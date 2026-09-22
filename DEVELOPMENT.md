@@ -36,6 +36,16 @@ device-facing Agent result must include the verified target context or its compa
 reminder so the target OS, interpreter, path style, working directory, and environment
 revision remain explicit after context compaction.
 
+`pab-platform` is the isolated native platform boundary used by Executor builds. Its
+first implementation detects the real Windows, macOS, or Linux OS version, CPU
+architecture, path style, and process default working directory without launching a
+shell. It produces a deterministic `native-v1` environment revision and leaves the
+interpreter empty until a concrete command selects and verifies one. `os_info` is
+exactly pinned with default features disabled; its target-specific system dependencies
+do not enter the server, Relay, protocol, or task-runtime build graphs. A command's
+requested working directory is task input and must not mutate the Executor process
+working directory or silently redefine the published base environment.
+
 `pab-agent-core` is the GUI-independent client boundary shared by Windows, macOS,
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
