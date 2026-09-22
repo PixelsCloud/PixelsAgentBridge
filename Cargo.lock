@@ -2418,6 +2418,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-executor"
+version = "0.1.0"
+dependencies = [
+ "iroh-base",
+ "pab-agent-core",
+ "pab-platform",
+ "pab-protocol",
+ "tempfile",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "pab-platform"
 version = "0.1.0"
 dependencies = [

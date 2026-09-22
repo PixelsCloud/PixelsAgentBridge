@@ -1,0 +1,16 @@
+[package]
+name = "pab-executor"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+iroh-base = { version = "=1.2.0", features = ["key"] }
+pab-agent-core = { path = "../agent-core" }
+pab-platform = { path = "../platform" }
+pab-protocol = { path = "../protocol" }
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

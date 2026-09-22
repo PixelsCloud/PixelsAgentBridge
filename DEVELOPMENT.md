@@ -57,6 +57,34 @@ authentication, and publishes current connection state through a Tokio watch cha
 for UI/Executor adapters. It does not persist account passwords or disable certificate
 verification.
 
+`pab-executor` is the first runnable, headless Executor entry point. It reads the
+deployment, tenant, device, WSS URL, endpoint-key file, and optional private CA from
+environment configuration; the endpoint secret itself is accepted only from a file.
+It detects the native environment, publishes `DeviceHello`, reports supervised
+connection-state changes, reconnects, and shuts down on the platform termination
+signal. It intentionally has no task execution path yet. Before the control service
+pushes task-sync messages, `pab-agent-core` must replace its heartbeat-owned receive
+loop with one multiplexed socket reader that routes pong and application frames; an
+application frame must never be treated as a protocol failure merely because it
+arrived while waiting for a heartbeat.
+
+Run the Debug Executor with a previously registered device endpoint:
+
+```powershell
+$env:PAB_DEPLOYMENT_ID = "<deployment UUID>"
+$env:PAB_TENANT_ID = "<tenant UUID>"
+$env:PAB_DEVICE_ID = "<device UUID>"
+$env:PAB_CONTROL_URL = "wss://server.example/control"
+$env:PAB_ENDPOINT_SECRET_FILE = "C:\protected\pab-endpoint.key"
+# Optional for a self-signed or private CA:
+$env:PAB_CONTROL_CA_CERT = "C:\protected\pab-ca.pem"
+cargo run -p pab-executor
+```
+
+The key file contains the 64 lowercase hexadecimal characters used by iroh's
+`SecretKey` representation, with an optional trailing newline. Do not pass the key as
+an environment value or print it in diagnostics.
+
 After a device endpoint authenticates, it publishes a versioned `DeviceHello` with
 its immutable deployment/tenant/device reference and current execution context.
 The server validates the endpoint principal and platform contract again, rechecks
