@@ -26,6 +26,16 @@ module when unrelated responsibilities or heavyweight dependencies start changin
 together; create another crate only when the dependency graph or independent build
 and test boundary justifies it.
 
+`pab-protocol` also owns the serialized target-platform and task contracts shared by
+Executor, Bridge, MCP, server, and UI adapters. `pab-task-runtime` is the small,
+dependency-light state projection boundary. It enforces task transitions, monotonic
+transfer progress and output ranges, and exact event-sequence recovery without
+depending on networking, a database, platform process APIs, or a GUI. Adapters must
+reuse this state model rather than defining their own task lifecycle. Every
+device-facing Agent result must include the verified target context or its compact
+reminder so the target OS, interpreter, path style, working directory, and environment
+revision remain explicit after context compaction.
+
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
 `PAB_DATABASE_URL` and use its initialization commands against an empty database:

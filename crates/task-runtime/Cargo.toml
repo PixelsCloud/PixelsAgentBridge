@@ -1,0 +1,10 @@
+[package]
+name = "pab-task-runtime"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pab-protocol = { path = "../protocol" }
+thiserror.workspace = true
+

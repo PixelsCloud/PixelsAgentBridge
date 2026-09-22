@@ -68,3 +68,4 @@ uuid_id!(DeviceId);
 uuid_id!(ConnectionId);
 uuid_id!(ChallengeId);
 uuid_id!(RequestId);
+uuid_id!(TaskId);
