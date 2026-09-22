@@ -20,3 +20,17 @@ only the TLS and QUIC listeners.
 
 Project design documents and local environment/server information are intentionally
 excluded from Git.
+
+The `pab-relay-probe` binary is a validation tool, not a production service. It can
+start an allowlisted TLS Relay and exercise the public Relay protocol or QUIC address
+discovery:
+
+```powershell
+cargo run --release --bin pab-relay-probe -- endpoint-id <32-byte-secret-hex>
+cargo run --release --bin pab-relay-probe -- ping <https-relay-url> <secret-hex>
+cargo run --release --bin pab-relay-probe -- qad <relay-ip:7842> <tls-server-name>
+```
+
+Run the binary without arguments to see the server, sender, and receiver forms. Probe
+keys and host-specific deployment automation belong under the ignored `.env/`
+directory and must not be committed.

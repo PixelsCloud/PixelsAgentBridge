@@ -3,6 +3,8 @@
 /docs/
 /README.md
 /target/
+/.build/
+/dist/
 /.idea/
 /.vscode/
 *.pdb
