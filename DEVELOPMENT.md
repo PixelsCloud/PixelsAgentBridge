@@ -51,12 +51,21 @@ TLS listener exposes the internal Relay policy WSS endpoint. Set a random
 `PAB_RELAY_CONTROL_SECRET` of at least 32 bytes on the server and provide the
 same secret to each trusted Relay node; it is never sent outside TLS or logged.
 
+The production Relay entry point is `cargo run -p pab-relay --bin pab-relay-server`.
+It requires `PAB_DEPLOYMENT_ID`, `PAB_CONTROL_URL` (a `wss://` URL),
+`PAB_RELAY_CONTROL_SECRET`, `PAB_RELAY_TLS_CERT`, and `PAB_RELAY_TLS_KEY`.
+`PAB_CONTROL_CA_CERT` adds trust for a self-signed control certificate. The Relay
+defaults to HTTPS on `127.0.0.1:31443`, QUIC on `0.0.0.0:7842`, and keeps iroh's
+captive portal on an automatically assigned loopback port. Public HTTPS and QUIC
+bind addresses can be set with `PAB_RELAY_HTTPS_ADDR` and `PAB_RELAY_QUIC_ADDR`.
+
 Relay nodes request a versioned full policy snapshot over the authenticated WSS
 channel. An unchanged response extends the snapshot lifetime without resetting
 rate buckets. A newer snapshot atomically replaces Endpoint ownership and removes
 revoked entries. Unknown endpoints, cross-tenant forwarding, and expired policy
-state fail closed. The production Relay service loop still needs to schedule these
-refreshes and reconnect the channel before packaging.
+state fail closed. The production Relay service refreshes every 20 seconds and
+reconnects with bounded exponential backoff; the in-memory policy still expires if
+the control service remains unavailable.
 
 The Relay integration tests use loopback listeners and a generated self-signed
 certificate. They verify explicit certificate trust, endpoint admission, and an

@@ -8,7 +8,10 @@ use pab_protocol::{
     EndpointRegistration, EndpointRegistrationResult, EndpointSignature, RelayLimitDefaults,
     RequestId,
 };
-use pab_relay::{PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState};
+use pab_relay::{
+    PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
+    start_relay_service,
+};
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth, control_router,
@@ -80,6 +83,11 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     );
 
     let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_owned()]).unwrap();
+    let certificate_directory = tempfile::tempdir().unwrap();
+    let certificate_path = certificate_directory.path().join("relay-cert.pem");
+    let private_key_path = certificate_directory.path().join("relay-key.pem");
+    std::fs::write(&certificate_path, certified.cert.pem()).unwrap();
+    std::fs::write(&private_key_path, certified.signing_key.serialize_pem()).unwrap();
     let certificate = certified.cert.der().clone();
     let tls = RustlsConfig::from_der(
         vec![certificate.to_vec()],
@@ -284,6 +292,35 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         relay_client.sync_policy(&relay_policy).await.unwrap(),
         PolicySync::Unchanged { policy_version }
     );
+
+    let running_relay = tokio::time::timeout(
+        Duration::from_secs(10),
+        start_relay_service(RelayServiceConfig {
+            deployment_id,
+            control_url: format!("wss://localhost:{}/relay-control", address.port()),
+            control_secret: RELAY_CONTROL_SECRET.to_owned(),
+            control_ca_cert: Some(certificate_path.clone()),
+            tls_cert: certificate_path,
+            tls_key: private_key_path,
+            https_bind: "127.0.0.1:0".parse().unwrap(),
+            captive_bind: "127.0.0.1:0".parse().unwrap(),
+            quic_bind: "127.0.0.1:0".parse().unwrap(),
+            policy_refresh_interval: Duration::from_secs(20),
+            reconnect_initial_delay: Duration::from_millis(50),
+            reconnect_max_delay: Duration::from_secs(1),
+            limiter_burst: Duration::from_millis(100),
+        }),
+    )
+    .await
+    .expect("production Relay startup timed out")
+    .unwrap();
+    assert!(running_relay.https_addr().unwrap().ip().is_loopback());
+    assert!(running_relay.quic_addr().unwrap().ip().is_loopback());
+    assert!(running_relay.captive_addr().unwrap().ip().is_loopback());
+    tokio::time::timeout(Duration::from_secs(5), running_relay.shutdown())
+        .await
+        .expect("production Relay shutdown timed out")
+        .unwrap();
 
     handle.graceful_shutdown(Some(Duration::from_secs(1)));
     tokio::time::timeout(Duration::from_secs(5), server)

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -42,6 +42,14 @@ macro_rules! uuid_id {
         impl From<Uuid> for $name {
             fn from(value: Uuid) -> Self {
                 Self::from_uuid(value)
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = uuid::Error;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                value.parse::<Uuid>().map(Self::from_uuid)
             }
         }
 

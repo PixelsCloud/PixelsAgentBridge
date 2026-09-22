@@ -33,6 +33,7 @@ uuid.workspace = true
 [dev-dependencies]
 pab-relay = { path = "../relay" }
 rcgen = "0.14"
+tempfile = "3"
 tokio-tungstenite = { version = "0.29", default-features = false, features = [
     "connect",
     "rustls-tls-webpki-roots",
