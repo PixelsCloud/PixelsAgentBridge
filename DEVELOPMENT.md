@@ -46,6 +46,15 @@ do not enter the server, Relay, protocol, or task-runtime build graphs. A comman
 requested working directory is task input and must not mutate the Executor process
 working directory or silently redefine the published base environment.
 
+`pab-transport` isolates the heavier pinned iroh 1.2.0 endpoint graph from protocol,
+server, and task-runtime crates. It starts from iroh's `Minimal` preset, supplies the
+registered endpoint key and the PAB ALPN, and requires at least one explicit HTTPS
+Relay URL. It does not enable n0's public Relay or DNS address lookup. Normal embedded
+root verification remains active and a deployment CA may be added; there is no
+certificate-verification bypass. Optional iroh metrics, port mapping, and Apple's fast
+datapath stay disabled until measurements justify their compile and runtime cost. UDP
+hole punching and TLS Relay fallback remain available without those features.
+
 `pab-agent-core` is the GUI-independent client boundary shared by Windows, macOS,
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control

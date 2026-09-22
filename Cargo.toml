@@ -7,6 +7,7 @@ members = [
     "crates/relay",
     "crates/server",
     "crates/task-runtime",
+    "crates/transport",
 ]
 resolver = "2"
 

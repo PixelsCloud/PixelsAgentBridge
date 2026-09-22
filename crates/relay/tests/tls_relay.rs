@@ -18,6 +18,7 @@ use iroh_relay::{
     tls::{CaTlsConfig, default_provider},
 };
 use n0_future::{SinkExt, StreamExt};
+use pab_transport::{PabEndpoint, PabEndpointConfig};
 use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -119,6 +120,63 @@ async fn relay_serves_health_over_trusted_self_signed_tls() {
         "unexpected response: {response}"
     );
 
+    server.shutdown().await.expect("clean relay shutdown");
+}
+
+#[tokio::test]
+async fn pab_iroh_endpoint_uses_only_the_configured_tls_relay() {
+    let endpoint_secret = SecretKey::from_bytes(&[31; 32]);
+    let endpoint_id = endpoint_secret.public();
+    let access = Arc::new(EndpointAllowlist {
+        allowed: HashSet::from([endpoint_id]),
+        seen: Mutex::new(Vec::new()),
+    });
+    let (certificates, server_tls) = testing::self_signed_tls_certs_and_config();
+    let mut relay = RelayConfig::new((Ipv4Addr::LOCALHOST, 0));
+    relay.tls = Some(TlsConfig::new(
+        (Ipv4Addr::LOCALHOST, 0),
+        CertConfig::Manual {
+            server_config: server_tls,
+        },
+    ));
+    relay.access = access.clone();
+    let mut server_config = ServerConfig::default();
+    server_config.relay = Some(relay);
+    let server = Server::spawn(server_config)
+        .await
+        .expect("TLS relay should start");
+    let relay_url: RelayUrl = format!(
+        "https://localhost:{}",
+        server.https_addr().expect("HTTPS listener").port()
+    )
+    .parse()
+    .expect("valid relay URL");
+    let endpoint_config = PabEndpointConfig::new(vec![relay_url.clone()])
+        .unwrap()
+        .with_extra_ca_certificates(certificates);
+
+    let endpoint = PabEndpoint::bind(endpoint_config, endpoint_secret)
+        .await
+        .expect("PAB endpoint binds");
+    let address = endpoint
+        .wait_online(Duration::from_secs(10))
+        .await
+        .expect("PAB endpoint reaches its configured relay");
+
+    assert_eq!(endpoint.id(), endpoint_id);
+    assert_eq!(
+        address.relay_urls().cloned().collect::<Vec<_>>(),
+        vec![relay_url]
+    );
+    assert!(
+        access
+            .seen
+            .lock()
+            .expect("seen lock")
+            .contains(&endpoint_id)
+    );
+
+    endpoint.close().await;
     server.shutdown().await.expect("clean relay shutdown");
 }
 
