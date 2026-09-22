@@ -36,6 +36,13 @@ device-facing Agent result must include the verified target context or its compa
 reminder so the target OS, interpreter, path style, working directory, and environment
 revision remain explicit after context compaction.
 
+`pab-agent-core` is the GUI-independent client boundary shared by Windows, macOS,
+and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
+`wss://`, uses normal certificate validation plus an optional private CA, caps control
+frames at 64 KiB, validates every challenge identity field before signing, and keeps
+the authenticated socket available for later heartbeat and task-sync protocols. It
+does not persist account passwords or disable certificate verification.
+
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
 `PAB_DATABASE_URL` and use its initialization commands against an empty database:

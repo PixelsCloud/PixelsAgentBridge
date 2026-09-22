@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use axum_server::tls_rustls::RustlsConfig;
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
+use pab_agent_core::{AuthenticatedControlConnection, EndpointControlConfig, tls_connector};
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
     EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
@@ -301,6 +302,28 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         }
     );
     drop(endpoint_socket);
+
+    let connector = tls_connector(Some(&std::fs::read(&certificate_path).unwrap())).unwrap();
+    let agent_config = EndpointControlConfig {
+        url: format!("wss://localhost:{}/control", address.port()),
+        deployment_id,
+        tenant_id: personal_tenant_id,
+        principal: EndpointProofPrincipal::User { user_id },
+        operation_timeout: Duration::from_secs(5),
+    };
+    let agent_connection =
+        AuthenticatedControlConnection::connect(&agent_config, &secret, connector.clone())
+            .await
+            .unwrap();
+    assert_eq!(
+        agent_connection.identity(),
+        EndpointAuthenticationResult {
+            tenant_id: personal_tenant_id,
+            endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
+            principal: EndpointProofPrincipal::User { user_id },
+        }
+    );
+    agent_connection.close().await.unwrap();
 
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),

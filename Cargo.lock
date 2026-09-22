@@ -2197,6 +2197,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
+name = "pab-agent-core"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "iroh-base",
+ "pab-protocol",
+ "rustls",
+ "rustls-pemfile",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-tungstenite",
+ "webpki-roots 1.0.9",
+]
+
+[[package]]
 name = "pab-protocol"
 version = "0.1.0"
 dependencies = [
@@ -2238,6 +2254,7 @@ dependencies = [
  "blake3",
  "futures-util",
  "iroh-base",
+ "pab-agent-core",
  "pab-protocol",
  "pab-relay",
  "rand_core 0.6.4",
