@@ -23,7 +23,7 @@ use iroh_relay::{
     tls::{CaTlsConfig, default_provider},
 };
 use n0_future::{SinkExt, StreamExt};
-use pab_protocol::{TrafficScope, mbps_to_bytes_per_second};
+use pab_protocol::{TenantId, TrafficScope, UserId, mbps_to_bytes_per_second};
 use pab_relay::{Acquire, AggregateLimiter, LimitKey, Rate};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -46,28 +46,22 @@ impl AccessControl for EndpointAllowlist {
 #[derive(Debug)]
 struct TeamForwarding {
     limiter: Mutex<AggregateLimiter>,
-    members: HashMap<EndpointId, u64>,
+    members: HashMap<EndpointId, UserId>,
 }
 
 impl TeamForwarding {
-    fn new(members: HashMap<EndpointId, u64>, team_mbps: u32, member_mbps: u32) -> Result<Self> {
+    fn new(members: HashMap<EndpointId, UserId>, team_mbps: u32, member_mbps: u32) -> Result<Self> {
         let now = Instant::now();
         let burst = Duration::from_millis(150);
+        let tenant_id = TenantId::from_u128(1);
         let mut limiter = AggregateLimiter::default();
         let team_rate =
             Rate::new(mbps_to_bytes_per_second(team_mbps), burst).ok_or("invalid Team rate")?;
         let member_rate =
             Rate::new(mbps_to_bytes_per_second(member_mbps), burst).ok_or("invalid member rate")?;
-        limiter.set_rate(LimitKey::Team(1), team_rate, now);
+        limiter.set_rate(LimitKey::Team(tenant_id), team_rate, now);
         for user_id in members.values().copied().collect::<HashSet<_>>() {
-            limiter.set_rate(
-                LimitKey::Member {
-                    team_id: 1,
-                    user_id,
-                },
-                member_rate,
-                now,
-            );
+            limiter.set_rate(LimitKey::Member { tenant_id, user_id }, member_rate, now);
         }
         Ok(Self {
             limiter: Mutex::new(limiter),
@@ -96,7 +90,7 @@ impl iroh_relay::server::ForwardingControl for TeamForwarding {
         };
         match self.limiter.lock().expect("limiter lock").acquire(
             TrafficScope::Team {
-                team_id: 1,
+                tenant_id: TenantId::from_u128(1),
                 user_id,
             },
             bytes,
@@ -168,7 +162,10 @@ async fn run_rate_server(args: &[String]) -> Result<()> {
             let (endpoint, user) = mapping
                 .split_once(':')
                 .ok_or("member mapping must be endpoint:user")?;
-            Ok((EndpointId::from_str(endpoint)?, user.parse::<u64>()?))
+            Ok((
+                EndpointId::from_str(endpoint)?,
+                UserId::from_u128(user.parse::<u128>()?),
+            ))
         })
         .collect::<Result<HashMap<_, _>>>()?;
     if members.is_empty() {

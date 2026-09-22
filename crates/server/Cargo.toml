@@ -1,0 +1,24 @@
+[package]
+name = "pab-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+argon2 = "0.5"
+pab-protocol = { path = "../protocol" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "macros",
+    "migrate",
+    "postgres",
+    "runtime-tokio-rustls",
+    "time",
+    "uuid",
+] }
+thiserror.workspace = true
+time = "0.3"
+tokio.workspace = true
+unicode-normalization = "0.1"
+uuid.workspace = true
+

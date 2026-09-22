@@ -3,13 +3,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pab_protocol::TrafficScope;
+use pab_protocol::{TenantId, TrafficScope, UserId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKey {
-    Team(u64),
-    Member { team_id: u64, user_id: u64 },
-    Personal(u64),
+    Team(TenantId),
+    Member {
+        tenant_id: TenantId,
+        user_id: UserId,
+    },
+    Personal(TenantId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,11 +106,11 @@ impl AggregateLimiter {
 
     pub fn acquire(&mut self, scope: TrafficScope, bytes: u64, now: Instant) -> Acquire {
         let keys: [Option<LimitKey>; 2] = match scope {
-            TrafficScope::Team { team_id, user_id } => [
-                Some(LimitKey::Team(team_id)),
-                Some(LimitKey::Member { team_id, user_id }),
+            TrafficScope::Team { tenant_id, user_id } => [
+                Some(LimitKey::Team(tenant_id)),
+                Some(LimitKey::Member { tenant_id, user_id }),
             ],
-            TrafficScope::Personal { user_id } => [Some(LimitKey::Personal(user_id)), None],
+            TrafficScope::Personal { tenant_id, .. } => [Some(LimitKey::Personal(tenant_id)), None],
         };
 
         let mut wait = Duration::ZERO;
@@ -149,35 +152,43 @@ mod tests {
         Rate::new(bytes_per_second, BURST).unwrap()
     }
 
+    fn tenant(value: u128) -> TenantId {
+        TenantId::from_u128(value)
+    }
+
+    fn user(value: u128) -> UserId {
+        UserId::from_u128(value)
+    }
+
     #[test]
     fn team_and_member_budgets_are_consumed_atomically() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Team(1), rate(1_000), now);
+        limiter.set_rate(LimitKey::Team(tenant(1)), rate(1_000), now);
         limiter.set_rate(
             LimitKey::Member {
-                team_id: 1,
-                user_id: 10,
+                tenant_id: tenant(1),
+                user_id: user(10),
             },
             rate(500),
             now,
         );
         let scope = TrafficScope::Team {
-            team_id: 1,
-            user_id: 10,
+            tenant_id: tenant(1),
+            user_id: user(10),
         };
 
         assert_eq!(limiter.acquire(scope, 50, now), Acquire::Ready);
         assert_eq!(limiter.acquire(scope, 1, now), Acquire::Wait(BURST / 50));
 
         let other_member = TrafficScope::Team {
-            team_id: 1,
-            user_id: 11,
+            tenant_id: tenant(1),
+            user_id: user(11),
         };
         limiter.set_rate(
             LimitKey::Member {
-                team_id: 1,
-                user_id: 11,
+                tenant_id: tenant(1),
+                user_id: user(11),
             },
             rate(500),
             now,
@@ -189,11 +200,11 @@ mod tests {
     fn waiting_on_member_does_not_consume_team_budget() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Team(1), rate(1_000), now);
-        for user_id in [10, 11] {
+        limiter.set_rate(LimitKey::Team(tenant(1)), rate(1_000), now);
+        for user_id in [user(10), user(11)] {
             limiter.set_rate(
                 LimitKey::Member {
-                    team_id: 1,
+                    tenant_id: tenant(1),
                     user_id,
                 },
                 rate(500),
@@ -201,12 +212,12 @@ mod tests {
             );
         }
         let first = TrafficScope::Team {
-            team_id: 1,
-            user_id: 10,
+            tenant_id: tenant(1),
+            user_id: user(10),
         };
         let second = TrafficScope::Team {
-            team_id: 1,
-            user_id: 11,
+            tenant_id: tenant(1),
+            user_id: user(11),
         };
         assert_eq!(limiter.acquire(first, 50, now), Acquire::Ready);
         assert!(matches!(limiter.acquire(first, 1, now), Acquire::Wait(_)));
@@ -217,8 +228,11 @@ mod tests {
     fn reconnects_share_the_same_personal_bucket() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Personal(7), rate(500), now);
-        let scope = TrafficScope::Personal { user_id: 7 };
+        limiter.set_rate(LimitKey::Personal(tenant(7)), rate(500), now);
+        let scope = TrafficScope::Personal {
+            tenant_id: tenant(7),
+            user_id: user(7),
+        };
         assert_eq!(limiter.acquire(scope, 50, now), Acquire::Ready);
         assert!(matches!(limiter.acquire(scope, 1, now), Acquire::Wait(_)));
     }
@@ -227,8 +241,11 @@ mod tests {
     fn rate_reduction_does_not_refill_the_bucket() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        let key = LimitKey::Personal(7);
-        let scope = TrafficScope::Personal { user_id: 7 };
+        let key = LimitKey::Personal(tenant(7));
+        let scope = TrafficScope::Personal {
+            tenant_id: tenant(7),
+            user_id: user(7),
+        };
         limiter.set_rate(key, rate(1_000), now);
         assert_eq!(limiter.acquire(scope, 80, now), Acquire::Ready);
         limiter.set_rate(key, rate(500), now);

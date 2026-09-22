@@ -1,6 +1,7 @@
 # Development
 
-Pixels Agent Bridge is currently validating its Relay and traffic-control foundations.
+Pixels Agent Bridge is currently validating its Relay, traffic-control, and PostgreSQL
+control-plane foundations.
 The Rust toolchain is pinned in `rust-toolchain.toml` and dependencies are locked in
 `Cargo.lock`.
 
@@ -11,6 +12,21 @@ cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
+It does not expose an insecure HTTP listener or issue bearer tokens. Set
+`PAB_DATABASE_URL` and use its initialization commands against an empty database:
+
+```powershell
+cargo run -p pab-server -- check
+cargo run -p pab-server -- migrate
+cargo run -p pab-server -- init
+```
+
+`init` is idempotent: it applies versioned schema files and creates the single
+deployment record with the current 20/4/5 Mbps defaults if it is absent. PostgreSQL
+integration tests use `DATABASE_URL`; SQLx creates and removes isolated test databases.
+Use a disposable PostgreSQL instance with database-creation privileges for those tests.
 
 The Relay integration tests use loopback listeners and a generated self-signed
 certificate. They verify explicit certificate trust, endpoint admission, and an
