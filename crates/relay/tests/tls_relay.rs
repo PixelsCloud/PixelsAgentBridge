@@ -1,8 +1,9 @@
 use std::{
     collections::HashSet,
     net::Ipv4Addr,
+    sync::atomic::{AtomicUsize, Ordering},
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use iroh_base::{EndpointId, RelayUrl, SecretKey};
@@ -11,8 +12,8 @@ use iroh_relay::{
     client::ClientBuilder,
     protos::relay::{ClientToRelayMsg, Datagrams, RelayToClientMsg},
     server::{
-        Access, AccessControl, CertConfig, ClientRequest, RelayConfig, Server, ServerConfig,
-        TlsConfig, testing,
+        Access, AccessControl, CertConfig, ClientRequest, ForwardingControl, ForwardingDecision,
+        RelayConfig, Server, ServerConfig, TlsConfig, testing,
     },
     tls::{CaTlsConfig, default_provider},
 };
@@ -40,6 +41,26 @@ impl AccessControl for EndpointAllowlist {
             Access::Deny {
                 reason: Some("endpoint is not registered".to_owned()),
             }
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct DelayFirstDatagram {
+    calls: AtomicUsize,
+    endpoints: Mutex<Vec<(EndpointId, EndpointId, usize)>>,
+}
+
+impl ForwardingControl for DelayFirstDatagram {
+    fn check(&self, src: EndpointId, dst: EndpointId, bytes: usize) -> ForwardingDecision {
+        self.endpoints
+            .lock()
+            .expect("endpoint lock")
+            .push((src, dst, bytes));
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            ForwardingDecision::Wait(Duration::from_millis(60))
+        } else {
+            ForwardingDecision::Allow
         }
     }
 }
@@ -179,6 +200,78 @@ async fn endpoint_admission_and_source_identity_survive_tls_forwarding() {
     assert!(seen.contains(&a_id));
     assert!(seen.contains(&b_id));
     assert!(seen.contains(&denied_id));
+    drop(client_a);
+    drop(client_b);
+    server.shutdown().await.expect("clean relay shutdown");
+}
+
+#[tokio::test]
+async fn forwarding_control_delays_with_both_endpoint_ids_visible() {
+    let a_secret = SecretKey::from_bytes(&[4; 32]);
+    let b_secret = SecretKey::from_bytes(&[5; 32]);
+    let a_id = a_secret.public();
+    let b_id = b_secret.public();
+    let forwarding = Arc::new(DelayFirstDatagram::default());
+
+    let (certificates, server_tls) = testing::self_signed_tls_certs_and_config();
+    let mut relay = RelayConfig::new((Ipv4Addr::LOCALHOST, 0));
+    relay.tls = Some(TlsConfig::new(
+        (Ipv4Addr::LOCALHOST, 0),
+        CertConfig::Manual {
+            server_config: server_tls,
+        },
+    ));
+    relay.forwarding = forwarding.clone();
+    let mut config = ServerConfig::default();
+    config.relay = Some(relay);
+    let server = Server::spawn(config).await.expect("TLS relay should start");
+    let relay_url: RelayUrl = format!(
+        "https://localhost:{}",
+        server.https_addr().expect("HTTPS listener").port()
+    )
+    .parse()
+    .expect("valid relay URL");
+    let client_tls = CaTlsConfig::custom_roots(certificates)
+        .client_config(default_provider())
+        .expect("custom test root");
+    let mut client_a = ClientBuilder::new(relay_url.clone(), a_secret, DnsResolver::new())
+        .tls_client_config(client_tls.clone())
+        .connect()
+        .await
+        .expect("endpoint A connected");
+    let mut client_b = ClientBuilder::new(relay_url, b_secret, DnsResolver::new())
+        .tls_client_config(client_tls)
+        .connect()
+        .await
+        .expect("endpoint B connected");
+
+    let payload = Datagrams::from("delayed by forwarding control");
+    let started = Instant::now();
+    client_a
+        .send(ClientToRelayMsg::Datagrams {
+            dst_endpoint_id: b_id,
+            datagrams: payload.clone(),
+        })
+        .await
+        .expect("send relay datagram");
+    let received = tokio::time::timeout(Duration::from_secs(2), client_b.next())
+        .await
+        .expect("relay receive timeout")
+        .expect("relay stream ended")
+        .expect("relay receive error");
+    assert!(started.elapsed() >= Duration::from_millis(50));
+    assert!(matches!(
+        received,
+        RelayToClientMsg::Datagrams { remote_endpoint_id, datagrams }
+            if remote_endpoint_id == a_id && datagrams == payload
+    ));
+    {
+        let observations = forwarding.endpoints.lock().expect("endpoint lock");
+        assert!(observations.len() >= 2);
+        assert!(observations.iter().all(|(src, dst, bytes)| *src == a_id
+            && *dst == b_id
+            && *bytes == payload.contents.len()));
+    }
     drop(client_a);
     drop(client_b);
     server.shutdown().await.expect("clean relay shutdown");
