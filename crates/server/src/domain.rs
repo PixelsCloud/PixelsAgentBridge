@@ -1,4 +1,4 @@
-use pab_protocol::{DeviceId, TenantId, UserId};
+use pab_protocol::{DeviceId, EndpointKey, EndpointProofPrincipal, TenantId, UserId};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -61,4 +61,11 @@ pub struct Device {
     pub id: DeviceId,
     pub tenant_id: TenantId,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RegisteredEndpoint {
+    pub endpoint_key: EndpointKey,
+    pub tenant_id: TenantId,
+    pub principal: EndpointProofPrincipal,
 }

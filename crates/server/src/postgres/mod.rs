@@ -1,16 +1,18 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
-    TrafficScope, UserId,
+    DeploymentId, DeviceId, EndpointKey, EndpointProofPrincipal, RELAY_POLICY_SCHEMA_VERSION,
+    RelayEndpointOwner, RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot,
+    TeamRelayLimits, TenantId, TrafficScope, UserId,
 };
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::domain::{Account, AccountCredential, Device, Team, TeamInvitation, TeamRole};
+use crate::domain::{
+    Account, AccountCredential, Device, RegisteredEndpoint, Team, TeamInvitation, TeamRole,
+};
 
 mod accounts;
 mod endpoints;

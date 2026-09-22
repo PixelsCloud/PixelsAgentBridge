@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DeploymentId, EndpointProofPurpose, RelayLimitDefaults, RelayPolicySnapshot, TenantId, UserId,
+    DeploymentId, EndpointProofPrincipal, EndpointProofPurpose, RelayLimitDefaults,
+    RelayPolicySnapshot, TenantId, UserId,
 };
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -9,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::{CredentialError, PasswordEngine, PasswordPolicy, normalize_username},
-    domain::{Account, Device, Team, TeamInvitation, TeamRole},
+    domain::{Account, Device, RegisteredEndpoint, Team, TeamInvitation, TeamRole},
     endpoint_proof::VerifiedEndpointProof,
     postgres::{PostgresStore, StoreError},
 };
@@ -127,9 +128,12 @@ impl ControlPlane {
         if proof.purpose() != EndpointProofPurpose::RegisterUserEndpoint {
             return Err(ServiceError::WrongEndpointProofPurpose);
         }
+        let EndpointProofPrincipal::User { user_id } = proof.principal() else {
+            return Err(ServiceError::WrongEndpointProofPrincipal);
+        };
         Ok(self
             .store
-            .register_user_endpoint(proof.user_id(), proof.tenant_id(), proof.endpoint_key())
+            .register_user_endpoint(user_id, proof.tenant_id(), proof.endpoint_key())
             .await?)
     }
 
@@ -141,15 +145,34 @@ impl ControlPlane {
         if proof.purpose() != EndpointProofPurpose::RegisterDevice {
             return Err(ServiceError::WrongEndpointProofPurpose);
         }
+        let EndpointProofPrincipal::User { user_id } = proof.principal() else {
+            return Err(ServiceError::WrongEndpointProofPrincipal);
+        };
         Ok(self
             .store
-            .register_device(
-                proof.user_id(),
-                proof.tenant_id(),
-                name,
-                proof.endpoint_key(),
-            )
+            .register_device(user_id, proof.tenant_id(), name, proof.endpoint_key())
             .await?)
+    }
+
+    pub async fn authenticate_registered_endpoint(
+        &self,
+        proof: VerifiedEndpointProof,
+    ) -> Result<RegisteredEndpoint, ServiceError> {
+        if proof.purpose() != EndpointProofPurpose::AuthenticateRegisteredEndpoint {
+            return Err(ServiceError::WrongEndpointProofPurpose);
+        }
+        let endpoint = self.store.registered_endpoint(proof.endpoint_key()).await?;
+        if endpoint.tenant_id != proof.tenant_id() || endpoint.principal != proof.principal() {
+            return Err(ServiceError::EndpointIdentityChanged);
+        }
+        Ok(endpoint)
+    }
+
+    pub async fn registered_endpoint(
+        &self,
+        endpoint_key: pab_protocol::EndpointKey,
+    ) -> Result<RegisteredEndpoint, ServiceError> {
+        Ok(self.store.registered_endpoint(endpoint_key).await?)
     }
 
     pub async fn relay_policy_snapshot(
@@ -166,6 +189,10 @@ pub enum ServiceError {
     InvalidCredentials,
     #[error("endpoint proof was issued for a different operation")]
     WrongEndpointProofPurpose,
+    #[error("endpoint proof principal does not match the operation")]
+    WrongEndpointProofPrincipal,
+    #[error("registered endpoint identity changed while authentication was in progress")]
+    EndpointIdentityChanged,
     #[error(transparent)]
     Credential(#[from] CredentialError),
     #[error(transparent)]

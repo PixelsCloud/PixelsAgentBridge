@@ -4,7 +4,8 @@ use axum_server::tls_rustls::RustlsConfig;
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeploymentId, EndpointKey, EndpointProofResponse,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
+    EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
     EndpointRegistration, EndpointRegistrationResult, EndpointSignature, RelayLimitDefaults,
     RequestId,
 };
@@ -179,7 +180,10 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             challenge,
         } => {
             assert_eq!(request_id, begin_request_id);
-            assert_eq!(challenge.user_id, user_id);
+            assert_eq!(
+                challenge.principal,
+                EndpointProofPrincipal::User { user_id }
+            );
             assert!(!challenge.connection_id.as_uuid().is_nil());
             challenge
         }
@@ -215,6 +219,88 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     }
 
     drop(socket);
+
+    let (mut endpoint_socket, _) = tokio::time::timeout(
+        Duration::from_secs(5),
+        connect_async_tls_with_config(
+            format!("wss://localhost:{}/control", address.port()),
+            None,
+            false,
+            Some(connector.clone()),
+        ),
+    )
+    .await
+    .expect("endpoint WSS connection timed out")
+    .unwrap();
+    let authenticate_request_id = RequestId::new();
+    send(
+        &mut endpoint_socket,
+        &ControlClientMessage::BeginEndpointAuthentication {
+            request_id: authenticate_request_id,
+            endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
+        },
+    )
+    .await;
+    let authentication_challenge = match receive(&mut endpoint_socket).await {
+        ControlServerMessage::EndpointChallenge {
+            request_id,
+            challenge,
+        } => {
+            assert_eq!(request_id, authenticate_request_id);
+            assert_eq!(
+                challenge.principal,
+                EndpointProofPrincipal::User { user_id }
+            );
+            challenge
+        }
+        response => panic!("unexpected endpoint challenge response: {response:?}"),
+    };
+    let conflicting_login_request_id = RequestId::new();
+    send(
+        &mut endpoint_socket,
+        &ControlClientMessage::Login {
+            request_id: conflicting_login_request_id,
+            username: "alice".to_owned(),
+            password: "correct horse battery staple".to_owned(),
+        },
+    )
+    .await;
+    assert!(matches!(
+        receive(&mut endpoint_socket).await,
+        ControlServerMessage::Error {
+            request_id: Some(request_id),
+            code: ControlErrorCode::InvalidState,
+            ..
+        } if request_id == conflicting_login_request_id
+    ));
+    let complete_authentication_request_id = RequestId::new();
+    send(
+        &mut endpoint_socket,
+        &ControlClientMessage::CompleteEndpointAuthentication {
+            request_id: complete_authentication_request_id,
+            proof: EndpointProofResponse {
+                challenge_id: authentication_challenge.challenge_id,
+                signature: EndpointSignature::from_bytes(
+                    secret
+                        .sign(&authentication_challenge.signing_message())
+                        .to_bytes(),
+                ),
+            },
+        },
+    )
+    .await;
+    assert_eq!(
+        receive(&mut endpoint_socket).await,
+        ControlServerMessage::EndpointAuthenticated {
+            request_id: complete_authentication_request_id,
+            result: EndpointAuthenticationResult {
+                tenant_id: personal_tenant_id,
+                endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
+                principal: EndpointProofPrincipal::User { user_id },
+            },
+        }
+    );
+    drop(endpoint_socket);
 
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),

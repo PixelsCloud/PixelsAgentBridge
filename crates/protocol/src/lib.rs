@@ -9,12 +9,12 @@ mod relay_policy;
 mod task;
 
 pub use control::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointRegistration,
-    EndpointRegistrationResult,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
+    EndpointRegistration, EndpointRegistrationResult,
 };
 pub use endpoint_proof::{
     ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey, EndpointProofChallenge, EndpointProofContractError,
-    EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
+    EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
 };
 pub use ids::{
     ChallengeId, ConnectionId, DeploymentId, DeviceId, RequestId, TaskId, TenantId, UserId,

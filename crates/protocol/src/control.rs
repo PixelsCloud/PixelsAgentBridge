@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    DeviceId, EndpointKey, EndpointProofChallenge, EndpointProofResponse, RequestId, TenantId,
-    UserId,
+    DeviceId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse,
+    RequestId, TenantId, UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -28,6 +28,14 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         proof: EndpointProofResponse,
     },
+    BeginEndpointAuthentication {
+        request_id: RequestId,
+        endpoint_key: EndpointKey,
+    },
+    CompleteEndpointAuthentication {
+        request_id: RequestId,
+        proof: EndpointProofResponse,
+    },
 }
 
 impl ControlClientMessage {
@@ -36,7 +44,9 @@ impl ControlClientMessage {
             Self::RegisterAccount { request_id, .. }
             | Self::Login { request_id, .. }
             | Self::BeginEndpointRegistration { request_id, .. }
-            | Self::CompleteEndpointRegistration { request_id, .. } => *request_id,
+            | Self::CompleteEndpointRegistration { request_id, .. }
+            | Self::BeginEndpointAuthentication { request_id, .. }
+            | Self::CompleteEndpointAuthentication { request_id, .. } => *request_id,
         }
     }
 }
@@ -65,11 +75,22 @@ pub enum ControlServerMessage {
         request_id: RequestId,
         result: EndpointRegistrationResult,
     },
+    EndpointAuthenticated {
+        request_id: RequestId,
+        result: EndpointAuthenticationResult,
+    },
     Error {
         request_id: Option<RequestId>,
         code: ControlErrorCode,
         message: String,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EndpointAuthenticationResult {
+    pub tenant_id: TenantId,
+    pub endpoint_key: EndpointKey,
+    pub principal: EndpointProofPrincipal,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

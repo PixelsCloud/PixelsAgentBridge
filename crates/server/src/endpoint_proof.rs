@@ -3,8 +3,8 @@ use std::time::Duration;
 use iroh_base::{PublicKey, Signature};
 use pab_protocol::{
     ChallengeId, ConnectionId, DeploymentId, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey,
-    EndpointProofChallenge, EndpointProofContractError, EndpointProofPurpose,
-    EndpointProofResponse, TenantId, UserId,
+    EndpointProofChallenge, EndpointProofContractError, EndpointProofPrincipal,
+    EndpointProofPurpose, EndpointProofResponse, TenantId,
 };
 use rand_core::{OsRng, RngCore};
 use thiserror::Error;
@@ -34,7 +34,7 @@ impl EndpointProofSession {
 
     pub fn issue(
         &mut self,
-        user_id: UserId,
+        principal: EndpointProofPrincipal,
         tenant_id: TenantId,
         endpoint_key: EndpointKey,
         purpose: EndpointProofPurpose,
@@ -59,7 +59,7 @@ impl EndpointProofSession {
             challenge_id: ChallengeId::new(),
             deployment_id: self.deployment_id,
             connection_id: self.connection_id,
-            user_id,
+            principal,
             tenant_id,
             endpoint_key,
             purpose,
@@ -101,8 +101,8 @@ pub struct VerifiedEndpointProof {
 }
 
 impl VerifiedEndpointProof {
-    pub const fn user_id(&self) -> UserId {
-        self.challenge.user_id
+    pub const fn principal(&self) -> EndpointProofPrincipal {
+        self.challenge.principal
     }
 
     pub const fn tenant_id(&self) -> TenantId {
@@ -149,7 +149,7 @@ pub enum EndpointProofError {
 mod tests {
     use super::*;
     use iroh_base::SecretKey;
-    use pab_protocol::EndpointSignature;
+    use pab_protocol::{EndpointSignature, UserId};
 
     fn endpoint(secret: &SecretKey) -> EndpointKey {
         EndpointKey::new(*secret.public().as_bytes())
@@ -171,7 +171,9 @@ mod tests {
         let mut session = EndpointProofSession::new(DeploymentId::new());
         let challenge = session
             .issue(
-                UserId::new(),
+                EndpointProofPrincipal::User {
+                    user_id: UserId::new(),
+                },
                 TenantId::new(),
                 endpoint(&secret),
                 EndpointProofPurpose::RegisterUserEndpoint,
@@ -195,7 +197,9 @@ mod tests {
         let mut session = EndpointProofSession::new(DeploymentId::new());
         let challenge = session
             .issue(
-                UserId::new(),
+                EndpointProofPrincipal::User {
+                    user_id: UserId::new(),
+                },
                 TenantId::new(),
                 endpoint(&claimed),
                 EndpointProofPurpose::RegisterDevice,
@@ -220,7 +224,9 @@ mod tests {
         let mut session = EndpointProofSession::new(DeploymentId::new());
         let challenge = session
             .issue(
-                UserId::new(),
+                EndpointProofPrincipal::Device {
+                    device_id: pab_protocol::DeviceId::new(),
+                },
                 TenantId::new(),
                 endpoint(&secret),
                 EndpointProofPurpose::AuthenticateRegisteredEndpoint,

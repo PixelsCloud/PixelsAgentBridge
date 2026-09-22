@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DeploymentId, EndpointKey, EndpointProofChallenge, EndpointProofPurpose, EndpointProofResponse,
-    EndpointSignature, RelayEndpointOwner, RelayLimitDefaults, TenantId, TrafficScope, UserId,
+    DeploymentId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RelayEndpointOwner,
+    RelayLimitDefaults, TenantId, TrafficScope, UserId,
 };
 use pab_server::{ControlPlane, PasswordPolicy, PostgresStore, ServiceError, StoreError, TeamRole};
 use sqlx::PgPool;
@@ -16,11 +17,27 @@ fn prove_endpoint(
     purpose: EndpointProofPurpose,
     secret: &SecretKey,
 ) -> pab_server::VerifiedEndpointProof {
+    prove_endpoint_principal(
+        deployment_id,
+        EndpointProofPrincipal::User { user_id },
+        tenant_id,
+        purpose,
+        secret,
+    )
+}
+
+fn prove_endpoint_principal(
+    deployment_id: DeploymentId,
+    principal: EndpointProofPrincipal,
+    tenant_id: TenantId,
+    purpose: EndpointProofPurpose,
+    secret: &SecretKey,
+) -> pab_server::VerifiedEndpointProof {
     let now = OffsetDateTime::now_utc();
     let mut session = pab_server::EndpointProofSession::new(deployment_id);
     let challenge = session
         .issue(
-            user_id,
+            principal,
             tenant_id,
             EndpointKey::new(*secret.public().as_bytes()),
             purpose,
@@ -195,4 +212,44 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             .all(|endpoint| endpoint.owner.tenant_id() != TenantId::from_u128(0))
     );
     snapshot.validate().unwrap();
+
+    let authenticated_device = control
+        .authenticate_registered_endpoint(prove_endpoint_principal(
+            deployment_id,
+            EndpointProofPrincipal::Device {
+                device_id: device.id,
+            },
+            team.tenant_id,
+            EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+            &device_key,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(authenticated_device.tenant_id, team.tenant_id);
+    assert_eq!(
+        authenticated_device.principal,
+        EndpointProofPrincipal::Device {
+            device_id: device.id,
+        }
+    );
+
+    sqlx::query("UPDATE devices SET status = 'disabled' WHERE id = $1")
+        .bind(device.id.as_uuid())
+        .execute(control.store().pool())
+        .await
+        .unwrap();
+    assert!(matches!(
+        control
+            .authenticate_registered_endpoint(prove_endpoint_principal(
+                deployment_id,
+                EndpointProofPrincipal::Device {
+                    device_id: device.id,
+                },
+                team.tenant_id,
+                EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+                &device_key,
+            ))
+            .await,
+        Err(ServiceError::Store(StoreError::NotFound))
+    ));
 }

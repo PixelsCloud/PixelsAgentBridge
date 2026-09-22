@@ -2,14 +2,15 @@ use std::time::Duration;
 
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
-    EndpointProofPurpose, EndpointRegistration, EndpointRegistrationResult, RequestId,
+    EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
+    EndpointRegistration, EndpointRegistrationResult, RequestId,
 };
 use time::OffsetDateTime;
 
 use super::ControlApiConfig;
 use crate::{
     ControlPlane, EndpointProofError, EndpointProofSession, ServiceError, StoreError,
-    domain::Account,
+    domain::{Account, RegisteredEndpoint},
 };
 
 const ENDPOINT_CHALLENGE_VALIDITY: Duration = Duration::from_secs(30);
@@ -20,12 +21,19 @@ enum PendingRegistration {
     Device { name: String },
 }
 
+#[derive(Debug, Clone)]
+enum PendingProof {
+    Registration(PendingRegistration),
+    Authentication,
+}
+
 pub struct ControlSession {
     control: ControlPlane,
     config: ControlApiConfig,
     proof_session: EndpointProofSession,
     account: Option<Account>,
-    pending_registration: Option<PendingRegistration>,
+    endpoint: Option<RegisteredEndpoint>,
+    pending_proof: Option<PendingProof>,
 }
 
 impl ControlSession {
@@ -39,12 +47,13 @@ impl ControlSession {
             config,
             proof_session: EndpointProofSession::new(deployment_id),
             account: None,
-            pending_registration: None,
+            endpoint: None,
+            pending_proof: None,
         }
     }
 
     pub const fn is_authenticated(&self) -> bool {
-        self.account.is_some()
+        self.account.is_some() || self.endpoint.is_some()
     }
 
     pub async fn handle(&mut self, message: ControlClientMessage) -> ControlServerMessage {
@@ -74,6 +83,17 @@ impl ControlSession {
                 .complete_endpoint_registration(proof)
                 .await
                 .map(|result| ControlServerMessage::EndpointRegistered { request_id, result }),
+            ControlClientMessage::BeginEndpointAuthentication { endpoint_key, .. } => self
+                .begin_endpoint_authentication(endpoint_key)
+                .await
+                .map(|challenge| ControlServerMessage::EndpointChallenge {
+                    request_id,
+                    challenge,
+                }),
+            ControlClientMessage::CompleteEndpointAuthentication { proof, .. } => self
+                .complete_endpoint_authentication(proof)
+                .await
+                .map(|result| ControlServerMessage::EndpointAuthenticated { request_id, result }),
         };
         match result {
             Ok(response) => response,
@@ -87,8 +107,11 @@ impl ControlSession {
         username: &str,
         password: &str,
     ) -> Result<ControlServerMessage, ControlSessionError> {
-        if self.account.is_some() {
+        if self.is_authenticated() {
             return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
         }
         if !self.config.registration_enabled {
             return Err(ControlSessionError::RegistrationDisabled);
@@ -104,8 +127,11 @@ impl ControlSession {
         username: &str,
         password: &str,
     ) -> Result<ControlServerMessage, ControlSessionError> {
-        if self.account.is_some() {
+        if self.is_authenticated() {
             return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
         }
         let account = self.control.authenticate(username, password).await?;
         self.account = Some(account.clone());
@@ -122,6 +148,9 @@ impl ControlSession {
             .account
             .as_ref()
             .ok_or(ControlSessionError::NotAuthenticated)?;
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
+        }
         let (purpose, pending) = match registration {
             EndpointRegistration::User => (
                 EndpointProofPurpose::RegisterUserEndpoint,
@@ -133,14 +162,16 @@ impl ControlSession {
             ),
         };
         let challenge = self.proof_session.issue(
-            account.id,
+            EndpointProofPrincipal::User {
+                user_id: account.id,
+            },
             tenant_id,
             endpoint_key,
             purpose,
             OffsetDateTime::now_utc(),
             ENDPOINT_CHALLENGE_VALIDITY,
         )?;
-        self.pending_registration = Some(pending);
+        self.pending_proof = Some(PendingProof::Registration(pending));
         Ok(challenge)
     }
 
@@ -149,9 +180,12 @@ impl ControlSession {
         response: pab_protocol::EndpointProofResponse,
     ) -> Result<EndpointRegistrationResult, ControlSessionError> {
         let pending = self
-            .pending_registration
+            .pending_proof
             .take()
             .ok_or(ControlSessionError::NoPendingRegistration)?;
+        let PendingProof::Registration(pending) = pending else {
+            return Err(ControlSessionError::NoPendingRegistration);
+        };
         let proof = self
             .proof_session
             .verify(response, OffsetDateTime::now_utc())?;
@@ -173,6 +207,76 @@ impl ControlSession {
                     endpoint_key,
                 })
             }
+        }
+    }
+
+    async fn begin_endpoint_authentication(
+        &mut self,
+        endpoint_key: EndpointKey,
+    ) -> Result<pab_protocol::EndpointProofChallenge, ControlSessionError> {
+        if self.is_authenticated() {
+            return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
+        }
+        let endpoint = self
+            .control
+            .registered_endpoint(endpoint_key)
+            .await
+            .map_err(ControlSessionError::endpoint_authentication)?;
+        let challenge = self.proof_session.issue(
+            endpoint.principal,
+            endpoint.tenant_id,
+            endpoint.endpoint_key,
+            EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+            OffsetDateTime::now_utc(),
+            ENDPOINT_CHALLENGE_VALIDITY,
+        )?;
+        self.pending_proof = Some(PendingProof::Authentication);
+        Ok(challenge)
+    }
+
+    async fn complete_endpoint_authentication(
+        &mut self,
+        response: pab_protocol::EndpointProofResponse,
+    ) -> Result<EndpointAuthenticationResult, ControlSessionError> {
+        if self.is_authenticated() {
+            return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        let pending = self
+            .pending_proof
+            .take()
+            .ok_or(ControlSessionError::NoPendingAuthentication)?;
+        if !matches!(pending, PendingProof::Authentication) {
+            return Err(ControlSessionError::NoPendingAuthentication);
+        }
+        let proof = self
+            .proof_session
+            .verify(response, OffsetDateTime::now_utc())?;
+        let endpoint = self
+            .control
+            .authenticate_registered_endpoint(proof)
+            .await
+            .map_err(ControlSessionError::endpoint_authentication)?;
+        let result = EndpointAuthenticationResult {
+            tenant_id: endpoint.tenant_id,
+            endpoint_key: endpoint.endpoint_key,
+            principal: endpoint.principal,
+        };
+        self.endpoint = Some(endpoint);
+        Ok(result)
+    }
+}
+
+impl ControlSessionError {
+    fn endpoint_authentication(error: ServiceError) -> Self {
+        match error {
+            ServiceError::Store(StoreError::NotFound)
+            | ServiceError::WrongEndpointProofPurpose
+            | ServiceError::WrongEndpointProofPrincipal
+            | ServiceError::EndpointIdentityChanged => Self::EndpointAuthenticationFailed,
+            other => Self::Service(other),
         }
     }
 }
@@ -207,6 +311,18 @@ fn error_response(
             ControlErrorCode::InvalidState,
             "no endpoint registration is pending".to_owned(),
         ),
+        ControlSessionError::NoPendingAuthentication => (
+            ControlErrorCode::InvalidState,
+            "no endpoint authentication is pending".to_owned(),
+        ),
+        ControlSessionError::ProofPending => (
+            ControlErrorCode::InvalidState,
+            "an endpoint proof challenge is already pending".to_owned(),
+        ),
+        ControlSessionError::EndpointAuthenticationFailed => (
+            ControlErrorCode::InvalidCredentials,
+            "endpoint authentication failed".to_owned(),
+        ),
         ControlSessionError::EndpointProof(_) => (
             ControlErrorCode::InvalidCredentials,
             "endpoint proof was rejected".to_owned(),
@@ -218,6 +334,14 @@ fn error_response(
         ControlSessionError::Service(ServiceError::WrongEndpointProofPurpose) => (
             ControlErrorCode::InvalidMessage,
             "endpoint proof purpose does not match the operation".to_owned(),
+        ),
+        ControlSessionError::Service(ServiceError::WrongEndpointProofPrincipal) => (
+            ControlErrorCode::InvalidMessage,
+            "endpoint proof principal does not match the operation".to_owned(),
+        ),
+        ControlSessionError::Service(ServiceError::EndpointIdentityChanged) => (
+            ControlErrorCode::InvalidCredentials,
+            "endpoint authentication failed".to_owned(),
         ),
         ControlSessionError::Service(ServiceError::Store(StoreError::PermissionDenied)) => (
             ControlErrorCode::PermissionDenied,
@@ -256,6 +380,12 @@ enum ControlSessionError {
     RegistrationDisabled,
     #[error("no endpoint registration is pending")]
     NoPendingRegistration,
+    #[error("no endpoint authentication is pending")]
+    NoPendingAuthentication,
+    #[error("an endpoint proof challenge is already pending")]
+    ProofPending,
+    #[error("endpoint authentication failed")]
+    EndpointAuthenticationFailed,
     #[error(transparent)]
     EndpointProof(#[from] EndpointProofError),
     #[error(transparent)]

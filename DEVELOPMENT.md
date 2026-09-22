@@ -51,11 +51,14 @@ deployment record with the current 20/4/5 Mbps defaults if it is absent. Postgre
 integration tests use `DATABASE_URL`; SQLx creates and removes isolated test databases.
 Use a disposable PostgreSQL instance with database-creation privileges for those tests.
 
-Endpoint registration accepts a one-time proof signed by the same Ed25519 secret key
-that produces the iroh Endpoint ID. The proof binds the deployment, connection,
-account, tenant, purpose, nonce, and short validity window. A TLS-only WSS control
-service now owns each proof session and supports account registration, login, and
-endpoint registration. Configure `PAB_TLS_CERT`, `PAB_TLS_KEY`, and optionally
+Endpoint registration and reconnect authentication use a one-time proof signed by
+the same Ed25519 secret key that produces the iroh Endpoint ID. Proof schema v2 binds
+the deployment, connection, typed user-or-device principal, tenant, purpose, nonce,
+and short validity window. A TLS-only WSS control service owns each proof session and
+supports account registration, login, endpoint registration, and password-free
+reconnects for active registered endpoints. It rechecks PostgreSQL after signature
+verification so revoked endpoints and disabled owners fail authentication. Configure
+`PAB_TLS_CERT`, `PAB_TLS_KEY`, and optionally
 `PAB_LISTEN_ADDR` before running `cargo run -p pab-server -- serve`. The same
 TLS listener exposes the internal Relay policy WSS endpoint. Set a random
 `PAB_RELAY_CONTROL_SECRET` of at least 32 bytes on the server and provide the

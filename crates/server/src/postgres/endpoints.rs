@@ -1,6 +1,55 @@
 use super::*;
 
 impl PostgresStore {
+    pub async fn registered_endpoint(
+        &self,
+        endpoint_key: EndpointKey,
+    ) -> Result<RegisteredEndpoint, StoreError> {
+        let row = sqlx::query(
+            r#"
+            SELECT e.tenant_id, e.owner_kind, e.user_id, e.device_id
+            FROM endpoints e
+            JOIN tenants tenant ON tenant.id = e.tenant_id AND tenant.status = 'active'
+            LEFT JOIN users u ON u.id = e.user_id
+            LEFT JOIN memberships m
+                   ON m.tenant_id = e.tenant_id AND m.user_id = e.user_id
+            LEFT JOIN devices device
+                   ON device.tenant_id = e.tenant_id AND device.id = e.device_id
+            WHERE e.endpoint_key = $1
+              AND e.status = 'active'
+              AND (
+                  (e.owner_kind = 'user' AND u.status = 'active' AND m.status = 'active')
+                  OR
+                  (e.owner_kind = 'device' AND device.status = 'active')
+              )
+            "#,
+        )
+        .bind(endpoint_key.as_bytes().as_slice())
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or(StoreError::NotFound)?;
+        let tenant_id = TenantId::from_uuid(row.try_get("tenant_id")?);
+        let owner_kind: String = row.try_get("owner_kind")?;
+        let principal = match owner_kind.as_str() {
+            "user" => EndpointProofPrincipal::User {
+                user_id: UserId::from_uuid(row.try_get("user_id")?),
+            },
+            "device" => EndpointProofPrincipal::Device {
+                device_id: DeviceId::from_uuid(row.try_get("device_id")?),
+            },
+            other => {
+                return Err(StoreError::InvalidData(format!(
+                    "unknown endpoint owner kind {other}"
+                )));
+            }
+        };
+        Ok(RegisteredEndpoint {
+            endpoint_key,
+            tenant_id,
+            principal,
+        })
+    }
+
     pub async fn register_user_endpoint(
         &self,
         actor: UserId,

@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ChallengeId, ConnectionId, DeploymentId, TenantId, UserId};
+use crate::{ChallengeId, ConnectionId, DeploymentId, DeviceId, TenantId, UserId};
 
-pub const ENDPOINT_PROOF_SCHEMA_VERSION: u16 = 1;
-const ENDPOINT_PROOF_DOMAIN: &str = "pixels-agent-bridge endpoint proof v1";
+pub const ENDPOINT_PROOF_SCHEMA_VERSION: u16 = 2;
+const ENDPOINT_PROOF_DOMAIN: &str = "pixels-agent-bridge endpoint proof v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -62,13 +62,35 @@ impl EndpointProofPurpose {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum EndpointProofPrincipal {
+    User { user_id: UserId },
+    Device { device_id: DeviceId },
+}
+
+impl EndpointProofPrincipal {
+    fn encode(self, context: &mut Vec<u8>) {
+        match self {
+            Self::User { user_id } => {
+                context.push(1);
+                context.extend_from_slice(user_id.as_uuid().as_bytes());
+            }
+            Self::Device { device_id } => {
+                context.push(2);
+                context.extend_from_slice(device_id.as_uuid().as_bytes());
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EndpointProofChallenge {
     pub schema_version: u16,
     pub challenge_id: ChallengeId,
     pub deployment_id: DeploymentId,
     pub connection_id: ConnectionId,
-    pub user_id: UserId,
+    pub principal: EndpointProofPrincipal,
     pub tenant_id: TenantId,
     pub endpoint_key: EndpointKey,
     pub purpose: EndpointProofPurpose,
@@ -79,12 +101,12 @@ pub struct EndpointProofChallenge {
 
 impl EndpointProofChallenge {
     pub fn signing_message(&self) -> [u8; 32] {
-        let mut context = Vec::with_capacity(163);
+        let mut context = Vec::with_capacity(164);
         context.extend_from_slice(&self.schema_version.to_be_bytes());
         context.extend_from_slice(self.challenge_id.as_uuid().as_bytes());
         context.extend_from_slice(self.deployment_id.as_uuid().as_bytes());
         context.extend_from_slice(self.connection_id.as_uuid().as_bytes());
-        context.extend_from_slice(self.user_id.as_uuid().as_bytes());
+        self.principal.encode(&mut context);
         context.extend_from_slice(self.tenant_id.as_uuid().as_bytes());
         context.extend_from_slice(self.endpoint_key.as_bytes());
         context.push(self.purpose.tag());
@@ -129,4 +151,37 @@ pub enum EndpointProofContractError {
     NotYetValid,
     #[error("endpoint proof challenge has expired")]
     Expired,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn challenge(principal: EndpointProofPrincipal) -> EndpointProofChallenge {
+        EndpointProofChallenge {
+            schema_version: ENDPOINT_PROOF_SCHEMA_VERSION,
+            challenge_id: ChallengeId::from_u128(1),
+            deployment_id: DeploymentId::from_u128(2),
+            connection_id: ConnectionId::from_u128(3),
+            principal,
+            tenant_id: TenantId::from_u128(4),
+            endpoint_key: EndpointKey::new([5; 32]),
+            purpose: EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+            issued_at_unix_ms: 1_000,
+            expires_at_unix_ms: 2_000,
+            nonce: [6; 32],
+        }
+    }
+
+    #[test]
+    fn signing_message_binds_the_typed_principal() {
+        let user = challenge(EndpointProofPrincipal::User {
+            user_id: UserId::from_u128(7),
+        });
+        let device = challenge(EndpointProofPrincipal::Device {
+            device_id: DeviceId::from_u128(7),
+        });
+
+        assert_ne!(user.signing_message(), device.signing_message());
+    }
 }
