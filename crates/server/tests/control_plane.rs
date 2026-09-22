@@ -1,11 +1,49 @@
 use std::time::Duration;
 
+use iroh_base::SecretKey;
 use pab_protocol::{
-    DeploymentId, EndpointKey, RelayEndpointOwner, RelayLimitDefaults, TenantId, TrafficScope,
+    DeploymentId, EndpointKey, EndpointProofChallenge, EndpointProofPurpose, EndpointProofResponse,
+    EndpointSignature, RelayEndpointOwner, RelayLimitDefaults, TenantId, TrafficScope, UserId,
 };
 use pab_server::{ControlPlane, PasswordPolicy, PostgresStore, ServiceError, StoreError, TeamRole};
 use sqlx::PgPool;
 use time::OffsetDateTime;
+
+fn prove_endpoint(
+    deployment_id: DeploymentId,
+    user_id: UserId,
+    tenant_id: TenantId,
+    purpose: EndpointProofPurpose,
+    secret: &SecretKey,
+) -> pab_server::VerifiedEndpointProof {
+    let now = OffsetDateTime::now_utc();
+    let mut session = pab_server::EndpointProofSession::new(deployment_id);
+    let challenge = session
+        .issue(
+            user_id,
+            tenant_id,
+            EndpointKey::new(*secret.public().as_bytes()),
+            purpose,
+            now,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+    session
+        .verify(signed_response(secret, &challenge), now)
+        .unwrap()
+}
+
+fn signed_response(
+    secret: &SecretKey,
+    challenge: &EndpointProofChallenge,
+) -> EndpointProofResponse {
+    EndpointProofResponse {
+        challenge_id: challenge.challenge_id,
+        signature: EndpointSignature::from_bytes(
+            secret.sign(&challenge.signing_message()).to_bytes(),
+        ),
+    }
+}
 
 #[sqlx::test(migrations = "./migrations")]
 async fn account_team_device_and_policy_flow(pool: PgPool) {
@@ -62,38 +100,65 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         team.tenant_id
     );
 
+    let alice_team_key = SecretKey::generate();
+    let bob_team_key = SecretKey::generate();
+    let alice_personal_key = SecretKey::generate();
+    let device_key = SecretKey::generate();
+    let unauthorized_device_key = SecretKey::generate();
     control
-        .register_user_endpoint(alice.id, team.tenant_id, EndpointKey::new([1; 32]))
+        .register_user_endpoint(prove_endpoint(
+            deployment_id,
+            alice.id,
+            team.tenant_id,
+            EndpointProofPurpose::RegisterUserEndpoint,
+            &alice_team_key,
+        ))
         .await
         .unwrap();
     control
-        .register_user_endpoint(bob.id, team.tenant_id, EndpointKey::new([2; 32]))
+        .register_user_endpoint(prove_endpoint(
+            deployment_id,
+            bob.id,
+            team.tenant_id,
+            EndpointProofPurpose::RegisterUserEndpoint,
+            &bob_team_key,
+        ))
         .await
         .unwrap();
     control
-        .register_user_endpoint(
+        .register_user_endpoint(prove_endpoint(
+            deployment_id,
             alice.id,
             alice.personal_tenant_id,
-            EndpointKey::new([3; 32]),
-        )
+            EndpointProofPurpose::RegisterUserEndpoint,
+            &alice_personal_key,
+        ))
         .await
         .unwrap();
     let device = control
         .register_device(
-            alice.id,
-            team.tenant_id,
+            prove_endpoint(
+                deployment_id,
+                alice.id,
+                team.tenant_id,
+                EndpointProofPurpose::RegisterDevice,
+                &device_key,
+            ),
             "build-worker",
-            EndpointKey::new([4; 32]),
         )
         .await
         .unwrap();
     assert!(matches!(
         control
             .register_device(
-                bob.id,
-                team.tenant_id,
+                prove_endpoint(
+                    deployment_id,
+                    bob.id,
+                    team.tenant_id,
+                    EndpointProofPurpose::RegisterDevice,
+                    &unauthorized_device_key,
+                ),
                 "unauthorized-worker",
-                EndpointKey::new([5; 32]),
             )
             .await,
         Err(ServiceError::Store(StoreError::PermissionDenied))

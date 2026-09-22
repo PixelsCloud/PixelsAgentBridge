@@ -6,6 +6,7 @@ rust-version.workspace = true
 
 [dependencies]
 argon2 = "0.5"
+iroh-base = "=1.2.0"
 pab-protocol = { path = "../protocol" }
 rand_core = { version = "0.6", features = ["getrandom"] }
 sqlx = { version = "0.8", default-features = false, features = [
@@ -21,4 +22,3 @@ time = "0.3"
 tokio.workspace = true
 unicode-normalization = "0.1"
 uuid.workspace = true
-

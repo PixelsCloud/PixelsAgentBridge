@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+blake3 = "1"
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true

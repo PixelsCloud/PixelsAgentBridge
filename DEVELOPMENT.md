@@ -28,6 +28,11 @@ deployment record with the current 20/4/5 Mbps defaults if it is absent. Postgre
 integration tests use `DATABASE_URL`; SQLx creates and removes isolated test databases.
 Use a disposable PostgreSQL instance with database-creation privileges for those tests.
 
+Endpoint registration accepts a one-time proof signed by the same Ed25519 secret key
+that produces the iroh Endpoint ID. The proof binds the deployment, connection,
+account, tenant, purpose, nonce, and short validity window. The WSS transport that will
+own each proof session is the next control-plane increment and is not exposed yet.
+
 The Relay integration tests use loopback listeners and a generated self-signed
 certificate. They verify explicit certificate trust, endpoint admission, and an
 actual datagram transfer through `iroh-relay` 1.2.0. The plain HTTP captive-portal

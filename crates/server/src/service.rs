@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DeploymentId, EndpointKey, RelayLimitDefaults, RelayPolicySnapshot, TenantId, UserId,
+    DeploymentId, EndpointProofPurpose, RelayLimitDefaults, RelayPolicySnapshot, TenantId, UserId,
 };
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::{
     auth::{CredentialError, PasswordEngine, PasswordPolicy, normalize_username},
     domain::{Account, Device, Team, TeamInvitation, TeamRole},
+    endpoint_proof::VerifiedEndpointProof,
     postgres::{PostgresStore, StoreError},
 };
 
@@ -121,26 +122,33 @@ impl ControlPlane {
 
     pub async fn register_user_endpoint(
         &self,
-        actor: UserId,
-        tenant_id: TenantId,
-        endpoint_key: EndpointKey,
+        proof: VerifiedEndpointProof,
     ) -> Result<(), ServiceError> {
+        if proof.purpose() != EndpointProofPurpose::RegisterUserEndpoint {
+            return Err(ServiceError::WrongEndpointProofPurpose);
+        }
         Ok(self
             .store
-            .register_user_endpoint(actor, tenant_id, endpoint_key)
+            .register_user_endpoint(proof.user_id(), proof.tenant_id(), proof.endpoint_key())
             .await?)
     }
 
     pub async fn register_device(
         &self,
-        actor: UserId,
-        tenant_id: TenantId,
+        proof: VerifiedEndpointProof,
         name: &str,
-        endpoint_key: EndpointKey,
     ) -> Result<Device, ServiceError> {
+        if proof.purpose() != EndpointProofPurpose::RegisterDevice {
+            return Err(ServiceError::WrongEndpointProofPurpose);
+        }
         Ok(self
             .store
-            .register_device(actor, tenant_id, name, endpoint_key)
+            .register_device(
+                proof.user_id(),
+                proof.tenant_id(),
+                name,
+                proof.endpoint_key(),
+            )
             .await?)
     }
 
@@ -156,6 +164,8 @@ impl ControlPlane {
 pub enum ServiceError {
     #[error("invalid username or password")]
     InvalidCredentials,
+    #[error("endpoint proof was issued for a different operation")]
+    WrongEndpointProofPurpose,
     #[error(transparent)]
     Credential(#[from] CredentialError),
     #[error(transparent)]

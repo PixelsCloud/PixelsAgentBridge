@@ -2057,6 +2057,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 name = "pab-protocol"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "serde",
  "thiserror",
  "uuid",
@@ -2085,6 +2086,7 @@ name = "pab-server"
 version = "0.1.0"
 dependencies = [
  "argon2",
+ "iroh-base",
  "pab-protocol",
  "rand_core 0.6.4",
  "sqlx",
