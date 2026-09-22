@@ -1,15 +1,18 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
-    EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
-    EndpointRegistration, EndpointRegistrationResult, RequestId,
+    ControlClientMessage, ControlServerMessage, DeploymentId, EndpointAuthenticationResult,
+    EndpointKey, EndpointProofPrincipal, EndpointProofPurpose, EndpointRegistration,
+    EndpointRegistrationResult, RequestId,
 };
 use time::OffsetDateTime;
 
-use super::ControlApiConfig;
+use super::{
+    ControlApiConfig,
+    session_error::{ControlSessionError, error_response},
+};
 use crate::{
-    ControlPlane, EndpointProofError, EndpointProofSession, ServiceError, StoreError,
+    ControlPlane, EndpointProofSession,
     domain::{Account, RegisteredEndpoint},
 };
 
@@ -29,6 +32,7 @@ enum PendingProof {
 
 pub struct ControlSession {
     control: ControlPlane,
+    deployment_id: DeploymentId,
     config: ControlApiConfig,
     proof_session: EndpointProofSession,
     account: Option<Account>,
@@ -44,6 +48,7 @@ impl ControlSession {
     ) -> Self {
         Self {
             control,
+            deployment_id,
             config,
             proof_session: EndpointProofSession::new(deployment_id),
             account: None,
@@ -94,6 +99,10 @@ impl ControlSession {
                 .complete_endpoint_authentication(proof)
                 .await
                 .map(|result| ControlServerMessage::EndpointAuthenticated { request_id, result }),
+            ControlClientMessage::PublishDeviceHello { hello, .. } => self
+                .publish_device_hello(&hello)
+                .await
+                .map(|result| ControlServerMessage::DeviceHelloAccepted { request_id, result }),
         };
         match result {
             Ok(response) => response,
@@ -267,17 +276,22 @@ impl ControlSession {
         self.endpoint = Some(endpoint);
         Ok(result)
     }
-}
 
-impl ControlSessionError {
-    fn endpoint_authentication(error: ServiceError) -> Self {
-        match error {
-            ServiceError::Store(StoreError::NotFound)
-            | ServiceError::WrongEndpointProofPurpose
-            | ServiceError::WrongEndpointProofPrincipal
-            | ServiceError::EndpointIdentityChanged => Self::EndpointAuthenticationFailed,
-            other => Self::Service(other),
+    async fn publish_device_hello(
+        &self,
+        hello: &pab_protocol::DeviceHello,
+    ) -> Result<pab_protocol::DeviceHelloResult, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::DeviceEndpointRequired)?;
+        if hello.device_ref.deployment_id != self.deployment_id {
+            return Err(ControlSessionError::DeviceIdentityMismatch);
         }
+        self.control
+            .publish_device_hello(endpoint, hello)
+            .await
+            .map_err(Into::into)
     }
 }
 
@@ -288,106 +302,4 @@ fn authenticated_response(request_id: RequestId, account: Account) -> ControlSer
         username: account.username,
         personal_tenant_id: account.personal_tenant_id,
     }
-}
-
-fn error_response(
-    request_id: Option<RequestId>,
-    error: ControlSessionError,
-) -> ControlServerMessage {
-    let (code, message) = match error {
-        ControlSessionError::NotAuthenticated => (
-            ControlErrorCode::InvalidState,
-            "account login is required".to_owned(),
-        ),
-        ControlSessionError::AlreadyAuthenticated => (
-            ControlErrorCode::InvalidState,
-            "this connection is already authenticated".to_owned(),
-        ),
-        ControlSessionError::RegistrationDisabled => (
-            ControlErrorCode::RegistrationDisabled,
-            "account registration is disabled".to_owned(),
-        ),
-        ControlSessionError::NoPendingRegistration => (
-            ControlErrorCode::InvalidState,
-            "no endpoint registration is pending".to_owned(),
-        ),
-        ControlSessionError::NoPendingAuthentication => (
-            ControlErrorCode::InvalidState,
-            "no endpoint authentication is pending".to_owned(),
-        ),
-        ControlSessionError::ProofPending => (
-            ControlErrorCode::InvalidState,
-            "an endpoint proof challenge is already pending".to_owned(),
-        ),
-        ControlSessionError::EndpointAuthenticationFailed => (
-            ControlErrorCode::InvalidCredentials,
-            "endpoint authentication failed".to_owned(),
-        ),
-        ControlSessionError::EndpointProof(_) => (
-            ControlErrorCode::InvalidCredentials,
-            "endpoint proof was rejected".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::InvalidCredentials) => (
-            ControlErrorCode::InvalidCredentials,
-            "invalid username or password".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::WrongEndpointProofPurpose) => (
-            ControlErrorCode::InvalidMessage,
-            "endpoint proof purpose does not match the operation".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::WrongEndpointProofPrincipal) => (
-            ControlErrorCode::InvalidMessage,
-            "endpoint proof principal does not match the operation".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::EndpointIdentityChanged) => (
-            ControlErrorCode::InvalidCredentials,
-            "endpoint authentication failed".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::Store(StoreError::PermissionDenied)) => (
-            ControlErrorCode::PermissionDenied,
-            "operation is not permitted in this tenant".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::Store(StoreError::Conflict(_))) => (
-            ControlErrorCode::Conflict,
-            "resource already exists".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::Store(StoreError::NotFound)) => (
-            ControlErrorCode::NotFound,
-            "resource was not found".to_owned(),
-        ),
-        ControlSessionError::Service(ServiceError::Credential(error)) => {
-            (ControlErrorCode::InvalidMessage, error.to_string())
-        }
-        ControlSessionError::Service(_) => (
-            ControlErrorCode::Internal,
-            "control service failed".to_owned(),
-        ),
-    };
-    ControlServerMessage::Error {
-        request_id,
-        code,
-        message,
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum ControlSessionError {
-    #[error("account login is required")]
-    NotAuthenticated,
-    #[error("connection is already authenticated")]
-    AlreadyAuthenticated,
-    #[error("account registration is disabled")]
-    RegistrationDisabled,
-    #[error("no endpoint registration is pending")]
-    NoPendingRegistration,
-    #[error("no endpoint authentication is pending")]
-    NoPendingAuthentication,
-    #[error("an endpoint proof challenge is already pending")]
-    ProofPending,
-    #[error("endpoint authentication failed")]
-    EndpointAuthenticationFailed,
-    #[error(transparent)]
-    EndpointProof(#[from] EndpointProofError),
-    #[error(transparent)]
-    Service(#[from] ServiceError),
 }

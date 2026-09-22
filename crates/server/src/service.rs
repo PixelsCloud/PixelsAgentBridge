@@ -1,9 +1,11 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DeploymentId, EndpointProofPrincipal, EndpointProofPurpose, RelayLimitDefaults,
-    RelayPolicySnapshot, TenantId, UserId,
+    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceHelloResult,
+    EndpointProofPrincipal, EndpointProofPurpose, RelayLimitDefaults, RelayPolicySnapshot,
+    TenantId, UserId,
 };
+use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -175,6 +177,41 @@ impl ControlPlane {
         Ok(self.store.registered_endpoint(endpoint_key).await?)
     }
 
+    pub async fn publish_device_hello(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        hello: &DeviceHello,
+    ) -> Result<DeviceHelloResult, ServiceError> {
+        if hello.schema_version != DEVICE_SESSION_SCHEMA_VERSION {
+            return Err(ServiceError::UnsupportedDeviceSessionSchema(
+                hello.schema_version,
+            ));
+        }
+        let EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
+            return Err(ServiceError::DeviceEndpointRequired);
+        };
+        if hello.device_ref.tenant_id != endpoint.tenant_id
+            || hello.device_ref.device_id != device_id
+        {
+            return Err(ServiceError::EndpointIdentityChanged);
+        }
+        let agent_version = hello.agent_version.trim();
+        if agent_version.is_empty()
+            || agent_version != hello.agent_version
+            || agent_version.chars().count() > 64
+        {
+            return Err(ServiceError::InvalidAgentVersion);
+        }
+        if hello.observed_at_unix_ms <= 0 {
+            return Err(ServiceError::InvalidObservedTime);
+        }
+        validate_execution_context(&hello.execution_context)?;
+        Ok(self
+            .store
+            .publish_device_hello(endpoint.endpoint_key, hello)
+            .await?)
+    }
+
     pub async fn relay_policy_snapshot(
         &self,
         validity: Duration,
@@ -193,6 +230,16 @@ pub enum ServiceError {
     WrongEndpointProofPrincipal,
     #[error("registered endpoint identity changed while authentication was in progress")]
     EndpointIdentityChanged,
+    #[error("device session schema version {0} is not supported")]
+    UnsupportedDeviceSessionSchema(u16),
+    #[error("this operation requires an authenticated device endpoint")]
+    DeviceEndpointRequired,
+    #[error("agent version must contain between 1 and 64 characters")]
+    InvalidAgentVersion,
+    #[error("device observation time must be a positive Unix timestamp")]
+    InvalidObservedTime,
+    #[error(transparent)]
+    TaskRuntime(#[from] TaskRuntimeError),
     #[error(transparent)]
     Credential(#[from] CredentialError),
     #[error(transparent)]

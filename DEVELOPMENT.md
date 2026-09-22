@@ -47,6 +47,16 @@ authentication, and publishes current connection state through a Tokio watch cha
 for UI/Executor adapters. It does not persist account passwords or disable certificate
 verification.
 
+After a device endpoint authenticates, it publishes a versioned `DeviceHello` with
+its immutable deployment/tenant/device reference and current execution context.
+The server validates the endpoint principal and platform contract again, rechecks
+that the device and endpoint are active, and stores the latest accepted environment
+in PostgreSQL migration `0002_device_runtime.sql`. The connection supervisor republishes
+the hello after every successful reconnect before reporting `Authenticated`, so task
+submission can later use the stored environment revision as its expected-environment
+guard. Device session messages, connection state/backoff, and control-session error
+mapping stay in separate modules to keep each build unit focused.
+
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
 `PAB_DATABASE_URL` and use its initialization commands against an empty database:

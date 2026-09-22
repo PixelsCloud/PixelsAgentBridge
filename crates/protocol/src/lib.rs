@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod control;
+mod device;
 mod endpoint_proof;
 mod ids;
 mod platform;
@@ -12,6 +13,7 @@ pub use control::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
     EndpointRegistration, EndpointRegistrationResult,
 };
+pub use device::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceHelloResult};
 pub use endpoint_proof::{
     ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey, EndpointProofChallenge, EndpointProofContractError,
     EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse, EndpointSignature,

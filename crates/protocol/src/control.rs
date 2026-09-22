@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    DeviceId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse,
-    RequestId, TenantId, UserId,
+    DeviceHello, DeviceHelloResult, DeviceId, EndpointKey, EndpointProofChallenge,
+    EndpointProofPrincipal, EndpointProofResponse, RequestId, TenantId, UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -36,6 +36,10 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         proof: EndpointProofResponse,
     },
+    PublishDeviceHello {
+        request_id: RequestId,
+        hello: Box<DeviceHello>,
+    },
 }
 
 impl ControlClientMessage {
@@ -46,7 +50,8 @@ impl ControlClientMessage {
             | Self::BeginEndpointRegistration { request_id, .. }
             | Self::CompleteEndpointRegistration { request_id, .. }
             | Self::BeginEndpointAuthentication { request_id, .. }
-            | Self::CompleteEndpointAuthentication { request_id, .. } => *request_id,
+            | Self::CompleteEndpointAuthentication { request_id, .. }
+            | Self::PublishDeviceHello { request_id, .. } => *request_id,
         }
     }
 }
@@ -78,6 +83,10 @@ pub enum ControlServerMessage {
     EndpointAuthenticated {
         request_id: RequestId,
         result: EndpointAuthenticationResult,
+    },
+    DeviceHelloAccepted {
+        request_id: RequestId,
+        result: DeviceHelloResult,
     },
     Error {
         request_id: Option<RequestId>,

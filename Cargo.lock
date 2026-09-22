@@ -2257,6 +2257,7 @@ dependencies = [
  "pab-agent-core",
  "pab-protocol",
  "pab-relay",
+ "pab-task-runtime",
  "rand_core 0.6.4",
  "rcgen",
  "rustls",

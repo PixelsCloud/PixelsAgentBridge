@@ -2,16 +2,10 @@ use pab_protocol::{ExecutionContext, OsFamily, PathStyle, TaskProgress, Transfer
 
 use crate::TaskRuntimeError;
 
-pub(crate) fn execution_context(value: &ExecutionContext) -> Result<(), TaskRuntimeError> {
-    if value.os_name.trim().is_empty() {
-        return Err(TaskRuntimeError::EmptyField("os_name"));
-    }
-    if value.os_version.trim().is_empty() {
-        return Err(TaskRuntimeError::EmptyField("os_version"));
-    }
-    if value.environment_revision.trim().is_empty() {
-        return Err(TaskRuntimeError::EmptyField("environment_revision"));
-    }
+pub fn validate_execution_context(value: &ExecutionContext) -> Result<(), TaskRuntimeError> {
+    validate_text("os_name", &value.os_name, 128)?;
+    validate_text("os_version", &value.os_version, 128)?;
+    validate_text("environment_revision", &value.environment_revision, 128)?;
     let expected_path_style = match value.os_family {
         OsFamily::Windows => PathStyle::Windows,
         OsFamily::Linux | OsFamily::Macos => PathStyle::Posix,
@@ -20,19 +14,35 @@ pub(crate) fn execution_context(value: &ExecutionContext) -> Result<(), TaskRunt
         return Err(TaskRuntimeError::PathStyleMismatch);
     }
     if let Some(interpreter) = &value.interpreter {
-        for (name, field) in [
-            ("interpreter.id", interpreter.id.as_str()),
-            ("interpreter.name", interpreter.name.as_str()),
-            ("interpreter.version", interpreter.version.as_str()),
+        for (name, field, max_chars) in [
+            ("interpreter.id", interpreter.id.as_str(), 128),
+            ("interpreter.name", interpreter.name.as_str(), 128),
+            ("interpreter.version", interpreter.version.as_str(), 128),
             (
                 "interpreter.executable_path",
                 interpreter.executable_path.as_str(),
+                4_096,
             ),
         ] {
-            if field.trim().is_empty() {
-                return Err(TaskRuntimeError::EmptyField(name));
-            }
+            validate_text(name, field, max_chars)?;
         }
+    }
+    if let Some(cwd) = value.cwd.as_deref() {
+        validate_text("cwd", cwd, 4_096)?;
+    }
+    Ok(())
+}
+
+fn validate_text(
+    field: &'static str,
+    value: &str,
+    max_chars: usize,
+) -> Result<(), TaskRuntimeError> {
+    if value.trim().is_empty() {
+        return Err(TaskRuntimeError::EmptyField(field));
+    }
+    if value.chars().count() > max_chars {
+        return Err(TaskRuntimeError::FieldTooLong { field, max_chars });
     }
     Ok(())
 }

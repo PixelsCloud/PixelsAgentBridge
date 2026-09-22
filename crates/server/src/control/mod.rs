@@ -7,6 +7,7 @@ use crate::ControlPlane;
 mod relay_auth;
 mod relay_session;
 mod session;
+mod session_error;
 mod transport;
 
 pub use relay_auth::{RelayControlAuth, RelayControlAuthError};

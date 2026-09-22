@@ -3,8 +3,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
-    ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult, EndpointKey,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId, DeviceHello,
+    DeviceHelloResult, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult, EndpointKey,
     EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
     EndpointSignature, RequestId, TenantId,
 };
@@ -124,6 +124,43 @@ impl AuthenticatedControlConnection {
 
     pub const fn identity(&self) -> EndpointAuthenticationResult {
         self.identity
+    }
+
+    pub async fn publish_device_hello(
+        &mut self,
+        hello: &DeviceHello,
+        timeout: Duration,
+    ) -> Result<DeviceHelloResult, EndpointControlError> {
+        if timeout.is_zero() {
+            return Err(EndpointControlError::InvalidTimeout);
+        }
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::PublishDeviceHello {
+                request_id,
+                hello: Box::new(hello.clone()),
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceHelloAccepted {
+                request_id: response_id,
+                result,
+            } if response_id == request_id
+                && result.device_ref == hello.device_ref
+                && result.environment_revision == hello.execution_context.environment_revision =>
+            {
+                Ok(result)
+            }
+            ControlServerMessage::Error {
+                request_id: Some(response_id),
+                code,
+                message,
+            } if response_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
     }
 
     pub async fn heartbeat(

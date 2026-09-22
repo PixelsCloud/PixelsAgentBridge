@@ -1,7 +1,5 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
 use iroh_base::SecretKey;
-use thiserror::Error;
+use pab_protocol::{ControlErrorCode, DeviceHello, EndpointProofPrincipal};
 use tokio::{
     sync::watch,
     task::{JoinError, JoinHandle},
@@ -9,100 +7,21 @@ use tokio::{
 };
 use tokio_tungstenite::Connector;
 
-use crate::{AuthenticatedControlConnection, EndpointControlConfig, EndpointControlError};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReconnectPolicy {
-    pub heartbeat_interval: Duration,
-    pub heartbeat_timeout: Duration,
-    pub initial_delay: Duration,
-    pub max_delay: Duration,
-}
-
-impl Default for ReconnectPolicy {
-    fn default() -> Self {
-        Self {
-            heartbeat_interval: Duration::from_secs(30),
-            heartbeat_timeout: Duration::from_secs(10),
-            initial_delay: Duration::from_millis(500),
-            max_delay: Duration::from_secs(30),
-        }
-    }
-}
-
-impl ReconnectPolicy {
-    pub fn validate(self) -> Result<Self, ReconnectPolicyError> {
-        if self.heartbeat_interval.is_zero() {
-            return Err(ReconnectPolicyError::ZeroHeartbeatInterval);
-        }
-        if self.heartbeat_timeout.is_zero() {
-            return Err(ReconnectPolicyError::ZeroHeartbeatTimeout);
-        }
-        if self.heartbeat_timeout >= self.heartbeat_interval {
-            return Err(ReconnectPolicyError::HeartbeatTimeoutNotShorter);
-        }
-        if self.initial_delay.is_zero() {
-            return Err(ReconnectPolicyError::ZeroInitialDelay);
-        }
-        if self.max_delay < self.initial_delay {
-            return Err(ReconnectPolicyError::InvalidMaximumDelay);
-        }
-        Ok(self)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControlConnectionPhase {
-    Disconnected,
-    Connecting,
-    Authenticated,
-    BackingOff,
-    Stopped,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConnectionFailureKind {
-    Configuration,
-    Authentication,
-    Network,
-    Timeout,
-    Protocol,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConnectionFailure {
-    pub kind: ConnectionFailureKind,
-    pub detail: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ControlConnectionStatus {
-    pub phase: ControlConnectionPhase,
-    pub generation: u64,
-    pub consecutive_failures: u32,
-    pub retry_in_ms: Option<u64>,
-    pub changed_at_unix_ms: i64,
-    pub last_failure: Option<ConnectionFailure>,
-}
-
-impl ControlConnectionStatus {
-    fn initial() -> Self {
-        Self {
-            phase: ControlConnectionPhase::Disconnected,
-            generation: 0,
-            consecutive_failures: 0,
-            retry_in_ms: None,
-            changed_at_unix_ms: now_unix_millis(),
-            last_failure: None,
-        }
-    }
-}
+use crate::{
+    AuthenticatedControlConnection, EndpointControlConfig, EndpointControlError,
+    connection_state::{
+        ConnectionFailure, ConnectionFailureKind, ControlConnectionPhase, ControlConnectionStatus,
+        DeviceHelloConfigError, ReconnectPolicy, ReconnectPolicyError, duration_millis, publish,
+        publish_stopped, reconnect_delay,
+    },
+};
 
 pub struct EndpointControlSupervisor {
     config: EndpointControlConfig,
     secret: SecretKey,
     connector: Connector,
     policy: ReconnectPolicy,
+    device_hello: Option<DeviceHello>,
 }
 
 impl EndpointControlSupervisor {
@@ -117,7 +36,22 @@ impl EndpointControlSupervisor {
             secret,
             connector,
             policy: policy.validate()?,
+            device_hello: None,
         })
+    }
+
+    pub fn with_device_hello(mut self, hello: DeviceHello) -> Result<Self, DeviceHelloConfigError> {
+        let EndpointProofPrincipal::Device { device_id } = self.config.principal else {
+            return Err(DeviceHelloConfigError::DevicePrincipalRequired);
+        };
+        if hello.device_ref.deployment_id != self.config.deployment_id
+            || hello.device_ref.tenant_id != self.config.tenant_id
+            || hello.device_ref.device_id != device_id
+        {
+            return Err(DeviceHelloConfigError::IdentityMismatch);
+        }
+        self.device_hello = Some(hello);
+        Ok(self)
     }
 
     pub fn spawn(self) -> EndpointControlSupervisorHandle {
@@ -161,29 +95,41 @@ impl EndpointControlSupervisor {
             .await;
             let failure = match connection {
                 Ok(mut connection) => {
-                    generation = generation.saturating_add(1);
-                    consecutive_failures = 0;
-                    publish(
-                        &status,
-                        ControlConnectionPhase::Authenticated,
-                        generation,
-                        0,
-                        None,
-                        None,
-                    );
-                    match maintain_connection(
-                        &mut connection,
-                        generation,
-                        self.policy,
-                        &mut shutdown,
-                    )
-                    .await
-                    {
-                        Ok(()) => {
-                            publish_stopped(&status, generation, 0, None);
-                            return;
-                        }
+                    let hello_result = match self.device_hello.as_ref() {
+                        Some(hello) => connection
+                            .publish_device_hello(hello, self.config.operation_timeout)
+                            .await
+                            .map(|_| ()),
+                        None => Ok(()),
+                    };
+                    match hello_result {
                         Err(error) => classify(error),
+                        Ok(()) => {
+                            generation = generation.saturating_add(1);
+                            consecutive_failures = 0;
+                            publish(
+                                &status,
+                                ControlConnectionPhase::Authenticated,
+                                generation,
+                                0,
+                                None,
+                                None,
+                            );
+                            match maintain_connection(
+                                &mut connection,
+                                generation,
+                                self.policy,
+                                &mut shutdown,
+                            )
+                            .await
+                            {
+                                Ok(()) => {
+                                    publish_stopped(&status, generation, 0, None);
+                                    return;
+                                }
+                                Err(error) => classify(error),
+                            }
+                        }
                     }
                 }
                 Err(error) => classify(error),
@@ -261,14 +207,21 @@ async fn maintain_connection(
 }
 
 fn classify(error: EndpointControlError) -> ConnectionFailure {
-    let kind = match error {
+    let kind = match &error {
         EndpointControlError::TlsRequired
         | EndpointControlError::InvalidTimeout
         | EndpointControlError::InvalidSystemTime => ConnectionFailureKind::Configuration,
         EndpointControlError::ChallengeMismatch
         | EndpointControlError::InvalidChallenge
-        | EndpointControlError::IdentityMismatch
-        | EndpointControlError::Server { .. } => ConnectionFailureKind::Authentication,
+        | EndpointControlError::IdentityMismatch => ConnectionFailureKind::Authentication,
+        EndpointControlError::Server {
+            code:
+                ControlErrorCode::InvalidCredentials
+                | ControlErrorCode::PermissionDenied
+                | ControlErrorCode::NotFound,
+            ..
+        } => ConnectionFailureKind::Authentication,
+        EndpointControlError::Server { .. } => ConnectionFailureKind::Protocol,
         EndpointControlError::Timeout => ConnectionFailureKind::Timeout,
         EndpointControlError::Closed | EndpointControlError::WebSocket(_) => {
             ConnectionFailureKind::Network
@@ -280,115 +233,5 @@ fn classify(error: EndpointControlError) -> ConnectionFailure {
     ConnectionFailure {
         kind,
         detail: error.to_string(),
-    }
-}
-
-fn reconnect_delay(policy: ReconnectPolicy, endpoint_key: [u8; 32], failures: u32) -> Duration {
-    let exponent = failures.saturating_sub(1).min(31);
-    let ceiling = policy
-        .initial_delay
-        .saturating_mul(1_u32 << exponent)
-        .min(policy.max_delay);
-    let ceiling_ms = duration_millis(ceiling);
-    let floor_ms = ceiling_ms / 2;
-    let spread = ceiling_ms.saturating_sub(floor_ms);
-    let mut seed = u64::from_be_bytes(endpoint_key[..8].try_into().expect("fixed slice"))
-        ^ u64::from(failures);
-    seed ^= seed << 13;
-    seed ^= seed >> 7;
-    seed ^= seed << 17;
-    let jitter = if spread == 0 { 0 } else { seed % (spread + 1) };
-    Duration::from_millis(floor_ms + jitter)
-}
-
-fn duration_millis(value: Duration) -> u64 {
-    u64::try_from(value.as_millis()).unwrap_or(u64::MAX)
-}
-
-fn now_unix_millis() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .and_then(|value| i64::try_from(value.as_millis()).ok())
-        .unwrap_or(0)
-}
-
-fn publish(
-    status: &watch::Sender<ControlConnectionStatus>,
-    phase: ControlConnectionPhase,
-    generation: u64,
-    consecutive_failures: u32,
-    retry_in_ms: Option<u64>,
-    last_failure: Option<ConnectionFailure>,
-) {
-    status.send_replace(ControlConnectionStatus {
-        phase,
-        generation,
-        consecutive_failures,
-        retry_in_ms,
-        changed_at_unix_ms: now_unix_millis(),
-        last_failure,
-    });
-}
-
-fn publish_stopped(
-    status: &watch::Sender<ControlConnectionStatus>,
-    generation: u64,
-    consecutive_failures: u32,
-    last_failure: Option<ConnectionFailure>,
-) {
-    publish(
-        status,
-        ControlConnectionPhase::Stopped,
-        generation,
-        consecutive_failures,
-        None,
-        last_failure,
-    );
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub enum ReconnectPolicyError {
-    #[error("heartbeat interval must be greater than zero")]
-    ZeroHeartbeatInterval,
-    #[error("heartbeat timeout must be greater than zero")]
-    ZeroHeartbeatTimeout,
-    #[error("heartbeat timeout must be shorter than the heartbeat interval")]
-    HeartbeatTimeoutNotShorter,
-    #[error("initial reconnect delay must be greater than zero")]
-    ZeroInitialDelay,
-    #[error("maximum reconnect delay must be at least the initial delay")]
-    InvalidMaximumDelay,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validates_heartbeat_and_reconnect_ranges() {
-        let error = ReconnectPolicy {
-            heartbeat_interval: Duration::from_secs(5),
-            heartbeat_timeout: Duration::from_secs(5),
-            ..ReconnectPolicy::default()
-        }
-        .validate()
-        .unwrap_err();
-        assert_eq!(error, ReconnectPolicyError::HeartbeatTimeoutNotShorter);
-    }
-
-    #[test]
-    fn reconnect_delay_stays_within_the_jittered_exponential_window() {
-        let policy = ReconnectPolicy {
-            initial_delay: Duration::from_millis(100),
-            max_delay: Duration::from_millis(800),
-            ..ReconnectPolicy::default()
-        };
-        let endpoint = [9; 32];
-        for (failures, ceiling_ms) in [(1, 100), (2, 200), (3, 400), (4, 800), (8, 800)] {
-            let delay = reconnect_delay(policy, endpoint, failures);
-            assert!(delay >= Duration::from_millis(ceiling_ms / 2));
-            assert!(delay <= Duration::from_millis(ceiling_ms));
-        }
     }
 }

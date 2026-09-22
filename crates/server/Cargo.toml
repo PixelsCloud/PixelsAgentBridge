@@ -12,6 +12,7 @@ blake3 = "1"
 futures-util = "0.3"
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-protocol = { path = "../protocol" }
+pab-task-runtime = { path = "../task-runtime" }
 rand_core = { version = "0.6", features = ["getrandom"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 serde_json.workspace = true

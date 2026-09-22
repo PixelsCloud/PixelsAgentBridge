@@ -39,7 +39,7 @@ impl TaskAggregate {
         if value.display_summary.trim().is_empty() {
             return Err(TaskRuntimeError::EmptyField("display_summary"));
         }
-        validation::execution_context(&value.execution_context)?;
+        validation::validate_execution_context(&value.execution_context)?;
         let event = TaskEvent {
             schema_version: TASK_SCHEMA_VERSION,
             task_ref: value.task_ref,
@@ -78,7 +78,7 @@ impl TaskAggregate {
         if snapshot.latest_event_seq == 0 {
             return Err(TaskRuntimeError::InvalidSnapshotSequence);
         }
-        validation::execution_context(&snapshot.execution_context)?;
+        validation::validate_execution_context(&snapshot.execution_context)?;
         validate_output_range(&snapshot.output.stdout)?;
         validate_output_range(&snapshot.output.stderr)?;
         if snapshot.state.is_terminal() != snapshot.finished_at_unix_ms.is_some() {
@@ -296,6 +296,11 @@ pub enum TaskRuntimeError {
     UnsupportedSchemaVersion(u16),
     #[error("{0} must not be empty")]
     EmptyField(&'static str),
+    #[error("{field} must contain at most {max_chars} characters")]
+    FieldTooLong {
+        field: &'static str,
+        max_chars: usize,
+    },
     #[error("capability version must be greater than zero")]
     ZeroCapabilityVersion,
     #[error("path style does not match the target OS")]

@@ -8,10 +8,11 @@ use pab_agent_core::{
     EndpointControlSupervisor, ReconnectPolicy, tls_connector,
 };
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
+    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceRef,
     EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
-    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, RelayLimitDefaults,
-    RequestId,
+    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
+    ExecutionScope, InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -77,6 +78,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         )
         .await
         .unwrap();
+    let inspection_control = control.clone();
     let state = ControlApiState::new(
         control,
         deployment_id,
@@ -221,6 +223,67 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         }
         response => panic!("unexpected registration response: {response:?}"),
     }
+
+    let device_secret = SecretKey::generate();
+    let begin_device_request_id = RequestId::new();
+    send(
+        &mut socket,
+        &ControlClientMessage::BeginEndpointRegistration {
+            request_id: begin_device_request_id,
+            tenant_id: personal_tenant_id,
+            endpoint_key: EndpointKey::new(*device_secret.public().as_bytes()),
+            registration: EndpointRegistration::Device {
+                name: "windows-test-executor".to_owned(),
+            },
+        },
+    )
+    .await;
+    let device_challenge = match receive(&mut socket).await {
+        ControlServerMessage::EndpointChallenge {
+            request_id,
+            challenge,
+        } => {
+            assert_eq!(request_id, begin_device_request_id);
+            challenge
+        }
+        response => panic!("unexpected device challenge response: {response:?}"),
+    };
+    let complete_device_request_id = RequestId::new();
+    send(
+        &mut socket,
+        &ControlClientMessage::CompleteEndpointRegistration {
+            request_id: complete_device_request_id,
+            proof: EndpointProofResponse {
+                challenge_id: device_challenge.challenge_id,
+                signature: EndpointSignature::from_bytes(
+                    device_secret
+                        .sign(&device_challenge.signing_message())
+                        .to_bytes(),
+                ),
+            },
+        },
+    )
+    .await;
+    let device_id = match receive(&mut socket).await {
+        ControlServerMessage::EndpointRegistered {
+            request_id,
+            result:
+                EndpointRegistrationResult::Device {
+                    tenant_id,
+                    device_id,
+                    endpoint_key,
+                },
+        } => {
+            assert_eq!(request_id, complete_device_request_id);
+            assert_eq!(tenant_id, personal_tenant_id);
+            assert_eq!(
+                endpoint_key,
+                EndpointKey::new(*device_secret.public().as_bytes())
+            );
+            device_id
+        }
+        response => panic!("unexpected device registration response: {response:?}"),
+    };
 
     drop(socket);
 
@@ -367,6 +430,87 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         connection_status.borrow().phase,
         ControlConnectionPhase::Stopped
     );
+
+    let device_ref = DeviceRef {
+        deployment_id,
+        tenant_id: personal_tenant_id,
+        device_id,
+    };
+    let device_config = EndpointControlConfig {
+        url: format!("wss://localhost:{}/control", address.port()),
+        deployment_id,
+        tenant_id: personal_tenant_id,
+        principal: EndpointProofPrincipal::Device { device_id },
+        operation_timeout: Duration::from_secs(5),
+    };
+    let device_hello = DeviceHello {
+        schema_version: DEVICE_SESSION_SCHEMA_VERSION,
+        device_ref,
+        execution_context: ExecutionContext {
+            os_family: OsFamily::Windows,
+            os_name: "Windows Server 2022".to_owned(),
+            os_version: "21H2".to_owned(),
+            architecture: CpuArchitecture::X86_64,
+            execution_scope: ExecutionScope::Native,
+            path_style: PathStyle::Windows,
+            interpreter: Some(InterpreterContext {
+                id: "pwsh".to_owned(),
+                name: "PowerShell".to_owned(),
+                version: "7.5.3".to_owned(),
+                executable_path: r"C:\Program Files\PowerShell\7\pwsh.exe".to_owned(),
+            }),
+            cwd: Some(r"C:\PAB".to_owned()),
+            environment_revision: "windows-test-env-1".to_owned(),
+        },
+        agent_version: "0.1.0-test".to_owned(),
+        observed_at_unix_ms: 1_795_000_000_000,
+    };
+    let mut device_connection =
+        AuthenticatedControlConnection::connect(&device_config, &device_secret, connector.clone())
+            .await
+            .unwrap();
+    let hello_result = device_connection
+        .publish_device_hello(&device_hello, Duration::from_secs(5))
+        .await
+        .unwrap();
+    assert_eq!(hello_result.device_ref, device_ref);
+    assert_eq!(hello_result.environment_revision, "windows-test-env-1");
+    assert!(hello_result.accepted_at_unix_ms > 0);
+    let stored_revision = sqlx::query_scalar::<_, String>(
+        "SELECT environment_revision FROM device_runtime WHERE tenant_id = $1 AND device_id = $2",
+    )
+    .bind(personal_tenant_id.as_uuid())
+    .bind(device_id.as_uuid())
+    .fetch_one(inspection_control.store().pool())
+    .await
+    .unwrap();
+    assert_eq!(stored_revision, "windows-test-env-1");
+    device_connection.close().await.unwrap();
+
+    let device_supervisor = EndpointControlSupervisor::new(
+        device_config,
+        device_secret,
+        connector.clone(),
+        ReconnectPolicy {
+            heartbeat_interval: Duration::from_secs(1),
+            heartbeat_timeout: Duration::from_millis(500),
+            initial_delay: Duration::from_millis(50),
+            max_delay: Duration::from_millis(200),
+        },
+    )
+    .unwrap()
+    .with_device_hello(device_hello)
+    .unwrap()
+    .spawn();
+    let mut device_status = device_supervisor.status();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while device_status.borrow().phase != ControlConnectionPhase::Authenticated {
+            device_status.changed().await.unwrap();
+        }
+    })
+    .await
+    .expect("device supervisor did not publish hello");
+    device_supervisor.shutdown().await.unwrap();
 
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),

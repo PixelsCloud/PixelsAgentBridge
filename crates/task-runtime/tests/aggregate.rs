@@ -201,3 +201,17 @@ fn restore_rejects_a_non_terminal_snapshot_with_a_finished_time() {
         TaskRuntimeError::InvalidFinishedTime
     );
 }
+
+#[test]
+fn rejects_an_oversized_environment_revision() {
+    let mut value = accepted(OsFamily::Linux, PathStyle::Posix);
+    value.execution_context.environment_revision = "x".repeat(129);
+
+    assert_eq!(
+        TaskAggregate::accept(value).unwrap_err(),
+        TaskRuntimeError::FieldTooLong {
+            field: "environment_revision",
+            max_chars: 128,
+        }
+    );
+}
