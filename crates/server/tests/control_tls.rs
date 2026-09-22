@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Duration};
 use axum_server::tls_rustls::RustlsConfig;
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
-use pab_agent_core::{AuthenticatedControlConnection, EndpointControlConfig, tls_connector};
+use pab_agent_core::{
+    AuthenticatedControlConnection, ControlConnectionPhase, EndpointControlConfig,
+    EndpointControlSupervisor, ReconnectPolicy, tls_connector,
+};
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId,
     EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
@@ -323,7 +326,47 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             principal: EndpointProofPrincipal::User { user_id },
         }
     );
+    let mut agent_connection = agent_connection;
+    agent_connection
+        .heartbeat(b"pab-test-heartbeat".to_vec(), Duration::from_secs(5))
+        .await
+        .unwrap();
     agent_connection.close().await.unwrap();
+
+    let supervisor = EndpointControlSupervisor::new(
+        agent_config,
+        secret.clone(),
+        connector.clone(),
+        ReconnectPolicy {
+            heartbeat_interval: Duration::from_secs(1),
+            heartbeat_timeout: Duration::from_millis(500),
+            initial_delay: Duration::from_millis(50),
+            max_delay: Duration::from_millis(200),
+        },
+    )
+    .unwrap();
+    let supervisor = supervisor.spawn();
+    let mut connection_status = supervisor.status();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if connection_status.borrow().phase == ControlConnectionPhase::Authenticated {
+                break;
+            }
+            connection_status.changed().await.unwrap();
+        }
+    })
+    .await
+    .expect("endpoint supervisor did not authenticate");
+    tokio::time::sleep(Duration::from_millis(1_200)).await;
+    assert_eq!(
+        connection_status.borrow().phase,
+        ControlConnectionPhase::Authenticated
+    );
+    supervisor.shutdown().await.unwrap();
+    assert_eq!(
+        connection_status.borrow().phase,
+        ControlConnectionPhase::Stopped
+    );
 
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),

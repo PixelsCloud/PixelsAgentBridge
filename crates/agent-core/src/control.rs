@@ -126,9 +126,38 @@ impl AuthenticatedControlConnection {
         self.identity
     }
 
-    pub async fn ping(&mut self, payload: Vec<u8>) -> Result<(), EndpointControlError> {
-        self.socket.send(Message::Ping(payload.into())).await?;
-        Ok(())
+    pub async fn heartbeat(
+        &mut self,
+        payload: Vec<u8>,
+        timeout: Duration,
+    ) -> Result<(), EndpointControlError> {
+        if timeout.is_zero() {
+            return Err(EndpointControlError::InvalidTimeout);
+        }
+        let payload: tokio_tungstenite::tungstenite::Bytes = payload.into();
+        tokio::time::timeout(timeout, self.socket.send(Message::Ping(payload.clone())))
+            .await
+            .map_err(|_| EndpointControlError::Timeout)??;
+        tokio::time::timeout(timeout, async {
+            loop {
+                let message = self
+                    .socket
+                    .next()
+                    .await
+                    .ok_or(EndpointControlError::Closed)??;
+                match message {
+                    Message::Pong(received) if received == payload => return Ok(()),
+                    Message::Pong(_) => {}
+                    Message::Ping(received) => self.socket.send(Message::Pong(received)).await?,
+                    Message::Close(_) => return Err(EndpointControlError::Closed),
+                    Message::Text(_) | Message::Binary(_) | Message::Frame(_) => {
+                        return Err(EndpointControlError::UnexpectedMessage);
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|_| EndpointControlError::Timeout)?
     }
 
     pub async fn close(mut self) -> Result<(), EndpointControlError> {

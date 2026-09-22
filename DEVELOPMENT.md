@@ -40,8 +40,12 @@ revision remain explicit after context compaction.
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
 frames at 64 KiB, validates every challenge identity field before signing, and keeps
-the authenticated socket available for later heartbeat and task-sync protocols. It
-does not persist account passwords or disable certificate verification.
+the authenticated socket available for later task-sync protocols. Its supervisor
+requires matching pong heartbeats, reconnects with bounded identity-jittered
+exponential backoff, increments a connection generation after every successful
+authentication, and publishes current connection state through a Tokio watch channel
+for UI/Executor adapters. It does not persist account passwords or disable certificate
+verification.
 
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
