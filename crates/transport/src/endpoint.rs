@@ -54,6 +54,7 @@ impl PabEndpointConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct PabEndpoint {
     inner: Endpoint,
 }

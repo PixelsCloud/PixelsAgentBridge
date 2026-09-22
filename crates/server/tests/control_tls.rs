@@ -13,13 +13,15 @@ use pab_agent_core::{
 };
 use pab_bridge::{BridgeClient, BridgeConfig, BridgeError};
 use pab_executor::{DeviceSessionAcceptor, DeviceSessionError};
+use pab_platform::detect_native_execution_context;
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
+    CommandTaskSpec, ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
     DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
-    DeviceNetworkUpdate, DeviceRef, EndpointAuthenticationResult, EndpointInstanceId, EndpointKey,
-    EndpointProofPrincipal, EndpointProofResponse, EndpointRegistration,
-    EndpointRegistrationResult, EndpointSignature, ExecutionContext, ExecutionScope,
-    InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId, UserId,
+    DeviceNetworkUpdate, DeviceRef, DeviceTaskResponse, EndpointAuthenticationResult,
+    EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
+    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
+    ExecutionScope, ExpectedEnvironment, InterpreterContext, OsFamily, PathStyle,
+    RelayLimitDefaults, RequestId, TaskState, UserId,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -869,12 +871,17 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .to_string(),
     )
     .unwrap();
+    let native_context = detect_native_execution_context().unwrap();
+    let task_database = credential_directory.path().join("executor-tasks.sqlite3");
     let acceptor = DeviceSessionAcceptor::from_credential_file(
         device_supervisor.peer_authorizer(),
         device_ref,
         &credential_path,
         Duration::from_secs(5),
     )
+    .unwrap()
+    .with_task_database(&task_database, native_context.clone())
+    .await
     .unwrap();
 
     let (accepted, accepted_server) = connect_device_over_bridge(
@@ -895,6 +902,189 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert_eq!(peer_user_id, user_id);
     assert_eq!(password_version, 7);
     assert!(authenticated_at_unix_ms > 0);
+
+    let task_acceptor = acceptor.clone();
+    let task_device = device_endpoint.clone();
+    let task_server = tokio::spawn(async move {
+        let connection = task_device.accept().await.unwrap().unwrap();
+        task_acceptor.handle(connection).await
+    });
+    let task_connection = bridge
+        .connect_device(
+            device_ref,
+            zeroize::Zeroizing::new(device_password.to_owned()),
+        )
+        .await
+        .unwrap();
+    let verified_target = task_connection.get_environment().await.unwrap();
+    assert_eq!(verified_target.device_ref, device_ref);
+    assert_eq!(verified_target.execution, native_context);
+    #[cfg(windows)]
+    let (program, args) = (
+        "cmd.exe".to_owned(),
+        vec![
+            "/D".to_owned(),
+            "/S".to_owned(),
+            "/C".to_owned(),
+            "echo e2e-stdout&& echo e2e-stderr 1>&2".to_owned(),
+        ],
+    );
+    #[cfg(not(windows))]
+    let (program, args) = (
+        "/bin/sh".to_owned(),
+        vec![
+            "-c".to_owned(),
+            "printf 'e2e-stdout\\n'; printf 'e2e-stderr\\n' >&2".to_owned(),
+        ],
+    );
+    let submitted_result = task_connection
+        .submit_command(
+            RequestId::new(),
+            CommandTaskSpec {
+                program,
+                args,
+                cwd: None,
+                expected_environment: ExpectedEnvironment {
+                    os_family: verified_target.execution.os_family,
+                    environment_revision: verified_target.execution.environment_revision,
+                },
+                display_summary: "authenticated iroh command test".to_owned(),
+            },
+        )
+        .await;
+    let submitted = match submitted_result {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            task_connection.close();
+            let server_result = tokio::time::timeout(Duration::from_secs(5), task_server).await;
+            panic!("task submission failed: {error}; device session result: {server_result:?}");
+        }
+    };
+    task_connection.close();
+    tokio::time::timeout(Duration::from_secs(5), task_server)
+        .await
+        .expect("first task device session did not close")
+        .unwrap()
+        .unwrap();
+
+    let task_acceptor = acceptor.clone();
+    let task_device = device_endpoint.clone();
+    let task_server = tokio::spawn(async move {
+        let connection = task_device.accept().await.unwrap().unwrap();
+        task_acceptor.handle(connection).await
+    });
+    let task_connection = bridge
+        .connect_device(
+            device_ref,
+            zeroize::Zeroizing::new(device_password.to_owned()),
+        )
+        .await
+        .unwrap();
+    let mut subscription = task_connection
+        .subscribe_task(submitted.task_ref, 0, 0, 0)
+        .await
+        .unwrap();
+    let (final_snapshot, stdout, stderr) = tokio::time::timeout(Duration::from_secs(10), async {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        loop {
+            match subscription.next().await.unwrap() {
+                DeviceTaskResponse::Output { chunk, .. } => match chunk.stream {
+                    pab_protocol::OutputStream::Stdout => stdout.extend_from_slice(&chunk.bytes),
+                    pab_protocol::OutputStream::Stderr => stderr.extend_from_slice(&chunk.bytes),
+                },
+                DeviceTaskResponse::CaughtUp { snapshot }
+                    if snapshot.state.is_terminal()
+                        && snapshot.output.stdout.complete
+                        && snapshot.output.stderr.complete =>
+                {
+                    break (*snapshot, stdout, stderr);
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("task subscription did not reach a terminal snapshot");
+    assert_eq!(final_snapshot.state, TaskState::Succeeded);
+    assert!(String::from_utf8_lossy(&stdout).contains("e2e-stdout"));
+    assert!(String::from_utf8_lossy(&stderr).contains("e2e-stderr"));
+
+    #[cfg(windows)]
+    let (cancel_program, cancel_args) = (
+        "powershell.exe".to_owned(),
+        vec![
+            "-NoProfile".to_owned(),
+            "-Command".to_owned(),
+            "Start-Sleep -Seconds 30".to_owned(),
+        ],
+    );
+    #[cfg(not(windows))]
+    let (cancel_program, cancel_args) = ("/bin/sleep".to_owned(), vec!["30".to_owned()]);
+    let cancel_target = task_connection.get_environment().await.unwrap();
+    let cancellable = task_connection
+        .submit_command(
+            RequestId::new(),
+            CommandTaskSpec {
+                program: cancel_program,
+                args: cancel_args,
+                cwd: None,
+                expected_environment: ExpectedEnvironment {
+                    os_family: cancel_target.execution.os_family,
+                    environment_revision: cancel_target.execution.environment_revision,
+                },
+                display_summary: "authenticated iroh cancellation test".to_owned(),
+            },
+        )
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if task_connection
+                .get_task(cancellable.task_ref)
+                .await
+                .unwrap()
+                .state
+                == TaskState::Running
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("cancellable task did not start");
+    let cancel_snapshot = task_connection
+        .cancel_task(
+            cancellable.task_ref,
+            "integration test cancellation".to_owned(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(cancel_snapshot.state, TaskState::CancelRequested);
+    let mut cancelled_subscription = task_connection
+        .subscribe_task(cancellable.task_ref, 0, 0, 0)
+        .await
+        .unwrap();
+    let cancelled = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if let DeviceTaskResponse::CaughtUp { snapshot } =
+                cancelled_subscription.next().await.unwrap()
+                && snapshot.state.is_terminal()
+            {
+                break *snapshot;
+            }
+        }
+    })
+    .await
+    .expect("cancelled task did not reach a terminal snapshot");
+    assert_eq!(cancelled.state, TaskState::Cancelled);
+    task_connection.close();
+    tokio::time::timeout(Duration::from_secs(5), task_server)
+        .await
+        .expect("task device session did not close")
+        .unwrap()
+        .unwrap();
 
     let (rejected, rejected_server) = connect_device_over_bridge(
         &mut bridge,

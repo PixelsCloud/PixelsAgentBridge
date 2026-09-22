@@ -16,6 +16,7 @@ use crate::{
     ExecutorConfig,
     credential::{DeviceCredential, DeviceCredentialError},
     session::DeviceSessionAcceptor,
+    task_service::TaskService,
 };
 use crate::{
     network::ExecutorNetworkError,
@@ -49,7 +50,7 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let hello = DeviceHello {
         schema_version: DEVICE_SESSION_SCHEMA_VERSION,
         device_ref,
-        execution_context,
+        execution_context: execution_context.clone(),
         agent_version: env!("CARGO_PKG_VERSION").to_owned(),
         observed_at_unix_ms: unix_millis(SystemTime::now())?,
     };
@@ -68,12 +69,16 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
             .with_device_network(network_updates)?
             .spawn();
     let peer_authorizer = supervisor.peer_authorizer();
+    let task_service = TaskService::open(&config.task_database_file, device_ref, execution_context)
+        .await
+        .map_err(|error| ExecutorError::TaskService(error.to_string()))?;
     let session_acceptor = DeviceSessionAcceptor::new(
         peer_authorizer,
         credential,
         device_ref,
         config.operation_timeout,
-    );
+    )
+    .with_task_service(task_service);
     let session_limit = Arc::new(Semaphore::new(64));
     let mut sessions = JoinSet::new();
     let mut status = supervisor.status();
@@ -191,6 +196,8 @@ pub enum ExecutorError {
     SupervisorTask(#[from] tokio::task::JoinError),
     #[error("the iroh endpoint closed unexpectedly")]
     EndpointClosed,
+    #[error("the local task service failed to start: {0}")]
+    TaskService(String),
 }
 
 #[cfg(test)]

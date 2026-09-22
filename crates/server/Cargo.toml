@@ -36,6 +36,7 @@ url = "2"
 pab-agent-core = { path = "../agent-core" }
 pab-bridge = { path = "../bridge" }
 pab-executor = { path = "../executor" }
+pab-platform = { path = "../platform" }
 pab-relay = { path = "../relay" }
 pab-transport = { path = "../transport" }
 rcgen = "0.14"

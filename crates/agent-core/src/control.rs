@@ -5,9 +5,9 @@ use iroh_base::SecretKey;
 use pab_protocol::{
     AuthorizedDevicePeer, ControlClientMessage, ControlErrorCode, ControlServerMessage,
     DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
-    DeviceNetworkUpdate, DeviceRef, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult,
-    EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose,
-    EndpointProofResponse, EndpointSignature, RequestId, TenantId,
+    DeviceNetworkUpdate, DeviceRef, ENDPOINT_PROOF_CLOCK_SKEW_MS, ENDPOINT_PROOF_SCHEMA_VERSION,
+    EndpointAuthenticationResult, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RequestId, TenantId,
 };
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -284,7 +284,10 @@ fn validate_challenge(
         return Err(EndpointControlError::ChallengeMismatch);
     }
     challenge
-        .validate_at(unix_millis(SystemTime::now())?)
+        .validate_at_with_skew(
+            unix_millis(SystemTime::now())?,
+            ENDPOINT_PROOF_CLOCK_SKEW_MS,
+        )
         .map_err(|_| EndpointControlError::InvalidChallenge)?;
     Ok(())
 }

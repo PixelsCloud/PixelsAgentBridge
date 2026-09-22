@@ -13,6 +13,7 @@ pub struct ExecutorConfig {
     pub relay_urls: Vec<RelayUrl>,
     pub endpoint_secret_file: PathBuf,
     pub device_credential_file: PathBuf,
+    pub task_database_file: PathBuf,
     pub control_ca_cert: Option<PathBuf>,
     pub relay_ca_cert: Option<PathBuf>,
     pub operation_timeout: Duration,
@@ -40,6 +41,9 @@ impl ExecutorConfig {
             relay_urls: relay_urls(required_text(&mut lookup, "PAB_RELAY_URLS")?)?,
             endpoint_secret_file: required_path(&mut lookup, "PAB_ENDPOINT_SECRET_FILE")?,
             device_credential_file: required_path(&mut lookup, "PAB_DEVICE_CREDENTIAL_FILE")?,
+            task_database_file: lookup("PAB_TASK_DATABASE")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("pab-executor.sqlite3")),
             control_ca_cert: lookup("PAB_CONTROL_CA_CERT").map(PathBuf::from),
             relay_ca_cert: lookup("PAB_RELAY_CA_CERT").map(PathBuf::from),
             operation_timeout: Duration::from_secs(10),
@@ -173,6 +177,10 @@ mod tests {
         assert_eq!(config.device_id, DeviceId::from_u128(3));
         assert_eq!(config.operation_timeout, Duration::from_secs(10));
         assert_eq!(config.control_ca_cert, None);
+        assert_eq!(
+            config.task_database_file,
+            PathBuf::from("pab-executor.sqlite3")
+        );
         assert_eq!(config.relay_urls.len(), 2);
     }
 

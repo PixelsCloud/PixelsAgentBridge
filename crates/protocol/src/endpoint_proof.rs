@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::{ChallengeId, ConnectionId, DeploymentId, DeviceId, TenantId, UserId};
 
 pub const ENDPOINT_PROOF_SCHEMA_VERSION: u16 = 2;
+pub const ENDPOINT_PROOF_CLOCK_SKEW_MS: i64 = 30_000;
 const ENDPOINT_PROOF_DOMAIN: &str = "pixels-agent-bridge endpoint proof v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -117,6 +118,14 @@ impl EndpointProofChallenge {
     }
 
     pub fn validate_at(&self, unix_ms: i64) -> Result<(), EndpointProofContractError> {
+        self.validate_at_with_skew(unix_ms, 0)
+    }
+
+    pub fn validate_at_with_skew(
+        &self,
+        unix_ms: i64,
+        allowed_skew_ms: i64,
+    ) -> Result<(), EndpointProofContractError> {
         if self.schema_version != ENDPOINT_PROOF_SCHEMA_VERSION {
             return Err(EndpointProofContractError::UnsupportedSchemaVersion(
                 self.schema_version,
@@ -125,10 +134,13 @@ impl EndpointProofChallenge {
         if self.expires_at_unix_ms <= self.issued_at_unix_ms {
             return Err(EndpointProofContractError::InvalidValidityWindow);
         }
-        if unix_ms < self.issued_at_unix_ms {
+        if allowed_skew_ms < 0 {
+            return Err(EndpointProofContractError::InvalidClockSkew);
+        }
+        if unix_ms.saturating_add(allowed_skew_ms) < self.issued_at_unix_ms {
             return Err(EndpointProofContractError::NotYetValid);
         }
-        if unix_ms >= self.expires_at_unix_ms {
+        if unix_ms >= self.expires_at_unix_ms.saturating_add(allowed_skew_ms) {
             return Err(EndpointProofContractError::Expired);
         }
         Ok(())
@@ -151,6 +163,8 @@ pub enum EndpointProofContractError {
     NotYetValid,
     #[error("endpoint proof challenge has expired")]
     Expired,
+    #[error("allowed clock skew must not be negative")]
+    InvalidClockSkew,
 }
 
 #[cfg(test)]
@@ -183,5 +197,27 @@ mod tests {
         });
 
         assert_ne!(user.signing_message(), device.signing_message());
+    }
+
+    #[test]
+    fn validation_allows_only_the_configured_clock_skew() {
+        let challenge = challenge(EndpointProofPrincipal::User {
+            user_id: UserId::from_u128(7),
+        });
+
+        assert_eq!(
+            challenge.validate_at_with_skew(970, 29),
+            Err(EndpointProofContractError::NotYetValid)
+        );
+        assert_eq!(challenge.validate_at_with_skew(970, 30), Ok(()));
+        assert_eq!(challenge.validate_at_with_skew(2_029, 30), Ok(()));
+        assert_eq!(
+            challenge.validate_at_with_skew(2_030, 30),
+            Err(EndpointProofContractError::Expired)
+        );
+        assert_eq!(
+            challenge.validate_at_with_skew(1_500, -1),
+            Err(EndpointProofContractError::InvalidClockSkew)
+        );
     }
 }

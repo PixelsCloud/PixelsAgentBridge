@@ -1,7 +1,9 @@
 # Development
 
-Pixels Agent Bridge is currently validating its Relay, traffic-control, PostgreSQL
-control plane, and authenticated iroh device-session foundations.
+Pixels Agent Bridge has a first remotely operable vertical slice: an enrolled Bridge
+can authenticate through the PostgreSQL control plane, reach an Executor through
+iroh, execute an explicit native program, and stream persistent task events and
+stdout/stderr back to the operator.
 The Rust toolchain is pinned in `rust-toolchain.toml` and dependencies are locked in
 `Cargo.lock`.
 
@@ -69,16 +71,22 @@ interval after recoverable failures, increments a connection generation after ev
 authentication, and publishes current connection state through a Tokio watch channel
 for UI/Executor adapters. The same receive loop multiplexes heartbeat, address, and
 device-peer authorization responses. It does not persist account passwords or disable
-certificate verification.
+certificate verification. Its enrollment API registers an account and initial
+user/device Endpoints while checking every signed challenge field. Client challenge
+validation tolerates at most 30 seconds of clock skew; the server still validates its
+own issued challenge against its own clock.
 
 `pab-bridge` is the GUI-independent operation-side connection boundary. Given a
 previously registered user Endpoint, it authenticates WSS, starts the matching PAB
 iroh Endpoint, queries an authorized device address, connects to the exact advertised
 Endpoint ID, and verifies the device-session response against the configured user and
-device. The device password is supplied by the caller in a zeroizing value; it is not
-read from the environment or exposed as an MCP argument. Both serialized password
-buffers and the Executor's corresponding receive buffers are zeroized. Persistent
-first-use account login and task operations remain future work.
+device. It can query the verified target environment, submit idempotent command
+requests, query or cancel tasks, read output by byte offset, and subscribe from event
+and output cursors. The device password is supplied by the caller in a zeroizing
+value; the Debug CLI reads it from a protected file and never accepts it as a command
+or MCP argument. Both serialized password buffers and the Executor's corresponding
+receive buffers are zeroized. A production desktop credential store remains future
+work.
 
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
@@ -89,7 +97,13 @@ endpoint with the same registered key, detects the native environment, publishes
 both connections on the platform termination signal. It watches iroh address changes
 and publishes them through the authenticated control connection. It accepts bounded
 incoming PAB connections and authenticates them before any task capability is exposed.
-Task execution itself is still absent.
+Each task uses a separate bounded iroh stream. The Executor runs the exact program and
+argument vector without an implicit shell, drains stdout and stderr concurrently, and
+stores acceptance, request deduplication, state, events, and output in local SQLite.
+Unfinished tasks become `Interrupted` after restart. Output uses a rolling 16 MiB
+retention window per stream, and an Executor runs at most 32 command tasks at once.
+A subscription reports caught-up only after its event, stdout, and stderr cursors
+agree with the same persisted snapshot.
 
 Run the Debug Executor with a previously registered device endpoint:
 
@@ -101,11 +115,41 @@ $env:PAB_CONTROL_URL = "wss://server.example/control"
 $env:PAB_RELAY_URLS = "https://relay-1.example,https://relay-2.example"
 $env:PAB_ENDPOINT_SECRET_FILE = "C:\protected\pab-endpoint.key"
 $env:PAB_DEVICE_CREDENTIAL_FILE = "C:\protected\pab-device-credential.json"
+$env:PAB_TASK_DATABASE = "C:\protected\pab-executor.sqlite3"
 # Optional; control and Relay may use different private CAs:
 $env:PAB_CONTROL_CA_CERT = "C:\protected\pab-ca.pem"
 $env:PAB_RELAY_CA_CERT = "C:\protected\relay-ca.pem"
 cargo run -p pab-executor
 ```
+
+The Debug command client prints the verified target OS reminder, streams output and
+state, cancels on Ctrl+C, and retries recoverable connections indefinitely at the
+fixed three-second interval. `follow` reconnects to an existing task and replays its
+retained history:
+
+```powershell
+cargo run -p pab-bridge --bin pab-bridge -- command <device-id> <program> [argument ...]
+cargo run -p pab-bridge --bin pab-bridge -- follow <device-id> <task-id>
+```
+
+Set `PAB_REQUEST_ID` to a caller-generated UUID when a durable caller must retry the
+same submission across process restarts. Reusing it with different command input is
+rejected.
+
+For a fresh Debug deployment, prepare separate account and device password files, set
+`PAB_CONTROL_URL`, `PAB_DEPLOYMENT_ID`, and `PAB_RELAY_URLS`, then create the initial
+account, user Endpoint, and device Endpoint:
+
+```powershell
+cargo run -p pab-bridge --bin pab-enroll -- <username> <account-password-file> <device-name> <device-password-file> <new-output-directory>
+```
+
+The output directory is created before the network request and must not contain any
+generated filename. It receives two Endpoint key files, the local Argon2 device
+credential, and a non-secret enrollment manifest. Keep the device Endpoint key and
+credential on the Executor; keep the user Endpoint key and cleartext device password
+on the Bridge side. The account password is used only during this enrollment flow.
+Production onboarding and OS credential-store integration remain separate work.
 
 The key file contains the 64 lowercase hexadecimal characters used by iroh's
 `SecretKey` representation, with an optional trailing newline. Do not pass the key as

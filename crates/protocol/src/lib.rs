@@ -10,6 +10,7 @@ mod platform;
 mod relay_control;
 mod relay_policy;
 mod task;
+mod task_session;
 
 pub use control::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
@@ -21,8 +22,9 @@ pub use device_network::{
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS,
 };
 pub use endpoint_proof::{
-    ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey, EndpointProofChallenge, EndpointProofContractError,
-    EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
+    ENDPOINT_PROOF_CLOCK_SKEW_MS, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey,
+    EndpointProofChallenge, EndpointProofContractError, EndpointProofPrincipal,
+    EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
 };
 pub use ids::{
     ChallengeId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId, TaskId,
@@ -49,4 +51,9 @@ pub use task::{
     CapabilityRef, OutputAvailability, OutputChunk, OutputRange, OutputStream, TASK_SCHEMA_VERSION,
     TaskCompletion, TaskError, TaskEvent, TaskEventKind, TaskProgress, TaskRef, TaskSnapshot,
     TaskState, TransferDirection, TransferPhase, TransferProgress,
+};
+pub use task_session::{
+    CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DeviceTaskErrorCode, DeviceTaskRequest,
+    DeviceTaskResponse, MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS,
+    MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES,
 };

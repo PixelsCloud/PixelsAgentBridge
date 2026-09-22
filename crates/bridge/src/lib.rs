@@ -4,4 +4,4 @@ mod config;
 mod connection;
 
 pub use config::{BridgeConfig, BridgeConfigError};
-pub use connection::{AuthenticatedDeviceConnection, BridgeClient, BridgeError};
+pub use connection::{AuthenticatedDeviceConnection, BridgeClient, BridgeError, TaskSubscription};

@@ -5,10 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+argon2 = "0.5"
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }
 pab-protocol = { path = "../protocol" }
 pab-transport = { path = "../transport" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 zeroize = "1"

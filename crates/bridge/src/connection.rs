@@ -7,8 +7,12 @@ use pab_agent_core::{
     read_endpoint_secret, tls_connector,
 };
 use pab_protocol::{
-    DEVICE_SESSION_AUTH_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
-    DeviceSessionAuthenticationResult, EndpointProofPrincipal, MAX_DEVICE_PASSWORD_BYTES, UserId,
+    CommandTaskSpec, ContextFreshness, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
+    DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
+    DeviceSessionAuthenticationResult, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
+    EndpointProofPrincipal, MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OutputStream,
+    RequestId, TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef, TaskSnapshot,
+    UserId,
 };
 use pab_transport::{
     PabConnection, PabConnectionError, PabEndpoint, PabEndpointAddress, PabEndpointConfig,
@@ -127,6 +131,7 @@ impl BridgeClient {
                     peer_user_id,
                     password_version,
                     authenticated_at_unix_ms,
+                    operation_timeout: self.config.operation_timeout,
                 })
             }
             DeviceSessionAuthenticationResult::Rejected => {
@@ -153,6 +158,7 @@ pub struct AuthenticatedDeviceConnection {
     peer_user_id: UserId,
     password_version: u64,
     authenticated_at_unix_ms: i64,
+    operation_timeout: std::time::Duration,
 }
 
 impl AuthenticatedDeviceConnection {
@@ -176,9 +182,271 @@ impl AuthenticatedDeviceConnection {
         &self.connection
     }
 
+    pub async fn get_environment(&self) -> Result<TargetContext, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::GetEnvironment {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Environment { context }
+                if context.device_ref == self.device_ref
+                    && context.source == TargetContextSource::ExecutorVerified
+                    && context.freshness == ContextFreshness::Current =>
+            {
+                Ok(*context)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn submit_command(
+        &self,
+        request_id: RequestId,
+        command: CommandTaskSpec,
+    ) -> Result<TaskSnapshot, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::SubmitCommand {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id,
+                command,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Submitted { snapshot }
+                if valid_snapshot(
+                    &snapshot,
+                    self.device_ref,
+                    self.peer_user_id,
+                    Some(request_id),
+                    None,
+                ) =>
+            {
+                Ok(*snapshot)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn get_task(&self, task_ref: TaskRef) -> Result<TaskSnapshot, BridgeError> {
+        self.validate_task_ref(task_ref)?;
+        match self
+            .task_request(DeviceTaskRequest::GetTask {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                task_ref,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Snapshot { snapshot }
+                if valid_snapshot(
+                    &snapshot,
+                    self.device_ref,
+                    self.peer_user_id,
+                    None,
+                    Some(task_ref),
+                ) =>
+            {
+                Ok(*snapshot)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn read_output(
+        &self,
+        task_ref: TaskRef,
+        stream: OutputStream,
+        offset: u64,
+        max_bytes: u32,
+    ) -> Result<(pab_protocol::OutputChunk, pab_protocol::OutputRange), BridgeError> {
+        self.validate_task_ref(task_ref)?;
+        if max_bytes == 0 || max_bytes > MAX_OUTPUT_READ_BYTES {
+            return Err(BridgeError::InvalidOutputReadSize);
+        }
+        match self
+            .task_request(DeviceTaskRequest::ReadOutput {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                task_ref,
+                stream,
+                offset,
+                max_bytes,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Output { chunk, range }
+                if chunk.schema_version == TASK_SCHEMA_VERSION
+                    && chunk.task_ref == task_ref
+                    && chunk.stream == stream
+                    && chunk.offset == offset
+                    && range.retained_from <= chunk.offset
+                    && chunk
+                        .offset
+                        .checked_add(u64::try_from(chunk.bytes.len()).unwrap_or(u64::MAX))
+                        .is_some_and(|end| end <= range.available_to) =>
+            {
+                Ok((chunk, range))
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn cancel_task(
+        &self,
+        task_ref: TaskRef,
+        reason: String,
+    ) -> Result<TaskSnapshot, BridgeError> {
+        self.validate_task_ref(task_ref)?;
+        match self
+            .task_request(DeviceTaskRequest::Cancel {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                task_ref,
+                reason,
+            })
+            .await?
+        {
+            DeviceTaskResponse::CancelAccepted { snapshot }
+                if valid_snapshot(
+                    &snapshot,
+                    self.device_ref,
+                    self.peer_user_id,
+                    None,
+                    Some(task_ref),
+                ) =>
+            {
+                Ok(*snapshot)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn subscribe_task(
+        &self,
+        task_ref: TaskRef,
+        after_event_seq: u64,
+        stdout_offset: u64,
+        stderr_offset: u64,
+    ) -> Result<TaskSubscription, BridgeError> {
+        self.validate_task_ref(task_ref)?;
+        let mut stream = self.connection.open_bi(self.operation_timeout()).await?;
+        stream
+            .send_json(
+                &DeviceTaskRequest::Subscribe {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    task_ref,
+                    after_event_seq,
+                    stdout_offset,
+                    stderr_offset,
+                },
+                self.operation_timeout(),
+            )
+            .await?;
+        Ok(TaskSubscription {
+            stream,
+            task_ref,
+            initiated_by: self.peer_user_id,
+        })
+    }
+
+    async fn task_request(
+        &self,
+        request: DeviceTaskRequest,
+    ) -> Result<DeviceTaskResponse, BridgeError> {
+        let mut stream = self.connection.open_bi(self.operation_timeout()).await?;
+        stream.send_json(&request, self.operation_timeout()).await?;
+        let response: DeviceTaskResponse = stream.receive_json(self.operation_timeout()).await?;
+        match response {
+            DeviceTaskResponse::Error { code, message } => {
+                Err(BridgeError::RemoteTask { code, message })
+            }
+            response => Ok(response),
+        }
+    }
+
+    fn operation_timeout(&self) -> std::time::Duration {
+        self.operation_timeout
+    }
+
+    fn validate_task_ref(&self, task_ref: TaskRef) -> Result<(), BridgeError> {
+        if task_ref.device_ref != self.device_ref {
+            return Err(BridgeError::TaskDeviceMismatch);
+        }
+        Ok(())
+    }
+
     pub fn close(self) {
         self.connection.close(b"Bridge device session closed");
     }
+}
+
+pub struct TaskSubscription {
+    stream: pab_transport::PabBiStream,
+    task_ref: TaskRef,
+    initiated_by: UserId,
+}
+
+impl TaskSubscription {
+    pub async fn next(&mut self) -> Result<DeviceTaskResponse, BridgeError> {
+        let response: DeviceTaskResponse = self.stream.receive_json_wait().await?;
+        match &response {
+            DeviceTaskResponse::Error { code, message } => {
+                return Err(BridgeError::RemoteTask {
+                    code: *code,
+                    message: message.clone(),
+                });
+            }
+            DeviceTaskResponse::Event { event }
+                if event.schema_version != TASK_SCHEMA_VERSION
+                    || event.task_ref != self.task_ref =>
+            {
+                return Err(unexpected_task_response(response));
+            }
+            DeviceTaskResponse::Output { chunk, range }
+                if chunk.schema_version != TASK_SCHEMA_VERSION
+                    || chunk.task_ref != self.task_ref
+                    || range.retained_from > chunk.offset
+                    || chunk
+                        .offset
+                        .checked_add(u64::try_from(chunk.bytes.len()).unwrap_or(u64::MAX))
+                        .is_none_or(|end| end > range.available_to) =>
+            {
+                return Err(unexpected_task_response(response));
+            }
+            DeviceTaskResponse::OutputChanged { task_ref, .. } if *task_ref != self.task_ref => {
+                return Err(unexpected_task_response(response));
+            }
+            DeviceTaskResponse::CaughtUp { snapshot }
+                if !valid_snapshot(
+                    snapshot,
+                    self.task_ref.device_ref,
+                    self.initiated_by,
+                    None,
+                    Some(self.task_ref),
+                ) =>
+            {
+                return Err(unexpected_task_response(response));
+            }
+            _ => {}
+        }
+        Ok(response)
+    }
+}
+
+fn valid_snapshot(
+    snapshot: &TaskSnapshot,
+    device_ref: DeviceRef,
+    initiated_by: UserId,
+    request_id: Option<RequestId>,
+    task_ref: Option<TaskRef>,
+) -> bool {
+    snapshot.schema_version == TASK_SCHEMA_VERSION
+        && snapshot.task_ref.device_ref == device_ref
+        && snapshot.initiated_by == initiated_by
+        && request_id.is_none_or(|expected| snapshot.request_id == expected)
+        && task_ref.is_none_or(|expected| snapshot.task_ref == expected)
+}
+
+fn unexpected_task_response(response: DeviceTaskResponse) -> BridgeError {
+    BridgeError::UnexpectedTaskResponse(format!("{response:?}"))
 }
 
 fn read_file(path: &std::path::Path, kind: &'static str) -> Result<Vec<u8>, BridgeError> {
@@ -221,4 +489,24 @@ pub enum BridgeError {
     AuthenticationRejected,
     #[error("the device authentication response does not match the requested identity")]
     AuthenticationIdentityMismatch,
+    #[error("the task belongs to a different device")]
+    TaskDeviceMismatch,
+    #[error("output read size is outside the supported range")]
+    InvalidOutputReadSize,
+    #[error("Executor task request failed with {code:?}: {message}")]
+    RemoteTask {
+        code: DeviceTaskErrorCode,
+        message: String,
+    },
+    #[error("Executor returned an unexpected task response: {0}")]
+    UnexpectedTaskResponse(String),
+}
+
+impl BridgeError {
+    pub const fn is_recoverable_connection(&self) -> bool {
+        matches!(
+            self,
+            Self::NetworkResolution(_) | Self::Endpoint(_) | Self::Connection(_)
+        )
+    }
 }

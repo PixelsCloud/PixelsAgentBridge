@@ -56,8 +56,8 @@ impl PabBiStream {
         value: &T,
         timeout: Duration,
     ) -> Result<(), PabConnectionError> {
-        let encoded = serde_json::to_vec(value)?;
-        self.send_encoded(&encoded, timeout).await
+        self.send_frame_json(value, timeout).await?;
+        self.finish_send(timeout).await
     }
 
     pub async fn send_sensitive_json<T: Serialize>(
@@ -66,6 +66,16 @@ impl PabBiStream {
         timeout: Duration,
     ) -> Result<(), PabConnectionError> {
         let encoded = Zeroizing::new(serde_json::to_vec(value)?);
+        self.send_encoded(&encoded, timeout).await?;
+        self.finish_send(timeout).await
+    }
+
+    pub async fn send_frame_json<T: Serialize>(
+        &mut self,
+        value: &T,
+        timeout: Duration,
+    ) -> Result<(), PabConnectionError> {
+        let encoded = serde_json::to_vec(value)?;
         self.send_encoded(&encoded, timeout).await
     }
 
@@ -89,6 +99,14 @@ impl PabBiStream {
                 .write_all(encoded)
                 .await
                 .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+            Ok(())
+        })
+        .await
+        .map_err(|_| PabConnectionError::Timeout)?
+    }
+
+    pub async fn finish_send(&mut self, timeout: Duration) -> Result<(), PabConnectionError> {
+        tokio::time::timeout(timeout, async {
             self.send
                 .finish()
                 .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
@@ -99,6 +117,7 @@ impl PabBiStream {
                 .map_err(|error| PabConnectionError::Stream(error.to_string()))?
             {
                 None => Ok(()),
+                Some(code) if code == 0_u8.into() => Ok(()),
                 Some(code) => Err(PabConnectionError::Stream(format!(
                     "peer stopped the message stream with code {code}"
                 ))),
@@ -112,26 +131,30 @@ impl PabBiStream {
         &mut self,
         timeout: Duration,
     ) -> Result<T, PabConnectionError> {
-        tokio::time::timeout(timeout, async {
-            let mut length = [0_u8; 4];
-            self.receive
-                .read_exact(&mut length)
-                .await
-                .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
-            let length = usize::try_from(u32::from_be_bytes(length))
-                .map_err(|_| PabConnectionError::MessageTooLarge(usize::MAX))?;
-            if length > MAX_PAB_MESSAGE_BYTES {
-                return Err(PabConnectionError::MessageTooLarge(length));
-            }
-            let mut encoded = vec![0_u8; length];
-            self.receive
-                .read_exact(&mut encoded)
-                .await
-                .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
-            Ok(serde_json::from_slice(&encoded)?)
-        })
-        .await
-        .map_err(|_| PabConnectionError::Timeout)?
+        tokio::time::timeout(timeout, self.receive_json_wait())
+            .await
+            .map_err(|_| PabConnectionError::Timeout)?
+    }
+
+    pub async fn receive_json_wait<T: DeserializeOwned>(
+        &mut self,
+    ) -> Result<T, PabConnectionError> {
+        let mut length = [0_u8; 4];
+        self.receive
+            .read_exact(&mut length)
+            .await
+            .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+        let length = usize::try_from(u32::from_be_bytes(length))
+            .map_err(|_| PabConnectionError::MessageTooLarge(usize::MAX))?;
+        if length > MAX_PAB_MESSAGE_BYTES {
+            return Err(PabConnectionError::MessageTooLarge(length));
+        }
+        let mut encoded = vec![0_u8; length];
+        self.receive
+            .read_exact(&mut encoded)
+            .await
+            .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+        Ok(serde_json::from_slice(&encoded)?)
     }
 
     pub async fn receive_sensitive_json<T: DeserializeOwned>(

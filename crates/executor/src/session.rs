@@ -13,6 +13,7 @@ use thiserror::Error;
 use zeroize::Zeroizing;
 
 use crate::credential::{DeviceCredential, DeviceCredentialError};
+use crate::task_service::TaskService;
 
 const FAILED_PASSWORD_DELAY: Duration = Duration::from_millis(500);
 
@@ -22,6 +23,7 @@ pub struct DeviceSessionAcceptor {
     credential: DeviceCredential,
     device_ref: DeviceRef,
     timeout: Duration,
+    tasks: Option<TaskService>,
 }
 
 impl DeviceSessionAcceptor {
@@ -39,6 +41,7 @@ impl DeviceSessionAcceptor {
             credential: DeviceCredential::read(path)?,
             device_ref,
             timeout,
+            tasks: None,
         })
     }
 
@@ -53,7 +56,26 @@ impl DeviceSessionAcceptor {
             credential,
             device_ref,
             timeout,
+            tasks: None,
         }
+    }
+
+    pub async fn with_task_database(
+        mut self,
+        database_file: &Path,
+        execution_context: pab_protocol::ExecutionContext,
+    ) -> Result<Self, DeviceSessionError> {
+        self.tasks = Some(
+            TaskService::open(database_file, self.device_ref, execution_context)
+                .await
+                .map_err(|error| DeviceSessionError::TaskService(error.to_string()))?,
+        );
+        Ok(self)
+    }
+
+    pub(crate) fn with_task_service(mut self, tasks: TaskService) -> Self {
+        self.tasks = Some(tasks);
+        self
     }
 
     pub async fn handle(&self, connection: PabConnection) -> Result<(), DeviceSessionError> {
@@ -63,6 +85,7 @@ impl DeviceSessionAcceptor {
             self.credential.clone(),
             self.device_ref,
             self.timeout,
+            self.tasks.clone(),
         )
         .await
     }
@@ -74,6 +97,7 @@ async fn authenticate(
     credential: DeviceCredential,
     device_ref: DeviceRef,
     timeout: Duration,
+    tasks: Option<TaskService>,
 ) -> Result<(), DeviceSessionError> {
     let mut stream = connection.accept_bi(timeout).await?;
     let request: DeviceSessionAuthenticate = stream.receive_sensitive_json(timeout).await?;
@@ -117,7 +141,27 @@ async fn authenticate(
             timeout,
         )
         .await?;
-    connection.closed().await;
+    if let Some(tasks) = tasks {
+        loop {
+            match connection.accept_bi(timeout).await {
+                Ok(stream) => {
+                    let tasks = tasks.clone();
+                    let initiated_by = authorized.peer_user_id;
+                    tokio::spawn(async move {
+                        if let Err(error) = tasks.handle_stream(initiated_by, stream, timeout).await
+                            && !error.is_connection_end()
+                        {
+                            eprintln!("pab-executor: task_stream={error}");
+                        }
+                    });
+                }
+                Err(PabConnectionError::Timeout) => continue,
+                Err(_) => break,
+            }
+        }
+    } else {
+        connection.closed().await;
+    }
     Ok(())
 }
 
@@ -154,4 +198,6 @@ pub enum DeviceSessionError {
     Credential(#[from] DeviceCredentialError),
     #[error(transparent)]
     Connection(#[from] PabConnectionError),
+    #[error("the local task service failed to start: {0}")]
+    TaskService(String),
 }
