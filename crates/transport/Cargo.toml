@@ -14,3 +14,4 @@ rustls-pki-types = "1"
 rustls-pemfile = "2"
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
+zeroize = "1"

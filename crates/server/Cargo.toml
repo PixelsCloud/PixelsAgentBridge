@@ -34,6 +34,7 @@ url = "2"
 
 [dev-dependencies]
 pab-agent-core = { path = "../agent-core" }
+pab-bridge = { path = "../bridge" }
 pab-executor = { path = "../executor" }
 pab-relay = { path = "../relay" }
 pab-transport = { path = "../transport" }
@@ -43,3 +44,4 @@ tokio-tungstenite = { version = "0.29", default-features = false, features = [
     "connect",
     "rustls-tls-webpki-roots",
 ] }
+zeroize = "1"

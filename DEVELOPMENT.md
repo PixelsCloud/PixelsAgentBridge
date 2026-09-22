@@ -71,6 +71,15 @@ for UI/Executor adapters. The same receive loop multiplexes heartbeat, address, 
 device-peer authorization responses. It does not persist account passwords or disable
 certificate verification.
 
+`pab-bridge` is the GUI-independent operation-side connection boundary. Given a
+previously registered user Endpoint, it authenticates WSS, starts the matching PAB
+iroh Endpoint, queries an authorized device address, connects to the exact advertised
+Endpoint ID, and verifies the device-session response against the configured user and
+device. The device password is supplied by the caller in a zeroizing value; it is not
+read from the environment or exposed as an MCP argument. Both serialized password
+buffers and the Executor's corresponding receive buffers are zeroized. Persistent
+Bridge supervision, first-use account login, and task operations remain future work.
+
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
 file, local device-credential file, and optional control/Relay private CAs from

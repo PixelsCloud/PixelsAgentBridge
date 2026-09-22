@@ -76,7 +76,7 @@ async fn authenticate(
     timeout: Duration,
 ) -> Result<(), DeviceSessionError> {
     let mut stream = connection.accept_bi(timeout).await?;
-    let request: DeviceSessionAuthenticate = stream.receive_json(timeout).await?;
+    let request: DeviceSessionAuthenticate = stream.receive_sensitive_json(timeout).await?;
     let password = Zeroizing::new(request.device_password);
     if request.schema_version != DEVICE_SESSION_AUTH_SCHEMA_VERSION
         || request.device_ref != device_ref

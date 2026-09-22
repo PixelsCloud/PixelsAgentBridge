@@ -5,7 +5,7 @@ use thiserror::Error;
 
 const MAX_SECRET_TEXT_BYTES: usize = 256;
 
-pub(crate) fn read_endpoint_secret(path: &Path) -> Result<SecretKey, EndpointSecretError> {
+pub fn read_endpoint_secret(path: &Path) -> Result<SecretKey, EndpointSecretError> {
     let encoded = fs::read_to_string(path).map_err(|source| EndpointSecretError::Read {
         path: path.to_owned(),
         source,

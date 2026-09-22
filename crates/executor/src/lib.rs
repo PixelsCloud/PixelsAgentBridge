@@ -2,7 +2,6 @@
 
 mod config;
 mod credential;
-mod identity;
 mod network;
 mod runtime;
 mod session;

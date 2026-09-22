@@ -2791,10 +2791,24 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tokio-tungstenite",
  "webpki-roots 1.0.9",
+]
+
+[[package]]
+name = "pab-bridge"
+version = "0.1.0"
+dependencies = [
+ "iroh-base",
+ "pab-agent-core",
+ "pab-protocol",
+ "pab-transport",
+ "thiserror 2.0.20",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -2871,6 +2885,7 @@ dependencies = [
  "futures-util",
  "iroh-base",
  "pab-agent-core",
+ "pab-bridge",
  "pab-executor",
  "pab-protocol",
  "pab-relay",
@@ -2890,6 +2905,7 @@ dependencies = [
  "unicode-normalization",
  "url",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -2913,6 +2929,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]

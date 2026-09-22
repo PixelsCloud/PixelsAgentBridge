@@ -2,8 +2,8 @@ use std::{fs, sync::Arc, time::SystemTime};
 
 use pab_agent_core::{
     ControlConnectionPhase, DeviceHelloConfigError, DeviceNetworkConfigError,
-    EndpointControlConfig, EndpointControlSupervisor, ReconnectPolicy, ReconnectPolicyError,
-    TlsConnectorError, tls_connector,
+    EndpointControlConfig, EndpointControlSupervisor, EndpointSecretError, ReconnectPolicy,
+    ReconnectPolicyError, TlsConnectorError, read_endpoint_secret, tls_connector,
 };
 use pab_platform::{PlatformDetectionError, detect_native_execution_context};
 use pab_protocol::{
@@ -15,7 +15,6 @@ use tokio::{sync::Semaphore, task::JoinSet};
 use crate::{
     ExecutorConfig,
     credential::{DeviceCredential, DeviceCredentialError},
-    identity::{EndpointSecretError, read_endpoint_secret},
     session::DeviceSessionAcceptor,
 };
 use crate::{
