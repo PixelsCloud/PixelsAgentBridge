@@ -72,12 +72,10 @@ file, and optional control/Relay private CAs from environment configuration; the
 endpoint secret itself is accepted only from a file. It binds an iroh endpoint with
 the same registered key, detects the native environment, publishes `DeviceHello`,
 reports supervised connection-state changes, reconnects, and closes both connections
-on the platform termination signal. It intentionally has no task execution path yet.
-Before the control service
-pushes task-sync messages, `pab-agent-core` must replace its heartbeat-owned receive
-loop with one multiplexed socket reader that routes pong and application frames; an
-application frame must never be treated as a protocol failure merely because it
-arrived while waiting for a heartbeat.
+on the platform termination signal. It watches iroh address changes and publishes
+them through the authenticated control connection. The steady-state connection uses
+one receive loop for pongs, address acknowledgements, and future server pushes. It
+intentionally has no task execution path yet.
 
 Run the Debug Executor with a previously registered device endpoint:
 
@@ -107,6 +105,16 @@ the hello after every successful reconnect before reporting `Authenticated`, so 
 submission can later use the stored environment revision as its expected-environment
 guard. Device session messages, connection state/backoff, and control-session error
 mapping stay in separate modules to keep each build unit focused.
+
+The same authenticated session publishes a separate versioned device-network record.
+`pab-transport` watches iroh address changes and exposes only HTTPS Relay URLs and
+socket addresses; the lightweight protocol and server do not depend on iroh's address
+types. Each Executor process uses a fresh instance ID and monotonically increasing
+address revision. PostgreSQL migration `0003_device_network.sql` stores the latest
+accepted address set only after rechecking the active device and endpoint key. The
+steady-state control connection has one WebSocket receive loop for pongs, address
+acknowledgements, and future server pushes, so independent features never compete for
+frames.
 
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set

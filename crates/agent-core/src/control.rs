@@ -4,9 +4,9 @@ use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId, DeviceHello,
-    DeviceHelloResult, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult, EndpointKey,
-    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
-    EndpointSignature, RequestId, TenantId,
+    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkUpdate, ENDPOINT_PROOF_SCHEMA_VERSION,
+    EndpointAuthenticationResult, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RequestId, TenantId,
 };
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -28,7 +28,7 @@ pub struct EndpointControlConfig {
 
 pub struct AuthenticatedControlConnection {
     identity: EndpointAuthenticationResult,
-    socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    pub(crate) socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
 }
 
 impl AuthenticatedControlConnection {
@@ -163,43 +163,42 @@ impl AuthenticatedControlConnection {
         }
     }
 
-    pub async fn heartbeat(
+    pub async fn publish_device_network(
         &mut self,
-        payload: Vec<u8>,
+        update: &DeviceNetworkUpdate,
         timeout: Duration,
-    ) -> Result<(), EndpointControlError> {
+    ) -> Result<DeviceNetworkResult, EndpointControlError> {
         if timeout.is_zero() {
             return Err(EndpointControlError::InvalidTimeout);
         }
-        let payload: tokio_tungstenite::tungstenite::Bytes = payload.into();
-        tokio::time::timeout(timeout, self.socket.send(Message::Ping(payload.clone())))
-            .await
-            .map_err(|_| EndpointControlError::Timeout)??;
-        tokio::time::timeout(timeout, async {
-            loop {
-                let message = self
-                    .socket
-                    .next()
-                    .await
-                    .ok_or(EndpointControlError::Closed)??;
-                match message {
-                    Message::Pong(received) if received == payload => return Ok(()),
-                    Message::Pong(_) => {}
-                    Message::Ping(received) => self.socket.send(Message::Pong(received)).await?,
-                    Message::Close(_) => return Err(EndpointControlError::Closed),
-                    Message::Text(_) | Message::Binary(_) | Message::Frame(_) => {
-                        return Err(EndpointControlError::UnexpectedMessage);
-                    }
-                }
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::PublishDeviceNetwork {
+                request_id,
+                update: Box::new(update.clone()),
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceNetworkAccepted {
+                request_id: response_id,
+                result,
+            } if response_id == request_id
+                && result.device_ref == update.device_ref
+                && result.endpoint_instance_id == update.endpoint_instance_id
+                && result.address_revision == update.address_revision =>
+            {
+                Ok(result)
             }
-        })
-        .await
-        .map_err(|_| EndpointControlError::Timeout)?
-    }
-
-    pub async fn close(mut self) -> Result<(), EndpointControlError> {
-        self.socket.close(None).await?;
-        Ok(())
+            ControlServerMessage::Error {
+                request_id: Some(response_id),
+                code,
+                message,
+            } if response_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
     }
 }
 
@@ -223,7 +222,7 @@ fn validate_challenge(
     Ok(())
 }
 
-async fn send(
+pub(crate) async fn send(
     socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
     message: &ControlClientMessage,
     timeout: Duration,
@@ -235,7 +234,7 @@ async fn send(
     Ok(())
 }
 
-async fn receive(
+pub(crate) async fn receive(
     socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
     timeout: Duration,
 ) -> Result<ControlServerMessage, EndpointControlError> {

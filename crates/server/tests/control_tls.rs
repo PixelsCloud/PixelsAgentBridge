@@ -9,10 +9,11 @@ use pab_agent_core::{
 };
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
-    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceRef,
-    EndpointAuthenticationResult, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
-    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
-    ExecutionScope, InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
+    DeviceNetworkUpdate, DeviceRef, EndpointAuthenticationResult, EndpointInstanceId, EndpointKey,
+    EndpointProofPrincipal, EndpointProofResponse, EndpointRegistration,
+    EndpointRegistrationResult, EndpointSignature, ExecutionContext, ExecutionScope,
+    InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -485,8 +486,31 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(stored_revision, "windows-test-env-1");
+    let endpoint_key = EndpointKey::new(*device_secret.public().as_bytes());
+    let endpoint_instance_id = EndpointInstanceId::new();
+    let device_network = DeviceNetworkUpdate {
+        schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
+        device_ref,
+        endpoint_key,
+        endpoint_instance_id,
+        address_revision: 1,
+        relay_urls: vec!["https://relay.example/".to_owned()],
+        direct_addresses: vec!["192.0.2.8:7842".parse().unwrap()],
+        observed_at_unix_ms: 1_795_000_000_100,
+    };
+    let network_result = device_connection
+        .publish_device_network(&device_network, Duration::from_secs(5))
+        .await
+        .unwrap();
+    assert_eq!(network_result.endpoint_instance_id, endpoint_instance_id);
+    assert_eq!(network_result.address_revision, 1);
     device_connection.close().await.unwrap();
 
+    let supervisor_instance_id = EndpointInstanceId::new();
+    let mut supervisor_network = device_network.clone();
+    supervisor_network.endpoint_instance_id = supervisor_instance_id;
+    let (network_sender, network_receiver) =
+        tokio::sync::watch::channel(supervisor_network.clone());
     let device_supervisor = EndpointControlSupervisor::new(
         device_config,
         device_secret,
@@ -501,6 +525,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .unwrap()
     .with_device_hello(device_hello)
     .unwrap()
+    .with_device_network(network_receiver)
+    .unwrap()
     .spawn();
     let mut device_status = device_supervisor.status();
     tokio::time::timeout(Duration::from_secs(5), async {
@@ -510,6 +536,28 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     })
     .await
     .expect("device supervisor did not publish hello");
+    supervisor_network.address_revision = 2;
+    supervisor_network.direct_addresses = vec!["192.0.2.9:7842".parse().unwrap()];
+    supervisor_network.observed_at_unix_ms += 1;
+    network_sender.send(supervisor_network).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let revision = sqlx::query_scalar::<_, i64>(
+                "SELECT address_revision FROM device_network WHERE tenant_id = $1 AND device_id = $2",
+            )
+            .bind(personal_tenant_id.as_uuid())
+            .bind(device_id.as_uuid())
+            .fetch_one(inspection_control.store().pool())
+            .await
+            .unwrap();
+            if revision == 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("device supervisor did not publish changed addresses");
     device_supervisor.shutdown().await.unwrap();
 
     let (mut login_socket, _) = tokio::time::timeout(

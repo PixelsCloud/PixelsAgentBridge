@@ -180,6 +180,16 @@ pub enum DeviceHelloConfigError {
     IdentityMismatch,
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum DeviceNetworkConfigError {
+    #[error("device network updates require a device endpoint principal")]
+    DevicePrincipalRequired,
+    #[error("device network identity does not match endpoint control configuration")]
+    IdentityMismatch,
+    #[error("device network endpoint key does not match the control endpoint key")]
+    EndpointKeyMismatch,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

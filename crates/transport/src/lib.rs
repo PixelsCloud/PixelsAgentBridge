@@ -2,4 +2,6 @@
 
 mod endpoint;
 
-pub use endpoint::{PAB_ALPN, PabEndpoint, PabEndpointConfig, PabEndpointError};
+pub use endpoint::{
+    PAB_ALPN, PabEndpoint, PabEndpointAddress, PabEndpointConfig, PabEndpointError,
+};

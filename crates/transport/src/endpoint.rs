@@ -1,10 +1,13 @@
-use std::{io::Cursor, time::Duration};
+use std::{io::Cursor, net::SocketAddr, time::Duration};
 
 use iroh::{
-    Endpoint, EndpointAddr, EndpointId, RelayMap, RelayMode, RelayUrl, SecretKey, endpoint::presets,
+    Endpoint, EndpointAddr, EndpointId, RelayMap, RelayMode, RelayUrl, SecretKey, Watcher as _,
+    endpoint::presets,
 };
 use iroh_relay::tls::CaTlsConfig;
+use n0_future::StreamExt;
 use thiserror::Error;
+use tokio::sync::watch;
 
 pub const PAB_ALPN: &[u8] = b"pixels-agent-bridge/1";
 
@@ -53,6 +56,12 @@ pub struct PabEndpoint {
     inner: Endpoint,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PabEndpointAddress {
+    pub relay_urls: Vec<String>,
+    pub direct_addresses: Vec<SocketAddr>,
+}
+
 impl PabEndpoint {
     pub async fn bind(
         config: PabEndpointConfig,
@@ -78,6 +87,20 @@ impl PabEndpoint {
         self.inner.addr()
     }
 
+    pub fn watch_address(&self) -> watch::Receiver<PabEndpointAddress> {
+        let (sender, receiver) = watch::channel(convert_address(&self.inner.addr()));
+        let mut addresses = self.inner.watch_addr().stream();
+        let closed = self.inner.closed();
+        tokio::spawn(closed.run_until(async move {
+            while let Some(address) = addresses.next().await {
+                if sender.send(convert_address(&address)).is_err() {
+                    break;
+                }
+            }
+        }));
+        receiver
+    }
+
     pub fn endpoint(&self) -> &Endpoint {
         &self.inner
     }
@@ -94,6 +117,13 @@ impl PabEndpoint {
 
     pub async fn close(&self) {
         self.inner.close().await;
+    }
+}
+
+fn convert_address(address: &EndpointAddr) -> PabEndpointAddress {
+    PabEndpointAddress {
+        relay_urls: address.relay_urls().map(ToString::to_string).collect(),
+        direct_addresses: address.ip_addrs().copied().collect(),
     }
 }
 
@@ -140,5 +170,23 @@ mod tests {
             .with_extra_ca_pem(b"not a certificate")
             .unwrap_err();
         assert!(matches!(error, PabEndpointError::NoCaCertificates));
+    }
+
+    #[test]
+    fn converts_only_supported_address_types() {
+        let endpoint_id = SecretKey::generate().public();
+        let relay = "https://relay.example".parse().unwrap();
+        let direct = "192.0.2.8:7842".parse().unwrap();
+        let address = EndpointAddr::new(endpoint_id)
+            .with_relay_url(relay)
+            .with_ip_addr(direct);
+
+        assert_eq!(
+            convert_address(&address),
+            PabEndpointAddress {
+                relay_urls: vec!["https://relay.example/".to_owned()],
+                direct_addresses: vec![direct],
+            }
+        );
     }
 }

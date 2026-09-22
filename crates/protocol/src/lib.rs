@@ -2,6 +2,7 @@
 
 mod control;
 mod device;
+mod device_network;
 mod endpoint_proof;
 mod ids;
 mod platform;
@@ -14,12 +15,17 @@ pub use control::{
     EndpointRegistration, EndpointRegistrationResult,
 };
 pub use device::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceHelloResult};
+pub use device_network::{
+    DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkUpdate,
+    MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS,
+};
 pub use endpoint_proof::{
     ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey, EndpointProofChallenge, EndpointProofContractError,
     EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
 };
 pub use ids::{
-    ChallengeId, ConnectionId, DeploymentId, DeviceId, RequestId, TaskId, TenantId, UserId,
+    ChallengeId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId, TaskId,
+    TenantId, UserId,
 };
 pub use platform::{
     ContextFreshness, CpuArchitecture, DeviceRef, ExecutionContext, ExecutionScope,

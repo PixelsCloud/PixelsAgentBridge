@@ -7,7 +7,8 @@ rust-version.workspace = true
 [dependencies]
 iroh = { version = "=1.2.0", default-features = false, features = ["tls-ring"] }
 iroh-relay = "=1.2.0"
+n0-future = "=0.3.2"
 rustls-pki-types = "1"
 rustls-pemfile = "2"
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync"] }

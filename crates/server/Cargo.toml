@@ -30,6 +30,7 @@ time = "0.3"
 tokio.workspace = true
 unicode-normalization = "0.1"
 uuid.workspace = true
+url = "2"
 
 [dev-dependencies]
 pab-agent-core = { path = "../agent-core" }

@@ -2828,6 +2828,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "serde",
+ "serde_json",
  "thiserror 2.0.20",
  "uuid",
 ]
@@ -2881,6 +2882,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "unicode-normalization",
+ "url",
  "uuid",
 ]
 
@@ -2898,6 +2900,7 @@ version = "0.1.0"
 dependencies = [
  "iroh",
  "iroh-relay",
+ "n0-future",
  "rustls-pemfile",
  "rustls-pki-types",
  "thiserror 2.0.20",

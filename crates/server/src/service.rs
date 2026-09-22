@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceHelloResult,
-    EndpointProofPrincipal, EndpointProofPurpose, RelayLimitDefaults, RelayPolicySnapshot,
-    TenantId, UserId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
+    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkUpdate, EndpointProofPrincipal,
+    EndpointProofPurpose, MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults,
+    RelayPolicySnapshot, TenantId, UserId,
 };
 use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
@@ -212,6 +213,54 @@ impl ControlPlane {
             .await?)
     }
 
+    pub async fn publish_device_network(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        update: &DeviceNetworkUpdate,
+    ) -> Result<DeviceNetworkResult, ServiceError> {
+        if update.schema_version != DEVICE_NETWORK_SCHEMA_VERSION {
+            return Err(ServiceError::UnsupportedDeviceNetworkSchema(
+                update.schema_version,
+            ));
+        }
+        let EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
+            return Err(ServiceError::DeviceEndpointRequired);
+        };
+        if update.device_ref.tenant_id != endpoint.tenant_id
+            || update.device_ref.device_id != device_id
+            || update.endpoint_key != endpoint.endpoint_key
+        {
+            return Err(ServiceError::EndpointIdentityChanged);
+        }
+        if update.address_revision == 0 {
+            return Err(ServiceError::InvalidAddressRevision);
+        }
+        if update.observed_at_unix_ms <= 0 {
+            return Err(ServiceError::InvalidObservedTime);
+        }
+        if update.relay_urls.len() > MAX_DEVICE_RELAY_URLS
+            || update.direct_addresses.len() > MAX_DEVICE_DIRECT_ADDRESSES
+        {
+            return Err(ServiceError::TooManyDeviceAddresses);
+        }
+        for relay_url in &update.relay_urls {
+            let parsed =
+                url::Url::parse(relay_url).map_err(|_| ServiceError::InvalidDeviceRelayUrl)?;
+            if parsed.scheme() != "https" || parsed.host_str().is_none() || relay_url.len() > 2_048
+            {
+                return Err(ServiceError::InvalidDeviceRelayUrl);
+            }
+        }
+        if update
+            .direct_addresses
+            .iter()
+            .any(|address| address.port() == 0 || address.ip().is_unspecified())
+        {
+            return Err(ServiceError::InvalidDeviceDirectAddress);
+        }
+        Ok(self.store.publish_device_network(update).await?)
+    }
+
     pub async fn relay_policy_snapshot(
         &self,
         validity: Duration,
@@ -232,12 +281,22 @@ pub enum ServiceError {
     EndpointIdentityChanged,
     #[error("device session schema version {0} is not supported")]
     UnsupportedDeviceSessionSchema(u16),
+    #[error("device network schema version {0} is not supported")]
+    UnsupportedDeviceNetworkSchema(u16),
     #[error("this operation requires an authenticated device endpoint")]
     DeviceEndpointRequired,
     #[error("agent version must contain between 1 and 64 characters")]
     InvalidAgentVersion,
     #[error("device observation time must be a positive Unix timestamp")]
     InvalidObservedTime,
+    #[error("device address revision must be greater than zero")]
+    InvalidAddressRevision,
+    #[error("device published too many network addresses")]
+    TooManyDeviceAddresses,
+    #[error("device Relay URLs must be absolute HTTPS URLs of at most 2048 bytes")]
+    InvalidDeviceRelayUrl,
+    #[error("device direct addresses must use a specific IP and nonzero port")]
+    InvalidDeviceDirectAddress,
     #[error(transparent)]
     TaskRuntime(#[from] TaskRuntimeError),
     #[error(transparent)]

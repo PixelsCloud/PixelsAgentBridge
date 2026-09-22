@@ -15,6 +15,7 @@ use crate::domain::{
 };
 
 mod accounts;
+mod device_network;
 mod device_runtime;
 mod endpoints;
 mod support;

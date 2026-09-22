@@ -80,8 +80,13 @@ pub(super) fn error_response(
             "an authenticated device endpoint is required".to_owned(),
         ),
         ControlSessionError::Service(ServiceError::UnsupportedDeviceSessionSchema(_))
+        | ControlSessionError::Service(ServiceError::UnsupportedDeviceNetworkSchema(_))
         | ControlSessionError::Service(ServiceError::InvalidAgentVersion)
         | ControlSessionError::Service(ServiceError::InvalidObservedTime)
+        | ControlSessionError::Service(ServiceError::InvalidAddressRevision)
+        | ControlSessionError::Service(ServiceError::TooManyDeviceAddresses)
+        | ControlSessionError::Service(ServiceError::InvalidDeviceRelayUrl)
+        | ControlSessionError::Service(ServiceError::InvalidDeviceDirectAddress)
         | ControlSessionError::Service(ServiceError::TaskRuntime(_))
         | ControlSessionError::Service(ServiceError::Store(StoreError::InvalidInput(_))) => (
             ControlErrorCode::InvalidMessage,

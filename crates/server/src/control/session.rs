@@ -103,6 +103,10 @@ impl ControlSession {
                 .publish_device_hello(&hello)
                 .await
                 .map(|result| ControlServerMessage::DeviceHelloAccepted { request_id, result }),
+            ControlClientMessage::PublishDeviceNetwork { update, .. } => self
+                .publish_device_network(&update)
+                .await
+                .map(|result| ControlServerMessage::DeviceNetworkAccepted { request_id, result }),
         };
         match result {
             Ok(response) => response,
@@ -290,6 +294,23 @@ impl ControlSession {
         }
         self.control
             .publish_device_hello(endpoint, hello)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn publish_device_network(
+        &self,
+        update: &pab_protocol::DeviceNetworkUpdate,
+    ) -> Result<pab_protocol::DeviceNetworkResult, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::DeviceEndpointRequired)?;
+        if update.device_ref.deployment_id != self.deployment_id {
+            return Err(ControlSessionError::DeviceIdentityMismatch);
+        }
+        self.control
+            .publish_device_network(endpoint, update)
             .await
             .map_err(Into::into)
     }

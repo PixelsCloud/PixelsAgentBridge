@@ -1,16 +1,21 @@
 use std::{fs, time::SystemTime};
 
 use pab_agent_core::{
-    ControlConnectionPhase, DeviceHelloConfigError, EndpointControlConfig,
-    EndpointControlSupervisor, ReconnectPolicy, ReconnectPolicyError, TlsConnectorError,
-    tls_connector,
+    ControlConnectionPhase, DeviceHelloConfigError, DeviceNetworkConfigError,
+    EndpointControlConfig, EndpointControlSupervisor, ReconnectPolicy, ReconnectPolicyError,
+    TlsConnectorError, tls_connector,
 };
 use pab_platform::{PlatformDetectionError, detect_native_execution_context};
-use pab_protocol::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceRef, EndpointProofPrincipal};
+use pab_protocol::{
+    DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceRef, EndpointKey, EndpointProofPrincipal,
+};
 use thiserror::Error;
 
 use crate::{ExecutorConfig, identity::EndpointSecretError, identity::read_endpoint_secret};
-use crate::{network::ExecutorNetworkError, network::bind_endpoint};
+use crate::{
+    network::ExecutorNetworkError,
+    network::{bind_endpoint, watch_device_network},
+};
 
 pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     config.validate()?;
@@ -30,6 +35,11 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
         tenant_id: config.tenant_id,
         device_id: config.device_id,
     };
+    let network_updates = watch_device_network(
+        &endpoint,
+        device_ref,
+        EndpointKey::new(*secret.public().as_bytes()),
+    )?;
     let hello = DeviceHello {
         schema_version: DEVICE_SESSION_SCHEMA_VERSION,
         device_ref,
@@ -49,6 +59,7 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let supervisor =
         EndpointControlSupervisor::new(control, secret, connector, ReconnectPolicy::default())?
             .with_device_hello(hello.clone())?
+            .with_device_network(network_updates)?
             .spawn();
     let mut status = supervisor.status();
     report_status(&status.borrow());
@@ -118,6 +129,8 @@ pub enum ExecutorError {
     ReconnectPolicy(#[from] ReconnectPolicyError),
     #[error(transparent)]
     DeviceHello(#[from] DeviceHelloConfigError),
+    #[error(transparent)]
+    DeviceNetwork(#[from] DeviceNetworkConfigError),
     #[error("system time is outside the supported Unix timestamp range")]
     InvalidSystemTime,
     #[error("the shutdown signal listener failed: {0}")]

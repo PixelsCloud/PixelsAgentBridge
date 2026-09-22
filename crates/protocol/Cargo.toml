@@ -9,3 +9,6 @@ blake3 = "1"
 serde.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
