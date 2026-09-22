@@ -10,10 +10,13 @@ use pab_protocol::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceRef, Endpoi
 use thiserror::Error;
 
 use crate::{ExecutorConfig, identity::EndpointSecretError, identity::read_endpoint_secret};
+use crate::{network::ExecutorNetworkError, network::bind_endpoint};
 
 pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     config.validate()?;
     let secret = read_endpoint_secret(&config.endpoint_secret_file)?;
+    let endpoint = bind_endpoint(&config, secret.clone()).await?;
+    eprintln!("pab-executor: iroh_endpoint={}", endpoint.id());
     let extra_ca = config
         .control_ca_cert
         .as_ref()
@@ -54,14 +57,19 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
             signal = tokio::signal::ctrl_c() => {
                 signal.map_err(ExecutorError::ShutdownSignal)?;
                 supervisor.shutdown().await?;
+                endpoint.close().await;
                 return Ok(());
             }
             changed = status.changed() => {
-                changed.map_err(|_| ExecutorError::SupervisorClosed)?;
+                if changed.is_err() {
+                    endpoint.close().await;
+                    return Err(ExecutorError::SupervisorClosed);
+                }
                 let current = status.borrow().clone();
                 report_status(&current);
                 if current.phase == ControlConnectionPhase::Stopped {
                     supervisor.shutdown().await?;
+                    endpoint.close().await;
                     return Err(ExecutorError::SupervisorStopped(
                         current.last_failure.map(|failure| failure.detail)
                     ));
@@ -98,6 +106,8 @@ pub enum ExecutorError {
     Config(#[from] crate::ExecutorConfigError),
     #[error(transparent)]
     EndpointSecret(#[from] EndpointSecretError),
+    #[error(transparent)]
+    Network(#[from] ExecutorNetworkError),
     #[error("the control CA file could not be read: {0}")]
     ControlCaFile(std::io::Error),
     #[error(transparent)]

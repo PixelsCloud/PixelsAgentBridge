@@ -2,6 +2,7 @@
 
 mod config;
 mod identity;
+mod network;
 mod runtime;
 
 pub use config::{ExecutorConfig, ExecutorConfigError};

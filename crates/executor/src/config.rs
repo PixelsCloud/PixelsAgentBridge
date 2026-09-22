@@ -1,5 +1,6 @@
 use std::{env, ffi::OsString, path::PathBuf, time::Duration};
 
+use iroh_base::RelayUrl;
 use pab_protocol::{DeploymentId, DeviceId, TenantId};
 use thiserror::Error;
 
@@ -9,8 +10,10 @@ pub struct ExecutorConfig {
     pub tenant_id: TenantId,
     pub device_id: DeviceId,
     pub control_url: String,
+    pub relay_urls: Vec<RelayUrl>,
     pub endpoint_secret_file: PathBuf,
     pub control_ca_cert: Option<PathBuf>,
+    pub relay_ca_cert: Option<PathBuf>,
     pub operation_timeout: Duration,
 }
 
@@ -33,8 +36,10 @@ impl ExecutorConfig {
                 .parse()
                 .map_err(|error| invalid("PAB_DEVICE_ID", error))?,
             control_url: required_text(&mut lookup, "PAB_CONTROL_URL")?,
+            relay_urls: relay_urls(required_text(&mut lookup, "PAB_RELAY_URLS")?)?,
             endpoint_secret_file: required_path(&mut lookup, "PAB_ENDPOINT_SECRET_FILE")?,
             control_ca_cert: lookup("PAB_CONTROL_CA_CERT").map(PathBuf::from),
+            relay_ca_cert: lookup("PAB_RELAY_CA_CERT").map(PathBuf::from),
             operation_timeout: Duration::from_secs(10),
         };
         config.validate()?;
@@ -45,11 +50,34 @@ impl ExecutorConfig {
         if !self.control_url.starts_with("wss://") {
             return Err(ExecutorConfigError::ControlUrlMustUseTls);
         }
+        if self.relay_urls.is_empty() {
+            return Err(ExecutorConfigError::NoRelayUrls);
+        }
+        if let Some(url) = self
+            .relay_urls
+            .iter()
+            .find(|relay_url| relay_url.scheme() != "https")
+        {
+            return Err(ExecutorConfigError::RelayTlsRequired(url.to_string()));
+        }
         if self.operation_timeout.is_zero() {
             return Err(ExecutorConfigError::ZeroOperationTimeout);
         }
         Ok(())
     }
+}
+
+fn relay_urls(value: String) -> Result<Vec<RelayUrl>, ExecutorConfigError> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|error| invalid("PAB_RELAY_URLS", error))
+        })
+        .collect()
 }
 
 fn required_text(
@@ -88,6 +116,10 @@ pub enum ExecutorConfigError {
     Invalid { name: &'static str, message: String },
     #[error("PAB_CONTROL_URL must use wss://")]
     ControlUrlMustUseTls,
+    #[error("PAB_RELAY_URLS must contain at least one Relay URL")]
+    NoRelayUrls,
+    #[error("Relay URL must use HTTPS: {0}")]
+    RelayTlsRequired(String),
     #[error("the control operation timeout must be greater than zero")]
     ZeroOperationTimeout,
 }
@@ -117,6 +149,10 @@ mod tests {
                 OsString::from("wss://pab.example/control"),
             ),
             (
+                "PAB_RELAY_URLS".to_owned(),
+                OsString::from("https://relay-1.example, https://relay-2.example"),
+            ),
+            (
                 "PAB_ENDPOINT_SECRET_FILE".to_owned(),
                 OsString::from("endpoint.key"),
             ),
@@ -131,6 +167,7 @@ mod tests {
         assert_eq!(config.device_id, DeviceId::from_u128(3));
         assert_eq!(config.operation_timeout, Duration::from_secs(10));
         assert_eq!(config.control_ca_cert, None);
+        assert_eq!(config.relay_urls.len(), 2);
     }
 
     #[test]
@@ -145,5 +182,19 @@ mod tests {
             ExecutorConfig::from_lookup(|name| values.get(name).cloned()).unwrap_err(),
             ExecutorConfigError::ControlUrlMustUseTls
         );
+    }
+
+    #[test]
+    fn rejects_a_plaintext_relay_url() {
+        let mut values = valid_values();
+        values.insert(
+            "PAB_RELAY_URLS".to_owned(),
+            OsString::from("http://relay.example"),
+        );
+
+        assert!(matches!(
+            ExecutorConfig::from_lookup(|name| values.get(name).cloned()),
+            Err(ExecutorConfigError::RelayTlsRequired(_))
+        ));
     }
 }
