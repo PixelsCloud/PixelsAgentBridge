@@ -3,6 +3,7 @@
 mod control;
 mod endpoint_proof;
 mod ids;
+mod relay_control;
 mod relay_policy;
 
 pub use control::{
@@ -14,6 +15,9 @@ pub use endpoint_proof::{
     EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
 };
 pub use ids::{ChallengeId, ConnectionId, DeploymentId, DeviceId, RequestId, TenantId, UserId};
+pub use relay_control::{
+    RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
+};
 pub use relay_policy::{
     LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner, RelayEndpointPolicy,
     RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot, TeamRelayLimits, TrafficScope,

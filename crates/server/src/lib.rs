@@ -8,7 +8,10 @@ pub mod postgres;
 pub mod service;
 
 pub use auth::PasswordPolicy;
-pub use control::{ControlApiConfig, ControlApiState, ControlSession, control_router, serve_tls};
+pub use control::{
+    ControlApiConfig, ControlApiState, ControlSession, RelayControlAuth, RelayControlAuthError,
+    control_router, serve_tls,
+};
 pub use domain::{Account, Device, Team, TeamInvitation, TeamRole};
 pub use endpoint_proof::{EndpointProofError, EndpointProofSession, VerifiedEndpointProof};
 pub use postgres::{PostgresStore, StoreError};

@@ -104,6 +104,10 @@ impl AggregateLimiter {
         }
     }
 
+    pub fn retain(&mut self, mut keep: impl FnMut(LimitKey) -> bool) {
+        self.buckets.retain(|key, _| keep(*key));
+    }
+
     pub fn acquire(&mut self, scope: TrafficScope, bytes: u64, now: Instant) -> Acquire {
         let keys: [Option<LimitKey>; 2] = match scope {
             TrafficScope::Team { tenant_id, user_id } => [

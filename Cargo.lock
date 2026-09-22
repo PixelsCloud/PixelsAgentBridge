@@ -2204,6 +2204,7 @@ dependencies = [
 name = "pab-relay"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "hex",
  "iroh-base",
  "iroh-dns",
@@ -2213,9 +2214,11 @@ dependencies = [
  "pab-protocol",
  "rustls",
  "rustls-pemfile",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-rustls",
+ "tokio-tungstenite",
 ]
 
 [[package]]
@@ -2225,14 +2228,17 @@ dependencies = [
  "argon2",
  "axum",
  "axum-server",
+ "blake3",
  "futures-util",
  "iroh-base",
  "pab-protocol",
+ "pab-relay",
  "rand_core 0.6.4",
  "rcgen",
  "rustls",
  "serde_json",
  "sqlx",
+ "subtle",
  "thiserror",
  "time",
  "tokio",

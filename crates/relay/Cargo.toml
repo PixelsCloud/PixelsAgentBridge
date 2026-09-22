@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+futures-util = "0.3"
 hex = "0.4"
 iroh-base = "=1.2.0"
 iroh-dns = "=1.3.0"
@@ -14,8 +15,13 @@ noq = "=1.3.0"
 pab-protocol = { path = "../protocol" }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-pemfile = "2"
+serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-tungstenite = { version = "0.29", default-features = false, features = [
+    "connect",
+    "rustls-tls-webpki-roots",
+] }
 
 [dev-dependencies]
 iroh-relay = { version = "=1.2.0", features = ["test-utils"] }

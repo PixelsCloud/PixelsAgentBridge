@@ -6,14 +6,14 @@ use axum::{
         State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::StatusCode,
-    response::Response,
+    http::{HeaderMap, StatusCode, header::AUTHORIZATION},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
 use pab_protocol::{ControlErrorCode, ControlServerMessage};
 
-use super::{ControlApiState, ControlSession};
+use super::{ControlApiState, ControlSession, relay_session::run_relay_socket};
 
 const MAX_CONTROL_MESSAGE_BYTES: usize = 64 * 1024;
 const LOGIN_MESSAGE_TIMEOUT: Duration = Duration::from_secs(20);
@@ -23,6 +23,7 @@ pub fn control_router(state: ControlApiState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/control", get(control_upgrade))
+        .route("/relay-control", get(relay_control_upgrade))
         .with_state(state)
 }
 
@@ -59,6 +60,23 @@ async fn control_upgrade(
         .max_message_size(MAX_CONTROL_MESSAGE_BYTES)
         .max_frame_size(MAX_CONTROL_MESSAGE_BYTES)
         .on_upgrade(move |socket| run_socket(socket, state))
+}
+
+async fn relay_control_upgrade(
+    State(state): State<ControlApiState>,
+    headers: HeaderMap,
+    websocket: WebSocketUpgrade,
+) -> Response {
+    let authorization = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
+    if !state.relay_auth.authorizes(authorization) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    websocket
+        .max_message_size(MAX_CONTROL_MESSAGE_BYTES)
+        .max_frame_size(MAX_CONTROL_MESSAGE_BYTES)
+        .on_upgrade(move |socket| run_relay_socket(socket, state))
 }
 
 async fn run_socket(socket: WebSocket, state: ControlApiState) {

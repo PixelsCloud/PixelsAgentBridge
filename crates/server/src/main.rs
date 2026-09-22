@@ -2,7 +2,8 @@ use std::{env, net::SocketAddr, path::PathBuf, process::ExitCode};
 
 use pab_protocol::{DeploymentId, RelayLimitDefaults};
 use pab_server::{
-    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore, serve_tls,
+    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
+    RelayControlAuth, serve_tls,
 };
 
 #[tokio::main]
@@ -58,12 +59,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let registration_enabled = env::var("PAB_REGISTRATION_ENABLED")
                 .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
                 .unwrap_or(true);
+            let relay_control_secret = env::var("PAB_RELAY_CONTROL_SECRET")
+                .map_err(|_| "PAB_RELAY_CONTROL_SECRET must be set; the value is never printed")?;
+            let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
             let state = ControlApiState::new(
                 control_plane,
                 deployment_id,
                 ControlApiConfig {
                     registration_enabled,
+                    ..ControlApiConfig::default()
                 },
+                relay_auth,
             );
             println!("TLS control service listening on {address}");
             serve_tls(address, certificate_path, private_key_path, state).await?;

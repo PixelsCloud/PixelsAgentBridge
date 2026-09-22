@@ -45,7 +45,17 @@ that produces the iroh Endpoint ID. The proof binds the deployment, connection,
 account, tenant, purpose, nonce, and short validity window. A TLS-only WSS control
 service now owns each proof session and supports account registration, login, and
 endpoint registration. Configure `PAB_TLS_CERT`, `PAB_TLS_KEY`, and optionally
-`PAB_LISTEN_ADDR` before running `cargo run -p pab-server -- serve`.
+`PAB_LISTEN_ADDR` before running `cargo run -p pab-server -- serve`. The same
+TLS listener exposes the internal Relay policy WSS endpoint. Set a random
+`PAB_RELAY_CONTROL_SECRET` of at least 32 bytes on the server and provide the
+same secret to each trusted Relay node; it is never sent outside TLS or logged.
+
+Relay nodes request a versioned full policy snapshot over the authenticated WSS
+channel. An unchanged response extends the snapshot lifetime without resetting
+rate buckets. A newer snapshot atomically replaces Endpoint ownership and removes
+revoked entries. Unknown endpoints, cross-tenant forwarding, and expired policy
+state fail closed. The production Relay service loop still needs to schedule these
+refreshes and reconnect the channel before packaging.
 
 The Relay integration tests use loopback listeners and a generated self-signed
 certificate. They verify explicit certificate trust, endpoint admission, and an

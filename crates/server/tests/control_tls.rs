@@ -8,14 +8,18 @@ use pab_protocol::{
     EndpointRegistration, EndpointRegistrationResult, EndpointSignature, RelayLimitDefaults,
     RequestId,
 };
+use pab_relay::{PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState};
 use pab_server::{
-    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore, control_router,
+    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
+    RelayControlAuth, control_router,
 };
 use rustls::{ClientConfig, RootCertStore};
 use sqlx::PgPool;
 use tokio_tungstenite::{
     Connector, connect_async, connect_async_tls_with_config, tungstenite::Message,
 };
+
+const RELAY_CONTROL_SECRET: &str = "test-only Relay control secret 0123456789";
 
 async fn send(
     socket: &mut tokio_tungstenite::WebSocketStream<
@@ -50,7 +54,7 @@ async fn receive(
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn tls_wss_registration_login_and_endpoint_proof(pool: PgPool) {
+async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
@@ -70,7 +74,9 @@ async fn tls_wss_registration_login_and_endpoint_proof(pool: PgPool) {
         deployment_id,
         ControlApiConfig {
             registration_enabled: true,
+            ..ControlApiConfig::default()
         },
+        RelayControlAuth::new(RELAY_CONTROL_SECRET).unwrap(),
     );
 
     let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_owned()]).unwrap();
@@ -208,7 +214,7 @@ async fn tls_wss_registration_login_and_endpoint_proof(pool: PgPool) {
             format!("wss://localhost:{}/control", address.port()),
             None,
             false,
-            Some(connector),
+            Some(connector.clone()),
         ),
     )
     .await
@@ -238,6 +244,46 @@ async fn tls_wss_registration_login_and_endpoint_proof(pool: PgPool) {
         response => panic!("unexpected login response: {response:?}"),
     }
     drop(login_socket);
+
+    let relay_url = format!("wss://localhost:{}/relay-control", address.port());
+    let unauthorized = tokio::time::timeout(
+        Duration::from_secs(5),
+        connect_async_tls_with_config(relay_url.clone(), None, false, Some(connector.clone())),
+    )
+    .await
+    .expect("unauthorized Relay WSS connection timed out");
+    assert!(
+        unauthorized.is_err(),
+        "Relay control must reject a connection without its internal secret"
+    );
+
+    let mut relay_client =
+        RelayControlClient::connect(&relay_url, deployment_id, RELAY_CONTROL_SECRET, connector)
+            .await
+            .unwrap();
+    let relay_policy = RelayPolicyRuntime::new(
+        RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),
+    );
+    let first_sync = relay_client.sync_policy(&relay_policy).await.unwrap();
+    let policy_version = match first_sync {
+        PolicySync::Updated { policy_version } => policy_version,
+        other => panic!("unexpected initial policy result: {other:?}"),
+    };
+    assert_eq!(
+        relay_policy
+            .endpoint_owner(secret.public())
+            .expect("Relay policy lock"),
+        Some(pab_protocol::RelayEndpointOwner::User {
+            scope: pab_protocol::TrafficScope::Personal {
+                tenant_id: personal_tenant_id,
+                user_id,
+            },
+        })
+    );
+    assert_eq!(
+        relay_client.sync_policy(&relay_policy).await.unwrap(),
+        PolicySync::Unchanged { policy_version }
+    );
 
     handle.graceful_shutdown(Some(Duration::from_secs(1)));
     tokio::time::timeout(Duration::from_secs(5), server)
