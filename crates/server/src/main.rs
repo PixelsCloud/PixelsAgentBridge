@@ -1,7 +1,9 @@
-use std::{env, process::ExitCode};
+use std::{env, net::SocketAddr, path::PathBuf, process::ExitCode};
 
 use pab_protocol::{DeploymentId, RelayLimitDefaults};
-use pab_server::{ControlPlane, PasswordPolicy, PostgresStore};
+use pab_server::{
+    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore, serve_tls,
+};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -44,7 +46,35 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .await?;
             println!("PostgreSQL initialized for deployment {deployment_id}");
         }
-        _ => return Err("usage: pab-server [check|migrate|init]".into()),
+        "serve" => {
+            store.migrate().await?;
+            let deployment_id = store.deployment_id().await?;
+            let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
+            let address = env::var("PAB_LISTEN_ADDR")
+                .unwrap_or_else(|_| "127.0.0.1:8443".to_owned())
+                .parse::<SocketAddr>()?;
+            let certificate_path = required_path("PAB_TLS_CERT")?;
+            let private_key_path = required_path("PAB_TLS_KEY")?;
+            let registration_enabled = env::var("PAB_REGISTRATION_ENABLED")
+                .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
+                .unwrap_or(true);
+            let state = ControlApiState::new(
+                control_plane,
+                deployment_id,
+                ControlApiConfig {
+                    registration_enabled,
+                },
+            );
+            println!("TLS control service listening on {address}");
+            serve_tls(address, certificate_path, private_key_path, state).await?;
+        }
+        _ => return Err("usage: pab-server [check|migrate|init|serve]".into()),
     }
     Ok(())
+}
+
+fn required_path(name: &'static str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    env::var_os(name)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("{name} must be set").into())
 }

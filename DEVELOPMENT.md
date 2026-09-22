@@ -13,6 +13,18 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
+Development and test verification use Cargo's debug profile. Do not add
+`--release` to routine checks or integration-test commands; release builds are
+reserved for an explicit packaging or performance-validation step.
+
+Keep implementation units divided by responsibility before they become costly to
+compile or review. Protocol IDs, endpoint proof, Relay policy, and control messages
+live in separate modules. Server TLS transport, connection-session state, and the
+account, Team, and endpoint PostgreSQL repositories also remain separate. Split a
+module when unrelated responsibilities or heavyweight dependencies start changing
+together; create another crate only when the dependency graph or independent build
+and test boundary justifies it.
+
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
 `PAB_DATABASE_URL` and use its initialization commands against an empty database:
@@ -30,8 +42,10 @@ Use a disposable PostgreSQL instance with database-creation privileges for those
 
 Endpoint registration accepts a one-time proof signed by the same Ed25519 secret key
 that produces the iroh Endpoint ID. The proof binds the deployment, connection,
-account, tenant, purpose, nonce, and short validity window. The WSS transport that will
-own each proof session is the next control-plane increment and is not exposed yet.
+account, tenant, purpose, nonce, and short validity window. A TLS-only WSS control
+service now owns each proof session and supports account registration, login, and
+endpoint registration. Configure `PAB_TLS_CERT`, `PAB_TLS_KEY`, and optionally
+`PAB_LISTEN_ADDR` before running `cargo run -p pab-server -- serve`.
 
 The Relay integration tests use loopback listeners and a generated self-signed
 certificate. They verify explicit certificate trust, endpoint admission, and an
@@ -47,9 +61,9 @@ start an allowlisted TLS Relay and exercise the public Relay protocol or QUIC ad
 discovery:
 
 ```powershell
-cargo run --release --bin pab-relay-probe -- endpoint-id <32-byte-secret-hex>
-cargo run --release --bin pab-relay-probe -- ping <https-relay-url> <secret-hex>
-cargo run --release --bin pab-relay-probe -- qad <relay-ip:7842> <tls-server-name>
+cargo run --bin pab-relay-probe -- endpoint-id <32-byte-secret-hex>
+cargo run --bin pab-relay-probe -- ping <https-relay-url> <secret-hex>
+cargo run --bin pab-relay-probe -- qad <relay-ip:7842> <tls-server-name>
 ```
 
 Run the binary without arguments to see the server, sender, and receiver forms. Probe
