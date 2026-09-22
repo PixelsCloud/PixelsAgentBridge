@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, path::PathBuf, process::ExitCode};
+use std::{env, fs, net::SocketAddr, path::PathBuf, process::ExitCode};
 
 use pab_protocol::{DeploymentId, RelayLimitDefaults};
 use pab_server::{
@@ -35,9 +35,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         "init" => {
             store.migrate().await?;
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
+            let requested_id = match env::var("PAB_DEPLOYMENT_ID") {
+                Ok(value) => value.parse::<DeploymentId>()?,
+                Err(env::VarError::NotPresent) => DeploymentId::default(),
+                Err(error) => return Err(error.into()),
+            };
             let deployment_id = control_plane
                 .initialize_deployment(
-                    DeploymentId::new(),
+                    requested_id,
                     RelayLimitDefaults {
                         team_mbps: 20,
                         member_mbps: 4,
@@ -59,8 +64,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let registration_enabled = env::var("PAB_REGISTRATION_ENABLED")
                 .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
                 .unwrap_or(true);
-            let relay_control_secret = env::var("PAB_RELAY_CONTROL_SECRET")
-                .map_err(|_| "PAB_RELAY_CONTROL_SECRET must be set; the value is never printed")?;
+            let relay_control_secret = required_secret("PAB_RELAY_CONTROL_SECRET")?;
             let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
             let state = ControlApiState::new(
                 control_plane,
@@ -83,4 +87,20 @@ fn required_path(name: &'static str) -> Result<PathBuf, Box<dyn std::error::Erro
     env::var_os(name)
         .map(PathBuf::from)
         .ok_or_else(|| format!("{name} must be set").into())
+}
+
+fn required_secret(name: &'static str) -> Result<String, Box<dyn std::error::Error>> {
+    if let Ok(value) = env::var(name) {
+        return Ok(value);
+    }
+    let file_name = format!("{name}_FILE");
+    let path = env::var_os(&file_name)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("{name} or {file_name} must be set; the value is never printed"))?;
+    let value = fs::read_to_string(path)?;
+    let value = value.trim_end_matches(['\r', '\n']).to_owned();
+    if value.is_empty() {
+        return Err(format!("{file_name} must not be empty").into());
+    }
+    Ok(value)
 }

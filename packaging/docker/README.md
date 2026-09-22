@@ -1,0 +1,41 @@
+# Linux Docker server prototype
+
+This Compose stack runs PostgreSQL 17, the TLS control backend, and the TLS/QUIC
+iroh Relay. The image is deliberately compiled with Cargo's Debug (`dev`) profile
+while the implementation is under validation.
+
+Copy `example.env` to a private env file, generate a UUID for
+`PAB_DEPLOYMENT_ID`, and keep that UUID unchanged. Create a random Relay control
+secret containing at least 32 bytes at the path named by
+`PAB_RELAY_CONTROL_SECRET_PATH`.
+
+The certificate directory must contain:
+
+- `backend-cert.pem`, `backend-key.pem`, and `backend-ca.pem`
+- `relay-cert.pem`, `relay-key.pem`, and `relay-ca.pem`
+
+The backend certificate DNS SAN must match `PAB_BACKEND_TLS_NAME`; the Relay
+certificate DNS SAN must match `PAB_RELAY_TLS_NAME`. For testing, create a local
+CA, use it to sign both server leaf certificates, and put the corresponding CA
+certificate in each `*-ca.pem` file. Do not mark a server leaf certificate as a CA.
+
+Build and start the stack from the repository root:
+
+```sh
+docker compose --env-file packaging/docker/private.env \
+  -f packaging/docker/compose.yaml build
+docker compose --env-file packaging/docker/private.env \
+  -f packaging/docker/compose.yaml up -d
+docker compose --env-file packaging/docker/private.env \
+  -f packaging/docker/compose.yaml ps
+```
+
+The backend HTTPS and Relay HTTPS ports bind to host loopback by default for an
+existing reverse proxy. Relay QUIC publishes UDP 7842 directly. The upstream
+iroh captive-portal listener stays inside the Relay container on loopback and is
+never published by Compose.
+
+The Relay control secret is mounted through a Compose secret file. PostgreSQL is
+reachable only on the private Compose network. No public HTTP listener is added.
+BuildKit keeps Cargo registry, git, and target caches between builds so a source or
+packaging change does not force all third-party Rust crates to compile again.

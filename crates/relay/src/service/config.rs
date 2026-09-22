@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, path::PathBuf, str::FromStr, time::Duration};
+use std::{env, fs, net::SocketAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use pab_protocol::DeploymentId;
 use thiserror::Error;
@@ -28,7 +28,7 @@ impl RelayServiceConfig {
                 .parse()
                 .map_err(|error| invalid("PAB_DEPLOYMENT_ID", error))?,
             control_url: required("PAB_CONTROL_URL")?,
-            control_secret: required("PAB_RELAY_CONTROL_SECRET")?,
+            control_secret: required_secret("PAB_RELAY_CONTROL_SECRET")?,
             control_ca_cert: env::var_os("PAB_CONTROL_CA_CERT").map(PathBuf::from),
             tls_cert: required_path("PAB_RELAY_TLS_CERT")?,
             tls_key: required_path("PAB_RELAY_TLS_KEY")?,
@@ -81,6 +81,31 @@ fn required_path(name: &'static str) -> Result<PathBuf, RelayServiceConfigError>
         .ok_or(RelayServiceConfigError::Missing(name))
 }
 
+fn required_secret(name: &'static str) -> Result<String, RelayServiceConfigError> {
+    if let Ok(value) = env::var(name) {
+        return Ok(value);
+    }
+    let file_name = format!("{name}_FILE");
+    let path = env::var_os(&file_name).map(PathBuf::from).ok_or_else(|| {
+        RelayServiceConfigError::MissingSecretFile {
+            name,
+            file_name: file_name.clone(),
+        }
+    })?;
+    let value = fs::read_to_string(path).map_err(|error| RelayServiceConfigError::SecretFile {
+        file_name: file_name.clone(),
+        message: error.to_string(),
+    })?;
+    let value = value.trim_end_matches(['\r', '\n']).to_owned();
+    if value.is_empty() {
+        return Err(RelayServiceConfigError::SecretFile {
+            file_name,
+            message: "file is empty".to_owned(),
+        });
+    }
+    Ok(value)
+}
+
 fn optional<T>(name: &'static str, default: &str) -> Result<T, RelayServiceConfigError>
 where
     T: FromStr,
@@ -103,6 +128,13 @@ fn invalid(name: &'static str, error: impl std::fmt::Display) -> RelayServiceCon
 pub enum RelayServiceConfigError {
     #[error("{0} must be set")]
     Missing(&'static str),
+    #[error("{name} or {file_name} must be set")]
+    MissingSecretFile {
+        name: &'static str,
+        file_name: String,
+    },
+    #[error("{file_name} could not be read: {message}")]
+    SecretFile { file_name: String, message: String },
     #[error("{name} is invalid: {message}")]
     Invalid { name: &'static str, message: String },
     #[error("PAB_CONTROL_URL must use wss://")]

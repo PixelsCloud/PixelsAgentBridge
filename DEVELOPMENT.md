@@ -82,6 +82,14 @@ keeps that probe local and requires TLS on its own account, control, and data en
 Project design documents and local environment/server information are intentionally
 excluded from Git.
 
+The first Linux server container stack lives under `packaging/docker`. It builds the
+backend and Relay with Cargo's Debug profile, uses persistent BuildKit caches for Rust
+dependencies and build artifacts, runs both processes as an unprivileged user, and
+mounts the Relay control credential as a Compose secret. PostgreSQL has no host port;
+the two HTTPS listeners bind to host loopback for a reverse proxy, while Relay QUIC
+publishes UDP 7842. See `packaging/docker/README.md` for the required certificate files
+and startup commands.
+
 The `pab-relay-probe` binary is a validation tool, not a production service. It can
 start an allowlisted TLS Relay and exercise the public Relay protocol or QUIC address
 discovery:

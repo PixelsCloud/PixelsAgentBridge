@@ -1,0 +1,128 @@
+name: pixels-agent-bridge
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pab
+      POSTGRES_USER: pab
+      POSTGRES_PASSWORD: ${PAB_DB_PASSWORD:?set PAB_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pab -d pab"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - pab-internal
+
+  init:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    command: ["pab-server", "init"]
+    restart: "no"
+    environment:
+      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/pab
+      PAB_DEPLOYMENT_ID: ${PAB_DEPLOYMENT_ID:?set PAB_DEPLOYMENT_ID}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pab-internal
+
+  backend:
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    command: ["pab-server", "serve"]
+    restart: unless-stopped
+    init: true
+    environment:
+      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/pab
+      PAB_LISTEN_ADDR: 0.0.0.0:8443
+      PAB_TLS_CERT: /run/pab-certs/backend-cert.pem
+      PAB_TLS_KEY: /run/pab-certs/backend-key.pem
+      PAB_REGISTRATION_ENABLED: ${PAB_REGISTRATION_ENABLED:-true}
+      PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret
+      PAB_BACKEND_TLS_NAME: ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
+    secrets:
+      - pab_relay_control_secret
+    volumes:
+      - type: bind
+        source: ${PAB_CERT_DIR:-./certs}
+        target: /run/pab-certs
+        read_only: true
+    ports:
+      - "${PAB_BACKEND_HOST_IP:-127.0.0.1}:${PAB_BACKEND_HOST_PORT:-31400}:8443"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --fail --silent --show-error
+          --cacert /run/pab-certs/backend-ca.pem
+          --resolve "$${PAB_BACKEND_TLS_NAME}:8443:127.0.0.1"
+          "https://$${PAB_BACKEND_TLS_NAME}:8443/health" >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    networks:
+      pab-internal:
+        aliases:
+          - ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
+
+  relay:
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    command: ["pab-relay-server"]
+    restart: unless-stopped
+    init: true
+    environment:
+      PAB_DEPLOYMENT_ID: ${PAB_DEPLOYMENT_ID:?set PAB_DEPLOYMENT_ID}
+      PAB_CONTROL_URL: wss://${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}:8443/relay-control
+      PAB_CONTROL_CA_CERT: /run/pab-certs/backend-ca.pem
+      PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret
+      PAB_RELAY_TLS_CERT: /run/pab-certs/relay-cert.pem
+      PAB_RELAY_TLS_KEY: /run/pab-certs/relay-key.pem
+      PAB_RELAY_HTTPS_ADDR: 0.0.0.0:31443
+      PAB_RELAY_QUIC_ADDR: 0.0.0.0:7842
+      PAB_RELAY_TLS_NAME: ${PAB_RELAY_TLS_NAME:-pab-relay.rgaa.vip}
+    secrets:
+      - pab_relay_control_secret
+    volumes:
+      - type: bind
+        source: ${PAB_CERT_DIR:-./certs}
+        target: /run/pab-certs
+        read_only: true
+    ports:
+      - "${PAB_RELAY_HTTPS_HOST_IP:-127.0.0.1}:${PAB_RELAY_HTTPS_HOST_PORT:-31443}:31443/tcp"
+      - "${PAB_RELAY_QUIC_HOST_IP:-0.0.0.0}:${PAB_RELAY_QUIC_HOST_PORT:-7842}:7842/udp"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --fail --silent --show-error
+          --cacert /run/pab-certs/relay-ca.pem
+          --resolve "$${PAB_RELAY_TLS_NAME}:31443:127.0.0.1"
+          "https://$${PAB_RELAY_TLS_NAME}:31443/healthz" >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - pab-internal
+
+networks:
+  pab-internal:
+
+volumes:
+  postgres-data:
+
+secrets:
+  pab_relay_control_secret:
+    file: ${PAB_RELAY_CONTROL_SECRET_PATH:-./secrets/relay-control-secret}

@@ -7,6 +7,9 @@
 /dist/
 /.idea/
 /.vscode/
+/packaging/docker/certs/
+/packaging/docker/secrets/
+/packaging/docker/private.env
 *.pdb
 *.log
 __pycache__/
