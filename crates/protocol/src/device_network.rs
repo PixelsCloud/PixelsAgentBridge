@@ -28,6 +28,19 @@ pub struct DeviceNetworkResult {
     pub accepted_at_unix_ms: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceNetworkSnapshot {
+    pub schema_version: u16,
+    pub device_ref: DeviceRef,
+    pub endpoint_key: EndpointKey,
+    pub endpoint_instance_id: EndpointInstanceId,
+    pub address_revision: u64,
+    pub relay_urls: Vec<String>,
+    pub direct_addresses: Vec<SocketAddr>,
+    pub observed_at_unix_ms: i64,
+    pub accepted_at_unix_ms: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

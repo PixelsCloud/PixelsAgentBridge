@@ -398,7 +398,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     agent_connection.close().await.unwrap();
 
     let supervisor = EndpointControlSupervisor::new(
-        agent_config,
+        agent_config.clone(),
         secret.clone(),
         connector.clone(),
         ReconnectPolicy {
@@ -560,6 +560,23 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .expect("device supervisor did not publish changed addresses");
     device_supervisor.shutdown().await.unwrap();
 
+    let mut bridge_connection =
+        AuthenticatedControlConnection::connect(&agent_config, &secret, connector.clone())
+            .await
+            .unwrap();
+    let discovered = bridge_connection
+        .get_device_network(device_ref, Duration::from_secs(5))
+        .await
+        .unwrap();
+    assert_eq!(discovered.endpoint_key, endpoint_key);
+    assert_eq!(discovered.endpoint_instance_id, supervisor_instance_id);
+    assert_eq!(discovered.address_revision, 2);
+    assert_eq!(
+        discovered.direct_addresses,
+        vec!["192.0.2.9:7842".parse().unwrap()]
+    );
+    bridge_connection.close().await.unwrap();
+
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),
         connect_async_tls_with_config(
@@ -594,6 +611,30 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             assert_eq!(logged_in_tenant, personal_tenant_id);
         }
         response => panic!("unexpected login response: {response:?}"),
+    }
+    for allowed in [false, true] {
+        let grant_request_id = RequestId::new();
+        send(
+            &mut login_socket,
+            &ControlClientMessage::SetDeviceConnectGrant {
+                request_id: grant_request_id,
+                tenant_id: personal_tenant_id,
+                device_id,
+                user_id,
+                allowed,
+            },
+        )
+        .await;
+        assert_eq!(
+            receive(&mut login_socket).await,
+            ControlServerMessage::DeviceConnectGrantUpdated {
+                request_id: grant_request_id,
+                tenant_id: personal_tenant_id,
+                device_id,
+                user_id,
+                allowed,
+            }
+        );
     }
     drop(login_socket);
 

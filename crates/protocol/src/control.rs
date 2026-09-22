@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    DeviceHello, DeviceHelloResult, DeviceId, DeviceNetworkResult, DeviceNetworkUpdate,
-    EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse, RequestId,
-    TenantId, UserId,
+    DeviceHello, DeviceHelloResult, DeviceId, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    EndpointProofResponse, RequestId, TenantId, UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -45,6 +45,17 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         update: Box<DeviceNetworkUpdate>,
     },
+    GetDeviceNetwork {
+        request_id: RequestId,
+        device_ref: DeviceRef,
+    },
+    SetDeviceConnectGrant {
+        request_id: RequestId,
+        tenant_id: TenantId,
+        device_id: DeviceId,
+        user_id: UserId,
+        allowed: bool,
+    },
 }
 
 impl ControlClientMessage {
@@ -57,7 +68,9 @@ impl ControlClientMessage {
             | Self::BeginEndpointAuthentication { request_id, .. }
             | Self::CompleteEndpointAuthentication { request_id, .. }
             | Self::PublishDeviceHello { request_id, .. }
-            | Self::PublishDeviceNetwork { request_id, .. } => *request_id,
+            | Self::PublishDeviceNetwork { request_id, .. }
+            | Self::GetDeviceNetwork { request_id, .. }
+            | Self::SetDeviceConnectGrant { request_id, .. } => *request_id,
         }
     }
 }
@@ -97,6 +110,17 @@ pub enum ControlServerMessage {
     DeviceNetworkAccepted {
         request_id: RequestId,
         result: DeviceNetworkResult,
+    },
+    DeviceNetworkFound {
+        request_id: RequestId,
+        snapshot: Box<DeviceNetworkSnapshot>,
+    },
+    DeviceConnectGrantUpdated {
+        request_id: RequestId,
+        tenant_id: TenantId,
+        device_id: DeviceId,
+        user_id: UserId,
+        allowed: bool,
     },
     Error {
         request_id: Option<RequestId>,

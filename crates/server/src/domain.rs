@@ -2,6 +2,8 @@ use pab_protocol::{DeviceId, EndpointKey, EndpointProofPrincipal, TenantId, User
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+pub(crate) const DEVICE_CONNECT_CAPABILITY: i32 = 1;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     pub id: UserId,

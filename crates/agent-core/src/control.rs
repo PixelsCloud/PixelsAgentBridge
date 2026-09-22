@@ -4,9 +4,10 @@ use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId, DeviceHello,
-    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkUpdate, ENDPOINT_PROOF_SCHEMA_VERSION,
-    EndpointAuthenticationResult, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
-    EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RequestId, TenantId,
+    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef,
+    ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult, EndpointKey,
+    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
+    EndpointSignature, RequestId, TenantId,
 };
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -192,6 +193,38 @@ impl AuthenticatedControlConnection {
             {
                 Ok(result)
             }
+            ControlServerMessage::Error {
+                request_id: Some(response_id),
+                code,
+                message,
+            } if response_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
+
+    pub async fn get_device_network(
+        &mut self,
+        device_ref: DeviceRef,
+        timeout: Duration,
+    ) -> Result<DeviceNetworkSnapshot, EndpointControlError> {
+        if timeout.is_zero() {
+            return Err(EndpointControlError::InvalidTimeout);
+        }
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::GetDeviceNetwork {
+                request_id,
+                device_ref,
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceNetworkFound {
+                request_id: response_id,
+                snapshot,
+            } if response_id == request_id && snapshot.device_ref == device_ref => Ok(*snapshot),
             ControlServerMessage::Error {
                 request_id: Some(response_id),
                 code,

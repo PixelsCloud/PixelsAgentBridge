@@ -16,7 +16,7 @@ pub use control::{
 };
 pub use device::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceHelloResult};
 pub use device_network::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkUpdate,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS,
 };
 pub use endpoint_proof::{

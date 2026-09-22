@@ -51,6 +51,10 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidState,
             "an authenticated device endpoint is required".to_owned(),
         ),
+        ControlSessionError::UserEndpointRequired => (
+            ControlErrorCode::InvalidState,
+            "an authenticated user endpoint is required".to_owned(),
+        ),
         ControlSessionError::DeviceIdentityMismatch => (
             ControlErrorCode::PermissionDenied,
             "device identity does not match this connection".to_owned(),
@@ -78,6 +82,10 @@ pub(super) fn error_response(
         ControlSessionError::Service(ServiceError::DeviceEndpointRequired) => (
             ControlErrorCode::InvalidState,
             "an authenticated device endpoint is required".to_owned(),
+        ),
+        ControlSessionError::Service(ServiceError::UserEndpointRequired) => (
+            ControlErrorCode::InvalidState,
+            "an authenticated user endpoint is required".to_owned(),
         ),
         ControlSessionError::Service(ServiceError::UnsupportedDeviceSessionSchema(_))
         | ControlSessionError::Service(ServiceError::UnsupportedDeviceNetworkSchema(_))
@@ -137,6 +145,8 @@ pub(super) enum ControlSessionError {
     EndpointAuthenticationFailed,
     #[error("an authenticated device endpoint is required")]
     DeviceEndpointRequired,
+    #[error("an authenticated user endpoint is required")]
+    UserEndpointRequired,
     #[error("device identity does not match this connection")]
     DeviceIdentityMismatch,
     #[error(transparent)]

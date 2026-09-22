@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use pab_protocol::{
     DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
-    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkUpdate, EndpointProofPrincipal,
-    EndpointProofPurpose, MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults,
-    RelayPolicySnapshot, TenantId, UserId,
+    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef,
+    EndpointProofPrincipal, EndpointProofPurpose, MAX_DEVICE_DIRECT_ADDRESSES,
+    MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot, TenantId, UserId,
 };
 use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
@@ -157,6 +157,20 @@ impl ControlPlane {
             .await?)
     }
 
+    pub async fn set_device_connect_grant(
+        &self,
+        actor: UserId,
+        tenant_id: TenantId,
+        device_id: pab_protocol::DeviceId,
+        user_id: UserId,
+        allowed: bool,
+    ) -> Result<(), ServiceError> {
+        Ok(self
+            .store
+            .set_device_connect_grant(actor, tenant_id, device_id, user_id, allowed)
+            .await?)
+    }
+
     pub async fn authenticate_registered_endpoint(
         &self,
         proof: VerifiedEndpointProof,
@@ -261,6 +275,23 @@ impl ControlPlane {
         Ok(self.store.publish_device_network(update).await?)
     }
 
+    pub async fn device_network_snapshot(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        device_ref: DeviceRef,
+    ) -> Result<DeviceNetworkSnapshot, ServiceError> {
+        let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
+            return Err(ServiceError::UserEndpointRequired);
+        };
+        if device_ref.tenant_id != endpoint.tenant_id {
+            return Err(ServiceError::EndpointIdentityChanged);
+        }
+        Ok(self
+            .store
+            .device_network_snapshot(endpoint.endpoint_key, user_id, device_ref)
+            .await?)
+    }
+
     pub async fn relay_policy_snapshot(
         &self,
         validity: Duration,
@@ -285,6 +316,8 @@ pub enum ServiceError {
     UnsupportedDeviceNetworkSchema(u16),
     #[error("this operation requires an authenticated device endpoint")]
     DeviceEndpointRequired,
+    #[error("this operation requires an authenticated user endpoint")]
+    UserEndpointRequired,
     #[error("agent version must contain between 1 and 64 characters")]
     InvalidAgentVersion,
     #[error("device observation time must be a positive Unix timestamp")]

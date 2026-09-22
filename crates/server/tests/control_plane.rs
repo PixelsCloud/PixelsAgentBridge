@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DeploymentId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceNetworkUpdate, DeviceRef,
+    EndpointInstanceId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
     EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RelayEndpointOwner,
     RelayLimitDefaults, TenantId, TrafficScope, UserId,
 };
@@ -232,6 +233,90 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             device_id: device.id,
         }
     );
+
+    let device_ref = DeviceRef {
+        deployment_id,
+        tenant_id: team.tenant_id,
+        device_id: device.id,
+    };
+    control
+        .publish_device_network(
+            &authenticated_device,
+            &DeviceNetworkUpdate {
+                schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
+                device_ref,
+                endpoint_key: EndpointKey::new(*device_key.public().as_bytes()),
+                endpoint_instance_id: EndpointInstanceId::new(),
+                address_revision: 1,
+                relay_urls: vec!["https://relay.example/".to_owned()],
+                direct_addresses: vec!["192.0.2.10:7842".parse().unwrap()],
+                observed_at_unix_ms: 1_795_000_000_000,
+            },
+        )
+        .await
+        .unwrap();
+    let alice_endpoint = control
+        .authenticate_registered_endpoint(prove_endpoint(
+            deployment_id,
+            alice.id,
+            team.tenant_id,
+            EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+            &alice_team_key,
+        ))
+        .await
+        .unwrap();
+    let bob_endpoint = control
+        .authenticate_registered_endpoint(prove_endpoint(
+            deployment_id,
+            bob.id,
+            team.tenant_id,
+            EndpointProofPurpose::AuthenticateRegisteredEndpoint,
+            &bob_team_key,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        control
+            .device_network_snapshot(&alice_endpoint, device_ref)
+            .await
+            .unwrap()
+            .endpoint_key,
+        EndpointKey::new(*device_key.public().as_bytes())
+    );
+    assert!(matches!(
+        control
+            .device_network_snapshot(&bob_endpoint, device_ref)
+            .await,
+        Err(ServiceError::Store(StoreError::NotFound))
+    ));
+    assert!(matches!(
+        control
+            .set_device_connect_grant(bob.id, team.tenant_id, device.id, bob.id, true)
+            .await,
+        Err(ServiceError::Store(StoreError::PermissionDenied))
+    ));
+    control
+        .set_device_connect_grant(alice.id, team.tenant_id, device.id, bob.id, true)
+        .await
+        .unwrap();
+    assert_eq!(
+        control
+            .device_network_snapshot(&bob_endpoint, device_ref)
+            .await
+            .unwrap()
+            .device_ref,
+        device_ref
+    );
+    control
+        .set_device_connect_grant(alice.id, team.tenant_id, device.id, bob.id, false)
+        .await
+        .unwrap();
+    assert!(matches!(
+        control
+            .device_network_snapshot(&bob_endpoint, device_ref)
+            .await,
+        Err(ServiceError::Store(StoreError::NotFound))
+    ));
 
     sqlx::query("UPDATE devices SET status = 'disabled' WHERE id = $1")
         .bind(device.id.as_uuid())

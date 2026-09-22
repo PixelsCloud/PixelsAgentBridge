@@ -107,6 +107,29 @@ impl ControlSession {
                 .publish_device_network(&update)
                 .await
                 .map(|result| ControlServerMessage::DeviceNetworkAccepted { request_id, result }),
+            ControlClientMessage::GetDeviceNetwork { device_ref, .. } => self
+                .get_device_network(device_ref)
+                .await
+                .map(|snapshot| ControlServerMessage::DeviceNetworkFound {
+                    request_id,
+                    snapshot: Box::new(snapshot),
+                }),
+            ControlClientMessage::SetDeviceConnectGrant {
+                tenant_id,
+                device_id,
+                user_id,
+                allowed,
+                ..
+            } => self
+                .set_device_connect_grant(tenant_id, device_id, user_id, allowed)
+                .await
+                .map(|()| ControlServerMessage::DeviceConnectGrantUpdated {
+                    request_id,
+                    tenant_id,
+                    device_id,
+                    user_id,
+                    allowed,
+                }),
         };
         match result {
             Ok(response) => response,
@@ -132,6 +155,23 @@ impl ControlSession {
         let account = self.control.register_account(username, password).await?;
         self.account = Some(account.clone());
         Ok(authenticated_response(request_id, account))
+    }
+
+    async fn set_device_connect_grant(
+        &self,
+        tenant_id: pab_protocol::TenantId,
+        device_id: pab_protocol::DeviceId,
+        user_id: pab_protocol::UserId,
+        allowed: bool,
+    ) -> Result<(), ControlSessionError> {
+        let account = self
+            .account
+            .as_ref()
+            .ok_or(ControlSessionError::NotAuthenticated)?;
+        self.control
+            .set_device_connect_grant(account.id, tenant_id, device_id, user_id, allowed)
+            .await
+            .map_err(Into::into)
     }
 
     async fn login(
@@ -311,6 +351,23 @@ impl ControlSession {
         }
         self.control
             .publish_device_network(endpoint, update)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn get_device_network(
+        &self,
+        device_ref: pab_protocol::DeviceRef,
+    ) -> Result<pab_protocol::DeviceNetworkSnapshot, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::UserEndpointRequired)?;
+        if device_ref.deployment_id != self.deployment_id {
+            return Err(ControlSessionError::DeviceIdentityMismatch);
+        }
+        self.control
+            .device_network_snapshot(endpoint, device_ref)
             .await
             .map_err(Into::into)
     }

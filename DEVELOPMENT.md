@@ -116,6 +116,14 @@ steady-state control connection has one WebSocket receive loop for pongs, addres
 acknowledgements, and future server pushes, so independent features never compete for
 frames.
 
+An authenticated user endpoint may query a device-network snapshot only inside its
+own tenant and only while its membership, endpoint, target device, target endpoint,
+and device connect grant are active. Device registration creates the registering
+user's initial grant. Team roles can manage grants but do not implicitly grant device
+use. Missing and unauthorized snapshots share the same not-found result to avoid a
+device-directory oracle. The returned endpoint key remains the identity that iroh
+must authenticate when the Bridge connects.
+
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set
 `PAB_DATABASE_URL` and use its initialization commands against an empty database:

@@ -1,4 +1,5 @@
 use super::*;
+use crate::domain::DEVICE_CONNECT_CAPABILITY;
 
 impl PostgresStore {
     pub async fn registered_endpoint(
@@ -124,6 +125,24 @@ impl PostgresStore {
                 "endpoint is already registered",
             ));
         }
+        sqlx::query(
+            r#"
+            INSERT INTO device_grants (
+                tenant_id,
+                device_id,
+                user_id,
+                capability_bits,
+                granted_by_user_id
+            )
+            VALUES ($1, $2, $3, $4, $3)
+            "#,
+        )
+        .bind(tenant_id.as_uuid())
+        .bind(device_id.as_uuid())
+        .bind(actor.as_uuid())
+        .bind(DEVICE_CONNECT_CAPABILITY)
+        .execute(&mut *tx)
+        .await?;
         support::bump_policy_revision(&mut tx).await?;
         tx.commit().await?;
 
