@@ -50,8 +50,7 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
         deployment_id: config.deployment_id,
         control_secret: config.control_secret,
         refresh_interval: config.policy_refresh_interval,
-        reconnect_initial_delay: config.reconnect_initial_delay,
-        reconnect_max_delay: config.reconnect_max_delay,
+        reconnect_interval: config.reconnect_interval,
     };
     let client = connect_and_sync(&sync_settings, connector.clone(), &runtime).await?;
 

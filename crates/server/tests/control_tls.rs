@@ -451,8 +451,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         ReconnectPolicy {
             heartbeat_interval: Duration::from_secs(1),
             heartbeat_timeout: Duration::from_millis(500),
-            initial_delay: Duration::from_millis(50),
-            max_delay: Duration::from_millis(200),
+            retry_interval: Duration::from_millis(50),
         },
     )
     .unwrap();
@@ -565,8 +564,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         ReconnectPolicy {
             heartbeat_interval: Duration::from_secs(1),
             heartbeat_timeout: Duration::from_millis(500),
-            initial_delay: Duration::from_millis(50),
-            max_delay: Duration::from_millis(200),
+            retry_interval: Duration::from_millis(50),
         },
     )
     .unwrap()
@@ -764,8 +762,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             captive_bind: "127.0.0.1:0".parse().unwrap(),
             quic_bind: "127.0.0.1:0".parse().unwrap(),
             policy_refresh_interval: Duration::from_secs(20),
-            reconnect_initial_delay: Duration::from_millis(50),
-            reconnect_max_delay: Duration::from_secs(1),
+            reconnect_interval: Duration::from_millis(50),
             limiter_burst: Duration::from_millis(100),
         }),
     )
@@ -836,8 +833,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         ReconnectPolicy {
             heartbeat_interval: Duration::from_secs(1),
             heartbeat_timeout: Duration::from_millis(500),
-            initial_delay: Duration::from_millis(50),
-            max_delay: Duration::from_millis(200),
+            retry_interval: Duration::from_millis(50),
         },
     )
     .unwrap()

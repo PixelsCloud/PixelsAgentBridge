@@ -16,8 +16,9 @@ use crate::{
     connection_state::{
         ConnectionFailure, ConnectionFailureKind, ControlConnectionPhase, ControlConnectionStatus,
         DeviceHelloConfigError, DeviceNetworkConfigError, ReconnectPolicy, ReconnectPolicyError,
-        duration_millis, publish, publish_stopped, reconnect_delay,
+        duration_millis, publish, publish_stopped,
     },
+    device_network_resolver::{DeviceNetworkRequest, DeviceNetworkResolver},
     peer_authorizer::{DevicePeerAuthorizer, PeerAuthorizationRequest},
 };
 
@@ -89,11 +90,20 @@ impl EndpointControlSupervisor {
         let (peer_requests, peer_request_receiver) = mpsc::channel(32);
         let peer_authorizer =
             DevicePeerAuthorizer::new(peer_requests, self.config.operation_timeout);
-        let task = tokio::spawn(self.run(status_sender, shutdown_receiver, peer_request_receiver));
+        let (network_requests, network_request_receiver) = mpsc::channel(32);
+        let device_network_resolver =
+            DeviceNetworkResolver::new(network_requests, self.config.operation_timeout);
+        let task = tokio::spawn(self.run(
+            status_sender,
+            shutdown_receiver,
+            peer_request_receiver,
+            network_request_receiver,
+        ));
         EndpointControlSupervisorHandle {
             status,
             shutdown,
             peer_authorizer,
+            device_network_resolver,
             task,
         }
     }
@@ -103,10 +113,10 @@ impl EndpointControlSupervisor {
         status: watch::Sender<ControlConnectionStatus>,
         mut shutdown: watch::Receiver<bool>,
         mut peer_requests: mpsc::Receiver<PeerAuthorizationRequest>,
+        mut network_requests: mpsc::Receiver<DeviceNetworkRequest>,
     ) {
         let mut generation = 0_u64;
         let mut consecutive_failures = 0_u32;
-        let endpoint_key = *self.secret.public().as_bytes();
         loop {
             if *shutdown.borrow() {
                 publish_stopped(&status, generation, consecutive_failures, None);
@@ -159,13 +169,17 @@ impl EndpointControlSupervisor {
                                 None,
                                 None,
                             );
+                            let mut requests = ControlRequestReceivers {
+                                peer: &mut peer_requests,
+                                network: &mut network_requests,
+                            };
                             match maintain_connection(
                                 &mut connection,
                                 generation,
                                 self.policy,
                                 &mut shutdown,
                                 &mut self.device_network,
-                                &mut peer_requests,
+                                &mut requests,
                                 self.config.operation_timeout,
                             )
                             .await
@@ -186,10 +200,10 @@ impl EndpointControlSupervisor {
                 publish_stopped(&status, generation, consecutive_failures, Some(failure));
                 return;
             }
-            let delay = reconnect_delay(self.policy, endpoint_key, consecutive_failures);
+            let delay = self.policy.retry_delay();
             publish(
                 &status,
-                ControlConnectionPhase::BackingOff,
+                ControlConnectionPhase::Reconnecting,
                 generation,
                 consecutive_failures,
                 Some(duration_millis(delay)),
@@ -212,6 +226,7 @@ pub struct EndpointControlSupervisorHandle {
     status: watch::Receiver<ControlConnectionStatus>,
     shutdown: watch::Sender<bool>,
     peer_authorizer: DevicePeerAuthorizer,
+    device_network_resolver: DeviceNetworkResolver,
     task: JoinHandle<()>,
 }
 
@@ -222,6 +237,10 @@ impl EndpointControlSupervisorHandle {
 
     pub fn peer_authorizer(&self) -> DevicePeerAuthorizer {
         self.peer_authorizer.clone()
+    }
+
+    pub fn device_network_resolver(&self) -> DeviceNetworkResolver {
+        self.device_network_resolver.clone()
     }
 
     pub async fn shutdown(self) -> Result<(), JoinError> {
@@ -236,7 +255,7 @@ async fn maintain_connection(
     policy: ReconnectPolicy,
     shutdown: &mut watch::Receiver<bool>,
     device_network: &mut Option<watch::Receiver<DeviceNetworkUpdate>>,
-    peer_requests: &mut mpsc::Receiver<PeerAuthorizationRequest>,
+    requests: &mut ControlRequestReceivers<'_>,
     operation_timeout: std::time::Duration,
 ) -> Result<(), EndpointControlError> {
     let start = Instant::now() + policy.heartbeat_interval;
@@ -246,6 +265,7 @@ async fn maintain_connection(
     let mut pending_heartbeat: Option<(Vec<u8>, Instant)> = None;
     let mut pending_network: Option<PendingNetworkUpdate> = None;
     let mut pending_peer: Option<PendingPeerAuthorization> = None;
+    let mut pending_resolution: Option<PendingDeviceNetworkResolution> = None;
     loop {
         tokio::select! {
             _ = heartbeat.tick() => {
@@ -273,11 +293,16 @@ async fn maintain_connection(
                         }
                     }
                     IncomingControlFrame::Server(message) => {
-                        handle_server_message(message, &mut pending_network, &mut pending_peer)?;
+                        handle_server_message(
+                            message,
+                            &mut pending_network,
+                            &mut pending_peer,
+                            &mut pending_resolution,
+                        )?;
                     }
                 }
             }
-            request = peer_requests.recv(), if pending_peer.is_none() => {
+            request = requests.peer.recv(), if pending_peer.is_none() => {
                 let Some(request) = request else {
                     return Ok(());
                 };
@@ -290,6 +315,20 @@ async fn maintain_connection(
                 pending_peer = Some(PendingPeerAuthorization {
                     request_id,
                     peer_endpoint_key: request.peer_endpoint_key,
+                    response: request.response,
+                    deadline: Instant::now() + operation_timeout,
+                });
+            }
+            request = requests.network.recv(), if pending_resolution.is_none() => {
+                let Some(request) = request else {
+                    return Ok(());
+                };
+                let request_id = connection
+                    .send_get_device_network(request.device_ref, operation_timeout)
+                    .await?;
+                pending_resolution = Some(PendingDeviceNetworkResolution {
+                    request_id,
+                    device_ref: request.device_ref,
                     response: request.response,
                     deadline: Instant::now() + operation_timeout,
                 });
@@ -323,8 +362,16 @@ async fn maintain_connection(
             _ = wait_for_deadline(pending_peer.as_ref().map(|pending| pending.deadline)) => {
                 return Err(EndpointControlError::Timeout);
             }
+            _ = wait_for_deadline(pending_resolution.as_ref().map(|pending| pending.deadline)) => {
+                return Err(EndpointControlError::Timeout);
+            }
         }
     }
+}
+
+struct ControlRequestReceivers<'a> {
+    peer: &'a mut mpsc::Receiver<PeerAuthorizationRequest>,
+    network: &'a mut mpsc::Receiver<DeviceNetworkRequest>,
 }
 
 struct PendingNetworkUpdate {
@@ -340,10 +387,18 @@ struct PendingPeerAuthorization {
     deadline: Instant,
 }
 
+struct PendingDeviceNetworkResolution {
+    request_id: RequestId,
+    device_ref: pab_protocol::DeviceRef,
+    response: oneshot::Sender<Result<pab_protocol::DeviceNetworkSnapshot, EndpointControlError>>,
+    deadline: Instant,
+}
+
 fn handle_server_message(
     message: ControlServerMessage,
     pending_network: &mut Option<PendingNetworkUpdate>,
     pending_peer: &mut Option<PendingPeerAuthorization>,
+    pending_resolution: &mut Option<PendingDeviceNetworkResolution>,
 ) -> Result<(), EndpointControlError> {
     match message {
         ControlServerMessage::DeviceNetworkAccepted { request_id, result }
@@ -367,6 +422,17 @@ fn handle_server_message(
             let _ = pending.response.send(Ok(result));
             Ok(())
         }
+        ControlServerMessage::DeviceNetworkFound {
+            request_id,
+            snapshot,
+        } if pending_resolution.as_ref().is_some_and(|pending| {
+            request_id == pending.request_id && snapshot.device_ref == pending.device_ref
+        }) =>
+        {
+            let pending = pending_resolution.take().expect("matched network request");
+            let _ = pending.response.send(Ok(*snapshot));
+            Ok(())
+        }
         ControlServerMessage::Error {
             request_id: Some(request_id),
             code,
@@ -386,6 +452,20 @@ fn handle_server_message(
             .is_some_and(|pending| request_id == pending.request_id) =>
         {
             let pending = pending_peer.take().expect("matched peer request");
+            let _ = pending
+                .response
+                .send(Err(EndpointControlError::Server { code, message }));
+            Ok(())
+        }
+        ControlServerMessage::Error {
+            request_id: Some(request_id),
+            code,
+            message,
+        } if pending_resolution
+            .as_ref()
+            .is_some_and(|pending| request_id == pending.request_id) =>
+        {
+            let pending = pending_resolution.take().expect("matched network request");
             let _ = pending
                 .response
                 .send(Err(EndpointControlError::Server { code, message }));
@@ -445,5 +525,58 @@ fn classify(error: EndpointControlError) -> ConnectionFailure {
     ConnectionFailure {
         kind,
         detail: error.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use iroh_base::SecretKey;
+    use pab_protocol::{DeploymentId, EndpointProofPrincipal, TenantId, UserId};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn retries_forever_at_the_same_interval() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let supervisor = EndpointControlSupervisor::new(
+            EndpointControlConfig {
+                url: format!("wss://127.0.0.1:{port}/control"),
+                deployment_id: DeploymentId::from_u128(1),
+                tenant_id: TenantId::from_u128(2),
+                principal: EndpointProofPrincipal::User {
+                    user_id: UserId::from_u128(3),
+                },
+                operation_timeout: Duration::from_millis(100),
+            },
+            SecretKey::generate(),
+            crate::tls_connector(None).unwrap(),
+            ReconnectPolicy {
+                heartbeat_interval: Duration::from_secs(1),
+                heartbeat_timeout: Duration::from_millis(500),
+                retry_interval: Duration::from_millis(25),
+            },
+        )
+        .unwrap()
+        .spawn();
+        let mut status = supervisor.status();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let current = status.borrow().clone();
+                if current.phase == ControlConnectionPhase::Reconnecting {
+                    assert_eq!(current.retry_in_ms, Some(25));
+                    if current.consecutive_failures >= 4 {
+                        break;
+                    }
+                }
+                status.changed().await.unwrap();
+            }
+        })
+        .await
+        .expect("the supervisor stopped retrying");
+        supervisor.shutdown().await.unwrap();
     }
 }

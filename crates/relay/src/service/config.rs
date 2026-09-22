@@ -16,8 +16,7 @@ pub struct RelayServiceConfig {
     pub captive_bind: SocketAddr,
     pub quic_bind: SocketAddr,
     pub policy_refresh_interval: Duration,
-    pub reconnect_initial_delay: Duration,
-    pub reconnect_max_delay: Duration,
+    pub reconnect_interval: Duration,
     pub limiter_burst: Duration,
 }
 
@@ -36,8 +35,7 @@ impl RelayServiceConfig {
             captive_bind: "127.0.0.1:0".parse().expect("valid captive address"),
             quic_bind: optional("PAB_RELAY_QUIC_ADDR", "0.0.0.0:7842")?,
             policy_refresh_interval: Duration::from_secs(20),
-            reconnect_initial_delay: Duration::from_secs(1),
-            reconnect_max_delay: Duration::from_secs(30),
+            reconnect_interval: Duration::from_secs(3),
             limiter_burst: Duration::from_millis(100),
         };
         config.validate()?;
@@ -56,16 +54,12 @@ impl RelayServiceConfig {
         }
         for (name, duration) in [
             ("policy refresh interval", self.policy_refresh_interval),
-            ("initial reconnect delay", self.reconnect_initial_delay),
-            ("maximum reconnect delay", self.reconnect_max_delay),
+            ("reconnect interval", self.reconnect_interval),
             ("limiter burst", self.limiter_burst),
         ] {
             if duration.is_zero() {
                 return Err(RelayServiceConfigError::ZeroDuration(name));
             }
-        }
-        if self.reconnect_initial_delay > self.reconnect_max_delay {
-            return Err(RelayServiceConfigError::InvalidReconnectRange);
         }
         Ok(())
     }
@@ -145,6 +139,4 @@ pub enum RelayServiceConfigError {
     CaptivePortalMustBeLoopback,
     #[error("{0} must be greater than zero")]
     ZeroDuration(&'static str),
-    #[error("initial reconnect delay must not exceed maximum reconnect delay")]
-    InvalidReconnectRange,
 }

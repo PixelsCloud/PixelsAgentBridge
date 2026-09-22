@@ -10,8 +10,7 @@ pub struct PolicySyncSettings {
     pub deployment_id: pab_protocol::DeploymentId,
     pub control_secret: String,
     pub refresh_interval: Duration,
-    pub reconnect_initial_delay: Duration,
-    pub reconnect_max_delay: Duration,
+    pub reconnect_interval: Duration,
 }
 
 pub async fn connect_and_sync(
@@ -52,9 +51,8 @@ async fn reconnect(
     connector: Connector,
     runtime: &RelayPolicyRuntime,
 ) -> RelayControlClient {
-    let mut delay = settings.reconnect_initial_delay;
     loop {
-        tokio::time::sleep(delay).await;
+        tokio::time::sleep(settings.reconnect_interval).await;
         match connect_and_sync(settings, connector.clone(), runtime).await {
             Ok(client) => {
                 eprintln!("pab-relay: policy control connection restored");
@@ -62,7 +60,6 @@ async fn reconnect(
             }
             Err(error) => {
                 eprintln!("pab-relay: policy reconnect failed: {error}");
-                delay = delay.saturating_mul(2).min(settings.reconnect_max_delay);
             }
         }
     }

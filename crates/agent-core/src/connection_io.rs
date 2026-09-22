@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeviceNetworkUpdate, EndpointKey, RequestId,
+    ControlClientMessage, ControlServerMessage, DeviceNetworkUpdate, DeviceRef, EndpointKey,
+    RequestId,
 };
 use tokio_tungstenite::tungstenite::Message;
 
@@ -57,6 +58,24 @@ impl AuthenticatedControlConnection {
             &ControlClientMessage::AuthorizeDevicePeer {
                 request_id,
                 peer_endpoint_key,
+            },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
+
+    pub(crate) async fn send_get_device_network(
+        &mut self,
+        device_ref: DeviceRef,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::GetDeviceNetwork {
+                request_id,
+                device_ref,
             },
             timeout,
         )

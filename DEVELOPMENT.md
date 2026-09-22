@@ -64,8 +64,8 @@ and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
 frames at 64 KiB, validates every challenge identity field before signing, and keeps
 the authenticated socket available for later task-sync protocols. Its supervisor
-requires matching pong heartbeats, reconnects with bounded identity-jittered
-exponential backoff, increments a connection generation after every successful
+requires matching pong heartbeats, retries indefinitely at a fixed three-second
+interval after recoverable failures, increments a connection generation after every successful
 authentication, and publishes current connection state through a Tokio watch channel
 for UI/Executor adapters. The same receive loop multiplexes heartbeat, address, and
 device-peer authorization responses. It does not persist account passwords or disable
@@ -78,7 +78,7 @@ Endpoint ID, and verifies the device-session response against the configured use
 device. The device password is supplied by the caller in a zeroizing value; it is not
 read from the environment or exposed as an MCP argument. Both serialized password
 buffers and the Executor's corresponding receive buffers are zeroized. Persistent
-Bridge supervision, first-use account login, and task operations remain future work.
+first-use account login and task operations remain future work.
 
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
@@ -195,8 +195,8 @@ Relay nodes request a versioned full policy snapshot over the authenticated WSS
 channel. An unchanged response extends the snapshot lifetime without resetting
 rate buckets. A newer snapshot atomically replaces Endpoint ownership and removes
 revoked entries. Unknown endpoints, cross-tenant forwarding, and expired policy
-state fail closed. The production Relay service refreshes every 20 seconds and
-reconnects with bounded exponential backoff; the in-memory policy still expires if
+state fail closed. The production Relay service refreshes every 20 seconds and retries
+the control connection indefinitely at a fixed three-second interval; the in-memory policy still expires if
 the control service remains unavailable.
 
 The Relay integration tests use loopback listeners and a generated self-signed

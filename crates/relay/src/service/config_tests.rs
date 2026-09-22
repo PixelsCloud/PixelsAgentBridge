@@ -16,8 +16,7 @@ fn config() -> RelayServiceConfig {
         captive_bind: "127.0.0.1:0".parse().unwrap(),
         quic_bind: "0.0.0.0:7842".parse().unwrap(),
         policy_refresh_interval: Duration::from_secs(20),
-        reconnect_initial_delay: Duration::from_secs(1),
-        reconnect_max_delay: Duration::from_secs(30),
+        reconnect_interval: Duration::from_secs(3),
         limiter_burst: Duration::from_millis(100),
     }
 }

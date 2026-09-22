@@ -1,8 +1,10 @@
 use std::fs;
 
 use pab_agent_core::{
-    AuthenticatedControlConnection, EndpointControlConfig, EndpointControlError,
-    EndpointSecretError, TlsConnectorError, read_endpoint_secret, tls_connector,
+    ControlConnectionStatus, DeviceNetworkResolutionError, DeviceNetworkResolver,
+    EndpointControlConfig, EndpointControlSupervisor, EndpointControlSupervisorHandle,
+    EndpointSecretError, ReconnectPolicy, ReconnectPolicyError, TlsConnectorError,
+    read_endpoint_secret, tls_connector,
 };
 use pab_protocol::{
     DEVICE_SESSION_AUTH_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
@@ -19,7 +21,8 @@ use crate::{BridgeConfig, BridgeConfigError};
 
 pub struct BridgeClient {
     config: BridgeConfig,
-    control: AuthenticatedControlConnection,
+    control: EndpointControlSupervisorHandle,
+    network_resolver: DeviceNetworkResolver,
     endpoint: PabEndpoint,
 }
 
@@ -33,8 +36,8 @@ impl BridgeClient {
             .map(|path| read_file(path, "control CA"))
             .transpose()?;
         let connector = tls_connector(control_ca.as_deref())?;
-        let control = AuthenticatedControlConnection::connect(
-            &EndpointControlConfig {
+        let control = EndpointControlSupervisor::new(
+            EndpointControlConfig {
                 url: config.control_url.clone(),
                 deployment_id: config.deployment_id,
                 tenant_id: config.tenant_id,
@@ -43,10 +46,12 @@ impl BridgeClient {
                 },
                 operation_timeout: config.operation_timeout,
             },
-            &secret,
+            secret.clone(),
             connector,
-        )
-        .await?;
+            ReconnectPolicy::default(),
+        )?
+        .spawn();
+        let network_resolver = control.device_network_resolver();
 
         let mut endpoint_config = PabEndpointConfig::new(config.relay_urls.clone())?;
         if let Some(path) = &config.relay_ca_cert {
@@ -57,12 +62,17 @@ impl BridgeClient {
         Ok(Self {
             config,
             control,
+            network_resolver,
             endpoint,
         })
     }
 
+    pub fn control_status(&self) -> tokio::sync::watch::Receiver<ControlConnectionStatus> {
+        self.control.status()
+    }
+
     pub async fn connect_device(
-        &mut self,
+        &self,
         device_ref: DeviceRef,
         password: Zeroizing<String>,
     ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
@@ -74,10 +84,7 @@ impl BridgeClient {
         if password.is_empty() || password.len() > MAX_DEVICE_PASSWORD_BYTES {
             return Err(BridgeError::InvalidDevicePassword);
         }
-        let snapshot = self
-            .control
-            .get_device_network(device_ref, self.config.operation_timeout)
-            .await?;
+        let snapshot = self.network_resolver.resolve(device_ref).await?;
         let address = PabEndpointAddress {
             relay_urls: snapshot.relay_urls,
             direct_addresses: snapshot.direct_addresses,
@@ -135,7 +142,7 @@ impl BridgeClient {
 
     pub async fn shutdown(self) -> Result<(), BridgeError> {
         self.endpoint.close().await;
-        self.control.close().await?;
+        self.control.shutdown().await?;
         Ok(())
     }
 }
@@ -197,11 +204,15 @@ pub enum BridgeError {
     #[error(transparent)]
     Tls(#[from] TlsConnectorError),
     #[error(transparent)]
-    Control(#[from] EndpointControlError),
+    ReconnectPolicy(#[from] ReconnectPolicyError),
+    #[error(transparent)]
+    NetworkResolution(#[from] DeviceNetworkResolutionError),
     #[error(transparent)]
     Endpoint(#[from] PabEndpointError),
     #[error(transparent)]
     Connection(#[from] PabConnectionError),
+    #[error("the endpoint control supervisor task failed: {0}")]
+    SupervisorTask(#[from] tokio::task::JoinError),
     #[error("the requested device does not belong to this Bridge deployment and tenant")]
     DeviceIdentityMismatch,
     #[error("the device password must contain between 1 and {MAX_DEVICE_PASSWORD_BYTES} bytes")]
