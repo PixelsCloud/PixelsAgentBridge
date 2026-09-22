@@ -1,0 +1,323 @@
+diff --git a/src/server/client.rs b/src/server/client.rs
+--- a/src/server/client.rs
++++ b/src/server/client.rs
+@@ -502,7 +502,7 @@
+             } => {
+                 let packet_len = datagrams.contents.len();
+                 if let Err(err @ ForwardPacketError { .. }) =
+-                    self.handle_frame_send_packet(dst_key, datagrams)
++                    self.handle_frame_send_packet(dst_key, datagrams).await
+                 {
+                     warn!("failed to handle send packet frame: {err:#}");
+                 }
+@@ -521,14 +521,15 @@
+         Ok(())
+     }
+ 
+-    fn handle_frame_send_packet(
+-        &self,
++    async fn handle_frame_send_packet(
++        &mut self,
+         dst: EndpointId,
+         data: Datagrams,
+     ) -> Result<(), ForwardPacketError> {
+         self.metrics.send_packets_recv.inc();
+         self.clients
+-            .send_packet(dst, data, self.guard.endpoint_id(), &self.metrics)?;
++            .send_packet(dst, data, self.guard.endpoint_id(), &self.metrics)
++            .await?;
+ 
+         Ok(())
+     }
+diff --git a/src/server/clients.rs b/src/server/clients.rs
+--- a/src/server/clients.rs
++++ b/src/server/clients.rs
+@@ -10,7 +10,7 @@
+ use tracing::{debug, trace};
+ 
+ use super::{
+-    ConnectionId, OnDisconnectGuard,
++    AllowAllForwarding, ConnectionId, DynForwardingControl, ForwardingDecision, OnDisconnectGuard,
+     client::{Client, Config, ForwardPacketError},
+ };
+ use crate::{
+@@ -25,15 +25,22 @@
+ ///
+ /// This type manages the collection of active client connections and
+ /// handles routing messages between them.
+-#[derive(Debug, Clone, Default)]
++#[derive(Debug, Clone)]
+ pub struct Clients(Arc<Inner>);
+ 
+-#[derive(Debug, Default)]
++#[derive(Debug)]
+ struct Inner {
+     /// The list of all currently connected clients.
+     clients: DashMap<EndpointId, ClientState>,
+     /// Map of which client has sent where
+     sent_to: DashMap<EndpointId, HashSet<EndpointId>>,
++    forwarding: Arc<dyn DynForwardingControl>,
++}
++
++impl Default for Clients {
++    fn default() -> Self {
++        Self::new(Arc::new(AllowAllForwarding))
++    }
+ }
+ 
+ #[derive(Debug)]
+@@ -54,6 +61,15 @@
+ }
+ 
+ impl Clients {
++    /// Creates a client registry using the supplied datagram forwarding control.
++    pub fn new(forwarding: Arc<dyn DynForwardingControl>) -> Self {
++        Self(Arc::new(Inner {
++            clients: DashMap::new(),
++            sent_to: DashMap::new(),
++            forwarding,
++        }))
++    }
++
+     /// Shuts down all connected clients.
+     ///
+     /// This method gracefully disconnects all active client connections managed by
+@@ -197,13 +213,26 @@
+     }
+ 
+     /// Attempt to send a packet to client with [`EndpointId`] `dst`.
+-    pub(super) fn send_packet(
++    pub(super) async fn send_packet(
+         &self,
+         dst: EndpointId,
+         data: Datagrams,
+         src: EndpointId,
+         metrics: &Metrics,
+     ) -> Result<(), ForwardPacketError> {
++        loop {
++            match self.0.forwarding.check(src, dst, data.contents.len()) {
++                ForwardingDecision::Allow => break,
++                ForwardingDecision::Wait(delay) if delay.is_zero() => {
++                    tokio::task::yield_now().await;
++                }
++                ForwardingDecision::Wait(delay) => tokio::time::sleep(delay).await,
++                ForwardingDecision::Drop => {
++                    metrics.send_packets_dropped.inc();
++                    return Ok(());
++                }
++            }
++        }
+         let Some(client) = self.0.clients.get(&dst) else {
+             debug!(dst = %dst.fmt_short(), "no connected client, dropped packet");
+             metrics.send_packets_dropped.inc();
+diff --git a/src/server/http_server.rs b/src/server/http_server.rs
+--- a/src/server/http_server.rs
++++ b/src/server/http_server.rs
+@@ -32,7 +32,7 @@
+ use tracing::{Instrument, debug, error, info, info_span, trace, warn};
+ 
+ use super::{
+-    AllowAll, ClientRequest, DynAccessControl, SpawnError, clients::Clients,
++    AllowAll, AllowAllForwarding, ClientRequest, DynAccessControl, DynForwardingControl, SpawnError, clients::Clients,
+     streams::InvalidBucketConfig,
+ };
+ use crate::{
+@@ -352,6 +352,8 @@
+     key_cache_capacity: usize,
+     /// Access control for endpoints.
+     access: Arc<dyn DynAccessControl>,
++    /// Forwarding control for datagrams.
++    forwarding: Arc<dyn DynForwardingControl>,
+     metrics: Option<Arc<Metrics>>,
+     establish_timeout: Duration,
+ }
+@@ -367,6 +369,7 @@
+             client_rx_ratelimit: None,
+             key_cache_capacity: DEFAULT_KEY_CACHE_CAPACITY,
+             access: Arc::new(AllowAll),
++            forwarding: Arc::new(AllowAllForwarding),
+             metrics: None,
+             establish_timeout: ESTABLISH_TIMEOUT,
+         }
+@@ -381,6 +384,11 @@
+     /// Set the access control.
+     pub(super) fn access(mut self, access: Arc<dyn DynAccessControl>) -> Self {
+         self.access = access;
++        self
++    }
++
++    pub(super) fn forwarding(mut self, forwarding: Arc<dyn DynForwardingControl>) -> Self {
++        self.forwarding = forwarding;
+         self
+     }
+ 
+@@ -442,12 +450,13 @@
+     pub(super) async fn spawn(self) -> Result<Server, SpawnError> {
+         let cancel_token = CancellationToken::new();
+ 
+-        let service = RelayService::new(
++        let service = RelayService::new_with_forwarding(
+             self.handlers,
+             self.headers,
+             self.client_rx_ratelimit,
+             KeyCache::new(self.key_cache_capacity),
+             self.access,
++            self.forwarding,
+             self.metrics.unwrap_or_default(),
+         );
+ 
+@@ -921,10 +930,31 @@
+         access: Arc<dyn DynAccessControl>,
+         metrics: Arc<Metrics>,
+     ) -> Self {
++        Self::new_with_forwarding(
++            handlers,
++            headers,
++            rate_limit,
++            key_cache,
++            access,
++            Arc::new(AllowAllForwarding),
++            metrics,
++        )
++    }
++
++    /// Creates a new RelayService with datagram forwarding control.
++    pub fn new_with_forwarding(
++        handlers: Handlers,
++        headers: HeaderMap,
++        rate_limit: Option<ClientRateLimit>,
++        key_cache: KeyCache,
++        access: Arc<dyn DynAccessControl>,
++        forwarding: Arc<dyn DynForwardingControl>,
++        metrics: Arc<Metrics>,
++    ) -> Self {
+         Self(Arc::new(Inner {
+             handlers,
+             headers,
+-            clients: Clients::default(),
++            clients: Clients::new(forwarding),
+             write_timeout: SERVER_WRITE_TIMEOUT,
+             rate_limit: watch::Sender::new(rate_limit),
+             key_cache,
+diff --git a/src/server/testing.rs b/src/server/testing.rs
+--- a/src/server/testing.rs
++++ b/src/server/testing.rs
+@@ -1,7 +1,9 @@
+ //! Exposes functions to quickly configure a server suitable for testing.
+ use std::{net::Ipv4Addr, sync::Arc};
+ 
+-use super::{AllowAll, CertConfig, QuicConfig, RelayConfig, ServerConfig, TlsConfig};
++use super::{
++    AllowAll, AllowAllForwarding, CertConfig, QuicConfig, RelayConfig, ServerConfig, TlsConfig,
++};
+ 
+ /// Creates a [`rustls::ServerConfig`] and certificates suitable for testing.
+ ///
+@@ -57,6 +59,7 @@
+         limits: Default::default(),
+         key_cache_capacity: Some(1024),
+         access: Arc::new(AllowAll),
++        forwarding: Arc::new(AllowAllForwarding),
+     }
+ }
+ 
+diff --git a/src/server.rs b/src/server.rs
+--- a/src/server.rs
++++ b/src/server.rs
+@@ -26,6 +26,7 @@
+         Arc,
+         atomic::{AtomicU64, Ordering},
+     },
++    time::Duration,
+ };
+ 
+ use derive_more::Debug;
+@@ -144,6 +145,8 @@
+     pub key_cache_capacity: Option<usize>,
+     /// Access control for incoming connections.
+     pub access: Arc<dyn DynAccessControl>,
++    /// Controls forwarding of relay datagrams after both endpoint identities are known.
++    pub forwarding: Arc<dyn DynForwardingControl>,
+ }
+ 
+ impl RelayConfig {
+@@ -159,7 +162,70 @@
+             limits: Limits::default(),
+             key_cache_capacity: None,
+             access: Arc::new(AllowAll),
+-        }
++            forwarding: Arc::new(AllowAllForwarding),
++        }
++    }
++}
++
++/// Decision returned by [`ForwardingControl`] for a relay datagram.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum ForwardingDecision {
++    /// Forward the datagram now.
++    Allow,
++    /// Recheck after this delay. The source connection is backpressured while waiting.
++    Wait(Duration),
++    /// Drop the datagram without forwarding it.
++    Drop,
++}
++
++/// Controls datagram forwarding after source and destination identities are known.
++///
++/// Implementations must return quickly and must not block the async runtime. Shared
++/// rate limiters can update a short critical section and return [`ForwardingDecision::Wait`].
++pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
++    /// Checks whether a datagram can be forwarded now.
++    fn check(
++        &self,
++        src: EndpointId,
++        dst: EndpointId,
++        bytes: usize,
++    ) -> ForwardingDecision;
++}
++
++/// Dynamic form of [`ForwardingControl`].
++pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
++    /// See [`ForwardingControl::check`].
++    fn check(
++        &self,
++        src: EndpointId,
++        dst: EndpointId,
++        bytes: usize,
++    ) -> ForwardingDecision;
++}
++
++impl<T: ForwardingControl> DynForwardingControl for T {
++    fn check(
++        &self,
++        src: EndpointId,
++        dst: EndpointId,
++        bytes: usize,
++    ) -> ForwardingDecision {
++        <Self as ForwardingControl>::check(self, src, dst, bytes)
++    }
++}
++
++/// Forwarding policy that allows every datagram immediately.
++#[derive(Debug, Clone, Copy)]
++pub struct AllowAllForwarding;
++
++impl ForwardingControl for AllowAllForwarding {
++    fn check(
++        &self,
++        _src: EndpointId,
++        _dst: EndpointId,
++        _bytes: usize,
++    ) -> ForwardingDecision {
++        ForwardingDecision::Allow
+     }
+ }
+ 
+@@ -733,6 +799,7 @@
+                     .headers(headers)
+                     .key_cache_capacity(key_cache_capacity)
+                     .access(relay_config.access)
++                    .forwarding(relay_config.forwarding)
+                     .request_handler(Method::GET, "/", Box::new(root_handler))
+                     .request_handler(Method::GET, "/index.html", Box::new(root_handler))
+                     .request_handler(Method::GET, RELAY_PROBE_PATH, Box::new(probe_handler))

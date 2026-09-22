@@ -1,0 +1,29 @@
+{
+  "package": "iroh-relay",
+  "version": "1.2.0",
+  "vendor_path": "vendor/iroh-relay",
+  "vendor_tree_sha256": "8f44fd399f6155bcdf7c85328a5c580d9efb27f1e58defd00806bce4ab093012",
+  "patch_path": "patches/iroh-relay/1.2.0-forwarding-control.patch",
+  "modified_files": {
+    "src/server.rs": {
+      "upstream_sha256": "96c19ba39d744ff41c2ac8ec8c3cd53db8923199c02b4d79fb28cf6d4a7eb373",
+      "patched_sha256": "229cc1bdc0d2ae01443219f85824b5afb3bb62dbc70e990692aaf43182b8862b"
+    },
+    "src/server/client.rs": {
+      "upstream_sha256": "090e6d862e95d89e29f10f22c889ace538ec3ce9c339b41194f55048c99c6d7c",
+      "patched_sha256": "38c54bb96dde048d65eb1af744734f4a33862b72a3793653f6e10b1f0178b9f9"
+    },
+    "src/server/clients.rs": {
+      "upstream_sha256": "f9cfe61fd0c450eaf5c1443d02126e5da99b1629ae9e9fd5bf1f9fb9b340393a",
+      "patched_sha256": "8ad9adf8d97a6f0b019b378c2e6a7761f6c734c4d8a0c690532d1817058ffe27"
+    },
+    "src/server/http_server.rs": {
+      "upstream_sha256": "fb2366bcefee7aa7b56e62a20ef50372f19f72dc04ee47b3290fac95d1ec31b9",
+      "patched_sha256": "3e6961cd5cf1d3406484efaf317fc4cbcb3de6e25abb77342f18c64222e8b4f2"
+    },
+    "src/server/testing.rs": {
+      "upstream_sha256": "d4245c3bd95079dccf79e97fba1f62cad0e72d4560a08d74b212d2205ee2ffe5",
+      "patched_sha256": "f687ed056e501ab619b048509e69af835b5e13f08d1a6d9b6411f3b0c8f9705f"
+    }
+  }
+}

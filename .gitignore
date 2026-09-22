@@ -9,3 +9,4 @@
 /.vscode/
 *.pdb
 *.log
+__pycache__/

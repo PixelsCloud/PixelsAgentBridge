@@ -9,6 +9,7 @@ Run the current checks with:
 
 ```powershell
 cargo fmt --all -- --check
+python scripts/verify_iroh_vendor.py
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
@@ -62,6 +63,12 @@ certificate. They verify explicit certificate trust, endpoint admission, and an
 actual datagram transfer through `iroh-relay` 1.2.0. The plain HTTP captive-portal
 listener is bound to loopback in this configuration; public deployments must expose
 only the TLS and QUIC listeners.
+
+`iroh-relay` is pinned to 1.2.0 and vendored only because PAB needs a forwarding hook
+that receives both authenticated Endpoint IDs before applying aggregate limits. The
+machine-readable baseline, reproducible patch, drift verifier, and upgrade checklist
+live under `patches/iroh-relay`. The patch leaves iroh's captive portal unchanged; PAB
+keeps that probe local and requires TLS on its own account, control, and data entrances.
 
 Project design documents and local environment/server information are intentionally
 excluded from Git.
