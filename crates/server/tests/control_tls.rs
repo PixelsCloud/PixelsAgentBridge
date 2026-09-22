@@ -1,5 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
+use argon2::{
+    Argon2, PasswordHasher,
+    password_hash::{SaltString, rand_core::OsRng},
+};
 use axum_server::tls_rustls::RustlsConfig;
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
@@ -7,13 +11,15 @@ use pab_agent_core::{
     AuthenticatedControlConnection, ControlConnectionPhase, EndpointControlConfig,
     EndpointControlSupervisor, ReconnectPolicy, tls_connector,
 };
+use pab_executor::{DeviceSessionAcceptor, DeviceSessionError};
 use pab_protocol::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
-    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
-    DeviceNetworkUpdate, DeviceRef, EndpointAuthenticationResult, EndpointInstanceId, EndpointKey,
-    EndpointProofPrincipal, EndpointProofResponse, EndpointRegistration,
-    EndpointRegistrationResult, EndpointSignature, ExecutionContext, ExecutionScope,
-    InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
+    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceNetworkUpdate, DeviceRef,
+    DeviceSessionAuthenticate, DeviceSessionAuthenticationResult, EndpointAuthenticationResult,
+    EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
+    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
+    ExecutionScope, InterpreterContext, OsFamily, PathStyle, RelayLimitDefaults, RequestId,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -23,6 +29,7 @@ use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth, control_router,
 };
+use pab_transport::{PabEndpoint, PabEndpointAddress, PabEndpointConfig};
 use rustls::{ClientConfig, RootCertStore};
 use sqlx::PgPool;
 use tokio_tungstenite::{
@@ -30,6 +37,42 @@ use tokio_tungstenite::{
 };
 
 const RELAY_CONTROL_SECRET: &str = "test-only Relay control secret 0123456789";
+
+async fn authenticate_device_over_pab(
+    bridge: &PabEndpoint,
+    device: &PabEndpoint,
+    device_address: &PabEndpointAddress,
+    device_endpoint_key: EndpointKey,
+    acceptor: &DeviceSessionAcceptor,
+    request: DeviceSessionAuthenticate,
+) -> (
+    Result<DeviceSessionAuthenticationResult, pab_transport::PabConnectionError>,
+    Result<(), DeviceSessionError>,
+) {
+    let timeout = Duration::from_secs(5);
+    let client = async {
+        let connection = bridge
+            .connect(
+                *device_endpoint_key.as_bytes(),
+                device_address,
+                Duration::from_secs(10),
+            )
+            .await
+            .unwrap();
+        let mut stream = connection.open_bi(timeout).await.unwrap();
+        stream.send_json(&request, timeout).await.unwrap();
+        let result = stream.receive_json(timeout).await;
+        if result.is_ok() {
+            connection.close(b"device authentication test complete");
+        }
+        result
+    };
+    let server = async {
+        let connection = device.accept().await.unwrap().unwrap();
+        acceptor.handle(connection).await
+    };
+    tokio::join!(client, server)
+}
 
 async fn send(
     socket: &mut tokio_tungstenite::WebSocketStream<
@@ -512,8 +555,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let (network_sender, network_receiver) =
         tokio::sync::watch::channel(supervisor_network.clone());
     let device_supervisor = EndpointControlSupervisor::new(
-        device_config,
-        device_secret,
+        device_config.clone(),
+        device_secret.clone(),
         connector.clone(),
         ReconnectPolicy {
             heartbeat_interval: Duration::from_secs(1),
@@ -558,7 +601,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     })
     .await
     .expect("device supervisor did not publish changed addresses");
-    device_supervisor.shutdown().await.unwrap();
+    let peer_authorizer = device_supervisor.peer_authorizer();
 
     let mut bridge_connection =
         AuthenticatedControlConnection::connect(&agent_config, &secret, connector.clone())
@@ -575,7 +618,29 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         discovered.direct_addresses,
         vec!["192.0.2.9:7842".parse().unwrap()]
     );
+    let peer_endpoint_key = EndpointKey::new(*secret.public().as_bytes());
+    let authorized_peer = peer_authorizer.authorize(peer_endpoint_key).await.unwrap();
+    assert_eq!(authorized_peer.device_ref, device_ref);
+    assert_eq!(authorized_peer.peer_endpoint_key, peer_endpoint_key);
+    assert_eq!(authorized_peer.peer_user_id, user_id);
     bridge_connection.close().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match peer_authorizer.authorize(peer_endpoint_key).await {
+                Err(pab_agent_core::PeerAuthorizationError::Control(
+                    pab_agent_core::EndpointControlError::Server {
+                        code: ControlErrorCode::NotFound,
+                        ..
+                    },
+                )) => break,
+                Ok(_) => tokio::time::sleep(Duration::from_millis(20)).await,
+                Err(error) => panic!("unexpected peer authorization error: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("closed peer remained online");
+    device_supervisor.shutdown().await.unwrap();
 
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),
@@ -650,10 +715,14 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         "Relay control must reject a connection without its internal secret"
     );
 
-    let mut relay_client =
-        RelayControlClient::connect(&relay_url, deployment_id, RELAY_CONTROL_SECRET, connector)
-            .await
-            .unwrap();
+    let mut relay_client = RelayControlClient::connect(
+        &relay_url,
+        deployment_id,
+        RELAY_CONTROL_SECRET,
+        connector.clone(),
+    )
+    .await
+    .unwrap();
     let relay_policy = RelayPolicyRuntime::new(
         RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),
     );
@@ -685,8 +754,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             control_url: format!("wss://localhost:{}/relay-control", address.port()),
             control_secret: RELAY_CONTROL_SECRET.to_owned(),
             control_ca_cert: Some(certificate_path.clone()),
-            tls_cert: certificate_path,
-            tls_key: private_key_path,
+            tls_cert: certificate_path.clone(),
+            tls_key: private_key_path.clone(),
             https_bind: "127.0.0.1:0".parse().unwrap(),
             captive_bind: "127.0.0.1:0".parse().unwrap(),
             quic_bind: "127.0.0.1:0".parse().unwrap(),
@@ -702,6 +771,166 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert!(running_relay.https_addr().unwrap().ip().is_loopback());
     assert!(running_relay.quic_addr().unwrap().ip().is_loopback());
     assert!(running_relay.captive_addr().unwrap().ip().is_loopback());
+
+    let pab_relay_url: iroh_base::RelayUrl = format!(
+        "https://localhost:{}",
+        running_relay.https_addr().unwrap().port()
+    )
+    .parse()
+    .unwrap();
+    let relay_ca = std::fs::read(&certificate_path).unwrap();
+    let bridge_endpoint = PabEndpoint::bind(
+        PabEndpointConfig::new(vec![pab_relay_url.clone()])
+            .unwrap()
+            .with_extra_ca_pem(&relay_ca)
+            .unwrap(),
+        secret.clone(),
+    )
+    .await
+    .unwrap();
+    let device_endpoint = PabEndpoint::bind(
+        PabEndpointConfig::new(vec![pab_relay_url])
+            .unwrap()
+            .with_extra_ca_pem(&relay_ca)
+            .unwrap(),
+        device_secret.clone(),
+    )
+    .await
+    .unwrap();
+    let (bridge_address, device_address) = tokio::join!(
+        bridge_endpoint.wait_online(Duration::from_secs(10)),
+        device_endpoint.wait_online(Duration::from_secs(10)),
+    );
+    bridge_address.unwrap();
+    let device_address = device_address.unwrap();
+    let device_address = PabEndpointAddress {
+        relay_urls: device_address
+            .relay_urls()
+            .map(ToString::to_string)
+            .collect(),
+        direct_addresses: device_address.ip_addrs().copied().collect(),
+    };
+
+    let authenticated_bridge =
+        AuthenticatedControlConnection::connect(&agent_config, &secret, connector.clone())
+            .await
+            .unwrap();
+    let live_network = DeviceNetworkUpdate {
+        schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
+        device_ref,
+        endpoint_key,
+        endpoint_instance_id: EndpointInstanceId::new(),
+        address_revision: 3,
+        relay_urls: device_address.relay_urls.clone(),
+        direct_addresses: device_address.direct_addresses.clone(),
+        observed_at_unix_ms: 1_795_000_000_102,
+    };
+    let (_network_sender, network_receiver) = tokio::sync::watch::channel(live_network);
+    let device_supervisor = EndpointControlSupervisor::new(
+        device_config,
+        device_secret,
+        connector,
+        ReconnectPolicy {
+            heartbeat_interval: Duration::from_secs(1),
+            heartbeat_timeout: Duration::from_millis(500),
+            initial_delay: Duration::from_millis(50),
+            max_delay: Duration::from_millis(200),
+        },
+    )
+    .unwrap()
+    .with_device_network(network_receiver)
+    .unwrap()
+    .spawn();
+    let mut device_status = device_supervisor.status();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while device_status.borrow().phase != ControlConnectionPhase::Authenticated {
+            device_status.changed().await.unwrap();
+        }
+    })
+    .await
+    .expect("device supervisor did not publish its live Relay address");
+
+    let device_password = "correct local device password";
+    let password_hash = Argon2::default()
+        .hash_password(
+            device_password.as_bytes(),
+            &SaltString::generate(&mut OsRng),
+        )
+        .unwrap()
+        .to_string();
+    let credential_directory = tempfile::tempdir().unwrap();
+    let credential_path = credential_directory.path().join("device-credential.json");
+    std::fs::write(
+        &credential_path,
+        serde_json::json!({
+            "schema_version": 1,
+            "password_version": 7,
+            "password_hash": password_hash,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let acceptor = DeviceSessionAcceptor::from_credential_file(
+        device_supervisor.peer_authorizer(),
+        device_ref,
+        &credential_path,
+        Duration::from_secs(5),
+    )
+    .unwrap();
+
+    let (accepted, accepted_server) = authenticate_device_over_pab(
+        &bridge_endpoint,
+        &device_endpoint,
+        &device_address,
+        endpoint_key,
+        &acceptor,
+        DeviceSessionAuthenticate {
+            schema_version: DEVICE_SESSION_AUTH_SCHEMA_VERSION,
+            device_ref,
+            device_password: device_password.to_owned(),
+        },
+    )
+    .await;
+    assert!(
+        accepted_server.is_ok(),
+        "device server rejected valid authentication: {accepted_server:?}"
+    );
+    let accepted = accepted.expect("bridge receives the accepted authentication result");
+    assert!(matches!(
+        accepted,
+        DeviceSessionAuthenticationResult::Accepted {
+            device_ref: accepted_device,
+            peer_user_id,
+            password_version: 7,
+            authenticated_at_unix_ms,
+        } if accepted_device == device_ref
+            && peer_user_id == user_id
+            && authenticated_at_unix_ms > 0
+    ));
+
+    let (rejected, rejected_server) = authenticate_device_over_pab(
+        &bridge_endpoint,
+        &device_endpoint,
+        &device_address,
+        endpoint_key,
+        &acceptor,
+        DeviceSessionAuthenticate {
+            schema_version: DEVICE_SESSION_AUTH_SCHEMA_VERSION,
+            device_ref,
+            device_password: "wrong local device password".to_owned(),
+        },
+    )
+    .await;
+    assert_eq!(
+        rejected.expect("bridge receives the rejected authentication result"),
+        DeviceSessionAuthenticationResult::Rejected
+    );
+    assert!(matches!(rejected_server, Err(DeviceSessionError::Rejected)));
+
+    authenticated_bridge.close().await.unwrap();
+    device_supervisor.shutdown().await.unwrap();
+    bridge_endpoint.close().await;
+    device_endpoint.close().await;
     tokio::time::timeout(Duration::from_secs(5), running_relay.shutdown())
         .await
         .expect("production Relay shutdown timed out")

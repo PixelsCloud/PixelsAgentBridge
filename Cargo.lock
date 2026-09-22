@@ -2801,14 +2801,18 @@ dependencies = [
 name = "pab-executor"
 version = "0.1.0"
 dependencies = [
+ "argon2",
  "iroh-base",
  "pab-agent-core",
  "pab-platform",
  "pab-protocol",
  "pab-transport",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -2867,9 +2871,11 @@ dependencies = [
  "futures-util",
  "iroh-base",
  "pab-agent-core",
+ "pab-executor",
  "pab-protocol",
  "pab-relay",
  "pab-task-runtime",
+ "pab-transport",
  "rand_core 0.6.4",
  "rcgen",
  "rustls",
@@ -2903,6 +2909,8 @@ dependencies = [
  "n0-future",
  "rustls-pemfile",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "thiserror 2.0.20",
  "tokio",
 ]

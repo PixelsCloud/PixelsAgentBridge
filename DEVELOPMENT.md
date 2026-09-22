@@ -1,7 +1,7 @@
 # Development
 
-Pixels Agent Bridge is currently validating its Relay, traffic-control, and PostgreSQL
-control-plane foundations.
+Pixels Agent Bridge is currently validating its Relay, traffic-control, PostgreSQL
+control plane, and authenticated iroh device-session foundations.
 The Rust toolchain is pinned in `rust-toolchain.toml` and dependencies are locked in
 `Cargo.lock`.
 
@@ -55,6 +55,10 @@ certificate-verification bypass. Optional iroh metrics, port mapping, and Apple'
 datapath stay disabled until measurements justify their compile and runtime cost. UDP
 hole punching and TLS Relay fallback remain available without those features.
 
+PAB application messages use bounded length-prefixed JSON on reliable bidirectional
+streams. A sender waits for QUIC acknowledgement before reporting delivery, so a
+connection close cannot overtake a completed authentication result.
+
 `pab-agent-core` is the GUI-independent client boundary shared by Windows, macOS,
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
@@ -63,19 +67,20 @@ the authenticated socket available for later task-sync protocols. Its supervisor
 requires matching pong heartbeats, reconnects with bounded identity-jittered
 exponential backoff, increments a connection generation after every successful
 authentication, and publishes current connection state through a Tokio watch channel
-for UI/Executor adapters. It does not persist account passwords or disable certificate
-verification.
+for UI/Executor adapters. The same receive loop multiplexes heartbeat, address, and
+device-peer authorization responses. It does not persist account passwords or disable
+certificate verification.
 
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
-file, and optional control/Relay private CAs from environment configuration; the
-endpoint secret itself is accepted only from a file. It binds an iroh endpoint with
-the same registered key, detects the native environment, publishes `DeviceHello`,
-reports supervised connection-state changes, reconnects, and closes both connections
-on the platform termination signal. It watches iroh address changes and publishes
-them through the authenticated control connection. The steady-state connection uses
-one receive loop for pongs, address acknowledgements, and future server pushes. It
-intentionally has no task execution path yet.
+file, local device-credential file, and optional control/Relay private CAs from
+environment configuration; secrets are accepted only from files. It binds an iroh
+endpoint with the same registered key, detects the native environment, publishes
+`DeviceHello`, reports supervised connection-state changes, reconnects, and closes
+both connections on the platform termination signal. It watches iroh address changes
+and publishes them through the authenticated control connection. It accepts bounded
+incoming PAB connections and authenticates them before any task capability is exposed.
+Task execution itself is still absent.
 
 Run the Debug Executor with a previously registered device endpoint:
 
@@ -86,6 +91,7 @@ $env:PAB_DEVICE_ID = "<device UUID>"
 $env:PAB_CONTROL_URL = "wss://server.example/control"
 $env:PAB_RELAY_URLS = "https://relay-1.example,https://relay-2.example"
 $env:PAB_ENDPOINT_SECRET_FILE = "C:\protected\pab-endpoint.key"
+$env:PAB_DEVICE_CREDENTIAL_FILE = "C:\protected\pab-device-credential.json"
 # Optional; control and Relay may use different private CAs:
 $env:PAB_CONTROL_CA_CERT = "C:\protected\pab-ca.pem"
 $env:PAB_RELAY_CA_CERT = "C:\protected\relay-ca.pem"
@@ -95,6 +101,13 @@ cargo run -p pab-executor
 The key file contains the 64 lowercase hexadecimal characters used by iroh's
 `SecretKey` representation, with an optional trailing newline. Do not pass the key as
 an environment value or print it in diagnostics.
+
+The device-credential file is JSON with `schema_version: 1`, a positive
+`password_version`, and an Argon2 PHC string in `password_hash`. The cleartext device
+password is sent only inside the authenticated iroh connection, moved into a
+zeroizing buffer on receipt, and never sent to the backend or Relay. A successful
+authentication response contains identity and password-version facts but no reusable
+session credential.
 
 After a device endpoint authenticates, it publishes a versioned `DeviceHello` with
 its immutable deployment/tenant/device reference and current execution context.
@@ -123,6 +136,15 @@ user's initial grant. Team roles can manage grants but do not implicitly grant d
 use. Missing and unauthorized snapshots share the same not-found result to avoid a
 device-directory oracle. The returned endpoint key remains the identity that iroh
 must authenticate when the Bridge connects.
+
+For each incoming iroh session, the Executor takes the remote Endpoint ID from the
+QUIC/TLS connection and asks its existing WSS supervisor to authorize that exact peer.
+The server requires the user Endpoint to be online and rechecks the tenant membership,
+device, both Endpoints, and the explicit device-connect grant in PostgreSQL. Current
+online presence is process-local, so a single backend instance is the supported
+topology for this phase. Before active-active backend deployment, connection routing
+or shared presence coordination must replace this registry; Redis is optional and
+does not become a permission source.
 
 The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
 It does not expose an insecure HTTP listener or issue bearer tokens. Set

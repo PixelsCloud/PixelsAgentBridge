@@ -4,7 +4,7 @@ use pab_protocol::{
     EndpointProofPrincipal, RequestId,
 };
 use tokio::{
-    sync::watch,
+    sync::{mpsc, oneshot, watch},
     task::{JoinError, JoinHandle},
     time::{Instant, MissedTickBehavior},
 };
@@ -18,6 +18,7 @@ use crate::{
         DeviceHelloConfigError, DeviceNetworkConfigError, ReconnectPolicy, ReconnectPolicyError,
         duration_millis, publish, publish_stopped, reconnect_delay,
     },
+    peer_authorizer::{DevicePeerAuthorizer, PeerAuthorizationRequest},
 };
 
 pub struct EndpointControlSupervisor {
@@ -85,10 +86,14 @@ impl EndpointControlSupervisor {
     pub fn spawn(self) -> EndpointControlSupervisorHandle {
         let (status_sender, status) = watch::channel(ControlConnectionStatus::initial());
         let (shutdown, shutdown_receiver) = watch::channel(false);
-        let task = tokio::spawn(self.run(status_sender, shutdown_receiver));
+        let (peer_requests, peer_request_receiver) = mpsc::channel(32);
+        let peer_authorizer =
+            DevicePeerAuthorizer::new(peer_requests, self.config.operation_timeout);
+        let task = tokio::spawn(self.run(status_sender, shutdown_receiver, peer_request_receiver));
         EndpointControlSupervisorHandle {
             status,
             shutdown,
+            peer_authorizer,
             task,
         }
     }
@@ -97,6 +102,7 @@ impl EndpointControlSupervisor {
         mut self,
         status: watch::Sender<ControlConnectionStatus>,
         mut shutdown: watch::Receiver<bool>,
+        mut peer_requests: mpsc::Receiver<PeerAuthorizationRequest>,
     ) {
         let mut generation = 0_u64;
         let mut consecutive_failures = 0_u32;
@@ -159,6 +165,7 @@ impl EndpointControlSupervisor {
                                 self.policy,
                                 &mut shutdown,
                                 &mut self.device_network,
+                                &mut peer_requests,
                                 self.config.operation_timeout,
                             )
                             .await
@@ -204,12 +211,17 @@ impl EndpointControlSupervisor {
 pub struct EndpointControlSupervisorHandle {
     status: watch::Receiver<ControlConnectionStatus>,
     shutdown: watch::Sender<bool>,
+    peer_authorizer: DevicePeerAuthorizer,
     task: JoinHandle<()>,
 }
 
 impl EndpointControlSupervisorHandle {
     pub fn status(&self) -> watch::Receiver<ControlConnectionStatus> {
         self.status.clone()
+    }
+
+    pub fn peer_authorizer(&self) -> DevicePeerAuthorizer {
+        self.peer_authorizer.clone()
     }
 
     pub async fn shutdown(self) -> Result<(), JoinError> {
@@ -224,6 +236,7 @@ async fn maintain_connection(
     policy: ReconnectPolicy,
     shutdown: &mut watch::Receiver<bool>,
     device_network: &mut Option<watch::Receiver<DeviceNetworkUpdate>>,
+    peer_requests: &mut mpsc::Receiver<PeerAuthorizationRequest>,
     operation_timeout: std::time::Duration,
 ) -> Result<(), EndpointControlError> {
     let start = Instant::now() + policy.heartbeat_interval;
@@ -232,6 +245,7 @@ async fn maintain_connection(
     let mut sequence = 0_u64;
     let mut pending_heartbeat: Option<(Vec<u8>, Instant)> = None;
     let mut pending_network: Option<PendingNetworkUpdate> = None;
+    let mut pending_peer: Option<PendingPeerAuthorization> = None;
     loop {
         tokio::select! {
             _ = heartbeat.tick() => {
@@ -259,9 +273,26 @@ async fn maintain_connection(
                         }
                     }
                     IncomingControlFrame::Server(message) => {
-                        handle_server_message(message, &mut pending_network)?;
+                        handle_server_message(message, &mut pending_network, &mut pending_peer)?;
                     }
                 }
+            }
+            request = peer_requests.recv(), if pending_peer.is_none() => {
+                let Some(request) = request else {
+                    return Ok(());
+                };
+                let request_id = connection
+                    .send_authorize_device_peer(
+                        request.peer_endpoint_key,
+                        operation_timeout,
+                    )
+                    .await?;
+                pending_peer = Some(PendingPeerAuthorization {
+                    request_id,
+                    peer_endpoint_key: request.peer_endpoint_key,
+                    response: request.response,
+                    deadline: Instant::now() + operation_timeout,
+                });
             }
             changed = network_changed(device_network, pending_network.is_none()) => {
                 match changed {
@@ -289,6 +320,9 @@ async fn maintain_connection(
             _ = wait_for_deadline(pending_network.as_ref().map(|pending| pending.deadline)) => {
                 return Err(EndpointControlError::Timeout);
             }
+            _ = wait_for_deadline(pending_peer.as_ref().map(|pending| pending.deadline)) => {
+                return Err(EndpointControlError::Timeout);
+            }
         }
     }
 }
@@ -299,31 +333,63 @@ struct PendingNetworkUpdate {
     deadline: Instant,
 }
 
+struct PendingPeerAuthorization {
+    request_id: RequestId,
+    peer_endpoint_key: pab_protocol::EndpointKey,
+    response: oneshot::Sender<Result<pab_protocol::AuthorizedDevicePeer, EndpointControlError>>,
+    deadline: Instant,
+}
+
 fn handle_server_message(
     message: ControlServerMessage,
-    pending: &mut Option<PendingNetworkUpdate>,
+    pending_network: &mut Option<PendingNetworkUpdate>,
+    pending_peer: &mut Option<PendingPeerAuthorization>,
 ) -> Result<(), EndpointControlError> {
     match message {
         ControlServerMessage::DeviceNetworkAccepted { request_id, result }
-            if pending.as_ref().is_some_and(|pending| {
+            if pending_network.as_ref().is_some_and(|pending| {
                 request_id == pending.request_id
                     && result.device_ref == pending.update.device_ref
                     && result.endpoint_instance_id == pending.update.endpoint_instance_id
                     && result.address_revision == pending.update.address_revision
             }) =>
         {
-            *pending = None;
+            *pending_network = None;
+            Ok(())
+        }
+        ControlServerMessage::DevicePeerAuthorized { request_id, result }
+            if pending_peer.as_ref().is_some_and(|pending| {
+                request_id == pending.request_id
+                    && result.peer_endpoint_key == pending.peer_endpoint_key
+            }) =>
+        {
+            let pending = pending_peer.take().expect("matched peer request");
+            let _ = pending.response.send(Ok(result));
             Ok(())
         }
         ControlServerMessage::Error {
             request_id: Some(request_id),
             code,
             message,
-        } if pending
+        } if pending_network
             .as_ref()
             .is_some_and(|pending| request_id == pending.request_id) =>
         {
             Err(EndpointControlError::Server { code, message })
+        }
+        ControlServerMessage::Error {
+            request_id: Some(request_id),
+            code,
+            message,
+        } if pending_peer
+            .as_ref()
+            .is_some_and(|pending| request_id == pending.request_id) =>
+        {
+            let pending = pending_peer.take().expect("matched peer request");
+            let _ = pending
+                .response
+                .send(Err(EndpointControlError::Server { code, message }));
+            Ok(())
         }
         _ => Err(EndpointControlError::UnexpectedMessage),
     }

@@ -12,6 +12,7 @@ pub struct ExecutorConfig {
     pub control_url: String,
     pub relay_urls: Vec<RelayUrl>,
     pub endpoint_secret_file: PathBuf,
+    pub device_credential_file: PathBuf,
     pub control_ca_cert: Option<PathBuf>,
     pub relay_ca_cert: Option<PathBuf>,
     pub operation_timeout: Duration,
@@ -38,6 +39,7 @@ impl ExecutorConfig {
             control_url: required_text(&mut lookup, "PAB_CONTROL_URL")?,
             relay_urls: relay_urls(required_text(&mut lookup, "PAB_RELAY_URLS")?)?,
             endpoint_secret_file: required_path(&mut lookup, "PAB_ENDPOINT_SECRET_FILE")?,
+            device_credential_file: required_path(&mut lookup, "PAB_DEVICE_CREDENTIAL_FILE")?,
             control_ca_cert: lookup("PAB_CONTROL_CA_CERT").map(PathBuf::from),
             relay_ca_cert: lookup("PAB_RELAY_CA_CERT").map(PathBuf::from),
             operation_timeout: Duration::from_secs(10),
@@ -155,6 +157,10 @@ mod tests {
             (
                 "PAB_ENDPOINT_SECRET_FILE".to_owned(),
                 OsString::from("endpoint.key"),
+            ),
+            (
+                "PAB_DEVICE_CREDENTIAL_FILE".to_owned(),
+                OsString::from("device-credential.json"),
             ),
         ])
     }

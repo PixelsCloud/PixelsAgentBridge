@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use pab_protocol::{ControlClientMessage, ControlServerMessage, DeviceNetworkUpdate, RequestId};
+use pab_protocol::{
+    ControlClientMessage, ControlServerMessage, DeviceNetworkUpdate, EndpointKey, RequestId,
+};
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{AuthenticatedControlConnection, EndpointControlError, control::send};
@@ -37,6 +39,24 @@ impl AuthenticatedControlConnection {
             &ControlClientMessage::PublishDeviceNetwork {
                 request_id,
                 update: Box::new(update.clone()),
+            },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
+
+    pub(crate) async fn send_authorize_device_peer(
+        &mut self,
+        peer_endpoint_key: EndpointKey,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::AuthorizeDevicePeer {
+                request_id,
+                peer_endpoint_key,
             },
             timeout,
         )

@@ -18,7 +18,7 @@ use iroh_relay::{
     tls::{CaTlsConfig, default_provider},
 };
 use n0_future::{SinkExt, StreamExt};
-use pab_transport::{PabEndpoint, PabEndpointConfig};
+use pab_transport::{PabEndpoint, PabEndpointAddress, PabEndpointConfig};
 use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -126,9 +126,11 @@ async fn relay_serves_health_over_trusted_self_signed_tls() {
 #[tokio::test]
 async fn pab_iroh_endpoint_uses_only_the_configured_tls_relay() {
     let endpoint_secret = SecretKey::from_bytes(&[31; 32]);
+    let peer_secret = SecretKey::from_bytes(&[32; 32]);
     let endpoint_id = endpoint_secret.public();
+    let peer_id = peer_secret.public();
     let access = Arc::new(EndpointAllowlist {
-        allowed: HashSet::from([endpoint_id]),
+        allowed: HashSet::from([endpoint_id, peer_id]),
         seen: Mutex::new(Vec::new()),
     });
     let (certificates, server_tls) = testing::self_signed_tls_certs_and_config();
@@ -153,15 +155,25 @@ async fn pab_iroh_endpoint_uses_only_the_configured_tls_relay() {
     .expect("valid relay URL");
     let endpoint_config = PabEndpointConfig::new(vec![relay_url.clone()])
         .unwrap()
+        .with_extra_ca_certificates(certificates.clone());
+    let peer_config = PabEndpointConfig::new(vec![relay_url.clone()])
+        .unwrap()
         .with_extra_ca_certificates(certificates);
 
     let endpoint = PabEndpoint::bind(endpoint_config, endpoint_secret)
         .await
         .expect("PAB endpoint binds");
+    let peer = PabEndpoint::bind(peer_config, peer_secret)
+        .await
+        .expect("PAB peer binds");
     let address = endpoint
         .wait_online(Duration::from_secs(10))
         .await
         .expect("PAB endpoint reaches its configured relay");
+    let peer_address = peer
+        .wait_online(Duration::from_secs(10))
+        .await
+        .expect("PAB peer reaches its configured relay");
 
     assert_eq!(endpoint.id(), endpoint_id);
     assert_eq!(
@@ -176,7 +188,59 @@ async fn pab_iroh_endpoint_uses_only_the_configured_tls_relay() {
             .contains(&endpoint_id)
     );
 
+    let peer_address = PabEndpointAddress {
+        relay_urls: peer_address.relay_urls().map(ToString::to_string).collect(),
+        direct_addresses: peer_address.ip_addrs().copied().collect(),
+    };
+    let (client_connection, server_connection) = tokio::join!(
+        endpoint.connect(*peer_id.as_bytes(), &peer_address, Duration::from_secs(10)),
+        peer.accept()
+    );
+    let client_connection = client_connection.expect("PAB endpoint connects");
+    let server_connection = server_connection
+        .expect("PAB peer accepts")
+        .expect("PAB peer remains open");
+    assert_eq!(client_connection.remote_endpoint_key(), *peer_id.as_bytes());
+    assert_eq!(
+        server_connection.remote_endpoint_key(),
+        *endpoint_id.as_bytes()
+    );
+
+    let client = async {
+        let mut stream = client_connection
+            .open_bi(Duration::from_secs(5))
+            .await
+            .unwrap();
+        stream
+            .send_json(
+                &serde_json::json!({"request": "hello"}),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        let response: serde_json::Value =
+            stream.receive_json(Duration::from_secs(5)).await.unwrap();
+        assert_eq!(response, serde_json::json!({"response": "world"}));
+    };
+    let server_side = async {
+        let mut stream = server_connection
+            .accept_bi(Duration::from_secs(5))
+            .await
+            .unwrap();
+        let request: serde_json::Value = stream.receive_json(Duration::from_secs(5)).await.unwrap();
+        assert_eq!(request, serde_json::json!({"request": "hello"}));
+        stream
+            .send_json(
+                &serde_json::json!({"response": "world"}),
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+    };
+    tokio::join!(client, server_side);
+
     endpoint.close().await;
+    peer.close().await;
     server.shutdown().await.expect("clean relay shutdown");
 }
 

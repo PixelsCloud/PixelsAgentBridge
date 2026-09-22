@@ -20,6 +20,7 @@ mod device_grants;
 mod device_network;
 mod device_runtime;
 mod endpoints;
+mod peer_authorization;
 mod support;
 mod teams;
 

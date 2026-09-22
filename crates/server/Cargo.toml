@@ -34,7 +34,9 @@ url = "2"
 
 [dev-dependencies]
 pab-agent-core = { path = "../agent-core" }
+pab-executor = { path = "../executor" }
 pab-relay = { path = "../relay" }
+pab-transport = { path = "../transport" }
 rcgen = "0.14"
 tempfile = "3"
 tokio-tungstenite = { version = "0.29", default-features = false, features = [

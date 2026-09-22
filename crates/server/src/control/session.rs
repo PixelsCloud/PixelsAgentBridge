@@ -130,6 +130,12 @@ impl ControlSession {
                     user_id,
                     allowed,
                 }),
+            ControlClientMessage::AuthorizeDevicePeer {
+                peer_endpoint_key, ..
+            } => self
+                .authorize_device_peer(peer_endpoint_key)
+                .await
+                .map(|result| ControlServerMessage::DevicePeerAuthorized { request_id, result }),
         };
         match result {
             Ok(response) => response,
@@ -317,6 +323,7 @@ impl ControlSession {
             endpoint_key: endpoint.endpoint_key,
             principal: endpoint.principal,
         };
+        self.control.endpoint_connected(endpoint.endpoint_key);
         self.endpoint = Some(endpoint);
         Ok(result)
     }
@@ -370,6 +377,28 @@ impl ControlSession {
             .device_network_snapshot(endpoint, device_ref)
             .await
             .map_err(Into::into)
+    }
+
+    async fn authorize_device_peer(
+        &self,
+        peer_endpoint_key: EndpointKey,
+    ) -> Result<pab_protocol::AuthorizedDevicePeer, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::DeviceEndpointRequired)?;
+        self.control
+            .authorize_device_peer(endpoint, peer_endpoint_key)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+impl Drop for ControlSession {
+    fn drop(&mut self) {
+        if let Some(endpoint) = self.endpoint.as_ref() {
+            self.control.endpoint_disconnected(endpoint.endpoint_key);
+        }
     }
 }
 

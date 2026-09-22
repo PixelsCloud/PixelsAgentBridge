@@ -1,10 +1,11 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
-    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef,
-    EndpointProofPrincipal, EndpointProofPurpose, MAX_DEVICE_DIRECT_ADDRESSES,
-    MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot, TenantId, UserId,
+    AuthorizedDevicePeer, DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION,
+    DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
+    MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot,
+    TenantId, UserId,
 };
 use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
@@ -12,6 +13,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
+    active_endpoints::ActiveEndpoints,
     auth::{CredentialError, PasswordEngine, PasswordPolicy, normalize_username},
     domain::{Account, Device, RegisteredEndpoint, Team, TeamInvitation, TeamRole},
     endpoint_proof::VerifiedEndpointProof,
@@ -23,6 +25,7 @@ pub struct ControlPlane {
     store: PostgresStore,
     passwords: PasswordEngine,
     dummy_password_hash: String,
+    active_endpoints: Arc<ActiveEndpoints>,
 }
 
 impl ControlPlane {
@@ -36,6 +39,7 @@ impl ControlPlane {
             store,
             passwords,
             dummy_password_hash,
+            active_endpoints: Arc::new(ActiveEndpoints::default()),
         })
     }
 
@@ -192,6 +196,31 @@ impl ControlPlane {
         Ok(self.store.registered_endpoint(endpoint_key).await?)
     }
 
+    pub(crate) fn endpoint_connected(&self, endpoint_key: EndpointKey) {
+        self.active_endpoints.connected(endpoint_key);
+    }
+
+    pub(crate) fn endpoint_disconnected(&self, endpoint_key: EndpointKey) {
+        self.active_endpoints.disconnected(endpoint_key);
+    }
+
+    pub async fn authorize_device_peer(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        peer_endpoint_key: EndpointKey,
+    ) -> Result<AuthorizedDevicePeer, ServiceError> {
+        let EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
+            return Err(ServiceError::DeviceEndpointRequired);
+        };
+        if !self.active_endpoints.is_connected(peer_endpoint_key) {
+            return Err(ServiceError::PeerEndpointOffline);
+        }
+        Ok(self
+            .store
+            .authorize_device_peer(endpoint, device_id, peer_endpoint_key)
+            .await?)
+    }
+
     pub async fn publish_device_hello(
         &self,
         endpoint: &RegisteredEndpoint,
@@ -318,6 +347,8 @@ pub enum ServiceError {
     DeviceEndpointRequired,
     #[error("this operation requires an authenticated user endpoint")]
     UserEndpointRequired,
+    #[error("the peer endpoint does not have an active control connection")]
+    PeerEndpointOffline,
     #[error("agent version must contain between 1 and 64 characters")]
     InvalidAgentVersion,
     #[error("device observation time must be a positive Unix timestamp")]

@@ -3,11 +3,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId, DeviceHello,
-    DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef,
-    ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult, EndpointKey,
-    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
-    EndpointSignature, RequestId, TenantId,
+    AuthorizedDevicePeer, ControlClientMessage, ControlErrorCode, ControlServerMessage,
+    DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceNetworkUpdate, DeviceRef, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointAuthenticationResult,
+    EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose,
+    EndpointProofResponse, EndpointSignature, RequestId, TenantId,
 };
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -225,6 +225,40 @@ impl AuthenticatedControlConnection {
                 request_id: response_id,
                 snapshot,
             } if response_id == request_id && snapshot.device_ref == device_ref => Ok(*snapshot),
+            ControlServerMessage::Error {
+                request_id: Some(response_id),
+                code,
+                message,
+            } if response_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
+
+    pub async fn authorize_device_peer(
+        &mut self,
+        peer_endpoint_key: EndpointKey,
+        timeout: Duration,
+    ) -> Result<AuthorizedDevicePeer, EndpointControlError> {
+        if timeout.is_zero() {
+            return Err(EndpointControlError::InvalidTimeout);
+        }
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::AuthorizeDevicePeer {
+                request_id,
+                peer_endpoint_key,
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DevicePeerAuthorized {
+                request_id: response_id,
+                result,
+            } if response_id == request_id && result.peer_endpoint_key == peer_endpoint_key => {
+                Ok(result)
+            }
             ControlServerMessage::Error {
                 request_id: Some(response_id),
                 code,

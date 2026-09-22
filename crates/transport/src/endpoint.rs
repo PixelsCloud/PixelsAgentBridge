@@ -9,6 +9,8 @@ use n0_future::StreamExt;
 use thiserror::Error;
 use tokio::sync::watch;
 
+use crate::PabConnection;
+
 pub const PAB_ALPN: &[u8] = b"pixels-agent-bridge/1";
 
 #[derive(Debug, Clone)]
@@ -105,6 +107,48 @@ impl PabEndpoint {
         &self.inner
     }
 
+    pub async fn connect(
+        &self,
+        endpoint_key: [u8; 32],
+        address: &PabEndpointAddress,
+        timeout: Duration,
+    ) -> Result<PabConnection, PabEndpointError> {
+        if timeout.is_zero() {
+            return Err(PabEndpointError::InvalidConnectionTimeout);
+        }
+        let endpoint_id = EndpointId::from_bytes(&endpoint_key)
+            .map_err(|error| PabEndpointError::InvalidEndpointKey(error.to_string()))?;
+        let mut endpoint_address = EndpointAddr::new(endpoint_id);
+        for relay_url in &address.relay_urls {
+            let relay_url = relay_url
+                .parse::<RelayUrl>()
+                .map_err(|error| PabEndpointError::InvalidRemoteRelay(error.to_string()))?;
+            if relay_url.scheme() != "https" {
+                return Err(PabEndpointError::RelayTlsRequired(relay_url.to_string()));
+            }
+            endpoint_address = endpoint_address.with_relay_url(relay_url);
+        }
+        for direct_address in &address.direct_addresses {
+            endpoint_address = endpoint_address.with_ip_addr(*direct_address);
+        }
+        let connection =
+            tokio::time::timeout(timeout, self.inner.connect(endpoint_address, PAB_ALPN))
+                .await
+                .map_err(|_| PabEndpointError::ConnectionTimeout)?
+                .map_err(|error| PabEndpointError::Connect(error.to_string()))?;
+        Ok(PabConnection::new(connection))
+    }
+
+    pub async fn accept(&self) -> Result<Option<PabConnection>, PabEndpointError> {
+        let Some(incoming) = self.inner.accept().await else {
+            return Ok(None);
+        };
+        let connection = incoming
+            .await
+            .map_err(|error| PabEndpointError::Accept(error.to_string()))?;
+        Ok(Some(PabConnection::new(connection)))
+    }
+
     pub async fn wait_online(&self, timeout: Duration) -> Result<EndpointAddr, PabEndpointError> {
         if timeout.is_zero() {
             return Err(PabEndpointError::InvalidOnlineTimeout);
@@ -143,6 +187,18 @@ pub enum PabEndpointError {
     InvalidOnlineTimeout,
     #[error("the endpoint did not connect to a self-hosted Relay before the timeout")]
     OnlineTimeout,
+    #[error("PAB connection timeout must be greater than zero")]
+    InvalidConnectionTimeout,
+    #[error("remote Endpoint key is invalid: {0}")]
+    InvalidEndpointKey(String),
+    #[error("remote Relay URL is invalid: {0}")]
+    InvalidRemoteRelay(String),
+    #[error("PAB connection attempt timed out")]
+    ConnectionTimeout,
+    #[error("PAB connection failed: {0}")]
+    Connect(String),
+    #[error("PAB incoming connection failed: {0}")]
+    Accept(String),
 }
 
 #[cfg(test)]

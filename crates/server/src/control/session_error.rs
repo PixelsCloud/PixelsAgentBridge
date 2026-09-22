@@ -87,6 +87,10 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidState,
             "an authenticated user endpoint is required".to_owned(),
         ),
+        ControlSessionError::Service(ServiceError::PeerEndpointOffline) => (
+            ControlErrorCode::NotFound,
+            "peer endpoint is unavailable".to_owned(),
+        ),
         ControlSessionError::Service(ServiceError::UnsupportedDeviceSessionSchema(_))
         | ControlSessionError::Service(ServiceError::UnsupportedDeviceNetworkSchema(_))
         | ControlSessionError::Service(ServiceError::InvalidAgentVersion)

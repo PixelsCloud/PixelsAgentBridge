@@ -5,6 +5,7 @@ mod device;
 mod device_network;
 mod endpoint_proof;
 mod ids;
+mod peer;
 mod platform;
 mod relay_control;
 mod relay_policy;
@@ -26,6 +27,10 @@ pub use endpoint_proof::{
 pub use ids::{
     ChallengeId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId, TaskId,
     TenantId, UserId,
+};
+pub use peer::{
+    AuthorizedDevicePeer, DEVICE_SESSION_AUTH_SCHEMA_VERSION, DeviceSessionAuthenticate,
+    DeviceSessionAuthenticationResult, MAX_DEVICE_PASSWORD_BYTES,
 };
 pub use platform::{
     ContextFreshness, CpuArchitecture, DeviceRef, ExecutionContext, ExecutionScope,

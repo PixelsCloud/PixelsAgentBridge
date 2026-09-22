@@ -1,4 +1,4 @@
-use std::{fs, time::SystemTime};
+use std::{fs, sync::Arc, time::SystemTime};
 
 use pab_agent_core::{
     ControlConnectionPhase, DeviceHelloConfigError, DeviceNetworkConfigError,
@@ -10,8 +10,14 @@ use pab_protocol::{
     DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceRef, EndpointKey, EndpointProofPrincipal,
 };
 use thiserror::Error;
+use tokio::{sync::Semaphore, task::JoinSet};
 
-use crate::{ExecutorConfig, identity::EndpointSecretError, identity::read_endpoint_secret};
+use crate::{
+    ExecutorConfig,
+    credential::{DeviceCredential, DeviceCredentialError},
+    identity::{EndpointSecretError, read_endpoint_secret},
+    session::DeviceSessionAcceptor,
+};
 use crate::{
     network::ExecutorNetworkError,
     network::{bind_endpoint, watch_device_network},
@@ -19,6 +25,7 @@ use crate::{
 
 pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     config.validate()?;
+    let credential = DeviceCredential::read(&config.device_credential_file)?;
     let secret = read_endpoint_secret(&config.endpoint_secret_file)?;
     let endpoint = bind_endpoint(&config, secret.clone()).await?;
     eprintln!("pab-executor: iroh_endpoint={}", endpoint.id());
@@ -61,12 +68,22 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
             .with_device_hello(hello.clone())?
             .with_device_network(network_updates)?
             .spawn();
+    let peer_authorizer = supervisor.peer_authorizer();
+    let session_acceptor = DeviceSessionAcceptor::new(
+        peer_authorizer,
+        credential,
+        device_ref,
+        config.operation_timeout,
+    );
+    let session_limit = Arc::new(Semaphore::new(64));
+    let mut sessions = JoinSet::new();
     let mut status = supervisor.status();
     report_status(&status.borrow());
     loop {
         tokio::select! {
             signal = tokio::signal::ctrl_c() => {
                 signal.map_err(ExecutorError::ShutdownSignal)?;
+                sessions.abort_all();
                 supervisor.shutdown().await?;
                 endpoint.close().await;
                 return Ok(());
@@ -79,11 +96,41 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 let current = status.borrow().clone();
                 report_status(&current);
                 if current.phase == ControlConnectionPhase::Stopped {
+                    sessions.abort_all();
                     supervisor.shutdown().await?;
                     endpoint.close().await;
                     return Err(ExecutorError::SupervisorStopped(
                         current.last_failure.map(|failure| failure.detail)
                     ));
+                }
+            }
+            incoming = endpoint.accept() => {
+                match incoming.map_err(ExecutorNetworkError::from)? {
+                    Some(connection) => {
+                        let Ok(permit) = session_limit.clone().try_acquire_owned() else {
+                            connection.close(b"too many device sessions");
+                            continue;
+                        };
+                        let session_acceptor = session_acceptor.clone();
+                        sessions.spawn(async move {
+                            let _permit = permit;
+                            session_acceptor.handle(connection).await
+                        });
+                    }
+                    None => {
+                        sessions.abort_all();
+                        supervisor.shutdown().await?;
+                        return Err(ExecutorError::EndpointClosed);
+                    }
+                }
+            }
+            completed = sessions.join_next(), if !sessions.is_empty() => {
+                match completed {
+                    Some(Ok(Err(error))) => eprintln!("pab-executor: device_session={error}"),
+                    Some(Err(error)) if !error.is_cancelled() => {
+                        eprintln!("pab-executor: device_session_task={error}");
+                    }
+                    _ => {}
                 }
             }
         }
@@ -118,6 +165,8 @@ pub enum ExecutorError {
     #[error(transparent)]
     EndpointSecret(#[from] EndpointSecretError),
     #[error(transparent)]
+    DeviceCredential(#[from] DeviceCredentialError),
+    #[error(transparent)]
     Network(#[from] ExecutorNetworkError),
     #[error("the control CA file could not be read: {0}")]
     ControlCaFile(std::io::Error),
@@ -141,6 +190,8 @@ pub enum ExecutorError {
     SupervisorStopped(Option<String>),
     #[error("the control supervisor task failed: {0}")]
     SupervisorTask(#[from] tokio::task::JoinError),
+    #[error("the iroh endpoint closed unexpectedly")]
+    EndpointClosed,
 }
 
 #[cfg(test)]

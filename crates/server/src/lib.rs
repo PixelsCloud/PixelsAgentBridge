@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod active_endpoints;
 pub mod auth;
 pub mod control;
 pub mod domain;
