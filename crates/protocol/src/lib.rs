@@ -2,6 +2,7 @@
 
 mod control;
 mod device;
+mod device_code;
 mod device_network;
 mod endpoint_proof;
 mod ids;
@@ -17,6 +18,7 @@ pub use control::{
     EndpointRegistration, EndpointRegistrationResult,
 };
 pub use device::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceHelloResult};
+pub use device_code::{DeviceCode, DeviceCodeError};
 pub use device_network::{
     DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS,

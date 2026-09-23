@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AuthorizedDevicePeer, DeviceHello, DeviceHelloResult, DeviceId, DeviceNetworkResult,
-    DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofChallenge,
-    EndpointProofPrincipal, EndpointProofResponse, RequestId, TenantId, UserId,
+    AuthorizedDevicePeer, DeviceCode, DeviceHello, DeviceHelloResult, DeviceId,
+    DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef, EndpointKey,
+    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse, RequestId, TenantId,
+    UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -49,6 +50,10 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         device_ref: DeviceRef,
     },
+    ResolveDeviceCode {
+        request_id: RequestId,
+        device_code: DeviceCode,
+    },
     SetDeviceConnectGrant {
         request_id: RequestId,
         tenant_id: TenantId,
@@ -74,6 +79,7 @@ impl ControlClientMessage {
             | Self::PublishDeviceHello { request_id, .. }
             | Self::PublishDeviceNetwork { request_id, .. }
             | Self::GetDeviceNetwork { request_id, .. }
+            | Self::ResolveDeviceCode { request_id, .. }
             | Self::SetDeviceConnectGrant { request_id, .. }
             | Self::AuthorizeDevicePeer { request_id, .. } => *request_id,
         }
@@ -120,6 +126,10 @@ pub enum ControlServerMessage {
         request_id: RequestId,
         snapshot: Box<DeviceNetworkSnapshot>,
     },
+    DeviceCodeResolved {
+        request_id: RequestId,
+        device_ref: DeviceRef,
+    },
     DeviceConnectGrantUpdated {
         request_id: RequestId,
         tenant_id: TenantId,
@@ -155,6 +165,7 @@ pub enum EndpointRegistrationResult {
     Device {
         tenant_id: TenantId,
         device_id: DeviceId,
+        device_code: DeviceCode,
         endpoint_key: EndpointKey,
     },
 }

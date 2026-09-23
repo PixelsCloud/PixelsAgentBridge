@@ -102,6 +102,19 @@ impl BridgeClient {
 }
 
 impl BridgeConnector {
+    pub async fn resolve_device_code(
+        &self,
+        code: pab_protocol::DeviceCode,
+    ) -> Result<DeviceRef, BridgeError> {
+        let device_ref = self.network_resolver.resolve_code(code).await?;
+        if device_ref.deployment_id != self.config.deployment_id
+            || device_ref.tenant_id != self.config.tenant_id
+        {
+            return Err(BridgeError::DeviceIdentityMismatch);
+        }
+        Ok(device_ref)
+    }
+
     pub async fn connect_device(
         &self,
         device_ref: DeviceRef,

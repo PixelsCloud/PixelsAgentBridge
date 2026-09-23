@@ -9,9 +9,7 @@ use std::{
 use pab_bridge::{
     BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, FileDevicePasswordProvider, RuntimeError,
 };
-use pab_protocol::{
-    DeviceId, DeviceRef, OutputStream, RequestId, TaskId, TaskRef, TaskSnapshot, TaskState,
-};
+use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef, TaskSnapshot, TaskState};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -33,17 +31,12 @@ async fn run() -> Result<(), CliError> {
     let Some(command) = args.next() else {
         return Err(CliError::Usage);
     };
-    let device_id = args
+    let device_code = args
         .next()
         .ok_or(CliError::Usage)?
-        .parse::<DeviceId>()
-        .map_err(|error| CliError::DeviceId(error.to_string()))?;
+        .parse::<DeviceCode>()
+        .map_err(|error| CliError::DeviceCode(error.to_string()))?;
     let config = BridgeConfig::from_env()?;
-    let device_ref = DeviceRef {
-        deployment_id: config.deployment_id,
-        tenant_id: config.tenant_id,
-        device_id,
-    };
     let password_file = env::var_os("PAB_DEVICE_PASSWORD_FILE")
         .map(PathBuf::from)
         .ok_or(CliError::MissingPasswordFile)?;
@@ -61,6 +54,7 @@ async fn run() -> Result<(), CliError> {
     )
     .await?;
     let mut events = runtime.subscribe();
+    let device_ref = runtime.resolve_device_code(device_code).await?;
 
     let initial = match command.as_str() {
         "command" => {
@@ -229,11 +223,11 @@ const fn stream_name(stream: OutputStream) -> &'static str {
 #[derive(Debug, Error)]
 enum CliError {
     #[error(
-        "usage: pab-bridge command <device-id> <program> [argument ...]\n       pab-bridge follow <device-id> <task-id>"
+        "usage: pab-bridge command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow <9-digit-device-code> <task-id>"
     )]
     Usage,
-    #[error("device ID is invalid: {0}")]
-    DeviceId(String),
+    #[error("device code is invalid: {0}")]
+    DeviceCode(String),
     #[error("task ID is invalid: {0}")]
     TaskId(String),
     #[error("PAB_REQUEST_ID is invalid: {0}")]

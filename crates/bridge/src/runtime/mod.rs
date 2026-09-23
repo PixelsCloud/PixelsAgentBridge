@@ -17,8 +17,8 @@ use std::{
 };
 
 use pab_protocol::{
-    CommandTaskSpec, DeviceRef, ExpectedEnvironment, OutputChunk, OutputRange, OutputStream,
-    RequestId, TargetContext, TaskEvent, TaskRef, TaskSnapshot,
+    CommandTaskSpec, DeviceCode, DeviceRef, ExpectedEnvironment, OutputChunk, OutputRange,
+    OutputStream, RequestId, TargetContext, TaskEvent, TaskRef, TaskSnapshot,
 };
 use thiserror::Error;
 use tokio::{
@@ -27,6 +27,7 @@ use tokio::{
 };
 
 use crate::{BridgeConfig, BridgeConfigError, BridgeError};
+use pab_agent_core::{DeviceNetworkResolutionError, EndpointControlError};
 
 use device::{BridgeAvailability, DeviceSession, run_bridge_supervisor};
 use worker::run_record;
@@ -120,6 +121,48 @@ impl BridgeRuntime {
 
     pub fn subscribe(&self) -> broadcast::Receiver<RuntimeEvent> {
         self.inner.events.subscribe()
+    }
+
+    pub async fn resolve_device_code(&self, code: DeviceCode) -> Result<DeviceRef, RuntimeError> {
+        let mut availability = self.inner.availability.clone();
+        loop {
+            let state = availability.borrow().clone();
+            match state {
+                BridgeAvailability::Connected(connector) => {
+                    match connector.resolve_device_code(code).await {
+                        Ok(device_ref) => return Ok(device_ref),
+                        Err(BridgeError::NetworkResolution(
+                            DeviceNetworkResolutionError::Unavailable
+                            | DeviceNetworkResolutionError::Timeout,
+                        )) => {
+                            self.inner
+                                .wait_or_shutdown(self.inner.retry_interval)
+                                .await?;
+                            continue;
+                        }
+                        Err(BridgeError::NetworkResolution(
+                            DeviceNetworkResolutionError::Control(EndpointControlError::Server {
+                                code: pab_protocol::ControlErrorCode::Internal,
+                                ..
+                            }),
+                        )) => {
+                            self.inner
+                                .wait_or_shutdown(self.inner.retry_interval)
+                                .await?;
+                            continue;
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                BridgeAvailability::Stopped(message) => {
+                    return Err(RuntimeError::BridgeUnavailable(message));
+                }
+                BridgeAvailability::Connecting => {}
+            }
+            availability.changed().await.map_err(|_| {
+                RuntimeError::BridgeUnavailable("Bridge supervisor stopped".to_owned())
+            })?;
+        }
     }
 
     pub async fn submit_command(

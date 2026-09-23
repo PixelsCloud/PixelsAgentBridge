@@ -87,13 +87,14 @@ async fn run() -> Result<(), EnrollCliError> {
         "tenant_id": enrollment.tenant_id,
         "user_id": enrollment.user_id,
         "device_id": enrollment.device_id,
+        "device_code": enrollment.device_code,
         "control_url": control_url,
         "relay_urls": relay_urls,
     }))?;
     write_new(output_directory.join("enrollment.json"), &manifest)?;
     println!(
-        "enrolled tenant={} user={} device={}",
-        enrollment.tenant_id, enrollment.user_id, enrollment.device_id
+        "enrolled tenant={} user={} device={} code={}",
+        enrollment.tenant_id, enrollment.user_id, enrollment.device_id, enrollment.device_code
     );
     Ok(())
 }

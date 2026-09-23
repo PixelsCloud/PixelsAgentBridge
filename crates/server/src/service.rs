@@ -321,6 +321,27 @@ impl ControlPlane {
             .await?)
     }
 
+    pub async fn resolve_device_code(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        code: pab_protocol::DeviceCode,
+        deployment_id: pab_protocol::DeploymentId,
+    ) -> Result<DeviceRef, ServiceError> {
+        let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
+            return Err(ServiceError::UserEndpointRequired);
+        };
+        Ok(self
+            .store
+            .resolve_device_code(
+                endpoint.endpoint_key,
+                user_id,
+                endpoint.tenant_id,
+                deployment_id,
+                code,
+            )
+            .await?)
+    }
+
     pub async fn relay_policy_snapshot(
         &self,
         validity: Duration,

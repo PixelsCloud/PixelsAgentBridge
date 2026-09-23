@@ -136,9 +136,15 @@ fixed three-second interval. `follow` reconnects to an existing task and replays
 retained history:
 
 ```powershell
-cargo run -p pab-bridge --bin pab-bridge -- command <device-id> <program> [argument ...]
-cargo run -p pab-bridge --bin pab-bridge -- follow <device-id> <task-id>
+cargo run -p pab-bridge --bin pab-bridge -- command <9-digit-device-code> <program> [argument ...]
+cargo run -p pab-bridge --bin pab-bridge -- follow <9-digit-device-code> <task-id>
 ```
+
+Enrollment prints the nine-digit code and writes it to `enrollment.json`. The code
+identifies a device within one server deployment; it grants no access by itself.
+The Bridge checks the current workspace membership and device grant before resolving
+it to the internal UUID. Resolution also works when the device is offline, so a
+submitted task can wait for reconnection. The Debug CLI requires the nine-digit code.
 
 Set `PAB_BRIDGE_DATABASE` to the Bridge Runtime SQLite file. When it is absent, the
 Debug CLI places `pab-bridge.sqlite3` beside `PAB_ENDPOINT_SECRET_FILE`. The database

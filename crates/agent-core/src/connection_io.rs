@@ -83,6 +83,24 @@ impl AuthenticatedControlConnection {
         Ok(request_id)
     }
 
+    pub(crate) async fn send_resolve_device_code(
+        &mut self,
+        device_code: pab_protocol::DeviceCode,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::ResolveDeviceCode {
+                request_id,
+                device_code,
+            },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
+
     pub(crate) async fn next_frame(
         &mut self,
     ) -> Result<IncomingControlFrame, EndpointControlError> {

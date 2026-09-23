@@ -234,6 +234,38 @@ impl AuthenticatedControlConnection {
         }
     }
 
+    pub async fn resolve_device_code(
+        &mut self,
+        device_code: pab_protocol::DeviceCode,
+        timeout: Duration,
+    ) -> Result<DeviceRef, EndpointControlError> {
+        if timeout.is_zero() {
+            return Err(EndpointControlError::InvalidTimeout);
+        }
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::ResolveDeviceCode {
+                request_id,
+                device_code,
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceCodeResolved {
+                request_id: response_id,
+                device_ref,
+            } if response_id == request_id => Ok(device_ref),
+            ControlServerMessage::Error {
+                request_id: Some(response_id),
+                code,
+                message,
+            } if response_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
+
     pub async fn authorize_device_peer(
         &mut self,
         peer_endpoint_key: EndpointKey,

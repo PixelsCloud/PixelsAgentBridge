@@ -18,7 +18,9 @@ use crate::{
         DeviceHelloConfigError, DeviceNetworkConfigError, ReconnectPolicy, ReconnectPolicyError,
         duration_millis, publish, publish_stopped,
     },
-    device_network_resolver::{DeviceNetworkRequest, DeviceNetworkResolver},
+    device_network_resolver::{
+        DeviceNetworkLookup, DeviceNetworkRequest, DeviceNetworkResolver, ResolvedDevice,
+    },
     peer_authorizer::{DevicePeerAuthorizer, PeerAuthorizationRequest},
 };
 
@@ -323,12 +325,17 @@ async fn maintain_connection(
                 let Some(request) = request else {
                     return Ok(());
                 };
-                let request_id = connection
-                    .send_get_device_network(request.device_ref, operation_timeout)
-                    .await?;
+                let request_id = match request.lookup {
+                    DeviceNetworkLookup::Ref(device_ref) => connection
+                        .send_get_device_network(device_ref, operation_timeout)
+                        .await?,
+                    DeviceNetworkLookup::Code(device_code) => connection
+                        .send_resolve_device_code(device_code, operation_timeout)
+                        .await?,
+                };
                 pending_resolution = Some(PendingDeviceNetworkResolution {
                     request_id,
-                    device_ref: request.device_ref,
+                    lookup: request.lookup,
                     response: request.response,
                     deadline: Instant::now() + operation_timeout,
                 });
@@ -389,8 +396,8 @@ struct PendingPeerAuthorization {
 
 struct PendingDeviceNetworkResolution {
     request_id: RequestId,
-    device_ref: pab_protocol::DeviceRef,
-    response: oneshot::Sender<Result<pab_protocol::DeviceNetworkSnapshot, EndpointControlError>>,
+    lookup: DeviceNetworkLookup,
+    response: oneshot::Sender<Result<ResolvedDevice, EndpointControlError>>,
     deadline: Instant,
 }
 
@@ -426,11 +433,23 @@ fn handle_server_message(
             request_id,
             snapshot,
         } if pending_resolution.as_ref().is_some_and(|pending| {
-            request_id == pending.request_id && snapshot.device_ref == pending.device_ref
+            request_id == pending.request_id
+                && matches!(pending.lookup, DeviceNetworkLookup::Ref(device_ref) if snapshot.device_ref == device_ref)
         }) =>
         {
             let pending = pending_resolution.take().expect("matched network request");
-            let _ = pending.response.send(Ok(*snapshot));
+            let _ = pending.response.send(Ok(ResolvedDevice::Network(*snapshot)));
+            Ok(())
+        }
+        ControlServerMessage::DeviceCodeResolved {
+            request_id,
+            device_ref,
+        } if pending_resolution.as_ref().is_some_and(|pending| {
+            request_id == pending.request_id && matches!(pending.lookup, DeviceNetworkLookup::Code(_))
+        }) =>
+        {
+            let pending = pending_resolution.take().expect("matched code request");
+            let _ = pending.response.send(Ok(ResolvedDevice::Ref(device_ref)));
             Ok(())
         }
         ControlServerMessage::Error {

@@ -1,11 +1,62 @@
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkSnapshot, DeviceRef, EndpointKey, UserId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceCode, DeviceId, DeviceNetworkSnapshot,
+    DeviceRef, EndpointKey, TenantId, UserId,
 };
 
 use super::*;
 use crate::domain::DEVICE_CONNECT_CAPABILITY;
 
 impl PostgresStore {
+    pub async fn resolve_device_code(
+        &self,
+        requester_key: EndpointKey,
+        requester_user: UserId,
+        tenant_id: TenantId,
+        deployment_id: DeploymentId,
+        code: DeviceCode,
+    ) -> Result<DeviceRef, StoreError> {
+        let device_id: uuid::Uuid = sqlx::query_scalar(
+            r#"
+            SELECT device.id
+            FROM endpoints requester
+            JOIN memberships membership
+              ON membership.tenant_id = requester.tenant_id
+             AND membership.user_id = requester.user_id
+             AND membership.status = 'active'
+            JOIN tenants tenant
+              ON tenant.id = requester.tenant_id AND tenant.status = 'active'
+            JOIN devices device
+              ON device.tenant_id = requester.tenant_id
+             AND device.code = $4 AND device.status = 'active'
+            WHERE requester.endpoint_key = $1
+              AND requester.tenant_id = $2
+              AND requester.user_id = $3
+              AND requester.owner_kind = 'user'
+              AND requester.status = 'active'
+              AND EXISTS (
+                  SELECT 1 FROM device_grants grant_row
+                  WHERE grant_row.tenant_id = device.tenant_id
+                    AND grant_row.device_id = device.id
+                    AND grant_row.user_id = requester.user_id
+                    AND (grant_row.capability_bits & $5) = $5
+              )
+            "#,
+        )
+        .bind(requester_key.as_bytes().as_slice())
+        .bind(tenant_id.as_uuid())
+        .bind(requester_user.as_uuid())
+        .bind(code.value() as i32)
+        .bind(DEVICE_CONNECT_CAPABILITY)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or(StoreError::NotFound)?;
+        Ok(DeviceRef {
+            deployment_id,
+            tenant_id,
+            device_id: DeviceId::from_uuid(device_id),
+        })
+    }
+
     pub async fn device_network_snapshot(
         &self,
         requester_key: EndpointKey,

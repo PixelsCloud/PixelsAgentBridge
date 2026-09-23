@@ -283,6 +283,20 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             .endpoint_key,
         EndpointKey::new(*device_key.public().as_bytes())
     );
+    assert_eq!(device.code.to_string().len(), 9);
+    assert_eq!(
+        control
+            .resolve_device_code(&alice_endpoint, device.code, deployment_id)
+            .await
+            .unwrap(),
+        device_ref
+    );
+    assert!(matches!(
+        control
+            .resolve_device_code(&bob_endpoint, device.code, deployment_id)
+            .await,
+        Err(ServiceError::Store(StoreError::NotFound))
+    ));
     assert!(matches!(
         control
             .device_network_snapshot(&bob_endpoint, device_ref)
@@ -307,6 +321,13 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             .device_ref,
         device_ref
     );
+    assert_eq!(
+        control
+            .resolve_device_code(&bob_endpoint, device.code, deployment_id)
+            .await
+            .unwrap(),
+        device_ref
+    );
     control
         .set_device_connect_grant(alice.id, team.tenant_id, device.id, bob.id, false)
         .await
@@ -317,6 +338,24 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             .await,
         Err(ServiceError::Store(StoreError::NotFound))
     ));
+    assert!(matches!(
+        control
+            .resolve_device_code(&bob_endpoint, device.code, deployment_id)
+            .await,
+        Err(ServiceError::Store(StoreError::NotFound))
+    ));
+    sqlx::query("DELETE FROM device_network WHERE device_id = $1")
+        .bind(device.id.as_uuid())
+        .execute(control.store().pool())
+        .await
+        .unwrap();
+    assert_eq!(
+        control
+            .resolve_device_code(&alice_endpoint, device.code, deployment_id)
+            .await
+            .unwrap(),
+        device_ref
+    );
 
     sqlx::query("UPDATE devices SET status = 'disabled' WHERE id = $1")
         .bind(device.id.as_uuid())

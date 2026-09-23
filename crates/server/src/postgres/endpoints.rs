@@ -1,5 +1,6 @@
 use super::*;
 use crate::domain::DEVICE_CONNECT_CAPABILITY;
+use rand_core::{OsRng, RngCore};
 
 impl PostgresStore {
     pub async fn registered_endpoint(
@@ -96,18 +97,29 @@ impl PostgresStore {
         }
 
         let device_id = DeviceId::new();
-        sqlx::query(
-            r#"
-            INSERT INTO devices (id, tenant_id, name, registered_by_user_id)
-            VALUES ($1, $2, $3, $4)
-            "#,
-        )
-        .bind(device_id.as_uuid())
-        .bind(tenant_id.as_uuid())
-        .bind(&name)
-        .bind(actor.as_uuid())
-        .execute(&mut *tx)
-        .await?;
+        let code = loop {
+            let candidate =
+                pab_protocol::DeviceCode::new(100_000_000 + OsRng.next_u32() % 900_000_000)
+                    .expect("generated nine-digit code");
+            let inserted = sqlx::query_scalar::<_, uuid::Uuid>(
+                r#"
+                INSERT INTO devices (id, tenant_id, code, name, registered_by_user_id)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (code) DO NOTHING
+                RETURNING id
+                "#,
+            )
+            .bind(device_id.as_uuid())
+            .bind(tenant_id.as_uuid())
+            .bind(candidate.value() as i32)
+            .bind(&name)
+            .bind(actor.as_uuid())
+            .fetch_optional(&mut *tx)
+            .await?;
+            if inserted.is_some() {
+                break candidate;
+            }
+        };
         let endpoint_result = sqlx::query(
             r#"
             INSERT INTO endpoints (endpoint_key, tenant_id, owner_kind, device_id)
@@ -148,6 +160,7 @@ impl PostgresStore {
 
         Ok(Device {
             id: device_id,
+            code,
             tenant_id,
             name,
         })

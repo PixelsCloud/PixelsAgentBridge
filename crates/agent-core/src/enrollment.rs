@@ -22,6 +22,7 @@ pub struct EndpointEnrollment {
     pub user_id: UserId,
     pub tenant_id: TenantId,
     pub device_id: pab_protocol::DeviceId,
+    pub device_code: pab_protocol::DeviceCode,
     pub user_endpoint_secret: SecretKey,
     pub device_endpoint_secret: SecretKey,
 }
@@ -100,15 +101,16 @@ pub async fn enroll_account_with_device(
         timeout,
     )
     .await?;
-    let device_id = match device_result {
+    let (device_id, device_code) = match device_result {
         EndpointRegistrationResult::Device {
             tenant_id: result_tenant,
             device_id,
+            device_code,
             endpoint_key,
         } if result_tenant == tenant_id
             && endpoint_key == EndpointKey::new(*device_endpoint_secret.public().as_bytes()) =>
         {
-            device_id
+            (device_id, device_code)
         }
         _ => return Err(EnrollmentError::MismatchedResponse),
     };
@@ -116,6 +118,7 @@ pub async fn enroll_account_with_device(
         user_id,
         tenant_id,
         device_id,
+        device_code,
         user_endpoint_secret,
         device_endpoint_secret,
     })

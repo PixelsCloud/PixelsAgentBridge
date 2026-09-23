@@ -114,6 +114,13 @@ impl ControlSession {
                     request_id,
                     snapshot: Box::new(snapshot),
                 }),
+            ControlClientMessage::ResolveDeviceCode { device_code, .. } => self
+                .resolve_device_code(device_code)
+                .await
+                .map(|device_ref| ControlServerMessage::DeviceCodeResolved {
+                    request_id,
+                    device_ref,
+                }),
             ControlClientMessage::SetDeviceConnectGrant {
                 tenant_id,
                 device_id,
@@ -263,6 +270,7 @@ impl ControlSession {
                 Ok(EndpointRegistrationResult::Device {
                     tenant_id,
                     device_id: device.id,
+                    device_code: device.code,
                     endpoint_key,
                 })
             }
@@ -375,6 +383,20 @@ impl ControlSession {
         }
         self.control
             .device_network_snapshot(endpoint, device_ref)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn resolve_device_code(
+        &self,
+        device_code: pab_protocol::DeviceCode,
+    ) -> Result<pab_protocol::DeviceRef, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::UserEndpointRequired)?;
+        self.control
+            .resolve_device_code(endpoint, device_code, self.deployment_id)
             .await
             .map_err(Into::into)
     }

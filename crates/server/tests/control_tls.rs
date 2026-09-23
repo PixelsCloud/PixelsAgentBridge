@@ -314,13 +314,14 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         },
     )
     .await;
-    let device_id = match receive(&mut socket).await {
+    let (device_id, device_code) = match receive(&mut socket).await {
         ControlServerMessage::EndpointRegistered {
             request_id,
             result:
                 EndpointRegistrationResult::Device {
                     tenant_id,
                     device_id,
+                    device_code,
                     endpoint_key,
                 },
         } => {
@@ -330,7 +331,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
                 endpoint_key,
                 EndpointKey::new(*device_secret.public().as_bytes())
             );
-            device_id
+            (device_id, device_code)
         }
         response => panic!("unexpected device registration response: {response:?}"),
     };
@@ -473,6 +474,18 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert_eq!(
         connection_status.borrow().phase,
         ControlConnectionPhase::Authenticated
+    );
+    assert_eq!(
+        supervisor
+            .device_network_resolver()
+            .resolve_code(device_code)
+            .await
+            .unwrap(),
+        DeviceRef {
+            deployment_id,
+            tenant_id: personal_tenant_id,
+            device_id,
+        }
     );
     supervisor.shutdown().await.unwrap();
     assert_eq!(
@@ -618,6 +631,14 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert_eq!(discovered.endpoint_key, endpoint_key);
     assert_eq!(discovered.endpoint_instance_id, supervisor_instance_id);
     assert_eq!(discovered.address_revision, 2);
+    assert_eq!(device_code.to_string().len(), 9);
+    assert_eq!(
+        bridge_connection
+            .resolve_device_code(device_code, Duration::from_secs(5))
+            .await
+            .unwrap(),
+        device_ref
+    );
     assert_eq!(
         discovered.direct_addresses,
         vec!["192.0.2.9:7842".parse().unwrap()]

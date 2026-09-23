@@ -61,6 +61,7 @@ pub struct TeamInvitation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
     pub id: DeviceId,
+    pub code: pab_protocol::DeviceCode,
     pub tenant_id: TenantId,
     pub name: String,
 }
