@@ -16,6 +16,24 @@ type ConnectedDevice = {
 type OperatorBootstrap = {
   devices: ConnectedDevice[];
   tasks: TaskEntry[];
+  operations: OperationEntry[];
+};
+
+type OperationEntry = {
+  id: string;
+  deviceCode: string;
+  initiatedBy: string;
+  kind: string;
+  direction: "upload" | "download" | string;
+  source: string;
+  destination: string;
+  overwrite: boolean;
+  state: string;
+  offset: number;
+  size: number;
+  startedAtUnixMs: number;
+  finishedAtUnixMs: number | null;
+  message: string | null;
 };
 
 type TaskUpdate = {
@@ -30,7 +48,11 @@ type TaskUpdate = {
 type TaskEntry = TaskUpdate & {
   id: string;
   deviceCode: string;
+  initiatedBy: string;
   program: string;
+  args: string[];
+  cwd: string | null;
+  startedAtUnixMs: number;
 };
 
 type ClaimResult = {
@@ -56,7 +78,8 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
   const [argumentsText, setArgumentsText] = useState("");
   const [cwd, setCwd] = useState("");
   const [tasks, setTasks] = useState<TaskEntry[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [operations, setOperations] = useState<OperationEntry[]>([]);
+  const [selectedActivityId, setSelectedActivityId] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -77,6 +100,11 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
   const selected = devices.find((device) => device.deviceCode === selectedCode);
+
+  async function refreshOperations() {
+    const saved = await invoke<OperationEntry[]>("operator_operations");
+    setOperations(saved);
+  }
 
   useEffect(() => {
     tasksRef.current = tasks;
@@ -155,6 +183,17 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
           }
           return next;
         });
+        setOperations((current) => current.map((item) => item.id === event.payload.id ? {
+          ...item,
+          state: event.payload.state,
+          offset: event.payload.state === "running" ? event.payload.offset : item.offset,
+          size: event.payload.state === "running" ? event.payload.size : item.size,
+          message: event.payload.message,
+          finishedAtUnixMs: event.payload.state === "running" ? null : Date.now(),
+        } : item));
+        if (event.payload.state !== "running") {
+          void refreshOperations();
+        }
       });
       if (closed) {
         stopTransfer();
@@ -166,7 +205,9 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
         setDevices(saved.devices);
         tasksRef.current = saved.tasks;
         setTasks(saved.tasks);
-        setSelectedTaskId(saved.tasks[0]?.id ?? "");
+        setOperations(saved.operations);
+        const latest = [...saved.tasks, ...saved.operations].sort((a, b) => b.startedAtUnixMs - a.startedAtUnixMs)[0];
+        setSelectedActivityId(latest?.id ?? "");
       } catch {
         if (!closed) setError(t.historyLoadFailed);
       }
@@ -220,7 +261,11 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
       const newTask: TaskEntry = {
         id,
         deviceCode: selected.deviceCode,
+        initiatedBy: "guest",
         program: program.trim(),
+        args: argumentsText.split(/\r?\n/).filter((line) => line.length > 0),
+        cwd: cwd.trim() || null,
+        startedAtUnixMs: Date.now(),
         state: "Accepted",
         complete: false,
         stdout: "",
@@ -230,7 +275,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
       };
       tasksRef.current = [newTask, ...tasksRef.current];
       setTasks(tasksRef.current);
-      setSelectedTaskId(id);
+      setSelectedActivityId(id);
       void refreshTask(id);
     } catch {
       setError(t.commandFailed);
@@ -275,6 +320,23 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
         size: 0,
         message: null,
       });
+      setOperations((current) => [{
+        id,
+        deviceCode: selected.deviceCode,
+        initiatedBy: "guest",
+        kind: "file_transfer",
+        direction: transferDirection,
+        source: transferSource.trim(),
+        destination: transferDestination.trim(),
+        overwrite: transferOverwrite,
+        state: "running",
+        offset: 0,
+        size: 0,
+        startedAtUnixMs: Date.now(),
+        finishedAtUnixMs: null,
+        message: null,
+      }, ...current.filter((item) => item.id !== id)]);
+      setSelectedActivityId(id);
     } catch (cause) {
       setError(`${t.transferFailed}: ${String(cause)}`);
     } finally {
@@ -319,7 +381,17 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
       <button className="primary-button" disabled={connecting || code.length !== 9 || !password} onClick={() => void connect()}>{connecting ? t.connecting : t.connect}<span>→</span></button>
     </div>
   );
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
+  const activity = [...tasks.map((task) => ({ kind: "command" as const, item: task })),
+    ...operations.map((item) => ({ kind: "operation" as const, item }))]
+    .sort((a, b) => b.item.startedAtUnixMs - a.item.startedAtUnixMs);
+  const selectedActivity = activity.find(({ item }) => item.id === selectedActivityId) ?? activity[0];
+  const selectedTask = selectedActivity?.kind === "command" ? selectedActivity.item : null;
+  const selectedOperation = selectedActivity?.kind === "operation" ? selectedActivity.item : null;
+  const formatTime = (value: number) => new Date(value).toLocaleString(language);
+  const operationLabel = (item: OperationEntry) => item.kind === "screenshot"
+    ? t.screenshot
+    : item.direction === "upload" ? t.upload : t.download;
+  const formatActor = (actor: string) => actor === "guest" ? t.guestOperator : actor;
 
   return (
     <>
@@ -397,23 +469,44 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
 
       {view === "activity" && (
         <section className="surface activity-panel">
-          <div className="surface-kicker">01 / {t.commandHistory}</div>
-          <div className="surface-topline"><h2>{t.commandHistory}</h2><span className="count-badge">{tasks.length}</span></div>
-          {tasks.length === 0 ? <div className="empty-panel"><span>≡</span><strong>{t.noTasks}</strong><p>{t.noTasksHint}</p></div> : (
+          <div className="surface-kicker">01 / {t.operationHistory}</div>
+          <div className="surface-topline"><h2>{t.operationHistory}</h2><span className="count-badge">{activity.length}</span></div>
+          {activity.length === 0 ? <div className="empty-panel"><span>≡</span><strong>{t.noTasks}</strong><p>{t.noTasksHint}</p></div> : (
             <div className="task-layout">
               <div className="task-list">
-                {tasks.map((task) => (
-                  <button className={`task-row ${selectedTask?.id === task.id ? "active" : ""}`} key={task.id} onClick={() => setSelectedTaskId(task.id)}>
-                    <span className="task-icon">›_</span><span><strong>{task.program}</strong><small>{task.deviceCode}</small></span><em>{task.state}</em>
+                {activity.map(({ kind, item }) => (
+                  <button className={`task-row ${selectedActivity?.item.id === item.id ? "active" : ""}`} key={item.id} onClick={() => setSelectedActivityId(item.id)}>
+                    <span className="task-icon">{kind === "command" ? "›_" : item.kind === "screenshot" ? "▣" : item.direction === "upload" ? "↑" : "↓"}</span>
+                    <span><strong>{kind === "command" ? item.program : operationLabel(item)}</strong><small>{item.deviceCode} · {formatTime(item.startedAtUnixMs)}</small></span>
+                    <em>{kind === "command" ? item.state : t.transferStates[item.state as keyof typeof t.transferStates] ?? item.state}</em>
                   </button>
                 ))}
               </div>
               <div className="task-output" tabIndex={0}>
-                <div className="output-heading"><strong>{selectedTask.program}</strong><span>{selectedTask.state}</span></div>
-                <div className="output-meta">{selectedTask.deviceCode}</div>
-                <pre>{selectedTask.stdout || (!selectedTask.stderr && t.waitingOutput)}</pre>
-                {selectedTask.stderr && <pre className="stderr-output">{selectedTask.stderr}</pre>}
-                {!selectedTask.complete && <button className="quiet-button" onClick={() => void refreshTask(selectedTask.id)}>{t.loadMoreOutput}</button>}
+                {selectedTask && <>
+                  <div className="output-heading"><strong>{selectedTask.program}</strong><span>{selectedTask.state}</span></div>
+                  <div className="output-meta">{selectedTask.deviceCode} · {t.commandDirection} · {formatTime(selectedTask.startedAtUnixMs)}</div>
+                  <div className="command-audit"><span>{t.initiatedBy}</span><code>{formatActor(selectedTask.initiatedBy)}</code></div>
+                  <div className="command-audit"><span>{t.commandArguments}</span><code>{selectedTask.args.length ? selectedTask.args.join(" · ") : "—"}</code></div>
+                  {selectedTask.cwd && <div className="command-audit"><span>{t.cwd}</span><code>{selectedTask.cwd}</code></div>}
+                  <pre>{selectedTask.stdout || (!selectedTask.stderr && t.waitingOutput)}</pre>
+                  {selectedTask.stderr && <pre className="stderr-output">{selectedTask.stderr}</pre>}
+                  {!selectedTask.complete && <button className="quiet-button" onClick={() => void refreshTask(selectedTask.id)}>{t.loadMoreOutput}</button>}
+                </>}
+                {selectedOperation && <>
+                  <div className="output-heading"><strong>{operationLabel(selectedOperation)}</strong><span>{t.transferStates[selectedOperation.state as keyof typeof t.transferStates] ?? selectedOperation.state}</span></div>
+                  <div className="output-meta">{selectedOperation.deviceCode} · {formatTime(selectedOperation.startedAtUnixMs)}</div>
+                  <div className="operation-details">
+                    <div><span>{t.initiatedBy}</span><strong>{formatActor(selectedOperation.initiatedBy)}</strong></div>
+                    <div><span>{t.direction}</span><strong>{selectedOperation.direction === "upload" ? t.uploadDirection : t.downloadDirection}</strong></div>
+                    <div><span>{t.sourcePath}</span><strong>{selectedOperation.source}</strong></div>
+                    <div><span>{t.destinationPath}</span><strong>{selectedOperation.destination}</strong></div>
+                    <div><span>{t.progress}</span><strong>{selectedOperation.offset.toLocaleString()} / {selectedOperation.size.toLocaleString()} B</strong></div>
+                    <div><span>{t.overwrite}</span><strong>{selectedOperation.overwrite ? t.yes : t.no}</strong></div>
+                    {selectedOperation.finishedAtUnixMs && <div><span>{t.finishedAt}</span><strong>{formatTime(selectedOperation.finishedAtUnixMs)}</strong></div>}
+                    {selectedOperation.message && <div><span>{t.result}</span><strong>{selectedOperation.message}</strong></div>}
+                  </div>
+                </>}
               </div>
             </div>
           )}

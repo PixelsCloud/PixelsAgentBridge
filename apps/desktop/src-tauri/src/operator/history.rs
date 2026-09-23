@@ -1,13 +1,14 @@
 use std::sync::atomic::Ordering;
 
-use pab_bridge::{BridgeLocalStore, BridgeRuntime, LocalTaskRecord, RuntimeEventKind};
-use pab_protocol::OutputStream;
+use pab_bridge::{
+    BridgeLocalStore, BridgeRuntime, LocalTaskRecord, OperationRecord, RuntimeEventKind,
+};
+use pab_protocol::{OperatorRef, OutputStream};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::{ConnectedDevice, OperatorState, parse_code};
 
-const HISTORY_LIMIT: usize = 100;
 const INITIAL_OUTPUT_BYTES: u32 = 32 * 1024;
 
 #[derive(Serialize)]
@@ -15,13 +16,36 @@ const INITIAL_OUTPUT_BYTES: u32 = 32 * 1024;
 pub struct HistoryTask {
     id: String,
     device_code: String,
+    initiated_by: String,
     program: String,
+    args: Vec<String>,
+    cwd: Option<String>,
     state: String,
     complete: bool,
     stdout: String,
     stderr: String,
     stdout_offset: u64,
     stderr_offset: u64,
+    started_at_unix_ms: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryOperation {
+    id: String,
+    device_code: String,
+    initiated_by: String,
+    kind: String,
+    direction: String,
+    source: String,
+    destination: String,
+    overwrite: bool,
+    state: String,
+    offset: u64,
+    size: u64,
+    started_at_unix_ms: i64,
+    finished_at_unix_ms: Option<i64>,
+    message: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -29,6 +53,7 @@ pub struct HistoryTask {
 pub struct OperatorBootstrap {
     devices: Vec<ConnectedDevice>,
     tasks: Vec<HistoryTask>,
+    operations: Vec<HistoryOperation>,
 }
 
 #[derive(Clone, Serialize)]
@@ -70,7 +95,6 @@ pub async fn operator_bootstrap(
     for record in records
         .into_iter()
         .filter(|record| record.snapshot.is_some())
-        .take(HISTORY_LIMIT)
     {
         let snapshot = record
             .snapshot
@@ -88,6 +112,13 @@ pub async fn operator_bootstrap(
             .unwrap_or_else(|| record.device_ref.device_id.to_string());
         tasks.push(history_task(&local, record, code).await?);
     }
+    let operations = local
+        .operations()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .map(|record| history_operation(record, &remembered))
+        .collect();
     if !state.events_started.swap(true, Ordering::AcqRel) {
         tauri::async_runtime::spawn(async move {
             loop {
@@ -105,7 +136,56 @@ pub async fn operator_bootstrap(
             }
         });
     }
-    Ok(OperatorBootstrap { devices, tasks })
+    Ok(OperatorBootstrap {
+        devices,
+        tasks,
+        operations,
+    })
+}
+
+#[tauri::command]
+pub async fn operator_operations(
+    state: State<'_, OperatorState>,
+) -> Result<Vec<HistoryOperation>, String> {
+    let local = state.local_store().await?;
+    let remembered = local
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(local
+        .operations()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .map(|record| history_operation(record, &remembered))
+        .collect())
+}
+
+fn history_operation(
+    record: OperationRecord,
+    remembered: &[pab_bridge::RememberedDevice],
+) -> HistoryOperation {
+    let device_code = remembered
+        .iter()
+        .find(|device| device.device_ref == record.device_ref)
+        .map(|device| device.code.to_string())
+        .unwrap_or_else(|| record.device_ref.device_id.to_string());
+    HistoryOperation {
+        id: record.id,
+        device_code,
+        initiated_by: record.initiated_by,
+        kind: record.kind,
+        direction: record.direction,
+        source: record.source,
+        destination: record.destination,
+        overwrite: record.overwrite,
+        state: record.state,
+        offset: record.offset,
+        size: record.size,
+        started_at_unix_ms: record.started_at_unix_ms,
+        finished_at_unix_ms: record.finished_at_unix_ms,
+        message: record.message,
+    }
 }
 
 async fn history_task(
@@ -141,11 +221,24 @@ async fn history_task(
     Ok(HistoryTask {
         id: task_ref.task_id.to_string(),
         device_code,
+        initiated_by: match snapshot.initiated_by {
+            OperatorRef::Account(user_id) => format!("account:{user_id}"),
+            OperatorRef::Guest { .. } => "guest".to_owned(),
+        },
         program: record
             .command
             .as_ref()
             .map(|command| command.program.clone())
             .unwrap_or_else(|| snapshot.display_summary.clone()),
+        args: record
+            .command
+            .as_ref()
+            .map(|command| command.args.clone())
+            .unwrap_or_default(),
+        cwd: record
+            .command
+            .as_ref()
+            .and_then(|command| command.cwd.clone()),
         state: format!("{:?}", snapshot.state),
         complete: record.is_complete()
             && stdout_offset >= record.stdout.available_to
@@ -154,6 +247,7 @@ async fn history_task(
         stderr: String::from_utf8_lossy(&stderr.bytes).into_owned(),
         stdout_offset,
         stderr_offset,
+        started_at_unix_ms: snapshot.created_at_unix_ms,
     })
 }
 

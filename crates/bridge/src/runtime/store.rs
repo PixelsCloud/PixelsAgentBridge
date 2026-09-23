@@ -10,7 +10,7 @@ use sqlx::{
 };
 use thiserror::Error;
 
-const DATABASE_SCHEMA_VERSION: i64 = 2;
+const DATABASE_SCHEMA_VERSION: i64 = 4;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +119,31 @@ impl RuntimeStore {
             .execute(&mut *tx)
             .await?;
             sqlx::query("PRAGMA user_version = 2")
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+        }
+        if schema_version < 3 {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "CREATE TABLE runtime_operations (id TEXT PRIMARY KEY, device_ref_json TEXT NOT NULL, kind TEXT NOT NULL, direction TEXT NOT NULL, source TEXT NOT NULL, destination TEXT NOT NULL, overwrite INTEGER NOT NULL, state TEXT NOT NULL, offset INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL DEFAULT 0, started_at_unix_ms INTEGER NOT NULL, finished_at_unix_ms INTEGER, message TEXT)",
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("CREATE INDEX runtime_operations_started ON runtime_operations (started_at_unix_ms DESC)")
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("PRAGMA user_version = 3")
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+        }
+        if schema_version < 4 {
+            let mut tx = pool.begin().await?;
+            sqlx::query("ALTER TABLE runtime_operations ADD COLUMN initiated_by TEXT NOT NULL DEFAULT 'unknown'")
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("PRAGMA user_version = 4")
                 .execute(&mut *tx)
                 .await?;
             tx.commit().await?;

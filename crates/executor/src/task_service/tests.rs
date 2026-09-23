@@ -8,6 +8,48 @@ use pab_protocol::{
 use super::*;
 
 #[tokio::test]
+async fn executor_transfer_audit_survives_reopen_and_records_interruption() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("tasks.sqlite3");
+    let store = TaskStore::open(&database).await.unwrap();
+    let operator = OperatorRef::Account(UserId::from_u128(9));
+    let completed = RequestId::from_u128(100);
+    let interrupted = RequestId::from_u128(101);
+
+    store
+        .start_transfer(completed, operator, "receive", "/tmp/a.bin", 512)
+        .await
+        .unwrap();
+    store.transfer_progress(completed, 512, 512).await.unwrap();
+    store
+        .finish_transfer(completed, "completed", None)
+        .await
+        .unwrap();
+    store
+        .start_transfer(interrupted, operator, "send", "/tmp/b.bin", 0)
+        .await
+        .unwrap();
+    drop(store);
+
+    let reopened = TaskStore::open(&database).await.unwrap();
+    reopened.interrupt_transfers().await.unwrap();
+    let options = sqlx::sqlite::SqliteConnectOptions::new().filename(&database);
+    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
+    let rows = sqlx::query_as::<_, (String, String, i64, i64)>(
+        "SELECT request_id, state, offset, size FROM transfer_operations ORDER BY request_id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        rows[0],
+        (completed.to_string(), "completed".to_owned(), 512, 512)
+    );
+    assert_eq!(rows[1].1, "interrupted");
+}
+
+#[tokio::test]
 async fn executes_and_persists_a_command_with_live_output_ranges() {
     let directory = tempfile::tempdir().unwrap();
     let context = detect_native_execution_context().unwrap();

@@ -139,7 +139,8 @@ pub async fn operator_start_transfer(
         .resolve_device_code(parse_code(&code)?)
         .await
         .map_err(|error| error.to_string())?;
-    let id = RequestId::new().to_string();
+    let request_id = RequestId::new();
+    let id = request_id.to_string();
     let task_id = id.clone();
     let transfers = Arc::clone(&state.transfers);
     let (start_tx, start_rx) = tokio::sync::oneshot::channel::<()>();
@@ -161,7 +162,8 @@ pub async fn operator_start_transfer(
         };
         let result = if direction == "upload" {
             runtime
-                .upload_file(
+                .upload_file_with_id(
+                    request_id,
                     device_ref,
                     std::path::Path::new(&source),
                     &destination,
@@ -171,7 +173,8 @@ pub async fn operator_start_transfer(
                 .await
         } else {
             runtime
-                .download_file(
+                .download_file_with_id(
+                    request_id,
                     device_ref,
                     &source,
                     std::path::Path::new(&destination),
@@ -218,6 +221,13 @@ pub async fn operator_cancel_transfer(
         .remove(&id)
         .ok_or_else(|| "transfer is not running".to_owned())?;
     handle.abort();
+    let request_id = id.parse::<RequestId>().map_err(|error| error.to_string())?;
+    state
+        .runtime()
+        .await?
+        .cancel_transfer_record(request_id)
+        .await
+        .map_err(|error| error.to_string())?;
     let _ = app.emit(
         "operator-transfer",
         TransferUpdate {

@@ -56,6 +56,10 @@ async fn upgrades_existing_task_database_without_losing_records() {
         .execute(&pool)
         .await
         .unwrap();
+    sqlx::query("DROP TABLE runtime_operations")
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("PRAGMA user_version = 1")
         .execute(&pool)
         .await
@@ -72,6 +76,65 @@ async fn upgrades_existing_task_database_without_losing_records() {
         device_ref()
     );
     assert!(migrated.remembered_devices().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn transfer_history_survives_reopen_without_changing_active_transfer() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    let completed = RequestId::from_u128(100);
+    let interrupted = RequestId::from_u128(101);
+
+    store
+        .start_operation(
+            completed,
+            device_ref(),
+            "guest",
+            "upload",
+            "a.bin",
+            "/tmp/a.bin",
+            false,
+        )
+        .await
+        .unwrap();
+    store.operation_progress(completed, 512, 512).await.unwrap();
+    store
+        .finish_operation(completed, "completed", None)
+        .await
+        .unwrap();
+    store
+        .start_operation(
+            interrupted,
+            device_ref(),
+            "guest",
+            "download",
+            "/tmp/b.bin",
+            "b.bin",
+            true,
+        )
+        .await
+        .unwrap();
+    store.close().await;
+
+    let reopened = RuntimeStore::open(&path).await.unwrap();
+    let operations = reopened.operations().await.unwrap();
+    assert_eq!(operations.len(), 2);
+    let upload = operations
+        .iter()
+        .find(|item| item.id == completed.to_string())
+        .unwrap();
+    assert_eq!(upload.state, "completed");
+    assert_eq!(upload.offset, 512);
+    assert_eq!(upload.size, 512);
+    assert_eq!(upload.direction, "upload");
+    assert_eq!(upload.initiated_by, "guest");
+    let download = operations
+        .iter()
+        .find(|item| item.id == interrupted.to_string())
+        .unwrap();
+    assert_eq!(download.state, "running");
+    assert!(download.finished_at_unix_ms.is_none());
 }
 
 #[tokio::test]

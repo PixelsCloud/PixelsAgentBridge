@@ -11,6 +11,6 @@ pub use connection::{
 pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
-    LocalTaskRecord, MemoryDevicePasswordProvider, RememberedDevice, RuntimeCredentialError,
-    RuntimeError, RuntimeEvent, RuntimeEventKind,
+    LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, RememberedDevice,
+    RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind,
 };

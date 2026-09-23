@@ -14,7 +14,9 @@ use tokio::sync::broadcast;
 
 const CHANGE_BUFFER: usize = 1024;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
-const TASK_DATABASE_SCHEMA_VERSION: i64 = 1;
+const TASK_DATABASE_SCHEMA_VERSION: i64 = 2;
+
+mod operation;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskChangeKind {
@@ -93,6 +95,18 @@ impl TaskStore {
                 sqlx::query(statement).execute(&mut *tx).await?;
             }
             sqlx::query("PRAGMA user_version = 1")
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+        }
+        if schema_version < 2 {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "CREATE TABLE transfer_operations (request_id TEXT PRIMARY KEY, initiated_by_json TEXT NOT NULL, direction TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, offset INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL, started_at_unix_ms INTEGER NOT NULL, finished_at_unix_ms INTEGER, message TEXT)",
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("PRAGMA user_version = 2")
                 .execute(&mut *tx)
                 .await?;
             tx.commit().await?;

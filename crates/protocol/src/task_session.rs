@@ -57,6 +57,8 @@ pub enum DeviceTaskRequest {
     },
     UploadFile {
         schema_version: u16,
+        #[serde(default)]
+        request_id: RequestId,
         path: String,
         size: u64,
         sha256: String,
@@ -65,6 +67,8 @@ pub enum DeviceTaskRequest {
     },
     DownloadFile {
         schema_version: u16,
+        #[serde(default)]
+        request_id: RequestId,
         path: String,
         offset: u64,
         #[serde(default)]

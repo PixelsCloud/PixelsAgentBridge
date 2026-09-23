@@ -43,6 +43,7 @@ impl TaskService {
         execution_context: ExecutionContext,
     ) -> Result<Self, TaskServiceError> {
         let store = TaskStore::open(database_file).await?;
+        store.interrupt_transfers().await?;
         for task_ref in store.incomplete_task_refs().await? {
             store
                 .complete_output(task_ref, OutputStream::Stdout)
@@ -107,13 +108,19 @@ impl TaskService {
 
         match &request {
             DeviceTaskRequest::UploadFile {
+                request_id,
                 path,
                 size,
                 sha256,
                 overwrite,
                 ..
             } => {
-                return file_transfer::upload(
+                self.store
+                    .start_transfer(*request_id, initiated_by, "receive", path, *size)
+                    .await?;
+                let result = file_transfer::upload(
+                    &self.store,
+                    *request_id,
                     &mut stream,
                     timeout.max(Duration::from_secs(60)),
                     path,
@@ -122,15 +129,29 @@ impl TaskService {
                     *overwrite,
                 )
                 .await;
+                self.finish_transfer(*request_id, &result).await?;
+                return result;
             }
-            DeviceTaskRequest::DownloadFile { path, offset, .. } => {
-                return file_transfer::download(
+            DeviceTaskRequest::DownloadFile {
+                request_id,
+                path,
+                offset,
+                ..
+            } => {
+                self.store
+                    .start_transfer(*request_id, initiated_by, "send", path, 0)
+                    .await?;
+                let result = file_transfer::download(
+                    &self.store,
+                    *request_id,
                     &mut stream,
                     timeout.max(Duration::from_secs(60)),
                     path,
                     *offset,
                 )
                 .await;
+                self.finish_transfer(*request_id, &result).await?;
+                return result;
             }
             _ => {}
         }
@@ -140,6 +161,21 @@ impl TaskService {
             Err(error) => error_response(&error),
         };
         stream.send_json(&response, timeout).await?;
+        Ok(())
+    }
+
+    async fn finish_transfer(
+        &self,
+        request_id: pab_protocol::RequestId,
+        result: &Result<(), TaskServiceError>,
+    ) -> Result<(), TaskServiceError> {
+        let (state, message) = match result {
+            Ok(()) => ("completed", None),
+            Err(error) => ("failed", Some(error.to_string())),
+        };
+        self.store
+            .finish_transfer(request_id, state, message.as_deref())
+            .await?;
         Ok(())
     }
 

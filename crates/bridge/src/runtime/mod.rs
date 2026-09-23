@@ -1,6 +1,7 @@
 mod credential;
 mod device;
 mod event;
+mod operation;
 mod remembered;
 mod store;
 #[cfg(test)]
@@ -38,6 +39,7 @@ pub use credential::{
     MemoryDevicePasswordProvider, RuntimeCredentialError,
 };
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
+pub use operation::OperationRecord;
 pub use remembered::RememberedDevice;
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
@@ -59,6 +61,10 @@ impl BridgeLocalStore {
 
     pub async fn tasks(&self) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
         self.store.list().await
+    }
+
+    pub async fn operations(&self) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
+        self.store.operations().await
     }
 
     pub async fn task(&self, task_ref: TaskRef) -> Result<LocalTaskRecord, RuntimeStoreError> {
@@ -154,6 +160,10 @@ impl BridgeRuntime {
         let (availability_sender, availability) = watch::channel(BridgeAvailability::Connecting);
         let (shutdown, shutdown_receiver) = watch::channel(false);
         let guest_identity = matches!(bridge_config.identity, crate::BridgeIdentity::Guest);
+        let initiated_by = match bridge_config.identity {
+            crate::BridgeIdentity::Account(user_id) => format!("account:{user_id}"),
+            crate::BridgeIdentity::Guest => "guest".to_owned(),
+        };
         let inner = Arc::new(RuntimeInner {
             store,
             passwords,
@@ -165,6 +175,7 @@ impl BridgeRuntime {
             devices: Mutex::new(HashMap::new()),
             guest_codes: Mutex::new(HashSet::new()),
             guest_identity,
+            initiated_by,
             operations: Mutex::new(HashMap::new()),
         });
         inner.publish(RuntimeEventKind::BridgeConnecting);
@@ -319,11 +330,56 @@ impl BridgeRuntime {
         overwrite: bool,
         progress: impl Fn(u64, u64) + Send + Sync,
     ) -> Result<(), RuntimeError> {
-        let connection = self.inner.device(device_ref).await.connection().await?;
-        connection
-            .upload_file(source, destination, overwrite, progress)
-            .await?;
-        Ok(())
+        self.upload_file_with_id(
+            RequestId::new(),
+            device_ref,
+            source,
+            destination,
+            overwrite,
+            progress,
+        )
+        .await
+    }
+
+    pub async fn upload_file_with_id(
+        &self,
+        id: RequestId,
+        device_ref: DeviceRef,
+        source: &std::path::Path,
+        destination: &str,
+        overwrite: bool,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), RuntimeError> {
+        let progress_store = self.inner.store.clone();
+        let final_progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
+        let callback_progress = Arc::clone(&final_progress);
+        self.transfer_file(
+            id,
+            device_ref,
+            "upload",
+            &source.to_string_lossy(),
+            destination,
+            overwrite,
+            final_progress,
+            async {
+                let connection = self.inner.device(device_ref).await.connection().await?;
+                connection
+                    .upload_file(id, source, destination, overwrite, move |offset, size| {
+                        progress(offset, size);
+                        callback_progress.0.store(offset, Ordering::Release);
+                        callback_progress.1.store(size, Ordering::Release);
+                        let store = progress_store.clone();
+                        tokio::spawn(async move {
+                            if let Err(error) = store.operation_progress(id, offset, size).await {
+                                tracing::warn!(%error, "failed to save transfer progress");
+                            }
+                        });
+                    })
+                    .await
+                    .map_err(Into::into)
+            },
+        )
+        .await
     }
 
     pub async fn download_file(
@@ -334,9 +390,108 @@ impl BridgeRuntime {
         overwrite: bool,
         progress: impl Fn(u64, u64) + Send + Sync,
     ) -> Result<(), RuntimeError> {
-        let connection = self.inner.device(device_ref).await.connection().await?;
-        connection
-            .download_file(source, destination, overwrite, progress)
+        self.download_file_with_id(
+            RequestId::new(),
+            device_ref,
+            source,
+            destination,
+            overwrite,
+            progress,
+        )
+        .await
+    }
+
+    pub async fn download_file_with_id(
+        &self,
+        id: RequestId,
+        device_ref: DeviceRef,
+        source: &str,
+        destination: &std::path::Path,
+        overwrite: bool,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), RuntimeError> {
+        let progress_store = self.inner.store.clone();
+        let final_progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
+        let callback_progress = Arc::clone(&final_progress);
+        self.transfer_file(
+            id,
+            device_ref,
+            "download",
+            source,
+            &destination.to_string_lossy(),
+            overwrite,
+            final_progress,
+            async {
+                let connection = self.inner.device(device_ref).await.connection().await?;
+                connection
+                    .download_file(id, source, destination, overwrite, move |offset, size| {
+                        progress(offset, size);
+                        callback_progress.0.store(offset, Ordering::Release);
+                        callback_progress.1.store(size, Ordering::Release);
+                        let store = progress_store.clone();
+                        tokio::spawn(async move {
+                            if let Err(error) = store.operation_progress(id, offset, size).await {
+                                tracing::warn!(%error, "failed to save transfer progress");
+                            }
+                        });
+                    })
+                    .await
+                    .map_err(Into::into)
+            },
+        )
+        .await
+    }
+
+    async fn transfer_file<F>(
+        &self,
+        id: RequestId,
+        device_ref: DeviceRef,
+        direction: &str,
+        source: &str,
+        destination: &str,
+        overwrite: bool,
+        final_progress: Arc<(AtomicU64, AtomicU64)>,
+        operation: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: std::future::Future<Output = Result<(), RuntimeError>>,
+    {
+        self.inner
+            .store
+            .start_operation(
+                id,
+                device_ref,
+                &self.inner.initiated_by,
+                direction,
+                source,
+                destination,
+                overwrite,
+            )
+            .await?;
+        let result = operation.await;
+        self.inner
+            .store
+            .operation_progress(
+                id,
+                final_progress.0.load(Ordering::Acquire),
+                final_progress.1.load(Ordering::Acquire),
+            )
+            .await?;
+        let (state, message) = match &result {
+            Ok(()) => ("completed", None),
+            Err(error) => ("failed", Some(error.to_string())),
+        };
+        self.inner
+            .store
+            .finish_operation(id, state, message.as_deref())
+            .await?;
+        result
+    }
+
+    pub async fn cancel_transfer_record(&self, id: RequestId) -> Result<(), RuntimeError> {
+        self.inner
+            .store
+            .finish_operation(id, "cancelled", None)
             .await?;
         Ok(())
     }
@@ -569,6 +724,7 @@ struct RuntimeInner {
     devices: Mutex<HashMap<DeviceRef, Arc<DeviceSession>>>,
     guest_codes: Mutex<HashSet<DeviceCode>>,
     guest_identity: bool,
+    initiated_by: String,
     operations: Mutex<HashMap<RequestId, AbortHandle>>,
 }
 

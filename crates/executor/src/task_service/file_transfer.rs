@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use pab_protocol::{DeviceTaskErrorCode, DeviceTaskResponse};
+use pab_protocol::{DeviceTaskErrorCode, DeviceTaskResponse, RequestId};
 use pab_transport::{MAX_BINARY_FRAME_BYTES, PabBiStream};
 use sha2::{Digest, Sha256};
 use tokio::{
@@ -12,8 +12,11 @@ use tokio::{
 };
 
 use super::{TaskServiceError, send_error};
+use crate::task_store::TaskStore;
 
 pub(super) async fn upload(
+    store: &TaskStore,
+    request_id: RequestId,
     stream: &mut PabBiStream,
     timeout: Duration,
     path: &str,
@@ -54,6 +57,7 @@ pub(super) async fn upload(
         offset = 0;
     }
     file.seek(std::io::SeekFrom::Start(offset)).await?;
+    store.transfer_progress(request_id, offset, size).await?;
     stream
         .send_frame_json(
             &DeviceTaskResponse::FileReady {
@@ -73,6 +77,7 @@ pub(super) async fn upload(
         }
         file.write_all(&bytes).await?;
         offset = next;
+        store.transfer_progress(request_id, offset, size).await?;
         stream
             .send_frame_json(&DeviceTaskResponse::FileProgress { offset }, timeout)
             .await?;
@@ -103,6 +108,8 @@ pub(super) async fn upload(
 }
 
 pub(super) async fn download(
+    store: &TaskStore,
+    request_id: RequestId,
     stream: &mut PabBiStream,
     timeout: Duration,
     path: &str,
@@ -128,6 +135,7 @@ pub(super) async fn download(
         .await;
     }
     let size = metadata.len();
+    store.transfer_progress(request_id, offset, size).await?;
     let sha256 = hash_file(&source).await?;
     file.seek(std::io::SeekFrom::Start(offset)).await?;
     stream
@@ -151,6 +159,7 @@ pub(super) async fn download(
         }
         stream.send_binary_frame(&buffer[..read], timeout).await?;
         sent += read as u64;
+        store.transfer_progress(request_id, sent, size).await?;
     }
     stream
         .send_json(&DeviceTaskResponse::FileComplete { size, sha256 }, timeout)
@@ -204,7 +213,7 @@ async fn hash_file(path: &Path) -> Result<String, std::io::Error> {
 async fn reject(
     stream: &mut PabBiStream,
     timeout: Duration,
-    message: &str,
+    message: &'static str,
 ) -> Result<(), TaskServiceError> {
     send_error(
         stream,
@@ -212,5 +221,6 @@ async fn reject(
         DeviceTaskErrorCode::InvalidRequest,
         message,
     )
-    .await
+    .await?;
+    Err(TaskServiceError::InvalidRequest(message))
 }

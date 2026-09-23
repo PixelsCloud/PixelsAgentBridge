@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use pab_protocol::{DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse};
+use pab_protocol::{DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId};
 use pab_transport::{MAX_BINARY_FRAME_BYTES, PabBiStream};
 use sha2::{Digest, Sha256};
 use tokio::{
@@ -16,6 +16,7 @@ use super::{AuthenticatedDeviceConnection, BridgeError};
 impl AuthenticatedDeviceConnection {
     pub async fn upload_file(
         &self,
+        request_id: RequestId,
         source: &Path,
         destination: &str,
         overwrite: bool,
@@ -36,6 +37,7 @@ impl AuthenticatedDeviceConnection {
             .send_frame_json(
                 &DeviceTaskRequest::UploadFile {
                     schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id,
                     path: destination.to_owned(),
                     size,
                     sha256: sha256.clone(),
@@ -85,6 +87,7 @@ impl AuthenticatedDeviceConnection {
 
     pub async fn download_file(
         &self,
+        request_id: RequestId,
         source: &str,
         destination: &Path,
         overwrite: bool,
@@ -129,6 +132,7 @@ impl AuthenticatedDeviceConnection {
             .send_frame_json(
                 &DeviceTaskRequest::DownloadFile {
                     schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id,
                     path: source.to_owned(),
                     offset,
                     overwrite,
