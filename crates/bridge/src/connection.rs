@@ -24,8 +24,13 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::{BridgeConfig, BridgeConfigError};
 
 pub struct BridgeClient {
-    config: BridgeConfig,
+    connector: BridgeConnector,
     control: EndpointControlSupervisorHandle,
+}
+
+#[derive(Clone)]
+pub struct BridgeConnector {
+    config: BridgeConfig,
     network_resolver: DeviceNetworkResolver,
     endpoint: PabEndpoint,
 }
@@ -64,10 +69,12 @@ impl BridgeClient {
         let endpoint = PabEndpoint::bind(endpoint_config, secret).await?;
         endpoint.wait_online(config.operation_timeout).await?;
         Ok(Self {
-            config,
+            connector: BridgeConnector {
+                config,
+                network_resolver,
+                endpoint,
+            },
             control,
-            network_resolver,
-            endpoint,
         })
     }
 
@@ -75,6 +82,26 @@ impl BridgeClient {
         self.control.status()
     }
 
+    pub fn connector(&self) -> BridgeConnector {
+        self.connector.clone()
+    }
+
+    pub async fn connect_device(
+        &self,
+        device_ref: DeviceRef,
+        password: Zeroizing<String>,
+    ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
+        self.connector.connect_device(device_ref, password).await
+    }
+
+    pub async fn shutdown(self) -> Result<(), BridgeError> {
+        self.connector.endpoint.close().await;
+        self.control.shutdown().await?;
+        Ok(())
+    }
+}
+
+impl BridgeConnector {
     pub async fn connect_device(
         &self,
         device_ref: DeviceRef,
@@ -144,14 +171,9 @@ impl BridgeClient {
             }
         }
     }
-
-    pub async fn shutdown(self) -> Result<(), BridgeError> {
-        self.endpoint.close().await;
-        self.control.shutdown().await?;
-        Ok(())
-    }
 }
 
+#[derive(Clone)]
 pub struct AuthenticatedDeviceConnection {
     connection: PabConnection,
     device_ref: DeviceRef,

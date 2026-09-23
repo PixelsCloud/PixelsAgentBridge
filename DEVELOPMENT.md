@@ -82,11 +82,19 @@ iroh Endpoint, queries an authorized device address, connects to the exact adver
 Endpoint ID, and verifies the device-session response against the configured user and
 device. It can query the verified target environment, submit idempotent command
 requests, query or cancel tasks, read output by byte offset, and subscribe from event
-and output cursors. The device password is supplied by the caller in a zeroizing
-value; the Debug CLI reads it from a protected file and never accepts it as a command
-or MCP argument. Both serialized password buffers and the Executor's corresponding
-receive buffers are zeroized. A production desktop credential store remains future
-work.
+and output cursors. Its `BridgeRuntime` layer starts while offline, supervises the
+control/iroh connection with a fixed three-second retry, reuses one authenticated
+session per device, and resumes unfinished submissions and subscriptions from local
+SQLite after restart. It persists the request before submission, then projects remote
+snapshots, exact event cursors, and rolling 16 MiB stdout/stderr caches before
+publishing bounded live events. Consumers recover from a lagged event channel by
+querying SQLite. Every task event carries the target context, and an output retention
+gap is explicitly reported before the cursor advances to the Executor's retained
+boundary. The device password is supplied through a replaceable provider in a
+zeroizing value; the Debug CLI reads it from a protected file and never accepts it as
+a command or MCP argument. Both serialized password buffers and the Executor's
+corresponding receive buffers are zeroized. A production desktop credential store
+remains future work.
 
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
@@ -131,6 +139,11 @@ retained history:
 cargo run -p pab-bridge --bin pab-bridge -- command <device-id> <program> [argument ...]
 cargo run -p pab-bridge --bin pab-bridge -- follow <device-id> <task-id>
 ```
+
+Set `PAB_BRIDGE_DATABASE` to the Bridge Runtime SQLite file. When it is absent, the
+Debug CLI places `pab-bridge.sqlite3` beside `PAB_ENDPOINT_SECRET_FILE`. The database
+contains task metadata, events, cursors, and retained output; it never contains the
+device password or endpoint private key.
 
 Set `PAB_REQUEST_ID` to a caller-generated UUID when a durable caller must retry the
 same submission across process restarts. Reusing it with different command input is

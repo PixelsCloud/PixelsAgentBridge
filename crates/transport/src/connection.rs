@@ -7,6 +7,7 @@ use zeroize::Zeroizing;
 
 pub const MAX_PAB_MESSAGE_BYTES: usize = 64 * 1024;
 
+#[derive(Clone)]
 pub struct PabConnection {
     inner: Connection,
 }

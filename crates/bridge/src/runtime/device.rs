@@ -1,0 +1,177 @@
+use std::{sync::Arc, time::Duration};
+
+use pab_protocol::DeviceRef;
+use tokio::sync::{Mutex, RwLock, watch};
+
+use crate::{
+    AuthenticatedDeviceConnection, BridgeClient, BridgeConfig, BridgeConnector, BridgeError,
+};
+
+use super::{DeviceConnectionPhase, RuntimeError, RuntimeEventKind, RuntimeInner, duration_millis};
+
+pub(super) struct DeviceSession {
+    device_ref: DeviceRef,
+    connection: RwLock<Option<Arc<AuthenticatedDeviceConnection>>>,
+    connect_lock: Mutex<()>,
+    runtime: Arc<RuntimeInner>,
+}
+
+impl DeviceSession {
+    pub(super) fn new(device_ref: DeviceRef, runtime: Arc<RuntimeInner>) -> Self {
+        Self {
+            device_ref,
+            connection: RwLock::new(None),
+            connect_lock: Mutex::new(()),
+            runtime,
+        }
+    }
+
+    pub(super) async fn connection(
+        &self,
+    ) -> Result<Arc<AuthenticatedDeviceConnection>, RuntimeError> {
+        if let Some(connection) = self.connection.read().await.as_ref() {
+            return Ok(Arc::clone(connection));
+        }
+        let _guard = self.connect_lock.lock().await;
+        if let Some(connection) = self.connection.read().await.as_ref() {
+            return Ok(Arc::clone(connection));
+        }
+        let mut availability = self.runtime.availability.clone();
+        let connector = loop {
+            match availability.borrow().clone() {
+                BridgeAvailability::Connecting => {
+                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                        device_ref: self.device_ref,
+                        phase: DeviceConnectionPhase::WaitingForBridge,
+                        retry_in_ms: None,
+                        message: None,
+                    });
+                }
+                BridgeAvailability::Connected(connector) => break *connector,
+                BridgeAvailability::Stopped(message) => {
+                    return Err(RuntimeError::BridgeUnavailable(message));
+                }
+            }
+            let mut shutdown = self.runtime.shutdown.clone();
+            tokio::select! {
+                changed = availability.changed() => {
+                    changed.map_err(|_| RuntimeError::BridgeUnavailable("Bridge supervisor stopped".to_owned()))?;
+                }
+                changed = shutdown.changed() => {
+                    let _ = changed;
+                    return Err(RuntimeError::ShuttingDown);
+                }
+            }
+        };
+        loop {
+            self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                device_ref: self.device_ref,
+                phase: DeviceConnectionPhase::Connecting,
+                retry_in_ms: None,
+                message: None,
+            });
+            let password = self.runtime.passwords.load_password(self.device_ref)?;
+            match connector.connect_device(self.device_ref, password).await {
+                Ok(connection) => {
+                    let connection = Arc::new(connection);
+                    *self.connection.write().await = Some(Arc::clone(&connection));
+                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                        device_ref: self.device_ref,
+                        phase: DeviceConnectionPhase::Connected,
+                        retry_in_ms: None,
+                        message: None,
+                    });
+                    return Ok(connection);
+                }
+                Err(error) if error.is_recoverable_connection() => {
+                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                        device_ref: self.device_ref,
+                        phase: DeviceConnectionPhase::Retrying,
+                        retry_in_ms: Some(duration_millis(self.runtime.retry_interval)),
+                        message: Some(error.to_string()),
+                    });
+                    self.runtime
+                        .wait_or_shutdown(self.runtime.retry_interval)
+                        .await?;
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+
+    pub(super) async fn recover(
+        &self,
+        failed: &Arc<AuthenticatedDeviceConnection>,
+        error: &BridgeError,
+    ) -> Result<(), RuntimeError> {
+        let mut connection = self.connection.write().await;
+        if connection
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, failed))
+        {
+            connection.take();
+            failed.as_ref().clone().close();
+        }
+        drop(connection);
+        self.runtime.publish(RuntimeEventKind::DeviceConnection {
+            device_ref: self.device_ref,
+            phase: DeviceConnectionPhase::Retrying,
+            retry_in_ms: Some(duration_millis(self.runtime.retry_interval)),
+            message: Some(error.to_string()),
+        });
+        self.runtime
+            .wait_or_shutdown(self.runtime.retry_interval)
+            .await
+    }
+}
+
+#[derive(Clone)]
+pub(super) enum BridgeAvailability {
+    Connecting,
+    Connected(Box<BridgeConnector>),
+    Stopped(String),
+}
+
+pub(super) async fn run_bridge_supervisor(
+    config: BridgeConfig,
+    retry_interval: Duration,
+    availability: watch::Sender<BridgeAvailability>,
+    mut shutdown: watch::Receiver<bool>,
+    runtime: Arc<RuntimeInner>,
+) {
+    loop {
+        match BridgeClient::connect(config.clone()).await {
+            Ok(bridge) => {
+                let _ =
+                    availability.send(BridgeAvailability::Connected(Box::new(bridge.connector())));
+                runtime.publish(RuntimeEventKind::BridgeConnected);
+                let _ = shutdown.changed().await;
+                let _ = availability.send(BridgeAvailability::Stopped(
+                    "Bridge Runtime is shutting down".to_owned(),
+                ));
+                if let Err(error) = bridge.shutdown().await {
+                    runtime.publish(RuntimeEventKind::BridgeStopped {
+                        message: error.to_string(),
+                    });
+                }
+                return;
+            }
+            Err(error) => {
+                runtime.publish(RuntimeEventKind::BridgeRetrying {
+                    retry_in_ms: duration_millis(retry_interval),
+                    message: error.to_string(),
+                });
+                tokio::select! {
+                    _ = tokio::time::sleep(retry_interval) => {}
+                    changed = shutdown.changed() => {
+                        let _ = changed;
+                        let _ = availability.send(BridgeAvailability::Stopped(
+                            "Bridge Runtime is shutting down".to_owned(),
+                        ));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
