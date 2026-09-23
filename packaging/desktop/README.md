@@ -2,7 +2,7 @@
 
 Build the Windows core binaries with `cargo build --locked --release`. In
 `apps/desktop`, run `npm ci` and `npm run tauri build -- --no-bundle`, then run
-`python packaging/desktop/build.py`. The resulting Windows archive contains
+`python packaging/desktop/build.py --platform windows`. The resulting Windows archive contains
 one Tauri app, the background Executor, the MCP stdio tool, installation
 scripts, and a SHA-256 manifest. Release profiles strip symbols.
 

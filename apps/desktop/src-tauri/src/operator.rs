@@ -1,18 +1,28 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 use pab_agent_core::{
     DataPaths, DataScope, begin_device_claim, begin_personal_device_claim, tls_connector,
 };
-use pab_bridge::{BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, MemoryDevicePasswordProvider};
+use pab_bridge::{
+    BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, MemoryDevicePasswordProvider,
+    RememberedDevice,
+};
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
 use serde::Serialize;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, OnceCell};
 use zeroize::Zeroizing;
+
+pub(crate) mod history;
 
 pub struct OperatorState {
     runtime: Mutex<Option<Arc<BridgeRuntime>>>,
     passwords: Arc<MemoryDevicePasswordProvider>,
     tasks: Mutex<HashMap<TaskId, TaskRef>>,
+    events_started: AtomicBool,
+    local: OnceCell<Arc<BridgeLocalStore>>,
 }
 
 impl OperatorState {
@@ -21,6 +31,8 @@ impl OperatorState {
             runtime: Mutex::new(None),
             passwords: Arc::new(MemoryDevicePasswordProvider::new(None)),
             tasks: Mutex::new(HashMap::new()),
+            events_started: AtomicBool::new(false),
+            local: OnceCell::new(),
         }
     }
 
@@ -37,9 +49,11 @@ impl OperatorState {
         .map_err(|_| "guest registration timed out".to_owned())?
         .map_err(|error| error.to_string())?;
         let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+        let mut runtime_config = BridgeRuntimeConfig::new(paths.bridge_database());
+        runtime_config.resume_incomplete_on_start = false;
         let runtime = BridgeRuntime::start(
             config,
-            BridgeRuntimeConfig::new(paths.bridge_database()),
+            runtime_config,
             self.passwords.clone(),
         )
         .await
@@ -48,14 +62,32 @@ impl OperatorState {
         *current = Some(Arc::clone(&runtime));
         Ok(runtime)
     }
+
+    async fn local_store(&self) -> Result<Arc<BridgeLocalStore>, String> {
+        let local = self
+            .local
+            .get_or_try_init(|| async {
+                let paths = DataPaths::for_scope(DataScope::User)
+                    .map_err(|error| error.to_string())?;
+                BridgeLocalStore::open(&paths.bridge_database())
+                    .await
+                    .map(Arc::new)
+                    .map_err(|error| error.to_string())
+            })
+            .await?;
+        Ok(Arc::clone(local))
+    }
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectedDevice {
+    device_id: String,
     device_code: String,
+    alias: String,
     os_family: String,
     os_reminder: String,
+    connected: bool,
 }
 
 #[derive(Serialize)]
@@ -101,10 +133,36 @@ pub async fn operator_connect(
         .current_environment(device_ref)
         .await
         .map_err(|error| error.to_string())?;
+    let remembered = RememberedDevice {
+        device_ref,
+        code,
+        alias: String::new(),
+        os_family: target.execution.os_family,
+        os_reminder: target.compact_reminder(),
+    };
+    runtime
+        .remember_device(&remembered)
+        .await
+        .map_err(|error| error.to_string())?;
+    runtime
+        .resume_incomplete_for_device(device_ref)
+        .await
+        .map_err(|error| error.to_string())?;
+    let alias = runtime
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|device| device.device_ref == device_ref)
+        .map(|device| device.alias)
+        .unwrap_or_default();
     Ok(ConnectedDevice {
+        device_id: device_ref.device_id.to_string(),
         device_code: code.to_string(),
+        alias,
         os_family: format!("{:?}", target.execution.os_family).to_lowercase(),
         os_reminder: target.compact_reminder(),
+        connected: true,
     })
 }
 
@@ -143,7 +201,6 @@ pub async fn operator_task(
     stdout_offset: u64,
     stderr_offset: u64,
 ) -> Result<TaskUpdate, String> {
-    let runtime = state.runtime().await?;
     let task_id = task_id
         .parse::<TaskId>()
         .map_err(|_| "invalid task ID".to_owned())?;
@@ -153,15 +210,16 @@ pub async fn operator_task(
         .await
         .get(&task_id)
         .ok_or_else(|| "task is not in this desktop session".to_owned())?;
-    let record = runtime
+    let local = state.local_store().await?;
+    let record = local
         .task(task_ref)
         .await
         .map_err(|error| error.to_string())?;
-    let (stdout, _) = runtime
+    let (stdout, _) = local
         .read_output(task_ref, OutputStream::Stdout, stdout_offset, 32 * 1024)
         .await
         .map_err(|error| error.to_string())?;
-    let (stderr, _) = runtime
+    let (stderr, _) = local
         .read_output(task_ref, OutputStream::Stderr, stderr_offset, 32 * 1024)
         .await
         .map_err(|error| error.to_string())?;

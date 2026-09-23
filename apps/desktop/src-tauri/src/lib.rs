@@ -86,6 +86,8 @@ pub fn run() {
             device_status,
             approve_claim,
             operator::operator_connect,
+            operator::history::operator_bootstrap,
+            operator::history::operator_rename_device,
             operator::operator_run_command,
             operator::operator_task,
             operator::operator_claim,

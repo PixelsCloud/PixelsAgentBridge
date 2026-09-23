@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { messages, type Language } from "./i18n";
 import type { View } from "./App";
 
 type ConnectedDevice = {
+  deviceId: string;
   deviceCode: string;
+  alias: string;
   osFamily: string;
   osReminder: string;
+  connected: boolean;
+};
+
+type OperatorBootstrap = {
+  devices: ConnectedDevice[];
+  tasks: TaskEntry[];
 };
 
 type TaskUpdate = {
@@ -48,57 +57,101 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
   const [teamId, setTeamId] = useState("");
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [requestingClaim, setRequestingClaim] = useState(false);
+  const [aliasDraft, setAliasDraft] = useState("");
   const tasksRef = useRef(tasks);
+  const refreshingRef = useRef(new Set<string>());
+  const refreshAgainRef = useRef(new Set<string>());
   const selected = devices.find((device) => device.deviceCode === selectedCode);
 
   useEffect(() => {
     tasksRef.current = tasks;
   }, [tasks]);
 
-  useEffect(() => {
-    let polling = false;
-    let closed = false;
-    const poll = async () => {
-      if (polling) return;
-      polling = true;
-      try {
-        const pending = tasksRef.current.filter((task) => !task.complete);
-        for (const task of pending) {
-          try {
-            const update = await invoke<TaskUpdate>("operator_task", {
-              taskId: task.id,
-              stdoutOffset: task.stdoutOffset,
-              stderrOffset: task.stderrOffset,
-            });
-            if (closed) return;
-            setTasks((current) => current.map((item) => item.id === task.id ? {
-              ...item,
-              state: update.state,
-              complete: update.complete,
-              stdout: item.stdout + update.stdout,
-              stderr: item.stderr + update.stderr,
-              stdoutOffset: update.stdoutOffset,
-              stderrOffset: update.stderrOffset,
-            } : item));
-          } catch {
-            if (closed) return;
-            setTasks((current) => current.map((item) => item.id === task.id ? {
-              ...item,
-              state: "Error",
-              complete: true,
-            } : item));
+  async function refreshTask(taskId: string) {
+    const task = tasksRef.current.find((item) => item.id === taskId);
+    if (!task || task.complete) return;
+    if (refreshingRef.current.has(taskId)) {
+      refreshAgainRef.current.add(taskId);
+      return;
+    }
+    refreshingRef.current.add(taskId);
+    try {
+      const update = await invoke<TaskUpdate>("operator_task", {
+        taskId,
+        stdoutOffset: task.stdoutOffset,
+        stderrOffset: task.stderrOffset,
+      });
+      setTasks((current) => {
+        const next = current.map((item) => {
+          if (item.id !== taskId || item.stdoutOffset !== task.stdoutOffset || item.stderrOffset !== task.stderrOffset) {
+            return item;
           }
-        }
-      } finally {
-        polling = false;
+          return {
+            ...item,
+            state: update.state,
+            complete: update.complete,
+            stdout: item.stdout + update.stdout,
+            stderr: item.stderr + update.stderr,
+            stdoutOffset: update.stdoutOffset,
+            stderrOffset: update.stderrOffset,
+          };
+        });
+        tasksRef.current = next;
+        return next;
+      });
+    } catch {
+      setError(t.taskRefreshFailed);
+    } finally {
+      refreshingRef.current.delete(taskId);
+      if (refreshAgainRef.current.delete(taskId)) {
+        void refreshTask(taskId);
       }
-    };
-    const timer = window.setInterval(() => void poll(), 500);
+    }
+  }
+
+  useEffect(() => {
+    let closed = false;
+    let stopTask: (() => void) | undefined;
+    let stopDevice: (() => void) | undefined;
+    void (async () => {
+      stopTask = await listen<{ taskId: string }>("operator-task-changed", (event) => {
+        void refreshTask(event.payload.taskId);
+      });
+      if (closed) {
+        stopTask();
+        return;
+      }
+      stopDevice = await listen<{ deviceId: string; phase: string }>("operator-device-connection", (event) => {
+        setDevices((current) => current.map((device) => device.deviceId === event.payload.deviceId ? {
+          ...device,
+          connected: event.payload.phase === "connected",
+        } : device));
+      });
+      if (closed) {
+        stopDevice();
+        return;
+      }
+      try {
+        const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
+        if (closed) return;
+        setDevices(saved.devices);
+        tasksRef.current = saved.tasks;
+        setTasks(saved.tasks);
+        setSelectedTaskId(saved.tasks[0]?.id ?? "");
+      } catch {
+        if (!closed) setError(t.historyLoadFailed);
+      }
+    })();
     return () => {
       closed = true;
-      window.clearInterval(timer);
+      stopTask?.();
+      stopDevice?.();
     };
   }, []);
+
+  useEffect(() => {
+    setAliasDraft(selected?.alias ?? "");
+  }, [selectedCode, selected?.alias]);
 
   async function connect() {
     setConnecting(true);
@@ -115,6 +168,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
       setSelectedCode(device.deviceCode);
       setCode("");
       setPassword("");
+      setAliasDraft(device.alias);
     } catch {
       setError(t.connectFailed);
     } finally {
@@ -123,7 +177,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
   }
 
   async function runCommand() {
-    if (!selected || !program.trim()) return;
+    if (!selected?.connected || !program.trim()) return;
     setSubmitting(true);
     setError("");
     try {
@@ -133,7 +187,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
         args: argumentsText.split(/\r?\n/).filter((line) => line.length > 0),
         cwd: cwd.trim() || null,
       });
-      setTasks((current) => [{
+      const newTask: TaskEntry = {
         id,
         deviceCode: selected.deviceCode,
         program: program.trim(),
@@ -143,12 +197,32 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
         stderr: "",
         stdoutOffset: 0,
         stderrOffset: 0,
-      }, ...current]);
+      };
+      tasksRef.current = [newTask, ...tasksRef.current];
+      setTasks(tasksRef.current);
       setSelectedTaskId(id);
+      void refreshTask(id);
     } catch {
       setError(t.commandFailed);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function renameDevice() {
+    if (!selected) return;
+    try {
+      const alias = await invoke<string>("operator_rename_device", {
+        code: selected.deviceCode,
+        alias: aliasDraft,
+      });
+      setDevices((current) => current.map((device) => device.deviceCode === selected.deviceCode ? {
+        ...device,
+        alias,
+      } : device));
+      setError("");
+    } catch {
+      setError(t.renameFailed);
     }
   }
 
@@ -197,9 +271,12 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
             {devices.length === 0 ? <div className="empty-list">{t.noConnectedDevices}</div> : (
               <div className="device-list">
                 {devices.map((device) => (
-                  <button className={`device-row ${selectedCode === device.deviceCode ? "active" : ""}`} key={device.deviceCode} onClick={() => setSelectedCode(device.deviceCode)}>
+                  <button className={`device-row ${selectedCode === device.deviceCode ? "active" : ""}`} key={device.deviceCode} onClick={() => {
+                    setSelectedCode(device.deviceCode);
+                    if (!device.connected) setCode(device.deviceCode);
+                  }}>
                     <span className="device-avatar">{device.osFamily.slice(0, 1).toUpperCase()}</span>
-                    <span><strong>{device.deviceCode}</strong><small>{device.osFamily}</small></span>
+                    <span><strong>{device.alias || device.deviceCode}</strong><small>{device.deviceCode} · {device.osFamily} · {device.connected ? t.connected : t.reconnectRequired}</small></span>
                     <span className="device-arrow">›</span>
                   </button>
                 ))}
@@ -211,14 +288,19 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
             <div className="surface-topline"><h2>{t.commandTitle}</h2>{selected && <span className="target-badge">{selected.deviceCode}</span>}</div>
             {selected ? (
               <>
+                <div className="device-alias-row">
+                  <input value={aliasDraft} onChange={(event) => setAliasDraft(event.target.value)} maxLength={64} placeholder={t.deviceAlias} />
+                  <button className="quiet-button" onClick={() => void renameDevice()}>{t.saveName}</button>
+                </div>
                 <div className="os-banner"><strong>{t.targetOs}: {selected.osFamily}</strong><span>{selected.osReminder}</span></div>
+                {!selected.connected && <p className="form-hint">{t.reconnectHint}</p>}
                 <p className="form-hint">{t.nativeCommandHint}</p>
                 <div className="command-fields">
                   <label><span className="field-label">{t.program}</span><input value={program} onChange={(event) => setProgram(event.target.value)} placeholder="powershell.exe / bash" /></label>
                   <label><span className="field-label">{t.arguments}</span><textarea value={argumentsText} onChange={(event) => setArgumentsText(event.target.value)} placeholder={t.argumentPlaceholder} /></label>
                   <label><span className="field-label">{t.cwd}</span><input value={cwd} onChange={(event) => setCwd(event.target.value)} /></label>
                 </div>
-                <button className="primary-button" disabled={submitting || !program.trim()} onClick={() => void runCommand()}>{submitting ? t.runningCommand : t.runCommand}<span>→</span></button>
+                <button className="primary-button" disabled={submitting || !selected.connected || !program.trim()} onClick={() => void runCommand()}>{submitting ? t.runningCommand : t.runCommand}<span>→</span></button>
               </>
             ) : <div className="empty-panel"><span>↗</span><strong>{t.selectDevice}</strong><p>{t.selectDeviceHint}</p></div>}
           </section>
@@ -243,6 +325,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
                 <div className="output-meta">{selectedTask.deviceCode}</div>
                 <pre>{selectedTask.stdout || (!selectedTask.stderr && t.waitingOutput)}</pre>
                 {selectedTask.stderr && <pre className="stderr-output">{selectedTask.stderr}</pre>}
+                {!selectedTask.complete && <button className="quiet-button" onClick={() => void refreshTask(selectedTask.id)}>{t.loadMoreOutput}</button>}
               </div>
             </div>
           )}

@@ -1,6 +1,7 @@
 mod credential;
 mod device;
 mod event;
+mod remembered;
 mod store;
 #[cfg(test)]
 mod store_tests;
@@ -37,8 +38,45 @@ pub use credential::{
     MemoryDevicePasswordProvider, RuntimeCredentialError,
 };
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
+pub use remembered::RememberedDevice;
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
+
+pub struct BridgeLocalStore {
+    store: RuntimeStore,
+}
+
+impl BridgeLocalStore {
+    pub async fn open(path: &std::path::Path) -> Result<Self, RuntimeStoreError> {
+        Ok(Self {
+            store: RuntimeStore::open(path).await?,
+        })
+    }
+
+    pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeStoreError> {
+        self.store.remembered_devices().await
+    }
+
+    pub async fn tasks(&self) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
+        self.store.list().await
+    }
+
+    pub async fn task(&self, task_ref: TaskRef) -> Result<LocalTaskRecord, RuntimeStoreError> {
+        self.store.get_by_task(task_ref).await
+    }
+
+    pub async fn read_output(
+        &self,
+        task_ref: TaskRef,
+        stream: OutputStream,
+        offset: u64,
+        max_bytes: u32,
+    ) -> Result<(OutputChunk, OutputRange), RuntimeStoreError> {
+        self.store
+            .read_output(task_ref, stream, offset, max_bytes)
+            .await
+    }
+}
 
 const DEFAULT_RETRY_INTERVAL: Duration = Duration::from_secs(3);
 const DEFAULT_EVENT_BUFFER: usize = 1_024;
@@ -48,6 +86,7 @@ pub struct BridgeRuntimeConfig {
     pub database_path: PathBuf,
     pub retry_interval: Duration,
     pub event_buffer: usize,
+    pub resume_incomplete_on_start: bool,
 }
 
 impl BridgeRuntimeConfig {
@@ -56,6 +95,7 @@ impl BridgeRuntimeConfig {
             database_path: database_path.into(),
             retry_interval: DEFAULT_RETRY_INTERVAL,
             event_buffer: DEFAULT_EVENT_BUFFER,
+            resume_incomplete_on_start: true,
         }
     }
 
@@ -140,8 +180,10 @@ impl BridgeRuntime {
             shutdown,
             bridge_task,
         };
-        for record in runtime.inner.store.incomplete().await? {
-            runtime.start_record(record, None).await?;
+        if runtime_config.resume_incomplete_on_start {
+            for record in runtime.inner.store.incomplete().await? {
+                runtime.start_record(record, None).await?;
+            }
         }
         Ok(runtime)
     }
@@ -347,6 +389,33 @@ impl BridgeRuntime {
 
     pub async fn tasks(&self) -> Result<Vec<LocalTaskRecord>, RuntimeError> {
         Ok(self.inner.store.list().await?)
+    }
+
+    pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeError> {
+        Ok(self.inner.store.remembered_devices().await?)
+    }
+
+    pub async fn remember_device(&self, device: &RememberedDevice) -> Result<(), RuntimeError> {
+        Ok(self.inner.store.remember_device(device).await?)
+    }
+
+    pub async fn rename_device(&self, code: DeviceCode, alias: &str) -> Result<(), RuntimeError> {
+        Ok(self.inner.store.rename_device(code, alias).await?)
+    }
+
+    pub async fn resume_incomplete_for_device(
+        &self,
+        device_ref: DeviceRef,
+    ) -> Result<(), RuntimeError> {
+        for record in self.inner.store.incomplete().await? {
+            if record.device_ref == device_ref {
+                match self.start_record(record, None).await {
+                    Ok(()) | Err(RuntimeError::OperationAlreadyRunning(_)) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Ok(())
     }
 
     pub async fn events_after(

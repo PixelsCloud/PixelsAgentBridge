@@ -11,6 +11,7 @@ import zipfile
 root = Path(__file__).resolve().parents[2]
 scripts = Path(__file__).resolve().parent
 parser = ArgumentParser(description=__doc__)
+parser.add_argument("--platform", choices=("all", "windows", "linux"), default="all")
 parser.add_argument("--windows-bin-dir", type=Path, default=root / "target" / "release")
 parser.add_argument(
     "--windows-desktop-bin",
@@ -64,11 +65,12 @@ def package_unix(platform, architecture, binaries):
     return archive_path
 
 
-archives = [
-    package_windows(),
-    package_unix("linux", "x86_64", args.linux_bin_dir),
-]
-if args.macos_bin_dir is not None:
+archives = []
+if args.platform in ("all", "windows"):
+    archives.append(package_windows())
+if args.platform in ("all", "linux"):
+    archives.append(package_unix("linux", "x86_64", args.linux_bin_dir))
+if args.platform == "all" and args.macos_bin_dir is not None:
     archives.append(package_unix("macos", "aarch64", args.macos_bin_dir))
 
 manifest = {}

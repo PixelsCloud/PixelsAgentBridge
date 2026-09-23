@@ -112,6 +112,9 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .os-banner span { color: #68877b; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .form-hint { margin-top: 12px; }
 .command-fields { display: grid; gap: 13px; margin: 17px 0; }
+.device-alias-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.device-alias-row input { min-width: 0; flex: 1; }
+.device-alias-row .quiet-button { flex: none; margin-top: 0; }
 .command-fields textarea { height: 62px; resize: none; }
 .remote-command .primary-button { align-self: flex-end; min-width: 130px; }
 .empty-panel { display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; min-height: 0; color: #75909e; text-align: center; }

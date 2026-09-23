@@ -10,7 +10,7 @@ use sqlx::{
 };
 use thiserror::Error;
 
-const DATABASE_SCHEMA_VERSION: i64 = 1;
+const DATABASE_SCHEMA_VERSION: i64 = 2;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,7 +37,7 @@ impl LocalTaskRecord {
 
 #[derive(Clone)]
 pub(super) struct RuntimeStore {
-    pool: SqlitePool,
+    pub(super) pool: SqlitePool,
 }
 
 pub(super) struct OutputGap {
@@ -99,6 +99,26 @@ impl RuntimeStore {
                 sqlx::query(statement).execute(&mut *tx).await?;
             }
             sqlx::query("PRAGMA user_version = 1")
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+        }
+        if schema_version < 2 {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                r#"
+                CREATE TABLE remembered_devices (
+                    device_ref_json TEXT PRIMARY KEY,
+                    device_code TEXT NOT NULL UNIQUE,
+                    alias TEXT NOT NULL DEFAULT '',
+                    os_family_json TEXT NOT NULL,
+                    os_reminder TEXT NOT NULL
+                )
+                "#,
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("PRAGMA user_version = 2")
                 .execute(&mut *tx)
                 .await?;
             tx.commit().await?;

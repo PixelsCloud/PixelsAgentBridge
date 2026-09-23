@@ -1,5 +1,5 @@
 use pab_protocol::{
-    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeploymentId, DeviceId, DeviceRef,
+    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeploymentId, DeviceCode, DeviceId, DeviceRef,
     ExecutionContext, ExecutionScope, ExpectedEnvironment, OsFamily, OutputAvailability,
     OutputChunk, OutputRange, OutputStream, PathStyle, RequestId, TASK_SCHEMA_VERSION,
     TaskCompletion, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot, TaskState, TenantId,
@@ -7,7 +7,72 @@ use pab_protocol::{
 };
 use tempfile::tempdir;
 
+use super::RememberedDevice;
 use super::store::*;
+
+#[tokio::test]
+async fn remembers_device_name_across_reconnect_and_reopen() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    let mut device = RememberedDevice {
+        device_ref: device_ref(),
+        code: DeviceCode::new(123_456_789).unwrap(),
+        alias: String::new(),
+        os_family: OsFamily::Linux,
+        os_reminder: "Linux shell".to_owned(),
+    };
+    store.remember_device(&device).await.unwrap();
+    store.rename_device(device.code, "SG Linux").await.unwrap();
+    device.os_reminder = "Linux bash".to_owned();
+    store.remember_device(&device).await.unwrap();
+    store.close().await;
+
+    let reopened = RuntimeStore::open(&path).await.unwrap();
+    let remembered = reopened.remembered_devices().await.unwrap();
+    assert_eq!(remembered.len(), 1);
+    assert_eq!(remembered[0].alias, "SG Linux");
+    assert_eq!(remembered[0].os_reminder, "Linux bash");
+    assert_eq!(remembered[0].device_ref, device.device_ref);
+}
+
+#[tokio::test]
+async fn upgrades_existing_task_database_without_losing_records() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    let request_id = RequestId::from_u128(910);
+    store
+        .record_pending(device_ref(), request_id, &command())
+        .await
+        .unwrap();
+    store.close().await;
+
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(&path)
+        .create_if_missing(false);
+    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
+    sqlx::query("DROP TABLE remembered_devices")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("PRAGMA user_version = 1")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+
+    let migrated = RuntimeStore::open(&path).await.unwrap();
+    assert_eq!(
+        migrated
+            .get_by_request(request_id)
+            .await
+            .unwrap()
+            .device_ref,
+        device_ref()
+    );
+    assert!(migrated.remembered_devices().await.unwrap().is_empty());
+}
 
 #[tokio::test]
 async fn persists_submission_events_output_and_resume_cursor() {
