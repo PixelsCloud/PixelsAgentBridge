@@ -22,6 +22,8 @@ const ENDPOINT_CHALLENGE_VALIDITY: Duration = Duration::from_secs(30);
 enum PendingRegistration {
     User,
     Device { name: String },
+    UnclaimedDevice { name: String },
+    Guest,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +75,20 @@ impl ControlSession {
             ControlClientMessage::Login {
                 username, password, ..
             } => self.login(request_id, &username, &password).await,
+            ControlClientMessage::BeginUnclaimedDeviceRegistration {
+                endpoint_key, name, ..
+            } => self
+                .begin_unclaimed_device_registration(endpoint_key, name)
+                .map(|challenge| ControlServerMessage::EndpointChallenge {
+                    request_id,
+                    challenge,
+                }),
+            ControlClientMessage::BeginGuestEndpointRegistration { endpoint_key, .. } => self
+                .begin_guest_registration(endpoint_key)
+                .map(|challenge| ControlServerMessage::EndpointChallenge {
+                    request_id,
+                    challenge,
+                }),
             ControlClientMessage::BeginEndpointRegistration {
                 tenant_id,
                 endpoint_key,
@@ -241,6 +257,55 @@ impl ControlSession {
         Ok(challenge)
     }
 
+    fn begin_unclaimed_device_registration(
+        &mut self,
+        endpoint_key: EndpointKey,
+        name: String,
+    ) -> Result<pab_protocol::EndpointProofChallenge, ControlSessionError> {
+        if self.is_authenticated() {
+            return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
+        }
+        let challenge = self.proof_session.issue(
+            EndpointProofPrincipal::Device {
+                device_id: pab_protocol::DeviceId::new(),
+            },
+            pab_protocol::TenantId::new(),
+            endpoint_key,
+            EndpointProofPurpose::RegisterUnclaimedDevice,
+            OffsetDateTime::now_utc(),
+            ENDPOINT_CHALLENGE_VALIDITY,
+        )?;
+        self.pending_proof = Some(PendingProof::Registration(
+            PendingRegistration::UnclaimedDevice { name },
+        ));
+        Ok(challenge)
+    }
+
+    fn begin_guest_registration(
+        &mut self,
+        endpoint_key: EndpointKey,
+    ) -> Result<pab_protocol::EndpointProofChallenge, ControlSessionError> {
+        if self.is_authenticated() {
+            return Err(ControlSessionError::AlreadyAuthenticated);
+        }
+        if self.pending_proof.is_some() {
+            return Err(ControlSessionError::ProofPending);
+        }
+        let challenge = self.proof_session.issue(
+            EndpointProofPrincipal::Guest,
+            pab_protocol::TenantId::new(),
+            endpoint_key,
+            EndpointProofPurpose::RegisterGuestEndpoint,
+            OffsetDateTime::now_utc(),
+            ENDPOINT_CHALLENGE_VALIDITY,
+        )?;
+        self.pending_proof = Some(PendingProof::Registration(PendingRegistration::Guest));
+        Ok(challenge)
+    }
+
     async fn complete_endpoint_registration(
         &mut self,
         response: pab_protocol::EndpointProofResponse,
@@ -271,6 +336,22 @@ impl ControlSession {
                     tenant_id,
                     device_id: device.id,
                     device_code: device.code,
+                    endpoint_key,
+                })
+            }
+            PendingRegistration::UnclaimedDevice { name } => {
+                let device = self.control.register_unclaimed_device(proof, &name).await?;
+                Ok(EndpointRegistrationResult::Device {
+                    tenant_id: device.tenant_id,
+                    device_id: device.id,
+                    device_code: device.code,
+                    endpoint_key,
+                })
+            }
+            PendingRegistration::Guest => {
+                let tenant_id = self.control.register_guest_endpoint(proof).await?;
+                Ok(EndpointRegistrationResult::Guest {
+                    tenant_id,
                     endpoint_key,
                 })
             }

@@ -23,6 +23,7 @@ impl PostgresStore {
                   (e.owner_kind = 'user' AND u.status = 'active' AND m.status = 'active')
                   OR
                   (e.owner_kind = 'device' AND device.status = 'active')
+                  OR (e.owner_kind = 'guest' AND tenant.kind = 'guest')
               )
             "#,
         )
@@ -39,6 +40,7 @@ impl PostgresStore {
             "device" => EndpointProofPrincipal::Device {
                 device_id: DeviceId::from_uuid(row.try_get("device_id")?),
             },
+            "guest" => EndpointProofPrincipal::Guest,
             other => {
                 return Err(StoreError::InvalidData(format!(
                     "unknown endpoint owner kind {other}"

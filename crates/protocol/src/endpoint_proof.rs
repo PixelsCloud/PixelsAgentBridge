@@ -51,6 +51,8 @@ pub enum EndpointProofPurpose {
     RegisterUserEndpoint,
     RegisterDevice,
     AuthenticateRegisteredEndpoint,
+    RegisterUnclaimedDevice,
+    RegisterGuestEndpoint,
 }
 
 impl EndpointProofPurpose {
@@ -59,6 +61,8 @@ impl EndpointProofPurpose {
             Self::RegisterUserEndpoint => 1,
             Self::RegisterDevice => 2,
             Self::AuthenticateRegisteredEndpoint => 3,
+            Self::RegisterUnclaimedDevice => 4,
+            Self::RegisterGuestEndpoint => 5,
         }
     }
 }
@@ -68,6 +72,7 @@ impl EndpointProofPurpose {
 pub enum EndpointProofPrincipal {
     User { user_id: UserId },
     Device { device_id: DeviceId },
+    Guest,
 }
 
 impl EndpointProofPrincipal {
@@ -81,6 +86,7 @@ impl EndpointProofPrincipal {
                 context.push(2);
                 context.extend_from_slice(device_id.as_uuid().as_bytes());
             }
+            Self::Guest => context.push(3),
         }
     }
 }

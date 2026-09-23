@@ -20,8 +20,8 @@ use pab_protocol::{
     DeviceNetworkUpdate, DeviceRef, DeviceTaskResponse, EndpointAuthenticationResult,
     EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
     EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
-    ExecutionScope, ExpectedEnvironment, InterpreterContext, OsFamily, PathStyle,
-    RelayLimitDefaults, RequestId, TaskState, UserId,
+    ExecutionScope, ExpectedEnvironment, InterpreterContext, OperatorRef, OsFamily, PathStyle,
+    RelayLimitDefaults, RequestId, TaskState,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -47,7 +47,7 @@ async fn connect_device_over_bridge(
     device_ref: DeviceRef,
     password: &str,
 ) -> (
-    Result<(DeviceRef, UserId, u64, i64), BridgeError>,
+    Result<(DeviceRef, OperatorRef, u64, i64), BridgeError>,
     Result<(), DeviceSessionError>,
 ) {
     let client = async {
@@ -56,7 +56,7 @@ async fn connect_device_over_bridge(
             .await?;
         let result = (
             connection.device_ref(),
-            connection.peer_user_id(),
+            connection.operator(),
             connection.password_version(),
             connection.authenticated_at_unix_ms(),
         );
@@ -647,7 +647,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let authorized_peer = peer_authorizer.authorize(peer_endpoint_key).await.unwrap();
     assert_eq!(authorized_peer.device_ref, device_ref);
     assert_eq!(authorized_peer.peer_endpoint_key, peer_endpoint_key);
-    assert_eq!(authorized_peer.peer_user_id, user_id);
+    assert_eq!(authorized_peer.operator, OperatorRef::Account(user_id));
     bridge_connection.close().await.unwrap();
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -917,10 +917,10 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         accepted_server.is_ok(),
         "device server rejected valid authentication: {accepted_server:?}"
     );
-    let (accepted_device, peer_user_id, password_version, authenticated_at_unix_ms) =
+    let (accepted_device, operator, password_version, authenticated_at_unix_ms) =
         accepted.expect("Bridge accepts the authenticated device session");
     assert_eq!(accepted_device, device_ref);
-    assert_eq!(peer_user_id, user_id);
+    assert_eq!(operator, OperatorRef::Account(user_id));
     assert_eq!(password_version, 7);
     assert!(authenticated_at_unix_ms > 0);
 

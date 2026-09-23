@@ -189,6 +189,39 @@ impl ControlPlane {
         Ok(endpoint)
     }
 
+    pub async fn register_unclaimed_device(
+        &self,
+        proof: VerifiedEndpointProof,
+        name: &str,
+    ) -> Result<Device, ServiceError> {
+        if proof.purpose() != EndpointProofPurpose::RegisterUnclaimedDevice {
+            return Err(ServiceError::WrongEndpointProofPurpose);
+        }
+        let EndpointProofPrincipal::Device { device_id } = proof.principal() else {
+            return Err(ServiceError::WrongEndpointProofPrincipal);
+        };
+        Ok(self
+            .store
+            .register_unclaimed_device(proof.tenant_id(), device_id, name, proof.endpoint_key())
+            .await?)
+    }
+
+    pub async fn register_guest_endpoint(
+        &self,
+        proof: VerifiedEndpointProof,
+    ) -> Result<TenantId, ServiceError> {
+        if proof.purpose() != EndpointProofPurpose::RegisterGuestEndpoint {
+            return Err(ServiceError::WrongEndpointProofPurpose);
+        }
+        if proof.principal() != EndpointProofPrincipal::Guest {
+            return Err(ServiceError::WrongEndpointProofPrincipal);
+        }
+        Ok(self
+            .store
+            .register_guest_endpoint(proof.tenant_id(), proof.endpoint_key())
+            .await?)
+    }
+
     pub async fn registered_endpoint(
         &self,
         endpoint_key: pab_protocol::EndpointKey,

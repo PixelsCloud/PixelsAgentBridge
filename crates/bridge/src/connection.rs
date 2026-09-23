@@ -10,9 +10,9 @@ use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
     DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
     DeviceSessionAuthenticationResult, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
-    EndpointProofPrincipal, MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OutputStream,
-    RequestId, TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef, TaskSnapshot,
-    UserId,
+    EndpointProofPrincipal, MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef,
+    OutputStream, RequestId, TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef,
+    TaskSnapshot,
 };
 use pab_transport::{
     PabConnection, PabConnectionError, PabEndpoint, PabEndpointAddress, PabEndpointConfig,
@@ -157,18 +157,18 @@ impl BridgeConnector {
         match result {
             DeviceSessionAuthenticationResult::Accepted {
                 device_ref: accepted_device,
-                peer_user_id,
+                operator,
                 password_version,
                 authenticated_at_unix_ms,
             } if accepted_device == device_ref
-                && peer_user_id == self.config.user_id
+                && operator == OperatorRef::Account(self.config.user_id)
                 && password_version > 0
                 && authenticated_at_unix_ms > 0 =>
             {
                 Ok(AuthenticatedDeviceConnection {
                     connection,
                     device_ref,
-                    peer_user_id,
+                    operator,
                     password_version,
                     authenticated_at_unix_ms,
                     operation_timeout: self.config.operation_timeout,
@@ -190,7 +190,7 @@ impl BridgeConnector {
 pub struct AuthenticatedDeviceConnection {
     connection: PabConnection,
     device_ref: DeviceRef,
-    peer_user_id: UserId,
+    operator: OperatorRef,
     password_version: u64,
     authenticated_at_unix_ms: i64,
     operation_timeout: std::time::Duration,
@@ -201,8 +201,8 @@ impl AuthenticatedDeviceConnection {
         self.device_ref
     }
 
-    pub const fn peer_user_id(&self) -> UserId {
-        self.peer_user_id
+    pub const fn operator(&self) -> OperatorRef {
+        self.operator
     }
 
     pub const fn password_version(&self) -> u64 {
@@ -252,7 +252,7 @@ impl AuthenticatedDeviceConnection {
                 if valid_snapshot(
                     &snapshot,
                     self.device_ref,
-                    self.peer_user_id,
+                    self.operator,
                     Some(request_id),
                     None,
                 ) =>
@@ -276,7 +276,7 @@ impl AuthenticatedDeviceConnection {
                 if valid_snapshot(
                     &snapshot,
                     self.device_ref,
-                    self.peer_user_id,
+                    self.operator,
                     None,
                     Some(task_ref),
                 ) =>
@@ -343,7 +343,7 @@ impl AuthenticatedDeviceConnection {
                 if valid_snapshot(
                     &snapshot,
                     self.device_ref,
-                    self.peer_user_id,
+                    self.operator,
                     None,
                     Some(task_ref),
                 ) =>
@@ -378,7 +378,7 @@ impl AuthenticatedDeviceConnection {
         Ok(TaskSubscription {
             stream,
             task_ref,
-            initiated_by: self.peer_user_id,
+            initiated_by: self.operator,
         })
     }
 
@@ -416,7 +416,7 @@ impl AuthenticatedDeviceConnection {
 pub struct TaskSubscription {
     stream: pab_transport::PabBiStream,
     task_ref: TaskRef,
-    initiated_by: UserId,
+    initiated_by: OperatorRef,
 }
 
 impl TaskSubscription {
@@ -469,13 +469,13 @@ impl TaskSubscription {
 fn valid_snapshot(
     snapshot: &TaskSnapshot,
     device_ref: DeviceRef,
-    initiated_by: UserId,
+    initiated_by: OperatorRef,
     request_id: Option<RequestId>,
     task_ref: Option<TaskRef>,
 ) -> bool {
     snapshot.schema_version == TASK_SCHEMA_VERSION
         && snapshot.task_ref.device_ref == device_ref
-        && snapshot.initiated_by == initiated_by.into()
+        && snapshot.initiated_by == initiated_by
         && request_id.is_none_or(|expected| snapshot.request_id == expected)
         && task_ref.is_none_or(|expected| snapshot.task_ref == expected)
 }

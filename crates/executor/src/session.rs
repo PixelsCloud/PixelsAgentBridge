@@ -134,7 +134,7 @@ async fn authenticate(
         .send_json(
             &DeviceSessionAuthenticationResult::Accepted {
                 device_ref,
-                peer_user_id: authorized.peer_user_id,
+                operator: authorized.operator,
                 password_version: credential.password_version(),
                 authenticated_at_unix_ms: unix_millis(SystemTime::now())?,
             },
@@ -146,11 +146,9 @@ async fn authenticate(
             match connection.accept_bi(timeout).await {
                 Ok(stream) => {
                     let tasks = tasks.clone();
-                    let initiated_by = authorized.peer_user_id;
+                    let initiated_by = authorized.operator;
                     tokio::spawn(async move {
-                        if let Err(error) = tasks
-                            .handle_stream(initiated_by.into(), stream, timeout)
-                            .await
+                        if let Err(error) = tasks.handle_stream(initiated_by, stream, timeout).await
                             && !error.is_connection_end()
                         {
                             eprintln!("pab-executor: task_stream={error}");

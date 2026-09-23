@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{DeviceRef, EndpointKey, UserId};
+use crate::{DeviceRef, EndpointKey, OperatorRef};
 
 pub const DEVICE_SESSION_AUTH_SCHEMA_VERSION: u16 = 1;
 pub const MAX_DEVICE_PASSWORD_BYTES: usize = 1_024;
@@ -9,7 +9,7 @@ pub const MAX_DEVICE_PASSWORD_BYTES: usize = 1_024;
 pub struct AuthorizedDevicePeer {
     pub device_ref: DeviceRef,
     pub peer_endpoint_key: EndpointKey,
-    pub peer_user_id: UserId,
+    pub operator: OperatorRef,
     pub authorized_at_unix_ms: i64,
 }
 
@@ -25,7 +25,7 @@ pub struct DeviceSessionAuthenticate {
 pub enum DeviceSessionAuthenticationResult {
     Accepted {
         device_ref: DeviceRef,
-        peer_user_id: UserId,
+        operator: OperatorRef,
         password_version: u64,
         authenticated_at_unix_ms: i64,
     },

@@ -20,6 +20,15 @@ pub enum ControlClientMessage {
         username: String,
         password: String,
     },
+    BeginUnclaimedDeviceRegistration {
+        request_id: RequestId,
+        endpoint_key: EndpointKey,
+        name: String,
+    },
+    BeginGuestEndpointRegistration {
+        request_id: RequestId,
+        endpoint_key: EndpointKey,
+    },
     BeginEndpointRegistration {
         request_id: RequestId,
         tenant_id: TenantId,
@@ -72,6 +81,8 @@ impl ControlClientMessage {
         match self {
             Self::RegisterAccount { request_id, .. }
             | Self::Login { request_id, .. }
+            | Self::BeginUnclaimedDeviceRegistration { request_id, .. }
+            | Self::BeginGuestEndpointRegistration { request_id, .. }
             | Self::BeginEndpointRegistration { request_id, .. }
             | Self::CompleteEndpointRegistration { request_id, .. }
             | Self::BeginEndpointAuthentication { request_id, .. }
@@ -166,6 +177,10 @@ pub enum EndpointRegistrationResult {
         tenant_id: TenantId,
         device_id: DeviceId,
         device_code: DeviceCode,
+        endpoint_key: EndpointKey,
+    },
+    Guest {
+        tenant_id: TenantId,
         endpoint_key: EndpointKey,
     },
 }

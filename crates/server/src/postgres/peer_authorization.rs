@@ -62,7 +62,9 @@ impl PostgresStore {
                 device_id,
             },
             peer_endpoint_key,
-            peer_user_id: UserId::from_uuid(row.try_get("user_id")?),
+            operator: pab_protocol::OperatorRef::Account(UserId::from_uuid(
+                row.try_get("user_id")?,
+            )),
             authorized_at_unix_ms: support::unix_millis(OffsetDateTime::now_utc())?,
         })
     }
