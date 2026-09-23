@@ -8,9 +8,9 @@ use std::{
 use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceTaskErrorCode,
     DeviceTaskRequest, DeviceTaskResponse, ExecutionContext, MAX_COMMAND_ARGUMENT_BYTES,
-    MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES, OutputStream,
-    TargetContext, TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
-    UserId,
+    MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef,
+    OutputStream, TargetContext, TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef,
+    TaskSnapshot,
 };
 use pab_task_runtime::TaskRuntimeError;
 use pab_transport::{PabBiStream, PabConnectionError};
@@ -69,7 +69,7 @@ impl TaskService {
 
     pub async fn handle_stream(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         mut stream: PabBiStream,
         timeout: Duration,
     ) -> Result<(), TaskServiceError> {
@@ -114,7 +114,7 @@ impl TaskService {
 
     async fn handle_request(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         request: DeviceTaskRequest,
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
@@ -179,7 +179,7 @@ impl TaskService {
 
     async fn submit_command(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         request_id: pab_protocol::RequestId,
         command: CommandTaskSpec,
     ) -> Result<TaskSnapshot, TaskServiceError> {
@@ -250,7 +250,7 @@ impl TaskService {
 
     async fn cancel(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         reason: String,
     ) -> Result<TaskSnapshot, TaskServiceError> {

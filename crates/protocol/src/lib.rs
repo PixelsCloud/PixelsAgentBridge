@@ -6,6 +6,7 @@ mod device_code;
 mod device_network;
 mod endpoint_proof;
 mod ids;
+mod operator;
 mod peer;
 mod platform;
 mod relay_control;
@@ -32,6 +33,7 @@ pub use ids::{
     ChallengeId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId, TaskId,
     TenantId, UserId,
 };
+pub use operator::OperatorRef;
 pub use peer::{
     AuthorizedDevicePeer, DEVICE_SESSION_AUTH_SCHEMA_VERSION, DeviceSessionAuthenticate,
     DeviceSessionAuthenticationResult, MAX_DEVICE_PASSWORD_BYTES,

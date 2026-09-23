@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use pab_protocol::{DeviceTaskResponse, MAX_OUTPUT_READ_BYTES, OutputStream, TaskRef, UserId};
+use pab_protocol::{DeviceTaskResponse, MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, TaskRef};
 use pab_transport::PabBiStream;
 use tokio::sync::broadcast;
 
@@ -10,7 +10,7 @@ impl TaskService {
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn subscribe_stream(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         mut event_seq: u64,
         mut stdout_offset: u64,
@@ -88,7 +88,7 @@ impl TaskService {
     #[allow(clippy::too_many_arguments)]
     async fn catch_up(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         event_seq: &mut u64,
         stdout_offset: &mut u64,
@@ -146,7 +146,7 @@ impl TaskService {
 
     async fn catch_up_output(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         output_stream: OutputStream,
         offset: &mut u64,

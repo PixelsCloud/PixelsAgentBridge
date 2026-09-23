@@ -475,7 +475,7 @@ fn valid_snapshot(
 ) -> bool {
     snapshot.schema_version == TASK_SCHEMA_VERSION
         && snapshot.task_ref.device_ref == device_ref
-        && snapshot.initiated_by == initiated_by
+        && snapshot.initiated_by == initiated_by.into()
         && request_id.is_none_or(|expected| snapshot.request_id == expected)
         && task_ref.is_none_or(|expected| snapshot.task_ref == expected)
 }

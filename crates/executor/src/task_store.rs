@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use pab_protocol::{
-    CapabilityRef, CommandTaskSpec, DeviceRef, OutputChunk, OutputRange, OutputStream, RequestId,
-    TASK_SCHEMA_VERSION, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot, UserId,
+    CapabilityRef, CommandTaskSpec, DeviceRef, OperatorRef, OutputChunk, OutputRange, OutputStream,
+    RequestId, TASK_SCHEMA_VERSION, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
 };
 use pab_task_runtime::{AcceptedTask, TaskAggregate, TaskRuntimeError};
 use sqlx::{
@@ -122,7 +122,7 @@ impl TaskStore {
     pub async fn accept_command(
         &self,
         device_ref: DeviceRef,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         request_id: RequestId,
         command: &CommandTaskSpec,
         execution_context: pab_protocol::ExecutionContext,
@@ -132,7 +132,7 @@ impl TaskStore {
         if let Some(row) = sqlx::query(
             "SELECT snapshot_json, command_json FROM task_records WHERE initiated_by = ? AND request_id = ?",
         )
-        .bind(initiated_by.to_string())
+        .bind(initiated_by.storage_key())
         .bind(request_id.to_string())
         .fetch_optional(&mut *tx)
         .await?
@@ -167,7 +167,7 @@ impl TaskStore {
             "INSERT INTO task_records (task_id, initiated_by, request_id, snapshot_json, command_json) VALUES (?, ?, ?, ?, ?)",
         )
         .bind(task_ref.task_id.to_string())
-        .bind(initiated_by.to_string())
+        .bind(initiated_by.storage_key())
         .bind(request_id.to_string())
         .bind(serde_json::to_string(&snapshot)?)
         .bind(serde_json::to_string(command)?)
@@ -189,14 +189,14 @@ impl TaskStore {
 
     pub async fn get_task(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
     ) -> Result<TaskSnapshot, TaskStoreError> {
         let row = sqlx::query(
             "SELECT snapshot_json FROM task_records WHERE task_id = ? AND initiated_by = ?",
         )
         .bind(task_ref.task_id.to_string())
-        .bind(initiated_by.to_string())
+        .bind(initiated_by.storage_key())
         .fetch_optional(&self.pool)
         .await?
         .ok_or(TaskStoreError::NotFound)?;
@@ -209,7 +209,7 @@ impl TaskStore {
 
     pub async fn events_after(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         after_seq: u64,
     ) -> Result<Vec<TaskEvent>, TaskStoreError> {
@@ -307,7 +307,7 @@ impl TaskStore {
 
     pub async fn read_output(
         &self,
-        initiated_by: UserId,
+        initiated_by: OperatorRef,
         task_ref: TaskRef,
         stream: OutputStream,
         offset: u64,

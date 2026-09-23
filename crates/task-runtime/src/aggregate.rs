@@ -1,6 +1,6 @@
 use pab_protocol::{
-    CapabilityRef, ExecutionContext, OutputAvailability, OutputRange, OutputStream, RequestId,
-    TASK_SCHEMA_VERSION, TaskEvent, TaskEventKind, TaskRef, TaskSnapshot, TaskState, UserId,
+    CapabilityRef, ExecutionContext, OperatorRef, OutputAvailability, OutputRange, OutputStream,
+    RequestId, TASK_SCHEMA_VERSION, TaskEvent, TaskEventKind, TaskRef, TaskSnapshot, TaskState,
 };
 use thiserror::Error;
 
@@ -10,7 +10,7 @@ use crate::validation;
 pub struct AcceptedTask {
     pub task_ref: TaskRef,
     pub request_id: RequestId,
-    pub initiated_by: UserId,
+    pub initiated_by: OperatorRef,
     pub capability: CapabilityRef,
     pub display_summary: String,
     pub execution_context: ExecutionContext,

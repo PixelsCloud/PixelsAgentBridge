@@ -148,7 +148,9 @@ async fn authenticate(
                     let tasks = tasks.clone();
                     let initiated_by = authorized.peer_user_id;
                     tokio::spawn(async move {
-                        if let Err(error) = tasks.handle_stream(initiated_by, stream, timeout).await
+                        if let Err(error) = tasks
+                            .handle_stream(initiated_by.into(), stream, timeout)
+                            .await
                             && !error.is_connection_end()
                         {
                             eprintln!("pab-executor: task_stream={error}");

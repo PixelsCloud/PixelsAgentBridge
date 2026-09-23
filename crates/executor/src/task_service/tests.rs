@@ -26,11 +26,11 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let request_id = RequestId::from_u128(4);
     let command = test_command(&context);
     let accepted = service
-        .submit_command(UserId::from_u128(5), request_id, command.clone())
+        .submit_command(UserId::from_u128(5).into(), request_id, command.clone())
         .await
         .unwrap();
     let duplicate = service
-        .submit_command(UserId::from_u128(5), request_id, command)
+        .submit_command(UserId::from_u128(5).into(), request_id, command)
         .await
         .unwrap();
     assert_eq!(accepted.task_ref, duplicate.task_ref);
@@ -39,7 +39,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
         loop {
             let snapshot = service
                 .store
-                .get_task(UserId::from_u128(5), accepted.task_ref)
+                .get_task(UserId::from_u128(5).into(), accepted.task_ref)
                 .await
                 .unwrap();
             if snapshot.state.is_terminal() {
@@ -57,7 +57,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let (stdout, _) = service
         .store
         .read_output(
-            UserId::from_u128(5),
+            UserId::from_u128(5).into(),
             accepted.task_ref,
             OutputStream::Stdout,
             0,
@@ -68,7 +68,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let (stderr, _) = service
         .store
         .read_output(
-            UserId::from_u128(5),
+            UserId::from_u128(5).into(),
             accepted.task_ref,
             OutputStream::Stderr,
             0,
@@ -93,7 +93,7 @@ async fn reopening_marks_an_accepted_task_interrupted() {
         tenant_id: TenantId::from_u128(12),
         device_id: DeviceId::from_u128(13),
     };
-    let initiated_by = UserId::from_u128(14);
+    let initiated_by = UserId::from_u128(14).into();
     let store = TaskStore::open(&database).await.unwrap();
     let accepted = store
         .accept_command(
@@ -151,7 +151,7 @@ async fn active_task_limit_fails_new_work_but_preserves_request_deduplication() 
             .await
             .insert(TaskId::from_u128(value as u128 + 100), sender);
     }
-    let initiated_by = UserId::from_u128(24);
+    let initiated_by = UserId::from_u128(24).into();
     let request_id = RequestId::from_u128(25);
     let command = test_command(&context);
     let rejected = service
@@ -172,6 +172,62 @@ async fn active_task_limit_fails_new_work_but_preserves_request_deduplication() 
         .unwrap();
     assert_eq!(duplicate.task_ref, rejected.task_ref);
     assert_eq!(duplicate.state, TaskState::Failed);
+}
+
+#[tokio::test]
+async fn guest_task_history_is_isolated_by_endpoint_identity() {
+    let directory = tempfile::tempdir().unwrap();
+    let context = detect_native_execution_context().unwrap();
+    let device_ref = DeviceRef {
+        deployment_id: DeploymentId::from_u128(31),
+        tenant_id: TenantId::from_u128(32),
+        device_id: DeviceId::from_u128(33),
+    };
+    let store = TaskStore::open(&directory.path().join("tasks.sqlite3"))
+        .await
+        .unwrap();
+    let first_guest = pab_protocol::OperatorRef::guest(pab_protocol::EndpointKey::new([1; 32]));
+    let other_guest = pab_protocol::OperatorRef::guest(pab_protocol::EndpointKey::new([2; 32]));
+    let request_id = RequestId::from_u128(34);
+    let command = test_command(&context);
+    let first = store
+        .accept_command(
+            device_ref,
+            first_guest,
+            request_id,
+            &command,
+            context.clone(),
+            1_000,
+        )
+        .await
+        .unwrap();
+    let first_ref = match first {
+        AcceptTaskOutcome::Created(snapshot) => snapshot.task_ref,
+        AcceptTaskOutcome::Existing(_) => panic!("first task was not created"),
+    };
+    assert!(store.get_task(first_guest, first_ref).await.is_ok());
+    assert!(matches!(
+        store.get_task(other_guest, first_ref).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    assert!(matches!(
+        store
+            .get_task(UserId::from_u128(35).into(), first_ref)
+            .await,
+        Err(TaskStoreError::NotFound)
+    ));
+    let second = store
+        .accept_command(
+            device_ref,
+            other_guest,
+            request_id,
+            &command,
+            context,
+            1_001,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(second, AcceptTaskOutcome::Created(_)));
 }
 
 fn test_command(context: &ExecutionContext) -> CommandTaskSpec {

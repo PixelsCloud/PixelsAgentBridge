@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ContextFreshness, DeviceRef, ExecutionContext, RequestId, TargetContext, TargetContextSource,
-    TaskId, UserId,
+    ContextFreshness, DeviceRef, ExecutionContext, OperatorRef, RequestId, TargetContext,
+    TargetContextSource, TaskId,
 };
 
 pub const TASK_SCHEMA_VERSION: u16 = 1;
@@ -142,7 +142,7 @@ pub struct TaskSnapshot {
     pub schema_version: u16,
     pub task_ref: TaskRef,
     pub request_id: RequestId,
-    pub initiated_by: UserId,
+    pub initiated_by: OperatorRef,
     pub capability: CapabilityRef,
     pub display_summary: String,
     pub state: TaskState,

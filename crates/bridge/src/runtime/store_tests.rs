@@ -205,7 +205,7 @@ fn snapshot(device_ref: DeviceRef, request_id: RequestId) -> TaskSnapshot {
             task_id: TaskId::from_u128(5),
         },
         request_id,
-        initiated_by: UserId::from_u128(6),
+        initiated_by: UserId::from_u128(6).into(),
         capability: CapabilityRef {
             name: "process.exec".to_owned(),
             version: 1,
