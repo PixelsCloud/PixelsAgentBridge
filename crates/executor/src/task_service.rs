@@ -233,11 +233,12 @@ impl TaskService {
                 let service = self.clone();
                 tokio::spawn(async move {
                     if let Err(error) = service.run_command(task_ref, command, receiver).await {
-                        eprintln!("pab-executor: task={} error={error}", task_ref.task_id);
+                        tracing::error!(task_id = %task_ref.task_id, %error, "task failed");
                         if let Err(finalize_error) = service.finalize_worker_error(task_ref).await {
-                            eprintln!(
-                                "pab-executor: task={} finalize_error={finalize_error}",
-                                task_ref.task_id
+                            tracing::error!(
+                                task_id = %task_ref.task_id,
+                                %finalize_error,
+                                "task finalization failed"
                             );
                         }
                     }

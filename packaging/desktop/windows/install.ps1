@@ -53,6 +53,10 @@ foreach ($name in @('run-ui.ps1', 'run-executor.ps1', 'uninstall.ps1')) {
 if ($Executor) {
     $dataRoot = Join-Path $env:ProgramData 'PixelsAgentBridge'
     New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
+    & icacls.exe $dataRoot /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not protect the Executor data directory'
+    }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
         '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
         (Join-Path $InstallRoot 'run-executor.ps1') + '"'

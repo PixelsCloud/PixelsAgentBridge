@@ -2809,6 +2809,7 @@ dependencies = [
  "axum",
  "iroh-base",
  "pab-agent-core",
+ "pab-logging",
  "pab-protocol",
  "pab-transport",
  "rand_core 0.6.4",
@@ -2818,6 +2819,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
  "zeroize",
 ]
 
@@ -2828,6 +2830,7 @@ dependencies = [
  "argon2",
  "iroh-base",
  "pab-agent-core",
+ "pab-logging",
  "pab-platform",
  "pab-protocol",
  "pab-task-runtime",
@@ -2839,7 +2842,18 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "pab-logging"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2875,6 +2889,7 @@ dependencies = [
  "iroh-relay",
  "n0-future",
  "noq",
+ "pab-logging",
  "pab-protocol",
  "pab-transport",
  "rustls",
@@ -2884,6 +2899,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
+ "tracing",
  "webpki-roots 1.0.9",
 ]
 
@@ -2900,6 +2916,7 @@ dependencies = [
  "pab-agent-core",
  "pab-bridge",
  "pab-executor",
+ "pab-logging",
  "pab-platform",
  "pab-protocol",
  "pab-relay",
@@ -2916,6 +2933,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-tungstenite",
+ "tracing",
  "unicode-normalization",
  "url",
  "uuid",

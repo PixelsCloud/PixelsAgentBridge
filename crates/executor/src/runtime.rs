@@ -1,4 +1,8 @@
-use std::{fs, sync::Arc, time::SystemTime};
+use std::{
+    fs,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use pab_agent_core::{
     ControlConnectionPhase, DeviceHelloConfigError, DeviceNetworkConfigError,
@@ -28,7 +32,7 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let credential = DeviceCredential::read(&config.device_credential_file)?;
     let secret = read_endpoint_secret(&config.endpoint_secret_file)?;
     let endpoint = bind_endpoint(&config, secret.clone()).await?;
-    eprintln!("pab-executor: iroh_endpoint={}", endpoint.id());
+    tracing::info!(endpoint = %endpoint.id(), "iroh endpoint ready");
     let extra_ca = config
         .control_ca_cert
         .as_ref()
@@ -109,8 +113,8 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 }
             }
             incoming = endpoint.accept() => {
-                match incoming.map_err(ExecutorNetworkError::from)? {
-                    Some(connection) => {
+                match incoming {
+                    Ok(Some(connection)) => {
                         let Ok(permit) = session_limit.clone().try_acquire_owned() else {
                             connection.close(b"too many device sessions");
                             continue;
@@ -121,18 +125,22 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                             session_acceptor.handle(connection).await
                         });
                     }
-                    None => {
+                    Ok(None) => {
                         sessions.abort_all();
                         supervisor.shutdown().await?;
                         return Err(ExecutorError::EndpointClosed);
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "incoming connection failed; retrying in 3s");
+                        tokio::time::sleep(Duration::from_secs(3)).await;
                     }
                 }
             }
             completed = sessions.join_next(), if !sessions.is_empty() => {
                 match completed {
-                    Some(Ok(Err(error))) => eprintln!("pab-executor: device_session={error}"),
+                    Some(Ok(Err(error))) => tracing::warn!(%error, "device session failed"),
                     Some(Err(error)) if !error.is_cancelled() => {
-                        eprintln!("pab-executor: device_session_task={error}");
+                        tracing::error!(%error, "device session task failed");
                     }
                     _ => {}
                 }
@@ -142,15 +150,15 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
 }
 
 fn report_status(status: &pab_agent_core::ControlConnectionStatus) {
-    eprintln!(
-        "pab-executor: control={:?} generation={} failures={} retry_ms={:?}",
-        status.phase, status.generation, status.consecutive_failures, status.retry_in_ms
+    tracing::info!(
+        phase = ?status.phase,
+        generation = status.generation,
+        failures = status.consecutive_failures,
+        retry_ms = ?status.retry_in_ms,
+        "control connection status"
     );
     if let Some(failure) = &status.last_failure {
-        eprintln!(
-            "pab-executor: last_failure={:?}: {}",
-            failure.kind, failure.detail
-        );
+        tracing::warn!(kind = ?failure.kind, detail = %failure.detail, "control connection failure");
     }
 }
 

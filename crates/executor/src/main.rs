@@ -1,13 +1,26 @@
 use std::process::ExitCode;
 
+use pab_agent_core::{DataPaths, DataScope};
 use pab_executor::{approve_claim, bootstrapped_config, run_executor, show_access};
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let log_root = match DataPaths::for_scope(DataScope::Machine) {
+        Ok(paths) => paths.root().to_path_buf(),
+        Err(error) => {
+            eprintln!("pab-executor: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = pab_logging::init("executor", &log_root) {
+        eprintln!("pab-executor: {error}");
+        return ExitCode::FAILURE;
+    }
     if std::env::args().nth(1).as_deref() == Some("show-access") {
         return match show_access() {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
+                tracing::error!(%error, "show-access failed");
                 eprintln!("pab-executor: {error}");
                 ExitCode::FAILURE
             }
@@ -25,6 +38,7 @@ async fn main() -> ExitCode {
         return match approve_claim(claim_id).await {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
+                tracing::error!(%error, "approve-claim failed");
                 eprintln!("pab-executor: {error}");
                 ExitCode::FAILURE
             }
@@ -39,6 +53,7 @@ async fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            tracing::error!(%error, "executor failed");
             eprintln!("pab-executor: {error}");
             ExitCode::FAILURE
         }

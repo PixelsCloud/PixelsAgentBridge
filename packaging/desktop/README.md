@@ -1,12 +1,15 @@
-# Desktop Debug packages
+# Desktop Release packages
 
-Build the three binaries for each target with Cargo's Debug profile, then run
-`python packaging/desktop/build.py`. The packager uses the Windows binaries in
-`target/debug` and Linux binaries in `.build/guest-desktop-linux` by default.
+Build the three binaries for each target with `cargo build --locked --release`,
+then run `python packaging/desktop/build.py`. The release profile strips symbols.
+The packager uses Windows binaries in `target/release` and Linux binaries in
+`.build/guest-desktop-linux-release` by default. Build the Linux binaries with
+`docker build -f packaging/desktop/Dockerfile.linux --output
+type=local,dest=.build/guest-desktop-linux-release .` when building on Windows.
 It creates archives and a SHA-256 manifest in `.build/packages`.
 
 To package macOS after a native or CI build, pass `--macos-bin-dir PATH` with
-the three macOS Debug binaries. This path is prepared but has not been tested
+the three macOS Release binaries. This path is prepared but has not been tested
 on a Mac.
 
 For an operator, extract the archive and run `install.ps1` on Windows or
@@ -24,3 +27,8 @@ data directory. The password rotates when the Executor process starts again.
 `uninstall.ps1` and `uninstall.sh` remove application files and service
 registration. They leave the user and machine data directories untouched, so
 reinstalling retains device identity and local task history.
+
+Each process writes rotating logs under the persistent data directory's `logs`
+subdirectory. The active file plus four archives are limited to 16 MiB each.
+Set `PAB_LOG_DIR` to override the directory and `PAB_LOG_LEVEL` to adjust the
+filter. The temporary device password is never written to the log.

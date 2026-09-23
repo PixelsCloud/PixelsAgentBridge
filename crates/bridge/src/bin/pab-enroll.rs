@@ -9,9 +9,21 @@ use zeroize::Zeroizing;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let log_root = match DataPaths::for_scope(DataScope::User) {
+        Ok(paths) => paths.root().to_path_buf(),
+        Err(error) => {
+            eprintln!("pab-enroll: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(error) = pab_logging::init("enroll", &log_root) {
+        eprintln!("pab-enroll: {error}");
+        return ExitCode::FAILURE;
+    }
     match run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            tracing::error!(%error, "enrollment failed");
             eprintln!("pab-enroll: {error}");
             ExitCode::FAILURE
         }

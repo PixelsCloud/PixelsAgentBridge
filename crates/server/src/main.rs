@@ -8,9 +8,14 @@ use pab_server::{
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if let Err(error) = pab_logging::init("server", std::path::Path::new(".")) {
+        eprintln!("pab-server: {error}");
+        return ExitCode::FAILURE;
+    }
     match run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            tracing::error!(%error, "server failed");
             eprintln!("pab-server: {error}");
             ExitCode::FAILURE
         }
@@ -76,6 +81,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 relay_auth,
             );
             println!("TLS control service listening on {address}");
+            tracing::info!(%address, "TLS control service listening");
             serve_tls(address, certificate_path, private_key_path, state).await?;
         }
         _ => return Err("usage: pab-server [check|migrate|init|serve]".into()),

@@ -1,0 +1,18 @@
+FROM rust:1.95-bookworm AS builder
+
+WORKDIR /src
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/target \
+    cargo build --locked --release \
+        -p pab-executor --bin pab-executor \
+        -p pab-bridge --bin pab-bridge \
+        -p pab-bridge --bin pab-mcp \
+    && mkdir -p /out \
+    && cp /src/target/release/pab-executor /out/pab-executor \
+    && cp /src/target/release/pab-bridge /out/pab-bridge \
+    && cp /src/target/release/pab-mcp /out/pab-mcp
+
+FROM scratch
+COPY --from=builder /out/ /

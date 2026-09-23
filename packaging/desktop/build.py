@@ -1,4 +1,4 @@
-"""Package already-built Debug desktop binaries without rebuilding them."""
+"""Package already-built stripped Release desktop binaries."""
 
 from argparse import ArgumentParser
 from hashlib import sha256
@@ -11,8 +11,8 @@ import zipfile
 root = Path(__file__).resolve().parents[2]
 scripts = Path(__file__).resolve().parent
 parser = ArgumentParser(description=__doc__)
-parser.add_argument("--windows-bin-dir", type=Path, default=root / "target" / "debug")
-parser.add_argument("--linux-bin-dir", type=Path, default=root / ".build" / "guest-desktop-linux")
+parser.add_argument("--windows-bin-dir", type=Path, default=root / "target" / "release")
+parser.add_argument("--linux-bin-dir", type=Path, default=root / ".build" / "guest-desktop-linux-release")
 parser.add_argument("--macos-bin-dir", type=Path)
 parser.add_argument("--output-dir", type=Path, default=root / ".build" / "packages")
 args = parser.parse_args()
@@ -20,7 +20,7 @@ args.output_dir.mkdir(parents=True, exist_ok=True)
 
 
 def package_windows():
-    archive_path = args.output_dir / "pixels-agent-bridge-windows-x86_64-debug.zip"
+    archive_path = args.output_dir / "pixels-agent-bridge-windows-x86_64-release.zip"
     files = [
         *(args.windows_bin_dir / name for name in (
             "pab-mcp.exe", "pab-bridge.exe", "pab-executor.exe"
@@ -39,7 +39,7 @@ def package_windows():
 
 
 def package_unix(platform, architecture, binaries):
-    archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-debug.tar.gz"
+    archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-release.tar.gz"
     files = [
         *(binaries / name for name in ("pab-mcp", "pab-bridge", "pab-executor")),
         *(scripts / "unix" / name for name in (

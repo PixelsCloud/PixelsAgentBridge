@@ -39,7 +39,7 @@ pub fn spawn_refresh_loop(
         loop {
             tokio::time::sleep(settings.refresh_interval).await;
             if let Err(error) = client.sync_policy(&runtime).await {
-                eprintln!("pab-relay: policy refresh failed: {error}");
+                tracing::warn!(%error, "relay policy refresh failed");
                 client = reconnect(&settings, connector.clone(), &runtime).await;
             }
         }
@@ -55,11 +55,11 @@ async fn reconnect(
         tokio::time::sleep(settings.reconnect_interval).await;
         match connect_and_sync(settings, connector.clone(), runtime).await {
             Ok(client) => {
-                eprintln!("pab-relay: policy control connection restored");
+                tracing::info!("relay policy control connection restored");
                 return client;
             }
             Err(error) => {
-                eprintln!("pab-relay: policy reconnect failed: {error}");
+                tracing::warn!(%error, "relay policy reconnect failed");
             }
         }
     }

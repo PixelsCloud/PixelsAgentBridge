@@ -19,13 +19,24 @@ const OUTPUT_READ_BYTES: u32 = 64 * 1024;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if let Err(error) = init_logging() {
+        eprintln!("pab-bridge: {error}");
+        return ExitCode::FAILURE;
+    }
     match run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            tracing::error!(%error, "bridge failed");
             eprintln!("pab-bridge: {error}");
             ExitCode::FAILURE
         }
     }
+}
+
+fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
+    let paths = DataPaths::for_scope(DataScope::User)?;
+    pab_logging::init("bridge", paths.root())?;
+    Ok(())
 }
 
 async fn run() -> Result<(), CliError> {

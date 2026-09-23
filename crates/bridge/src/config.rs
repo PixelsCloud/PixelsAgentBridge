@@ -61,15 +61,32 @@ impl BridgeConfig {
             .map(std::fs::read)
             .transpose()?;
         let connector = tls_connector(ca.as_deref())?;
-        let result = register_open_endpoint(
-            &control_url,
-            deployment_id,
-            &secret,
-            OpenRegistrationKind::Guest,
-            connector,
-            Duration::from_secs(10),
-        )
-        .await?;
+        let result = loop {
+            match register_open_endpoint(
+                &control_url,
+                deployment_id,
+                &secret,
+                OpenRegistrationKind::Guest,
+                connector.clone(),
+                Duration::from_secs(10),
+            )
+            .await
+            {
+                Ok(result) => break result,
+                Err(
+                    error @ (pab_agent_core::OpenRegistrationError::Timeout
+                    | pab_agent_core::OpenRegistrationError::WebSocket(_)
+                    | pab_agent_core::OpenRegistrationError::Server {
+                        code: pab_protocol::ControlErrorCode::Internal,
+                        ..
+                    }),
+                ) => {
+                    tracing::warn!(%error, "guest registration unavailable; retrying in 3s");
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                }
+                Err(error) => return Err(error.into()),
+            }
+        };
         let pab_protocol::EndpointRegistrationResult::Guest { tenant_id, .. } = result else {
             return Err(GuestConfigError::InvalidResult);
         };

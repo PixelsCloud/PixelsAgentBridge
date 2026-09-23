@@ -1,8 +1,7 @@
 # Linux Docker server prototype
 
 This Compose stack runs PostgreSQL 17, the TLS control backend, and the TLS/QUIC
-iroh Relay. The image is deliberately compiled with Cargo's Debug (`dev`) profile
-while the implementation is under validation.
+iroh Relay. The image is compiled with Cargo's stripped Release profile.
 
 PostgreSQL uses the named `postgres-data` volume, so replacing images or running
 `docker compose down` keeps accounts, device UUID/code mappings, and grants. Do not
@@ -42,5 +41,8 @@ never published by Compose.
 
 The Relay control secret is mounted through a Compose secret file. PostgreSQL is
 reachable only on the private Compose network. No public HTTP listener is added.
+Backend and Relay logs are stored in separate persistent named volumes at
+`/var/log/pab`. Each process keeps at most five 16 MiB files. Set
+`PAB_LOG_LEVEL` for a different event filter.
 BuildKit keeps Cargo registry, git, and target caches between builds so a source or
 packaging change does not force all third-party Rust crates to compile again.

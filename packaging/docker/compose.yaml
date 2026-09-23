@@ -22,7 +22,7 @@ services:
     build:
       context: ../..
       dockerfile: packaging/docker/Dockerfile
-    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
     command: ["pab-server", "init"]
     restart: "no"
     environment:
@@ -35,7 +35,7 @@ services:
       - pab-internal
 
   backend:
-    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
     command: ["pab-server", "serve"]
     restart: unless-stopped
     init: true
@@ -50,6 +50,7 @@ services:
     secrets:
       - pab_relay_control_secret
     volumes:
+      - backend-logs:/var/log/pab
       - type: bind
         source: ${PAB_CERT_DIR:-./certs}
         target: /run/pab-certs
@@ -76,7 +77,7 @@ services:
           - ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
 
   relay:
-    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:debug}
+    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
     command: ["pab-relay-server"]
     restart: unless-stopped
     init: true
@@ -93,6 +94,7 @@ services:
     secrets:
       - pab_relay_control_secret
     volumes:
+      - relay-logs:/var/log/pab
       - type: bind
         source: ${PAB_CERT_DIR:-./certs}
         target: /run/pab-certs
@@ -122,6 +124,8 @@ networks:
 
 volumes:
   postgres-data:
+  backend-logs:
+  relay-logs:
 
 secrets:
   pab_relay_control_secret:

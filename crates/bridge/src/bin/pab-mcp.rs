@@ -22,7 +22,19 @@ const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() {
+    let log_root = match DataPaths::for_scope(DataScope::User) {
+        Ok(paths) => paths.root().to_path_buf(),
+        Err(error) => {
+            eprintln!("pab-mcp: {error}");
+            std::process::exit(1);
+        }
+    };
+    if let Err(error) = pab_logging::init("mcp", &log_root) {
+        eprintln!("pab-mcp: {error}");
+        std::process::exit(1);
+    }
     if let Err(error) = run().await {
+        tracing::error!(%error, "MCP process failed");
         eprintln!("pab-mcp: {error}");
         std::process::exit(1);
     }
@@ -76,6 +88,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await
             {
+                tracing::error!(%error, "UI server failed");
                 eprintln!("pab-ui: {error}");
             }
         }))

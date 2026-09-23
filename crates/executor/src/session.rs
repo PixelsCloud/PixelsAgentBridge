@@ -185,7 +185,7 @@ async fn authenticate(
                         if let Err(error) = tasks.handle_stream(initiated_by, stream, timeout).await
                             && !error.is_connection_end()
                         {
-                            eprintln!("pab-executor: task_stream={error}");
+                            tracing::warn!(%error, "task stream failed");
                         }
                     });
                 }

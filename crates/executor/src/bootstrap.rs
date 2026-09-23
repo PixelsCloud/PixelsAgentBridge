@@ -56,9 +56,13 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
             Ok(result) => break result,
             Err(
                 error @ (pab_agent_core::OpenRegistrationError::Timeout
-                | pab_agent_core::OpenRegistrationError::WebSocket(_)),
+                | pab_agent_core::OpenRegistrationError::WebSocket(_)
+                | pab_agent_core::OpenRegistrationError::Server {
+                    code: pab_protocol::ControlErrorCode::Internal,
+                    ..
+                }),
             ) => {
-                eprintln!("pab-executor: registration unavailable: {error}; retrying in 3s");
+                tracing::warn!(%error, "device registration unavailable; retrying in 3s");
                 tokio::time::sleep(Duration::from_secs(3)).await;
             }
             Err(error) => return Err(error.into()),
