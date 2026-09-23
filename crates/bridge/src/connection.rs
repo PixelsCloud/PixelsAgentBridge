@@ -22,6 +22,8 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::{BridgeConfig, BridgeConfigError};
 
+mod file_transfer;
+
 pub struct BridgeClient {
     connector: BridgeConnector,
     control: EndpointControlSupervisorHandle,
@@ -540,6 +542,10 @@ pub enum BridgeError {
     },
     #[error("Executor returned an unexpected task response: {0}")]
     UnexpectedTaskResponse(String),
+    #[error("file transfer failed: {0}")]
+    FileTransfer(String),
+    #[error("local file operation failed: {0}")]
+    LocalFile(#[from] std::io::Error),
 }
 
 impl BridgeError {

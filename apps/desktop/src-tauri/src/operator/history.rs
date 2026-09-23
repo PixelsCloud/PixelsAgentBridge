@@ -67,8 +67,15 @@ pub async fn operator_bootstrap(
         .collect::<Vec<_>>();
     let records = local.tasks().await.map_err(|error| error.to_string())?;
     let mut tasks = Vec::new();
-    for record in records.into_iter().filter(|record| record.snapshot.is_some()).take(HISTORY_LIMIT) {
-        let snapshot = record.snapshot.as_ref().expect("filtered task has a snapshot");
+    for record in records
+        .into_iter()
+        .filter(|record| record.snapshot.is_some())
+        .take(HISTORY_LIMIT)
+    {
+        let snapshot = record
+            .snapshot
+            .as_ref()
+            .expect("filtered task has a snapshot");
         state
             .tasks
             .lock()
@@ -106,7 +113,10 @@ async fn history_task(
     record: LocalTaskRecord,
     device_code: String,
 ) -> Result<HistoryTask, String> {
-    let snapshot = record.snapshot.as_ref().expect("history task has a snapshot");
+    let snapshot = record
+        .snapshot
+        .as_ref()
+        .expect("history task has a snapshot");
     let task_ref = snapshot.task_ref;
     let (stdout, _) = local
         .read_output(

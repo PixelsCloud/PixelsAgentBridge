@@ -11,6 +11,9 @@ WSS control URL, and HTTPS Relay URL. Installation starts the Executor as a
 scheduled task and installs `run-app.ps1` as the single interface entry point.
 That window can both receive and make connections. Device identity, passwords,
 and local task history are retained when `uninstall.ps1` removes the program.
+The remote view can run commands and transfer binary files in either direction.
+File transfer shows live progress, supports cancellation and retry from a partial
+file, and replaces an existing destination only when explicitly requested.
 The installer gives its current Windows user a private local WebSocket token.
 Other local users require a separate privileged `pab-executor issue-local-access
 <user-token-file>` operation before they can view this device's password or

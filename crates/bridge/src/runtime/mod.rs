@@ -311,6 +311,36 @@ impl BridgeRuntime {
         }
     }
 
+    pub async fn upload_file(
+        &self,
+        device_ref: DeviceRef,
+        source: &std::path::Path,
+        destination: &str,
+        overwrite: bool,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), RuntimeError> {
+        let connection = self.inner.device(device_ref).await.connection().await?;
+        connection
+            .upload_file(source, destination, overwrite, progress)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn download_file(
+        &self,
+        device_ref: DeviceRef,
+        source: &str,
+        destination: &std::path::Path,
+        overwrite: bool,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), RuntimeError> {
+        let connection = self.inner.device(device_ref).await.connection().await?;
+        connection
+            .download_file(source, destination, overwrite, progress)
+            .await?;
+        Ok(())
+    }
+
     pub async fn cancel_task(
         &self,
         task_ref: TaskRef,

@@ -18,6 +18,7 @@ use thiserror::Error;
 use tokio::sync::{Mutex, watch};
 
 mod command;
+mod file_transfer;
 mod subscription;
 
 use crate::task_store::{AcceptTaskOutcome, TaskStore, TaskStoreError};
@@ -104,6 +105,36 @@ impl TaskService {
                 .await;
         }
 
+        match &request {
+            DeviceTaskRequest::UploadFile {
+                path,
+                size,
+                sha256,
+                overwrite,
+                ..
+            } => {
+                return file_transfer::upload(
+                    &mut stream,
+                    timeout.max(Duration::from_secs(60)),
+                    path,
+                    *size,
+                    sha256,
+                    *overwrite,
+                )
+                .await;
+            }
+            DeviceTaskRequest::DownloadFile { path, offset, .. } => {
+                return file_transfer::download(
+                    &mut stream,
+                    timeout.max(Duration::from_secs(60)),
+                    path,
+                    *offset,
+                )
+                .await;
+            }
+            _ => {}
+        }
+
         let response = match self.handle_request(initiated_by, request).await {
             Ok(response) => response,
             Err(error) => error_response(&error),
@@ -173,7 +204,9 @@ impl TaskService {
                     snapshot: Box::new(snapshot),
                 })
             }
-            DeviceTaskRequest::Subscribe { .. } => unreachable!("handled before dispatch"),
+            DeviceTaskRequest::Subscribe { .. }
+            | DeviceTaskRequest::UploadFile { .. }
+            | DeviceTaskRequest::DownloadFile { .. } => unreachable!("handled before dispatch"),
         }
     }
 

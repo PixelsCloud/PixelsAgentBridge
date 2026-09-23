@@ -89,6 +89,8 @@ pub fn run() {
             operator::history::operator_bootstrap,
             operator::history::operator_rename_device,
             operator::operator_run_command,
+            operator::operator_start_transfer,
+            operator::operator_cancel_transfer,
             operator::operator_task,
             operator::operator_claim,
         ])

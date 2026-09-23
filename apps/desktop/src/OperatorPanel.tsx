@@ -38,6 +38,14 @@ type ClaimResult = {
   ownerTenantId: string;
 };
 
+type TransferUpdate = {
+  id: string;
+  state: "running" | "completed" | "failed" | "cancelled";
+  offset: number;
+  size: number;
+  message: string | null;
+};
+
 export function OperatorPanel({ language, view }: { language: Language; view: View }) {
   const t = messages[language];
   const [code, setCode] = useState("");
@@ -58,6 +66,13 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [requestingClaim, setRequestingClaim] = useState(false);
   const [aliasDraft, setAliasDraft] = useState("");
+  const [operation, setOperation] = useState<"command" | "transfer">("command");
+  const [transferDirection, setTransferDirection] = useState<"upload" | "download">("upload");
+  const [transferSource, setTransferSource] = useState("");
+  const [transferDestination, setTransferDestination] = useState("");
+  const [transferOverwrite, setTransferOverwrite] = useState(false);
+  const [transfer, setTransfer] = useState<TransferUpdate | null>(null);
+  const [startingTransfer, setStartingTransfer] = useState(false);
   const tasksRef = useRef(tasks);
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
@@ -113,6 +128,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
     let closed = false;
     let stopTask: (() => void) | undefined;
     let stopDevice: (() => void) | undefined;
+    let stopTransfer: (() => void) | undefined;
     void (async () => {
       stopTask = await listen<{ taskId: string }>("operator-task-changed", (event) => {
         void refreshTask(event.payload.taskId);
@@ -131,6 +147,19 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
         stopDevice();
         return;
       }
+      stopTransfer = await listen<TransferUpdate>("operator-transfer", (event) => {
+        setTransfer((current) => {
+          const next = event.payload;
+          if (next.state !== "running" && current?.id === next.id) {
+            return { ...next, offset: current.offset, size: current.size };
+          }
+          return next;
+        });
+      });
+      if (closed) {
+        stopTransfer();
+        return;
+      }
       try {
         const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
         if (closed) return;
@@ -146,6 +175,7 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
       closed = true;
       stopTask?.();
       stopDevice?.();
+      stopTransfer?.();
     };
   }, []);
 
@@ -226,6 +256,41 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
     }
   }
 
+  async function startTransfer() {
+    if (!selected?.connected || !transferSource.trim() || !transferDestination.trim()) return;
+    setStartingTransfer(true);
+    setError("");
+    try {
+      const id = await invoke<string>("operator_start_transfer", {
+        code: selected.deviceCode,
+        direction: transferDirection,
+        source: transferSource.trim(),
+        destination: transferDestination.trim(),
+        overwrite: transferOverwrite,
+      });
+      setTransfer((current) => current?.id === id ? current : {
+        id,
+        state: "running",
+        offset: 0,
+        size: 0,
+        message: null,
+      });
+    } catch (cause) {
+      setError(`${t.transferFailed}: ${String(cause)}`);
+    } finally {
+      setStartingTransfer(false);
+    }
+  }
+
+  async function cancelTransfer() {
+    if (!transfer || transfer.state !== "running") return;
+    try {
+      await invoke("operator_cancel_transfer", { id: transfer.id });
+    } catch (cause) {
+      setError(String(cause));
+    }
+  }
+
   async function requestClaim() {
     if (!selected || !accountName.trim() || !accountPassword) return;
     setRequestingClaim(true);
@@ -294,13 +359,36 @@ export function OperatorPanel({ language, view }: { language: Language; view: Vi
                 </div>
                 <div className="os-banner"><strong>{t.targetOs}: {selected.osFamily}</strong><span>{selected.osReminder}</span></div>
                 {!selected.connected && <p className="form-hint">{t.reconnectHint}</p>}
-                <p className="form-hint">{t.nativeCommandHint}</p>
-                <div className="command-fields">
-                  <label><span className="field-label">{t.program}</span><input value={program} onChange={(event) => setProgram(event.target.value)} placeholder="powershell.exe / bash" /></label>
-                  <label><span className="field-label">{t.arguments}</span><textarea value={argumentsText} onChange={(event) => setArgumentsText(event.target.value)} placeholder={t.argumentPlaceholder} /></label>
-                  <label><span className="field-label">{t.cwd}</span><input value={cwd} onChange={(event) => setCwd(event.target.value)} /></label>
+                <div className="operation-tabs">
+                  <button className={operation === "command" ? "active" : ""} onClick={() => setOperation("command")}>{t.commandTitle}</button>
+                  <button className={operation === "transfer" ? "active" : ""} onClick={() => setOperation("transfer")}>{t.fileTransfer}</button>
                 </div>
-                <button className="primary-button" disabled={submitting || !selected.connected || !program.trim()} onClick={() => void runCommand()}>{submitting ? t.runningCommand : t.runCommand}<span>→</span></button>
+                {operation === "command" ? <>
+                  <p className="form-hint">{t.nativeCommandHint}</p>
+                  <div className="command-fields">
+                    <label><span className="field-label">{t.program}</span><input value={program} onChange={(event) => setProgram(event.target.value)} placeholder="powershell.exe / bash" /></label>
+                    <label><span className="field-label">{t.arguments}</span><textarea value={argumentsText} onChange={(event) => setArgumentsText(event.target.value)} placeholder={t.argumentPlaceholder} /></label>
+                    <label><span className="field-label">{t.cwd}</span><input value={cwd} onChange={(event) => setCwd(event.target.value)} /></label>
+                  </div>
+                  <button className="primary-button" disabled={submitting || !selected.connected || !program.trim()} onClick={() => void runCommand()}>{submitting ? t.runningCommand : t.runCommand}<span>→</span></button>
+                </> : <>
+                  <div className="transfer-directions">
+                    <button className={transferDirection === "upload" ? "active" : ""} onClick={() => setTransferDirection("upload")}>{t.upload}</button>
+                    <button className={transferDirection === "download" ? "active" : ""} onClick={() => setTransferDirection("download")}>{t.download}</button>
+                  </div>
+                  <div className="command-fields">
+                    <label><span className="field-label">{transferDirection === "upload" ? t.localSource : t.remoteSource}</span><input value={transferSource} onChange={(event) => setTransferSource(event.target.value)} /></label>
+                    <label><span className="field-label">{transferDirection === "upload" ? t.remoteDestination : t.localDestination}</span><input value={transferDestination} onChange={(event) => setTransferDestination(event.target.value)} /></label>
+                  </div>
+                  <label className="check-row"><input type="checkbox" checked={transferOverwrite} onChange={(event) => setTransferOverwrite(event.target.checked)} />{t.overwriteExisting}</label>
+                  <button className="primary-button" disabled={startingTransfer || transfer?.state === "running" || !selected.connected || !transferSource.trim() || !transferDestination.trim()} onClick={() => void startTransfer()}>{startingTransfer ? t.startingTransfer : t.startTransfer}<span>→</span></button>
+                  {transfer && <div className="transfer-status">
+                    <div><strong>{t.transferStates[transfer.state]}</strong><span>{transfer.size ? `${Math.round(transfer.offset / transfer.size * 100)}% · ${transfer.offset} / ${transfer.size} B` : ""}</span></div>
+                    <progress value={transfer.offset} max={Math.max(transfer.size, 1)} />
+                    {transfer.message && <small>{transfer.message}</small>}
+                    {transfer.state === "running" && <button className="quiet-button" onClick={() => void cancelTransfer()}>{t.cancelTransfer}</button>}
+                  </div>}
+                </>}
               </>
             ) : <div className="empty-panel"><span>↗</span><strong>{t.selectDevice}</strong><p>{t.selectDeviceHint}</p></div>}
           </section>

@@ -115,6 +115,14 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .device-alias-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .device-alias-row input { min-width: 0; flex: 1; }
 .device-alias-row .quiet-button { flex: none; margin-top: 0; }
+.operation-tabs, .transfer-directions { display: flex; gap: 6px; margin-top: 15px; }
+.operation-tabs button, .transfer-directions button { flex: 1; min-height: 31px; border: 1px solid #d9e6e7; border-radius: 7px; color: #69818e; background: #f8fbfa; font-size: 11px; font-weight: 700; }
+.operation-tabs button.active, .transfer-directions button.active { border-color: #7ac4aa; color: #257a66; background: #eaf6ef; }
+.transfer-status { display: grid; gap: 5px; margin-top: 16px; font-size: 11px; }
+.transfer-status div { display: flex; justify-content: space-between; gap: 8px; }
+.transfer-status span { color: #688390; }
+.transfer-status progress { width: 100%; height: 7px; accent-color: #218574; }
+.transfer-status small { color: #bd4d53; overflow-wrap: anywhere; }
 .command-fields textarea { height: 62px; resize: none; }
 .remote-command .primary-button { align-self: flex-end; min-width: 130px; }
 .empty-panel { display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; min-height: 0; color: #75909e; text-align: center; }

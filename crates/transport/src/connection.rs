@@ -7,6 +7,7 @@ use thiserror::Error;
 use zeroize::Zeroizing;
 
 pub const MAX_PAB_MESSAGE_BYTES: usize = 64 * 1024;
+pub const MAX_BINARY_FRAME_BYTES: usize = 256 * 1024;
 
 #[derive(Clone)]
 pub struct PabConnection {
@@ -79,6 +80,61 @@ pub struct PabBiStream {
 }
 
 impl PabBiStream {
+    pub async fn send_binary_frame(
+        &mut self,
+        bytes: &[u8],
+        timeout: Duration,
+    ) -> Result<(), PabConnectionError> {
+        if bytes.is_empty() || bytes.len() > MAX_BINARY_FRAME_BYTES {
+            return Err(PabConnectionError::InvalidBinaryFrame(bytes.len()));
+        }
+        let length = u32::try_from(bytes.len())
+            .map_err(|_| PabConnectionError::InvalidBinaryFrame(bytes.len()))?
+            .to_be_bytes();
+        tokio::time::timeout(timeout, async {
+            self.send
+                .write_all(&length)
+                .await
+                .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+            self.send
+                .write_all(bytes)
+                .await
+                .map_err(|error| PabConnectionError::Stream(error.to_string()))
+        })
+        .await
+        .map_err(|_| PabConnectionError::Timeout)?
+    }
+
+    pub async fn receive_binary_frame(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, PabConnectionError> {
+        tokio::time::timeout(timeout, async {
+            let mut length = [0_u8; 4];
+            self.receive
+                .read_exact(&mut length)
+                .await
+                .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+            let length = u32::from_be_bytes(length) as usize;
+            if length == 0 || length > MAX_BINARY_FRAME_BYTES {
+                return Err(PabConnectionError::InvalidBinaryFrame(length));
+            }
+            let mut bytes = vec![0_u8; length];
+            let mut offset = 0;
+            while offset < length {
+                let end = (offset + 16 * 1024).min(length);
+                self.receive
+                    .read_exact(&mut bytes[offset..end])
+                    .await
+                    .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                offset = end;
+            }
+            Ok(bytes)
+        })
+        .await
+        .map_err(|_| PabConnectionError::Timeout)?
+    }
+
     pub async fn send_json<T: Serialize>(
         &mut self,
         value: &T,
@@ -218,6 +274,8 @@ pub enum PabConnectionError {
     Timeout,
     #[error("PAB message is too large: {0} bytes")]
     MessageTooLarge(usize),
+    #[error("invalid binary frame length: {0} bytes")]
+    InvalidBinaryFrame(usize),
     #[error("PAB stream failed: {0}")]
     Stream(String),
     #[error(transparent)]

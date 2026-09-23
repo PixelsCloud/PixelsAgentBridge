@@ -249,6 +249,60 @@ async fn call_tool(
                 "range": range
             }))
         }
+        "pab_upload_file" => {
+            let device_ref = resolve_target(runtime, arguments).await?;
+            let source = required_text(arguments, "source")?;
+            let destination = required_text(arguments, "destination")?;
+            let overwrite = arguments
+                .get("overwrite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let transferred = std::sync::atomic::AtomicU64::new(0);
+            let total = std::sync::atomic::AtomicU64::new(0);
+            runtime
+                .upload_file(
+                    device_ref,
+                    std::path::Path::new(source),
+                    destination,
+                    overwrite,
+                    |offset, size| {
+                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
+                        total.store(size, std::sync::atomic::Ordering::Relaxed);
+                    },
+                )
+                .await
+                .map_err(|error| error.to_string())?;
+            Ok(
+                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
+            )
+        }
+        "pab_download_file" => {
+            let device_ref = resolve_target(runtime, arguments).await?;
+            let source = required_text(arguments, "source")?;
+            let destination = required_text(arguments, "destination")?;
+            let overwrite = arguments
+                .get("overwrite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let transferred = std::sync::atomic::AtomicU64::new(0);
+            let total = std::sync::atomic::AtomicU64::new(0);
+            runtime
+                .download_file(
+                    device_ref,
+                    source,
+                    std::path::Path::new(destination),
+                    overwrite,
+                    |offset, size| {
+                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
+                        total.store(size, std::sync::atomic::Ordering::Relaxed);
+                    },
+                )
+                .await
+                .map_err(|error| error.to_string())?;
+            Ok(
+                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
+            )
+        }
         _ => Err(format!("unknown tool: {name}")),
     }
 }
@@ -391,7 +445,31 @@ fn tools() -> Vec<Value> {
                 "additionalProperties": false
             }),
         ),
+        tool(
+            "pab_upload_file",
+            "Upload a binary file to a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
+            file_tool_schema(),
+        ),
+        tool(
+            "pab_download_file",
+            "Download a binary file from a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
+            file_tool_schema(),
+        ),
     ]
+}
+
+fn file_tool_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
+            "source": { "type": "string" },
+            "destination": { "type": "string" },
+            "overwrite": { "type": "boolean", "default": false }
+        },
+        "required": ["device_code", "source", "destination"],
+        "additionalProperties": false
+    })
 }
 
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {

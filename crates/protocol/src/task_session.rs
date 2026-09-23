@@ -55,6 +55,21 @@ pub enum DeviceTaskRequest {
         task_ref: TaskRef,
         reason: String,
     },
+    UploadFile {
+        schema_version: u16,
+        path: String,
+        size: u64,
+        sha256: String,
+        #[serde(default)]
+        overwrite: bool,
+    },
+    DownloadFile {
+        schema_version: u16,
+        path: String,
+        offset: u64,
+        #[serde(default)]
+        overwrite: bool,
+    },
 }
 
 impl DeviceTaskRequest {
@@ -65,7 +80,9 @@ impl DeviceTaskRequest {
             | Self::GetTask { schema_version, .. }
             | Self::ReadOutput { schema_version, .. }
             | Self::Subscribe { schema_version, .. }
-            | Self::Cancel { schema_version, .. } => *schema_version,
+            | Self::Cancel { schema_version, .. }
+            | Self::UploadFile { schema_version, .. }
+            | Self::DownloadFile { schema_version, .. } => *schema_version,
         }
     }
 }
@@ -114,6 +131,18 @@ pub enum DeviceTaskResponse {
     },
     CancelAccepted {
         snapshot: Box<TaskSnapshot>,
+    },
+    FileReady {
+        size: u64,
+        offset: u64,
+        sha256: String,
+    },
+    FileProgress {
+        offset: u64,
+    },
+    FileComplete {
+        size: u64,
+        sha256: String,
     },
     Error {
         code: DeviceTaskErrorCode,
