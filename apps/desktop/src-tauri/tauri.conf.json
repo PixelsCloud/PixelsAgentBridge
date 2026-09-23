@@ -13,10 +13,11 @@
     "windows": [
       {
         "title": "Pixels Agent Bridge",
-        "width": 920,
-        "height": 720,
-        "minWidth": 700,
-        "minHeight": 560
+        "width": 1120,
+        "height": 740,
+        "minWidth": 980,
+        "minHeight": 680,
+        "decorations": false
       }
     ],
     "security": {

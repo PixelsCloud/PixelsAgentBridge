@@ -1,8 +1,16 @@
 use std::{
-    env, fs,
+    fs,
     path::Path,
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
+};
+
+#[cfg(windows)]
+use std::{
+    env,
+    os::windows::process::CommandExt,
+    process::Command,
+    sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
 };
 
 use pab_agent_core::{DataPaths, DataScope};
@@ -51,43 +59,45 @@ fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
     let heartbeat_running = observed
         .map(|observed| now.saturating_sub(observed) <= 10_000)
         .unwrap_or(false);
-    let executor_running = heartbeat_running || service_running();
     Ok(DeviceStatus {
         device_code: field("device_code")?,
         device_id: field("device_id")?,
         temporary_password: password.trim().to_owned(),
-        executor_running,
+        executor_running: heartbeat_running || service_running(),
         control_phase,
     })
 }
 
 #[cfg(windows)]
 fn service_running() -> bool {
+    static CACHE: OnceLock<Mutex<Option<(Instant, bool)>>> = OnceLock::new();
+    let Ok(mut cached) = CACHE.get_or_init(|| Mutex::new(None)).lock() else {
+        return false;
+    };
+    if let Some((checked_at, running)) = *cached
+        && checked_at.elapsed() < Duration::from_secs(30)
+    {
+        return running;
+    }
+
     let task_name = env::var("PAB_EXECUTOR_TASK_NAME")
         .unwrap_or_else(|_| "PixelsAgentBridgeExecutor".to_owned());
     let escaped_name = task_name.replace('\'', "''");
     let command = format!(
         "(Get-ScheduledTask -TaskName '{escaped_name}' -ErrorAction Stop).State.ToString()"
     );
-    Command::new("powershell.exe")
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let running = Command::new("powershell.exe")
+        .creation_flags(CREATE_NO_WINDOW)
         .args(["-NoProfile", "-NonInteractive", "-Command", &command])
         .output()
         .map(|output| output.status.success() && output.stdout.trim_ascii() == b"Running")
-        .unwrap_or(false)
+        .unwrap_or(false);
+    *cached = Some((Instant::now(), running));
+    running
 }
 
-#[cfg(target_os = "linux")]
-fn service_running() -> bool {
-    let service_name = env::var("PAB_EXECUTOR_SERVICE_NAME")
-        .unwrap_or_else(|_| "pixels-agent-bridge-executor.service".to_owned());
-    Command::new("systemctl")
-        .args(["is-active", "--quiet", &service_name])
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
-
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(windows))]
 fn service_running() -> bool {
     false
 }
