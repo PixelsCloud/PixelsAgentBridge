@@ -12,6 +12,7 @@ members = [
     "crates/transport",
 ]
 resolver = "2"
+exclude = ["apps/desktop/src-tauri"]
 
 [workspace.package]
 edition = "2024"

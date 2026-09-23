@@ -1,0 +1,30 @@
+[package]
+name = "pab-desktop"
+version = "0.1.0"
+description = "Pixels Agent Bridge desktop application"
+authors = ["Pixels"]
+edition = "2024"
+rust-version = "1.95"
+
+[lib]
+name = "pab_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+pab-executor = { path = "../../../crates/executor" }
+pab-agent-core = { path = "../../../crates/agent-core" }
+pab-logging = { path = "../../../crates/logging" }
+pab-protocol = { path = "../../../crates/protocol" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

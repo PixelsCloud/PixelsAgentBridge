@@ -37,10 +37,10 @@ if ($Executor) {
 }
 
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
-foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-executor.exe')) {
+foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-executor.exe', 'pab-desktop.exe')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
-foreach ($name in @('run-ui.ps1', 'run-executor.ps1', 'uninstall.ps1')) {
+foreach ($name in @('run-ui.ps1', 'run-executor.ps1', 'run-device-ui.ps1', 'uninstall.ps1')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 
@@ -78,4 +78,5 @@ Write-Output "Installed to $InstallRoot"
 Write-Output "Operator UI: powershell.exe -File `"$(Join-Path $InstallRoot 'run-ui.ps1')`""
 if ($Executor) {
     Write-Output "Device access: set PAB_DATA_DIR=$dataRoot, then run pab-executor.exe show-access"
+    Write-Output "Local device window: open an elevated PowerShell and run $(Join-Path $InstallRoot 'run-device-ui.ps1')"
 }

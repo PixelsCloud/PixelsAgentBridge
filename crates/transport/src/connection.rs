@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use iroh::endpoint::{Connection, RecvStream, SendStream};
+use iroh::endpoint::{Connection, PathEvent, RecvStream, SendStream};
+use n0_future::StreamExt;
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 use zeroize::Zeroizing;
@@ -14,6 +15,32 @@ pub struct PabConnection {
 
 impl PabConnection {
     pub(crate) fn new(inner: Connection) -> Self {
+        let initial = inner.paths();
+        if let Some(path) = initial.iter().find(|path| path.is_selected()) {
+            let selected = if path.is_ip() {
+                "direct"
+            } else if path.is_relay() {
+                "relay"
+            } else {
+                "unknown"
+            };
+            tracing::info!(selected_path = selected, "PAB connection path selected");
+        }
+        let mut events = inner.path_events();
+        tokio::spawn(async move {
+            while let Some(event) = events.next().await {
+                if let PathEvent::Selected { remote_addr, .. } = event {
+                    let selected = if remote_addr.is_ip() {
+                        "direct"
+                    } else if remote_addr.is_relay() {
+                        "relay"
+                    } else {
+                        "unknown"
+                    };
+                    tracing::info!(selected_path = selected, "PAB connection path selected");
+                }
+            }
+        });
         Self { inner }
     }
 

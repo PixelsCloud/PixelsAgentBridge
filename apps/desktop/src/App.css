@@ -1,0 +1,146 @@
+:root {
+  font-family: "Segoe UI", "Noto Sans CJK SC", system-ui, sans-serif;
+  color: #eaf1fc;
+  background: #0d1422;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 600px; }
+button, input, select { font: inherit; }
+
+.app-shell {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 42px 36px 56px;
+}
+
+.app-header, .section-heading, .value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header-actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.language-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a6b7d0;
+  font-size: 12px;
+}
+
+.language-select select {
+  padding: 6px 9px;
+  color: #eaf1fc;
+  background: #182438;
+  border: 1px solid #4b6282;
+  border-radius: 6px;
+}
+
+.eyebrow {
+  color: #81a8fb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+
+h1 { margin: 8px 0; font-size: 30px; }
+h2 { margin: 0 0 5px; font-size: 18px; }
+p { margin: 0; color: #a6b7d0; line-height: 1.55; }
+
+.status {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 100px;
+  background: #694722;
+  color: #ffe0ab;
+  font-size: 13px;
+}
+
+.status.online { background: #1d5941; color: #b4f2cf; }
+
+.card {
+  margin-top: 22px;
+  padding: 25px;
+  background: #182438;
+  border: 1px solid #314662;
+  border-radius: 14px;
+}
+
+.section-heading { align-items: start; margin-bottom: 24px; }
+.phase { color: #91a8c9; font-size: 12px; white-space: nowrap; }
+.field + .field { margin-top: 27px; }
+.field label, label[for="claim-id"] {
+  display: block;
+  margin-bottom: 9px;
+  color: #9eb0ca;
+  font-size: 13px;
+}
+
+.value-row { justify-content: start; flex-wrap: wrap; }
+.device-code, .password-value {
+  min-width: 240px;
+  font-size: 29px;
+  letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+
+.password-value { font-size: 19px; letter-spacing: .03em; }
+.footnote { margin-top: 23px; font-size: 12px; }
+
+button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  color: #061527;
+  background: #72a0fb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: #9bbafc; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button.secondary { color: #e9f1fc; background: #314869; }
+button.secondary:hover:not(:disabled) { background: #426088; }
+
+input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+  padding: 11px 13px;
+  color: #eef4fe;
+  background: #101a2b;
+  border: 1px solid #4b6282;
+  border-radius: 8px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 18px 0;
+  color: #bac9dc;
+  font-size: 13px;
+}
+
+.check-row input { width: 16px; height: 16px; margin: 0; }
+.alert, .notice { margin-top: 20px; padding: 12px 15px; border-radius: 8px; }
+.alert { background: #60333b; color: #ffcfce; }
+.notice { background: #234e3f; color: #c0f7d5; }
+
+@media (max-width: 700px) {
+  .app-shell { padding: 24px 18px; }
+  .app-header, .section-heading { align-items: start; flex-direction: column; }
+  .header-actions { align-items: flex-start; }
+  .device-code, .password-value { min-width: 0; }
+}

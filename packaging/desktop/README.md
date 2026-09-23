@@ -1,7 +1,10 @@
 # Desktop Release packages
 
-Build the three binaries for each target with `cargo build --locked --release`,
-then run `python packaging/desktop/build.py`. The release profile strips symbols.
+Build the three core binaries for each target with `cargo build --locked --release`.
+For the Windows local device window, run `npm ci` and
+`npm run tauri build -- --no-bundle` in `apps/desktop`, then run
+`python packaging/desktop/build.py`.
+The release profiles strip symbols.
 The packager uses Windows binaries in `target/release` and Linux binaries in
 `.build/guest-desktop-linux-release` by default. Build the Linux binaries with
 `docker build -f packaging/desktop/Dockerfile.linux --output
@@ -20,9 +23,14 @@ temporary password shown on the remote device. Login is not required.
 
 For an Executor, install with `-Executor` on Windows or `install.sh executor`
 as root on Unix. It starts as a scheduled task, systemd service, or launchd
-daemon. The administrator can read the current 9-digit code and temporary
-password using `pab-executor show-access` with `PAB_DATA_DIR` set to the machine
-data directory. The password rotates when the Executor process starts again.
+daemon. On Windows, open an elevated PowerShell window and run
+`run-device-ui.ps1` from the installed directory. This Tauri/React window shows
+the current 9-digit device code and temporary password and can approve a claim
+request. The administrator can also read the code and password using
+`pab-executor show-access` with `PAB_DATA_DIR` set to the machine data directory.
+The password rotates when the Executor process starts again. The Linux local
+device window is still awaiting a native Linux Tauri build; the command-line
+access display remains available there.
 
 `uninstall.ps1` and `uninstall.sh` remove application files and service
 registration. They leave the user and machine data directories untouched, so

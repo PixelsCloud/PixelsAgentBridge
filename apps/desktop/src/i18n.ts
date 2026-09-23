@@ -1,0 +1,78 @@
+export type Language = "zh-CN" | "en";
+
+export const messages = {
+  "zh-CN": {
+    title: "这台设备",
+    introduction: "在另一台电脑输入设备码和临时密码，即可连接这台设备。",
+    loading: "读取中",
+    running: "设备服务运行中",
+    stopped: "设备服务未运行",
+    accessTitle: "连接到此设备",
+    accessDescription: "服务重启后临时密码会更换，设备码保持不变。",
+    controlConnection: "控制连接",
+    unknown: "未知",
+    deviceCode: "9 位设备码",
+    temporaryPassword: "当前临时密码",
+    copy: "复制",
+    copied: "已复制",
+    copyFailed: "复制失败，请手动选择文本复制",
+    show: "显示",
+    hide: "隐藏",
+    accessFootnote: "这些信息只从本机受保护的数据目录读取，不会写入应用日志。",
+    claimTitle: "批准设备归属",
+    claimDescription: "账号或 Team 发起申请后，请先核对操控端显示的申请 ID。",
+    claimId: "申请 ID",
+    claimConfirmation: "我已确认这条申请由可信的操控端发起",
+    claimMissing: "请填写申请 ID 并确认申请来源",
+    approve: "批准归属",
+    approving: "正在批准…",
+    approved: "归属申请已批准",
+    approvalFailed: "批准归属失败",
+    statusFailed: "读取本机设备状态失败",
+    language: "语言",
+    phaseConnected: "已连接",
+    phaseConnecting: "连接中",
+    phaseDisconnected: "已断开",
+  },
+  en: {
+    title: "This device",
+    introduction: "Enter this device code and temporary password on another computer to connect.",
+    loading: "Loading",
+    running: "Device service running",
+    stopped: "Device service stopped",
+    accessTitle: "Connect to this device",
+    accessDescription: "The temporary password changes when the service restarts. The device code stays the same.",
+    controlConnection: "Control connection",
+    unknown: "Unknown",
+    deviceCode: "9-digit device code",
+    temporaryPassword: "Current temporary password",
+    copy: "Copy",
+    copied: "copied",
+    copyFailed: "Copy failed. Select and copy the text manually.",
+    show: "Show",
+    hide: "Hide",
+    accessFootnote: "This information is read only from protected local device data and is never written to app logs.",
+    claimTitle: "Approve device ownership",
+    claimDescription: "After an account or team requests ownership, verify the claim ID shown on the operator device.",
+    claimId: "Claim ID",
+    claimConfirmation: "I verified that this request came from a trusted operator",
+    claimMissing: "Enter a claim ID and confirm its source",
+    approve: "Approve ownership",
+    approving: "Approving…",
+    approved: "Ownership request approved",
+    approvalFailed: "Could not approve ownership",
+    statusFailed: "Could not read local device status",
+    language: "Language",
+    phaseConnected: "Connected",
+    phaseConnecting: "Connecting",
+    phaseDisconnected: "Disconnected",
+  },
+} as const;
+
+export function initialLanguage(): Language {
+  const saved = window.localStorage.getItem("pab.language");
+  if (saved === "zh-CN" || saved === "en") {
+    return saved;
+  }
+  return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+}

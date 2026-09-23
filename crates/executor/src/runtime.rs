@@ -30,6 +30,9 @@ use crate::{
 pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     config.validate()?;
     let credential = DeviceCredential::read(&config.device_credential_file)?;
+    let heartbeat_path = config
+        .task_database_file
+        .with_file_name("executor-heartbeat.json");
     let secret = read_endpoint_secret(&config.endpoint_secret_file)?;
     let endpoint = bind_endpoint(&config, secret.clone()).await?;
     tracing::info!(endpoint = %endpoint.id(), "iroh endpoint ready");
@@ -86,9 +89,16 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let session_limit = Arc::new(Semaphore::new(64));
     let mut sessions = JoinSet::new();
     let mut status = supervisor.status();
+    let mut heartbeat = tokio::time::interval(Duration::from_secs(3));
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     report_status(&status.borrow());
     loop {
         tokio::select! {
+            _ = heartbeat.tick() => {
+                if let Err(error) = write_heartbeat(&heartbeat_path, &status.borrow()) {
+                    tracing::warn!(%error, "could not update executor heartbeat");
+                }
+            }
             signal = tokio::signal::ctrl_c() => {
                 signal.map_err(ExecutorError::ShutdownSignal)?;
                 sessions.abort_all();
@@ -103,6 +113,9 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 }
                 let current = status.borrow().clone();
                 report_status(&current);
+                if let Err(error) = write_heartbeat(&heartbeat_path, &current) {
+                    tracing::warn!(%error, "could not update executor heartbeat");
+                }
                 if current.phase == ControlConnectionPhase::Stopped {
                     sessions.abort_all();
                     supervisor.shutdown().await?;
@@ -147,6 +160,21 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
             }
         }
     }
+}
+
+fn write_heartbeat(
+    path: &std::path::Path,
+    status: &pab_agent_core::ControlConnectionStatus,
+) -> std::io::Result<()> {
+    let observed_at_unix_ms = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(std::io::Error::other)?
+        .as_millis();
+    let payload = serde_json::json!({
+        "observed_at_unix_ms": observed_at_unix_ms,
+        "control_phase": format!("{:?}", status.phase),
+    });
+    fs::write(path, payload.to_string())
 }
 
 fn report_status(status: &pab_agent_core::ControlConnectionStatus) {

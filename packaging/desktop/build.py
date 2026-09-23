@@ -12,6 +12,11 @@ root = Path(__file__).resolve().parents[2]
 scripts = Path(__file__).resolve().parent
 parser = ArgumentParser(description=__doc__)
 parser.add_argument("--windows-bin-dir", type=Path, default=root / "target" / "release")
+parser.add_argument(
+    "--windows-desktop-bin",
+    type=Path,
+    default=root / "apps" / "desktop" / "src-tauri" / "target" / "release" / "pab-desktop.exe",
+)
 parser.add_argument("--linux-bin-dir", type=Path, default=root / ".build" / "guest-desktop-linux-release")
 parser.add_argument("--macos-bin-dir", type=Path)
 parser.add_argument("--output-dir", type=Path, default=root / ".build" / "packages")
@@ -22,11 +27,12 @@ args.output_dir.mkdir(parents=True, exist_ok=True)
 def package_windows():
     archive_path = args.output_dir / "pixels-agent-bridge-windows-x86_64-release.zip"
     files = [
+        args.windows_desktop_bin,
         *(args.windows_bin_dir / name for name in (
             "pab-mcp.exe", "pab-bridge.exe", "pab-executor.exe"
         )),
         *(scripts / "windows" / name for name in (
-            "install.ps1", "run-ui.ps1", "run-executor.ps1", "uninstall.ps1"
+            "install.ps1", "run-ui.ps1", "run-executor.ps1", "run-device-ui.ps1", "uninstall.ps1"
         )),
     ]
     for file in files:

@@ -27,9 +27,11 @@ foreach ($name in @(
     'pab-mcp.exe',
     'pab-bridge.exe',
     'pab-executor.exe',
+    'pab-desktop.exe',
     'settings.json',
     'run-ui.ps1',
     'run-executor.ps1',
+    'run-device-ui.ps1',
     'uninstall.ps1'
 )) {
     $path = Join-Path $InstallRoot $name
