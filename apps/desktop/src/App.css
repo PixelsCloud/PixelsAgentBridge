@@ -8,7 +8,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 600px; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 
 .app-shell {
   width: min(900px, 100%);
@@ -138,9 +138,50 @@ input:not([type="checkbox"]) {
 .alert { background: #60333b; color: #ffcfce; }
 .notice { background: #234e3f; color: #c0f7d5; }
 
+.operator-connect {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.operator-connect label span, .command-fields label span {
+  display: block;
+  margin-bottom: 8px;
+  color: #9eb0ca;
+  font-size: 13px;
+}
+
+h3 { margin: 25px 0 12px; font-size: 15px; }
+h4 { margin: 12px 0 5px; color: #a6b7d0; font-size: 12px; }
+.device-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.device-tab { color: #eaf1fc; background: #314869; }
+.device-tab.active { color: #061527; background: #72a0fb; }
+.command-area { margin-top: 26px; padding-top: 5px; border-top: 1px solid #314662; }
+.os-reminder { margin: 9px 0; color: #bad0f3; font-size: 12px; word-break: break-all; }
+.command-fields { display: grid; gap: 13px; margin: 18px 0; }
+.command-fields textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  padding: 11px 13px;
+  color: #eef4fe;
+  background: #101a2b;
+  border: 1px solid #4b6282;
+  border-radius: 8px;
+  resize: vertical;
+}
+.task-list { margin-top: 24px; }
+.task-entry { margin-top: 12px; padding: 15px; background: #101a2b; border-radius: 8px; }
+.task-entry > div { display: flex; justify-content: space-between; gap: 10px; }
+.task-entry span { color: #bad0f3; }
+.task-entry pre { overflow: auto; margin: 0; white-space: pre-wrap; word-break: break-word; }
+.claim-result { margin-top: 14px; word-break: break-all; }
+
 @media (max-width: 700px) {
   .app-shell { padding: 24px 18px; }
   .app-header, .section-heading { align-items: start; flex-direction: column; }
   .header-actions { align-items: flex-start; }
   .device-code, .password-value { min-width: 0; }
+  .operator-connect { grid-template-columns: 1fr; }
 }

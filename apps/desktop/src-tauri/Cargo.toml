@@ -16,12 +16,15 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 pab-executor = { path = "../../../crates/executor" }
+pab-bridge = { path = "../../../crates/bridge" }
 pab-agent-core = { path = "../../../crates/agent-core" }
 pab-logging = { path = "../../../crates/logging" }
 pab-protocol = { path = "../../../crates/protocol" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
+tokio = { version = "1", features = ["sync", "time"] }
+zeroize = "1"
 [profile.release]
 codegen-units = 1
 lto = true

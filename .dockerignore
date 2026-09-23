@@ -3,10 +3,11 @@
 .env
 .env/
 .build/
-dist/
 docs/
 references/
 target/
+**/target/
+**/node_modules/
 packaging/docker/certs/
 packaging/docker/secrets/
 packaging/docker/private.env

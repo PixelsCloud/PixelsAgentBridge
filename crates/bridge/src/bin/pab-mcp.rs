@@ -14,9 +14,6 @@ use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 
-#[path = "pab-mcp/ui.rs"]
-mod ui;
-
 const PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -41,6 +38,9 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    if env::args_os().len() != 1 {
+        return Err("pab-mcp accepts no command-line arguments".into());
+    }
     let guest = env::var("PAB_MCP_GUEST").as_deref() != Ok("0");
     let config = if guest {
         BridgeConfig::register_guest_from_env().await?
@@ -60,8 +60,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             })
         };
     let passwords = Arc::new(MemoryDevicePasswordProvider::new(fallback));
-    let ui_control_url = config.control_url.clone();
-    let ui_control_ca_cert = config.control_ca_cert.clone();
     let runtime = Arc::new(
         BridgeRuntime::start(
             config,
@@ -70,43 +68,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?,
     );
-    let ui_only = env::args().any(|argument| argument == "--ui");
-    let ui_task = if ui_only || env::var_os("PAB_UI_PORT").is_some() {
-        let port = env::var("PAB_UI_PORT")
-            .ok()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(0);
-        let ui_runtime = Arc::clone(&runtime);
-        let ui_passwords = Arc::clone(&passwords);
-        Some(tokio::spawn(async move {
-            if let Err(error) = ui::serve(
-                ui_runtime,
-                ui_passwords,
-                ui_control_url,
-                ui_control_ca_cert,
-                port,
-            )
-            .await
-            {
-                tracing::error!(%error, "UI server failed");
-                eprintln!("pab-ui: {error}");
-            }
-        }))
-    } else {
-        None
-    };
-    if ui_only {
-        tokio::signal::ctrl_c().await?;
-        if let Some(task) = ui_task {
-            task.abort();
-            let _ = task.await;
-        }
-        Arc::try_unwrap(runtime)
-            .map_err(|_| "UI still holds the Bridge Runtime")?
-            .shutdown()
-            .await?;
-        return Ok(());
-    }
     let (sender, mut receiver) = mpsc::channel::<String>(32);
     std::thread::spawn(move || {
         for line in io::stdin().lock().lines() {
@@ -132,12 +93,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             stdout.flush()?;
         }
     }
-    if let Some(task) = ui_task {
-        task.abort();
-        let _ = task.await;
-    }
     Arc::try_unwrap(runtime)
-        .map_err(|_| "UI still holds the Bridge Runtime")?
+        .map_err(|_| "MCP still holds the Bridge Runtime")?
         .shutdown()
         .await?;
     Ok(())

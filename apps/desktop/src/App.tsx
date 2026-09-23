@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { initialLanguage, messages, type Language } from "./i18n";
+import { OperatorPanel } from "./OperatorPanel";
 import "./App.css";
 
 type DeviceStatus = {
@@ -35,11 +36,10 @@ function App() {
       setError("");
     } catch {
       setDevice(null);
-      setError(messages[language].statusFailed);
     } finally {
       setLoading(false);
     }
-  }, [language]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -121,6 +121,8 @@ function App() {
       {error && <div className="alert" role="alert">{error}</div>}
       {notice && <div className="notice" role="status">{notice}</div>}
 
+      <OperatorPanel language={language} />
+
       <section className="card access-card">
         <div className="section-heading">
           <div>
@@ -130,15 +132,17 @@ function App() {
           <span className="phase">{t.controlConnection}: {phase}</span>
         </div>
 
-        <div className="field">
+        {!loading && !device && <p>{t.localUnavailable}</p>}
+
+        {device && <div className="field">
           <label>{t.deviceCode}</label>
           <div className="value-row">
             <strong className="device-code">{device?.device_code ?? "·········"}</strong>
             <button className="secondary" disabled={!device} onClick={() => void copy(device?.device_code ?? "", t.deviceCode)}>{t.copy}</button>
           </div>
-        </div>
+        </div>}
 
-        <div className="field">
+        {device && <div className="field">
           <label>{t.temporaryPassword}</label>
           <div className="value-row">
             <strong className="password-value">{showPassword ? device?.temporary_password ?? "" : "••••••••••••"}</strong>
@@ -147,11 +151,11 @@ function App() {
             </button>
             <button className="secondary" disabled={!device} onClick={() => void copy(device?.temporary_password ?? "", t.temporaryPassword)}>{t.copy}</button>
           </div>
-        </div>
-        <p className="footnote">{t.accessFootnote}</p>
+        </div>}
+        {device && <p className="footnote">{t.accessFootnote}</p>}
       </section>
 
-      <section className="card">
+      {device && <section className="card">
         <div className="section-heading">
           <div>
             <h2>{t.claimTitle}</h2>
@@ -173,7 +177,7 @@ function App() {
         <button disabled={approving || !device} onClick={() => void approve()}>
           {approving ? t.approving : t.approve}
         </button>
-      </section>
+      </section>}
     </main>
   );
 }

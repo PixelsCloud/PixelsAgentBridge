@@ -2,6 +2,8 @@ use pab_agent_core::{DataPaths, DataScope};
 use pab_executor::{DeviceStatus, read_local_device_status};
 use pab_protocol::ClaimId;
 
+mod operator;
+
 #[tauri::command]
 fn device_status() -> Result<DeviceStatus, String> {
     read_local_device_status().map_err(|error| error.to_string())
@@ -22,12 +24,18 @@ async fn approve_claim(claim_id: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let paths = DataPaths::for_scope(DataScope::Machine)
-        .expect("could not find machine data directory");
-    pab_logging::init("desktop", paths.root())
-        .expect("could not initialize desktop log file");
+    let paths = DataPaths::for_scope(DataScope::User).expect("could not find user data directory");
+    pab_logging::init("desktop", paths.root()).expect("could not initialize desktop log file");
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![device_status, approve_claim])
+        .manage(operator::OperatorState::new())
+        .invoke_handler(tauri::generate_handler![
+            device_status,
+            approve_claim,
+            operator::operator_connect,
+            operator::operator_run_command,
+            operator::operator_task,
+            operator::operator_claim,
+        ])
         .run(tauri::generate_context!())
         .expect("could not start Pixels Agent Bridge desktop application");
 }

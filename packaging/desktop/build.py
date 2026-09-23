@@ -32,7 +32,7 @@ def package_windows():
             "pab-mcp.exe", "pab-bridge.exe", "pab-executor.exe"
         )),
         *(scripts / "windows" / name for name in (
-            "install.ps1", "run-ui.ps1", "run-executor.ps1", "run-device-ui.ps1", "uninstall.ps1"
+            "install.ps1", "run-app.ps1", "run-executor.ps1", "uninstall.ps1"
         )),
     ]
     for file in files:
@@ -47,9 +47,9 @@ def package_windows():
 def package_unix(platform, architecture, binaries):
     archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-release.tar.gz"
     files = [
-        *(binaries / name for name in ("pab-mcp", "pab-bridge", "pab-executor")),
+        *(binaries / name for name in ("pab-mcp", "pab-bridge", "pab-executor", "pab-desktop")),
         *(scripts / "unix" / name for name in (
-            "install.sh", "run-ui.sh", "run-executor.sh", "uninstall.sh"
+            "install.sh", "run-app.sh", "run-executor.sh", "uninstall.sh"
         )),
     ]
     for file in files:

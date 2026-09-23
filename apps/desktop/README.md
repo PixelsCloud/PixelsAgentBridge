@@ -1,18 +1,18 @@
 # Pixels Agent Bridge desktop
 
-The interactive desktop UI uses Tauri 2, React and TypeScript. The Executor
-continues to run as a separate background service. This first window reads the
-local machine's device code, current temporary password, and Executor heartbeat;
-it can approve a claim ID entered by the device administrator.
-The interface supports Simplified Chinese and English. It uses the system
-language on first launch and saves a manual choice locally.
+This is the single Tauri 2 + React desktop application. One window can show
+this computer's access code and temporary password, approve ownership, connect
+to other devices, and run native remote commands on multiple connections.
+The Executor remains a background process from the same installation.
 
-Run `npm ci` followed by `npm run build` to validate the frontend. Run
-`npm run tauri build` to build the desktop application on Windows. The Rust
-project under `src-tauri` is kept outside the core Cargo workspace to avoid
-compiling Tauri when building the server, Relay, Bridge or Executor.
+The interface supports Simplified Chinese and English. It starts with the
+system language and saves a manual choice locally. Remote command results
+update while tasks run. The app does not open a local HTTP interface.
 
-The window must run with permission to read the machine data directory. The
-device page does not open a local HTTP listener. The operator pages will be
-ported into this app next; the current `pab-mcp --ui` browser page remains a
-temporary test interface.
+Run `npm ci` and `npm run tauri build -- --no-bundle` on Windows. The Rust
+project under `src-tauri` is kept outside the core Cargo workspace, so server,
+Relay, Bridge, and Executor builds do not compile Tauri.
+
+The Windows app and Executor service share an installation, but ordinary users
+may lack permission to read protected machine credentials. Remote operation
+remains available; the local access panel reports that permission limit.

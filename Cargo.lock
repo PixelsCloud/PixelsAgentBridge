@@ -2806,7 +2806,6 @@ name = "pab-bridge"
 version = "0.1.0"
 dependencies = [
  "argon2",
- "axum",
  "iroh-base",
  "pab-agent-core",
  "pab-logging",

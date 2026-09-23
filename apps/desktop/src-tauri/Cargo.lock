@@ -3451,10 +3451,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-bridge"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "iroh-base",
+ "pab-agent-core",
+ "pab-logging",
+ "pab-protocol",
+ "pab-transport",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "pab-desktop"
 version = "0.1.0"
 dependencies = [
  "pab-agent-core",
+ "pab-bridge",
  "pab-executor",
  "pab-logging",
  "pab-protocol",
@@ -3462,7 +3483,9 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
