@@ -4,6 +4,7 @@ mod bootstrap;
 mod config;
 mod credential;
 mod device_status;
+pub mod local_ipc;
 mod network;
 mod runtime;
 mod session;

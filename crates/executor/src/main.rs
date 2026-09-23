@@ -16,6 +16,21 @@ async fn main() -> ExitCode {
         eprintln!("pab-executor: {error}");
         return ExitCode::FAILURE;
     }
+    if std::env::args().nth(1).as_deref() == Some("issue-local-access") {
+        let Some(destination) = std::env::args().nth(2) else {
+            eprintln!("usage: pab-executor issue-local-access <user-token-file>");
+            return ExitCode::FAILURE;
+        };
+        return match pab_executor::local_ipc::issue_local_access(std::path::Path::new(&destination))
+        {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                tracing::error!(%error, "could not issue local access");
+                eprintln!("pab-executor: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     if std::env::args().nth(1).as_deref() == Some("show-access") {
         return match show_access() {
             Ok(()) => ExitCode::SUCCESS,

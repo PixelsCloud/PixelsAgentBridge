@@ -2827,6 +2827,9 @@ name = "pab-executor"
 version = "0.1.0"
 dependencies = [
  "argon2",
+ "futures-util",
+ "hex",
+ "hmac",
  "iroh-base",
  "pab-agent-core",
  "pab-logging",
@@ -2837,10 +2840,12 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "sqlx",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-tungstenite",
  "tracing",
  "zeroize",
 ]

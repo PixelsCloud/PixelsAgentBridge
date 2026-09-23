@@ -14,11 +14,11 @@ use std::{
 };
 
 use pab_agent_core::{DataPaths, DataScope};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DeviceStatus {
     pub device_code: String,
     pub device_id: String,
@@ -32,7 +32,20 @@ pub fn read_local_device_status() -> Result<DeviceStatus, DeviceStatusError> {
     read_device_status(paths.root())
 }
 
-fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
+pub(crate) fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
+    read_device_status_with_service(root, false)
+}
+
+pub(crate) fn read_device_status_from_service(
+    root: &Path,
+) -> Result<DeviceStatus, DeviceStatusError> {
+    read_device_status_with_service(root, true)
+}
+
+fn read_device_status_with_service(
+    root: &Path,
+    service_alive: bool,
+) -> Result<DeviceStatus, DeviceStatusError> {
     let info: Value = serde_json::from_slice(&fs::read(root.join("device-info.json"))?)?;
     let field = |name: &'static str| -> Result<String, DeviceStatusError> {
         info.get(name)
@@ -63,7 +76,7 @@ fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
         device_code: field("device_code")?,
         device_id: field("device_id")?,
         temporary_password: password.trim().to_owned(),
-        executor_running: heartbeat_running || service_running(),
+        executor_running: service_alive || heartbeat_running || service_running(),
         control_phase,
     })
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
@@ -54,7 +55,18 @@ function App() {
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 3000);
-    return () => window.clearInterval(timer);
+    let active = true;
+    const unlisteners: (() => void)[] = [];
+    void listen<DeviceStatus>("local-device-status", (event) => {
+      setDevice(event.payload);
+      setLoading(false);
+    }).then((unlisten) => active ? unlisteners.push(unlisten) : unlisten());
+    void listen("local-device-offline", () => void refresh()).then((unlisten) => active ? unlisteners.push(unlisten) : unlisten());
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      unlisteners.forEach((unlisten) => unlisten());
+    };
   }, [refresh]);
 
   async function copy(value: string, label: string) {

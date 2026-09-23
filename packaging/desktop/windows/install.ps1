@@ -53,6 +53,12 @@ New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw 'Could not protect the Executor data directory'
 }
+$env:PAB_DATA_DIR = $dataRoot
+$userToken = Join-Path $env:LOCALAPPDATA 'PixelsAgentBridge\local-access.key'
+& (Join-Path $InstallRoot 'pab-executor.exe') issue-local-access $userToken
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not grant this user local device access'
+}
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     (Join-Path $InstallRoot 'run-executor.ps1') + '"'

@@ -40,6 +40,17 @@ chmod 644 "$install_dir/settings.env"
 
 if [[ $platform == Linux ]]; then
     install -d -m 700 /var/lib/pixels-agent-bridge
+    desktop_user=${SUDO_USER:-root}
+    user_home=$(getent passwd "$desktop_user" | cut -d: -f6)
+    if [[ -z $user_home ]]; then
+        echo "Cannot find home directory for $desktop_user" >&2
+        exit 2
+    fi
+    user_data="$user_home/.local/share/pixels-agent-bridge"
+    install -d -m 700 -o "$desktop_user" "$user_data"
+    PAB_DATA_DIR=/var/lib/pixels-agent-bridge \
+        "$install_dir/pab-executor" issue-local-access "$user_data/local-access.key"
+    chown "$desktop_user" "$user_data/local-access.key"
     cat > /etc/systemd/system/pixels-agent-bridge-executor.service <<UNIT
 [Unit]
 Description=Pixels Agent Bridge Executor
