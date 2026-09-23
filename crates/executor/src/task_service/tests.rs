@@ -83,7 +83,10 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
 #[tokio::test]
 async fn reopening_marks_an_accepted_task_interrupted() {
     let directory = tempfile::tempdir().unwrap();
-    let database = directory.path().join("tasks.sqlite3");
+    let database = directory
+        .path()
+        .join("persistent-data")
+        .join("tasks.sqlite3");
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
         deployment_id: DeploymentId::from_u128(11),

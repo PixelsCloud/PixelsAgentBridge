@@ -12,7 +12,7 @@ use super::store::*;
 #[tokio::test]
 async fn persists_submission_events_output_and_resume_cursor() {
     let directory = tempdir().unwrap();
-    let path = directory.path().join("bridge.db");
+    let path = directory.path().join("persistent-data").join("bridge.db");
     let store = RuntimeStore::open(&path).await.unwrap();
     let device_ref = device_ref();
     let request_id = RequestId::from_u128(4);

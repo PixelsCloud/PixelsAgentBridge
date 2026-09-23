@@ -1,6 +1,7 @@
 use std::{env, ffi::OsString, path::PathBuf, time::Duration};
 
 use iroh_base::RelayUrl;
+use pab_agent_core::{DataPathError, DataPaths, DataScope};
 use pab_protocol::{DeploymentId, TenantId, UserId};
 use thiserror::Error;
 
@@ -25,6 +26,12 @@ impl BridgeConfig {
     fn from_lookup(
         mut lookup: impl FnMut(&str) -> Option<OsString>,
     ) -> Result<Self, BridgeConfigError> {
+        let endpoint_secret_file = match lookup("PAB_ENDPOINT_SECRET_FILE") {
+            Some(path) => PathBuf::from(path),
+            None => {
+                DataPaths::for_scope_with(DataScope::User, &mut lookup)?.bridge_endpoint_secret()
+            }
+        };
         let config = Self {
             deployment_id: required_text(&mut lookup, "PAB_DEPLOYMENT_ID")?
                 .parse()
@@ -37,7 +44,7 @@ impl BridgeConfig {
                 .map_err(|error| invalid("PAB_USER_ID", error))?,
             control_url: required_text(&mut lookup, "PAB_CONTROL_URL")?,
             relay_urls: relay_urls(required_text(&mut lookup, "PAB_RELAY_URLS")?)?,
-            endpoint_secret_file: required_path(&mut lookup, "PAB_ENDPOINT_SECRET_FILE")?,
+            endpoint_secret_file,
             control_ca_cert: lookup("PAB_CONTROL_CA_CERT").map(PathBuf::from),
             relay_ca_cert: lookup("PAB_RELAY_CA_CERT").map(PathBuf::from),
             operation_timeout: Duration::from_secs(10),
@@ -90,15 +97,6 @@ fn required_text(
         .map_err(|_| BridgeConfigError::NotUnicode(name))
 }
 
-fn required_path(
-    lookup: &mut impl FnMut(&str) -> Option<OsString>,
-    name: &'static str,
-) -> Result<PathBuf, BridgeConfigError> {
-    lookup(name)
-        .map(PathBuf::from)
-        .ok_or(BridgeConfigError::Missing(name))
-}
-
 fn invalid(name: &'static str, error: impl std::fmt::Display) -> BridgeConfigError {
     BridgeConfigError::Invalid {
         name,
@@ -108,6 +106,8 @@ fn invalid(name: &'static str, error: impl std::fmt::Display) -> BridgeConfigErr
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum BridgeConfigError {
+    #[error(transparent)]
+    DataPath(#[from] DataPathError),
     #[error("{0} must be set")]
     Missing(&'static str),
     #[error("{0} must contain valid Unicode")]
@@ -122,4 +122,40 @@ pub enum BridgeConfigError {
     RelayTlsRequired(String),
     #[error("the Bridge operation timeout must be greater than zero")]
     ZeroOperationTimeout,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn default_endpoint_key_uses_persistent_user_data() {
+        let values = HashMap::from([
+            ("PAB_DATA_DIR", OsString::from("persistent-user-data")),
+            (
+                "PAB_DEPLOYMENT_ID",
+                OsString::from("00000000-0000-0000-0000-000000000001"),
+            ),
+            (
+                "PAB_TENANT_ID",
+                OsString::from("00000000-0000-0000-0000-000000000002"),
+            ),
+            (
+                "PAB_USER_ID",
+                OsString::from("00000000-0000-0000-0000-000000000003"),
+            ),
+            (
+                "PAB_CONTROL_URL",
+                OsString::from("wss://pab.example/control"),
+            ),
+            ("PAB_RELAY_URLS", OsString::from("https://relay.example")),
+        ]);
+        let config = BridgeConfig::from_lookup(|name| values.get(name).cloned()).unwrap();
+        assert_eq!(
+            config.endpoint_secret_file,
+            PathBuf::from("persistent-user-data/bridge-endpoint.key")
+        );
+    }
 }

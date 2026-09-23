@@ -4,6 +4,11 @@ This Compose stack runs PostgreSQL 17, the TLS control backend, and the TLS/QUIC
 iroh Relay. The image is deliberately compiled with Cargo's Debug (`dev`) profile
 while the implementation is under validation.
 
+PostgreSQL uses the named `postgres-data` volume, so replacing images or running
+`docker compose down` keeps accounts, device UUID/code mappings, and grants. Do not
+use `docker compose down -v` for an ordinary uninstall or upgrade; removing that
+volume is an explicit data reset.
+
 Copy `example.env` to a private env file, generate a UUID for
 `PAB_DEPLOYMENT_ID`, and keep that UUID unchanged. Create a random Relay control
 secret containing at least 32 bytes at the path named by

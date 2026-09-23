@@ -7,6 +7,7 @@ mod device_network_resolver;
 mod enrollment;
 mod identity;
 mod peer_authorizer;
+mod storage_paths;
 mod supervisor;
 mod tls;
 
@@ -19,5 +20,8 @@ pub use device_network_resolver::{DeviceNetworkResolutionError, DeviceNetworkRes
 pub use enrollment::{EndpointEnrollment, EnrollmentError, enroll_account_with_device};
 pub use identity::{EndpointSecretError, read_endpoint_secret};
 pub use peer_authorizer::{DevicePeerAuthorizer, PeerAuthorizationError};
+pub use storage_paths::{
+    DataPathError, DataPaths, DataScope, ensure_data_dir, ensure_data_parent, persistent_data_dir,
+};
 pub use supervisor::{EndpointControlSupervisor, EndpointControlSupervisorHandle};
 pub use tls::{TlsConnectorError, tls_connector};

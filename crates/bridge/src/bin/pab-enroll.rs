@@ -1,7 +1,7 @@
 use std::{env, fs, io::Write, path::PathBuf, process::ExitCode, time::Duration};
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
-use pab_agent_core::{enroll_account_with_device, tls_connector};
+use pab_agent_core::{DataPaths, DataScope, enroll_account_with_device, tls_connector};
 use pab_protocol::DeploymentId;
 use rand_core::OsRng;
 use thiserror::Error;
@@ -24,7 +24,10 @@ async fn run() -> Result<(), EnrollCliError> {
     let account_password_file = PathBuf::from(args.next().ok_or(EnrollCliError::Usage)?);
     let device_name = args.next().ok_or(EnrollCliError::Usage)?;
     let device_password_file = PathBuf::from(args.next().ok_or(EnrollCliError::Usage)?);
-    let output_directory = PathBuf::from(args.next().ok_or(EnrollCliError::Usage)?);
+    let output_directory = match args.next() {
+        Some(path) => PathBuf::from(path),
+        None => DataPaths::for_scope(DataScope::User)?.root().to_path_buf(),
+    };
     if args.next().is_some() {
         return Err(EnrollCliError::Usage);
     }
@@ -100,7 +103,7 @@ async fn run() -> Result<(), EnrollCliError> {
 }
 
 fn prepare_output_directory(path: &PathBuf) -> Result<(), EnrollCliError> {
-    fs::create_dir_all(path)?;
+    pab_agent_core::ensure_data_dir(path)?;
     for name in [
         "bridge-endpoint.key",
         "device-endpoint.key",
@@ -155,8 +158,10 @@ fn secret_hex(bytes: [u8; 32]) -> String {
 
 #[derive(Debug, Error)]
 enum EnrollCliError {
+    #[error(transparent)]
+    DataPath(#[from] pab_agent_core::DataPathError),
     #[error(
-        "usage: pab-enroll <username> <account-password-file> <device-name> <device-password-file> <output-directory>"
+        "usage: pab-enroll <username> <account-password-file> <device-name> <device-password-file> [output-directory]"
     )]
     Usage,
     #[error("{0} must be set")]

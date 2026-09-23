@@ -146,10 +146,31 @@ The Bridge checks the current workspace membership and device grant before resol
 it to the internal UUID. Resolution also works when the device is offline, so a
 submitted task can wait for reconnection. The Debug CLI requires the nine-digit code.
 
-Set `PAB_BRIDGE_DATABASE` to the Bridge Runtime SQLite file. When it is absent, the
-Debug CLI places `pab-bridge.sqlite3` beside `PAB_ENDPOINT_SECRET_FILE`. The database
-contains task metadata, events, cursors, and retained output; it never contains the
-device password or endpoint private key.
+The Bridge Runtime defaults to `bridge.sqlite3` in the persistent user data directory.
+The Executor defaults to `device-endpoint.key`, `device-credential.json`, and
+`executor.sqlite3` in the persistent machine data directory. `PAB_ENDPOINT_SECRET_FILE`,
+`PAB_DEVICE_CREDENTIAL_FILE`, `PAB_BRIDGE_DATABASE`, and `PAB_TASK_DATABASE` still
+override individual paths; `PAB_DATA_DIR` overrides the data directory for either
+process; set it to an absolute path outside the installation directory. SQLite creates
+the parent directory when needed. The Bridge database contains
+task metadata, events, cursors, and retained output; it never contains the device
+password or endpoint private key.
+
+| OS | Bridge user data | Executor machine data |
+| --- | --- | --- |
+| Windows | `%LOCALAPPDATA%\PixelsAgentBridge` | `%PROGRAMDATA%\PixelsAgentBridge` |
+| macOS | `~/Library/Application Support/PixelsAgentBridge` | `/Library/Application Support/PixelsAgentBridge` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/pixels-agent-bridge` | `/var/lib/pixels-agent-bridge` |
+
+Keep the enrollment identity files and the Bridge device-password file in persistent
+data storage, not beside installed binaries. Move the Executor identity and credential
+files to its machine data directory on the remote computer. Reinstalling the program
+must reuse these files and the existing server database; do not re-enroll an existing
+device. Future uninstallers must remove binaries and services only, leaving these
+data directories untouched unless the user separately requests a data reset.
+The installer must create the machine directory with write access for the Executor
+service account; Unix-created data directories use mode `0700`, while Windows
+installer ACLs must restrict access to that service account and administrators.
 
 Set `PAB_REQUEST_ID` to a caller-generated UUID when a durable caller must retry the
 same submission across process restarts. Reusing it with different command input is
@@ -163,7 +184,9 @@ account, user Endpoint, and device Endpoint:
 cargo run -p pab-bridge --bin pab-enroll -- <username> <account-password-file> <device-name> <device-password-file> <new-output-directory>
 ```
 
-The output directory is created before the network request and must not contain any
+The output directory argument is optional; without it, enrollment writes to the
+persistent Bridge user data directory. The output directory is created before the
+network request and must not contain any
 generated filename. It receives two Endpoint key files, the local Argon2 device
 credential, and a non-secret enrollment manifest. Keep the device Endpoint key and
 credential on the Executor; keep the user Endpoint key and cleartext device password

@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use pab_agent_core::{DataPaths, DataScope};
 use pab_bridge::{
     BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, FileDevicePasswordProvider, RuntimeError,
 };
@@ -40,13 +41,10 @@ async fn run() -> Result<(), CliError> {
     let password_file = env::var_os("PAB_DEVICE_PASSWORD_FILE")
         .map(PathBuf::from)
         .ok_or(CliError::MissingPasswordFile)?;
-    let database_file = env::var_os("PAB_BRIDGE_DATABASE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            config
-                .endpoint_secret_file
-                .with_file_name("pab-bridge.sqlite3")
-        });
+    let database_file = match env::var_os("PAB_BRIDGE_DATABASE") {
+        Some(path) => PathBuf::from(path),
+        None => DataPaths::for_scope(DataScope::User)?.bridge_database(),
+    };
     let runtime = BridgeRuntime::start(
         config,
         BridgeRuntimeConfig::new(database_file),
@@ -222,6 +220,8 @@ const fn stream_name(stream: OutputStream) -> &'static str {
 
 #[derive(Debug, Error)]
 enum CliError {
+    #[error(transparent)]
+    DataPath(#[from] pab_agent_core::DataPathError),
     #[error(
         "usage: pab-bridge command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow <9-digit-device-code> <task-id>"
     )]

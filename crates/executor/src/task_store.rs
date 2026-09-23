@@ -42,6 +42,7 @@ pub(crate) struct TaskStore {
 
 impl TaskStore {
     pub async fn open(path: &Path) -> Result<Self, TaskStoreError> {
+        pab_agent_core::ensure_data_parent(path).map_err(TaskStoreError::Io)?;
         let options = SqliteConnectOptions::new()
             .filename(path)
             .create_if_missing(true)

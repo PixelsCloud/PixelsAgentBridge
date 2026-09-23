@@ -48,6 +48,7 @@ pub(super) struct OutputGap {
 
 impl RuntimeStore {
     pub async fn open(path: &Path) -> Result<Self, RuntimeStoreError> {
+        pab_agent_core::ensure_data_parent(path).map_err(RuntimeStoreError::Io)?;
         let options = SqliteConnectOptions::new()
             .filename(path)
             .create_if_missing(true)
@@ -559,6 +560,8 @@ fn from_i64(value: i64) -> Result<u64, RuntimeStoreError> {
 
 #[derive(Debug, Error)]
 pub enum RuntimeStoreError {
+    #[error("Bridge Runtime data directory could not be created: {0}")]
+    Io(std::io::Error),
     #[error(transparent)]
     Database(#[from] sqlx::Error),
     #[error(transparent)]
