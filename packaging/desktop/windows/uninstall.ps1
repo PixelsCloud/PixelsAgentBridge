@@ -14,6 +14,12 @@ if ($task) {
     Unregister-ScheduledTask -TaskName 'PixelsAgentBridgeExecutor' -Confirm:$false
 }
 
+foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor')) {
+    Get-Process -Name $processName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -eq (Join-Path $InstallRoot "$processName.exe") } |
+        Stop-Process -Force
+}
+
 foreach ($name in @(
     'pab-mcp.exe',
     'pab-bridge.exe',
