@@ -1,15 +1,20 @@
 use std::{env, ffi::OsString, path::PathBuf, time::Duration};
 
 use iroh_base::RelayUrl;
-use pab_agent_core::{DataPathError, DataPaths, DataScope};
-use pab_protocol::{DeploymentId, TenantId, UserId};
+use pab_agent_core::{
+    DataPathError, DataPaths, DataScope, OpenRegistrationKind, load_or_create_endpoint_secret,
+    register_open_endpoint, tls_connector,
+};
+use pab_protocol::{
+    DeploymentId, EndpointKey, EndpointProofPrincipal, OperatorRef, TenantId, UserId,
+};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BridgeConfig {
     pub deployment_id: DeploymentId,
     pub tenant_id: TenantId,
-    pub user_id: UserId,
+    pub identity: BridgeIdentity,
     pub control_url: String,
     pub relay_urls: Vec<RelayUrl>,
     pub endpoint_secret_file: PathBuf,
@@ -18,9 +23,73 @@ pub struct BridgeConfig {
     pub operation_timeout: Duration,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BridgeIdentity {
+    Account(UserId),
+    Guest,
+}
+
+impl BridgeIdentity {
+    pub fn principal(self) -> EndpointProofPrincipal {
+        match self {
+            Self::Account(user_id) => EndpointProofPrincipal::User { user_id },
+            Self::Guest => EndpointProofPrincipal::Guest,
+        }
+    }
+    pub fn operator(self, endpoint_key: EndpointKey) -> OperatorRef {
+        match self {
+            Self::Account(user_id) => OperatorRef::Account(user_id),
+            Self::Guest => OperatorRef::Guest {
+                guest_endpoint_key: endpoint_key,
+            },
+        }
+    }
+}
+
 impl BridgeConfig {
+    pub async fn register_guest_from_env() -> Result<Self, GuestConfigError> {
+        let paths = DataPaths::for_scope(DataScope::User)?;
+        let secret_path = paths.root().join("guest-endpoint.key");
+        let secret = load_or_create_endpoint_secret(&secret_path)?;
+        let control_url = env::var("PAB_CONTROL_URL")
+            .map_err(|_| GuestConfigError::Missing("PAB_CONTROL_URL"))?;
+        let deployment_id: DeploymentId = env::var("PAB_DEPLOYMENT_ID")
+            .map_err(|_| GuestConfigError::Missing("PAB_DEPLOYMENT_ID"))?
+            .parse()
+            .map_err(|_| GuestConfigError::InvalidDeployment)?;
+        let ca = env::var_os("PAB_CONTROL_CA_CERT")
+            .map(std::fs::read)
+            .transpose()?;
+        let connector = tls_connector(ca.as_deref())?;
+        let result = register_open_endpoint(
+            &control_url,
+            deployment_id,
+            &secret,
+            OpenRegistrationKind::Guest,
+            connector,
+            Duration::from_secs(10),
+        )
+        .await?;
+        let pab_protocol::EndpointRegistrationResult::Guest { tenant_id, .. } = result else {
+            return Err(GuestConfigError::InvalidResult);
+        };
+        Ok(Self::from_env_guest(tenant_id, secret_path)?)
+    }
+
     pub fn from_env() -> Result<Self, BridgeConfigError> {
         Self::from_lookup(|name| env::var_os(name))
+    }
+
+    pub fn from_env_guest(
+        tenant_id: TenantId,
+        secret_file: PathBuf,
+    ) -> Result<Self, BridgeConfigError> {
+        Self::from_lookup(|name| match name {
+            "PAB_GUEST" => Some(OsString::from("1")),
+            "PAB_TENANT_ID" => Some(OsString::from(tenant_id.to_string())),
+            "PAB_ENDPOINT_SECRET_FILE" => Some(secret_file.clone().into_os_string()),
+            _ => env::var_os(name),
+        })
     }
 
     fn from_lookup(
@@ -39,9 +108,14 @@ impl BridgeConfig {
             tenant_id: required_text(&mut lookup, "PAB_TENANT_ID")?
                 .parse()
                 .map_err(|error| invalid("PAB_TENANT_ID", error))?,
-            user_id: required_text(&mut lookup, "PAB_USER_ID")?
-                .parse()
-                .map_err(|error| invalid("PAB_USER_ID", error))?,
+            identity: match lookup("PAB_GUEST") {
+                Some(value) if value == "1" => BridgeIdentity::Guest,
+                _ => BridgeIdentity::Account(
+                    required_text(&mut lookup, "PAB_USER_ID")?
+                        .parse()
+                        .map_err(|error| invalid("PAB_USER_ID", error))?,
+                ),
+            },
             control_url: required_text(&mut lookup, "PAB_CONTROL_URL")?,
             relay_urls: relay_urls(required_text(&mut lookup, "PAB_RELAY_URLS")?)?,
             endpoint_secret_file,
@@ -122,6 +196,28 @@ pub enum BridgeConfigError {
     RelayTlsRequired(String),
     #[error("the Bridge operation timeout must be greater than zero")]
     ZeroOperationTimeout,
+}
+
+#[derive(Debug, Error)]
+pub enum GuestConfigError {
+    #[error("{0} must be set")]
+    Missing(&'static str),
+    #[error("PAB_DEPLOYMENT_ID is invalid")]
+    InvalidDeployment,
+    #[error("guest registration returned an unexpected result")]
+    InvalidResult,
+    #[error(transparent)]
+    Config(#[from] BridgeConfigError),
+    #[error(transparent)]
+    DataPath(#[from] DataPathError),
+    #[error(transparent)]
+    Secret(#[from] pab_agent_core::EndpointSecretError),
+    #[error(transparent)]
+    Registration(#[from] pab_agent_core::OpenRegistrationError),
+    #[error(transparent)]
+    Tls(#[from] pab_agent_core::TlsConnectorError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 #[cfg(test)]

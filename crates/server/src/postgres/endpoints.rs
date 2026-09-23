@@ -105,8 +105,10 @@ impl PostgresStore {
                     .expect("generated nine-digit code");
             let inserted = sqlx::query_scalar::<_, uuid::Uuid>(
                 r#"
-                INSERT INTO devices (id, tenant_id, code, name, registered_by_user_id)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO devices (
+                    id, tenant_id, owner_tenant_id, code, name, registered_by_user_id
+                )
+                VALUES ($1, $2, $2, $3, $4, $5)
                 ON CONFLICT (code) DO NOTHING
                 RETURNING id
                 "#,
@@ -222,7 +224,8 @@ impl PostgresStore {
         let endpoint_rows = sqlx::query(
             r#"
             SELECT e.endpoint_key, e.tenant_id, e.owner_kind, e.user_id, e.device_id,
-                   tenant.kind AS tenant_kind
+                   tenant.kind AS tenant_kind,
+                   COALESCE(device.owner_tenant_id, e.tenant_id) AS relay_tenant_id
             FROM endpoints e
             JOIN tenants tenant ON tenant.id = e.tenant_id AND tenant.status = 'active'
             LEFT JOIN users u ON u.id = e.user_id
@@ -235,6 +238,7 @@ impl PostgresStore {
                   (e.owner_kind = 'user' AND u.status = 'active' AND m.status = 'active')
                   OR
                   (e.owner_kind = 'device' AND device.status = 'active')
+                  OR (e.owner_kind = 'guest' AND tenant.kind = 'guest')
               )
             ORDER BY e.endpoint_key
             "#,
@@ -244,6 +248,30 @@ impl PostgresStore {
         let endpoints = endpoint_rows
             .into_iter()
             .map(endpoint_policy_from_row)
+            .collect::<Result<Vec<_>, StoreError>>()?;
+
+        let grant_rows = sqlx::query(
+            "SELECT intent.guest_endpoint_key, intent.device_id, intent.expires_at \
+             FROM guest_device_intents intent \
+             JOIN endpoints guest ON guest.endpoint_key = intent.guest_endpoint_key AND guest.owner_kind = 'guest' AND guest.status = 'active' \
+             JOIN devices device ON device.id = intent.device_id AND device.status = 'active' \
+             WHERE intent.expires_at > now()",
+        ).fetch_all(&self.pool).await?;
+        let guest_grants = grant_rows
+            .into_iter()
+            .map(|row| {
+                let key: [u8; 32] = row
+                    .try_get::<Vec<u8>, _>("guest_endpoint_key")?
+                    .try_into()
+                    .map_err(|_| {
+                        StoreError::InvalidData("endpoint key is not 32 bytes".to_owned())
+                    })?;
+                Ok(pab_protocol::GuestRelayGrant {
+                    guest_endpoint_key: EndpointKey::new(key),
+                    device_id: DeviceId::from_uuid(row.try_get("device_id")?),
+                    expires_at_unix_ms: support::unix_millis(row.try_get("expires_at")?)?,
+                })
+            })
             .collect::<Result<Vec<_>, StoreError>>()?;
 
         let issued_at = OffsetDateTime::now_utc();
@@ -263,6 +291,7 @@ impl PostgresStore {
             defaults,
             team_limits,
             endpoints,
+            guest_grants,
         };
         snapshot
             .validate()
@@ -294,9 +323,10 @@ fn endpoint_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RelayEndpointP
             RelayEndpointOwner::User { scope }
         }
         "device" => RelayEndpointOwner::Device {
-            tenant_id,
+            tenant_id: TenantId::from_uuid(row.try_get("relay_tenant_id")?),
             device_id: DeviceId::from_uuid(row.try_get("device_id")?),
         },
+        "guest" => RelayEndpointOwner::Guest,
         other => {
             return Err(StoreError::InvalidData(format!(
                 "unknown endpoint owner kind {other}"

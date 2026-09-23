@@ -20,7 +20,7 @@ impl PostgresStore {
             SELECT EXISTS (
                 SELECT 1
                 FROM memberships membership
-                JOIN devices device ON device.tenant_id = membership.tenant_id
+                JOIN devices device ON device.owner_tenant_id = membership.tenant_id
                 JOIN tenants tenant ON tenant.id = membership.tenant_id
                 JOIN users target_user ON target_user.id = membership.user_id
                 WHERE membership.tenant_id = $1

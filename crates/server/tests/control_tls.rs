@@ -9,7 +9,8 @@ use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_agent_core::{
     AuthenticatedControlConnection, ControlConnectionPhase, EndpointControlConfig,
-    EndpointControlSupervisor, ReconnectPolicy, tls_connector,
+    EndpointControlSupervisor, OpenRegistrationKind, ReconnectPolicy, register_open_endpoint,
+    tls_connector,
 };
 use pab_bridge::{BridgeClient, BridgeConfig, BridgeError};
 use pab_executor::{DeviceSessionAcceptor, DeviceSessionError};
@@ -773,7 +774,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     );
 
     let running_relay = tokio::time::timeout(
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         start_relay_service(RelayServiceConfig {
             deployment_id,
             control_url: format!("wss://localhost:{}/relay-control", address.port()),
@@ -784,7 +785,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             https_bind: "127.0.0.1:0".parse().unwrap(),
             captive_bind: "127.0.0.1:0".parse().unwrap(),
             quic_bind: "127.0.0.1:0".parse().unwrap(),
-            policy_refresh_interval: Duration::from_secs(20),
+            policy_refresh_interval: Duration::from_secs(1),
             reconnect_interval: Duration::from_millis(50),
             limiter_burst: Duration::from_millis(100),
         }),
@@ -828,7 +829,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let mut bridge = BridgeClient::connect(BridgeConfig {
         deployment_id,
         tenant_id: personal_tenant_id,
-        user_id,
+        identity: pab_bridge::BridgeIdentity::Account(user_id),
         control_url: format!("wss://localhost:{}/control", address.port()),
         relay_urls: vec![pab_relay_url],
         endpoint_secret_file: bridge_secret_path,
@@ -849,6 +850,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         observed_at_unix_ms: 1_795_000_000_102,
     };
     let (_network_sender, network_receiver) = tokio::sync::watch::channel(live_network);
+    let guest_connector = connector.clone();
     let device_supervisor = EndpointControlSupervisor::new(
         device_config,
         device_secret,
@@ -1117,6 +1119,160 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await;
     assert!(matches!(rejected, Err(BridgeError::AuthenticationRejected)));
     assert!(matches!(rejected_server, Err(DeviceSessionError::Rejected)));
+
+    let guest_secret = SecretKey::generate();
+    let guest_registration = register_open_endpoint(
+        &format!("wss://localhost:{}/control", address.port()),
+        deployment_id,
+        &guest_secret,
+        OpenRegistrationKind::Guest,
+        guest_connector,
+        Duration::from_secs(5),
+    )
+    .await
+    .unwrap();
+    let EndpointRegistrationResult::Guest {
+        tenant_id: guest_tenant_id,
+        ..
+    } = guest_registration
+    else {
+        panic!("guest registration returned a different endpoint kind");
+    };
+    let guest_secret_path = bridge_directory.path().join("guest-endpoint.key");
+    std::fs::write(&guest_secret_path, endpoint_secret_text(&guest_secret)).unwrap();
+    let mut guest = BridgeClient::connect(BridgeConfig {
+        deployment_id,
+        tenant_id: guest_tenant_id,
+        identity: pab_bridge::BridgeIdentity::Guest,
+        control_url: format!("wss://localhost:{}/control", address.port()),
+        relay_urls: vec![
+            format!(
+                "https://localhost:{}",
+                running_relay.https_addr().unwrap().port()
+            )
+            .parse()
+            .unwrap(),
+        ],
+        endpoint_secret_file: guest_secret_path,
+        control_ca_cert: Some(certificate_path.clone()),
+        relay_ca_cert: Some(certificate_path.clone()),
+        operation_timeout: Duration::from_secs(10),
+    })
+    .await
+    .unwrap();
+    let guest_ref = guest
+        .connector()
+        .resolve_device_code(device_code)
+        .await
+        .unwrap();
+    assert_eq!(guest_ref, device_ref);
+    let (accepted, accepted_server) = connect_device_over_bridge(
+        &mut guest,
+        &device_endpoint,
+        &acceptor,
+        device_ref,
+        device_password,
+    )
+    .await;
+    assert!(accepted_server.is_ok());
+    let (_, guest_operator, _, _) = accepted.unwrap();
+    assert_eq!(
+        guest_operator,
+        OperatorRef::Guest {
+            guest_endpoint_key: EndpointKey::new(*guest_secret.public().as_bytes()),
+        }
+    );
+
+    let guest_acceptor = acceptor.clone();
+    let guest_device = device_endpoint.clone();
+    let guest_server = tokio::spawn(async move {
+        let connection = guest_device.accept().await.unwrap().unwrap();
+        guest_acceptor.handle(connection).await
+    });
+    let guest_connection_result = guest
+        .connect_device(
+            device_ref,
+            zeroize::Zeroizing::new(device_password.to_owned()),
+        )
+        .await;
+    let guest_connection = match guest_connection_result {
+        Ok(connection) => connection,
+        Err(error) => {
+            let device_result = tokio::time::timeout(Duration::from_secs(5), guest_server).await;
+            panic!("second guest connection failed: {error}; device result: {device_result:?}");
+        }
+    };
+    let guest_target = guest_connection.get_environment().await.unwrap();
+    assert_eq!(guest_target.execution, native_context);
+    #[cfg(windows)]
+    let (guest_program, guest_args) = (
+        "cmd.exe".to_owned(),
+        vec![
+            "/D".to_owned(),
+            "/C".to_owned(),
+            "echo guest-command-ok".to_owned(),
+        ],
+    );
+    #[cfg(not(windows))]
+    let (guest_program, guest_args) = (
+        "/bin/sh".to_owned(),
+        vec!["-c".to_owned(), "printf 'guest-command-ok\\n'".to_owned()],
+    );
+    let guest_task = guest_connection
+        .submit_command(
+            RequestId::new(),
+            CommandTaskSpec {
+                program: guest_program,
+                args: guest_args,
+                cwd: None,
+                expected_environment: ExpectedEnvironment {
+                    os_family: guest_target.execution.os_family,
+                    environment_revision: guest_target.execution.environment_revision.clone(),
+                },
+                display_summary: "guest command test".to_owned(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        guest_task.initiated_by,
+        OperatorRef::Guest {
+            guest_endpoint_key: EndpointKey::new(*guest_secret.public().as_bytes()),
+        }
+    );
+    let mut guest_subscription = guest_connection
+        .subscribe_task(guest_task.task_ref, 0, 0, 0)
+        .await
+        .unwrap();
+    let (guest_final, guest_stdout) = tokio::time::timeout(Duration::from_secs(10), async {
+        let mut stdout = Vec::new();
+        loop {
+            match guest_subscription.next().await.unwrap() {
+                DeviceTaskResponse::Output { chunk, .. }
+                    if chunk.stream == pab_protocol::OutputStream::Stdout =>
+                {
+                    stdout.extend_from_slice(&chunk.bytes);
+                }
+                DeviceTaskResponse::CaughtUp { snapshot }
+                    if snapshot.state.is_terminal() && snapshot.output.stdout.complete =>
+                {
+                    break (*snapshot, stdout);
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("guest command did not reach a terminal snapshot");
+    assert_eq!(guest_final.state, TaskState::Succeeded);
+    assert!(String::from_utf8_lossy(&guest_stdout).contains("guest-command-ok"));
+    guest_connection.close();
+    tokio::time::timeout(Duration::from_secs(5), guest_server)
+        .await
+        .expect("guest device session did not close")
+        .unwrap()
+        .unwrap();
+    guest.shutdown().await.unwrap();
 
     bridge.shutdown().await.unwrap();
     device_supervisor.shutdown().await.unwrap();

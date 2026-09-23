@@ -127,4 +127,95 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     .await
     .unwrap();
     assert_eq!((users, devices, guests), (0, 1, 1));
+
+    let guest_key = EndpointKey::new(*guest_secret.public().as_bytes());
+    let device_ref = store
+        .guest_resolve_device_code(guest_key, first.code, DeploymentId::from_u128(1))
+        .await
+        .unwrap();
+    assert_eq!(device_ref.device_id, first.id);
+    let device_endpoint = control
+        .registered_endpoint(EndpointKey::new(*device_secret.public().as_bytes()))
+        .await
+        .unwrap();
+    let authorized = store
+        .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
+        .await
+        .unwrap();
+    assert_eq!(
+        authorized.operator,
+        pab_protocol::OperatorRef::Guest {
+            guest_endpoint_key: guest_key
+        }
+    );
+    let policy = store
+        .relay_policy_snapshot(Duration::from_secs(30))
+        .await
+        .unwrap();
+    assert_eq!(policy.guest_grants.len(), 1);
+    assert_eq!(policy.guest_grants[0].device_id, first.id);
+
+    let account = control
+        .register_account("claim-owner", "long enough test password")
+        .await
+        .unwrap();
+    let owner_key = SecretKey::generate();
+    control
+        .register_user_endpoint(proof(
+            &owner_key,
+            EndpointProofPrincipal::User {
+                user_id: account.id,
+            },
+            account.personal_tenant_id,
+            EndpointProofPurpose::RegisterUserEndpoint,
+        ))
+        .await
+        .unwrap();
+    let claim_id = control
+        .begin_device_claim(account.id, first.code, account.personal_tenant_id)
+        .await
+        .unwrap();
+    let (claimed_id, owner_tenant) = control
+        .approve_device_claim(&device_endpoint, claim_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        (claimed_id, owner_tenant),
+        (first.id, account.personal_tenant_id)
+    );
+    assert!(
+        control
+            .approve_device_claim(&device_endpoint, claim_id)
+            .await
+            .is_err()
+    );
+    assert!(
+        control
+            .begin_device_claim(account.id, first.code, account.personal_tenant_id)
+            .await
+            .is_err()
+    );
+    let resolved = store
+        .resolve_device_code(
+            EndpointKey::new(*owner_key.public().as_bytes()),
+            account.id,
+            account.personal_tenant_id,
+            DeploymentId::from_u128(1),
+            first.code,
+        )
+        .await
+        .unwrap();
+    assert_eq!(resolved.tenant_id, first.tenant_id);
+    let authorized_owner = store
+        .authorize_device_peer(
+            &device_endpoint,
+            first.id,
+            EndpointKey::new(*owner_key.public().as_bytes()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        authorized_owner.operator,
+        pab_protocol::OperatorRef::Account(account.id)
+    );
 }

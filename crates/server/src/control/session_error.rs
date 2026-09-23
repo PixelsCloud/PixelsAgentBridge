@@ -43,6 +43,10 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidState,
             "an endpoint proof challenge is already pending".to_owned(),
         ),
+        ControlSessionError::RateLimited => (
+            ControlErrorCode::RateLimited,
+            "too many attempts on this connection".to_owned(),
+        ),
         ControlSessionError::EndpointAuthenticationFailed => (
             ControlErrorCode::InvalidCredentials,
             "endpoint authentication failed".to_owned(),
@@ -133,6 +137,8 @@ pub(super) fn error_response(
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum ControlSessionError {
+    #[error("too many attempts on this connection")]
+    RateLimited,
     #[error("account login is required")]
     NotAuthenticated,
     #[error("connection is already authenticated")]

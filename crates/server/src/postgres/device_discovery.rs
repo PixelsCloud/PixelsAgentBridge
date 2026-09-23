@@ -1,12 +1,67 @@
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceCode, DeviceId, DeviceNetworkSnapshot,
-    DeviceRef, EndpointKey, TenantId, UserId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceCode, DeviceDirectoryEntry, DeviceId,
+    DeviceNetworkSnapshot, DeviceRef, EndpointKey, TenantId, UserId,
 };
 
 use super::*;
 use crate::domain::DEVICE_CONNECT_CAPABILITY;
 
 impl PostgresStore {
+    pub async fn list_authorized_devices(
+        &self,
+        requester_key: EndpointKey,
+        requester_user: UserId,
+        requester_tenant: TenantId,
+        deployment_id: DeploymentId,
+    ) -> Result<Vec<DeviceDirectoryEntry>, StoreError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT device.id, device.tenant_id AS device_tenant_id,
+                   device.code, device.name
+            FROM endpoints requester
+            JOIN memberships member
+              ON member.tenant_id = requester.tenant_id
+             AND member.user_id = requester.user_id
+             AND member.status = 'active'
+            JOIN device_grants grant_row
+              ON grant_row.tenant_id = member.tenant_id
+             AND grant_row.user_id = member.user_id
+             AND (grant_row.capability_bits & $4) = $4
+            JOIN devices device
+              ON device.id = grant_row.device_id
+             AND device.owner_tenant_id = member.tenant_id
+             AND device.status = 'active'
+            WHERE requester.endpoint_key = $1
+              AND requester.tenant_id = $2
+              AND requester.user_id = $3
+              AND requester.owner_kind = 'user'
+              AND requester.status = 'active'
+            ORDER BY device.name, device.code
+            "#,
+        )
+        .bind(requester_key.as_bytes().as_slice())
+        .bind(requester_tenant.as_uuid())
+        .bind(requester_user.as_uuid())
+        .bind(DEVICE_CONNECT_CAPABILITY)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(DeviceDirectoryEntry {
+                    device_ref: DeviceRef {
+                        deployment_id,
+                        tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
+                        device_id: DeviceId::from_uuid(row.try_get("id")?),
+                    },
+                    code: DeviceCode::new(row.try_get::<i32, _>("code")? as u32)
+                        .map_err(|error| StoreError::InvalidData(error.to_string()))?,
+                    name: row.try_get("name")?,
+                    owner_tenant_id: requester_tenant,
+                })
+            })
+            .collect()
+    }
+
     pub async fn resolve_device_code(
         &self,
         requester_key: EndpointKey,
@@ -15,9 +70,9 @@ impl PostgresStore {
         deployment_id: DeploymentId,
         code: DeviceCode,
     ) -> Result<DeviceRef, StoreError> {
-        let device_id: uuid::Uuid = sqlx::query_scalar(
+        let row = sqlx::query(
             r#"
-            SELECT device.id
+            SELECT device.id, device.tenant_id AS device_tenant_id
             FROM endpoints requester
             JOIN memberships membership
               ON membership.tenant_id = requester.tenant_id
@@ -26,7 +81,7 @@ impl PostgresStore {
             JOIN tenants tenant
               ON tenant.id = requester.tenant_id AND tenant.status = 'active'
             JOIN devices device
-              ON device.tenant_id = requester.tenant_id
+              ON device.owner_tenant_id = requester.tenant_id
              AND device.code = $4 AND device.status = 'active'
             WHERE requester.endpoint_key = $1
               AND requester.tenant_id = $2
@@ -35,7 +90,7 @@ impl PostgresStore {
               AND requester.status = 'active'
               AND EXISTS (
                   SELECT 1 FROM device_grants grant_row
-                  WHERE grant_row.tenant_id = device.tenant_id
+                  WHERE grant_row.tenant_id = requester.tenant_id
                     AND grant_row.device_id = device.id
                     AND grant_row.user_id = requester.user_id
                     AND (grant_row.capability_bits & $5) = $5
@@ -52,8 +107,8 @@ impl PostgresStore {
         .ok_or(StoreError::NotFound)?;
         Ok(DeviceRef {
             deployment_id,
-            tenant_id,
-            device_id: DeviceId::from_uuid(device_id),
+            tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
+            device_id: DeviceId::from_uuid(row.try_get("id")?),
         })
     }
 
@@ -61,6 +116,7 @@ impl PostgresStore {
         &self,
         requester_key: EndpointKey,
         requester_user: UserId,
+        requester_tenant: TenantId,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, StoreError> {
         let row = sqlx::query(
@@ -84,8 +140,9 @@ impl PostgresStore {
               ON deployment.singleton = true
              AND deployment.id = $5
             JOIN devices device
-              ON device.tenant_id = requester.tenant_id
+              ON device.owner_tenant_id = requester.tenant_id
              AND device.id = $4
+             AND device.tenant_id = $7
              AND device.status = 'active'
             JOIN device_network network
               ON network.tenant_id = device.tenant_id
@@ -104,7 +161,7 @@ impl PostgresStore {
               AND EXISTS (
                   SELECT 1
                   FROM device_grants grant_row
-                  WHERE grant_row.tenant_id = device.tenant_id
+                  WHERE grant_row.tenant_id = requester.tenant_id
                     AND grant_row.device_id = device.id
                     AND grant_row.user_id = requester.user_id
                     AND (grant_row.capability_bits & $6) = $6
@@ -112,11 +169,12 @@ impl PostgresStore {
             "#,
         )
         .bind(requester_key.as_bytes().as_slice())
-        .bind(device_ref.tenant_id.as_uuid())
+        .bind(requester_tenant.as_uuid())
         .bind(requester_user.as_uuid())
         .bind(device_ref.device_id.as_uuid())
         .bind(device_ref.deployment_id.as_uuid())
         .bind(DEVICE_CONNECT_CAPABILITY)
+        .bind(device_ref.tenant_id.as_uuid())
         .fetch_optional(&self.pool)
         .await?
         .ok_or(StoreError::NotFound)?;

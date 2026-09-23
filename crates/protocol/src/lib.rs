@@ -18,7 +18,9 @@ pub use control::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
     EndpointRegistration, EndpointRegistrationResult,
 };
-pub use device::{DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceHelloResult};
+pub use device::{
+    DEVICE_SESSION_SCHEMA_VERSION, DeviceDirectoryEntry, DeviceHello, DeviceHelloResult,
+};
 pub use device_code::{DeviceCode, DeviceCodeError};
 pub use device_network::{
     DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
@@ -30,8 +32,8 @@ pub use endpoint_proof::{
     EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
 };
 pub use ids::{
-    ChallengeId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId, TaskId,
-    TenantId, UserId,
+    ChallengeId, ClaimId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId,
+    TaskId, TenantId, UserId,
 };
 pub use operator::OperatorRef;
 pub use peer::{
@@ -47,9 +49,9 @@ pub use relay_control::{
     RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
 };
 pub use relay_policy::{
-    LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner, RelayEndpointPolicy,
-    RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot, TeamRelayLimits, TrafficScope,
-    mbps_to_bytes_per_second,
+    GuestRelayGrant, LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot,
+    TeamRelayLimits, TrafficScope, mbps_to_bytes_per_second,
 };
 pub use task::{
     CapabilityRef, OutputAvailability, OutputChunk, OutputRange, OutputStream, TASK_SCHEMA_VERSION,

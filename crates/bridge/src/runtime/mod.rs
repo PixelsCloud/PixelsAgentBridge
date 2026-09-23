@@ -7,7 +7,7 @@ mod store_tests;
 mod worker;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{
         Arc,
@@ -32,7 +32,10 @@ use pab_agent_core::{DeviceNetworkResolutionError, EndpointControlError};
 use device::{BridgeAvailability, DeviceSession, run_bridge_supervisor};
 use worker::run_record;
 
-pub use credential::{DevicePasswordProvider, FileDevicePasswordProvider, RuntimeCredentialError};
+pub use credential::{
+    DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
+    MemoryDevicePasswordProvider, RuntimeCredentialError,
+};
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
@@ -78,6 +81,27 @@ pub struct BridgeRuntime {
 }
 
 impl BridgeRuntime {
+    pub async fn list_devices(
+        &self,
+    ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, RuntimeError> {
+        let mut availability = self.inner.availability.clone();
+        loop {
+            let state = availability.borrow().clone();
+            match state {
+                BridgeAvailability::Connected(connector) => {
+                    return connector.list_devices().await.map_err(Into::into);
+                }
+                BridgeAvailability::Stopped(message) => {
+                    return Err(RuntimeError::BridgeUnavailable(message));
+                }
+                BridgeAvailability::Connecting => {}
+            }
+            availability.changed().await.map_err(|_| {
+                RuntimeError::BridgeUnavailable("Bridge supervisor stopped".to_owned())
+            })?;
+        }
+    }
+
     pub async fn start(
         bridge_config: BridgeConfig,
         runtime_config: BridgeRuntimeConfig,
@@ -89,6 +113,7 @@ impl BridgeRuntime {
         let (events, _) = broadcast::channel(runtime_config.event_buffer);
         let (availability_sender, availability) = watch::channel(BridgeAvailability::Connecting);
         let (shutdown, shutdown_receiver) = watch::channel(false);
+        let guest_identity = matches!(bridge_config.identity, crate::BridgeIdentity::Guest);
         let inner = Arc::new(RuntimeInner {
             store,
             passwords,
@@ -98,6 +123,8 @@ impl BridgeRuntime {
             availability,
             shutdown: shutdown_receiver,
             devices: Mutex::new(HashMap::new()),
+            guest_codes: Mutex::new(HashSet::new()),
+            guest_identity,
             operations: Mutex::new(HashMap::new()),
         });
         inner.publish(RuntimeEventKind::BridgeConnecting);
@@ -130,7 +157,12 @@ impl BridgeRuntime {
             match state {
                 BridgeAvailability::Connected(connector) => {
                     match connector.resolve_device_code(code).await {
-                        Ok(device_ref) => return Ok(device_ref),
+                        Ok(device_ref) => {
+                            if self.inner.guest_identity {
+                                self.inner.start_guest_lease(code).await;
+                            }
+                            return Ok(device_ref);
+                        }
                         Err(BridgeError::NetworkResolution(
                             DeviceNetworkResolutionError::Unavailable
                             | DeviceNetworkResolutionError::Timeout,
@@ -436,10 +468,42 @@ struct RuntimeInner {
     availability: watch::Receiver<BridgeAvailability>,
     shutdown: watch::Receiver<bool>,
     devices: Mutex<HashMap<DeviceRef, Arc<DeviceSession>>>,
+    guest_codes: Mutex<HashSet<DeviceCode>>,
+    guest_identity: bool,
     operations: Mutex<HashMap<RequestId, AbortHandle>>,
 }
 
 impl RuntimeInner {
+    async fn start_guest_lease(self: &Arc<Self>, code: DeviceCode) {
+        if !self.guest_codes.lock().await.insert(code) {
+            return;
+        }
+        let inner = Arc::downgrade(self);
+        tokio::spawn(async move {
+            let mut delay = Duration::from_secs(180);
+            loop {
+                let Some(runtime) = inner.upgrade() else {
+                    return;
+                };
+                if runtime.wait_or_shutdown(delay).await.is_err() {
+                    return;
+                }
+                let state = runtime.availability.borrow().clone();
+                let refreshed = match state {
+                    BridgeAvailability::Connected(connector) => {
+                        connector.resolve_device_code(code).await.is_ok()
+                    }
+                    _ => false,
+                };
+                delay = if refreshed {
+                    Duration::from_secs(180)
+                } else {
+                    runtime.retry_interval
+                };
+            }
+        });
+    }
+
     async fn device(self: &Arc<Self>, device_ref: DeviceRef) -> Arc<DeviceSession> {
         let mut devices = self.devices.lock().await;
         Arc::clone(

@@ -1,6 +1,8 @@
 use std::{
+    collections::HashMap,
     path::Path,
-    time::{Duration, SystemTime},
+    sync::Arc,
+    time::{Duration, Instant, SystemTime},
 };
 
 use pab_agent_core::{DevicePeerAuthorizer, PeerAuthorizationError};
@@ -10,12 +12,16 @@ use pab_protocol::{
 };
 use pab_transport::{PabConnection, PabConnectionError};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
 use crate::credential::{DeviceCredential, DeviceCredentialError};
 use crate::task_service::TaskService;
 
 const FAILED_PASSWORD_DELAY: Duration = Duration::from_millis(500);
+const PASSWORD_ATTEMPT_WINDOW: Duration = Duration::from_secs(600);
+const MAX_PASSWORD_FAILURES: usize = 5;
+type FailedPasswords = Arc<Mutex<HashMap<EndpointKey, Vec<Instant>>>>;
 
 #[derive(Clone)]
 pub struct DeviceSessionAcceptor {
@@ -24,6 +30,7 @@ pub struct DeviceSessionAcceptor {
     device_ref: DeviceRef,
     timeout: Duration,
     tasks: Option<TaskService>,
+    failed_passwords: FailedPasswords,
 }
 
 impl DeviceSessionAcceptor {
@@ -42,6 +49,7 @@ impl DeviceSessionAcceptor {
             device_ref,
             timeout,
             tasks: None,
+            failed_passwords: Arc::default(),
         })
     }
 
@@ -57,6 +65,7 @@ impl DeviceSessionAcceptor {
             device_ref,
             timeout,
             tasks: None,
+            failed_passwords: Arc::default(),
         }
     }
 
@@ -86,6 +95,7 @@ impl DeviceSessionAcceptor {
             self.device_ref,
             self.timeout,
             self.tasks.clone(),
+            Arc::clone(&self.failed_passwords),
         )
         .await
     }
@@ -98,6 +108,7 @@ async fn authenticate(
     device_ref: DeviceRef,
     timeout: Duration,
     tasks: Option<TaskService>,
+    failed_passwords: FailedPasswords,
 ) -> Result<(), DeviceSessionError> {
     let mut stream = connection.accept_bi(timeout).await?;
     let request: DeviceSessionAuthenticate = stream.receive_sensitive_json(timeout).await?;
@@ -124,11 +135,34 @@ async fn authenticate(
         }
     };
 
+    let locked_out = {
+        let mut failures = failed_passwords.lock().await;
+        let now = Instant::now();
+        failures.retain(|_, attempts| {
+            attempts.retain(|at| now.duration_since(*at) < PASSWORD_ATTEMPT_WINDOW);
+            !attempts.is_empty()
+        });
+        failures
+            .get(&peer_endpoint_key)
+            .is_some_and(|attempts| attempts.len() >= MAX_PASSWORD_FAILURES)
+    };
+    if locked_out {
+        reject(&mut stream, timeout).await?;
+        return Err(DeviceSessionError::Rejected);
+    }
+
     if !credential.verify(password).await? {
+        failed_passwords
+            .lock()
+            .await
+            .entry(peer_endpoint_key)
+            .or_default()
+            .push(Instant::now());
         tokio::time::sleep(FAILED_PASSWORD_DELAY).await;
         reject(&mut stream, timeout).await?;
         return Err(DeviceSessionError::Rejected);
     }
+    failed_passwords.lock().await.remove(&peer_endpoint_key);
 
     stream
         .send_json(

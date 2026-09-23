@@ -29,6 +29,47 @@ pub struct ControlPlane {
 }
 
 impl ControlPlane {
+    pub async fn list_authorized_devices(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        deployment_id: DeploymentId,
+    ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, ServiceError> {
+        let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
+            return Err(ServiceError::UserEndpointRequired);
+        };
+        Ok(self
+            .store
+            .list_authorized_devices(
+                endpoint.endpoint_key,
+                user_id,
+                endpoint.tenant_id,
+                deployment_id,
+            )
+            .await?)
+    }
+
+    pub async fn begin_device_claim(
+        &self,
+        actor: pab_protocol::UserId,
+        code: pab_protocol::DeviceCode,
+        owner_tenant_id: pab_protocol::TenantId,
+    ) -> Result<pab_protocol::ClaimId, ServiceError> {
+        Ok(self
+            .store
+            .begin_device_claim(actor, code, owner_tenant_id)
+            .await?)
+    }
+
+    pub async fn approve_device_claim(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        claim_id: pab_protocol::ClaimId,
+    ) -> Result<(pab_protocol::DeviceId, pab_protocol::TenantId), ServiceError> {
+        if !matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
+            return Err(ServiceError::DeviceEndpointRequired);
+        }
+        Ok(self.store.approve_device_claim(endpoint, claim_id).await?)
+    }
     pub fn new(
         store: PostgresStore,
         password_policy: PasswordPolicy,
@@ -248,10 +289,22 @@ impl ControlPlane {
         if !self.active_endpoints.is_connected(peer_endpoint_key) {
             return Err(ServiceError::PeerEndpointOffline);
         }
-        Ok(self
-            .store
-            .authorize_device_peer(endpoint, device_id, peer_endpoint_key)
-            .await?)
+        let peer = self.store.registered_endpoint(peer_endpoint_key).await?;
+        Ok(match peer.principal {
+            EndpointProofPrincipal::Guest => {
+                self.store
+                    .authorize_guest_device_peer(endpoint, device_id, peer_endpoint_key)
+                    .await?
+            }
+            EndpointProofPrincipal::User { .. } => {
+                self.store
+                    .authorize_device_peer(endpoint, device_id, peer_endpoint_key)
+                    .await?
+            }
+            EndpointProofPrincipal::Device { .. } => {
+                return Err(ServiceError::UserEndpointRequired);
+            }
+        })
     }
 
     pub async fn publish_device_hello(
@@ -342,16 +395,26 @@ impl ControlPlane {
         endpoint: &RegisteredEndpoint,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, ServiceError> {
-        let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
-            return Err(ServiceError::UserEndpointRequired);
-        };
-        if device_ref.tenant_id != endpoint.tenant_id {
-            return Err(ServiceError::EndpointIdentityChanged);
-        }
-        Ok(self
-            .store
-            .device_network_snapshot(endpoint.endpoint_key, user_id, device_ref)
-            .await?)
+        Ok(match endpoint.principal {
+            EndpointProofPrincipal::User { user_id } => {
+                self.store
+                    .device_network_snapshot(
+                        endpoint.endpoint_key,
+                        user_id,
+                        endpoint.tenant_id,
+                        device_ref,
+                    )
+                    .await?
+            }
+            EndpointProofPrincipal::Guest => {
+                self.store
+                    .guest_device_network_snapshot(endpoint.endpoint_key, device_ref)
+                    .await?
+            }
+            EndpointProofPrincipal::Device { .. } => {
+                return Err(ServiceError::UserEndpointRequired);
+            }
+        })
     }
 
     pub async fn resolve_device_code(
@@ -360,19 +423,27 @@ impl ControlPlane {
         code: pab_protocol::DeviceCode,
         deployment_id: pab_protocol::DeploymentId,
     ) -> Result<DeviceRef, ServiceError> {
-        let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
-            return Err(ServiceError::UserEndpointRequired);
-        };
-        Ok(self
-            .store
-            .resolve_device_code(
-                endpoint.endpoint_key,
-                user_id,
-                endpoint.tenant_id,
-                deployment_id,
-                code,
-            )
-            .await?)
+        Ok(match endpoint.principal {
+            EndpointProofPrincipal::User { user_id } => {
+                self.store
+                    .resolve_device_code(
+                        endpoint.endpoint_key,
+                        user_id,
+                        endpoint.tenant_id,
+                        deployment_id,
+                        code,
+                    )
+                    .await?
+            }
+            EndpointProofPrincipal::Guest => {
+                self.store
+                    .guest_resolve_device_code(endpoint.endpoint_key, code, deployment_id)
+                    .await?
+            }
+            EndpointProofPrincipal::Device { .. } => {
+                return Err(ServiceError::UserEndpointRequired);
+            }
+        })
     }
 
     pub async fn relay_policy_snapshot(

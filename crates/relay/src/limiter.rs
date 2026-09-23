@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pab_protocol::{TenantId, TrafficScope, UserId};
+use pab_protocol::{EndpointKey, TenantId, TrafficScope, UserId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKey {
@@ -13,6 +13,7 @@ pub enum LimitKey {
         user_id: UserId,
     },
     Personal(TenantId),
+    Guest(EndpointKey),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,6 +116,7 @@ impl AggregateLimiter {
                 Some(LimitKey::Member { tenant_id, user_id }),
             ],
             TrafficScope::Personal { tenant_id, .. } => [Some(LimitKey::Personal(tenant_id)), None],
+            TrafficScope::Guest { endpoint_key } => [Some(LimitKey::Guest(endpoint_key)), None],
         };
 
         let mut wait = Duration::ZERO;

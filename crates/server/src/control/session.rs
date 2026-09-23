@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use pab_protocol::{
     ControlClientMessage, ControlServerMessage, DeploymentId, EndpointAuthenticationResult,
@@ -40,6 +40,8 @@ pub struct ControlSession {
     account: Option<Account>,
     endpoint: Option<RegisteredEndpoint>,
     pending_proof: Option<PendingProof>,
+    open_registration_attempts: u8,
+    guest_code_lookups: HashSet<pab_protocol::DeviceCode>,
 }
 
 impl ControlSession {
@@ -56,6 +58,8 @@ impl ControlSession {
             account: None,
             endpoint: None,
             pending_proof: None,
+            open_registration_attempts: 0,
+            guest_code_lookups: HashSet::new(),
         }
     }
 
@@ -137,6 +141,14 @@ impl ControlSession {
                     request_id,
                     device_ref,
                 }),
+            ControlClientMessage::ListDevices { .. } => {
+                self.list_devices()
+                    .await
+                    .map(|devices| ControlServerMessage::DeviceList {
+                        request_id,
+                        devices,
+                    })
+            }
             ControlClientMessage::SetDeviceConnectGrant {
                 tenant_id,
                 device_id,
@@ -159,6 +171,28 @@ impl ControlSession {
                 .authorize_device_peer(peer_endpoint_key)
                 .await
                 .map(|result| ControlServerMessage::DevicePeerAuthorized { request_id, result }),
+            ControlClientMessage::BeginDeviceClaim {
+                device_code,
+                owner_tenant_id,
+                ..
+            } => self
+                .begin_device_claim(device_code, owner_tenant_id)
+                .await
+                .map(|claim_id| ControlServerMessage::DeviceClaimPending {
+                    request_id,
+                    claim_id,
+                }),
+            ControlClientMessage::ApproveDeviceClaim { claim_id, .. } => self
+                .approve_device_claim(claim_id)
+                .await
+                .map(
+                    |(device_id, owner_tenant_id)| ControlServerMessage::DeviceClaimApproved {
+                        request_id,
+                        claim_id,
+                        device_id,
+                        owner_tenant_id,
+                    },
+                ),
         };
         match result {
             Ok(response) => response,
@@ -268,6 +302,10 @@ impl ControlSession {
         if self.pending_proof.is_some() {
             return Err(ControlSessionError::ProofPending);
         }
+        if self.open_registration_attempts >= 3 {
+            return Err(ControlSessionError::RateLimited);
+        }
+        self.open_registration_attempts += 1;
         let challenge = self.proof_session.issue(
             EndpointProofPrincipal::Device {
                 device_id: pab_protocol::DeviceId::new(),
@@ -294,6 +332,10 @@ impl ControlSession {
         if self.pending_proof.is_some() {
             return Err(ControlSessionError::ProofPending);
         }
+        if self.open_registration_attempts >= 3 {
+            return Err(ControlSessionError::RateLimited);
+        }
+        self.open_registration_attempts += 1;
         let challenge = self.proof_session.issue(
             EndpointProofPrincipal::Guest,
             pab_protocol::TenantId::new(),
@@ -469,15 +511,36 @@ impl ControlSession {
     }
 
     async fn resolve_device_code(
-        &self,
+        &mut self,
         device_code: pab_protocol::DeviceCode,
     ) -> Result<pab_protocol::DeviceRef, ControlSessionError> {
         let endpoint = self
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
+        if matches!(endpoint.principal, EndpointProofPrincipal::Guest) {
+            if !self.guest_code_lookups.contains(&device_code)
+                && self.guest_code_lookups.len() >= 20
+            {
+                return Err(ControlSessionError::RateLimited);
+            }
+            self.guest_code_lookups.insert(device_code);
+        }
         self.control
             .resolve_device_code(endpoint, device_code, self.deployment_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn list_devices(
+        &self,
+    ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::UserEndpointRequired)?;
+        self.control
+            .list_authorized_devices(endpoint, self.deployment_id)
             .await
             .map_err(Into::into)
     }
@@ -492,6 +555,35 @@ impl ControlSession {
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
         self.control
             .authorize_device_peer(endpoint, peer_endpoint_key)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn begin_device_claim(
+        &self,
+        device_code: pab_protocol::DeviceCode,
+        owner_tenant_id: pab_protocol::TenantId,
+    ) -> Result<pab_protocol::ClaimId, ControlSessionError> {
+        let account = self
+            .account
+            .as_ref()
+            .ok_or(ControlSessionError::NotAuthenticated)?;
+        self.control
+            .begin_device_claim(account.id, device_code, owner_tenant_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn approve_device_claim(
+        &self,
+        claim_id: pab_protocol::ClaimId,
+    ) -> Result<(pab_protocol::DeviceId, pab_protocol::TenantId), ControlSessionError> {
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::DeviceEndpointRequired)?;
+        self.control
+            .approve_device_claim(endpoint, claim_id)
             .await
             .map_err(Into::into)
     }

@@ -10,9 +10,8 @@ use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
     DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
     DeviceSessionAuthenticationResult, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
-    EndpointProofPrincipal, MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef,
-    OutputStream, RequestId, TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef,
-    TaskSnapshot,
+    MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, RequestId,
+    TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef, TaskSnapshot,
 };
 use pab_transport::{
     PabConnection, PabConnectionError, PabEndpoint, PabEndpointAddress, PabEndpointConfig,
@@ -50,9 +49,7 @@ impl BridgeClient {
                 url: config.control_url.clone(),
                 deployment_id: config.deployment_id,
                 tenant_id: config.tenant_id,
-                principal: EndpointProofPrincipal::User {
-                    user_id: config.user_id,
-                },
+                principal: config.identity.principal(),
                 operation_timeout: config.operation_timeout,
             },
             secret.clone(),
@@ -102,14 +99,18 @@ impl BridgeClient {
 }
 
 impl BridgeConnector {
+    pub async fn list_devices(
+        &self,
+    ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, BridgeError> {
+        Ok(self.network_resolver.list_devices().await?)
+    }
+
     pub async fn resolve_device_code(
         &self,
         code: pab_protocol::DeviceCode,
     ) -> Result<DeviceRef, BridgeError> {
         let device_ref = self.network_resolver.resolve_code(code).await?;
-        if device_ref.deployment_id != self.config.deployment_id
-            || device_ref.tenant_id != self.config.tenant_id
-        {
+        if device_ref.deployment_id != self.config.deployment_id {
             return Err(BridgeError::DeviceIdentityMismatch);
         }
         Ok(device_ref)
@@ -120,9 +121,7 @@ impl BridgeConnector {
         device_ref: DeviceRef,
         password: Zeroizing<String>,
     ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
-        if device_ref.deployment_id != self.config.deployment_id
-            || device_ref.tenant_id != self.config.tenant_id
-        {
+        if device_ref.deployment_id != self.config.deployment_id {
             return Err(BridgeError::DeviceIdentityMismatch);
         }
         if password.is_empty() || password.len() > MAX_DEVICE_PASSWORD_BYTES {
@@ -161,7 +160,13 @@ impl BridgeConnector {
                 password_version,
                 authenticated_at_unix_ms,
             } if accepted_device == device_ref
-                && operator == OperatorRef::Account(self.config.user_id)
+                && operator
+                    == self
+                        .config
+                        .identity
+                        .operator(pab_protocol::EndpointKey::new(
+                            *self.endpoint.id().as_bytes(),
+                        ))
                 && password_version > 0
                 && authenticated_at_unix_ms > 0 =>
             {

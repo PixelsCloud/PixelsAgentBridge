@@ -25,7 +25,7 @@ impl ExecutorConfig {
         Self::from_lookup(|name| env::var_os(name))
     }
 
-    fn from_lookup(
+    pub(crate) fn from_lookup(
         mut lookup: impl FnMut(&str) -> Option<OsString>,
     ) -> Result<Self, ExecutorConfigError> {
         let endpoint_secret_path = lookup("PAB_ENDPOINT_SECRET_FILE").map(PathBuf::from);

@@ -33,6 +33,38 @@ pub struct AuthenticatedControlConnection {
 }
 
 impl AuthenticatedControlConnection {
+    pub async fn approve_device_claim(
+        &mut self,
+        claim_id: pab_protocol::ClaimId,
+        timeout: Duration,
+    ) -> Result<(pab_protocol::DeviceId, TenantId), EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::ApproveDeviceClaim {
+                request_id,
+                claim_id,
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceClaimApproved {
+                request_id: result_id,
+                claim_id: result_claim,
+                device_id,
+                owner_tenant_id,
+            } if result_id == request_id && result_claim == claim_id => {
+                Ok((device_id, owner_tenant_id))
+            }
+            ControlServerMessage::Error {
+                request_id: Some(result_id),
+                code,
+                message,
+            } if result_id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
     pub async fn connect(
         config: &EndpointControlConfig,
         secret: &SecretKey,

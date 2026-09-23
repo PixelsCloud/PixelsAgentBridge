@@ -6,9 +6,10 @@ use std::{
     sync::Arc,
 };
 
-use pab_agent_core::{DataPaths, DataScope};
+use pab_agent_core::{DataPaths, DataScope, begin_device_claim, tls_connector};
 use pab_bridge::{
-    BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, FileDevicePasswordProvider, RuntimeError,
+    BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, DevicePasswordProvider,
+    DirectoryDevicePasswordProvider, FileDevicePasswordProvider, RuntimeError,
 };
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef, TaskSnapshot, TaskState};
 use thiserror::Error;
@@ -37,25 +38,70 @@ async fn run() -> Result<(), CliError> {
         .ok_or(CliError::Usage)?
         .parse::<DeviceCode>()
         .map_err(|error| CliError::DeviceCode(error.to_string()))?;
-    let config = BridgeConfig::from_env()?;
-    let password_file = env::var_os("PAB_DEVICE_PASSWORD_FILE")
-        .map(PathBuf::from)
-        .ok_or(CliError::MissingPasswordFile)?;
+    if command == "claim" {
+        let owner_tenant_id = args
+            .next()
+            .ok_or(CliError::Usage)?
+            .parse()
+            .map_err(|_| CliError::InvalidTenantId)?;
+        if args.next().is_some() {
+            return Err(CliError::Usage);
+        }
+        let username =
+            env::var("PAB_ACCOUNT_USERNAME").map_err(|_| CliError::MissingAccountUsername)?;
+        let password_path =
+            env::var_os("PAB_ACCOUNT_PASSWORD_FILE").ok_or(CliError::MissingAccountPassword)?;
+        let password = zeroize::Zeroizing::new(
+            std::fs::read_to_string(password_path)?
+                .trim_end()
+                .to_owned(),
+        );
+        let url = env::var("PAB_CONTROL_URL").map_err(|_| CliError::MissingControlUrl)?;
+        let ca = env::var_os("PAB_CONTROL_CA_CERT")
+            .map(std::fs::read)
+            .transpose()?;
+        let claim_id = begin_device_claim(
+            &url,
+            username,
+            password,
+            device_code,
+            owner_tenant_id,
+            tls_connector(ca.as_deref())?,
+            std::time::Duration::from_secs(10),
+        )
+        .await?;
+        println!("Claim request: {claim_id}");
+        println!("On the device run: pab-executor approve-claim {claim_id}");
+        return Ok(());
+    }
+    let guest = command.starts_with("guest-");
+    let config = if guest {
+        BridgeConfig::register_guest_from_env().await?
+    } else {
+        BridgeConfig::from_env()?
+    };
+    let passwords: Arc<dyn DevicePasswordProvider> =
+        if let Some(directory) = env::var_os("PAB_DEVICE_PASSWORD_DIR") {
+            Arc::new(DirectoryDevicePasswordProvider::new(PathBuf::from(
+                directory,
+            )))
+        } else {
+            let password_file = env::var_os("PAB_DEVICE_PASSWORD_FILE")
+                .map(PathBuf::from)
+                .ok_or(CliError::MissingPasswordFile)?;
+            Arc::new(FileDevicePasswordProvider::new(password_file))
+        };
     let database_file = match env::var_os("PAB_BRIDGE_DATABASE") {
         Some(path) => PathBuf::from(path),
         None => DataPaths::for_scope(DataScope::User)?.bridge_database(),
     };
-    let runtime = BridgeRuntime::start(
-        config,
-        BridgeRuntimeConfig::new(database_file),
-        Arc::new(FileDevicePasswordProvider::new(password_file)),
-    )
-    .await?;
+    let runtime =
+        BridgeRuntime::start(config, BridgeRuntimeConfig::new(database_file), passwords).await?;
     let mut events = runtime.subscribe();
     let device_ref = runtime.resolve_device_code(device_code).await?;
 
     let initial = match command.as_str() {
-        "command" => {
+        "command" | "guest-command" => {
             let program = args.next().ok_or(CliError::Usage)?;
             let command_args = args.collect::<Vec<_>>();
             let request_id = request_id()?;
@@ -64,7 +110,7 @@ async fn run() -> Result<(), CliError> {
                 .submit_command(device_ref, request_id, program, command_args, cwd)
                 .await
         }
-        "follow" => {
+        "follow" | "guest-follow" => {
             let task_id = args
                 .next()
                 .ok_or(CliError::Usage)?
@@ -221,9 +267,23 @@ const fn stream_name(stream: OutputStream) -> &'static str {
 #[derive(Debug, Error)]
 enum CliError {
     #[error(transparent)]
+    Claim(#[from] pab_agent_core::ClaimError),
+    #[error("owner tenant ID is invalid")]
+    InvalidTenantId,
+    #[error("PAB_ACCOUNT_USERNAME must be set")]
+    MissingAccountUsername,
+    #[error("PAB_ACCOUNT_PASSWORD_FILE must be set")]
+    MissingAccountPassword,
+    #[error(transparent)]
+    GuestConfig(#[from] pab_bridge::GuestConfigError),
+    #[error(transparent)]
+    Tls(#[from] pab_agent_core::TlsConnectorError),
+    #[error("PAB_CONTROL_URL must be set")]
+    MissingControlUrl,
+    #[error(transparent)]
     DataPath(#[from] pab_agent_core::DataPathError),
     #[error(
-        "usage: pab-bridge command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow <9-digit-device-code> <task-id>"
+        "usage: pab-bridge command|guest-command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow|guest-follow <9-digit-device-code> <task-id>\n       pab-bridge claim <9-digit-device-code> <owner-tenant-id>"
     )]
     Usage,
     #[error("device code is invalid: {0}")]

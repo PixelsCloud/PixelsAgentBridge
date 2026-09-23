@@ -101,6 +101,20 @@ impl AuthenticatedControlConnection {
         Ok(request_id)
     }
 
+    pub(crate) async fn send_list_devices(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::ListDevices { request_id },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
+
     pub(crate) async fn next_frame(
         &mut self,
     ) -> Result<IncomingControlFrame, EndpointControlError> {

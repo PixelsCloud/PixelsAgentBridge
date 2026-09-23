@@ -1,16 +1,19 @@
 #![forbid(unsafe_code)]
 
+mod claim;
 mod connection_io;
 mod connection_state;
 mod control;
 mod device_network_resolver;
 mod enrollment;
 mod identity;
+mod open_registration;
 mod peer_authorizer;
 mod storage_paths;
 mod supervisor;
 mod tls;
 
+pub use claim::{ClaimError, begin_device_claim, begin_personal_device_claim};
 pub use connection_state::{
     ConnectionFailure, ConnectionFailureKind, ControlConnectionPhase, ControlConnectionStatus,
     DeviceHelloConfigError, DeviceNetworkConfigError, ReconnectPolicy, ReconnectPolicyError,
@@ -18,7 +21,11 @@ pub use connection_state::{
 pub use control::{AuthenticatedControlConnection, EndpointControlConfig, EndpointControlError};
 pub use device_network_resolver::{DeviceNetworkResolutionError, DeviceNetworkResolver};
 pub use enrollment::{EndpointEnrollment, EnrollmentError, enroll_account_with_device};
-pub use identity::{EndpointSecretError, read_endpoint_secret};
+pub use identity::{
+    EndpointSecretError, load_or_create_endpoint_secret, read_endpoint_secret,
+    restrict_private_file,
+};
+pub use open_registration::{OpenRegistrationError, OpenRegistrationKind, register_open_endpoint};
 pub use peer_authorizer::{DevicePeerAuthorizer, PeerAuthorizationError};
 pub use storage_paths::{
     DataPathError, DataPaths, DataScope, ensure_data_dir, ensure_data_parent, persistent_data_dir,

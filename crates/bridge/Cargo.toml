@@ -6,6 +6,7 @@ rust-version.workspace = true
 
 [dependencies]
 argon2 = "0.5"
+axum = { version = "0.8", features = ["json", "ws"] }
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }
 pab-protocol = { path = "../protocol" }

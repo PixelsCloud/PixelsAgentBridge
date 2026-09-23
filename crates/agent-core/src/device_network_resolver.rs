@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use pab_protocol::{DeviceCode, DeviceNetworkSnapshot, DeviceRef};
+use pab_protocol::{DeviceCode, DeviceDirectoryEntry, DeviceNetworkSnapshot, DeviceRef};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -14,12 +14,14 @@ pub(crate) struct DeviceNetworkRequest {
 pub(crate) enum ResolvedDevice {
     Network(DeviceNetworkSnapshot),
     Ref(DeviceRef),
+    List(Vec<DeviceDirectoryEntry>),
 }
 
 #[derive(Clone, Copy)]
 pub(crate) enum DeviceNetworkLookup {
     Ref(DeviceRef),
     Code(DeviceCode),
+    List,
 }
 
 #[derive(Clone)]
@@ -42,7 +44,9 @@ impl DeviceNetworkResolver {
             .await?
         {
             ResolvedDevice::Network(snapshot) => Ok(snapshot),
-            ResolvedDevice::Ref(_) => Err(DeviceNetworkResolutionError::UnexpectedResponse),
+            ResolvedDevice::Ref(_) | ResolvedDevice::List(_) => {
+                Err(DeviceNetworkResolutionError::UnexpectedResponse)
+            }
         }
     }
 
@@ -55,7 +59,18 @@ impl DeviceNetworkResolver {
             .await?
         {
             ResolvedDevice::Ref(device_ref) => Ok(device_ref),
-            ResolvedDevice::Network(_) => Err(DeviceNetworkResolutionError::UnexpectedResponse),
+            ResolvedDevice::Network(_) | ResolvedDevice::List(_) => {
+                Err(DeviceNetworkResolutionError::UnexpectedResponse)
+            }
+        }
+    }
+
+    pub async fn list_devices(
+        &self,
+    ) -> Result<Vec<DeviceDirectoryEntry>, DeviceNetworkResolutionError> {
+        match self.resolve_lookup(DeviceNetworkLookup::List).await? {
+            ResolvedDevice::List(devices) => Ok(devices),
+            _ => Err(DeviceNetworkResolutionError::UnexpectedResponse),
         }
     }
 

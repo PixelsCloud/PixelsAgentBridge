@@ -4,8 +4,8 @@ use std::{
 };
 
 use pab_protocol::{
-    DeploymentId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TenantId, TrafficScope,
-    mbps_to_bytes_per_second,
+    DeploymentId, DeviceId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TenantId,
+    TrafficScope, mbps_to_bytes_per_second,
 };
 use thiserror::Error;
 
@@ -18,6 +18,7 @@ pub struct RelayPolicyState {
     policy_version: Option<u64>,
     expires_at_unix_ms: i64,
     endpoints: HashMap<EndpointKey, RelayEndpointOwner>,
+    guest_grants: HashMap<(EndpointKey, DeviceId), i64>,
     limiter: AggregateLimiter,
 }
 
@@ -32,6 +33,7 @@ impl RelayPolicyState {
             policy_version: None,
             expires_at_unix_ms: 0,
             endpoints: HashMap::new(),
+            guest_grants: HashMap::new(),
             limiter: AggregateLimiter::default(),
         })
     }
@@ -78,25 +80,29 @@ impl RelayPolicyState {
         let mut endpoints = HashMap::with_capacity(snapshot.endpoints.len());
         for endpoint in &snapshot.endpoints {
             endpoints.insert(endpoint.endpoint_key, endpoint.owner);
-            let RelayEndpointOwner::User { scope } = endpoint.owner else {
-                continue;
-            };
-            match scope {
-                TrafficScope::Team { tenant_id, user_id } => {
-                    let limits = team_limits
-                        .get(&tenant_id)
-                        .ok_or(PolicyStateError::MissingTeamLimits(tenant_id))?;
-                    rates.insert(
-                        LimitKey::Member { tenant_id, user_id },
-                        rate(limits.member_mbps, self.burst)?,
-                    );
+            match endpoint.owner {
+                RelayEndpointOwner::Device { .. } => {}
+                RelayEndpointOwner::Guest => {
+                    rates.insert(LimitKey::Guest(endpoint.endpoint_key), rate(1, self.burst)?);
                 }
-                TrafficScope::Personal { tenant_id, .. } => {
-                    rates.insert(
-                        LimitKey::Personal(tenant_id),
-                        rate(snapshot.defaults.personal_mbps, self.burst)?,
-                    );
-                }
+                RelayEndpointOwner::User { scope } => match scope {
+                    TrafficScope::Team { tenant_id, user_id } => {
+                        let limits = team_limits
+                            .get(&tenant_id)
+                            .ok_or(PolicyStateError::MissingTeamLimits(tenant_id))?;
+                        rates.insert(
+                            LimitKey::Member { tenant_id, user_id },
+                            rate(limits.member_mbps, self.burst)?,
+                        );
+                    }
+                    TrafficScope::Personal { tenant_id, .. } => {
+                        rates.insert(
+                            LimitKey::Personal(tenant_id),
+                            rate(snapshot.defaults.personal_mbps, self.burst)?,
+                        );
+                    }
+                    TrafficScope::Guest { .. } => return Err(PolicyStateError::InvalidRate),
+                },
             }
         }
 
@@ -106,6 +112,16 @@ impl RelayPolicyState {
         }
         self.limiter.retain(|key| retained.contains(&key));
         self.endpoints = endpoints;
+        self.guest_grants = snapshot
+            .guest_grants
+            .iter()
+            .map(|grant| {
+                (
+                    (grant.guest_endpoint_key, grant.device_id),
+                    grant.expires_at_unix_ms,
+                )
+            })
+            .collect();
         self.policy_version = Some(snapshot.policy_version);
         self.expires_at_unix_ms = snapshot.expires_at_unix_ms;
         Ok(())
@@ -147,14 +163,36 @@ impl RelayPolicyState {
         second: EndpointKey,
         now_unix_ms: i64,
     ) -> Option<TrafficScope> {
-        let first = self.endpoint_owner(first, now_unix_ms)?;
-        let second = self.endpoint_owner(second, now_unix_ms)?;
+        let first_key = first;
+        let second_key = second;
+        let first = self.endpoint_owner(first_key, now_unix_ms)?;
+        let second = self.endpoint_owner(second_key, now_unix_ms)?;
         match (first, second) {
             (RelayEndpointOwner::User { scope }, RelayEndpointOwner::Device { tenant_id, .. })
             | (RelayEndpointOwner::Device { tenant_id, .. }, RelayEndpointOwner::User { scope })
-                if scope.tenant_id() == tenant_id =>
+                if scope.tenant_id() == Some(tenant_id) =>
             {
                 Some(scope)
+            }
+            (RelayEndpointOwner::Guest, RelayEndpointOwner::Device { device_id, .. })
+                if self
+                    .guest_grants
+                    .get(&(first_key, device_id))
+                    .is_some_and(|expires| *expires > now_unix_ms) =>
+            {
+                Some(TrafficScope::Guest {
+                    endpoint_key: first_key,
+                })
+            }
+            (RelayEndpointOwner::Device { device_id, .. }, RelayEndpointOwner::Guest)
+                if self
+                    .guest_grants
+                    .get(&(second_key, device_id))
+                    .is_some_and(|expires| *expires > now_unix_ms) =>
+            {
+                Some(TrafficScope::Guest {
+                    endpoint_key: second_key,
+                })
             }
             _ => None,
         }

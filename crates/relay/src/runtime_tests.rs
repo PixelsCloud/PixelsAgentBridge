@@ -51,6 +51,7 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
                 },
             },
         ],
+        guest_grants: Vec::new(),
     };
     let runtime = RelayPolicyRuntime::new(
         RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),

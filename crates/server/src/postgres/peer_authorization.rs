@@ -24,7 +24,7 @@ impl PostgresStore {
             JOIN deployments deployment ON deployment.singleton = true
             JOIN endpoints peer
               ON peer.endpoint_key = $4
-             AND peer.tenant_id = device.tenant_id
+             AND peer.tenant_id = device.owner_tenant_id
              AND peer.owner_kind = 'user'
              AND peer.status = 'active'
             JOIN users peer_user
@@ -35,7 +35,7 @@ impl PostgresStore {
              AND membership.user_id = peer.user_id
              AND membership.status = 'active'
             JOIN device_grants grant_row
-              ON grant_row.tenant_id = device.tenant_id
+              ON grant_row.tenant_id = device.owner_tenant_id
              AND grant_row.device_id = device.id
              AND grant_row.user_id = peer.user_id
              AND (grant_row.capability_bits & $5) = $5

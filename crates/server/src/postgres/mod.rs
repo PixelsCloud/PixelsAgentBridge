@@ -15,11 +15,13 @@ use crate::domain::{
 };
 
 mod accounts;
+mod device_claim;
 mod device_discovery;
 mod device_grants;
 mod device_network;
 mod device_runtime;
 mod endpoints;
+mod guest_access;
 mod guest_registration;
 mod peer_authorization;
 mod support;

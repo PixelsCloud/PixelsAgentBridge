@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{DeploymentId, DeviceId, EndpointKey, TenantId, UserId};
 
-pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 1;
+pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -18,18 +18,23 @@ pub enum TrafficScope {
         tenant_id: TenantId,
         user_id: UserId,
     },
+    Guest {
+        endpoint_key: EndpointKey,
+    },
 }
 
 impl TrafficScope {
-    pub const fn tenant_id(self) -> TenantId {
+    pub const fn tenant_id(self) -> Option<TenantId> {
         match self {
-            Self::Team { tenant_id, .. } | Self::Personal { tenant_id, .. } => tenant_id,
+            Self::Team { tenant_id, .. } | Self::Personal { tenant_id, .. } => Some(tenant_id),
+            Self::Guest { .. } => None,
         }
     }
 
-    pub const fn user_id(self) -> UserId {
+    pub const fn user_id(self) -> Option<UserId> {
         match self {
-            Self::Team { user_id, .. } | Self::Personal { user_id, .. } => user_id,
+            Self::Team { user_id, .. } | Self::Personal { user_id, .. } => Some(user_id),
+            Self::Guest { .. } => None,
         }
     }
 }
@@ -76,15 +81,24 @@ pub enum RelayEndpointOwner {
         tenant_id: TenantId,
         device_id: DeviceId,
     },
+    Guest,
 }
 
 impl RelayEndpointOwner {
-    pub const fn tenant_id(self) -> TenantId {
+    pub const fn tenant_id(self) -> Option<TenantId> {
         match self {
             Self::User { scope } => scope.tenant_id(),
-            Self::Device { tenant_id, .. } => tenant_id,
+            Self::Device { tenant_id, .. } => Some(tenant_id),
+            Self::Guest => None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuestRelayGrant {
+    pub guest_endpoint_key: EndpointKey,
+    pub device_id: DeviceId,
+    pub expires_at_unix_ms: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +117,7 @@ pub struct RelayPolicySnapshot {
     pub defaults: RelayLimitDefaults,
     pub team_limits: Vec<TeamRelayLimits>,
     pub endpoints: Vec<RelayEndpointPolicy>,
+    pub guest_grants: Vec<GuestRelayGrant>,
 }
 
 impl RelayPolicySnapshot {
@@ -134,6 +149,12 @@ impl RelayPolicySnapshot {
                 return Err(RelayPolicyError::DuplicateEndpoint(endpoint.endpoint_key));
             }
         }
+        let mut grants = HashSet::new();
+        for grant in &self.guest_grants {
+            if !grants.insert((grant.guest_endpoint_key, grant.device_id)) {
+                return Err(RelayPolicyError::DuplicateGuestGrant);
+            }
+        }
         Ok(())
     }
 }
@@ -158,6 +179,8 @@ pub enum RelayPolicyError {
     DuplicateTeam(TenantId),
     #[error("relay policy contains a duplicate endpoint {0:?}")]
     DuplicateEndpoint(EndpointKey),
+    #[error("relay policy contains a duplicate guest grant")]
+    DuplicateGuestGrant,
 }
 
 pub fn mbps_to_bytes_per_second(mbps: u32) -> u64 {
@@ -210,6 +233,7 @@ mod tests {
             defaults: defaults(),
             team_limits: Vec::new(),
             endpoints: vec![endpoint, endpoint],
+            guest_grants: Vec::new(),
         };
         assert_eq!(
             snapshot.validate(),

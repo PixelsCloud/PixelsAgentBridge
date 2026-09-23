@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixels Agent Bridge</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #0e1420; color: #e8eef8; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    h2 { font-size: 17px; margin: 0 0 14px; }
+    p { color: #a9b8d0; }
+    .grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 18px; }
+    .card { background: #182337; border: 1px solid #31425f; border-radius: 12px; padding: 20px; margin-top: 18px; }
+    label { display: block; font-size: 13px; color: #a9b8d0; margin: 12px 0 5px; }
+    input, textarea, button { box-sizing: border-box; border-radius: 7px; font: inherit; }
+    input, textarea { width: 100%; padding: 9px 11px; color: inherit; background: #0e1420; border: 1px solid #425777; }
+    textarea { min-height: 65px; resize: vertical; }
+    button { background: #5789f6; color: #07132b; border: 0; padding: 9px 14px; margin-top: 12px; cursor: pointer; font-weight: 700; }
+    button:hover { background: #80a7ff; }
+    .device { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #31425f; padding: 8px 0; }
+    .device button { margin: 0; }
+    .muted { color: #a9b8d0; }
+    #status { min-height: 22px; color: #95d6b0; }
+    #os { font-weight: 700; color: #8cb4ff; white-space: pre-wrap; }
+    #tasks { max-height: 230px; overflow: auto; }
+    .task { border-top: 1px solid #31425f; padding: 8px 0; word-break: break-word; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #0a101c; border-radius: 8px; padding: 12px; min-height: 90px; max-height: 360px; overflow: auto; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pixels Agent Bridge</h1>
+    <p>用 9 位码连接设备。命令会在远端执行；先确认下方显示的目标操作系统。</p>
+    <div id="status"></div>
+    <div class="grid">
+      <section class="card">
+        <h2>设备</h2>
+        <div id="devices" class="muted">正在读取设备列表…</div>
+        <label for="code">9 位设备码</label>
+        <input id="code" inputmode="numeric" maxlength="9" placeholder="123456789">
+        <label for="password">设备临时密码</label>
+        <input id="password" type="password" autocomplete="off" placeholder="显示在远端设备上">
+        <button id="connect">连接并验证环境</button>
+        <p id="os">尚未连接</p>
+        <h2>添加到账号或 Team</h2>
+        <p>登录只用于发起归属请求，设备端批准后才会绑定。</p>
+        <label for="account">账号</label>
+        <input id="account" autocomplete="username">
+        <label for="account-password">账号密码</label>
+        <input id="account-password" type="password" autocomplete="current-password">
+        <label for="team-id">Team ID（可选；留空为个人空间）</label>
+        <input id="team-id" placeholder="留空绑定到个人空间">
+        <button id="claim">登录并申请归属</button>
+        <p id="claim-status"></p>
+      </section>
+      <section class="card">
+        <h2>远端命令</h2>
+        <label for="program">可执行程序</label>
+        <input id="program" placeholder="例如 powershell.exe 或 /bin/sh">
+        <label for="args">参数（JSON 字符串数组）</label>
+        <textarea id="args" spellcheck="false">[]</textarea>
+        <label for="cwd">工作目录（可选）</label>
+        <input id="cwd" placeholder="留空使用默认目录">
+        <button id="run">执行</button>
+      </section>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>任务与进度</h2>
+        <div id="tasks" class="muted">尚无任务</div>
+      </section>
+      <section class="card">
+        <h2>输出</h2>
+        <div class="muted" id="selected">选择任务查看输出</div>
+        <label>stdout</label>
+        <pre id="stdout"></pre>
+        <label>stderr</label>
+        <pre id="stderr"></pre>
+      </section>
+    </div>
+  </main>
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+    const status = document.querySelector('#status');
+    const tasks = new Map();
+    let selectedTask = null;
+    let selectedCode = null;
+
+    async function api(path, options = {}) {
+      const separator = path.includes('?') ? '&' : '?';
+      const response = await fetch(`${path}${separator}token=${encodeURIComponent(token)}`, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || `HTTP ${response.status}`);
+      }
+      return body;
+    }
+
+    function report(error) {
+      status.textContent = error instanceof Error ? error.message : String(error);
+      status.style.color = '#ff9a9a';
+    }
+
+    function success(message) {
+      status.textContent = message;
+      status.style.color = '#95d6b0';
+    }
+
+    async function loadDevices() {
+      const container = document.querySelector('#devices');
+      try {
+        const result = await api('/api/devices');
+        container.replaceChildren();
+        if (!result.devices.length) {
+          container.textContent = '暂无账号设备；可直接输入设备码。';
+        }
+        for (const device of result.devices) {
+          const row = document.createElement('div');
+          row.className = 'device';
+          const label = document.createElement('span');
+          label.textContent = `${device.name} · ${device.code}`;
+          const button = document.createElement('button');
+          button.textContent = '选择';
+          button.onclick = () => {
+            document.querySelector('#code').value = device.code;
+            connect();
+          };
+          row.append(label, button);
+          container.append(row);
+        }
+      } catch {
+        container.textContent = '访客模式：输入设备码连接。';
+      }
+    }
+
+    async function connect() {
+      try {
+        const code = document.querySelector('#code').value.trim();
+        const passwordInput = document.querySelector('#password');
+        if (passwordInput.value) {
+          await api('/api/password', {
+            method: 'POST',
+            body: JSON.stringify({ device_code: code, password: passwordInput.value })
+          });
+          passwordInput.value = '';
+        }
+        const result = await api('/api/connect', {
+          method: 'POST',
+          body: JSON.stringify({ device_code: code })
+        });
+        selectedCode = code;
+        document.querySelector('#os').textContent = result.os_reminder;
+        success(`已连接设备 ${code}`);
+      } catch (error) {
+        report(error);
+      }
+    }
+
+    async function claim() {
+      try {
+        const passwordInput = document.querySelector('#account-password');
+        const request = {
+          device_code: document.querySelector('#code').value.trim(),
+          username: document.querySelector('#account').value.trim(),
+          password: passwordInput.value,
+          owner_tenant_id: document.querySelector('#team-id').value.trim() || null
+        };
+        const result = await api('/api/claim', {
+          method: 'POST',
+          body: JSON.stringify(request)
+        });
+        passwordInput.value = '';
+        document.querySelector('#claim-status').textContent =
+          `等待设备端批准：pab-executor approve-claim ${result.claim_id}`;
+        success(`归属申请已发送至 ${result.owner_tenant_id}`);
+      } catch (error) {
+        report(error);
+      }
+    }
+
+    function renderTasks() {
+      const container = document.querySelector('#tasks');
+      container.replaceChildren();
+      for (const [id, task] of [...tasks].reverse()) {
+        const row = document.createElement('div');
+        row.className = 'task';
+        const button = document.createElement('button');
+        button.textContent = `${task.deviceCode} · ${task.state} · ${id}`;
+        button.onclick = () => selectTask(id);
+        row.append(button);
+        container.append(row);
+      }
+    }
+
+    function rememberTask(snapshot, deviceCode) {
+      const id = snapshot.task_ref.task_id;
+      tasks.set(id, { state: snapshot.state, deviceCode });
+      renderTasks();
+    }
+
+    async function runCommand() {
+      try {
+        if (!selectedCode) {
+          throw new Error('请先连接设备并确认操作系统');
+        }
+        const args = JSON.parse(document.querySelector('#args').value);
+        if (!Array.isArray(args) || args.some(arg => typeof arg !== 'string')) {
+          throw new Error('参数必须是 JSON 字符串数组');
+        }
+        const request = {
+          device_code: selectedCode,
+          program: document.querySelector('#program').value.trim(),
+          args,
+          cwd: document.querySelector('#cwd').value.trim() || null
+        };
+        const result = await api('/api/command', {
+          method: 'POST',
+          body: JSON.stringify(request)
+        });
+        rememberTask(result.task, selectedCode);
+        selectTask(result.task.task_ref.task_id);
+        success(`任务 ${result.task.task_ref.task_id} 已接受`);
+      } catch (error) {
+        report(error);
+      }
+    }
+
+    async function selectTask(id) {
+      selectedTask = id;
+      const task = tasks.get(id);
+      if (!task) {
+        return;
+      }
+      document.querySelector('#selected').textContent = `${task.deviceCode} · ${id}`;
+      await refreshTask(id, task.deviceCode);
+    }
+
+    async function refreshTask(id, code) {
+      try {
+        const query = `device_code=${encodeURIComponent(code)}&task_id=${encodeURIComponent(id)}`;
+        const record = await api(`/api/task?${query}`);
+        if (record.snapshot) {
+          rememberTask(record.snapshot, code);
+        }
+        if (selectedTask !== id) {
+          return;
+        }
+        for (const stream of ['stdout', 'stderr']) {
+          const output = await api(`/api/output?${query}&stream=${stream}&offset=0`);
+          document.querySelector(`#${stream}`).textContent = output.text;
+        }
+      } catch (error) {
+        report(error);
+      }
+    }
+
+    function liveEvents() {
+      const websocket = new WebSocket(`ws://${location.host}/api/events?token=${encodeURIComponent(token)}`);
+      websocket.onmessage = event => {
+        const message = JSON.parse(event.data);
+        const kind = message.kind;
+        if (kind.type === 'task_snapshot') {
+          const code = selectedCode || tasks.get(kind.snapshot.task_ref.task_id)?.deviceCode;
+          if (code) {
+            rememberTask(kind.snapshot, code);
+          }
+        }
+        if (kind.type === 'task_snapshot' || kind.type === 'task_output' || kind.type === 'task_event') {
+          const current = selectedTask;
+          const task = tasks.get(current);
+          if (current && task) {
+            refreshTask(current, task.deviceCode);
+          }
+        }
+        if (kind.type === 'bridge_retrying') {
+          status.textContent = `控制连接重试中，${kind.retry_in_ms} ms 后重连`;
+        }
+      };
+      websocket.onclose = () => setTimeout(liveEvents, 3000);
+    }
+
+    document.querySelector('#connect').onclick = connect;
+    document.querySelector('#claim').onclick = claim;
+    document.querySelector('#run').onclick = runCommand;
+    loadDevices();
+    liveEvents();
+  </script>
+</body>
+</html>

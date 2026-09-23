@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AuthorizedDevicePeer, DeviceCode, DeviceHello, DeviceHelloResult, DeviceId,
-    DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate, DeviceRef, EndpointKey,
-    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse, RequestId, TenantId,
-    UserId,
+    AuthorizedDevicePeer, ClaimId, DeviceCode, DeviceDirectoryEntry, DeviceHello,
+    DeviceHelloResult, DeviceId, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
+    DeviceRef, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse,
+    RequestId, TenantId, UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -63,6 +63,9 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         device_code: DeviceCode,
     },
+    ListDevices {
+        request_id: RequestId,
+    },
     SetDeviceConnectGrant {
         request_id: RequestId,
         tenant_id: TenantId,
@@ -73,6 +76,15 @@ pub enum ControlClientMessage {
     AuthorizeDevicePeer {
         request_id: RequestId,
         peer_endpoint_key: EndpointKey,
+    },
+    BeginDeviceClaim {
+        request_id: RequestId,
+        device_code: DeviceCode,
+        owner_tenant_id: TenantId,
+    },
+    ApproveDeviceClaim {
+        request_id: RequestId,
+        claim_id: ClaimId,
     },
 }
 
@@ -91,8 +103,11 @@ impl ControlClientMessage {
             | Self::PublishDeviceNetwork { request_id, .. }
             | Self::GetDeviceNetwork { request_id, .. }
             | Self::ResolveDeviceCode { request_id, .. }
+            | Self::ListDevices { request_id }
             | Self::SetDeviceConnectGrant { request_id, .. }
             | Self::AuthorizeDevicePeer { request_id, .. } => *request_id,
+            Self::BeginDeviceClaim { request_id, .. }
+            | Self::ApproveDeviceClaim { request_id, .. } => *request_id,
         }
     }
 }
@@ -141,6 +156,10 @@ pub enum ControlServerMessage {
         request_id: RequestId,
         device_ref: DeviceRef,
     },
+    DeviceList {
+        request_id: RequestId,
+        devices: Vec<DeviceDirectoryEntry>,
+    },
     DeviceConnectGrantUpdated {
         request_id: RequestId,
         tenant_id: TenantId,
@@ -151,6 +170,16 @@ pub enum ControlServerMessage {
     DevicePeerAuthorized {
         request_id: RequestId,
         result: AuthorizedDevicePeer,
+    },
+    DeviceClaimPending {
+        request_id: RequestId,
+        claim_id: ClaimId,
+    },
+    DeviceClaimApproved {
+        request_id: RequestId,
+        claim_id: ClaimId,
+        device_id: DeviceId,
+        owner_tenant_id: TenantId,
     },
     Error {
         request_id: Option<RequestId>,
@@ -194,6 +223,7 @@ pub enum ControlErrorCode {
     RegistrationDisabled,
     PermissionDenied,
     Conflict,
+    RateLimited,
     NotFound,
     Internal,
 }

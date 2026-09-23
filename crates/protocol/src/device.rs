@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{DeviceRef, ExecutionContext};
+use crate::{DeviceCode, DeviceRef, ExecutionContext, TenantId};
 
 pub const DEVICE_SESSION_SCHEMA_VERSION: u16 = 1;
 
@@ -18,4 +18,12 @@ pub struct DeviceHelloResult {
     pub device_ref: DeviceRef,
     pub environment_revision: String,
     pub accepted_at_unix_ms: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceDirectoryEntry {
+    pub device_ref: DeviceRef,
+    pub code: DeviceCode,
+    pub name: String,
+    pub owner_tenant_id: TenantId,
 }
