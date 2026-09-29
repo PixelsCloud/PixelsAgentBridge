@@ -9,6 +9,13 @@ use zeroize::Zeroizing;
 pub const MAX_PAB_MESSAGE_BYTES: usize = 64 * 1024;
 pub const MAX_BINARY_FRAME_BYTES: usize = 256 * 1024;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnectionPath {
+    Direct,
+    Relay,
+    Unknown,
+}
+
 #[derive(Clone)]
 pub struct PabConnection {
     inner: Connection,
@@ -47,6 +54,29 @@ impl PabConnection {
 
     pub fn remote_endpoint_key(&self) -> [u8; 32] {
         *self.inner.remote_id().as_bytes()
+    }
+
+    pub fn selected_path(&self) -> Option<ConnectionPath> {
+        if self.inner.close_reason().is_some() {
+            return None;
+        }
+
+        Some(
+            self.inner
+                .paths()
+                .iter()
+                .find(|path| path.is_selected())
+                .map(|path| {
+                    if path.is_ip() {
+                        ConnectionPath::Direct
+                    } else if path.is_relay() {
+                        ConnectionPath::Relay
+                    } else {
+                        ConnectionPath::Unknown
+                    }
+                })
+                .unwrap_or(ConnectionPath::Unknown),
+        )
     }
 
     pub async fn open_bi(&self, timeout: Duration) -> Result<PabBiStream, PabConnectionError> {

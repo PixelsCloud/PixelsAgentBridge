@@ -18,7 +18,7 @@ pub struct RelayPolicyState {
     policy_version: Option<u64>,
     expires_at_unix_ms: i64,
     endpoints: HashMap<EndpointKey, RelayEndpointOwner>,
-    guest_grants: HashMap<(EndpointKey, DeviceId), i64>,
+    connection_intents: HashMap<(EndpointKey, DeviceId), i64>,
     limiter: AggregateLimiter,
 }
 
@@ -33,7 +33,7 @@ impl RelayPolicyState {
             policy_version: None,
             expires_at_unix_ms: 0,
             endpoints: HashMap::new(),
-            guest_grants: HashMap::new(),
+            connection_intents: HashMap::new(),
             limiter: AggregateLimiter::default(),
         })
     }
@@ -112,12 +112,12 @@ impl RelayPolicyState {
         }
         self.limiter.retain(|key| retained.contains(&key));
         self.endpoints = endpoints;
-        self.guest_grants = snapshot
-            .guest_grants
+        self.connection_intents = snapshot
+            .connection_intents
             .iter()
             .map(|grant| {
                 (
-                    (grant.guest_endpoint_key, grant.device_id),
+                    (grant.operator_endpoint_key, grant.device_id),
                     grant.expires_at_unix_ms,
                 )
             })
@@ -168,27 +168,25 @@ impl RelayPolicyState {
         let first = self.endpoint_owner(first_key, now_unix_ms)?;
         let second = self.endpoint_owner(second_key, now_unix_ms)?;
         match (first, second) {
-            (RelayEndpointOwner::User { scope }, RelayEndpointOwner::Device { tenant_id, .. })
-            | (RelayEndpointOwner::Device { tenant_id, .. }, RelayEndpointOwner::User { scope })
-                if scope.tenant_id() == Some(tenant_id) =>
+            (RelayEndpointOwner::User { scope }, RelayEndpointOwner::Device { device_id, .. })
+                if self.has_intent(first_key, device_id, now_unix_ms) =>
+            {
+                Some(scope)
+            }
+            (RelayEndpointOwner::Device { device_id, .. }, RelayEndpointOwner::User { scope })
+                if self.has_intent(second_key, device_id, now_unix_ms) =>
             {
                 Some(scope)
             }
             (RelayEndpointOwner::Guest, RelayEndpointOwner::Device { device_id, .. })
-                if self
-                    .guest_grants
-                    .get(&(first_key, device_id))
-                    .is_some_and(|expires| *expires > now_unix_ms) =>
+                if self.has_intent(first_key, device_id, now_unix_ms) =>
             {
                 Some(TrafficScope::Guest {
                     endpoint_key: first_key,
                 })
             }
             (RelayEndpointOwner::Device { device_id, .. }, RelayEndpointOwner::Guest)
-                if self
-                    .guest_grants
-                    .get(&(second_key, device_id))
-                    .is_some_and(|expires| *expires > now_unix_ms) =>
+                if self.has_intent(second_key, device_id, now_unix_ms) =>
             {
                 Some(TrafficScope::Guest {
                     endpoint_key: second_key,
@@ -196,6 +194,12 @@ impl RelayPolicyState {
             }
             _ => None,
         }
+    }
+
+    fn has_intent(&self, operator: EndpointKey, device_id: DeviceId, now_unix_ms: i64) -> bool {
+        self.connection_intents
+            .get(&(operator, device_id))
+            .is_some_and(|expires| *expires > now_unix_ms)
     }
 
     pub fn acquire(&mut self, scope: TrafficScope, bytes: u64, now: Instant) -> Acquire {

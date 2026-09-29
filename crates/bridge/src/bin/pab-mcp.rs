@@ -1,24 +1,44 @@
-use std::{
-    env,
-    io::{self, BufRead, Write},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{env, path::PathBuf, sync::Arc, time::Duration};
+
+#[path = "pab_mcp/catalog.rs"]
+mod mcp_catalog;
+#[path = "pab_mcp/settings.rs"]
+mod mcp_settings;
+#[path = "pab_mcp/tools.rs"]
+mod mcp_tools;
 
 use pab_agent_core::{DataPaths, DataScope};
 use pab_bridge::{
-    BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, DevicePasswordProvider,
-    DirectoryDevicePasswordProvider, FileDevicePasswordProvider, MemoryDevicePasswordProvider,
+    BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, MemoryDevicePasswordProvider,
+    SqliteDevicePasswordProvider,
 };
-use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
+use rmcp::{
+    ErrorData, RoleServer, ServerHandler, ServiceExt,
+    model::{
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
+        ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig,
+    },
+    service::RequestContext,
+    transport::stdio,
+};
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
 
-const PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. The device password stays in the local Bridge database; never pass it as a tool argument.";
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    if let Err(error) = mcp_settings::apply_at_start() {
+        eprintln!("pab-mcp: {error}");
+        std::process::exit(1);
+    }
+    let tokio = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("could not start the MCP runtime");
+    tokio.block_on(async_main());
+}
+
+async fn async_main() {
     let log_root = match DataPaths::for_scope(DataScope::User) {
         Ok(paths) => paths.root().to_path_buf(),
         Err(error) => {
@@ -41,441 +61,105 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if env::args_os().len() != 1 {
         return Err("pab-mcp accepts no command-line arguments".into());
     }
-    let guest = env::var("PAB_MCP_GUEST").as_deref() != Ok("0");
-    let config = if guest {
-        BridgeConfig::register_guest_from_env().await?
-    } else {
-        BridgeConfig::from_env()?
-    };
-    let paths = DataPaths::for_scope(DataScope::User)?;
-    let database_path = env::var_os("PAB_BRIDGE_DATABASE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| paths.bridge_database());
-    let fallback: Option<Box<dyn DevicePasswordProvider>> =
-        if let Some(directory) = env::var_os("PAB_DEVICE_PASSWORD_DIR") {
-            Some(Box::new(DirectoryDevicePasswordProvider::new(directory)))
-        } else {
-            env::var_os("PAB_DEVICE_PASSWORD_FILE").map(|file| {
-                Box::new(FileDevicePasswordProvider::new(file)) as Box<dyn DevicePasswordProvider>
-            })
-        };
-    let passwords = Arc::new(MemoryDevicePasswordProvider::new(fallback));
-    let runtime = Arc::new(
-        BridgeRuntime::start(
-            config,
-            BridgeRuntimeConfig::new(database_path),
-            passwords.clone(),
-        )
-        .await?,
-    );
-    let (sender, mut receiver) = mpsc::channel::<String>(32);
-    std::thread::spawn(move || {
-        for line in io::stdin().lock().lines() {
-            match line {
-                Ok(line) => {
-                    if sender.blocking_send(line).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-    while let Some(line) = receiver.recv().await {
-        let response = match serde_json::from_str::<Value>(&line) {
-            Ok(request) => dispatch(&runtime, request).await,
-            Err(_) => Some(rpc_error(Value::Null, -32700, "invalid JSON")),
-        };
-        if let Some(response) = response {
-            let mut stdout = io::stdout().lock();
-            serde_json::to_writer(&mut stdout, &response)?;
-            stdout.write_all(b"\n")?;
-            stdout.flush()?;
-        }
+    let server = McpServer::default();
+    server.clone().serve(stdio()).await?.waiting().await?;
+    if let Some(runtime) = server.runtime.lock().await.take() {
+        runtime.shutdown().await?;
     }
-    Arc::try_unwrap(runtime)
-        .map_err(|_| "MCP still holds the Bridge Runtime")?
-        .shutdown()
-        .await?;
     Ok(())
 }
 
-async fn dispatch(runtime: &BridgeRuntime, request: Value) -> Option<Value> {
-    let id = request.get("id")?.clone();
-    let method = request.get("method")?.as_str()?;
-    let result = match method {
-        "initialize" => json!({
-            "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {
-                "tools": {}
-            },
-            "serverInfo": {
-                "name": "pixels-agent-bridge",
-                "version": SERVER_VERSION
-            },
-            "instructions": "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. The device password stays in a local protected file; never pass it as a tool argument."
-        }),
-        "ping" => json!({}),
-        "tools/list" => json!({
-            "tools": tools()
-        }),
-        "tools/call" => {
-            let Some(params) = request.get("params") else {
-                return Some(rpc_error(id, -32602, "missing tool parameters"));
-            };
-            let Some(name) = params.get("name").and_then(Value::as_str) else {
-                return Some(rpc_error(id, -32602, "missing tool name"));
-            };
-            let arguments = params
-                .get("arguments")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
-            let result = call_tool(runtime, name, &arguments).await;
-            match result {
-                Ok(value) => json!({
-                    "content": [{
-                        "type": "text",
-                        "text": value.to_string()
-                    }],
-                    "structuredContent": value,
-                    "isError": false
-                }),
-                Err(error) => json!({
-                    "content": [{
-                        "type": "text",
-                        "text": error
-                    }],
-                    "isError": true
-                }),
-            }
-        }
-        _ => return Some(rpc_error(id, -32601, "method not found")),
-    };
-    Some(json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": result
-    }))
+#[derive(Clone, Default)]
+struct McpServer {
+    runtime: Arc<tokio::sync::Mutex<Option<BridgeRuntime>>>,
 }
 
-async fn call_tool(
-    runtime: &BridgeRuntime,
-    name: &str,
-    arguments: &Value,
-) -> Result<Value, String> {
-    match name {
-        "pab_list_devices" => {
-            let devices = runtime
-                .list_devices()
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({ "devices": devices }))
-        }
-        "pab_connect" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let context = runtime
-                .current_environment(device_ref)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "device_ref": device_ref,
-                "target": context,
-                "os_reminder": context.compact_reminder()
-            }))
-        }
-        "pab_run_command" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let program = required_text(arguments, "program")?.to_owned();
-            let args = arguments
-                .get("args")
-                .and_then(Value::as_array)
-                .ok_or("args must be a string array")?
-                .iter()
-                .map(|value| {
-                    value
-                        .as_str()
-                        .map(str::to_owned)
-                        .ok_or("args must contain strings")
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let cwd = arguments
-                .get("cwd")
-                .and_then(Value::as_str)
-                .map(str::to_owned);
-            let target = runtime
-                .current_environment(device_ref)
-                .await
-                .map_err(|error| error.to_string())?;
-            let snapshot = runtime
-                .submit_command(device_ref, RequestId::new(), program, args, cwd)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "task": snapshot,
-                "os_reminder": target.compact_reminder()
-            }))
-        }
-        "pab_get_task" => {
-            let task_ref = resolve_task(runtime, arguments).await?;
-            let record = runtime
-                .task(task_ref)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "task_ref": task_ref,
-                "snapshot": record.snapshot,
-                "complete": record.is_complete(),
-                "last_event_seq": record.last_event_seq,
-                "stdout": record.stdout,
-                "stderr": record.stderr
-            }))
-        }
-        "pab_read_output" => {
-            let task_ref = resolve_task(runtime, arguments).await?;
-            let stream = match required_text(arguments, "stream")? {
-                "stdout" => OutputStream::Stdout,
-                "stderr" => OutputStream::Stderr,
-                _ => return Err("stream must be stdout or stderr".to_owned()),
-            };
-            let offset = arguments.get("offset").and_then(Value::as_u64).unwrap_or(0);
-            let (chunk, range) = runtime
-                .read_output(task_ref, stream, offset, 64 * 1024)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "text": String::from_utf8_lossy(&chunk.bytes),
-                "offset": offset,
-                "next_offset": offset + chunk.bytes.len() as u64,
-                "range": range
-            }))
-        }
-        "pab_upload_file" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let source = required_text(arguments, "source")?;
-            let destination = required_text(arguments, "destination")?;
-            let overwrite = arguments
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let transferred = std::sync::atomic::AtomicU64::new(0);
-            let total = std::sync::atomic::AtomicU64::new(0);
-            runtime
-                .upload_file(
-                    device_ref,
-                    std::path::Path::new(source),
-                    destination,
-                    overwrite,
-                    |offset, size| {
-                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
-                        total.store(size, std::sync::atomic::Ordering::Relaxed);
-                    },
-                )
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(
-                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
-            )
-        }
-        "pab_download_file" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let source = required_text(arguments, "source")?;
-            let destination = required_text(arguments, "destination")?;
-            let overwrite = arguments
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let transferred = std::sync::atomic::AtomicU64::new(0);
-            let total = std::sync::atomic::AtomicU64::new(0);
-            runtime
-                .download_file(
-                    device_ref,
-                    source,
-                    std::path::Path::new(destination),
-                    overwrite,
-                    |offset, size| {
-                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
-                        total.store(size, std::sync::atomic::Ordering::Relaxed);
-                    },
-                )
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(
-                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
-            )
-        }
-        _ => Err(format!("unknown tool: {name}")),
+impl ServerHandler for McpServer {
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new("pixels-agent-bridge", SERVER_VERSION))
+            .with_instructions(INSTRUCTIONS)
+    }
+
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListToolsResult, ErrorData> {
+        serde_json::from_value(json!({ "tools": mcp_catalog::tools() }))
+            .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, ErrorData> {
+        let arguments = Value::Object(request.arguments.unwrap_or_default());
+        let result = if request.name == "pab_list_devices" {
+            mcp_tools::list_local_devices().await
+        } else {
+            let mut runtime = self.runtime.lock().await;
+            match ensure_runtime(&mut runtime).await {
+                Ok(runtime) => mcp_tools::call_tool(runtime, &request.name, &arguments).await,
+                Err(error) => Err(error),
+            }
+        };
+        Ok(match result {
+            Ok(value) => CallToolResult::structured(value).into(),
+            Err(error) => CallToolResult::error(vec![ContentBlock::text(error)]).into(),
+        })
     }
 }
 
-async fn resolve_target(
-    runtime: &BridgeRuntime,
-    arguments: &Value,
-) -> Result<pab_protocol::DeviceRef, String> {
-    let code: DeviceCode = required_text(arguments, "device_code")?
-        .parse()
-        .map_err(|error: pab_protocol::DeviceCodeError| error.to_string())?;
-    runtime
-        .resolve_device_code(code)
-        .await
-        .map_err(|error| error.to_string())
+async fn ensure_runtime(runtime: &mut Option<BridgeRuntime>) -> Result<&BridgeRuntime, String> {
+    if runtime.is_none() {
+        let config = if env::var("PAB_MCP_GUEST").as_deref() != Ok("0") {
+            tokio::time::timeout(
+                Duration::from_secs(12),
+                BridgeConfig::register_guest_from_env(),
+            )
+            .await
+            .map_err(|_| {
+                "The control server is unavailable; retry the tool call when it is online"
+                    .to_owned()
+            })?
+            .map_err(|error| error.to_string())?
+        } else {
+            BridgeConfig::from_env().map_err(|error| error.to_string())?
+        };
+        let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+        let database_path = env::var_os("PAB_BRIDGE_DATABASE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| paths.bridge_database());
+        let passwords = Arc::new(MemoryDevicePasswordProvider::new(Some(Box::new(
+            SqliteDevicePasswordProvider::new(&database_path),
+        ))));
+        let mut runtime_config = BridgeRuntimeConfig::new(database_path);
+        runtime_config.resume_incomplete_on_start = false;
+        *runtime = Some(
+            BridgeRuntime::start(config, runtime_config, passwords)
+                .await
+                .map_err(|error| error.to_string())?,
+        );
+    }
+    Ok(runtime.as_ref().expect("Bridge Runtime was initialized"))
 }
 
-async fn resolve_task(runtime: &BridgeRuntime, arguments: &Value) -> Result<TaskRef, String> {
-    let device_ref = resolve_target(runtime, arguments).await?;
-    let task_id: TaskId = required_text(arguments, "task_id")?
-        .parse()
-        .map_err(|_| "invalid task_id".to_owned())?;
-    Ok(TaskRef {
-        device_ref,
-        task_id,
-    })
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn required_text<'a>(arguments: &'a Value, key: &str) -> Result<&'a str, String> {
-    arguments
-        .get(key)
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| format!("missing {key}"))
-}
-
-fn rpc_error(id: Value, code: i32, message: &str) -> Value {
-    json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": {
-            "code": code,
-            "message": message
-        }
-    })
-}
-
-fn tools() -> Vec<Value> {
-    vec![
-        tool(
-            "pab_list_devices",
-            "List account devices available in the current workspace.",
-            json!({
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-            }),
-        ),
-        tool(
-            "pab_connect",
-            "Authenticate to one device and return its verified OS and shell context. Call this before native commands.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "device_code": {
-                        "type": "string",
-                        "pattern": "^[0-9]{9}$"
-                    }
-                },
-                "required": ["device_code"],
-                "additionalProperties": false
-            }),
-        ),
-        tool(
-            "pab_run_command",
-            "Run a native executable with an argv array on the selected device. This is the generic OS fallback.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "device_code": {
-                        "type": "string",
-                        "pattern": "^[0-9]{9}$"
-                    },
-                    "program": {
-                        "type": "string"
-                    },
-                    "args": {
-                        "type": "array",
-                        "items": { "type": "string" }
-                    },
-                    "cwd": {
-                        "type": "string"
-                    }
-                },
-                "required": ["device_code", "program", "args"],
-                "additionalProperties": false
-            }),
-        ),
-        tool(
-            "pab_get_task",
-            "Read live task state, progress and output ranges.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "device_code": {
-                        "type": "string",
-                        "pattern": "^[0-9]{9}$"
-                    },
-                    "task_id": {
-                        "type": "string"
-                    }
-                },
-                "required": ["device_code", "task_id"],
-                "additionalProperties": false
-            }),
-        ),
-        tool(
-            "pab_read_output",
-            "Read retained stdout or stderr from a task offset.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "device_code": {
-                        "type": "string",
-                        "pattern": "^[0-9]{9}$"
-                    },
-                    "task_id": {
-                        "type": "string"
-                    },
-                    "stream": {
-                        "type": "string",
-                        "enum": ["stdout", "stderr"]
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "minimum": 0
-                    }
-                },
-                "required": ["device_code", "task_id", "stream"],
-                "additionalProperties": false
-            }),
-        ),
-        tool(
-            "pab_upload_file",
-            "Upload a binary file to a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
-            file_tool_schema(),
-        ),
-        tool(
-            "pab_download_file",
-            "Download a binary file from a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
-            file_tool_schema(),
-        ),
-    ]
-}
-
-fn file_tool_schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
-            "source": { "type": "string" },
-            "destination": { "type": "string" },
-            "overwrite": { "type": "boolean", "default": false }
-        },
-        "required": ["device_code", "source", "destination"],
-        "additionalProperties": false
-    })
-}
-
-fn tool(name: &str, description: &str, input_schema: Value) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": input_schema
-    })
+    #[test]
+    fn catalog_is_compatible_with_sdk() {
+        let catalog: ListToolsResult =
+            serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
+        assert_eq!(catalog.tools.len(), 16);
+        let names = catalog
+            .tools
+            .iter()
+            .map(|tool| tool.name.as_ref())
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"pab_run_command"));
+    }
 }

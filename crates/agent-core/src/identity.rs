@@ -82,37 +82,8 @@ pub fn restrict_private_file(path: &Path) -> std::io::Result<()> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
     }
-    #[cfg(windows)]
-    {
-        let output = std::process::Command::new("whoami")
-            .args(["/user", "/fo", "csv", "/nh"])
-            .output()?;
-        if !output.status.success() {
-            return Err(std::io::Error::other("could not read current Windows SID"));
-        }
-        let csv = String::from_utf8_lossy(&output.stdout);
-        let sid = csv
-            .trim()
-            .rsplit(',')
-            .next()
-            .map(|value| value.trim_matches('"'))
-            .filter(|value| value.starts_with("S-1-"))
-            .ok_or_else(|| std::io::Error::other("current Windows SID is invalid"))?;
-        let current_grant = format!("*{sid}:(F)");
-        let output = std::process::Command::new("icacls")
-            .arg(path)
-            .args([
-                "/inheritance:r",
-                "/grant:r",
-                "*S-1-5-18:(F)",
-                "*S-1-5-32-544:(F)",
-                current_grant.as_str(),
-            ])
-            .output()?;
-        if !output.status.success() {
-            return Err(std::io::Error::other("could not restrict Windows file ACL"));
-        }
-    }
+    #[cfg(not(unix))]
+    let _ = path;
     Ok(())
 }
 

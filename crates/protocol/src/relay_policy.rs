@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::{DeploymentId, DeviceId, EndpointKey, TenantId, UserId};
 
-pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 2;
+pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -95,8 +95,8 @@ impl RelayEndpointOwner {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GuestRelayGrant {
-    pub guest_endpoint_key: EndpointKey,
+pub struct RelayConnectionIntent {
+    pub operator_endpoint_key: EndpointKey,
     pub device_id: DeviceId,
     pub expires_at_unix_ms: i64,
 }
@@ -117,7 +117,7 @@ pub struct RelayPolicySnapshot {
     pub defaults: RelayLimitDefaults,
     pub team_limits: Vec<TeamRelayLimits>,
     pub endpoints: Vec<RelayEndpointPolicy>,
-    pub guest_grants: Vec<GuestRelayGrant>,
+    pub connection_intents: Vec<RelayConnectionIntent>,
 }
 
 impl RelayPolicySnapshot {
@@ -150,9 +150,9 @@ impl RelayPolicySnapshot {
             }
         }
         let mut grants = HashSet::new();
-        for grant in &self.guest_grants {
-            if !grants.insert((grant.guest_endpoint_key, grant.device_id)) {
-                return Err(RelayPolicyError::DuplicateGuestGrant);
+        for intent in &self.connection_intents {
+            if !grants.insert((intent.operator_endpoint_key, intent.device_id)) {
+                return Err(RelayPolicyError::DuplicateConnectionIntent);
             }
         }
         Ok(())
@@ -179,8 +179,8 @@ pub enum RelayPolicyError {
     DuplicateTeam(TenantId),
     #[error("relay policy contains a duplicate endpoint {0:?}")]
     DuplicateEndpoint(EndpointKey),
-    #[error("relay policy contains a duplicate guest grant")]
-    DuplicateGuestGrant,
+    #[error("relay policy contains a duplicate connection intent")]
+    DuplicateConnectionIntent,
 }
 
 pub fn mbps_to_bytes_per_second(mbps: u32) -> u64 {
@@ -233,7 +233,7 @@ mod tests {
             defaults: defaults(),
             team_limits: Vec::new(),
             endpoints: vec![endpoint, endpoint],
-            guest_grants: Vec::new(),
+            connection_intents: Vec::new(),
         };
         assert_eq!(
             snapshot.validate(),

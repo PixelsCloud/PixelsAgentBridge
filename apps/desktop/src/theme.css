@@ -1,0 +1,266 @@
+:root[data-theme="dark"] {
+  --app-background: #202329;
+  --dark-surface: #2b3038;
+  --dark-raised: #333a43;
+  --dark-input: #242a32;
+  --dark-border: #434b55;
+  --dark-text: #f0f3f5;
+  --dark-muted: #afb9c2;
+  --dark-accent: #93d7c2;
+  --dark-accent-soft: #345047;
+  color-scheme: dark;
+  color: var(--dark-text);
+  background: var(--app-background);
+}
+
+[data-theme="dark"] .titlebar,
+[data-theme="dark"] .sidebar {
+  border-color: #343a43;
+  color: var(--dark-text);
+}
+
+[data-theme="dark"] .window-controls button,
+[data-theme="dark"] .nav-item,
+[data-theme="dark"] .sidebar-status {
+  color: var(--dark-muted);
+}
+
+[data-theme="dark"] .window-controls button:hover {
+  background: #353b43;
+}
+
+[data-theme="dark"] .nav-icon,
+[data-theme="dark"] .surface-kicker,
+[data-theme="dark"] .quiet-button {
+  color: var(--dark-accent);
+}
+
+[data-theme="dark"] .nav-item:hover {
+  color: var(--dark-text);
+  background: #30363e;
+}
+
+[data-theme="dark"] .nav-item.selected {
+  color: var(--dark-accent);
+  background: var(--dark-accent-soft);
+}
+
+[data-theme="dark"] .surface,
+[data-theme="dark"] .device-context-menu,
+[data-theme="dark"] .device-dialog,
+[data-theme="dark"] .toast {
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+  background: var(--dark-surface);
+  box-shadow: 0 12px 36px #11141936;
+}
+
+[data-theme="dark"] .home-device {
+  background: linear-gradient(145deg, var(--dark-surface) 0%, var(--dark-surface) 76%, #30423d 100%);
+}
+
+[data-theme="dark"] .home-device::after {
+  border-color: #4e6a60;
+}
+
+[data-theme="dark"] .home-recent-device-icon img,
+[data-theme="dark"] .device-basic-os img,
+[data-theme="dark"] .device-avatar img {
+  filter: brightness(0) invert(.88);
+  opacity: 1;
+}
+
+[data-theme="dark"] .home-recent-device-icon,
+[data-theme="dark"] .device-basic-os,
+[data-theme="dark"] .device-avatar {
+  color: #e0e7e8;
+}
+
+[data-theme="dark"] .device-avatar {
+  background: #3d4947;
+}
+
+[data-theme="dark"] .surface h2,
+[data-theme="dark"] .home-credential-value strong,
+[data-theme="dark"] .account-current strong,
+[data-theme="dark"] .settings-about strong,
+[data-theme="dark"] .settings-agent-row strong,
+[data-theme="dark"] .device-basic-heading strong,
+[data-theme="dark"] .device-basic-grid strong,
+[data-theme="dark"] .device-dialog h2,
+[data-theme="dark"] .device-dialog strong,
+[data-theme="dark"] .list-heading h3,
+[data-theme="dark"] .device-row strong,
+[data-theme="dark"] .task-row strong,
+[data-theme="dark"] .empty-panel strong {
+  color: var(--dark-text);
+}
+
+[data-theme="dark"] .surface p,
+[data-theme="dark"] .code-label,
+[data-theme="dark"] .field-label,
+[data-theme="dark"] .account-current span,
+[data-theme="dark"] .account-current small,
+[data-theme="dark"] .settings-about,
+[data-theme="dark"] .settings-agent-row span,
+[data-theme="dark"] .phase-label,
+[data-theme="dark"] .home-recent-device-info small,
+[data-theme="dark"] .device-basic-grid span,
+[data-theme="dark"] .device-basic-alias label,
+[data-theme="dark"] .device-basic-heading span:not(.device-basic-os),
+[data-theme="dark"] .device-row small,
+[data-theme="dark"] .device-row-status,
+[data-theme="dark"] .task-row small,
+[data-theme="dark"] .directory-entry small,
+[data-theme="dark"] .screenshot-meta,
+[data-theme="dark"] .check-row,
+[data-theme="dark"] .device-dialog p,
+[data-theme="dark"] .rename-device-label,
+[data-theme="dark"] .saved-connect-progress-title,
+[data-theme="dark"] .terminal-actions > span,
+[data-theme="dark"] .saved-connect-steps li {
+  color: var(--dark-muted);
+}
+
+[data-theme="dark"] .settings-about {
+  border-color: var(--dark-border);
+}
+
+[data-theme="dark"] .section-separator {
+  background: var(--dark-border);
+}
+
+[data-theme="dark"] input:not([type="checkbox"]),
+[data-theme="dark"] textarea {
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+  background: var(--dark-input);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #89949f;
+}
+
+[data-theme="dark"] .credential-icon-button,
+[data-theme="dark"] .home-account-disconnect,
+[data-theme="dark"] .icon-text-button,
+[data-theme="dark"] .device-dialog-actions button:not(.danger):not(.saved-connect-action),
+[data-theme="dark"] .settings-language button,
+[data-theme="dark"] .transfer-directions button {
+  border-color: var(--dark-border);
+  color: #d7dfe3;
+  background: var(--dark-raised);
+}
+
+[data-theme="dark"] .settings-language button.active,
+[data-theme="dark"] .transfer-directions button.active {
+  border-color: #649d89;
+  color: var(--dark-accent);
+  background: var(--dark-accent-soft);
+}
+
+[data-theme="dark"] .settings-menu button,
+[data-theme="dark"] .operation-list button,
+[data-theme="dark"] .device-detail-tabs button {
+  color: var(--dark-muted);
+}
+
+[data-theme="dark"] .settings-menu button:hover,
+[data-theme="dark"] .operation-list button:hover {
+  color: var(--dark-text);
+  background: #393f47;
+}
+
+[data-theme="dark"] .settings-menu button.active,
+[data-theme="dark"] .operation-list button.active {
+  color: var(--dark-accent);
+  background: var(--dark-accent-soft);
+}
+
+[data-theme="dark"] .device-detail-tabs {
+  background: #23282f;
+}
+
+[data-theme="dark"] .device-detail-tabs button.active {
+  color: var(--dark-text);
+  background: #3b424b;
+}
+
+[data-theme="dark"] .home-recent-device,
+[data-theme="dark"] .device-basic-grid > div,
+[data-theme="dark"] .task-row,
+[data-theme="dark"] .directory-entry {
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+  background: var(--dark-raised);
+}
+
+[data-theme="dark"] .home-recent-device:hover,
+[data-theme="dark"] .device-row:hover,
+[data-theme="dark"] .task-row:hover,
+[data-theme="dark"] .directory-entry:not(:disabled):hover {
+  border-color: #608f80;
+  background: #3b4746;
+}
+
+[data-theme="dark"] .home-recent-device.selected,
+[data-theme="dark"] .device-row.active,
+[data-theme="dark"] .task-row.active {
+  border-color: #6ba28e;
+  background: var(--dark-accent-soft);
+}
+
+[data-theme="dark"] .device-context-menu button {
+  color: var(--dark-text);
+}
+
+[data-theme="dark"] .device-context-menu button:hover,
+[data-theme="dark"] .device-context-menu button:focus-visible,
+[data-theme="dark"] .home-account-password button:hover,
+[data-theme="dark"] .saved-connect-close:hover {
+  background: #3b424b;
+}
+
+[data-theme="dark"] .device-dialog-actions button.danger,
+[data-theme="dark"] .device-context-menu button.danger {
+  color: #ffc0c1;
+}
+
+[data-theme="dark"] .device-dialog-actions button.danger {
+  background: #923f49;
+}
+
+[data-theme="dark"] .saved-connect-stage,
+[data-theme="dark"] .saved-connect-step-icon,
+[data-theme="dark"] .target-badge,
+[data-theme="dark"] .os-banner,
+[data-theme="dark"] .empty-panel > span,
+[data-theme="dark"] .count-badge {
+  color: var(--dark-accent);
+  background: var(--dark-accent-soft);
+}
+
+[data-theme="dark"] .saved-connect-stage.failed,
+[data-theme="dark"] .saved-connect-steps li.failed .saved-connect-step-icon {
+  color: #ffb9bc;
+  background: #4a3037;
+}
+
+[data-theme="dark"] .screenshot-preview {
+  border-color: var(--dark-border);
+  background: #252b33;
+}
+
+[data-theme="dark"] .task-output,
+[data-theme="dark"] .terminal-canvas {
+  border-color: var(--dark-border);
+  background: #171d25;
+}
+
+[data-theme="dark"] .toast.error,
+[data-theme="dark"] .inline-error,
+[data-theme="dark"] .settings-error,
+[data-theme="dark"] .device-dialog .device-dialog-error {
+  color: #ffb9bc !important;
+}

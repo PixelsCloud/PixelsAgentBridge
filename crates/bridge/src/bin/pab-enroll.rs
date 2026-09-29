@@ -91,22 +91,43 @@ async fn run() -> Result<(), EnrollCliError> {
         )
         .as_bytes(),
     )?;
-    let credential = serde_json::to_vec_pretty(&serde_json::json!({
-        "schema_version": 1,
-        "password_version": 1,
-        "password_hash": password_hash,
-    }))?;
-    write_new(output_directory.join("device-credential.json"), &credential)?;
-    let manifest = serde_json::to_vec_pretty(&serde_json::json!({
-        "deployment_id": deployment_id,
-        "tenant_id": enrollment.tenant_id,
-        "user_id": enrollment.user_id,
-        "device_id": enrollment.device_id,
-        "device_code": enrollment.device_code,
-        "control_url": control_url,
-        "relay_urls": relay_urls,
-    }))?;
-    write_new(output_directory.join("enrollment.json"), &manifest)?;
+    let database = output_directory.join("executor.sqlite3");
+    let pool = sqlx::SqlitePool::connect_with(
+        sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(&database)
+            .create_if_missing(true),
+    )
+    .await?;
+    pab_agent_core::restrict_private_file(&database)?;
+    sqlx::query(
+        "CREATE TABLE device_access (id INTEGER PRIMARY KEY CHECK (id = 1), \
+         deployment_id TEXT NOT NULL, tenant_id TEXT NOT NULL, device_id TEXT NOT NULL, \
+         device_code TEXT NOT NULL, temporary_password TEXT NOT NULL, \
+         password_version INTEGER NOT NULL, password_hash TEXT NOT NULL)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("INSERT INTO device_access VALUES (1, ?, ?, ?, ?, ?, 1, ?)")
+        .bind(deployment_id.to_string())
+        .bind(enrollment.tenant_id.to_string())
+        .bind(enrollment.device_id.to_string())
+        .bind(enrollment.device_code.to_string())
+        .bind(device_password.as_str())
+        .bind(password_hash)
+        .execute(&pool)
+        .await?;
+    sqlx::query(
+        "CREATE TABLE enrollment (id INTEGER PRIMARY KEY CHECK (id = 1), \
+         user_id TEXT NOT NULL, control_url TEXT NOT NULL, relay_urls TEXT NOT NULL)",
+    )
+    .execute(&pool)
+    .await?;
+    sqlx::query("INSERT INTO enrollment VALUES (1, ?, ?, ?)")
+        .bind(enrollment.user_id.to_string())
+        .bind(control_url)
+        .bind(relay_urls)
+        .execute(&pool)
+        .await?;
     println!(
         "enrolled tenant={} user={} device={} code={}",
         enrollment.tenant_id, enrollment.user_id, enrollment.device_id, enrollment.device_code
@@ -119,8 +140,7 @@ fn prepare_output_directory(path: &PathBuf) -> Result<(), EnrollCliError> {
     for name in [
         "bridge-endpoint.key",
         "device-endpoint.key",
-        "device-credential.json",
-        "enrollment.json",
+        "executor.sqlite3",
     ] {
         let output = path.join(name);
         if output.exists() {
@@ -200,7 +220,7 @@ enum EnrollCliError {
     #[error("device password hashing failed: {0}")]
     PasswordHash(String),
     #[error(transparent)]
-    Json(#[from] serde_json::Error),
+    Sql(#[from] sqlx::Error),
 }
 
 impl From<argon2::password_hash::Error> for EnrollCliError {

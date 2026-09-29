@@ -56,10 +56,6 @@ impl DataPaths {
         self.root.join("device-endpoint.key")
     }
 
-    pub fn executor_credential(&self) -> PathBuf {
-        self.root.join("device-credential.json")
-    }
-
     pub fn executor_database(&self) -> PathBuf {
         self.root.join("executor.sqlite3")
     }

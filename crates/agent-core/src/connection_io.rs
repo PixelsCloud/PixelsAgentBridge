@@ -101,6 +101,24 @@ impl AuthenticatedControlConnection {
         Ok(request_id)
     }
 
+    pub(crate) async fn send_get_device_presence(
+        &mut self,
+        device_code: pab_protocol::DeviceCode,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::GetDevicePresence {
+                request_id,
+                device_code,
+            },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
+
     pub(crate) async fn send_list_devices(
         &mut self,
         timeout: Duration,

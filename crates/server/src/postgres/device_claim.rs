@@ -1,7 +1,6 @@
 use pab_protocol::{ClaimId, DeviceCode};
 
 use super::*;
-use crate::domain::DEVICE_CONNECT_CAPABILITY;
 
 impl PostgresStore {
     pub async fn begin_device_claim(
@@ -11,8 +10,12 @@ impl PostgresStore {
         owner_tenant_id: TenantId,
     ) -> Result<ClaimId, StoreError> {
         let mut tx = self.pool.begin().await?;
-        let role = support::require_active_membership(&mut tx, actor, owner_tenant_id).await?;
-        if role == TeamRole::Member {
+        support::require_active_membership(&mut tx, actor, owner_tenant_id).await?;
+        let kind: String = sqlx::query_scalar("SELECT kind FROM tenants WHERE id = $1")
+            .bind(owner_tenant_id.as_uuid())
+            .fetch_one(&mut *tx)
+            .await?;
+        if kind != "personal" {
             return Err(StoreError::PermissionDenied);
         }
 
@@ -69,6 +72,10 @@ impl PostgresStore {
               ON member.tenant_id = request.owner_tenant_id
              AND member.user_id = request.requested_by_user_id
              AND member.status = 'active'
+            JOIN tenants owner_scope
+              ON owner_scope.id = request.owner_tenant_id
+             AND owner_scope.kind = 'personal'
+             AND owner_scope.status = 'active'
             WHERE request.id = $1
               AND endpoint.endpoint_key = $2
               AND endpoint.owner_kind = 'device'
@@ -89,7 +96,6 @@ impl PostgresStore {
 
         let device_id = DeviceId::from_uuid(row.try_get("device_id")?);
         let owner_tenant_id = TenantId::from_uuid(row.try_get("owner_tenant_id")?);
-        let actor = UserId::from_uuid(row.try_get("requested_by_user_id")?);
         let updated = sqlx::query(
             r#"
             UPDATE devices
@@ -107,20 +113,6 @@ impl PostgresStore {
             return Err(StoreError::Conflict("device was already claimed"));
         }
 
-        sqlx::query(
-            r#"
-            INSERT INTO device_grants (
-                tenant_id, device_id, user_id, capability_bits, granted_by_user_id
-            )
-            VALUES ($1, $2, $3, $4, $3)
-            "#,
-        )
-        .bind(owner_tenant_id.as_uuid())
-        .bind(device_id.as_uuid())
-        .bind(actor.as_uuid())
-        .bind(DEVICE_CONNECT_CAPABILITY)
-        .execute(&mut *tx)
-        .await?;
         sqlx::query("UPDATE device_claim_requests SET approved_at = now() WHERE id = $1")
             .bind(claim_id.as_uuid())
             .execute(&mut *tx)

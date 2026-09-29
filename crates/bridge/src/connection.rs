@@ -22,7 +22,14 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::{BridgeConfig, BridgeConfigError};
 
+mod directory;
 mod file_transfer;
+mod screenshot;
+mod terminal;
+mod windows;
+
+pub use screenshot::Screenshot;
+pub use terminal::{TerminalOpened, TerminalOutput};
 
 pub struct BridgeClient {
     connector: BridgeConnector,
@@ -65,6 +72,10 @@ impl BridgeClient {
         if let Some(path) = &config.relay_ca_cert {
             endpoint_config = endpoint_config.with_extra_ca_pem(&read_file(path, "Relay CA")?)?;
         }
+        #[cfg(debug_assertions)]
+        if std::env::var_os("PAB_TEST_RELAY_ONLY").is_some() {
+            endpoint_config = endpoint_config.relay_only_for_testing();
+        }
         let endpoint = PabEndpoint::bind(endpoint_config, secret).await?;
         endpoint.wait_online(config.operation_timeout).await?;
         Ok(Self {
@@ -101,6 +112,13 @@ impl BridgeClient {
 }
 
 impl BridgeConnector {
+    pub async fn device_presence(
+        &self,
+        code: pab_protocol::DeviceCode,
+    ) -> Result<pab_protocol::DevicePresence, BridgeError> {
+        Ok(self.network_resolver.device_presence(code).await?)
+    }
+
     pub async fn list_devices(
         &self,
     ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, BridgeError> {
@@ -242,6 +260,20 @@ impl AuthenticatedDeviceConnection {
         }
     }
 
+    pub async fn get_presence(&self) -> Result<u16, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::GetPresence {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Presence { active_operators } if active_operators > 0 => {
+                Ok(active_operators)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
     pub async fn submit_command(
         &self,
         request_id: RequestId,
@@ -289,6 +321,39 @@ impl AuthenticatedDeviceConnection {
                 ) =>
             {
                 Ok(*snapshot)
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn get_transfer(
+        &self,
+        request_id: RequestId,
+    ) -> Result<pab_protocol::TransferSnapshot, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::GetTransfer {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Transfer { snapshot }
+                if snapshot.request_id == request_id
+                    && snapshot.initiated_by == self.operator
+                    && snapshot.offset <= snapshot.size
+                    && snapshot.sha256.as_deref().is_none_or(|digest| {
+                        digest.len() == 64
+                            && digest
+                                .bytes()
+                                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                    })
+                    && matches!(snapshot.direction.as_str(), "receive" | "send")
+                    && matches!(
+                        snapshot.state.as_str(),
+                        "running" | "completed" | "failed" | "interrupted"
+                    ) =>
+            {
+                Ok(snapshot)
             }
             response => Err(unexpected_task_response(response)),
         }
@@ -544,6 +609,8 @@ pub enum BridgeError {
     UnexpectedTaskResponse(String),
     #[error("file transfer failed: {0}")]
     FileTransfer(String),
+    #[error("terminal operation failed: {0}")]
+    Terminal(String),
     #[error("local file operation failed: {0}")]
     LocalFile(#[from] std::io::Error),
 }

@@ -9,7 +9,9 @@ members = [
     "crates/relay",
     "crates/server",
     "crates/task-runtime",
+    "crates/terminal",
     "crates/transport",
+    "crates/windows-sas",
 ]
 resolver = "2"
 exclude = ["apps/desktop/src-tauri"]

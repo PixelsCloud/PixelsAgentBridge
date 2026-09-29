@@ -17,6 +17,7 @@ pub enum DeviceConnectionPhase {
     WaitingForBridge,
     Connecting,
     Connected,
+    Disconnected,
     Retrying,
 }
 

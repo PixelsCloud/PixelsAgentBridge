@@ -4,10 +4,9 @@ use pab_protocol::{
 };
 
 use super::*;
-use crate::domain::DEVICE_CONNECT_CAPABILITY;
 
 impl PostgresStore {
-    pub async fn list_authorized_devices(
+    pub async fn list_my_devices(
         &self,
         requester_key: EndpointKey,
         requester_user: UserId,
@@ -17,20 +16,23 @@ impl PostgresStore {
         let rows = sqlx::query(
             r#"
             SELECT device.id, device.tenant_id AS device_tenant_id,
-                   device.code, device.name
+                   device.owner_tenant_id, device.code, device.name
             FROM endpoints requester
             JOIN memberships member
               ON member.tenant_id = requester.tenant_id
              AND member.user_id = requester.user_id
              AND member.status = 'active'
-            JOIN device_grants grant_row
-              ON grant_row.tenant_id = member.tenant_id
-             AND grant_row.user_id = member.user_id
-             AND (grant_row.capability_bits & $4) = $4
             JOIN devices device
-              ON device.id = grant_row.device_id
-             AND device.owner_tenant_id = member.tenant_id
-             AND device.status = 'active'
+              ON device.status = 'active'
+             AND (
+                 device.registered_by_user_id = requester.user_id
+                 OR EXISTS (
+                     SELECT 1 FROM device_claim_requests claim
+                     WHERE claim.device_id = device.id
+                       AND claim.requested_by_user_id = requester.user_id
+                       AND claim.approved_at IS NOT NULL
+                 )
+             )
             WHERE requester.endpoint_key = $1
               AND requester.tenant_id = $2
               AND requester.user_id = $3
@@ -42,7 +44,6 @@ impl PostgresStore {
         .bind(requester_key.as_bytes().as_slice())
         .bind(requester_tenant.as_uuid())
         .bind(requester_user.as_uuid())
-        .bind(DEVICE_CONNECT_CAPABILITY)
         .fetch_all(&self.pool)
         .await?;
         rows.into_iter()
@@ -56,7 +57,7 @@ impl PostgresStore {
                     code: DeviceCode::new(row.try_get::<i32, _>("code")? as u32)
                         .map_err(|error| StoreError::InvalidData(error.to_string()))?,
                     name: row.try_get("name")?,
-                    owner_tenant_id: requester_tenant,
+                    owner_tenant_id: TenantId::from_uuid(row.try_get("owner_tenant_id")?),
                 })
             })
             .collect()
@@ -81,35 +82,40 @@ impl PostgresStore {
             JOIN tenants tenant
               ON tenant.id = requester.tenant_id AND tenant.status = 'active'
             JOIN devices device
-              ON device.owner_tenant_id = requester.tenant_id
-             AND device.code = $4 AND device.status = 'active'
+              ON device.code = $4 AND device.status = 'active'
             WHERE requester.endpoint_key = $1
               AND requester.tenant_id = $2
               AND requester.user_id = $3
               AND requester.owner_kind = 'user'
               AND requester.status = 'active'
-              AND EXISTS (
-                  SELECT 1 FROM device_grants grant_row
-                  WHERE grant_row.tenant_id = requester.tenant_id
-                    AND grant_row.device_id = device.id
-                    AND grant_row.user_id = requester.user_id
-                    AND (grant_row.capability_bits & $5) = $5
-              )
             "#,
         )
         .bind(requester_key.as_bytes().as_slice())
         .bind(tenant_id.as_uuid())
         .bind(requester_user.as_uuid())
         .bind(code.value() as i32)
-        .bind(DEVICE_CONNECT_CAPABILITY)
         .fetch_optional(&self.pool)
         .await?
         .ok_or(StoreError::NotFound)?;
-        Ok(DeviceRef {
+        let device_ref = DeviceRef {
             deployment_id,
             tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
             device_id: DeviceId::from_uuid(row.try_get("id")?),
-        })
+        };
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO device_connection_intents (operator_endpoint_key, device_id, expires_at) \
+             VALUES ($1, $2, now() + interval '10 minutes') \
+             ON CONFLICT (operator_endpoint_key, device_id) \
+             DO UPDATE SET expires_at = EXCLUDED.expires_at",
+        )
+        .bind(requester_key.as_bytes().as_slice())
+        .bind(device_ref.device_id.as_uuid())
+        .execute(&mut *tx)
+        .await?;
+        support::bump_policy_revision(&mut tx).await?;
+        tx.commit().await?;
+        Ok(device_ref)
     }
 
     pub async fn device_network_snapshot(
@@ -140,10 +146,13 @@ impl PostgresStore {
               ON deployment.singleton = true
              AND deployment.id = $5
             JOIN devices device
-              ON device.owner_tenant_id = requester.tenant_id
-             AND device.id = $4
-             AND device.tenant_id = $7
+              ON device.id = $4
+             AND device.tenant_id = $6
              AND device.status = 'active'
+            JOIN device_connection_intents intent
+              ON intent.operator_endpoint_key = requester.endpoint_key
+             AND intent.device_id = device.id
+             AND intent.expires_at > now()
             JOIN device_network network
               ON network.tenant_id = device.tenant_id
              AND network.device_id = device.id
@@ -158,14 +167,6 @@ impl PostgresStore {
               AND requester.user_id = $3
               AND requester.owner_kind = 'user'
               AND requester.status = 'active'
-              AND EXISTS (
-                  SELECT 1
-                  FROM device_grants grant_row
-                  WHERE grant_row.tenant_id = requester.tenant_id
-                    AND grant_row.device_id = device.id
-                    AND grant_row.user_id = requester.user_id
-                    AND (grant_row.capability_bits & $6) = $6
-              )
             "#,
         )
         .bind(requester_key.as_bytes().as_slice())
@@ -173,7 +174,6 @@ impl PostgresStore {
         .bind(requester_user.as_uuid())
         .bind(device_ref.device_id.as_uuid())
         .bind(device_ref.deployment_id.as_uuid())
-        .bind(DEVICE_CONNECT_CAPABILITY)
         .bind(device_ref.tenant_id.as_uuid())
         .fetch_optional(&self.pool)
         .await?

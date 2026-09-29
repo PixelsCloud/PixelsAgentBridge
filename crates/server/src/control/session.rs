@@ -141,6 +141,13 @@ impl ControlSession {
                     request_id,
                     device_ref,
                 }),
+            ControlClientMessage::GetDevicePresence { device_code, .. } => self
+                .get_device_presence(device_code)
+                .await
+                .map(|presence| ControlServerMessage::DevicePresenceFound {
+                    request_id,
+                    presence,
+                }),
             ControlClientMessage::ListDevices { .. } => {
                 self.list_devices()
                     .await
@@ -149,22 +156,14 @@ impl ControlSession {
                         devices,
                     })
             }
-            ControlClientMessage::SetDeviceConnectGrant {
-                tenant_id,
-                device_id,
-                user_id,
-                allowed,
-                ..
-            } => self
-                .set_device_connect_grant(tenant_id, device_id, user_id, allowed)
-                .await
-                .map(|()| ControlServerMessage::DeviceConnectGrantUpdated {
-                    request_id,
-                    tenant_id,
-                    device_id,
-                    user_id,
-                    allowed,
-                }),
+            ControlClientMessage::ListTrafficScopes { .. } => {
+                self.list_traffic_scopes().await.map(|options| {
+                    ControlServerMessage::TrafficScopeList {
+                        request_id,
+                        options,
+                    }
+                })
+            }
             ControlClientMessage::AuthorizeDevicePeer {
                 peer_endpoint_key, ..
             } => self
@@ -220,23 +219,6 @@ impl ControlSession {
         Ok(authenticated_response(request_id, account))
     }
 
-    async fn set_device_connect_grant(
-        &self,
-        tenant_id: pab_protocol::TenantId,
-        device_id: pab_protocol::DeviceId,
-        user_id: pab_protocol::UserId,
-        allowed: bool,
-    ) -> Result<(), ControlSessionError> {
-        let account = self
-            .account
-            .as_ref()
-            .ok_or(ControlSessionError::NotAuthenticated)?;
-        self.control
-            .set_device_connect_grant(account.id, tenant_id, device_id, user_id, allowed)
-            .await
-            .map_err(Into::into)
-    }
-
     async fn login(
         &mut self,
         request_id: RequestId,
@@ -252,6 +234,19 @@ impl ControlSession {
         let account = self.control.authenticate(username, password).await?;
         self.account = Some(account.clone());
         Ok(authenticated_response(request_id, account))
+    }
+
+    async fn list_traffic_scopes(
+        &self,
+    ) -> Result<pab_protocol::TrafficScopeOptions, ControlSessionError> {
+        let account = self
+            .account
+            .as_ref()
+            .ok_or(ControlSessionError::NotAuthenticated)?;
+        self.control
+            .list_traffic_scopes(account)
+            .await
+            .map_err(Into::into)
     }
 
     fn begin_endpoint_registration(
@@ -514,22 +509,41 @@ impl ControlSession {
         &mut self,
         device_code: pab_protocol::DeviceCode,
     ) -> Result<pab_protocol::DeviceRef, ControlSessionError> {
+        self.accept_code_lookup(device_code)?;
         let endpoint = self
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
-        if matches!(endpoint.principal, EndpointProofPrincipal::Guest) {
-            if !self.guest_code_lookups.contains(&device_code)
-                && self.guest_code_lookups.len() >= 20
-            {
-                return Err(ControlSessionError::RateLimited);
-            }
-            self.guest_code_lookups.insert(device_code);
-        }
         self.control
             .resolve_device_code(endpoint, device_code, self.deployment_id)
             .await
             .map_err(Into::into)
+    }
+
+    async fn get_device_presence(
+        &mut self,
+        device_code: pab_protocol::DeviceCode,
+    ) -> Result<pab_protocol::DevicePresence, ControlSessionError> {
+        self.accept_code_lookup(device_code)?;
+        let endpoint = self
+            .endpoint
+            .as_ref()
+            .ok_or(ControlSessionError::UserEndpointRequired)?;
+        self.control
+            .device_presence(endpoint, device_code)
+            .await
+            .map_err(Into::into)
+    }
+
+    fn accept_code_lookup(
+        &mut self,
+        device_code: pab_protocol::DeviceCode,
+    ) -> Result<(), ControlSessionError> {
+        if !self.guest_code_lookups.contains(&device_code) && self.guest_code_lookups.len() >= 20 {
+            return Err(ControlSessionError::RateLimited);
+        }
+        self.guest_code_lookups.insert(device_code);
+        Ok(())
     }
 
     async fn list_devices(
@@ -540,7 +554,7 @@ impl ControlSession {
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
         self.control
-            .list_authorized_devices(endpoint, self.deployment_id)
+            .list_my_devices(endpoint, self.deployment_id)
             .await
             .map_err(Into::into)
     }

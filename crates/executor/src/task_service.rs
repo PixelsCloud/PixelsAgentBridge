@@ -6,27 +6,33 @@ use std::{
 };
 
 use pab_protocol::{
-    CommandTaskSpec, ContextFreshness, DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceTaskErrorCode,
-    DeviceTaskRequest, DeviceTaskResponse, ExecutionContext, MAX_COMMAND_ARGUMENT_BYTES,
-    MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef,
-    OutputStream, TargetContext, TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef,
-    TaskSnapshot,
+    CommandTaskSpec, ContextFreshness, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent, DeviceRef,
+    DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse, ExecutionContext,
+    MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES,
+    MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, ScreenshotMeta, TargetContext,
+    TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef, TaskSnapshot, WindowList,
 };
 use pab_task_runtime::TaskRuntimeError;
-use pab_transport::{PabBiStream, PabConnectionError};
+use pab_transport::{MAX_BINARY_FRAME_BYTES, PabBiStream, PabConnectionError};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::sync::{Mutex, watch};
 
 mod command;
+mod directory;
 mod file_transfer;
 mod subscription;
+mod terminal;
+mod upload_lock;
 
+use crate::session::ActiveSessions;
 use crate::task_store::{AcceptTaskOutcome, TaskStore, TaskStoreError};
 
 const MAX_DISPLAY_SUMMARY_BYTES: usize = 1024;
 const MAX_CWD_BYTES: usize = 32 * 1024;
 const MAX_CANCEL_REASON_BYTES: usize = 1024;
 const MAX_ACTIVE_TASKS: usize = 32;
+const MAX_ACTIVE_TERMINALS: usize = 8;
 
 #[derive(Clone)]
 pub(crate) struct TaskService {
@@ -34,6 +40,9 @@ pub(crate) struct TaskService {
     device_ref: DeviceRef,
     execution_context: ExecutionContext,
     active: Arc<Mutex<HashMap<TaskId, watch::Sender<Option<String>>>>>,
+    terminals: Arc<Mutex<HashMap<pab_protocol::RequestId, Arc<terminal::ActiveTerminal>>>>,
+    upload_locks: upload_lock::UploadPathLocks,
+    active_sessions: ActiveSessions,
 }
 
 impl TaskService {
@@ -44,6 +53,8 @@ impl TaskService {
     ) -> Result<Self, TaskServiceError> {
         let store = TaskStore::open(database_file).await?;
         store.interrupt_transfers().await?;
+        store.interrupt_read_operations().await?;
+        store.interrupt_terminals().await?;
         for task_ref in store.incomplete_task_refs().await? {
             store
                 .complete_output(task_ref, OutputStream::Stdout)
@@ -66,7 +77,15 @@ impl TaskService {
             device_ref,
             execution_context,
             active: Arc::new(Mutex::new(HashMap::new())),
+            terminals: Arc::new(Mutex::new(HashMap::new())),
+            upload_locks: upload_lock::UploadPathLocks::default(),
+            active_sessions: ActiveSessions::default(),
         })
+    }
+
+    pub(crate) fn with_active_sessions(mut self, active_sessions: ActiveSessions) -> Self {
+        self.active_sessions = active_sessions;
+        self
     }
 
     pub async fn handle_stream(
@@ -106,6 +125,48 @@ impl TaskService {
                 .await;
         }
 
+        if let DeviceTaskRequest::CaptureScreenshot { request_id, .. } = request {
+            self.store
+                .start_screenshot_read(request_id, initiated_by)
+                .await?;
+            let result = self
+                .capture_screenshot_stream(request_id, &mut stream, timeout)
+                .await;
+            let (state, size, message) = match &result {
+                Ok(size) => ("completed", *size, None),
+                Err(error) => ("failed", 0, Some(error.to_string())),
+            };
+            self.store
+                .finish_directory_read(request_id, state, size, message.as_deref())
+                .await?;
+            return match result {
+                Ok(_) => Ok(()),
+                Err(error) => {
+                    let response = error_response(&error);
+                    let _ = stream.send_json(&response, timeout).await;
+                    Err(error)
+                }
+            };
+        }
+
+        if matches!(
+            request,
+            DeviceTaskRequest::OpenTerminal { .. }
+                | DeviceTaskRequest::TerminalInput { .. }
+                | DeviceTaskRequest::TerminalRead { .. }
+                | DeviceTaskRequest::TerminalResize { .. }
+                | DeviceTaskRequest::TerminalClose { .. }
+        ) {
+            let result = self
+                .handle_terminal(initiated_by, request, &mut stream, timeout)
+                .await;
+            if let Err(error) = &result {
+                let response = error_response(error);
+                let _ = stream.send_json(&response, timeout).await;
+            }
+            return result;
+        }
+
         match &request {
             DeviceTaskRequest::UploadFile {
                 request_id,
@@ -116,7 +177,14 @@ impl TaskService {
                 ..
             } => {
                 self.store
-                    .start_transfer(*request_id, initiated_by, "receive", path, *size)
+                    .start_transfer(
+                        *request_id,
+                        initiated_by,
+                        "receive",
+                        path,
+                        *size,
+                        Some(sha256),
+                    )
                     .await?;
                 let result = file_transfer::upload(
                     &self.store,
@@ -127,6 +195,7 @@ impl TaskService {
                     *size,
                     sha256,
                     *overwrite,
+                    &self.upload_locks,
                 )
                 .await;
                 self.finish_transfer(*request_id, &result).await?;
@@ -139,7 +208,7 @@ impl TaskService {
                 ..
             } => {
                 self.store
-                    .start_transfer(*request_id, initiated_by, "send", path, 0)
+                    .start_transfer(*request_id, initiated_by, "send", path, 0, None)
                     .await?;
                 let result = file_transfer::download(
                     &self.store,
@@ -162,6 +231,42 @@ impl TaskService {
         };
         stream.send_json(&response, timeout).await?;
         Ok(())
+    }
+
+    async fn capture_screenshot_stream(
+        &self,
+        request_id: pab_protocol::RequestId,
+        stream: &mut PabBiStream,
+        timeout: Duration,
+    ) -> Result<usize, TaskServiceError> {
+        if !cfg!(any(
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "macos"
+        )) {
+            return Err(TaskServiceError::Unsupported);
+        }
+        let bytes = crate::local_ipc::request_screenshot()
+            .await
+            .map_err(TaskServiceError::WindowHelper)?;
+        let (width, height) =
+            crate::local_ipc::validate_png(&bytes).map_err(TaskServiceError::WindowHelper)?;
+        let meta = ScreenshotMeta {
+            request_id,
+            format: "png".to_owned(),
+            width,
+            height,
+            size: bytes.len() as u64,
+            sha256: hex::encode(Sha256::digest(&bytes)),
+        };
+        stream
+            .send_frame_json(&DeviceTaskResponse::Screenshot { meta }, timeout)
+            .await?;
+        for chunk in bytes.chunks(MAX_BINARY_FRAME_BYTES.min(64 * 1024)) {
+            stream.send_binary_frame(chunk, timeout).await?;
+        }
+        stream.finish_send(timeout).await?;
+        Ok(bytes.len())
     }
 
     async fn finish_transfer(
@@ -194,6 +299,9 @@ impl TaskService {
                     freshness: ContextFreshness::Current,
                 }),
             }),
+            DeviceTaskRequest::GetPresence { .. } => Ok(DeviceTaskResponse::Presence {
+                active_operators: self.active_sessions.operator_count(),
+            }),
             DeviceTaskRequest::SubmitCommand {
                 request_id,
                 command,
@@ -213,6 +321,94 @@ impl TaskService {
                     snapshot: Box::new(snapshot),
                 })
             }
+            DeviceTaskRequest::GetTransfer { request_id, .. } => {
+                let snapshot = self.store.get_transfer(initiated_by, request_id).await?;
+                Ok(DeviceTaskResponse::Transfer { snapshot })
+            }
+            DeviceTaskRequest::ListDirectory {
+                request_id,
+                path,
+                after,
+                limit,
+                ..
+            } => {
+                self.store
+                    .start_directory_read(request_id, initiated_by, &path)
+                    .await?;
+                let result = directory::list(request_id, path, after, limit).await;
+                let (state, count, message) = match &result {
+                    Ok(page) => ("completed", page.entries.len(), None),
+                    Err(error) => ("failed", 0, Some(error.to_string())),
+                };
+                self.store
+                    .finish_directory_read(request_id, state, count, message.as_deref())
+                    .await?;
+                Ok(DeviceTaskResponse::Directory { page: result? })
+            }
+            DeviceTaskRequest::ListWindows { request_id, .. } => {
+                self.store
+                    .start_window_read(request_id, initiated_by)
+                    .await?;
+                let result = if cfg!(windows) {
+                    crate::local_ipc::request_window_list()
+                        .await
+                        .map(|entries| WindowList {
+                            request_id,
+                            entries,
+                        })
+                        .map_err(TaskServiceError::WindowHelper)
+                } else {
+                    Err(TaskServiceError::Unsupported)
+                };
+                let (state, count, message) = match &result {
+                    Ok(list) => ("completed", list.entries.len(), None),
+                    Err(error) => ("failed", 0, Some(error.to_string())),
+                };
+                self.store
+                    .finish_window_read(request_id, state, count, message.as_deref())
+                    .await?;
+                Ok(DeviceTaskResponse::Windows { list: result? })
+            }
+            DeviceTaskRequest::DesktopInput {
+                request_id, event, ..
+            } => {
+                if !cfg!(windows) {
+                    return Err(TaskServiceError::Unsupported);
+                }
+                let kind = match event {
+                    DesktopInputEvent::MouseMove { .. } => "mouse_move",
+                    DesktopInputEvent::MouseButton { .. } => "mouse_button",
+                    DesktopInputEvent::MouseWheel { .. } => "mouse_wheel",
+                    DesktopInputEvent::Key { .. } => "key",
+                    DesktopInputEvent::SecureAttention => "secure_attention",
+                };
+                self.store
+                    .start_desktop_input(request_id, initiated_by, kind)
+                    .await?;
+                let result = if matches!(event, DesktopInputEvent::SecureAttention) {
+                    crate::windows_sas::send_secure_attention()
+                        .map_err(TaskServiceError::SecureAttention)
+                } else {
+                    crate::local_ipc::request_desktop_input(event)
+                        .await
+                        .map_err(TaskServiceError::WindowHelper)
+                };
+                let (state, message) = match &result {
+                    Ok(()) => ("completed", None),
+                    Err(error) => ("failed", Some(error.to_string())),
+                };
+                self.store
+                    .finish_directory_read(request_id, state, 1, message.as_deref())
+                    .await?;
+                result?;
+                Ok(DeviceTaskResponse::DesktopInputApplied { request_id })
+            }
+            DeviceTaskRequest::CaptureScreenshot { .. } => unreachable!("handled before dispatch"),
+            DeviceTaskRequest::OpenTerminal { .. }
+            | DeviceTaskRequest::TerminalInput { .. }
+            | DeviceTaskRequest::TerminalRead { .. }
+            | DeviceTaskRequest::TerminalResize { .. }
+            | DeviceTaskRequest::TerminalClose { .. } => unreachable!("handled before dispatch"),
             DeviceTaskRequest::ReadOutput {
                 task_ref,
                 stream,
@@ -398,7 +594,16 @@ fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
 fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
     let code = match error {
         TaskServiceError::InvalidRequest(_) => DeviceTaskErrorCode::InvalidRequest,
+        TaskServiceError::DirectoryRead(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            DeviceTaskErrorCode::NotFound
+        }
+        TaskServiceError::DirectoryRead(error)
+            if error.kind() == std::io::ErrorKind::PermissionDenied =>
+        {
+            DeviceTaskErrorCode::AccessDenied
+        }
         TaskServiceError::EnvironmentChanged => DeviceTaskErrorCode::EnvironmentChanged,
+        TaskServiceError::AccessDenied => DeviceTaskErrorCode::AccessDenied,
         TaskServiceError::NotFound | TaskServiceError::Store(TaskStoreError::NotFound) => {
             DeviceTaskErrorCode::NotFound
         }
@@ -413,19 +618,26 @@ fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
             TaskRuntimeError::TerminalTask(_) | TaskRuntimeError::InvalidTransition { .. },
         )) => DeviceTaskErrorCode::NotCancellable,
         TaskServiceError::NotCancellable => DeviceTaskErrorCode::NotCancellable,
+        TaskServiceError::Unsupported
+        | TaskServiceError::WindowHelper(_)
+        | TaskServiceError::SecureAttention(_) => DeviceTaskErrorCode::Unsupported,
         TaskServiceError::Store(_) => DeviceTaskErrorCode::StorageUnavailable,
         _ => DeviceTaskErrorCode::Internal,
     };
     let message = match code {
         DeviceTaskErrorCode::InvalidRequest => "invalid task request",
         DeviceTaskErrorCode::EnvironmentChanged => "target execution environment changed",
-        DeviceTaskErrorCode::NotFound => "task was not found",
+        DeviceTaskErrorCode::NotFound => "requested task or path was not found",
         DeviceTaskErrorCode::RequestConflict => {
             "request ID was already used with different arguments"
         }
         DeviceTaskErrorCode::NotCancellable => "task is no longer cancellable",
         DeviceTaskErrorCode::StorageUnavailable => "Executor task storage is unavailable",
         DeviceTaskErrorCode::Internal => "Executor task operation failed",
+        DeviceTaskErrorCode::AccessDenied => "directory access denied",
+        DeviceTaskErrorCode::Unsupported => {
+            "remote desktop operation is unavailable on this device"
+        }
     };
     DeviceTaskResponse::Error {
         code,
@@ -467,6 +679,8 @@ pub(crate) enum TaskServiceError {
     EnvironmentChanged,
     #[error("task was not found")]
     NotFound,
+    #[error("terminal session belongs to a different operator")]
+    AccessDenied,
     #[error("task is no longer cancellable")]
     NotCancellable,
     #[error("system time or output offset is outside the supported range")]
@@ -477,8 +691,18 @@ pub(crate) enum TaskServiceError {
     Connection(#[from] PabConnectionError),
     #[error("process operation failed: {0}")]
     Process(#[from] std::io::Error),
+    #[error("directory read failed: {0}")]
+    DirectoryRead(std::io::Error),
     #[error("task worker failed: {0}")]
     Worker(#[from] tokio::task::JoinError),
+    #[error("window listing is unsupported on this device")]
+    Unsupported,
+    #[error("interactive window helper failed: {0}")]
+    WindowHelper(crate::local_ipc::LocalIpcError),
+    #[error("Windows secure attention failed: {0}")]
+    SecureAttention(std::io::Error),
+    #[error("terminal operation failed: {0}")]
+    Terminal(#[from] pab_terminal::TerminalError),
 }
 
 impl TaskServiceError {

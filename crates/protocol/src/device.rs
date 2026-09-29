@@ -27,3 +27,10 @@ pub struct DeviceDirectoryEntry {
     pub name: String,
     pub owner_tenant_id: TenantId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DevicePresence {
+    pub code: DeviceCode,
+    pub name: String,
+    pub online: bool,
+}

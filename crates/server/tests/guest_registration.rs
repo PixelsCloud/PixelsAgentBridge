@@ -152,8 +152,33 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         .relay_policy_snapshot(Duration::from_secs(30))
         .await
         .unwrap();
-    assert_eq!(policy.guest_grants.len(), 1);
-    assert_eq!(policy.guest_grants[0].device_id, first.id);
+    assert_eq!(policy.connection_intents.len(), 1);
+    assert_eq!(policy.connection_intents[0].device_id, first.id);
+    sqlx::query(
+        "UPDATE device_connection_intents \
+         SET expires_at = now() + interval '4 minutes' \
+         WHERE operator_endpoint_key = $1 AND device_id = $2",
+    )
+    .bind(guest_key.as_bytes().as_slice())
+    .bind(first.id.as_uuid())
+    .execute(store.pool())
+    .await
+    .unwrap();
+    store
+        .renew_connection_intent(guest_key, first.id)
+        .await
+        .unwrap();
+    let renewed: bool = sqlx::query_scalar(
+        "SELECT expires_at > now() + interval '9 minutes' \
+         FROM device_connection_intents \
+         WHERE operator_endpoint_key = $1 AND device_id = $2",
+    )
+    .bind(guest_key.as_bytes().as_slice())
+    .bind(first.id.as_uuid())
+    .fetch_one(store.pool())
+    .await
+    .unwrap();
+    assert!(renewed);
 
     let account = control
         .register_account("claim-owner", "long enough test password")
@@ -216,6 +241,47 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         .unwrap();
     assert_eq!(
         authorized_owner.operator,
-        pab_protocol::OperatorRef::Account(account.id)
+        pab_protocol::OperatorRef::account(
+            account.id,
+            EndpointKey::new(*owner_key.public().as_bytes()),
+        )
+    );
+
+    let revision_before: i64 =
+        sqlx::query_scalar("SELECT policy_revision FROM deployments WHERE singleton = true")
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+    sqlx::query(
+        "UPDATE device_connection_intents SET expires_at = now() - interval '1 second' \
+         WHERE operator_endpoint_key = $1 AND device_id = $2",
+    )
+    .bind(guest_key.as_bytes().as_slice())
+    .bind(first.id.as_uuid())
+    .execute(store.pool())
+    .await
+    .unwrap();
+    assert_eq!(store.delete_expired_connection_intents().await.unwrap(), 1);
+    assert_eq!(store.delete_expired_connection_intents().await.unwrap(), 0);
+    let revision_after: i64 =
+        sqlx::query_scalar("SELECT policy_revision FROM deployments WHERE singleton = true")
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+    assert_eq!(revision_after, revision_before + 1);
+    let policy_after = store
+        .relay_policy_snapshot(Duration::from_secs(30))
+        .await
+        .unwrap();
+    assert_eq!(policy_after.connection_intents.len(), 1);
+    assert_eq!(
+        policy_after.connection_intents[0].operator_endpoint_key,
+        EndpointKey::new(*owner_key.public().as_bytes())
+    );
+    assert!(
+        store
+            .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
+            .await
+            .is_err()
     );
 }

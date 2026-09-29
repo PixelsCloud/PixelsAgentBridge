@@ -38,7 +38,7 @@ impl BridgeIdentity {
     }
     pub fn operator(self, endpoint_key: EndpointKey) -> OperatorRef {
         match self {
-            Self::Account(user_id) => OperatorRef::Account(user_id),
+            Self::Account(user_id) => OperatorRef::account(user_id, endpoint_key),
             Self::Guest => OperatorRef::Guest {
                 guest_endpoint_key: endpoint_key,
             },
@@ -104,6 +104,20 @@ impl BridgeConfig {
         Self::from_lookup(|name| match name {
             "PAB_GUEST" => Some(OsString::from("1")),
             "PAB_TENANT_ID" => Some(OsString::from(tenant_id.to_string())),
+            "PAB_ENDPOINT_SECRET_FILE" => Some(secret_file.clone().into_os_string()),
+            _ => env::var_os(name),
+        })
+    }
+
+    pub fn from_env_account(
+        tenant_id: TenantId,
+        user_id: UserId,
+        secret_file: PathBuf,
+    ) -> Result<Self, BridgeConfigError> {
+        Self::from_lookup(|name| match name {
+            "PAB_GUEST" => Some(OsString::from("0")),
+            "PAB_TENANT_ID" => Some(OsString::from(tenant_id.to_string())),
+            "PAB_USER_ID" => Some(OsString::from(user_id.to_string())),
             "PAB_ENDPOINT_SECRET_FILE" => Some(secret_file.clone().into_os_string()),
             _ => env::var_os(name),
         })

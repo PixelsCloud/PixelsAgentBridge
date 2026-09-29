@@ -9,13 +9,11 @@ use pab_protocol::{
 };
 use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
-use time::OffsetDateTime;
-use uuid::Uuid;
 
 use crate::{
     active_endpoints::ActiveEndpoints,
     auth::{CredentialError, PasswordEngine, PasswordPolicy, normalize_username},
-    domain::{Account, Device, RegisteredEndpoint, Team, TeamInvitation, TeamRole},
+    domain::{Account, Device, RegisteredEndpoint, Team, TeamRole},
     endpoint_proof::VerifiedEndpointProof,
     postgres::{PostgresStore, StoreError},
 };
@@ -29,7 +27,17 @@ pub struct ControlPlane {
 }
 
 impl ControlPlane {
-    pub async fn list_authorized_devices(
+    pub async fn list_traffic_scopes(
+        &self,
+        account: &Account,
+    ) -> Result<pab_protocol::TrafficScopeOptions, ServiceError> {
+        Ok(self
+            .store
+            .list_traffic_scopes(account.id, account.personal_tenant_id)
+            .await?)
+    }
+
+    pub async fn list_my_devices(
         &self,
         endpoint: &RegisteredEndpoint,
         deployment_id: DeploymentId,
@@ -39,7 +47,7 @@ impl ControlPlane {
         };
         Ok(self
             .store
-            .list_authorized_devices(
+            .list_my_devices(
                 endpoint.endpoint_key,
                 user_id,
                 endpoint.tenant_id,
@@ -140,32 +148,74 @@ impl ControlPlane {
         }
     }
 
-    pub async fn create_team(&self, actor: UserId, name: &str) -> Result<Team, ServiceError> {
-        Ok(self.store.create_team(actor, name).await?)
+    pub async fn account_id_by_username(&self, username: &str) -> Result<UserId, ServiceError> {
+        let (_, username_key) = normalize_username(username)?;
+        self.store
+            .account_credential(&username_key)
+            .await?
+            .map(|credential| credential.account.id)
+            .ok_or(StoreError::NotFound.into())
     }
 
-    pub async fn invite_team_member(
+    pub async fn admin_create_team(
         &self,
-        actor: UserId,
-        tenant_id: TenantId,
-        invited_user: UserId,
-        role: TeamRole,
-        expires_at: OffsetDateTime,
-    ) -> Result<TeamInvitation, ServiceError> {
+        owner: UserId,
+        name: &str,
+        operator_label: &str,
+    ) -> Result<Team, ServiceError> {
         Ok(self
             .store
-            .invite_team_member(actor, tenant_id, invited_user, role, expires_at)
+            .admin_create_team(owner, name, operator_label)
             .await?)
     }
 
-    pub async fn accept_team_invitation(
+    pub async fn admin_add_team_member(
         &self,
-        actor: UserId,
-        invitation_id: Uuid,
-    ) -> Result<TenantId, ServiceError> {
+        tenant_id: TenantId,
+        user_id: UserId,
+        role: TeamRole,
+        operator_label: &str,
+    ) -> Result<bool, ServiceError> {
         Ok(self
             .store
-            .accept_team_invitation(actor, invitation_id)
+            .admin_add_team_member(tenant_id, user_id, role, operator_label)
+            .await?)
+    }
+
+    pub async fn admin_remove_team_member(
+        &self,
+        tenant_id: TenantId,
+        user_id: UserId,
+        operator_label: &str,
+    ) -> Result<bool, ServiceError> {
+        Ok(self
+            .store
+            .admin_remove_team_member(tenant_id, user_id, operator_label)
+            .await?)
+    }
+
+    pub async fn admin_set_default_traffic_team(
+        &self,
+        user_id: UserId,
+        team_id: Option<TenantId>,
+        operator_label: &str,
+    ) -> Result<bool, ServiceError> {
+        Ok(self
+            .store
+            .admin_set_default_traffic_team(user_id, team_id, operator_label)
+            .await?)
+    }
+
+    pub async fn admin_set_team_limits(
+        &self,
+        tenant_id: TenantId,
+        total_mbps: u32,
+        member_mbps: u32,
+        operator_label: &str,
+    ) -> Result<bool, ServiceError> {
+        Ok(self
+            .store
+            .admin_set_team_limits(tenant_id, total_mbps, member_mbps, operator_label)
             .await?)
     }
 
@@ -199,20 +249,6 @@ impl ControlPlane {
         Ok(self
             .store
             .register_device(user_id, proof.tenant_id(), name, proof.endpoint_key())
-            .await?)
-    }
-
-    pub async fn set_device_connect_grant(
-        &self,
-        actor: UserId,
-        tenant_id: TenantId,
-        device_id: pab_protocol::DeviceId,
-        user_id: UserId,
-        allowed: bool,
-    ) -> Result<(), ServiceError> {
-        Ok(self
-            .store
-            .set_device_connect_grant(actor, tenant_id, device_id, user_id, allowed)
             .await?)
     }
 
@@ -290,7 +326,7 @@ impl ControlPlane {
             return Err(ServiceError::PeerEndpointOffline);
         }
         let peer = self.store.registered_endpoint(peer_endpoint_key).await?;
-        Ok(match peer.principal {
+        let authorized = match peer.principal {
             EndpointProofPrincipal::Guest => {
                 self.store
                     .authorize_guest_device_peer(endpoint, device_id, peer_endpoint_key)
@@ -304,7 +340,11 @@ impl ControlPlane {
             EndpointProofPrincipal::Device { .. } => {
                 return Err(ServiceError::UserEndpointRequired);
             }
-        })
+        };
+        self.store
+            .renew_connection_intent(peer_endpoint_key, device_id)
+            .await?;
+        Ok(authorized)
     }
 
     pub async fn publish_device_hello(
@@ -443,6 +483,25 @@ impl ControlPlane {
             EndpointProofPrincipal::Device { .. } => {
                 return Err(ServiceError::UserEndpointRequired);
             }
+        })
+    }
+
+    pub async fn device_presence(
+        &self,
+        endpoint: &RegisteredEndpoint,
+        code: pab_protocol::DeviceCode,
+    ) -> Result<pab_protocol::DevicePresence, ServiceError> {
+        if matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
+            return Err(ServiceError::UserEndpointRequired);
+        }
+        let (name, key) = self
+            .store
+            .device_presence(endpoint.endpoint_key, code)
+            .await?;
+        Ok(pab_protocol::DevicePresence {
+            code,
+            name,
+            online: key.is_some_and(|key| self.active_endpoints.is_connected(key)),
         })
     }
 

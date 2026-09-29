@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use pab_protocol::{DeviceTaskResponse, TargetContext, TaskSnapshot};
 use tokio::sync::oneshot;
@@ -138,7 +139,12 @@ async fn follow_record(
             Err(error) => return Err(error.into()),
         };
         loop {
-            match subscription.next().await {
+            let response =
+                match tokio::time::timeout(Duration::from_secs(15), subscription.next()).await {
+                    Ok(response) => response,
+                    Err(_) => break,
+                };
+            match response {
                 Ok(DeviceTaskResponse::Event { event }) => {
                     if runtime.store.record_event(&event).await? {
                         let target = record

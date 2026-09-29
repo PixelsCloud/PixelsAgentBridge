@@ -1,0 +1,44 @@
+Pixels Agent Bridge - Windows Debug test package
+
+1. Extract the entire ZIP to a local folder. Keep all files together.
+2. Open PowerShell as Administrator in the extracted folder.
+3. Enable service-generated Ctrl+Alt+Delete if this test machine does not
+   already allow it:
+
+   New-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name SoftwareSASGeneration -PropertyType DWord -Value 1 -Force
+
+   This changes a Windows machine policy. Value 1 allows Windows services to
+   send Ctrl+Alt+Delete. The installer checks for value 1 or 3 before changing
+   installed program files.
+
+4. Install the complete package, replacing the deployment ID and URLs with
+   values supplied by the deployment administrator:
+
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DeploymentId '<deployment-uuid>' -ControlUrl 'wss://<server>/control' -RelayUrl 'https://<relay-server>'
+
+5. Open the single desktop app:
+
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:ProgramFiles\PixelsAgentBridge\run-app.ps1"
+
+   The NSIS setup.exe opens this window automatically after installation.
+   The command above is for manual ZIP installation or reopening the app.
+
+   The overview shows this machine's 9-digit device code and temporary
+   password. On another machine running the same package, use Remote Connection
+   to enter that code and password.
+
+6. Check the background components if the device is not reachable:
+
+   Get-Service PixelsAgentBridgeExecutor
+   Get-ScheduledTask PixelsAgentBridgeSessionSupervisor
+
+The installer requires administrator rights and outbound access to the HTTPS
+Relay and WSS control server. It installs a LocalSystem service and a SYSTEM
+session supervisor. Run the installer from a complete Debug ZIP after each code
+change. Do not replace individual files in an existing installation.
+
+The installer's local access token belongs to the Windows account that runs the
+elevated installer. If UAC uses a different administrator account, that account
+gets local device access; another signed-in user needs a separate local access
+grant. Uninstallation removes program files and services but retains device
+identity, password, and task data.

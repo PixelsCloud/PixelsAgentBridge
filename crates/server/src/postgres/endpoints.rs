@@ -1,5 +1,4 @@
 use super::*;
-use crate::domain::DEVICE_CONNECT_CAPABILITY;
 use rand_core::{OsRng, RngCore};
 
 impl PostgresStore {
@@ -93,8 +92,12 @@ impl PostgresStore {
     ) -> Result<Device, StoreError> {
         let name = support::validate_name(name, "device")?;
         let mut tx = self.pool.begin().await?;
-        let role = support::require_active_membership(&mut tx, actor, tenant_id).await?;
-        if role == TeamRole::Member {
+        support::require_active_membership(&mut tx, actor, tenant_id).await?;
+        let kind: String = sqlx::query_scalar("SELECT kind FROM tenants WHERE id = $1")
+            .bind(tenant_id.as_uuid())
+            .fetch_one(&mut *tx)
+            .await?;
+        if kind != "personal" {
             return Err(StoreError::PermissionDenied);
         }
 
@@ -141,24 +144,6 @@ impl PostgresStore {
                 "endpoint is already registered",
             ));
         }
-        sqlx::query(
-            r#"
-            INSERT INTO device_grants (
-                tenant_id,
-                device_id,
-                user_id,
-                capability_bits,
-                granted_by_user_id
-            )
-            VALUES ($1, $2, $3, $4, $3)
-            "#,
-        )
-        .bind(tenant_id.as_uuid())
-        .bind(device_id.as_uuid())
-        .bind(actor.as_uuid())
-        .bind(DEVICE_CONNECT_CAPABILITY)
-        .execute(&mut *tx)
-        .await?;
         support::bump_policy_revision(&mut tx).await?;
         tx.commit().await?;
 
@@ -250,24 +235,27 @@ impl PostgresStore {
             .map(endpoint_policy_from_row)
             .collect::<Result<Vec<_>, StoreError>>()?;
 
-        let grant_rows = sqlx::query(
-            "SELECT intent.guest_endpoint_key, intent.device_id, intent.expires_at \
-             FROM guest_device_intents intent \
-             JOIN endpoints guest ON guest.endpoint_key = intent.guest_endpoint_key AND guest.owner_kind = 'guest' AND guest.status = 'active' \
+        let intent_rows = sqlx::query(
+            "SELECT intent.operator_endpoint_key, intent.device_id, intent.expires_at \
+             FROM device_connection_intents intent \
+             JOIN endpoints source ON source.endpoint_key = intent.operator_endpoint_key \
+               AND source.owner_kind IN ('guest', 'user') AND source.status = 'active' \
              JOIN devices device ON device.id = intent.device_id AND device.status = 'active' \
              WHERE intent.expires_at > now()",
-        ).fetch_all(&self.pool).await?;
-        let guest_grants = grant_rows
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let connection_intents = intent_rows
             .into_iter()
             .map(|row| {
                 let key: [u8; 32] = row
-                    .try_get::<Vec<u8>, _>("guest_endpoint_key")?
+                    .try_get::<Vec<u8>, _>("operator_endpoint_key")?
                     .try_into()
                     .map_err(|_| {
                         StoreError::InvalidData("endpoint key is not 32 bytes".to_owned())
                     })?;
-                Ok(pab_protocol::GuestRelayGrant {
-                    guest_endpoint_key: EndpointKey::new(key),
+                Ok(pab_protocol::RelayConnectionIntent {
+                    operator_endpoint_key: EndpointKey::new(key),
                     device_id: DeviceId::from_uuid(row.try_get("device_id")?),
                     expires_at_unix_ms: support::unix_millis(row.try_get("expires_at")?)?,
                 })
@@ -291,7 +279,7 @@ impl PostgresStore {
             defaults,
             team_limits,
             endpoints,
-            guest_grants,
+            connection_intents,
         };
         snapshot
             .validate()

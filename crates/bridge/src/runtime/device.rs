@@ -1,6 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use pab_protocol::DeviceRef;
+use pab_transport::ConnectionPath;
 use tokio::sync::{Mutex, RwLock, watch};
 
 use crate::{
@@ -13,6 +20,7 @@ pub(super) struct DeviceSession {
     device_ref: DeviceRef,
     connection: RwLock<Option<Arc<AuthenticatedDeviceConnection>>>,
     connect_lock: Mutex<()>,
+    manually_disconnected: AtomicBool,
     runtime: Arc<RuntimeInner>,
 }
 
@@ -22,22 +30,62 @@ impl DeviceSession {
             device_ref,
             connection: RwLock::new(None),
             connect_lock: Mutex::new(()),
+            manually_disconnected: AtomicBool::new(false),
             runtime,
         }
+    }
+
+    pub(super) fn resume(&self) {
+        self.manually_disconnected.store(false, Ordering::Release);
+    }
+
+    pub(super) async fn selected_path(&self) -> Option<ConnectionPath> {
+        if self.manually_disconnected.load(Ordering::Acquire) {
+            return None;
+        }
+
+        self.connection
+            .read()
+            .await
+            .as_ref()
+            .and_then(|connection| connection.connection().selected_path())
+    }
+
+    pub(super) async fn disconnect(&self) {
+        self.manually_disconnected.store(true, Ordering::Release);
+        if let Some(connection) = self.connection.write().await.take() {
+            connection.as_ref().clone().close();
+        }
+        self.runtime.publish(RuntimeEventKind::DeviceConnection {
+            device_ref: self.device_ref,
+            phase: DeviceConnectionPhase::Disconnected,
+            retry_in_ms: None,
+            message: None,
+        });
+    }
+
+    fn ensure_enabled(&self) -> Result<(), RuntimeError> {
+        if self.manually_disconnected.load(Ordering::Acquire) {
+            return Err(RuntimeError::DeviceDisconnected);
+        }
+        Ok(())
     }
 
     pub(super) async fn connection(
         &self,
     ) -> Result<Arc<AuthenticatedDeviceConnection>, RuntimeError> {
+        self.ensure_enabled()?;
         if let Some(connection) = self.connection.read().await.as_ref() {
             return Ok(Arc::clone(connection));
         }
         let _guard = self.connect_lock.lock().await;
+        self.ensure_enabled()?;
         if let Some(connection) = self.connection.read().await.as_ref() {
             return Ok(Arc::clone(connection));
         }
         let mut availability = self.runtime.availability.clone();
         let connector = loop {
+            self.ensure_enabled()?;
             match availability.borrow().clone() {
                 BridgeAvailability::Connecting => {
                     self.runtime.publish(RuntimeEventKind::DeviceConnection {
@@ -64,15 +112,24 @@ impl DeviceSession {
             }
         };
         loop {
+            self.ensure_enabled()?;
             self.runtime.publish(RuntimeEventKind::DeviceConnection {
                 device_ref: self.device_ref,
                 phase: DeviceConnectionPhase::Connecting,
                 retry_in_ms: None,
                 message: None,
             });
-            let password = self.runtime.passwords.load_password(self.device_ref)?;
+            let password = self
+                .runtime
+                .passwords
+                .load_password(self.device_ref)
+                .await?;
             match connector.connect_device(self.device_ref, password).await {
                 Ok(connection) => {
+                    if self.manually_disconnected.load(Ordering::Acquire) {
+                        connection.close();
+                        return Err(RuntimeError::DeviceDisconnected);
+                    }
                     let connection = Arc::new(connection);
                     *self.connection.write().await = Some(Arc::clone(&connection));
                     self.runtime.publish(RuntimeEventKind::DeviceConnection {
@@ -104,6 +161,7 @@ impl DeviceSession {
         failed: &Arc<AuthenticatedDeviceConnection>,
         error: &BridgeError,
     ) -> Result<(), RuntimeError> {
+        self.ensure_enabled()?;
         let mut connection = self.connection.write().await;
         if connection
             .as_ref()

@@ -17,24 +17,34 @@ impl RuntimeStore {
         &self,
         device: &RememberedDevice,
     ) -> Result<(), RuntimeStoreError> {
+        let device_ref_json = serde_json::to_string(&device.device_ref)?;
+        let mut transaction = self.pool.begin().await?;
+        let existing_alias: Option<String> =
+            sqlx::query_scalar("SELECT alias FROM remembered_devices WHERE device_ref_json = ?")
+                .bind(&device_ref_json)
+                .fetch_optional(&mut *transaction)
+                .await?;
+        if existing_alias.is_some() {
+            sqlx::query("DELETE FROM remembered_devices WHERE device_ref_json = ?")
+                .bind(&device_ref_json)
+                .execute(&mut *transaction)
+                .await?;
+        }
         sqlx::query(
             r#"
             INSERT INTO remembered_devices (
                 device_ref_json, device_code, alias, os_family_json, os_reminder
             ) VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT (device_ref_json) DO UPDATE SET
-                device_code = excluded.device_code,
-                os_family_json = excluded.os_family_json,
-                os_reminder = excluded.os_reminder
             "#,
         )
-        .bind(serde_json::to_string(&device.device_ref)?)
+        .bind(device_ref_json)
         .bind(device.code.to_string())
-        .bind(&device.alias)
+        .bind(existing_alias.unwrap_or_else(|| device.alias.clone()))
         .bind(serde_json::to_string(&device.os_family)?)
         .bind(&device.os_reminder)
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await?;
+        transaction.commit().await?;
         Ok(())
     }
 
@@ -52,6 +62,32 @@ impl RuntimeStore {
             return Err(RuntimeStoreError::NotFound);
         }
         Ok(())
+    }
+
+    pub async fn forget_device(
+        &self,
+        code: DeviceCode,
+    ) -> Result<pab_protocol::DeviceId, RuntimeStoreError> {
+        let mut transaction = self.pool.begin().await?;
+        let stored: Option<String> = sqlx::query_scalar(
+            "SELECT device_ref_json FROM remembered_devices WHERE device_code = ?",
+        )
+        .bind(code.to_string())
+        .fetch_optional(&mut *transaction)
+        .await?;
+        let device_ref: DeviceRef =
+            serde_json::from_str(&stored.ok_or(RuntimeStoreError::NotFound)?)?;
+
+        sqlx::query("DELETE FROM remembered_devices WHERE device_code = ?")
+            .bind(code.to_string())
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query("DELETE FROM device_credentials WHERE device_id = ?")
+            .bind(device_ref.device_id.to_string())
+            .execute(&mut *transaction)
+            .await?;
+        transaction.commit().await?;
+        Ok(device_ref.device_id)
     }
 
     pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeStoreError> {

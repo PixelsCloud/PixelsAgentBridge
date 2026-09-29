@@ -1,8 +1,12 @@
 /.env/
 /references/
 /docs/
+/diagram/
 /README.md
 /target/
+/tools/nsis/
+/apps/desktop/src-tauri/icons/android/
+/apps/desktop/src-tauri/icons/ios/
 /.build/
 /dist/
 /.idea/

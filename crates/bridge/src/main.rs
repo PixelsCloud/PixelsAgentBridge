@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use pab_agent_core::{DataPaths, DataScope, begin_device_claim, tls_connector};
+use pab_agent_core::{DataPaths, DataScope, begin_personal_device_claim, tls_connector};
 use pab_bridge::{
     BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, DevicePasswordProvider,
     DirectoryDevicePasswordProvider, FileDevicePasswordProvider, RuntimeError,
@@ -50,11 +50,6 @@ async fn run() -> Result<(), CliError> {
         .parse::<DeviceCode>()
         .map_err(|error| CliError::DeviceCode(error.to_string()))?;
     if command == "claim" {
-        let owner_tenant_id = args
-            .next()
-            .ok_or(CliError::Usage)?
-            .parse()
-            .map_err(|_| CliError::InvalidTenantId)?;
         if args.next().is_some() {
             return Err(CliError::Usage);
         }
@@ -71,12 +66,11 @@ async fn run() -> Result<(), CliError> {
         let ca = env::var_os("PAB_CONTROL_CA_CERT")
             .map(std::fs::read)
             .transpose()?;
-        let claim_id = begin_device_claim(
+        let (claim_id, _) = begin_personal_device_claim(
             &url,
             username,
             password,
             device_code,
-            owner_tenant_id,
             tls_connector(ca.as_deref())?,
             std::time::Duration::from_secs(10),
         )
@@ -110,6 +104,35 @@ async fn run() -> Result<(), CliError> {
         BridgeRuntime::start(config, BridgeRuntimeConfig::new(database_file), passwords).await?;
     let mut events = runtime.subscribe();
     let device_ref = runtime.resolve_device_code(device_code).await?;
+
+    if matches!(
+        command.as_str(),
+        "transfer-status" | "guest-transfer-status"
+    ) {
+        let request_id = args
+            .next()
+            .ok_or(CliError::Usage)?
+            .parse::<RequestId>()
+            .map_err(|error| CliError::RequestId(error.to_string()))?;
+        if args.next().is_some() {
+            return Err(CliError::Usage);
+        }
+        let snapshot = runtime.transfer_status(device_ref, request_id).await?;
+        println!(
+            "request={} direction={} state={} offset={} size={} sha256={} finished_at_ms={}",
+            snapshot.request_id,
+            snapshot.direction,
+            snapshot.state,
+            snapshot.offset,
+            snapshot.size,
+            snapshot.sha256.as_deref().unwrap_or("unknown"),
+            snapshot
+                .finished_at_unix_ms
+                .map_or("unknown".to_owned(), |value| value.to_string())
+        );
+        runtime.shutdown().await?;
+        return Ok(());
+    }
 
     let initial = match command.as_str() {
         "command" | "guest-command" => {
@@ -279,8 +302,6 @@ const fn stream_name(stream: OutputStream) -> &'static str {
 enum CliError {
     #[error(transparent)]
     Claim(#[from] pab_agent_core::ClaimError),
-    #[error("owner tenant ID is invalid")]
-    InvalidTenantId,
     #[error("PAB_ACCOUNT_USERNAME must be set")]
     MissingAccountUsername,
     #[error("PAB_ACCOUNT_PASSWORD_FILE must be set")]
@@ -294,7 +315,7 @@ enum CliError {
     #[error(transparent)]
     DataPath(#[from] pab_agent_core::DataPathError),
     #[error(
-        "usage: pab-bridge command|guest-command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow|guest-follow <9-digit-device-code> <task-id>\n       pab-bridge claim <9-digit-device-code> <owner-tenant-id>"
+        "usage: pab-bridge command|guest-command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow|guest-follow <9-digit-device-code> <task-id>\n       pab-bridge transfer-status|guest-transfer-status <9-digit-device-code> <request-id>\n       pab-bridge claim <9-digit-device-code>"
     )]
     Usage,
     #[error("device code is invalid: {0}")]

@@ -4,6 +4,7 @@ mod control;
 mod device;
 mod device_code;
 mod device_network;
+mod directory;
 mod endpoint_proof;
 mod ids;
 mod operator;
@@ -11,20 +12,27 @@ mod peer;
 mod platform;
 mod relay_control;
 mod relay_policy;
+mod screenshot;
 mod task;
 mod task_session;
+mod window;
 
 pub use control::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
-    EndpointRegistration, EndpointRegistrationResult,
+    EndpointRegistration, EndpointRegistrationResult, TeamTrafficScope, TrafficScopeOptions,
 };
 pub use device::{
     DEVICE_SESSION_SCHEMA_VERSION, DeviceDirectoryEntry, DeviceHello, DeviceHelloResult,
+    DevicePresence,
 };
 pub use device_code::{DeviceCode, DeviceCodeError};
 pub use device_network::{
     DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS,
+};
+pub use directory::{
+    DirectoryEntry, DirectoryEntryKind, DirectoryPage, MAX_DIRECTORY_NAME_BYTES,
+    MAX_DIRECTORY_PAGE_ENTRIES, MAX_DIRECTORY_PATH_BYTES,
 };
 pub use endpoint_proof::{
     ENDPOINT_PROOF_CLOCK_SKEW_MS, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey,
@@ -49,17 +57,20 @@ pub use relay_control::{
     RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
 };
 pub use relay_policy::{
-    GuestRelayGrant, LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner,
+    LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
     RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot,
     TeamRelayLimits, TrafficScope, mbps_to_bytes_per_second,
 };
+pub use screenshot::{MAX_SCREENSHOT_BYTES, MAX_SCREENSHOT_PIXELS, ScreenshotMeta};
 pub use task::{
     CapabilityRef, OutputAvailability, OutputChunk, OutputRange, OutputStream, TASK_SCHEMA_VERSION,
     TaskCompletion, TaskError, TaskEvent, TaskEventKind, TaskProgress, TaskRef, TaskSnapshot,
     TaskState, TransferDirection, TransferPhase, TransferProgress,
 };
 pub use task_session::{
-    CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DeviceTaskErrorCode, DeviceTaskRequest,
-    DeviceTaskResponse, MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS,
-    MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES,
+    CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent, DesktopMouseButton,
+    DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse, MAX_COMMAND_ARGUMENT_BYTES,
+    MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES,
+    MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES, TransferSnapshot,
 };
+pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, WindowList};

@@ -103,10 +103,17 @@ pub(super) fn error_response(
         | ControlSessionError::Service(ServiceError::TooManyDeviceAddresses)
         | ControlSessionError::Service(ServiceError::InvalidDeviceRelayUrl)
         | ControlSessionError::Service(ServiceError::InvalidDeviceDirectAddress)
-        | ControlSessionError::Service(ServiceError::TaskRuntime(_))
-        | ControlSessionError::Service(ServiceError::Store(StoreError::InvalidInput(_))) => (
+        | ControlSessionError::Service(ServiceError::TaskRuntime(_)) => (
             ControlErrorCode::InvalidMessage,
             "device hello is invalid".to_owned(),
+        ),
+        ControlSessionError::Service(ServiceError::Store(StoreError::InvalidInput(_))) => (
+            ControlErrorCode::InvalidMessage,
+            "request input is invalid".to_owned(),
+        ),
+        ControlSessionError::Service(ServiceError::Store(StoreError::InvalidState(_))) => (
+            ControlErrorCode::InvalidState,
+            "resource is not in the required state".to_owned(),
         ),
         ControlSessionError::Service(ServiceError::Store(StoreError::PermissionDenied)) => (
             ControlErrorCode::PermissionDenied,

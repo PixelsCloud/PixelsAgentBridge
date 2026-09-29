@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AuthorizedDevicePeer, ClaimId, DeviceCode, DeviceDirectoryEntry, DeviceHello,
     DeviceHelloResult, DeviceId, DeviceNetworkResult, DeviceNetworkSnapshot, DeviceNetworkUpdate,
-    DeviceRef, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofResponse,
-    RequestId, TenantId, UserId,
+    DevicePresence, DeviceRef, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
+    EndpointProofResponse, RequestId, TenantId, UserId,
 };
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -63,15 +63,15 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         device_code: DeviceCode,
     },
+    GetDevicePresence {
+        request_id: RequestId,
+        device_code: DeviceCode,
+    },
     ListDevices {
         request_id: RequestId,
     },
-    SetDeviceConnectGrant {
+    ListTrafficScopes {
         request_id: RequestId,
-        tenant_id: TenantId,
-        device_id: DeviceId,
-        user_id: UserId,
-        allowed: bool,
     },
     AuthorizeDevicePeer {
         request_id: RequestId,
@@ -103,8 +103,9 @@ impl ControlClientMessage {
             | Self::PublishDeviceNetwork { request_id, .. }
             | Self::GetDeviceNetwork { request_id, .. }
             | Self::ResolveDeviceCode { request_id, .. }
+            | Self::GetDevicePresence { request_id, .. }
             | Self::ListDevices { request_id }
-            | Self::SetDeviceConnectGrant { request_id, .. }
+            | Self::ListTrafficScopes { request_id }
             | Self::AuthorizeDevicePeer { request_id, .. } => *request_id,
             Self::BeginDeviceClaim { request_id, .. }
             | Self::ApproveDeviceClaim { request_id, .. } => *request_id,
@@ -156,16 +157,17 @@ pub enum ControlServerMessage {
         request_id: RequestId,
         device_ref: DeviceRef,
     },
+    DevicePresenceFound {
+        request_id: RequestId,
+        presence: DevicePresence,
+    },
     DeviceList {
         request_id: RequestId,
         devices: Vec<DeviceDirectoryEntry>,
     },
-    DeviceConnectGrantUpdated {
+    TrafficScopeList {
         request_id: RequestId,
-        tenant_id: TenantId,
-        device_id: DeviceId,
-        user_id: UserId,
-        allowed: bool,
+        options: TrafficScopeOptions,
     },
     DevicePeerAuthorized {
         request_id: RequestId,
@@ -212,6 +214,22 @@ pub enum EndpointRegistrationResult {
         tenant_id: TenantId,
         endpoint_key: EndpointKey,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrafficScopeOptions {
+    pub personal_tenant_id: TenantId,
+    pub default_tenant_id: TenantId,
+    pub personal_mbps: u32,
+    pub teams: Vec<TeamTrafficScope>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamTrafficScope {
+    pub tenant_id: TenantId,
+    pub name: String,
+    pub total_mbps: u32,
+    pub member_mbps: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

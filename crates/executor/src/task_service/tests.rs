@@ -7,17 +7,32 @@ use pab_protocol::{
 
 use super::*;
 
+fn account(id: u128) -> OperatorRef {
+    OperatorRef::account(
+        UserId::from_u128(id),
+        pab_protocol::EndpointKey::new([id as u8; 32]),
+    )
+}
+
 #[tokio::test]
 async fn executor_transfer_audit_survives_reopen_and_records_interruption() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("tasks.sqlite3");
     let store = TaskStore::open(&database).await.unwrap();
-    let operator = OperatorRef::Account(UserId::from_u128(9));
+    let operator = account(9);
     let completed = RequestId::from_u128(100);
     let interrupted = RequestId::from_u128(101);
+    let checksum = "a".repeat(64);
 
     store
-        .start_transfer(completed, operator, "receive", "/tmp/a.bin", 512)
+        .start_transfer(
+            completed,
+            operator,
+            "receive",
+            "/tmp/a.bin",
+            512,
+            Some(&checksum),
+        )
         .await
         .unwrap();
     store.transfer_progress(completed, 512, 512).await.unwrap();
@@ -25,10 +40,54 @@ async fn executor_transfer_audit_survives_reopen_and_records_interruption() {
         .finish_transfer(completed, "completed", None)
         .await
         .unwrap();
-    store
-        .start_transfer(interrupted, operator, "send", "/tmp/b.bin", 0)
+    let snapshot = store.get_transfer(operator, completed).await.unwrap();
+    assert_eq!(snapshot.state, "completed");
+    assert_eq!(snapshot.direction, "receive");
+    assert_eq!(snapshot.offset, 512);
+    assert_eq!(snapshot.sha256.as_deref(), Some(checksum.as_str()));
+    let service = TaskService::open(
+        &database,
+        DeviceRef {
+            deployment_id: DeploymentId::from_u128(1),
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        },
+        detect_native_execution_context().unwrap(),
+    )
+    .await
+    .unwrap();
+    let response = service
+        .handle_request(
+            operator,
+            DeviceTaskRequest::GetTransfer {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id: completed,
+            },
+        )
         .await
         .unwrap();
+    assert!(matches!(
+        response,
+        DeviceTaskResponse::Transfer { snapshot } if snapshot.request_id == completed
+    ));
+    assert!(matches!(
+        store.get_transfer(account(10), completed).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    store
+        .start_transfer(interrupted, operator, "send", "/tmp/b.bin", 0, None)
+        .await
+        .unwrap();
+    store.transfer_hash(interrupted, &checksum).await.unwrap();
+    assert_eq!(
+        store
+            .get_transfer(operator, interrupted)
+            .await
+            .unwrap()
+            .sha256
+            .as_deref(),
+        Some(checksum.as_str())
+    );
     drop(store);
 
     let reopened = TaskStore::open(&database).await.unwrap();
@@ -68,11 +127,11 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let request_id = RequestId::from_u128(4);
     let command = test_command(&context);
     let accepted = service
-        .submit_command(UserId::from_u128(5).into(), request_id, command.clone())
+        .submit_command(account(5), request_id, command.clone())
         .await
         .unwrap();
     let duplicate = service
-        .submit_command(UserId::from_u128(5).into(), request_id, command)
+        .submit_command(account(5), request_id, command)
         .await
         .unwrap();
     assert_eq!(accepted.task_ref, duplicate.task_ref);
@@ -81,7 +140,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
         loop {
             let snapshot = service
                 .store
-                .get_task(UserId::from_u128(5).into(), accepted.task_ref)
+                .get_task(account(5), accepted.task_ref)
                 .await
                 .unwrap();
             if snapshot.state.is_terminal() {
@@ -99,7 +158,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let (stdout, _) = service
         .store
         .read_output(
-            UserId::from_u128(5).into(),
+            account(5),
             accepted.task_ref,
             OutputStream::Stdout,
             0,
@@ -110,7 +169,7 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let (stderr, _) = service
         .store
         .read_output(
-            UserId::from_u128(5).into(),
+            account(5),
             accepted.task_ref,
             OutputStream::Stderr,
             0,
@@ -135,7 +194,7 @@ async fn reopening_marks_an_accepted_task_interrupted() {
         tenant_id: TenantId::from_u128(12),
         device_id: DeviceId::from_u128(13),
     };
-    let initiated_by = UserId::from_u128(14).into();
+    let initiated_by = account(14);
     let store = TaskStore::open(&database).await.unwrap();
     let accepted = store
         .accept_command(
@@ -193,7 +252,7 @@ async fn active_task_limit_fails_new_work_but_preserves_request_deduplication() 
             .await
             .insert(TaskId::from_u128(value as u128 + 100), sender);
     }
-    let initiated_by = UserId::from_u128(24).into();
+    let initiated_by = account(24);
     let request_id = RequestId::from_u128(25);
     let command = test_command(&context);
     let rejected = service
@@ -253,9 +312,7 @@ async fn guest_task_history_is_isolated_by_endpoint_identity() {
         Err(TaskStoreError::NotFound)
     ));
     assert!(matches!(
-        store
-            .get_task(UserId::from_u128(35).into(), first_ref)
-            .await,
+        store.get_task(account(35), first_ref).await,
         Err(TaskStoreError::NotFound)
     ));
     let second = store
@@ -270,6 +327,60 @@ async fn guest_task_history_is_isolated_by_endpoint_identity() {
         .await
         .unwrap();
     assert!(matches!(second, AcceptTaskOutcome::Created(_)));
+}
+
+#[tokio::test]
+async fn one_accounts_endpoints_have_separate_task_history() {
+    let directory = tempfile::tempdir().unwrap();
+    let context = detect_native_execution_context().unwrap();
+    let device_ref = DeviceRef {
+        deployment_id: DeploymentId::from_u128(41),
+        tenant_id: TenantId::from_u128(42),
+        device_id: DeviceId::from_u128(43),
+    };
+    let store = TaskStore::open(&directory.path().join("tasks.sqlite3"))
+        .await
+        .unwrap();
+    let user_id = UserId::from_u128(44);
+    let first = OperatorRef::account(user_id, pab_protocol::EndpointKey::new([1; 32]));
+    let second = OperatorRef::account(user_id, pab_protocol::EndpointKey::new([2; 32]));
+    let request_id = RequestId::from_u128(45);
+    let command = test_command(&context);
+    let accepted = store
+        .accept_command(
+            device_ref,
+            first,
+            request_id,
+            &command,
+            context.clone(),
+            1_000,
+        )
+        .await
+        .unwrap();
+    let first_ref = match accepted {
+        AcceptTaskOutcome::Created(snapshot) => snapshot.task_ref,
+        AcceptTaskOutcome::Existing(_) => panic!("first account endpoint did not create a task"),
+    };
+    assert!(store.get_task(first, first_ref).await.is_ok());
+    assert!(matches!(
+        store.get_task(second, first_ref).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    assert!(matches!(
+        store
+            .read_output(second, first_ref, OutputStream::Stdout, 0, 64)
+            .await,
+        Err(TaskStoreError::NotFound)
+    ));
+    let accepted = store
+        .accept_command(device_ref, second, request_id, &command, context, 1_001)
+        .await
+        .unwrap();
+    let second_ref = match accepted {
+        AcceptTaskOutcome::Created(snapshot) => snapshot.task_ref,
+        AcceptTaskOutcome::Existing(_) => panic!("second account endpoint reused the first task"),
+    };
+    assert_ne!(first_ref, second_ref);
 }
 
 fn test_command(context: &ExecutionContext) -> CommandTaskSpec {

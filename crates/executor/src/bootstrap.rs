@@ -17,7 +17,7 @@ use pab_protocol::{
 use rand_core::{OsRng, RngCore};
 use thiserror::Error;
 
-use crate::{ExecutorConfig, ExecutorConfigError};
+use crate::{ExecutorConfig, ExecutorConfigError, credential::DeviceCredential};
 
 pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
     if env::var_os("PAB_DEVICE_ID").is_some() {
@@ -83,31 +83,89 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
         "PAB_ENDPOINT_SECRET_FILE" => Some(secret_path.clone().into_os_string()),
         _ => env::var_os(key),
     })?;
-    rotate_temporary_password(
-        &config.device_credential_file,
-        paths.root().join("current-password.txt"),
-    )?;
-    let device_info = serde_json::json!({
-        "deployment_id": deployment_id,
-        "tenant_id": tenant_id,
-        "device_id": device_id,
-        "device_code": device_code,
-    });
-    let device_info_bytes = serde_json::to_vec_pretty(&device_info)?;
-    atomic_private_write(&paths.root().join("device-info.json"), &device_info_bytes)?;
+    ensure_device_access(
+        &config.task_database_file,
+        deployment_id.to_string(),
+        tenant_id.to_string(),
+        device_id.to_string(),
+        device_code.to_string(),
+    )
+    .await?;
+    for name in [
+        "device-info.json",
+        "current-password.txt",
+        "device-credential.json",
+    ] {
+        let legacy = paths.root().join(name);
+        if let Err(error) = fs::remove_file(&legacy)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(path = %legacy.display(), %error, "could not remove old device access file");
+        }
+    }
     Ok(config)
 }
 
-fn rotate_temporary_password(
-    credential_path: &Path,
-    password_path: PathBuf,
+async fn ensure_device_access(
+    path: &Path,
+    deployment_id: String,
+    tenant_id: String,
+    device_id: String,
+    device_code: String,
 ) -> Result<(), BootstrapError> {
-    let mut random = [0u8; 16];
-    OsRng.fill_bytes(&mut random);
-    let password = random
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+    let mut access = if path.exists() {
+        match crate::device_access::load(path).await {
+            Ok(access) => access,
+            Err(crate::device_access::DeviceAccessError::Missing) => new_device_access(),
+            Err(error) => return Err(error.into()),
+        }
+    } else {
+        new_device_access()
+    };
+    access.deployment_id = deployment_id;
+    access.tenant_id = tenant_id;
+    access.device_id = device_id;
+    access.device_code = device_code;
+    let valid_password = if access.temporary_password.len() == 8 {
+        match DeviceCredential::read(path).await {
+            Ok(credential) => {
+                credential
+                    .verify(zeroize::Zeroizing::new(access.temporary_password.clone()))
+                    .await?
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+    if !valid_password {
+        set_new_password(&mut access)?;
+    }
+    crate::device_access::save(path, &access).await?;
+    Ok(())
+}
+
+pub async fn rotate_temporary_password(path: &Path) -> Result<(), BootstrapError> {
+    let mut access = crate::device_access::load(path).await?;
+    set_new_password(&mut access)?;
+    crate::device_access::save(path, &access).await?;
+    Ok(())
+}
+
+fn new_device_access() -> crate::device_access::DeviceAccess {
+    crate::device_access::DeviceAccess {
+        deployment_id: String::new(),
+        tenant_id: String::new(),
+        device_id: String::new(),
+        device_code: String::new(),
+        temporary_password: String::new(),
+        password_version: 0,
+        password_hash: String::new(),
+    }
+}
+
+fn set_new_password(access: &mut crate::device_access::DeviceAccess) -> Result<(), BootstrapError> {
+    let password = generate_temporary_password();
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .map_err(|_| BootstrapError::Hash)?
@@ -119,65 +177,45 @@ fn rotate_temporary_password(
             .as_millis(),
     )
     .map_err(|_| BootstrapError::Clock)?;
-    atomic_private_write(
-        credential_path,
-        serde_json::to_vec(&serde_json::json!({
-            "schema_version": 1,
-            "password_version": version,
-            "password_hash": hash,
-        }))?
-        .as_slice(),
-    )?;
-    atomic_private_write(&password_path, format!("{password}\n").as_bytes())?;
+    access.temporary_password = password;
+    access.password_version = version;
+    access.password_hash = hash;
     Ok(())
 }
 
-fn atomic_private_write(path: &Path, bytes: &[u8]) -> Result<(), BootstrapError> {
-    pab_agent_core::ensure_data_parent(path)?;
-    let temp = path.with_extension(format!("{}.tmp", std::process::id()));
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(&temp)?;
-    use std::io::Write;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    pab_agent_core::restrict_private_file(&temp)?;
-    fs::rename(&temp, path)?;
-    Ok(())
+fn generate_temporary_password() -> String {
+    // A 32-character alphabet keeps each character unbiased at five random bits.
+    // Ambiguous characters (0/O and 1/I) are excluded for easier manual entry.
+    const ALPHABET: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let mut random = [0u8; 8];
+    OsRng.fill_bytes(&mut random);
+    random
+        .iter()
+        .map(|byte| char::from(ALPHABET[(byte & 31) as usize]))
+        .collect()
 }
 
-pub fn show_access() -> Result<(), BootstrapError> {
+pub async fn show_access() -> Result<(), BootstrapError> {
     let paths = DataPaths::for_scope(DataScope::Machine)?;
-    let info = fs::read_to_string(paths.root().join("device-info.json"))?;
-    let password = fs::read_to_string(paths.root().join("current-password.txt"))?;
-    let info: serde_json::Value = serde_json::from_str(&info)?;
-    println!("Device code: {}", info["device_code"]);
-    println!("Temporary password: {}", password.trim());
+    let access = crate::device_access::load(&paths.executor_database()).await?;
+    println!("Device code: {}", access.device_code);
+    println!("Temporary password: {}", access.temporary_password);
     Ok(())
 }
 
 pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
     let paths = DataPaths::for_scope(DataScope::Machine)?;
-    let info: serde_json::Value =
-        serde_json::from_slice(&fs::read(paths.root().join("device-info.json"))?)?;
-    let parse = |key: &'static str| -> Result<String, BootstrapError> {
-        Ok(info[key]
-            .as_str()
-            .ok_or(BootstrapError::InvalidResult)?
-            .to_owned())
-    };
-    let deployment_id: DeploymentId = parse("deployment_id")?
+    let access = crate::device_access::load(&paths.executor_database()).await?;
+    let deployment_id: DeploymentId = access
+        .deployment_id
         .parse()
         .map_err(|_| BootstrapError::InvalidResult)?;
-    let tenant_id: TenantId = parse("tenant_id")?
+    let tenant_id: TenantId = access
+        .tenant_id
         .parse()
         .map_err(|_| BootstrapError::InvalidResult)?;
-    let device_id: DeviceId = parse("device_id")?
+    let device_id: DeviceId = access
+        .device_id
         .parse()
         .map_err(|_| BootstrapError::InvalidResult)?;
     let secret_path = env::var_os("PAB_ENDPOINT_SECRET_FILE")
@@ -226,6 +264,10 @@ pub enum BootstrapError {
     #[error(transparent)]
     Config(#[from] ExecutorConfigError),
     #[error(transparent)]
+    Credential(#[from] crate::credential::DeviceCredentialError),
+    #[error(transparent)]
+    Access(#[from] crate::device_access::DeviceAccessError),
+    #[error(transparent)]
     DataPath(#[from] pab_agent_core::DataPathError),
     #[error(transparent)]
     Secret(#[from] pab_agent_core::EndpointSecretError),
@@ -237,6 +279,140 @@ pub enum BootstrapError {
     Tls(#[from] pab_agent_core::TlsConnectorError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_device_access, generate_temporary_password, rotate_temporary_password};
+    use crate::credential::DeviceCredential;
+    use crate::device_access;
+    use zeroize::Zeroizing;
+
+    #[test]
+    fn temporary_password_is_eight_unambiguous_characters() {
+        for _ in 0..100 {
+            let password = generate_temporary_password();
+            assert_eq!(password.len(), 8);
+            assert!(
+                password
+                    .bytes()
+                    .all(|byte| { b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789".contains(&byte) })
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rotated_password_matches_credential_and_invalidates_previous_password() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("executor.sqlite3");
+        ensure_device_access(
+            &path,
+            "deployment".into(),
+            "tenant".into(),
+            "device".into(),
+            "123456789".into(),
+        )
+        .await
+        .unwrap();
+        let previous_password = device_access::load(&path).await.unwrap().temporary_password;
+        rotate_temporary_password(&path).await.unwrap();
+
+        let current_password = device_access::load(&path).await.unwrap().temporary_password;
+        let credential = DeviceCredential::read(&path).await.unwrap();
+        assert_eq!(current_password.len(), 8);
+        assert!(
+            credential
+                .verify(Zeroizing::new(current_password))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !credential
+                .verify(Zeroizing::new(previous_password))
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn existing_password_survives_restart_until_explicit_rotation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("executor.sqlite3");
+        ensure_device_access(
+            &path,
+            "deployment".into(),
+            "tenant".into(),
+            "device".into(),
+            "123456789".into(),
+        )
+        .await
+        .unwrap();
+        let first = device_access::load(&path).await.unwrap();
+
+        ensure_device_access(
+            &path,
+            "deployment".into(),
+            "tenant".into(),
+            "device".into(),
+            "123456789".into(),
+        )
+        .await
+        .unwrap();
+        let same = device_access::load(&path).await.unwrap();
+        assert_eq!(same.temporary_password, first.temporary_password);
+        assert_eq!(same.password_hash, first.password_hash);
+
+        rotate_temporary_password(&path).await.unwrap();
+        let rotated_password = device_access::load(&path).await.unwrap().temporary_password;
+        assert_ne!(rotated_password, first.temporary_password);
+        ensure_device_access(
+            &path,
+            "deployment".into(),
+            "tenant".into(),
+            "device".into(),
+            "123456789".into(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            device_access::load(&path).await.unwrap().temporary_password,
+            rotated_password
+        );
+    }
+
+    #[tokio::test]
+    async fn initializes_access_in_an_existing_task_database() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("executor.sqlite3");
+        let pool = sqlx::SqlitePool::connect_with(
+            sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(&path)
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+        sqlx::query("CREATE TABLE task_records (id INTEGER PRIMARY KEY)")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        ensure_device_access(
+            &path,
+            "deployment".into(),
+            "tenant".into(),
+            "device".into(),
+            "123456789".into(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            device_access::load(&path).await.unwrap().device_code,
+            "123456789"
+        );
+        let existing: i64 = sqlx::query_scalar("SELECT count(*) FROM task_records")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(existing, 0);
+    }
 }

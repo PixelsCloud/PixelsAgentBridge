@@ -3,13 +3,14 @@ use std::sync::atomic::Ordering;
 use pab_bridge::{
     BridgeLocalStore, BridgeRuntime, LocalTaskRecord, OperationRecord, RuntimeEventKind,
 };
-use pab_protocol::{OperatorRef, OutputStream};
+use pab_protocol::{DeviceRef, OperatorRef, OutputStream, RequestId};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::{ConnectedDevice, OperatorState, parse_code};
 
 const INITIAL_OUTPUT_BYTES: u32 = 32 * 1024;
+const HISTORY_PAGE_SIZE: usize = 40;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,14 +47,27 @@ pub struct HistoryOperation {
     started_at_unix_ms: i64,
     finished_at_unix_ms: Option<i64>,
     message: Option<String>,
+    execution_observation: Option<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperatorBootstrap {
     devices: Vec<ConnectedDevice>,
+    #[serde(flatten)]
+    history: HistoryPage,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryPage {
     tasks: Vec<HistoryTask>,
     operations: Vec<HistoryOperation>,
+    task_before: Option<String>,
+    operation_before_started_at_unix_ms: Option<i64>,
+    operation_before_id: Option<String>,
+    has_more_tasks: bool,
+    has_more_operations: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -90,35 +104,7 @@ pub async fn operator_bootstrap(
             connected: false,
         })
         .collect::<Vec<_>>();
-    let records = local.tasks().await.map_err(|error| error.to_string())?;
-    let mut tasks = Vec::new();
-    for record in records
-        .into_iter()
-        .filter(|record| record.snapshot.is_some())
-    {
-        let snapshot = record
-            .snapshot
-            .as_ref()
-            .expect("filtered task has a snapshot");
-        state
-            .tasks
-            .lock()
-            .await
-            .insert(snapshot.task_ref.task_id, snapshot.task_ref);
-        let code = remembered
-            .iter()
-            .find(|device| device.device_ref == record.device_ref)
-            .map(|device| device.code.to_string())
-            .unwrap_or_else(|| record.device_ref.device_id.to_string());
-        tasks.push(history_task(&local, record, code).await?);
-    }
-    let operations = local
-        .operations()
-        .await
-        .map_err(|error| error.to_string())?
-        .into_iter()
-        .map(|record| history_operation(record, &remembered))
-        .collect();
+    let history = load_history_page(&local, &remembered, &state, None, None, true, true, None).await?;
     if !state.events_started.swap(true, Ordering::AcqRel) {
         tauri::async_runtime::spawn(async move {
             loop {
@@ -136,10 +122,189 @@ pub async fn operator_bootstrap(
             }
         });
     }
-    Ok(OperatorBootstrap {
-        devices,
+    Ok(OperatorBootstrap { devices, history })
+}
+
+#[tauri::command]
+pub async fn operator_history_page(
+    state: State<'_, OperatorState>,
+    task_before: Option<String>,
+    operation_before_started_at_unix_ms: Option<i64>,
+    operation_before_id: Option<String>,
+    load_tasks: bool,
+    load_operations: bool,
+) -> Result<HistoryPage, String> {
+    let task_before = task_before
+        .as_deref()
+        .map(str::parse::<RequestId>)
+        .transpose()
+        .map_err(|_| "invalid task history cursor".to_owned())?;
+    let operation_before = match (
+        operation_before_started_at_unix_ms,
+        operation_before_id.as_deref(),
+    ) {
+        (Some(started_at), Some(id)) => Some((started_at, id)),
+        (None, None) => None,
+        _ => return Err("incomplete operation history cursor".to_owned()),
+    };
+    let local = state.local_store().await?;
+    let remembered = local
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?;
+    load_history_page(
+        &local,
+        &remembered,
+        &state,
+        task_before,
+        operation_before,
+        load_tasks,
+        load_operations,
+        None,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn operator_device_history_page(
+    state: State<'_, OperatorState>,
+    code: String,
+    task_before: Option<String>,
+    operation_before_started_at_unix_ms: Option<i64>,
+    operation_before_id: Option<String>,
+    load_tasks: bool,
+    load_operations: bool,
+) -> Result<HistoryPage, String> {
+    let code = parse_code(&code)?;
+    let local = state.local_store().await?;
+    let remembered = local
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?;
+    let device_ref = remembered
+        .iter()
+        .find(|device| device.code == code)
+        .map(|device| device.device_ref)
+        .ok_or_else(|| "saved device was not found".to_owned())?;
+    let task_before = task_before
+        .as_deref()
+        .map(str::parse::<RequestId>)
+        .transpose()
+        .map_err(|_| "invalid task history cursor".to_owned())?;
+    let operation_before = match (
+        operation_before_started_at_unix_ms,
+        operation_before_id.as_deref(),
+    ) {
+        (Some(started_at), Some(id)) => Some((started_at, id)),
+        (None, None) => None,
+        _ => return Err("incomplete operation history cursor".to_owned()),
+    };
+    load_history_page(
+        &local,
+        &remembered,
+        &state,
+        task_before,
+        operation_before,
+        load_tasks,
+        load_operations,
+        Some(device_ref),
+    )
+    .await
+}
+
+async fn load_history_page(
+    local: &BridgeLocalStore,
+    remembered: &[pab_bridge::RememberedDevice],
+    state: &OperatorState,
+    task_before: Option<RequestId>,
+    operation_before: Option<(i64, &str)>,
+    load_tasks: bool,
+    load_operations: bool,
+    device_ref: Option<DeviceRef>,
+) -> Result<HistoryPage, String> {
+    let mut tasks = Vec::new();
+    let mut task_cursor = None;
+    let mut has_more_tasks = false;
+    if load_tasks {
+        let mut records = match device_ref {
+            Some(device_ref) => local
+                .tasks_page_for_device(device_ref, task_before, HISTORY_PAGE_SIZE as u32 + 1)
+                .await,
+            None => local.tasks_page(task_before, HISTORY_PAGE_SIZE as u32 + 1).await,
+        }
+        .map_err(|error| error.to_string())?;
+        has_more_tasks = records.len() > HISTORY_PAGE_SIZE;
+        records.truncate(HISTORY_PAGE_SIZE);
+        task_cursor = records.last().map(|record| record.request_id.to_string());
+        for record in records {
+            let snapshot = record
+                .snapshot
+                .as_ref()
+                .expect("history query requires a task snapshot");
+            let endpoint_key = match snapshot.initiated_by {
+                OperatorRef::Account { endpoint_key, .. } => endpoint_key,
+                OperatorRef::Guest { guest_endpoint_key } => guest_endpoint_key,
+            };
+            if let Some(runtime) = state
+                .runtimes
+                .lock()
+                .await
+                .endpoints
+                .get(&endpoint_key)
+                .cloned()
+            {
+                state
+                    .tasks
+                    .lock()
+                    .await
+                    .entry(snapshot.task_ref.task_id)
+                    .or_insert((snapshot.task_ref, runtime));
+            }
+            let code = remembered
+                .iter()
+                .find(|device| device.device_ref == record.device_ref)
+                .map(|device| device.code.to_string())
+                .unwrap_or_else(|| record.device_ref.device_id.to_string());
+            tasks.push(history_task(local, record, code).await?);
+        }
+    }
+
+    let mut operations = Vec::new();
+    let mut operation_cursor = None;
+    let mut has_more_operations = false;
+    if load_operations {
+        let mut records = match device_ref {
+            Some(device_ref) => local
+                .operations_page_for_device(
+                    device_ref,
+                    operation_before,
+                    HISTORY_PAGE_SIZE as u32 + 1,
+                )
+                .await,
+            None => local
+                .operations_page(operation_before, HISTORY_PAGE_SIZE as u32 + 1)
+                .await,
+        }
+        .map_err(|error| error.to_string())?;
+        has_more_operations = records.len() > HISTORY_PAGE_SIZE;
+        records.truncate(HISTORY_PAGE_SIZE);
+        operation_cursor = records
+            .last()
+            .map(|record| (record.started_at_unix_ms, record.id.clone()));
+        operations = records
+            .into_iter()
+            .map(|record| history_operation(record, remembered))
+            .collect();
+    }
+
+    Ok(HistoryPage {
         tasks,
         operations,
+        task_before: task_cursor,
+        operation_before_started_at_unix_ms: operation_cursor.as_ref().map(|value| value.0),
+        operation_before_id: operation_cursor.map(|value| value.1),
+        has_more_tasks,
+        has_more_operations,
     })
 }
 
@@ -153,7 +318,7 @@ pub async fn operator_operations(
         .await
         .map_err(|error| error.to_string())?;
     Ok(local
-        .operations()
+        .operations_refresh()
         .await
         .map_err(|error| error.to_string())?
         .into_iter()
@@ -169,6 +334,7 @@ fn history_operation(
         .iter()
         .find(|device| device.device_ref == record.device_ref)
         .map(|device| device.code.to_string())
+        .or_else(|| record.device_code.map(|code| code.to_string()))
         .unwrap_or_else(|| record.device_ref.device_id.to_string());
     HistoryOperation {
         id: record.id,
@@ -185,6 +351,7 @@ fn history_operation(
         started_at_unix_ms: record.started_at_unix_ms,
         finished_at_unix_ms: record.finished_at_unix_ms,
         message: record.message,
+        execution_observation: record.execution_observation,
     }
 }
 
@@ -222,7 +389,16 @@ async fn history_task(
         id: task_ref.task_id.to_string(),
         device_code,
         initiated_by: match snapshot.initiated_by {
-            OperatorRef::Account(user_id) => format!("account:{user_id}"),
+            OperatorRef::Account {
+                user_id,
+                endpoint_key,
+            } => {
+                let bytes = endpoint_key.as_bytes();
+                format!(
+                    "account:{user_id}@{:02x}{:02x}{:02x}{:02x}",
+                    bytes[0], bytes[1], bytes[2], bytes[3]
+                )
+            }
             OperatorRef::Guest { .. } => "guest".to_owned(),
         },
         program: record
@@ -251,7 +427,7 @@ async fn history_task(
     })
 }
 
-fn forward_events(handle: AppHandle, runtime: std::sync::Arc<BridgeRuntime>) {
+pub(super) fn forward_events(handle: AppHandle, runtime: std::sync::Arc<BridgeRuntime>) {
     tauri::async_runtime::spawn(async move {
         let mut events = runtime.subscribe();
         loop {

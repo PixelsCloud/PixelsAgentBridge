@@ -41,19 +41,6 @@ pub(super) async fn require_active_membership(
         .ok_or_else(|| StoreError::InvalidData(format!("unknown membership role {role}")))
 }
 
-pub(super) async fn require_team_manager(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    user_id: UserId,
-    tenant_id: TenantId,
-) -> Result<TeamRole, StoreError> {
-    let role = require_active_membership(tx, user_id, tenant_id).await?;
-    if matches!(role, TeamRole::Owner | TeamRole::Admin) {
-        Ok(role)
-    } else {
-        Err(StoreError::PermissionDenied)
-    }
-}
-
 pub(super) async fn bump_policy_revision(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<(), StoreError> {

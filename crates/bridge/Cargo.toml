@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+base64 = "0.22"
 argon2 = "0.5"
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }
@@ -12,6 +13,7 @@ pab-logging = { path = "../logging" }
 pab-protocol = { path = "../protocol" }
 pab-transport = { path = "../transport" }
 rand_core = { version = "0.6", features = ["getrandom"] }
+rmcp = { version = "=3.5.0", default-features = false, features = ["server", "transport-io"] }
 serde.workspace = true
 serde_json.workspace = true
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite"] }

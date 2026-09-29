@@ -1,7 +1,8 @@
-"""Package already-built stripped Release desktop binaries."""
+"""Package already-built desktop binaries for one build profile."""
 
 from argparse import ArgumentParser
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 import json
 import tarfile
@@ -12,28 +13,34 @@ root = Path(__file__).resolve().parents[2]
 scripts = Path(__file__).resolve().parent
 parser = ArgumentParser(description=__doc__)
 parser.add_argument("--platform", choices=("all", "windows", "linux"), default="all")
-parser.add_argument("--windows-bin-dir", type=Path, default=root / "target" / "release")
+parser.add_argument("--profile", choices=("debug", "release"), default="release")
+parser.add_argument("--windows-bin-dir", type=Path)
 parser.add_argument(
     "--windows-desktop-bin",
     type=Path,
-    default=root / "apps" / "desktop" / "src-tauri" / "target" / "release" / "pab-desktop.exe",
 )
-parser.add_argument("--linux-bin-dir", type=Path, default=root / ".build" / "guest-desktop-linux-release")
+parser.add_argument("--linux-bin-dir", type=Path)
 parser.add_argument("--macos-bin-dir", type=Path)
 parser.add_argument("--output-dir", type=Path, default=root / ".build" / "packages")
 args = parser.parse_args()
+args.windows_bin_dir = args.windows_bin_dir or root / "target" / args.profile
+args.windows_desktop_bin = args.windows_desktop_bin or (
+    root / "apps" / "desktop" / "src-tauri" / "target" / args.profile / "pab-desktop.exe"
+)
+args.linux_bin_dir = args.linux_bin_dir or root / ".build" / f"guest-desktop-linux-{args.profile}"
 args.output_dir.mkdir(parents=True, exist_ok=True)
 
 
 def package_windows():
-    archive_path = args.output_dir / "pixels-agent-bridge-windows-x86_64-release.zip"
+    archive_path = args.output_dir / f"pixels-agent-bridge-windows-x86_64-{args.profile}.zip"
     files = [
         args.windows_desktop_bin,
         *(args.windows_bin_dir / name for name in (
-            "pab-mcp.exe", "pab-bridge.exe", "pab-executor.exe"
+            "pab-mcp.exe", "pab-executor.exe"
         )),
         *(scripts / "windows" / name for name in (
-            "install.ps1", "run-app.ps1", "run-executor.ps1", "uninstall.ps1"
+            "install.ps1", "run-app.ps1", "launch-app.ps1",
+            "run-session-supervisor.ps1", "uninstall.ps1", "INSTALL-WINDOWS.txt"
         )),
     ]
     for file in files:
@@ -46,11 +53,11 @@ def package_windows():
 
 
 def package_unix(platform, architecture, binaries):
-    archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-release.tar.gz"
+    archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-{args.profile}.tar.gz"
     files = [
-        *(binaries / name for name in ("pab-mcp", "pab-bridge", "pab-executor", "pab-desktop")),
+        *(binaries / name for name in ("pab-mcp", "pab-executor", "pab-desktop")),
         *(scripts / "unix" / name for name in (
-            "install.sh", "run-app.sh", "run-executor.sh", "uninstall.sh"
+            "install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh"
         )),
     ]
     for file in files:
@@ -60,21 +67,31 @@ def package_unix(platform, architecture, binaries):
         for file in files:
             info = archive.gettarinfo(str(file), arcname=file.name)
             info.mode = 0o755
-            with file.open("rb") as content:
-                archive.addfile(info, content)
+            if file.suffix == ".sh":
+                content = file.read_bytes().replace(b"\r\n", b"\n")
+                info.size = len(content)
+                archive.addfile(info, BytesIO(content))
+            else:
+                with file.open("rb") as content:
+                    archive.addfile(info, content)
     return archive_path
 
 
-archives = []
 if args.platform in ("all", "windows"):
-    archives.append(package_windows())
+    package_windows()
 if args.platform in ("all", "linux"):
-    archives.append(package_unix("linux", "x86_64", args.linux_bin_dir))
+    package_unix("linux", "x86_64", args.linux_bin_dir)
 if args.platform == "all" and args.macos_bin_dir is not None:
-    archives.append(package_unix("macos", "aarch64", args.macos_bin_dir))
+    package_unix("macos", "aarch64", args.macos_bin_dir)
 
 manifest = {}
-for archive in archives:
+for archive in sorted(args.output_dir.iterdir()):
+    if not archive.name.startswith("pixels-agent-bridge-"):
+        continue
+    if not archive.name.endswith((f"-{args.profile}.zip", f"-{args.profile}.tar.gz")):
+        continue
+    if not archive.is_file():
+        continue
     digest = sha256()
     with archive.open("rb") as content:
         while chunk := content.read(1024 * 1024):
@@ -83,5 +100,6 @@ for archive in archives:
         "bytes": archive.stat().st_size,
         "sha256": digest.hexdigest(),
     }
-(args.output_dir / "SHA256.json").write_text(json.dumps(manifest, indent=2) + "\n")
+checksum_name = "SHA256.json" if args.profile == "release" else "SHA256-debug.json"
+(args.output_dir / checksum_name).write_text(json.dumps(manifest, indent=2) + "\n")
 print(json.dumps(manifest, indent=2))

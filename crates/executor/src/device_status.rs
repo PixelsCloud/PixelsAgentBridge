@@ -7,10 +7,14 @@ use std::{
 #[cfg(windows)]
 use std::{
     env,
-    os::windows::process::CommandExt,
-    process::Command,
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
+};
+
+#[cfg(windows)]
+use windows_service::{
+    service::{ServiceAccess, ServiceState},
+    service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
 use pab_agent_core::{DataPaths, DataScope};
@@ -27,42 +31,29 @@ pub struct DeviceStatus {
     pub control_phase: String,
 }
 
-pub fn read_local_device_status() -> Result<DeviceStatus, DeviceStatusError> {
+pub async fn read_local_device_status() -> Result<DeviceStatus, DeviceStatusError> {
     let paths = DataPaths::for_scope(DataScope::Machine)?;
-    read_device_status(paths.root())
+    read_device_status(paths.root()).await
 }
 
-pub(crate) fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
-    read_device_status_with_service(root, false)
+pub(crate) async fn read_device_status(root: &Path) -> Result<DeviceStatus, DeviceStatusError> {
+    read_device_status_with_service(root, false).await
 }
 
-pub(crate) fn read_device_status_from_service(
+pub(crate) async fn read_device_status_from_service(
     root: &Path,
 ) -> Result<DeviceStatus, DeviceStatusError> {
-    read_device_status_with_service(root, true)
+    read_device_status_with_service(root, true).await
 }
 
-fn read_device_status_with_service(
+async fn read_device_status_with_service(
     root: &Path,
     service_alive: bool,
 ) -> Result<DeviceStatus, DeviceStatusError> {
-    let info: Value = serde_json::from_slice(&fs::read(root.join("device-info.json"))?)?;
-    let field = |name: &'static str| -> Result<String, DeviceStatusError> {
-        info.get(name)
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-            .ok_or(DeviceStatusError::MissingField(name))
-    };
-    let password = fs::read_to_string(root.join("current-password.txt"))?;
+    let access = crate::device_access::load(&root.join("executor.sqlite3")).await?;
     let heartbeat: Option<Value> = fs::read(root.join("executor-heartbeat.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok());
-    let control_phase = heartbeat
-        .as_ref()
-        .and_then(|value| value.get("control_phase"))
-        .and_then(Value::as_str)
-        .unwrap_or("Unknown")
-        .to_owned();
     let observed = heartbeat
         .as_ref()
         .and_then(|value| value.get("observed_at_unix_ms"))
@@ -72,10 +63,17 @@ fn read_device_status_with_service(
     let heartbeat_running = observed
         .map(|observed| now.saturating_sub(observed) <= 10_000)
         .unwrap_or(false);
+    let control_phase = heartbeat
+        .as_ref()
+        .filter(|_| heartbeat_running)
+        .and_then(|value| value.get("control_phase"))
+        .and_then(Value::as_str)
+        .unwrap_or("Unknown")
+        .to_owned();
     Ok(DeviceStatus {
-        device_code: field("device_code")?,
-        device_id: field("device_id")?,
-        temporary_password: password.trim().to_owned(),
+        device_code: access.device_code,
+        device_id: access.device_id,
+        temporary_password: access.temporary_password,
         executor_running: service_alive || heartbeat_running || service_running(),
         control_phase,
     })
@@ -93,19 +91,12 @@ fn service_running() -> bool {
         return running;
     }
 
-    let task_name = env::var("PAB_EXECUTOR_TASK_NAME")
+    let service_name = env::var("PAB_EXECUTOR_SERVICE_NAME")
         .unwrap_or_else(|_| "PixelsAgentBridgeExecutor".to_owned());
-    let escaped_name = task_name.replace('\'', "''");
-    let command = format!(
-        "(Get-ScheduledTask -TaskName '{escaped_name}' -ErrorAction Stop).State.ToString()"
-    );
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let running = Command::new("powershell.exe")
-        .creation_flags(CREATE_NO_WINDOW)
-        .args(["-NoProfile", "-NonInteractive", "-Command", &command])
-        .output()
-        .map(|output| output.status.success() && output.stdout.trim_ascii() == b"Running")
-        .unwrap_or(false);
+    let running = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+        .and_then(|manager| manager.open_service(service_name, ServiceAccess::QUERY_STATUS))
+        .and_then(|service| service.query_status())
+        .is_ok_and(|status| status.current_state == ServiceState::Running);
     *cached = Some((Instant::now(), running));
     running
 }
@@ -124,6 +115,8 @@ pub enum DeviceStatusError {
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
+    Access(#[from] crate::device_access::DeviceAccessError),
+    #[error(transparent)]
     Clock(#[from] std::time::SystemTimeError),
     #[error("device information has no {0}")]
     MissingField(&'static str),
@@ -136,18 +129,22 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn reads_device_access_and_live_status() {
+    #[tokio::test]
+    async fn reads_device_access_and_live_status() {
         let root = tempfile::tempdir().unwrap();
-        fs::write(
-            root.path().join("device-info.json"),
-            json!({"device_code":"123456789","device_id":"device-id"}).to_string(),
+        crate::device_access::save(
+            &root.path().join("executor.sqlite3"),
+            &crate::device_access::DeviceAccess {
+                deployment_id: "deployment".to_owned(),
+                tenant_id: "tenant".to_owned(),
+                device_id: "device-id".to_owned(),
+                device_code: "123456789".to_owned(),
+                temporary_password: "current-password".to_owned(),
+                password_version: 1,
+                password_hash: "hash".to_owned(),
+            },
         )
-        .unwrap();
-        fs::write(
-            root.path().join("current-password.txt"),
-            "current-password\n",
-        )
+        .await
         .unwrap();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -158,10 +155,35 @@ mod tests {
             json!({"observed_at_unix_ms":now,"control_phase":"Connected"}).to_string(),
         )
         .unwrap();
-        let status = read_device_status(root.path()).unwrap();
+        let status = read_device_status(root.path()).await.unwrap();
         assert_eq!(status.device_code, "123456789");
         assert_eq!(status.temporary_password, "current-password");
         assert!(status.executor_running);
         assert_eq!(status.control_phase, "Connected");
+    }
+
+    #[tokio::test]
+    async fn reads_saved_access_without_a_control_heartbeat() {
+        let root = tempfile::tempdir().unwrap();
+        crate::device_access::save(
+            &root.path().join("executor.sqlite3"),
+            &crate::device_access::DeviceAccess {
+                deployment_id: "deployment".to_owned(),
+                tenant_id: "tenant".to_owned(),
+                device_id: "device-id".to_owned(),
+                device_code: "123456789".to_owned(),
+                temporary_password: "ABCDEFGH".to_owned(),
+                password_version: 1,
+                password_hash: "hash".to_owned(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let status = read_device_status_from_service(root.path()).await.unwrap();
+        assert_eq!(status.device_code, "123456789");
+        assert_eq!(status.temporary_password, "ABCDEFGH");
+        assert_eq!(status.control_phase, "Unknown");
+        assert!(status.executor_running);
     }
 }

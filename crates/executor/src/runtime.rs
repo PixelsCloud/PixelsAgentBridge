@@ -29,23 +29,10 @@ use crate::{
 
 pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     config.validate()?;
-    let credential = DeviceCredential::read(&config.device_credential_file)?;
+    DeviceCredential::read(&config.task_database_file).await?;
     let heartbeat_path = config
         .task_database_file
         .with_file_name("executor-heartbeat.json");
-    let local_root = heartbeat_path
-        .parent()
-        .ok_or_else(|| ExecutorError::TaskService("task database has no parent".to_owned()))?
-        .to_path_buf();
-    let local_service = tokio::spawn(async move {
-        loop {
-            if let Err(error) = crate::local_ipc::run_local_service(local_root.clone()).await {
-                tracing::warn!(%error, "local WebSocket service unavailable; retrying in 3s");
-            }
-            tokio::time::sleep(Duration::from_secs(3)).await;
-        }
-    });
-    let _local_service_guard = LocalServiceGuard(local_service);
     let secret = read_endpoint_secret(&config.endpoint_secret_file)?;
     let endpoint = bind_endpoint(&config, secret.clone()).await?;
     tracing::info!(endpoint = %endpoint.id(), "iroh endpoint ready");
@@ -94,7 +81,7 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
         .map_err(|error| ExecutorError::TaskService(error.to_string()))?;
     let session_acceptor = DeviceSessionAcceptor::new(
         peer_authorizer,
-        credential,
+        config.task_database_file.clone(),
         device_ref,
         config.operation_timeout,
     )
@@ -172,14 +159,6 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 }
             }
         }
-    }
-}
-
-struct LocalServiceGuard(tokio::task::JoinHandle<()>);
-
-impl Drop for LocalServiceGuard {
-    fn drop(&mut self) {
-        self.0.abort();
     }
 }
 

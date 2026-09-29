@@ -22,12 +22,43 @@ case $platform in
     *) echo "unsupported platform: $platform" >&2; exit 2 ;;
 esac
 
+for name in pab-mcp pab-executor pab-desktop run-app.sh run-mcp.sh run-executor.sh uninstall.sh; do
+    [[ -f $source_dir/$name ]] || { echo "Package file is missing: $name" >&2; exit 2; }
+done
+
+if [[ $platform == Linux ]]; then
+    if systemctl cat pixels-agent-bridge-executor.service >/dev/null 2>&1; then
+        systemctl stop pixels-agent-bridge-executor.service
+    fi
+    for process in /proc/[0-9]*; do
+        executable=$(readlink "$process/exe" 2>/dev/null || true)
+        case $executable in
+            "$install_dir"/pab-mcp|"$install_dir"/pab-bridge|"$install_dir"/pab-executor|"$install_dir"/pab-desktop)
+                kill "${process##*/}" 2>/dev/null || true
+                ;;
+        esac
+    done
+    sleep 2
+    for process in /proc/[0-9]*; do
+        executable=$(readlink "$process/exe" 2>/dev/null || true)
+        case $executable in
+            "$install_dir"/pab-mcp|"$install_dir"/pab-bridge|"$install_dir"/pab-executor|"$install_dir"/pab-desktop)
+                echo "Cannot replace running program: $executable" >&2
+                exit 2
+                ;;
+        esac
+    done
+elif launchctl print system/com.pixelsagentbridge.executor >/dev/null 2>&1; then
+    launchctl bootout system/com.pixelsagentbridge.executor
+fi
+
 install -d -m 755 "$install_dir"
 rm -f -- "$install_dir/run-ui.sh"
-for name in pab-mcp pab-bridge pab-executor pab-desktop; do
+rm -f -- "$install_dir/pab-bridge"
+for name in pab-mcp pab-executor pab-desktop; do
     install -m 755 "$source_dir/$name" "$install_dir/$name"
 done
-for name in run-app.sh run-executor.sh uninstall.sh; do
+for name in run-app.sh run-mcp.sh run-executor.sh uninstall.sh; do
     install -m 755 "$source_dir/$name" "$install_dir/$name"
 done
 
@@ -67,7 +98,17 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
     systemctl daemon-reload
-    systemctl enable --now pixels-agent-bridge-executor.service
+    systemctl enable pixels-agent-bridge-executor.service
+    systemctl restart pixels-agent-bridge-executor.service
+    install -d -m 755 /etc/xdg/autostart
+    cat > /etc/xdg/autostart/pixels-agent-bridge-session-helper.desktop <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Pixels Agent Bridge Session Helper
+Exec=$install_dir/pab-desktop --session-helper
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+DESKTOP
 else
     install -d -m 700 '/Library/Application Support/PixelsAgentBridgeData'
     cat > /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist <<PLIST

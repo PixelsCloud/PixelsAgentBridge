@@ -4,36 +4,60 @@ use std::{
 };
 
 use pab_agent_core::{
-    DataPaths, DataScope, begin_device_claim, begin_personal_device_claim, tls_connector,
+    DataPaths, DataScope, begin_personal_device_claim, login_traffic_scopes, read_endpoint_secret,
+    register_account_traffic_scope, tls_connector,
 };
 use pab_bridge::{
     BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig,
-    MemoryDevicePasswordProvider, RememberedDevice,
+    ConnectionPath, MemoryDevicePasswordProvider, RememberedDevice, SqliteDevicePasswordProvider,
 };
-use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
+use pab_protocol::{DeviceCode, EndpointKey, OutputStream, RequestId, TaskId, TaskRef};
 use serde::Serialize;
 use tauri::Emitter;
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::AbortHandle;
 use zeroize::Zeroizing;
 
+pub(crate) mod directory;
 pub(crate) mod history;
+pub(crate) mod screenshot;
+pub(crate) mod terminal;
+pub(crate) mod windows;
 
 pub struct OperatorState {
-    runtime: Mutex<Option<Arc<BridgeRuntime>>>,
+    runtimes: Mutex<RuntimeSelection>,
     passwords: Arc<MemoryDevicePasswordProvider>,
-    tasks: Mutex<HashMap<TaskId, TaskRef>>,
+    tasks: Mutex<HashMap<TaskId, (TaskRef, Arc<BridgeRuntime>)>>,
+    terminal_runtimes: Mutex<HashMap<RequestId, Arc<BridgeRuntime>>>,
     transfers: Arc<Mutex<HashMap<String, AbortHandle>>>,
     events_started: AtomicBool,
     local: OnceCell<Arc<BridgeLocalStore>>,
 }
 
+struct RuntimeSelection {
+    active: String,
+    active_scope: Option<ScopeStatus>,
+    runtimes: HashMap<String, Arc<BridgeRuntime>>,
+    endpoints: HashMap<EndpointKey, Arc<BridgeRuntime>>,
+}
+
 impl OperatorState {
     pub fn new() -> Self {
+        let credential_database = DataPaths::for_scope(DataScope::User)
+            .expect("could not find user credential database path")
+            .bridge_database();
         Self {
-            runtime: Mutex::new(None),
-            passwords: Arc::new(MemoryDevicePasswordProvider::new(None)),
+            runtimes: Mutex::new(RuntimeSelection {
+                active: "guest".to_owned(),
+                active_scope: None,
+                runtimes: HashMap::new(),
+                endpoints: HashMap::new(),
+            }),
+            passwords: Arc::new(MemoryDevicePasswordProvider::new(Some(Box::new(
+                SqliteDevicePasswordProvider::new(credential_database),
+            )))),
             tasks: Mutex::new(HashMap::new()),
+            terminal_runtimes: Mutex::new(HashMap::new()),
             transfers: Arc::new(Mutex::new(HashMap::new())),
             events_started: AtomicBool::new(false),
             local: OnceCell::new(),
@@ -41,8 +65,8 @@ impl OperatorState {
     }
 
     async fn runtime(&self) -> Result<Arc<BridgeRuntime>, String> {
-        let mut current = self.runtime.lock().await;
-        if let Some(runtime) = current.as_ref() {
+        let mut selection = self.runtimes.lock().await;
+        if let Some(runtime) = selection.runtimes.get(&selection.active) {
             return Ok(Arc::clone(runtime));
         }
         let config = tokio::time::timeout(
@@ -52,6 +76,9 @@ impl OperatorState {
         .await
         .map_err(|_| "guest registration timed out".to_owned())?
         .map_err(|error| error.to_string())?;
+        let secret = read_endpoint_secret(&config.endpoint_secret_file)
+            .map_err(|error| error.to_string())?;
+        let endpoint_key = EndpointKey::new(*secret.public().as_bytes());
         let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
         let mut runtime_config = BridgeRuntimeConfig::new(paths.bridge_database());
         runtime_config.resume_incomplete_on_start = false;
@@ -59,7 +86,12 @@ impl OperatorState {
             .await
             .map_err(|error| error.to_string())?;
         let runtime = Arc::new(runtime);
-        *current = Some(Arc::clone(&runtime));
+        selection
+            .endpoints
+            .insert(endpoint_key, Arc::clone(&runtime));
+        selection
+            .runtimes
+            .insert("guest".to_owned(), Arc::clone(&runtime));
         Ok(runtime)
     }
 
@@ -92,6 +124,85 @@ pub struct ConnectedDevice {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SavedDevicePresence {
+    device_code: String,
+    name: String,
+    online: Option<bool>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceConnectionPath {
+    device_code: String,
+    path: Option<&'static str>,
+}
+
+#[tauri::command]
+pub async fn operator_connection_paths(
+    state: tauri::State<'_, OperatorState>,
+) -> Result<Vec<DeviceConnectionPath>, String> {
+    let remembered = state
+        .local_store()
+        .await?
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?;
+    let runtime = state.runtime().await?;
+    let mut paths = Vec::with_capacity(remembered.len());
+    for device in remembered {
+        let path = runtime.connection_path(device.device_ref).await.map(|path| match path {
+            ConnectionPath::Direct => "p2p",
+            ConnectionPath::Relay => "relay",
+            ConnectionPath::Unknown => "unknown",
+        });
+        paths.push(DeviceConnectionPath {
+            device_code: device.code.to_string(),
+            path,
+        });
+    }
+    Ok(paths)
+}
+
+#[tauri::command]
+pub async fn operator_saved_device_presence(
+    state: tauri::State<'_, OperatorState>,
+) -> Result<Vec<SavedDevicePresence>, String> {
+    let remembered = state
+        .local_store()
+        .await?
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?;
+    let runtime = tokio::time::timeout(std::time::Duration::from_secs(5), state.runtime())
+        .await
+        .map_err(|_| "operator connection is unavailable".to_owned())??;
+    let mut checks = tokio::task::JoinSet::new();
+    for device in remembered {
+        let runtime = Arc::clone(&runtime);
+        checks.spawn(async move {
+            let presence = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                runtime.device_presence(device.code),
+            )
+            .await
+            .ok()
+            .and_then(Result::ok);
+            SavedDevicePresence {
+                device_code: device.code.to_string(),
+                name: presence.as_ref().map(|value| value.name.clone()).unwrap_or_default(),
+                online: presence.map(|value| value.online),
+            }
+        });
+    }
+    let mut statuses = Vec::new();
+    while let Some(result) = checks.join_next().await {
+        statuses.push(result.map_err(|error| error.to_string())?);
+    }
+    Ok(statuses)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskUpdate {
     state: String,
     complete: bool,
@@ -106,6 +217,111 @@ pub struct TaskUpdate {
 pub struct ClaimResult {
     claim_id: String,
     owner_tenant_id: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopeStatus {
+    user_id: String,
+    username: String,
+    tenant_id: String,
+    team_name: Option<String>,
+}
+
+#[tauri::command]
+pub async fn operator_current_traffic_scope(
+    state: tauri::State<'_, OperatorState>,
+) -> Result<Option<ScopeStatus>, String> {
+    Ok(state.runtimes.lock().await.active_scope.clone())
+}
+
+#[tauri::command]
+pub async fn operator_login_account(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, OperatorState>,
+    username: String,
+    password: String,
+) -> Result<ScopeStatus, String> {
+    if username.trim().is_empty() || password.is_empty() {
+        return Err("account and password are required".to_owned());
+    }
+    let control_url = std::env::var("PAB_CONTROL_URL")
+        .map_err(|_| "PAB_CONTROL_URL is not configured".to_owned())?;
+    let deployment_id = std::env::var("PAB_DEPLOYMENT_ID")
+        .map_err(|_| "PAB_DEPLOYMENT_ID is not configured".to_owned())?
+        .parse()
+        .map_err(|_| "invalid deployment ID".to_owned())?;
+    let ca = std::env::var_os("PAB_CONTROL_CA_CERT")
+        .map(std::fs::read)
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    let connector = tls_connector(ca.as_deref()).map_err(|error| error.to_string())?;
+    let (_, options) = login_traffic_scopes(
+        &control_url,
+        username.trim().to_owned(),
+        Zeroizing::new(password.clone()),
+        connector.clone(),
+        std::time::Duration::from_secs(10),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+    let registration = register_account_traffic_scope(
+        &control_url,
+        deployment_id,
+        username.trim().to_owned(),
+        Zeroizing::new(password),
+        options.default_tenant_id,
+        paths.root(),
+        connector,
+        std::time::Duration::from_secs(10),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    let key = format!("{}:{}", registration.user_id, registration.tenant_id);
+    let mut selection = state.runtimes.lock().await;
+    if !selection.runtimes.contains_key(&key) {
+        let config = BridgeConfig::from_env_account(
+            registration.tenant_id,
+            registration.user_id,
+            registration.endpoint_secret_file,
+        )
+        .map_err(|error| error.to_string())?;
+        let secret = read_endpoint_secret(&config.endpoint_secret_file)
+            .map_err(|error| error.to_string())?;
+        let endpoint_key = EndpointKey::new(*secret.public().as_bytes());
+        let mut runtime_config = BridgeRuntimeConfig::new(paths.bridge_database());
+        runtime_config.resume_incomplete_on_start = false;
+        let runtime = Arc::new(
+            BridgeRuntime::start(config, runtime_config, state.passwords.clone())
+                .await
+                .map_err(|error| error.to_string())?,
+        );
+        history::forward_events(app, Arc::clone(&runtime));
+        selection
+            .endpoints
+            .insert(endpoint_key, Arc::clone(&runtime));
+        selection.runtimes.insert(key.clone(), runtime);
+    }
+    selection.active = key;
+    let status = ScopeStatus {
+        user_id: registration.user_id.to_string(),
+        username: username.trim().to_owned(),
+        tenant_id: registration.tenant_id.to_string(),
+        team_name: registration.team_name,
+    };
+    selection.active_scope = Some(status.clone());
+    Ok(status)
+}
+
+#[tauri::command]
+pub async fn operator_use_guest_scope(
+    state: tauri::State<'_, OperatorState>,
+) -> Result<(), String> {
+    let mut selection = state.runtimes.lock().await;
+    selection.active = "guest".to_owned();
+    selection.active_scope = None;
+    Ok(())
 }
 
 #[derive(Clone, Serialize)]
@@ -140,6 +356,17 @@ pub async fn operator_start_transfer(
         .await
         .map_err(|error| error.to_string())?;
     let request_id = RequestId::new();
+    runtime
+        .prepare_transfer_record(
+            request_id,
+            device_ref,
+            &direction,
+            &source,
+            &destination,
+            overwrite,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
     let id = request_id.to_string();
     let task_id = id.clone();
     let transfers = Arc::clone(&state.transfers);
@@ -222,17 +449,20 @@ pub async fn operator_cancel_transfer(
         .ok_or_else(|| "transfer is not running".to_owned())?;
     handle.abort();
     let request_id = id.parse::<RequestId>().map_err(|error| error.to_string())?;
-    state
+    let recorded = state
         .runtime()
         .await?
         .cancel_transfer_record(request_id)
         .await
         .map_err(|error| error.to_string())?;
+    if !recorded {
+        return Err("local transfer stopped, but its remote outcome is not recorded".to_owned());
+    }
     let _ = app.emit(
         "operator-transfer",
         TransferUpdate {
             id,
-            state: "cancelled",
+            state: "cancel_requested",
             offset: 0,
             size: 0,
             message: None,
@@ -253,19 +483,26 @@ pub async fn operator_connect(
     password: String,
 ) -> Result<ConnectedDevice, String> {
     let code = parse_code(&code)?;
+    let password = Zeroizing::new(password);
     let runtime = state.runtime().await?;
-    let device_ref = runtime
-        .resolve_device_code(code)
-        .await
-        .map_err(|error| error.to_string())?;
+    let device_ref = tokio::time::timeout(
+        std::time::Duration::from_secs(20),
+        runtime.resolve_device_code(code),
+    )
+    .await
+    .map_err(|_| "device code resolution timed out".to_owned())?
+    .map_err(|error| error.to_string())?;
     state
         .passwords
-        .set_password(device_ref.device_id, password)
+        .set_password(device_ref.device_id, password.to_string())
         .map_err(|error| error.to_string())?;
-    let target = runtime
-        .current_environment(device_ref)
-        .await
-        .map_err(|error| error.to_string())?;
+    let target = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        runtime.connect_device(device_ref),
+    )
+    .await
+    .map_err(|_| "device connection timed out".to_owned())?
+    .map_err(|error| error.to_string())?;
     let remembered = RememberedDevice {
         device_ref,
         code,
@@ -275,6 +512,12 @@ pub async fn operator_connect(
     };
     runtime
         .remember_device(&remembered)
+        .await
+        .map_err(|error| error.to_string())?;
+    state
+        .local_store()
+        .await?
+        .save_device_password(device_ref.device_id, &password)
         .await
         .map_err(|error| error.to_string())?;
     runtime
@@ -300,6 +543,118 @@ pub async fn operator_connect(
 }
 
 #[tauri::command]
+pub async fn operator_connect_saved(
+    state: tauri::State<'_, OperatorState>,
+    code: String,
+) -> Result<ConnectedDevice, String> {
+    let code = parse_code(&code)?;
+    let remembered = state
+        .local_store()
+        .await?
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|device| device.code == code)
+        .ok_or_else(|| "saved device was not found".to_owned())?;
+    let runtime = state.runtime().await?;
+    let target = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        runtime.connect_device(remembered.device_ref),
+    )
+    .await
+    .map_err(|_| "device connection timed out".to_owned())?
+    .map_err(|error| error.to_string())?;
+    runtime
+        .remember_device(&remembered)
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(ConnectedDevice {
+        device_id: remembered.device_ref.device_id.to_string(),
+        device_code: code.to_string(),
+        alias: remembered.alias,
+        os_family: format!("{:?}", target.execution.os_family).to_lowercase(),
+        os_reminder: target.compact_reminder(),
+        connected: true,
+    })
+}
+
+#[tauri::command]
+pub async fn operator_forget_device(
+    state: tauri::State<'_, OperatorState>,
+    code: String,
+) -> Result<(), String> {
+    let code = parse_code(&code)?;
+    let local = state.local_store().await?;
+    let remembered = local
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|device| device.code == code)
+        .ok_or_else(|| "saved device was not found".to_owned())?;
+    let runtimes = state
+        .runtimes
+        .lock()
+        .await
+        .runtimes
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    for runtime in runtimes {
+        runtime.disconnect_device(remembered.device_ref).await;
+    }
+    let device_id = local
+        .forget_device(code)
+        .await
+        .map_err(|error| error.to_string())?;
+    state
+        .passwords
+        .forget_password(device_id)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn operator_disconnect_device(
+    state: tauri::State<'_, OperatorState>,
+    code: String,
+) -> Result<(), String> {
+    let code = parse_code(&code)?;
+    let remembered = state
+        .local_store()
+        .await?
+        .remembered_devices()
+        .await
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|device| device.code == code)
+        .ok_or_else(|| "saved device was not found".to_owned())?;
+    state
+        .runtime()
+        .await?
+        .disconnect_device(remembered.device_ref)
+        .await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn operator_presence(
+    state: tauri::State<'_, OperatorState>,
+    code: String,
+) -> Result<u16, String> {
+    let runtime = state.runtime().await?;
+    let device_ref = runtime
+        .resolve_device_code(parse_code(&code)?)
+        .await
+        .map_err(|error| error.to_string())?;
+    runtime
+        .current_presence(device_ref)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn operator_run_command(
     state: tauri::State<'_, OperatorState>,
     code: String,
@@ -319,11 +674,10 @@ pub async fn operator_run_command(
         .submit_command(device_ref, RequestId::new(), program, args, cwd)
         .await
         .map_err(|error| error.to_string())?;
-    state
-        .tasks
-        .lock()
-        .await
-        .insert(snapshot.task_ref.task_id, snapshot.task_ref);
+    state.tasks.lock().await.insert(
+        snapshot.task_ref.task_id,
+        (snapshot.task_ref, Arc::clone(&runtime)),
+    );
     Ok(snapshot.task_ref.task_id.to_string())
 }
 
@@ -337,13 +691,37 @@ pub async fn operator_task(
     let task_id = task_id
         .parse::<TaskId>()
         .map_err(|_| "invalid task ID".to_owned())?;
-    let task_ref = *state
-        .tasks
-        .lock()
-        .await
-        .get(&task_id)
-        .ok_or_else(|| "task is not in this desktop session".to_owned())?;
     let local = state.local_store().await?;
+    let saved = local
+        .task_by_id(task_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    let snapshot = saved
+        .snapshot
+        .as_ref()
+        .ok_or_else(|| "task snapshot is unavailable".to_owned())?;
+    let task_ref = snapshot.task_ref;
+    let runtime = state.tasks.lock().await.get(&task_id).cloned();
+    let runtime = if let Some((_, runtime)) = runtime {
+        Some(runtime)
+    } else {
+        let endpoint_key = match &snapshot.initiated_by {
+            pab_protocol::OperatorRef::Account { endpoint_key, .. } => endpoint_key,
+            pab_protocol::OperatorRef::Guest { guest_endpoint_key } => guest_endpoint_key,
+        };
+        state.runtimes.lock().await.endpoints.get(endpoint_key).cloned()
+    };
+    if let Some(runtime) = runtime {
+        runtime
+            .follow_task(task_ref)
+            .await
+            .map_err(|error| error.to_string())?;
+        state
+            .tasks
+            .lock()
+            .await
+            .insert(task_id, (task_ref, runtime));
+    }
     let record = local
         .task(task_ref)
         .await
@@ -378,7 +756,6 @@ pub async fn operator_claim(
     code: String,
     username: String,
     password: String,
-    team_id: Option<String>,
 ) -> Result<ClaimResult, String> {
     if username.trim().is_empty() || password.is_empty() {
         return Err("account and password are required".to_owned());
@@ -393,28 +770,10 @@ pub async fn operator_claim(
     let connector = tls_connector(ca.as_deref()).map_err(|error| error.to_string())?;
     let password = Zeroizing::new(password);
     let timeout = std::time::Duration::from_secs(10);
-    let (claim_id, tenant_id) = match team_id.as_deref().filter(|value| !value.trim().is_empty()) {
-        Some(team_id) => {
-            let tenant_id = team_id.parse().map_err(|_| "invalid Team ID".to_owned())?;
-            let claim_id = begin_device_claim(
-                &control_url,
-                username,
-                password,
-                code,
-                tenant_id,
-                connector,
-                timeout,
-            )
+    let (claim_id, tenant_id) =
+        begin_personal_device_claim(&control_url, username, password, code, connector, timeout)
             .await
             .map_err(|error| error.to_string())?;
-            (claim_id, tenant_id)
-        }
-        None => {
-            begin_personal_device_claim(&control_url, username, password, code, connector, timeout)
-                .await
-                .map_err(|error| error.to_string())?
-        }
-    };
     Ok(ClaimResult {
         claim_id: claim_id.to_string(),
         owner_tenant_id: tenant_id.to_string(),

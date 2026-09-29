@@ -1,11 +1,8 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use serde::Deserialize;
 use thiserror::Error;
 use zeroize::Zeroizing;
-
-const DEVICE_CREDENTIAL_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Clone)]
 pub(crate) struct DeviceCredential {
@@ -14,21 +11,8 @@ pub(crate) struct DeviceCredential {
 }
 
 impl DeviceCredential {
-    pub fn read(path: &Path) -> Result<Self, DeviceCredentialError> {
-        let encoded = fs::read(path).map_err(|source| DeviceCredentialError::Read {
-            path: path.to_owned(),
-            source,
-        })?;
-        let stored: StoredDeviceCredential =
-            serde_json::from_slice(&encoded).map_err(|source| DeviceCredentialError::Json {
-                path: path.to_owned(),
-                source,
-            })?;
-        if stored.schema_version != DEVICE_CREDENTIAL_SCHEMA_VERSION {
-            return Err(DeviceCredentialError::UnsupportedSchema(
-                stored.schema_version,
-            ));
-        }
+    pub async fn read(path: &Path) -> Result<Self, DeviceCredentialError> {
+        let stored = crate::device_access::load(path).await?;
         if stored.password_version == 0 {
             return Err(DeviceCredentialError::InvalidPasswordVersion);
         }
@@ -61,27 +45,10 @@ impl DeviceCredential {
     }
 }
 
-#[derive(Deserialize)]
-struct StoredDeviceCredential {
-    schema_version: u16,
-    password_version: u64,
-    password_hash: String,
-}
-
 #[derive(Debug, Error)]
 pub enum DeviceCredentialError {
-    #[error("the device credential file {path} could not be read: {source}")]
-    Read {
-        path: std::path::PathBuf,
-        source: std::io::Error,
-    },
-    #[error("the device credential file {path} is invalid JSON: {source}")]
-    Json {
-        path: std::path::PathBuf,
-        source: serde_json::Error,
-    },
-    #[error("device credential schema version {0} is not supported")]
-    UnsupportedSchema(u16),
+    #[error(transparent)]
+    Store(#[from] crate::device_access::DeviceAccessError),
     #[error("device password version must be greater than zero")]
     InvalidPasswordVersion,
     #[error("device password hash is not a valid PHC string")]
@@ -99,7 +66,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn verifies_a_password_without_storing_plaintext() {
+    async fn verifies_a_password_from_the_device_database() {
         let salt = SaltString::encode_b64(b"pab-test-salt-01").unwrap();
         let hash = Argon2::default()
             .hash_password(b"correct device password", &salt)
@@ -107,18 +74,22 @@ mod tests {
             .to_string();
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("credential.json");
-        fs::write(
+        crate::device_access::save(
             &path,
-            serde_json::json!({
-                "schema_version": 1,
-                "password_version": 7,
-                "password_hash": hash,
-            })
-            .to_string(),
+            &crate::device_access::DeviceAccess {
+                deployment_id: "deployment".to_owned(),
+                tenant_id: "tenant".to_owned(),
+                device_id: "device".to_owned(),
+                device_code: "123456789".to_owned(),
+                temporary_password: "correct device password".to_owned(),
+                password_version: 7,
+                password_hash: hash.clone(),
+            },
         )
+        .await
         .unwrap();
 
-        let credential = DeviceCredential::read(&path).unwrap();
+        let credential = DeviceCredential::read(&path).await.unwrap();
         assert_eq!(credential.password_version(), 7);
         assert!(
             credential
@@ -133,18 +104,12 @@ mod tests {
                 .unwrap()
         );
 
-        fs::write(
-            &path,
-            serde_json::json!({
-                "schema_version": 1,
-                "password_version": 8,
-                "password_hash": hash.replacen("$argon2id$", "$argon2i$", 1),
-            })
-            .to_string(),
-        )
-        .unwrap();
+        let mut access = crate::device_access::load(&path).await.unwrap();
+        access.password_version = 8;
+        access.password_hash = hash.replacen("$argon2id$", "$argon2i$", 1);
+        crate::device_access::save(&path, &access).await.unwrap();
         assert!(matches!(
-            DeviceCredential::read(&path),
+            DeviceCredential::read(&path).await,
             Err(DeviceCredentialError::UnsupportedPasswordHash)
         ));
     }

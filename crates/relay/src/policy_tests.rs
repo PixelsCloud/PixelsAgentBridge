@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, GuestRelayGrant, RELAY_POLICY_SCHEMA_VERSION,
+    DeploymentId, DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent,
     RelayEndpointOwner, RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot,
     TeamRelayLimits, TenantId, TrafficScope, UserId,
 };
@@ -30,7 +30,7 @@ fn snapshot(
             member_mbps: 4,
         }],
         endpoints,
-        guest_grants: Vec::new(),
+        connection_intents: Vec::new(),
     }
 }
 
@@ -41,6 +41,7 @@ fn newer_snapshot_revokes_missing_endpoints_and_preserves_scope() {
     let user_id = UserId::from_u128(2);
     let user_key = EndpointKey::new([1; 32]);
     let device_key = EndpointKey::new([2; 32]);
+    let device_id = DeviceId::from_u128(3);
     let user = RelayEndpointPolicy {
         endpoint_key: user_key,
         owner: RelayEndpointOwner::User {
@@ -50,19 +51,24 @@ fn newer_snapshot_revokes_missing_endpoints_and_preserves_scope() {
     let device = RelayEndpointPolicy {
         endpoint_key: device_key,
         owner: RelayEndpointOwner::Device {
-            tenant_id,
-            device_id: DeviceId::from_u128(3),
+            tenant_id: TenantId::from_u128(4),
+            device_id,
         },
     };
     let now = Instant::now();
     let mut state = RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap();
-    state
-        .apply_snapshot(snapshot(deployment_id, 1, vec![user, device]), 2_000, now)
-        .unwrap();
+    let mut initial = snapshot(deployment_id, 1, vec![user, device]);
+    initial.connection_intents.push(RelayConnectionIntent {
+        operator_endpoint_key: user_key,
+        device_id,
+        expires_at_unix_ms: 5_000,
+    });
+    state.apply_snapshot(initial, 2_000, now).unwrap();
     assert_eq!(
         state.traffic_scope(user_key, device_key, 2_000),
         Some(TrafficScope::Team { tenant_id, user_id })
     );
+    assert_eq!(state.traffic_scope(user_key, device_key, 5_000), None);
 
     state
         .apply_snapshot(snapshot(deployment_id, 2, vec![device]), 3_000, now)
@@ -118,8 +124,8 @@ fn guest_relay_requires_an_unexpired_grant_for_that_device() {
         },
     ];
     let mut snapshot = snapshot(deployment_id, 1, endpoints);
-    snapshot.guest_grants.push(GuestRelayGrant {
-        guest_endpoint_key: guest_key,
+    snapshot.connection_intents.push(RelayConnectionIntent {
+        operator_endpoint_key: guest_key,
         device_id: first_id,
         expires_at_unix_ms: 5_000,
     });

@@ -5,18 +5,22 @@
   "identifier": "vip.rgaa.pab.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
         "title": "Pixels Agent Bridge",
-        "width": 1120,
-        "height": 740,
-        "minWidth": 980,
-        "minHeight": 680,
+        "width": 1000,
+        "height": 640,
+        "minWidth": 1000,
+        "minHeight": 640,
+        "maxWidth": 1000,
+        "maxHeight": 640,
+        "resizable": false,
+        "maximizable": false,
         "decorations": false
       }
     ],

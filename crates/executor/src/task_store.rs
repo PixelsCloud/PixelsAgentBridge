@@ -14,9 +14,10 @@ use tokio::sync::broadcast;
 
 const CHANGE_BUFFER: usize = 1024;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
-const TASK_DATABASE_SCHEMA_VERSION: i64 = 2;
 
+mod directory;
 mod operation;
+mod terminal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskChangeKind {
@@ -54,16 +55,9 @@ impl TaskStore {
             .max_connections(1)
             .connect_with(options)
             .await?;
-        let schema_version: i64 = sqlx::query_scalar("PRAGMA user_version")
-            .fetch_one(&pool)
-            .await?;
-        if schema_version > TASK_DATABASE_SCHEMA_VERSION {
-            return Err(TaskStoreError::UnsupportedSchemaVersion(schema_version));
-        }
-        if schema_version == 0 {
-            let mut tx = pool.begin().await?;
-            for statement in [
-                r#"
+        let mut tx = pool.begin().await?;
+        for statement in [
+            r#"
             CREATE TABLE IF NOT EXISTS task_records (
                 task_id TEXT PRIMARY KEY,
                 initiated_by TEXT NOT NULL,
@@ -71,46 +65,74 @@ impl TaskStore {
                 snapshot_json TEXT NOT NULL,
                 command_json TEXT NOT NULL,
                 UNIQUE (initiated_by, request_id)
-            )
-            "#,
-                r#"
+            )"#,
+            r#"
             CREATE TABLE IF NOT EXISTS task_events (
                 task_id TEXT NOT NULL,
                 seq INTEGER NOT NULL,
                 event_json TEXT NOT NULL,
                 PRIMARY KEY (task_id, seq),
                 FOREIGN KEY (task_id) REFERENCES task_records(task_id) ON DELETE CASCADE
-            )
-            "#,
-                r#"
+            )"#,
+            r#"
             CREATE TABLE IF NOT EXISTS task_outputs (
                 task_id TEXT NOT NULL,
                 stream TEXT NOT NULL,
                 bytes BLOB NOT NULL,
                 PRIMARY KEY (task_id, stream),
                 FOREIGN KEY (task_id) REFERENCES task_records(task_id) ON DELETE CASCADE
-            )
-            "#,
-            ] {
-                sqlx::query(statement).execute(&mut *tx).await?;
-            }
-            sqlx::query("PRAGMA user_version = 1")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
+            )"#,
+            r#"
+            CREATE TABLE IF NOT EXISTS transfer_operations (
+                request_id TEXT PRIMARY KEY,
+                initiated_by_json TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                path TEXT NOT NULL,
+                size INTEGER NOT NULL DEFAULT 0,
+                offset INTEGER NOT NULL DEFAULT 0,
+                state TEXT NOT NULL,
+                started_at_unix_ms INTEGER NOT NULL,
+                finished_at_unix_ms INTEGER,
+                message TEXT,
+                sha256 TEXT
+            )"#,
+            r#"
+            CREATE TABLE IF NOT EXISTS read_operations (
+                request_id TEXT PRIMARY KEY,
+                initiated_by_json TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                path TEXT NOT NULL,
+                state TEXT NOT NULL,
+                result_count INTEGER NOT NULL DEFAULT 0,
+                started_at_unix_ms INTEGER NOT NULL,
+                finished_at_unix_ms INTEGER,
+                message TEXT
+            )"#,
+            r#"
+            CREATE TABLE IF NOT EXISTS terminal_sessions (
+                id TEXT PRIMARY KEY,
+                initiated_by_json TEXT NOT NULL,
+                shell TEXT NOT NULL,
+                state TEXT NOT NULL,
+                started_at_unix_ms INTEGER NOT NULL,
+                finished_at_unix_ms INTEGER,
+                message TEXT
+            )"#,
+            r#"
+            CREATE TABLE IF NOT EXISTS terminal_events (
+                session_id TEXT NOT NULL,
+                seq INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                state TEXT NOT NULL,
+                at_unix_ms INTEGER NOT NULL,
+                PRIMARY KEY (session_id, seq),
+                FOREIGN KEY (session_id) REFERENCES terminal_sessions(id)
+            )"#,
+        ] {
+            sqlx::query(statement).execute(&mut *tx).await?;
         }
-        if schema_version < 2 {
-            let mut tx = pool.begin().await?;
-            sqlx::query(
-                "CREATE TABLE transfer_operations (request_id TEXT PRIMARY KEY, initiated_by_json TEXT NOT NULL, direction TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0, offset INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL, started_at_unix_ms INTEGER NOT NULL, finished_at_unix_ms INTEGER, message TEXT)",
-            )
-            .execute(&mut *tx)
-            .await?;
-            sqlx::query("PRAGMA user_version = 2")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
-        }
+        tx.commit().await?;
         let (changes, _) = broadcast::channel(CHANGE_BUFFER);
         Ok(Self { pool, changes })
     }
@@ -453,8 +475,6 @@ pub(crate) enum TaskStoreError {
     InvalidOutputOffset,
     #[error("task output offset is too large")]
     OffsetTooLarge,
-    #[error("task database schema version {0} is newer than this Executor supports")]
-    UnsupportedSchemaVersion(i64),
     #[error(transparent)]
     Sql(#[from] sqlx::Error),
     #[error(transparent)]

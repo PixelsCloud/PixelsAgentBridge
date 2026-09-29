@@ -332,6 +332,9 @@ async fn maintain_connection(
                     DeviceNetworkLookup::Code(device_code) => connection
                         .send_resolve_device_code(device_code, operation_timeout)
                         .await?,
+                    DeviceNetworkLookup::Presence(device_code) => connection
+                        .send_get_device_presence(device_code, operation_timeout)
+                        .await?,
                     DeviceNetworkLookup::List => connection
                         .send_list_devices(operation_timeout)
                         .await?,
@@ -464,6 +467,17 @@ fn handle_server_message(
         }) => {
             let pending = pending_resolution.take().expect("matched list request");
             let _ = pending.response.send(Ok(ResolvedDevice::List(devices)));
+            Ok(())
+        }
+        ControlServerMessage::DevicePresenceFound {
+            request_id,
+            presence,
+        } if pending_resolution.as_ref().is_some_and(|pending| {
+            request_id == pending.request_id
+                && matches!(pending.lookup, DeviceNetworkLookup::Presence(code) if code == presence.code)
+        }) => {
+            let pending = pending_resolution.take().expect("matched presence request");
+            let _ = pending.response.send(Ok(ResolvedDevice::Presence(presence)));
             Ok(())
         }
         ControlServerMessage::Error {

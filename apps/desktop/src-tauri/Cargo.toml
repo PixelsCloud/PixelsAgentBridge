@@ -22,9 +22,21 @@ pab-logging = { path = "../../../crates/logging" }
 pab-protocol = { path = "../../../crates/protocol" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml_edit = "0.25"
 tracing = "0.1"
-tokio = { version = "1", features = ["sync", "time"] }
+tokio = { version = "1", features = ["io-util", "process", "sync", "time"] }
 zeroize = "1"
+base64 = "0.22"
+url = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_RemoteDesktop", "Win32_System_StationsAndDesktops", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+xcap = "=0.8.2"
 [profile.release]
 codegen-units = 1
 lto = true

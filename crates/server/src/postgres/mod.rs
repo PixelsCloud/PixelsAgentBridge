@@ -10,15 +10,14 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::domain::{
-    Account, AccountCredential, Device, RegisteredEndpoint, Team, TeamInvitation, TeamRole,
-};
+use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint, Team, TeamRole};
 
 mod accounts;
+mod connection_intents;
 mod device_claim;
 mod device_discovery;
-mod device_grants;
 mod device_network;
+mod device_presence;
 mod device_runtime;
 mod endpoints;
 mod guest_access;

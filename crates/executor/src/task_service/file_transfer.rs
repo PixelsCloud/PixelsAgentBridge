@@ -11,7 +11,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
-use super::{TaskServiceError, send_error};
+use super::{TaskServiceError, send_error, upload_lock::UploadPathLocks};
 use crate::task_store::TaskStore;
 
 pub(super) async fn upload(
@@ -23,6 +23,7 @@ pub(super) async fn upload(
     size: u64,
     sha256: &str,
     overwrite: bool,
+    upload_locks: &UploadPathLocks,
 ) -> Result<(), TaskServiceError> {
     let Some(destination) = valid_path(path) else {
         return reject(stream, timeout, "invalid destination path").await;
@@ -30,6 +31,9 @@ pub(super) async fn upload(
     if !valid_sha256(sha256) {
         return reject(stream, timeout, "invalid checksum").await;
     }
+    let Some(_upload_guard) = upload_locks.try_acquire(&destination).await? else {
+        return reject(stream, timeout, "destination already has an active upload").await;
+    };
     match fs::symlink_metadata(&destination).await {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
             return reject(stream, timeout, "destination is not a regular file").await;
@@ -137,6 +141,7 @@ pub(super) async fn download(
     let size = metadata.len();
     store.transfer_progress(request_id, offset, size).await?;
     let sha256 = hash_file(&source).await?;
+    store.transfer_hash(request_id, &sha256).await?;
     file.seek(std::io::SeekFrom::Start(offset)).await?;
     stream
         .send_frame_json(

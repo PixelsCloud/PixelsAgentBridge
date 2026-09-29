@@ -17,7 +17,10 @@ fn accepted(os_family: OsFamily, path_style: PathStyle) -> AcceptedTask {
             task_id: TaskId::from_u128(4),
         },
         request_id: RequestId::from_u128(5),
-        initiated_by: UserId::from_u128(6).into(),
+        initiated_by: pab_protocol::OperatorRef::account(
+            UserId::from_u128(6),
+            pab_protocol::EndpointKey::new([6; 32]),
+        ),
         capability: CapabilityRef {
             name: "file.transfer".to_owned(),
             version: 1,

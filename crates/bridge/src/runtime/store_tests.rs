@@ -1,14 +1,49 @@
 use pab_protocol::{
     CapabilityRef, CommandTaskSpec, CpuArchitecture, DeploymentId, DeviceCode, DeviceId, DeviceRef,
-    ExecutionContext, ExecutionScope, ExpectedEnvironment, OsFamily, OutputAvailability,
-    OutputChunk, OutputRange, OutputStream, PathStyle, RequestId, TASK_SCHEMA_VERSION,
-    TaskCompletion, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot, TaskState, TenantId,
-    UserId,
+    ExecutionContext, ExecutionScope, ExpectedEnvironment, OperatorRef, OsFamily,
+    OutputAvailability, OutputChunk, OutputRange, OutputStream, PathStyle, RequestId,
+    TASK_SCHEMA_VERSION, TaskCompletion, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
+    TaskState, TenantId, UserId,
 };
 use tempfile::tempdir;
 
 use super::RememberedDevice;
 use super::store::*;
+use super::{BridgeLocalStore, DevicePasswordProvider, SqliteDevicePasswordProvider};
+
+#[tokio::test]
+async fn concurrent_stores_initialize_one_database() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let (first, second) = tokio::join!(RuntimeStore::open(&path), RuntimeStore::open(&path));
+    let first = first.unwrap();
+    let second = second.unwrap();
+    first.start_session("first").await.unwrap();
+    second.start_session("second").await.unwrap();
+    assert!(first.operations().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn device_password_is_available_to_another_process_store() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let local = BridgeLocalStore::open(&path).await.unwrap();
+    local
+        .save_device_password(device_ref().device_id, "TEMP1234")
+        .await
+        .unwrap();
+
+    let provider = SqliteDevicePasswordProvider::new(&path);
+    let password = provider.load_password(device_ref()).await.unwrap();
+    assert_eq!(password.as_str(), "TEMP1234");
+
+    local
+        .save_device_password(device_ref().device_id, "NEWPASS8")
+        .await
+        .unwrap();
+    let updated = provider.load_password(device_ref()).await.unwrap();
+    assert_eq!(updated.as_str(), "NEWPASS8");
+}
 
 #[tokio::test]
 async fn remembers_device_name_across_reconnect_and_reopen() {
@@ -24,58 +59,59 @@ async fn remembers_device_name_across_reconnect_and_reopen() {
     };
     store.remember_device(&device).await.unwrap();
     store.rename_device(device.code, "SG Linux").await.unwrap();
+    let other = RememberedDevice {
+        device_ref: DeviceRef {
+            device_id: DeviceId::from_u128(4),
+            ..device_ref()
+        },
+        code: DeviceCode::new(987_654_321).unwrap(),
+        alias: "Windows 90".to_owned(),
+        os_family: OsFamily::Windows,
+        os_reminder: "Windows PowerShell".to_owned(),
+    };
+    store.remember_device(&other).await.unwrap();
     device.os_reminder = "Linux bash".to_owned();
     store.remember_device(&device).await.unwrap();
     store.close().await;
 
     let reopened = RuntimeStore::open(&path).await.unwrap();
     let remembered = reopened.remembered_devices().await.unwrap();
-    assert_eq!(remembered.len(), 1);
+    assert_eq!(remembered.len(), 2);
     assert_eq!(remembered[0].alias, "SG Linux");
     assert_eq!(remembered[0].os_reminder, "Linux bash");
     assert_eq!(remembered[0].device_ref, device.device_ref);
+    assert_eq!(remembered[1].device_ref, other.device_ref);
 }
 
 #[tokio::test]
-async fn upgrades_existing_task_database_without_losing_records() {
+async fn forgetting_device_removes_saved_password() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("bridge.sqlite3");
-    let store = RuntimeStore::open(&path).await.unwrap();
-    let request_id = RequestId::from_u128(910);
-    store
-        .record_pending(device_ref(), request_id, &command())
+    let local = BridgeLocalStore::open(&path).await.unwrap();
+    let code = DeviceCode::new(123_456_789).unwrap();
+    let device = RememberedDevice {
+        device_ref: device_ref(),
+        code,
+        alias: "Test device".to_owned(),
+        os_family: OsFamily::Linux,
+        os_reminder: "Linux shell".to_owned(),
+    };
+    local.store.remember_device(&device).await.unwrap();
+    local
+        .save_device_password(device.device_ref.device_id, "PASSWORD")
         .await
         .unwrap();
-    store.close().await;
 
-    let options = sqlx::sqlite::SqliteConnectOptions::new()
-        .filename(&path)
-        .create_if_missing(false);
-    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
-    sqlx::query("DROP TABLE remembered_devices")
-        .execute(&pool)
-        .await
-        .unwrap();
-    sqlx::query("DROP TABLE runtime_operations")
-        .execute(&pool)
-        .await
-        .unwrap();
-    sqlx::query("PRAGMA user_version = 1")
-        .execute(&pool)
-        .await
-        .unwrap();
-    pool.close().await;
-
-    let migrated = RuntimeStore::open(&path).await.unwrap();
-    assert_eq!(
-        migrated
-            .get_by_request(request_id)
+    let removed_id = local.forget_device(code).await.unwrap();
+    assert_eq!(removed_id, device.device_ref.device_id);
+    assert!(local.remembered_devices().await.unwrap().is_empty());
+    let saved_password: Option<String> =
+        sqlx::query_scalar("SELECT password FROM device_credentials WHERE device_id = ?")
+            .bind(removed_id.to_string())
+            .fetch_optional(&local.store.pool)
             .await
-            .unwrap()
-            .device_ref,
-        device_ref()
-    );
-    assert!(migrated.remembered_devices().await.unwrap().is_empty());
+            .unwrap();
+    assert!(saved_password.is_none());
 }
 
 #[tokio::test]
@@ -90,11 +126,13 @@ async fn transfer_history_survives_reopen_without_changing_active_transfer() {
         .start_operation(
             completed,
             device_ref(),
+            Some(DeviceCode::new(123_456_789).unwrap()),
             "guest",
             "upload",
             "a.bin",
             "/tmp/a.bin",
             false,
+            None,
         )
         .await
         .unwrap();
@@ -107,11 +145,13 @@ async fn transfer_history_survives_reopen_without_changing_active_transfer() {
         .start_operation(
             interrupted,
             device_ref(),
+            None,
             "guest",
             "download",
             "/tmp/b.bin",
             "b.bin",
             true,
+            None,
         )
         .await
         .unwrap();
@@ -128,6 +168,10 @@ async fn transfer_history_survives_reopen_without_changing_active_transfer() {
     assert_eq!(upload.offset, 512);
     assert_eq!(upload.size, 512);
     assert_eq!(upload.direction, "upload");
+    assert_eq!(
+        upload.device_code,
+        Some(DeviceCode::new(123_456_789).unwrap())
+    );
     assert_eq!(upload.initiated_by, "guest");
     let download = operations
         .iter()
@@ -135,6 +179,435 @@ async fn transfer_history_survives_reopen_without_changing_active_transfer() {
         .unwrap();
     assert_eq!(download.state, "running");
     assert!(download.finished_at_unix_ms.is_none());
+}
+
+#[tokio::test]
+async fn shared_store_observes_each_runtime_session_without_rewriting_transfer_state() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let first = RuntimeStore::open(&path).await.unwrap();
+    let second = RuntimeStore::open(&path).await.unwrap();
+    first.start_session("first").await.unwrap();
+    second.start_session("second").await.unwrap();
+
+    let first_id = RequestId::from_u128(201);
+    let second_id = RequestId::from_u128(202);
+    first
+        .start_operation(
+            first_id,
+            device_ref(),
+            None,
+            "guest",
+            "upload",
+            "first.bin",
+            "/tmp/first.bin",
+            false,
+            Some("first"),
+        )
+        .await
+        .unwrap();
+    second
+        .start_operation(
+            second_id,
+            device_ref(),
+            None,
+            "guest",
+            "upload",
+            "second.bin",
+            "/tmp/second.bin",
+            false,
+            Some("second"),
+        )
+        .await
+        .unwrap();
+
+    first.stop_session("first").await.unwrap();
+    let operations = second.operations().await.unwrap();
+    let stopped = operations
+        .iter()
+        .find(|item| item.id == first_id.to_string())
+        .unwrap();
+    let active = operations
+        .iter()
+        .find(|item| item.id == second_id.to_string())
+        .unwrap();
+    assert_eq!(stopped.state, "running");
+    assert_eq!(
+        stopped.execution_observation.as_deref(),
+        Some("unconfirmed")
+    );
+    assert_eq!(active.state, "running");
+    assert_eq!(active.execution_observation.as_deref(), Some("active"));
+
+    assert!(
+        second
+            .finish_operation(second_id, "completed", None)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !second
+            .finish_operation(second_id, "cancelled", None)
+            .await
+            .unwrap()
+    );
+    let completed = second
+        .operations()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|item| item.id == second_id.to_string())
+        .unwrap();
+    assert_eq!(completed.state, "completed");
+    assert_eq!(completed.execution_observation, None);
+}
+
+#[tokio::test]
+async fn stale_heartbeat_reports_unconfirmed_without_failing_transfer() {
+    let directory = tempdir().unwrap();
+    let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))
+        .await
+        .unwrap();
+    store.start_session("stale").await.unwrap();
+    let id = RequestId::from_u128(203);
+    store
+        .start_operation(
+            id,
+            device_ref(),
+            None,
+            "guest",
+            "download",
+            "/tmp/source.bin",
+            "local.bin",
+            false,
+            Some("stale"),
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE runtime_sessions SET heartbeat_at_unix_ms = 1 WHERE id = 'stale'")
+        .execute(&store.pool)
+        .await
+        .unwrap();
+
+    let operation = store.operations().await.unwrap().pop().unwrap();
+    assert_eq!(operation.state, "running");
+    assert_eq!(
+        operation.execution_observation.as_deref(),
+        Some("unconfirmed")
+    );
+    assert!(operation.finished_at_unix_ms.is_none());
+}
+
+#[tokio::test]
+async fn cancellation_keeps_remote_result_unconfirmed_until_reconciled() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let first = RuntimeStore::open(&path).await.unwrap();
+    let second = RuntimeStore::open(&path).await.unwrap();
+    first.start_session("operator").await.unwrap();
+    second.start_session("other").await.unwrap();
+    let id = RequestId::from_u128(204);
+    first
+        .start_operation(
+            id,
+            device_ref(),
+            None,
+            "guest",
+            "upload",
+            "local.bin",
+            "/tmp/remote.bin",
+            false,
+            Some("operator"),
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        !second
+            .request_transfer_cancellation(id, "other")
+            .await
+            .unwrap()
+    );
+    assert!(
+        first
+            .request_transfer_cancellation(id, "operator")
+            .await
+            .unwrap()
+    );
+    assert!(
+        !first
+            .request_transfer_cancellation(id, "operator")
+            .await
+            .unwrap()
+    );
+    second
+        .operation_progress(id, 65_536, 4_194_304)
+        .await
+        .unwrap();
+    let operation = second.operations().await.unwrap().pop().unwrap();
+    assert_eq!(operation.state, "cancel_requested");
+    assert_eq!(operation.offset, 65_536);
+    assert_eq!(operation.size, 4_194_304);
+    assert_eq!(
+        operation.execution_observation.as_deref(),
+        Some("unconfirmed")
+    );
+    assert!(operation.finished_at_unix_ms.is_none());
+    assert_eq!(
+        second.cancellation_requests(8, None).await.unwrap().len(),
+        1
+    );
+
+    assert!(
+        second
+            .finish_operation(id, "completed", None)
+            .await
+            .unwrap()
+    );
+    assert!(
+        second
+            .cancellation_requests(8, None)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let operation = first.operations().await.unwrap().pop().unwrap();
+    assert_eq!(operation.state, "completed");
+    assert!(operation.finished_at_unix_ms.is_some());
+}
+
+#[tokio::test]
+async fn prepared_transfer_record_is_idempotent_only_for_the_same_operation() {
+    let directory = tempdir().unwrap();
+    let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))
+        .await
+        .unwrap();
+    store.start_session("operator").await.unwrap();
+    let id = RequestId::from_u128(205);
+    for _ in 0..2 {
+        store
+            .start_operation(
+                id,
+                device_ref(),
+                None,
+                "guest",
+                "upload",
+                "local.bin",
+                "/tmp/remote.bin",
+                false,
+                Some("operator"),
+            )
+            .await
+            .unwrap();
+    }
+    let conflict = store
+        .start_operation(
+            id,
+            device_ref(),
+            None,
+            "guest",
+            "upload",
+            "different.bin",
+            "/tmp/remote.bin",
+            false,
+            Some("operator"),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(conflict, RuntimeStoreError::RequestConflict));
+    assert!(
+        store
+            .request_transfer_cancellation(id, "operator")
+            .await
+            .unwrap()
+    );
+    store
+        .start_operation(
+            id,
+            device_ref(),
+            None,
+            "guest",
+            "upload",
+            "local.bin",
+            "/tmp/remote.bin",
+            false,
+            Some("operator"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(store.operations().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn unconfirmed_transfer_lookup_pages_without_repeating_a_record() {
+    let directory = tempdir().unwrap();
+    let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))
+        .await
+        .unwrap();
+    store.start_session("former").await.unwrap();
+    for value in 301..=303 {
+        store
+            .start_operation(
+                RequestId::from_u128(value),
+                device_ref(),
+                None,
+                "guest",
+                "upload",
+                "source.bin",
+                "/tmp/destination.bin",
+                false,
+                Some("former"),
+            )
+            .await
+            .unwrap();
+    }
+    store.stop_session("former").await.unwrap();
+
+    let first = store.unconfirmed_transfers(2, None).await.unwrap();
+    assert_eq!(first.len(), 2);
+    let last = first.last().unwrap();
+    let second = store
+        .unconfirmed_transfers(2, Some((last.started_at_unix_ms, &last.id)))
+        .await
+        .unwrap();
+    assert_eq!(second.len(), 1);
+    assert!(first.iter().all(|record| record.id != second[0].id));
+
+    let first_history = store.operations_page(None, 2).await.unwrap();
+    let history_cursor = first_history.last().unwrap();
+    let second_history = store
+        .operations_page(
+            Some((history_cursor.started_at_unix_ms, &history_cursor.id)),
+            2,
+        )
+        .await
+        .unwrap();
+    assert_eq!(second_history.len(), 1);
+    assert!(
+        first_history
+            .iter()
+            .all(|record| record.id != second_history[0].id)
+    );
+}
+
+#[tokio::test]
+async fn task_history_pages_only_accepted_tasks() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    for value in 400..403 {
+        let request_id = RequestId::from_u128(value);
+        store
+            .record_pending(device_ref(), request_id, &command())
+            .await
+            .unwrap();
+        if value != 401 {
+            let mut accepted = snapshot(device_ref(), request_id);
+            accepted.task_ref.task_id = TaskId::from_u128(value);
+            store.bind_snapshot(&accepted).await.unwrap();
+        }
+    }
+
+    let first = store.list_page(None, 1).await.unwrap();
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].request_id, RequestId::from_u128(402));
+    let second = store.list_page(Some(first[0].request_id), 1).await.unwrap();
+    assert_eq!(second.len(), 1);
+    assert_eq!(second[0].request_id, RequestId::from_u128(400));
+    assert!(
+        store
+            .list_page(Some(second[0].request_id), 1)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    store.close().await;
+
+    let reopened = RuntimeStore::open(&path).await.unwrap();
+    let saved = reopened
+        .get_by_task_id(TaskId::from_u128(400))
+        .await
+        .unwrap();
+    assert_eq!(saved.request_id, RequestId::from_u128(400));
+    assert_eq!(
+        saved.snapshot.unwrap().task_ref.task_id,
+        TaskId::from_u128(400)
+    );
+}
+
+#[tokio::test]
+async fn device_history_pages_exclude_other_devices() {
+    let directory = tempdir().unwrap();
+    let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))
+        .await
+        .unwrap();
+    let first_device = device_ref();
+    let second_device = DeviceRef {
+        device_id: DeviceId::from_u128(44),
+        ..first_device
+    };
+
+    for (value, device_ref) in [(1, first_device), (2, second_device), (3, first_device)] {
+        let request_id = RequestId::from_u128(value);
+        store
+            .record_pending(device_ref, request_id, &command())
+            .await
+            .unwrap();
+        let mut accepted = snapshot(device_ref, request_id);
+        accepted.task_ref.task_id = TaskId::from_u128(value);
+        store.bind_snapshot(&accepted).await.unwrap();
+        store
+            .start_operation(
+                RequestId::from_u128(value + 100),
+                device_ref,
+                None,
+                "guest",
+                "upload",
+                "source",
+                "destination",
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    let first_tasks = store
+        .list_page_for_device(first_device, None, 1)
+        .await
+        .unwrap();
+    assert_eq!(first_tasks[0].request_id, RequestId::from_u128(3));
+    let next_tasks = store
+        .list_page_for_device(first_device, Some(first_tasks[0].request_id), 1)
+        .await
+        .unwrap();
+    assert_eq!(next_tasks[0].request_id, RequestId::from_u128(1));
+
+    let first_operations = store
+        .operations_page_for_device(first_device, None, 1)
+        .await
+        .unwrap();
+    let operation = &first_operations[0];
+    assert_eq!(operation.device_ref, first_device);
+    let next_operations = store
+        .operations_page_for_device(
+            first_device,
+            Some((operation.started_at_unix_ms, &operation.id)),
+            1,
+        )
+        .await
+        .unwrap();
+    assert_eq!(next_operations.len(), 1);
+    assert_eq!(next_operations[0].device_ref, first_device);
+    assert_ne!(next_operations[0].id, operation.id);
+    assert_eq!(
+        store
+            .list_page_for_device(second_device, None, 10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[tokio::test]
@@ -333,7 +806,10 @@ fn snapshot(device_ref: DeviceRef, request_id: RequestId) -> TaskSnapshot {
             task_id: TaskId::from_u128(5),
         },
         request_id,
-        initiated_by: UserId::from_u128(6).into(),
+        initiated_by: OperatorRef::account(
+            UserId::from_u128(6),
+            pab_protocol::EndpointKey::new([6; 32]),
+        ),
         capability: CapabilityRef {
             name: "process.exec".to_owned(),
             version: 1,

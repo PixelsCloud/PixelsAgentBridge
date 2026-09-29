@@ -1,8 +1,4 @@
 use pab_protocol::{DeviceId, EndpointKey, EndpointProofPrincipal, TenantId, UserId};
-use time::OffsetDateTime;
-use uuid::Uuid;
-
-pub(crate) const DEVICE_CONNECT_CAPABILITY: i32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
@@ -47,15 +43,6 @@ impl TeamRole {
 pub struct Team {
     pub tenant_id: TenantId,
     pub name: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TeamInvitation {
-    pub id: Uuid,
-    pub tenant_id: TenantId,
-    pub invited_user_id: UserId,
-    pub role: TeamRole,
-    pub expires_at: OffsetDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

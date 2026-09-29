@@ -7,6 +7,16 @@ stdout/stderr back to the operator.
 The Rust toolchain is pinned in `rust-toolchain.toml` and dependencies are locked in
 `Cargo.lock`.
 
+For fast desktop page work, run `npm run dev:desktop` from `apps/desktop`.
+Tauri starts Vite on `http://localhost:1420` and opens a development window.
+React and CSS edits update in that window without rebuilding Rust or making an
+installer. The command uses `--no-watch` to avoid recompiling the backend while
+editing pages; restart it after Rust changes. Use the complete Debug installer
+only for final installed-package checks. Opening the Vite URL in a normal browser
+does not provide Tauri's native commands or device state. Press Ctrl+Shift+I in
+the development window to inspect its HTML, CSS, and console. Stop the process
+with Ctrl+C when finished.
+
 Run the current checks with:
 
 ```powershell
@@ -122,7 +132,6 @@ $env:PAB_DEVICE_ID = "<device UUID>"
 $env:PAB_CONTROL_URL = "wss://server.example/control"
 $env:PAB_RELAY_URLS = "https://relay-1.example,https://relay-2.example"
 $env:PAB_ENDPOINT_SECRET_FILE = "C:\protected\pab-endpoint.key"
-$env:PAB_DEVICE_CREDENTIAL_FILE = "C:\protected\pab-device-credential.json"
 $env:PAB_TASK_DATABASE = "C:\protected\pab-executor.sqlite3"
 # Optional; control and Relay may use different private CAs:
 $env:PAB_CONTROL_CA_CERT = "C:\protected\pab-ca.pem"
@@ -140,16 +149,17 @@ cargo run -p pab-bridge --bin pab-bridge -- command <9-digit-device-code> <progr
 cargo run -p pab-bridge --bin pab-bridge -- follow <9-digit-device-code> <task-id>
 ```
 
-Enrollment prints the nine-digit code and writes it to `enrollment.json`. The code
+Enrollment prints the nine-digit code and saves it in `executor.sqlite3`. The code
 identifies a device within one server deployment; it grants no access by itself.
 The Bridge checks the current workspace membership and device grant before resolving
 it to the internal UUID. Resolution also works when the device is offline, so a
 submitted task can wait for reconnection. The Debug CLI requires the nine-digit code.
 
 The Bridge Runtime defaults to `bridge.sqlite3` in the persistent user data directory.
-The Executor defaults to `device-endpoint.key`, `device-credential.json`, and
-`executor.sqlite3` in the persistent machine data directory. `PAB_ENDPOINT_SECRET_FILE`,
-`PAB_DEVICE_CREDENTIAL_FILE`, `PAB_BRIDGE_DATABASE`, and `PAB_TASK_DATABASE` still
+The Executor defaults to `device-endpoint.key` and `executor.sqlite3` in the
+persistent machine data directory. The SQLite database holds the device code,
+temporary password, password hash, and task history. `PAB_ENDPOINT_SECRET_FILE`,
+`PAB_BRIDGE_DATABASE`, and `PAB_TASK_DATABASE` still
 override individual paths; `PAB_DATA_DIR` overrides the data directory for either
 process; set it to an absolute path outside the installation directory. SQLite creates
 the parent directory when needed. The Bridge database contains

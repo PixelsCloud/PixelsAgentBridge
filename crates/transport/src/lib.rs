@@ -4,7 +4,8 @@ mod connection;
 mod endpoint;
 
 pub use connection::{
-    MAX_BINARY_FRAME_BYTES, MAX_PAB_MESSAGE_BYTES, PabBiStream, PabConnection, PabConnectionError,
+    ConnectionPath, MAX_BINARY_FRAME_BYTES, MAX_PAB_MESSAGE_BYTES, PabBiStream, PabConnection,
+    PabConnectionError,
 };
 
 pub use endpoint::{

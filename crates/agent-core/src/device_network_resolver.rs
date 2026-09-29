@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use pab_protocol::{DeviceCode, DeviceDirectoryEntry, DeviceNetworkSnapshot, DeviceRef};
+use pab_protocol::{
+    DeviceCode, DeviceDirectoryEntry, DeviceNetworkSnapshot, DevicePresence, DeviceRef,
+};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -15,6 +17,7 @@ pub(crate) enum ResolvedDevice {
     Network(DeviceNetworkSnapshot),
     Ref(DeviceRef),
     List(Vec<DeviceDirectoryEntry>),
+    Presence(DevicePresence),
 }
 
 #[derive(Clone, Copy)]
@@ -22,6 +25,7 @@ pub(crate) enum DeviceNetworkLookup {
     Ref(DeviceRef),
     Code(DeviceCode),
     List,
+    Presence(DeviceCode),
 }
 
 #[derive(Clone)]
@@ -44,7 +48,7 @@ impl DeviceNetworkResolver {
             .await?
         {
             ResolvedDevice::Network(snapshot) => Ok(snapshot),
-            ResolvedDevice::Ref(_) | ResolvedDevice::List(_) => {
+            ResolvedDevice::Ref(_) | ResolvedDevice::List(_) | ResolvedDevice::Presence(_) => {
                 Err(DeviceNetworkResolutionError::UnexpectedResponse)
             }
         }
@@ -59,7 +63,7 @@ impl DeviceNetworkResolver {
             .await?
         {
             ResolvedDevice::Ref(device_ref) => Ok(device_ref),
-            ResolvedDevice::Network(_) | ResolvedDevice::List(_) => {
+            ResolvedDevice::Network(_) | ResolvedDevice::List(_) | ResolvedDevice::Presence(_) => {
                 Err(DeviceNetworkResolutionError::UnexpectedResponse)
             }
         }
@@ -70,6 +74,19 @@ impl DeviceNetworkResolver {
     ) -> Result<Vec<DeviceDirectoryEntry>, DeviceNetworkResolutionError> {
         match self.resolve_lookup(DeviceNetworkLookup::List).await? {
             ResolvedDevice::List(devices) => Ok(devices),
+            _ => Err(DeviceNetworkResolutionError::UnexpectedResponse),
+        }
+    }
+
+    pub async fn device_presence(
+        &self,
+        code: DeviceCode,
+    ) -> Result<DevicePresence, DeviceNetworkResolutionError> {
+        match self
+            .resolve_lookup(DeviceNetworkLookup::Presence(code))
+            .await?
+        {
+            ResolvedDevice::Presence(presence) => Ok(presence),
             _ => Err(DeviceNetworkResolutionError::UnexpectedResponse),
         }
     }

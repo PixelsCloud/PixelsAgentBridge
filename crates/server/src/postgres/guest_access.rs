@@ -39,9 +39,9 @@ impl PostgresStore {
         let tenant_id = TenantId::from_uuid(row.try_get("tenant_id")?);
         sqlx::query(
             r#"
-            INSERT INTO guest_device_intents (guest_endpoint_key, device_id, expires_at)
+            INSERT INTO device_connection_intents (operator_endpoint_key, device_id, expires_at)
             VALUES ($1, $2, now() + interval '10 minutes')
-            ON CONFLICT (guest_endpoint_key, device_id)
+            ON CONFLICT (operator_endpoint_key, device_id)
             DO UPDATE SET expires_at = EXCLUDED.expires_at
             "#,
         )
@@ -72,9 +72,9 @@ impl PostgresStore {
                    network.direct_addresses::text AS direct_addresses,
                    network.observed_at_unix_ms,
                    network.accepted_at
-            FROM guest_device_intents intent
+            FROM device_connection_intents intent
             JOIN endpoints guest
-              ON guest.endpoint_key = intent.guest_endpoint_key
+              ON guest.endpoint_key = intent.operator_endpoint_key
              AND guest.owner_kind = 'guest'
              AND guest.status = 'active'
             JOIN devices device
@@ -90,7 +90,7 @@ impl PostgresStore {
             JOIN deployments deployment
               ON deployment.singleton = true
              AND deployment.id = $4
-            WHERE intent.guest_endpoint_key = $1
+            WHERE intent.operator_endpoint_key = $1
               AND intent.device_id = $2
               AND device.tenant_id = $3
               AND intent.expires_at > now()
@@ -141,11 +141,11 @@ impl PostgresStore {
               ON device.tenant_id = device_endpoint.tenant_id
              AND device.id = device_endpoint.device_id
              AND device.status = 'active'
-            JOIN guest_device_intents intent
+            JOIN device_connection_intents intent
               ON intent.device_id = device.id
              AND intent.expires_at > now()
             JOIN endpoints guest
-              ON guest.endpoint_key = intent.guest_endpoint_key
+              ON guest.endpoint_key = intent.operator_endpoint_key
              AND guest.owner_kind = 'guest'
              AND guest.status = 'active'
             JOIN deployments deployment ON deployment.singleton = true

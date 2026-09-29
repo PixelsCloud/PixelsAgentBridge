@@ -17,6 +17,8 @@ pub const PAB_ALPN: &[u8] = b"pixels-agent-bridge/1";
 pub struct PabEndpointConfig {
     relay_urls: Vec<RelayUrl>,
     tls: CaTlsConfig,
+    #[cfg(debug_assertions)]
+    relay_only_for_testing: bool,
 }
 
 impl PabEndpointConfig {
@@ -32,6 +34,8 @@ impl PabEndpointConfig {
         Ok(Self {
             relay_urls,
             tls: CaTlsConfig::embedded(),
+            #[cfg(debug_assertions)]
+            relay_only_for_testing: false,
         })
     }
 
@@ -50,6 +54,12 @@ impl PabEndpointConfig {
         certificates: impl IntoIterator<Item = rustls_pki_types::CertificateDer<'static>>,
     ) -> Self {
         self.tls = self.tls.with_extra_roots(certificates);
+        self
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn relay_only_for_testing(mut self) -> Self {
+        self.relay_only_for_testing = true;
         self
     }
 }
@@ -71,11 +81,18 @@ impl PabEndpoint {
         secret: SecretKey,
     ) -> Result<Self, PabEndpointError> {
         let relay_map = RelayMap::from_iter(config.relay_urls);
-        let inner = Endpoint::builder(presets::Minimal)
+        let builder = Endpoint::builder(presets::Minimal)
             .secret_key(secret)
             .alpns(vec![PAB_ALPN.to_vec()])
             .relay_mode(RelayMode::Custom(relay_map))
-            .ca_tls_config(config.tls)
+            .ca_tls_config(config.tls);
+        #[cfg(debug_assertions)]
+        let builder = if config.relay_only_for_testing {
+            builder.clear_ip_transports()
+        } else {
+            builder
+        };
+        let inner = builder
             .bind()
             .await
             .map_err(|error| PabEndpointError::Bind(error.to_string()))?;

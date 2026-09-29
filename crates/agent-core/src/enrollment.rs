@@ -124,7 +124,7 @@ pub async fn enroll_account_with_device(
     })
 }
 
-async fn register_endpoint(
+pub(crate) async fn register_endpoint(
     socket: &mut tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,

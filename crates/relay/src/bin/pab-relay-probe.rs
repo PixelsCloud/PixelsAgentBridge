@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
         Some("qad") => run_qad(&args).await?,
         Some("receive") => run_receive(&args).await?,
         Some("send") => run_send(&args).await?,
-        Some("load") => run_load(&args).await?,
+        Some("load" | "load-multi") => run_load(&args).await?,
         Some("sink") => run_sink(&args).await?,
         _ => print_usage(),
     }
@@ -332,7 +332,15 @@ async fn run_load(args: &[String]) -> Result<()> {
         required(args, 3, "secret hex")?,
     )
     .await?;
-    let destination = EndpointId::from_str(required(args, 4, "destination endpoint ID")?)?;
+    let destinations = required(args, 4, "destination endpoint IDs")?
+        .split(',')
+        .map(EndpointId::from_str)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    if (args[1] == "load" && destinations.len() != 1)
+        || (args[1] == "load-multi" && destinations.len() < 2)
+    {
+        return Err("load needs one destination; load-multi needs at least two".into());
+    }
     let seconds = required(args, 5, "duration seconds")?.parse::<u64>()?;
     let payload_size = args
         .get(6)
@@ -342,13 +350,28 @@ async fn run_load(args: &[String]) -> Result<()> {
     if !(1..=60_000).contains(&payload_size) {
         return Err("payload size must be between 1 and 60000 bytes".into());
     }
+    let pacing = args
+        .get(7)
+        .map(|value| value.parse::<f64>())
+        .transpose()?
+        .map(|mbps| -> Result<Duration> {
+            if !mbps.is_finite() || !(0.1..=100.0).contains(&mbps) {
+                return Err("load pacing must be between 0.1 and 100 Mbps".into());
+            }
+            Ok(Duration::from_secs_f64(
+                payload_size as f64 * 8.0 / (mbps * 1_000_000.0),
+            ))
+        })
+        .transpose()?;
     let payload = vec![0x5a; payload_size];
     let started = Instant::now();
     let deadline = started + Duration::from_secs(seconds);
     let mut bytes = 0u64;
+    let mut bytes_by_destination = vec![0u64; destinations.len()];
+    let mut next_destination = 0usize;
     while Instant::now() < deadline {
         let message = ClientToRelayMsg::Datagrams {
-            dst_endpoint_id: destination,
+            dst_endpoint_id: destinations[next_destination],
             datagrams: Datagrams::from(&payload),
         };
         match tokio::time::timeout(Duration::from_secs(2), client.send(message)).await {
@@ -356,15 +379,44 @@ async fn run_load(args: &[String]) -> Result<()> {
             Err(_) => break,
         }
         bytes = bytes.saturating_add(payload_size as u64);
+        bytes_by_destination[next_destination] =
+            bytes_by_destination[next_destination].saturating_add(payload_size as u64);
+        next_destination = (next_destination + 1) % destinations.len();
+        if let Some(interval) = pacing {
+            tokio::time::sleep(interval).await;
+        }
     }
-    let elapsed = started.elapsed();
+    let submitted_elapsed = started.elapsed();
+    let ping = [0x5au8; 8];
+    client.send(ClientToRelayMsg::Ping(ping)).await?;
+    tokio::time::timeout(Duration::from_secs(90), async {
+        loop {
+            match client
+                .next()
+                .await
+                .ok_or("relay stream ended before load acknowledgement")??
+            {
+                RelayToClientMsg::Pong(value) if value == ping => {
+                    break Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
+                }
+                RelayToClientMsg::Ping(value) => client.send(ClientToRelayMsg::Pong(value)).await?,
+                _ => {}
+            }
+        }
+    })
+    .await??;
+    let acknowledged_elapsed = started.elapsed();
     println!(
-        "LOAD endpoint={} bytes={} elapsed_ms={} submitted_mbps={:.3}",
+        "LOAD endpoint={} bytes={} elapsed_ms={} submitted_mbps={:.3} relay_ack_ms={}",
         endpoint_id,
         bytes,
-        elapsed.as_millis(),
-        bits_per_second(bytes, elapsed) / 1_000_000.0
+        submitted_elapsed.as_millis(),
+        bits_per_second(bytes, submitted_elapsed) / 1_000_000.0,
+        acknowledged_elapsed.as_millis()
     );
+    for (destination, bytes) in destinations.into_iter().zip(bytes_by_destination) {
+        println!("LOAD_DEST endpoint={} bytes={}", destination, bytes);
+    }
     Ok(())
 }
 
@@ -379,14 +431,25 @@ async fn run_sink(args: &[String]) -> Result<()> {
     io::stdout().flush()?;
     let started = Instant::now();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(seconds);
+    let mut progress = tokio::time::interval_at(
+        tokio::time::Instant::now() + Duration::from_secs(5),
+        Duration::from_secs(5),
+    );
+    let mut last_received_ms = None;
     let mut by_source: HashMap<EndpointId, u64> = HashMap::new();
     loop {
         tokio::select! {
             _ = tokio::time::sleep_until(deadline) => break,
+            _ = progress.tick() => {
+                let total = by_source.values().copied().sum::<u64>();
+                println!("PROGRESS bytes={} elapsed_ms={}", total, started.elapsed().as_millis());
+                io::stdout().flush()?;
+            }
             message = client.next() => {
                 match message.ok_or("relay stream ended")?? {
                     RelayToClientMsg::Datagrams { remote_endpoint_id, datagrams } => {
                         let bytes = u64::try_from(datagrams.contents.len()).unwrap_or(u64::MAX);
+                        last_received_ms = Some(started.elapsed().as_millis());
                         by_source.entry(remote_endpoint_id)
                             .and_modify(|total| *total = total.saturating_add(bytes))
                             .or_insert(bytes);
@@ -402,11 +465,12 @@ async fn run_sink(args: &[String]) -> Result<()> {
     let elapsed = started.elapsed();
     let total = by_source.values().copied().sum::<u64>();
     println!(
-        "SINK endpoint={} bytes={} elapsed_ms={} mbps={:.3}",
+        "SINK endpoint={} bytes={} elapsed_ms={} mbps={:.3} last_received_ms={}",
         endpoint_id,
         total,
         elapsed.as_millis(),
-        bits_per_second(total, elapsed) / 1_000_000.0
+        bits_per_second(total, elapsed) / 1_000_000.0,
+        last_received_ms.unwrap_or(0)
     );
     let mut sources = by_source.into_iter().collect::<Vec<_>>();
     sources.sort_unstable_by_key(|(source, _)| source.to_string());
@@ -466,7 +530,12 @@ fn load_server_tls(cert_path: &str, key_path: &str) -> Result<rustls::ServerConf
 }
 
 fn parse_secret(value: &str) -> Result<SecretKey> {
-    let decoded = hex::decode(value)?;
+    let contents = if let Some(path) = value.strip_prefix('@') {
+        std::fs::read_to_string(path)?
+    } else {
+        value.to_owned()
+    };
+    let decoded = hex::decode(contents.trim())?;
     let bytes: [u8; 32] = decoded
         .try_into()
         .map_err(|_| "secret key must contain exactly 32 bytes")?;
@@ -504,6 +573,9 @@ fn print_usage() {
     eprintln!("pab-relay-probe send <relay-url> <secret-hex> <destination-id> <message>");
     eprintln!(
         "pab-relay-probe load <relay-url> <secret-hex> <destination-id> <seconds> [payload-bytes]"
+    );
+    eprintln!(
+        "pab-relay-probe load-multi <relay-url> <secret-hex> <destination-id,...> <seconds> [payload-bytes] [pacing-mbps]"
     );
     eprintln!("pab-relay-probe sink <relay-url> <secret-hex> <seconds>");
 }

@@ -1,11 +1,19 @@
 mod credential;
 mod device;
+mod directory;
 mod event;
 mod operation;
+mod reconciliation;
 mod remembered;
+mod screenshot;
+mod session;
 mod store;
 #[cfg(test)]
 mod store_tests;
+mod terminal;
+mod terminal_store;
+mod transfer;
+mod windows;
 mod worker;
 
 use std::{
@@ -24,7 +32,7 @@ use pab_protocol::{
 };
 use thiserror::Error;
 use tokio::{
-    sync::{Mutex, broadcast, oneshot, watch},
+    sync::{Mutex, Notify, broadcast, oneshot, watch},
     task::{AbortHandle, JoinHandle},
 };
 
@@ -32,43 +40,137 @@ use crate::{BridgeConfig, BridgeConfigError, BridgeError};
 use pab_agent_core::{DeviceNetworkResolutionError, EndpointControlError};
 
 use device::{BridgeAvailability, DeviceSession, run_bridge_supervisor};
+use reconciliation::run_reconciliation;
+use session::run_session_heartbeat;
 use worker::run_record;
 
 pub use credential::{
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
-    MemoryDevicePasswordProvider, RuntimeCredentialError,
+    MemoryDevicePasswordProvider, RuntimeCredentialError, SqliteDevicePasswordProvider,
 };
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
 pub use operation::OperationRecord;
 pub use remembered::RememberedDevice;
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
+pub use terminal_store::TerminalAuditEvent;
 
 pub struct BridgeLocalStore {
     store: RuntimeStore,
+    screenshot_dir: PathBuf,
+    terminal_dir: PathBuf,
 }
 
 impl BridgeLocalStore {
     pub async fn open(path: &std::path::Path) -> Result<Self, RuntimeStoreError> {
         Ok(Self {
             store: RuntimeStore::open(path).await?,
+            screenshot_dir: screenshot::screenshot_dir(path),
+            terminal_dir: terminal::terminal_dir(path),
         })
+    }
+
+    pub async fn save_device_password(
+        &self,
+        device_id: pab_protocol::DeviceId,
+        password: &str,
+    ) -> Result<(), RuntimeStoreError> {
+        sqlx::query(
+            "INSERT INTO device_credentials (device_id, password) VALUES (?, ?) \
+             ON CONFLICT(device_id) DO UPDATE SET password = excluded.password",
+        )
+        .bind(device_id.to_string())
+        .bind(password)
+        .execute(&self.store.pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeStoreError> {
         self.store.remembered_devices().await
     }
 
+    pub async fn forget_device(
+        &self,
+        code: pab_protocol::DeviceCode,
+    ) -> Result<pab_protocol::DeviceId, RuntimeStoreError> {
+        self.store.forget_device(code).await
+    }
+
     pub async fn tasks(&self) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
         self.store.list().await
+    }
+
+    pub async fn tasks_page(
+        &self,
+        before: Option<RequestId>,
+        limit: u32,
+    ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
+        self.store.list_page(before, limit).await
+    }
+
+    pub async fn tasks_page_for_device(
+        &self,
+        device_ref: DeviceRef,
+        before: Option<RequestId>,
+        limit: u32,
+    ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
+        self.store
+            .list_page_for_device(device_ref, before, limit)
+            .await
     }
 
     pub async fn operations(&self) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         self.store.operations().await
     }
 
+    pub async fn operations_page(
+        &self,
+        before: Option<(i64, &str)>,
+        limit: u32,
+    ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
+        self.store.operations_page(before, limit).await
+    }
+
+    pub async fn operations_page_for_device(
+        &self,
+        device_ref: DeviceRef,
+        before: Option<(i64, &str)>,
+        limit: u32,
+    ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
+        self.store
+            .operations_page_for_device(device_ref, before, limit)
+            .await
+    }
+
+    pub async fn operations_refresh(&self) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
+        self.store.operations_refresh().await
+    }
+
+    pub async fn screenshot_bytes(&self, id: &str) -> Result<Option<Vec<u8>>, RuntimeStoreError> {
+        screenshot::read_screenshot(&self.store, &self.screenshot_dir, id).await
+    }
+
+    pub async fn terminal_bytes(&self, id: &str) -> Result<Option<Vec<u8>>, RuntimeStoreError> {
+        terminal::read_terminal(&self.store, &self.terminal_dir, id).await
+    }
+
+    pub async fn terminal_events(
+        &self,
+        id: &str,
+    ) -> Result<Vec<TerminalAuditEvent>, RuntimeStoreError> {
+        self.store.terminal_events(id).await
+    }
+
     pub async fn task(&self, task_ref: TaskRef) -> Result<LocalTaskRecord, RuntimeStoreError> {
         self.store.get_by_task(task_ref).await
+    }
+
+    pub async fn task_by_id(
+        &self,
+        task_id: pab_protocol::TaskId,
+    ) -> Result<LocalTaskRecord, RuntimeStoreError> {
+        self.store.get_by_task_id(task_id).await
     }
 
     pub async fn read_output(
@@ -124,9 +226,33 @@ pub struct BridgeRuntime {
     inner: Arc<RuntimeInner>,
     shutdown: watch::Sender<bool>,
     bridge_task: JoinHandle<()>,
+    heartbeat_task: JoinHandle<()>,
+    reconciliation_task: JoinHandle<()>,
 }
 
 impl BridgeRuntime {
+    pub async fn device_presence(
+        &self,
+        code: DeviceCode,
+    ) -> Result<pab_protocol::DevicePresence, RuntimeError> {
+        let mut availability = self.inner.availability.clone();
+        loop {
+            let state = availability.borrow().clone();
+            match state {
+                BridgeAvailability::Connected(connector) => {
+                    return connector.device_presence(code).await.map_err(Into::into);
+                }
+                BridgeAvailability::Stopped(message) => {
+                    return Err(RuntimeError::BridgeUnavailable(message));
+                }
+                BridgeAvailability::Connecting => {}
+            }
+            availability.changed().await.map_err(|_| {
+                RuntimeError::BridgeUnavailable("Bridge supervisor stopped".to_owned())
+            })?;
+        }
+    }
+
     pub async fn list_devices(
         &self,
     ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, RuntimeError> {
@@ -156,6 +282,8 @@ impl BridgeRuntime {
         bridge_config.validate()?;
         runtime_config.validate()?;
         let store = RuntimeStore::open(&runtime_config.database_path).await?;
+        let session_id = RequestId::new().to_string();
+        store.start_session(&session_id).await?;
         let (events, _) = broadcast::channel(runtime_config.event_buffer);
         let (availability_sender, availability) = watch::channel(BridgeAvailability::Connecting);
         let (shutdown, shutdown_receiver) = watch::channel(false);
@@ -166,6 +294,9 @@ impl BridgeRuntime {
         };
         let inner = Arc::new(RuntimeInner {
             store,
+            screenshot_dir: screenshot::screenshot_dir(&runtime_config.database_path),
+            terminal_dir: terminal::terminal_dir(&runtime_config.database_path),
+            session_id,
             passwords,
             retry_interval: runtime_config.retry_interval,
             events,
@@ -173,10 +304,13 @@ impl BridgeRuntime {
             availability,
             shutdown: shutdown_receiver,
             devices: Mutex::new(HashMap::new()),
+            device_codes: Mutex::new(HashMap::new()),
             guest_codes: Mutex::new(HashSet::new()),
             guest_identity,
             initiated_by,
             operations: Mutex::new(HashMap::new()),
+            terminals: Mutex::new(HashMap::new()),
+            reconciliation_notify: Notify::new(),
         });
         inner.publish(RuntimeEventKind::BridgeConnecting);
         let bridge_task = tokio::spawn(run_bridge_supervisor(
@@ -186,10 +320,19 @@ impl BridgeRuntime {
             shutdown.subscribe(),
             Arc::clone(&inner),
         ));
+        let heartbeat_task = tokio::spawn(run_session_heartbeat(
+            inner.store.clone(),
+            inner.session_id.clone(),
+            shutdown.subscribe(),
+        ));
+        let reconciliation_task =
+            tokio::spawn(run_reconciliation(Arc::clone(&inner), shutdown.subscribe()));
         let runtime = Self {
             inner,
             shutdown,
             bridge_task,
+            heartbeat_task,
+            reconciliation_task,
         };
         if runtime_config.resume_incomplete_on_start {
             for record in runtime.inner.store.incomplete().await? {
@@ -211,6 +354,11 @@ impl BridgeRuntime {
                 BridgeAvailability::Connected(connector) => {
                     match connector.resolve_device_code(code).await {
                         Ok(device_ref) => {
+                            self.inner
+                                .device_codes
+                                .lock()
+                                .await
+                                .insert(device_ref, code);
                             if self.inner.guest_identity {
                                 self.inner.start_guest_lease(code).await;
                             }
@@ -322,178 +470,38 @@ impl BridgeRuntime {
         }
     }
 
-    pub async fn upload_file(
+    pub async fn connect_device(
         &self,
         device_ref: DeviceRef,
-        source: &std::path::Path,
-        destination: &str,
-        overwrite: bool,
-        progress: impl Fn(u64, u64) + Send + Sync,
-    ) -> Result<(), RuntimeError> {
-        self.upload_file_with_id(
-            RequestId::new(),
-            device_ref,
-            source,
-            destination,
-            overwrite,
-            progress,
-        )
-        .await
+    ) -> Result<TargetContext, RuntimeError> {
+        self.inner.device(device_ref).await.resume();
+        self.current_environment(device_ref).await
     }
 
-    pub async fn upload_file_with_id(
-        &self,
-        id: RequestId,
-        device_ref: DeviceRef,
-        source: &std::path::Path,
-        destination: &str,
-        overwrite: bool,
-        progress: impl Fn(u64, u64) + Send + Sync,
-    ) -> Result<(), RuntimeError> {
-        let progress_store = self.inner.store.clone();
-        let final_progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
-        let callback_progress = Arc::clone(&final_progress);
-        self.transfer_file(
-            id,
-            device_ref,
-            "upload",
-            &source.to_string_lossy(),
-            destination,
-            overwrite,
-            final_progress,
-            async {
-                let connection = self.inner.device(device_ref).await.connection().await?;
-                connection
-                    .upload_file(id, source, destination, overwrite, move |offset, size| {
-                        progress(offset, size);
-                        callback_progress.0.store(offset, Ordering::Release);
-                        callback_progress.1.store(size, Ordering::Release);
-                        let store = progress_store.clone();
-                        tokio::spawn(async move {
-                            if let Err(error) = store.operation_progress(id, offset, size).await {
-                                tracing::warn!(%error, "failed to save transfer progress");
-                            }
-                        });
-                    })
-                    .await
-                    .map_err(Into::into)
-            },
-        )
-        .await
+    pub async fn disconnect_device(&self, device_ref: DeviceRef) {
+        self.inner.device(device_ref).await.disconnect().await;
     }
 
-    pub async fn download_file(
+    pub async fn connection_path(
         &self,
         device_ref: DeviceRef,
-        source: &str,
-        destination: &std::path::Path,
-        overwrite: bool,
-        progress: impl Fn(u64, u64) + Send + Sync,
-    ) -> Result<(), RuntimeError> {
-        self.download_file_with_id(
-            RequestId::new(),
-            device_ref,
-            source,
-            destination,
-            overwrite,
-            progress,
-        )
-        .await
+    ) -> Option<pab_transport::ConnectionPath> {
+        let device = self.inner.devices.lock().await.get(&device_ref).cloned()?;
+        device.selected_path().await
     }
 
-    pub async fn download_file_with_id(
-        &self,
-        id: RequestId,
-        device_ref: DeviceRef,
-        source: &str,
-        destination: &std::path::Path,
-        overwrite: bool,
-        progress: impl Fn(u64, u64) + Send + Sync,
-    ) -> Result<(), RuntimeError> {
-        let progress_store = self.inner.store.clone();
-        let final_progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
-        let callback_progress = Arc::clone(&final_progress);
-        self.transfer_file(
-            id,
-            device_ref,
-            "download",
-            source,
-            &destination.to_string_lossy(),
-            overwrite,
-            final_progress,
-            async {
-                let connection = self.inner.device(device_ref).await.connection().await?;
-                connection
-                    .download_file(id, source, destination, overwrite, move |offset, size| {
-                        progress(offset, size);
-                        callback_progress.0.store(offset, Ordering::Release);
-                        callback_progress.1.store(size, Ordering::Release);
-                        let store = progress_store.clone();
-                        tokio::spawn(async move {
-                            if let Err(error) = store.operation_progress(id, offset, size).await {
-                                tracing::warn!(%error, "failed to save transfer progress");
-                            }
-                        });
-                    })
-                    .await
-                    .map_err(Into::into)
-            },
-        )
-        .await
-    }
-
-    async fn transfer_file<F>(
-        &self,
-        id: RequestId,
-        device_ref: DeviceRef,
-        direction: &str,
-        source: &str,
-        destination: &str,
-        overwrite: bool,
-        final_progress: Arc<(AtomicU64, AtomicU64)>,
-        operation: F,
-    ) -> Result<(), RuntimeError>
-    where
-        F: std::future::Future<Output = Result<(), RuntimeError>>,
-    {
-        self.inner
-            .store
-            .start_operation(
-                id,
-                device_ref,
-                &self.inner.initiated_by,
-                direction,
-                source,
-                destination,
-                overwrite,
-            )
-            .await?;
-        let result = operation.await;
-        self.inner
-            .store
-            .operation_progress(
-                id,
-                final_progress.0.load(Ordering::Acquire),
-                final_progress.1.load(Ordering::Acquire),
-            )
-            .await?;
-        let (state, message) = match &result {
-            Ok(()) => ("completed", None),
-            Err(error) => ("failed", Some(error.to_string())),
-        };
-        self.inner
-            .store
-            .finish_operation(id, state, message.as_deref())
-            .await?;
-        result
-    }
-
-    pub async fn cancel_transfer_record(&self, id: RequestId) -> Result<(), RuntimeError> {
-        self.inner
-            .store
-            .finish_operation(id, "cancelled", None)
-            .await?;
-        Ok(())
+    pub async fn current_presence(&self, device_ref: DeviceRef) -> Result<u16, RuntimeError> {
+        let device = self.inner.device(device_ref).await;
+        loop {
+            let connection = device.connection().await?;
+            match connection.get_presence().await {
+                Ok(count) => return Ok(count),
+                Err(error) if error.is_recoverable_connection() => {
+                    device.recover(&connection, &error).await?;
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
     }
 
     pub async fn cancel_task(
@@ -626,6 +634,19 @@ impl BridgeRuntime {
     }
 
     pub async fn shutdown(self) -> Result<(), RuntimeError> {
+        let terminal_ids = self
+            .inner
+            .terminals
+            .lock()
+            .await
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
+        for id in terminal_ids {
+            if let Err(error) = self.terminal_close(id).await {
+                tracing::warn!(%id, %error, "terminal close during Bridge shutdown failed");
+            }
+        }
         let _ = self.shutdown.send(true);
         let operations = self
             .inner
@@ -639,6 +660,12 @@ impl BridgeRuntime {
             operation.abort();
         }
         self.bridge_task.await?;
+        self.heartbeat_task.await?;
+        self.reconciliation_task.await?;
+        self.inner
+            .store
+            .stop_session(&self.inner.session_id)
+            .await?;
         Ok(())
     }
 
@@ -657,6 +684,7 @@ impl BridgeRuntime {
             let mut accepted = accepted;
             let result = run_record(Arc::clone(&inner), record, &mut accepted).await;
             if let Err(error) = result {
+                tracing::warn!(%request_id, %error, "task follow worker stopped");
                 let message = error.to_string();
                 if let Some(sender) = accepted.take() {
                     let _ = sender.send(Err(message.clone()));
@@ -715,6 +743,9 @@ impl BridgeRuntime {
 
 struct RuntimeInner {
     store: RuntimeStore,
+    screenshot_dir: PathBuf,
+    terminal_dir: PathBuf,
+    session_id: String,
     passwords: Arc<dyn DevicePasswordProvider>,
     retry_interval: Duration,
     events: broadcast::Sender<RuntimeEvent>,
@@ -722,10 +753,13 @@ struct RuntimeInner {
     availability: watch::Receiver<BridgeAvailability>,
     shutdown: watch::Receiver<bool>,
     devices: Mutex<HashMap<DeviceRef, Arc<DeviceSession>>>,
+    device_codes: Mutex<HashMap<DeviceRef, DeviceCode>>,
     guest_codes: Mutex<HashSet<DeviceCode>>,
     guest_identity: bool,
     initiated_by: String,
     operations: Mutex<HashMap<RequestId, AbortHandle>>,
+    terminals: Mutex<HashMap<RequestId, Arc<Mutex<terminal::TerminalRuntimeSession>>>>,
+    reconciliation_notify: Notify,
 }
 
 impl RuntimeInner {
@@ -846,6 +880,8 @@ pub enum RuntimeError {
     InvalidConfig(String),
     #[error("Bridge connection is unavailable: {0}")]
     BridgeUnavailable(String),
+    #[error("device was disconnected in this desktop session")]
+    DeviceDisconnected,
     #[error("Bridge Runtime is shutting down")]
     ShuttingDown,
     #[error("request {0} is already being processed")]

@@ -1,8 +1,9 @@
 use std::path::Path;
+use std::time::Duration;
 
 use pab_protocol::{
     CommandTaskSpec, DeviceRef, OutputChunk, OutputRange, OutputStream, RequestId, TaskEvent,
-    TaskRef, TaskSnapshot,
+    TaskId, TaskRef, TaskSnapshot,
 };
 use sqlx::{
     Row, SqlitePool, Transaction,
@@ -10,7 +11,6 @@ use sqlx::{
 };
 use thiserror::Error;
 
-const DATABASE_SCHEMA_VERSION: i64 = 4;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,27 +48,36 @@ pub(super) struct OutputGap {
 
 impl RuntimeStore {
     pub async fn open(path: &Path) -> Result<Self, RuntimeStoreError> {
+        let mut attempt = 0;
+        loop {
+            match Self::open_once(path).await {
+                Err(RuntimeStoreError::Database(sqlx::Error::Database(error)))
+                    if matches!(error.code().as_deref(), Some("5" | "6")) && attempt < 19 =>
+                {
+                    attempt += 1;
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                result => return result,
+            }
+        }
+    }
+
+    async fn open_once(path: &Path) -> Result<Self, RuntimeStoreError> {
         pab_agent_core::ensure_data_parent(path).map_err(RuntimeStoreError::Io)?;
         let options = SqliteConnectOptions::new()
             .filename(path)
             .create_if_missing(true)
             .foreign_keys(true)
-            .journal_mode(SqliteJournalMode::Wal);
+            .journal_mode(SqliteJournalMode::Wal)
+            .busy_timeout(Duration::from_secs(10));
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(options)
             .await?;
-        let schema_version: i64 = sqlx::query_scalar("PRAGMA user_version")
-            .fetch_one(&pool)
-            .await?;
-        if schema_version > DATABASE_SCHEMA_VERSION {
-            return Err(RuntimeStoreError::UnsupportedSchemaVersion(schema_version));
-        }
-        if schema_version == 0 {
-            let mut tx = pool.begin().await?;
-            for statement in [
-                r#"
-                CREATE TABLE runtime_tasks (
+        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+        for statement in [
+            r#"
+                CREATE TABLE IF NOT EXISTS runtime_tasks (
                     request_id TEXT PRIMARY KEY,
                     device_ref_json TEXT NOT NULL,
                     command_json TEXT NOT NULL,
@@ -85,8 +94,8 @@ impl RuntimeStore {
                     stderr_bytes BLOB NOT NULL DEFAULT X''
                 )
                 "#,
-                r#"
-                CREATE TABLE runtime_task_events (
+            r#"
+                CREATE TABLE IF NOT EXISTS runtime_task_events (
                     task_id TEXT NOT NULL,
                     seq INTEGER NOT NULL,
                     event_json TEXT NOT NULL,
@@ -94,20 +103,9 @@ impl RuntimeStore {
                     FOREIGN KEY (task_id) REFERENCES runtime_tasks(task_id) ON DELETE CASCADE
                 )
                 "#,
-                "CREATE INDEX runtime_tasks_device ON runtime_tasks (device_ref_json)",
-            ] {
-                sqlx::query(statement).execute(&mut *tx).await?;
-            }
-            sqlx::query("PRAGMA user_version = 1")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
-        }
-        if schema_version < 2 {
-            let mut tx = pool.begin().await?;
-            sqlx::query(
-                r#"
-                CREATE TABLE remembered_devices (
+            "CREATE INDEX IF NOT EXISTS runtime_tasks_device ON runtime_tasks (device_ref_json)",
+            r#"
+                CREATE TABLE IF NOT EXISTS remembered_devices (
                     device_ref_json TEXT PRIMARY KEY,
                     device_code TEXT NOT NULL UNIQUE,
                     alias TEXT NOT NULL DEFAULT '',
@@ -115,39 +113,57 @@ impl RuntimeStore {
                     os_reminder TEXT NOT NULL
                 )
                 "#,
-            )
-            .execute(&mut *tx)
-            .await?;
-            sqlx::query("PRAGMA user_version = 2")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
+            r#"
+                CREATE TABLE IF NOT EXISTS device_credentials (
+                    device_id TEXT PRIMARY KEY,
+                    password TEXT NOT NULL
+                )
+                "#,
+            r#"
+                CREATE TABLE IF NOT EXISTS runtime_operations (
+                    id TEXT PRIMARY KEY,
+                    device_ref_json TEXT NOT NULL,
+                    device_code TEXT,
+                    initiated_by TEXT NOT NULL DEFAULT 'unknown',
+                    kind TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    overwrite INTEGER NOT NULL,
+                    state TEXT NOT NULL,
+                    offset INTEGER NOT NULL DEFAULT 0,
+                    size INTEGER NOT NULL DEFAULT 0,
+                    started_at_unix_ms INTEGER NOT NULL,
+                    finished_at_unix_ms INTEGER,
+                    message TEXT,
+                    owner_session_id TEXT
+                )
+                "#,
+            "CREATE INDEX IF NOT EXISTS runtime_operations_started ON runtime_operations (started_at_unix_ms DESC)",
+            "CREATE INDEX IF NOT EXISTS runtime_operations_owner ON runtime_operations (owner_session_id)",
+            r#"
+                CREATE TABLE IF NOT EXISTS runtime_sessions (
+                    id TEXT PRIMARY KEY,
+                    heartbeat_at_unix_ms INTEGER NOT NULL,
+                    stopped_at_unix_ms INTEGER
+                )
+                "#,
+            r#"
+                CREATE TABLE IF NOT EXISTS runtime_terminal_events (
+                    session_id TEXT NOT NULL,
+                    seq INTEGER NOT NULL,
+                    kind TEXT NOT NULL,
+                    payload BLOB NOT NULL,
+                    state TEXT NOT NULL,
+                    at_unix_ms INTEGER NOT NULL,
+                    PRIMARY KEY (session_id, seq),
+                    FOREIGN KEY (session_id) REFERENCES runtime_operations(id)
+                )
+                "#,
+        ] {
+            sqlx::query(statement).execute(&mut *tx).await?;
         }
-        if schema_version < 3 {
-            let mut tx = pool.begin().await?;
-            sqlx::query(
-                "CREATE TABLE runtime_operations (id TEXT PRIMARY KEY, device_ref_json TEXT NOT NULL, kind TEXT NOT NULL, direction TEXT NOT NULL, source TEXT NOT NULL, destination TEXT NOT NULL, overwrite INTEGER NOT NULL, state TEXT NOT NULL, offset INTEGER NOT NULL DEFAULT 0, size INTEGER NOT NULL DEFAULT 0, started_at_unix_ms INTEGER NOT NULL, finished_at_unix_ms INTEGER, message TEXT)",
-            )
-            .execute(&mut *tx)
-            .await?;
-            sqlx::query("CREATE INDEX runtime_operations_started ON runtime_operations (started_at_unix_ms DESC)")
-                .execute(&mut *tx)
-                .await?;
-            sqlx::query("PRAGMA user_version = 3")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
-        }
-        if schema_version < 4 {
-            let mut tx = pool.begin().await?;
-            sqlx::query("ALTER TABLE runtime_operations ADD COLUMN initiated_by TEXT NOT NULL DEFAULT 'unknown'")
-                .execute(&mut *tx)
-                .await?;
-            sqlx::query("PRAGMA user_version = 4")
-                .execute(&mut *tx)
-                .await?;
-            tx.commit().await?;
-        }
+        tx.commit().await?;
         Ok(Self { pool })
     }
 
@@ -468,10 +484,56 @@ impl RuntimeStore {
         Ok(record)
     }
 
+    pub async fn get_by_task_id(
+        &self,
+        task_id: TaskId,
+    ) -> Result<LocalTaskRecord, RuntimeStoreError> {
+        let row = sqlx::query("SELECT * FROM runtime_tasks WHERE task_id = ?")
+            .bind(task_id.to_string())
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or(RuntimeStoreError::NotFound)?;
+        decode_record(&row)
+    }
+
     pub async fn list(&self) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
         let rows = sqlx::query("SELECT * FROM runtime_tasks ORDER BY rowid DESC")
             .fetch_all(&self.pool)
             .await?;
+        rows.iter().map(decode_record).collect()
+    }
+
+    pub async fn list_page(
+        &self,
+        before: Option<RequestId>,
+        limit: u32,
+    ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
+        let rows = sqlx::query(
+            "SELECT * FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
+        )
+        .bind(before.map(|value| value.to_string()))
+        .bind(before.map(|value| value.to_string()))
+        .bind(i64::from(limit.min(101)))
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(decode_record).collect()
+    }
+
+    pub async fn list_page_for_device(
+        &self,
+        device_ref: DeviceRef,
+        before: Option<RequestId>,
+        limit: u32,
+    ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
+        let rows = sqlx::query(
+            "SELECT * FROM runtime_tasks WHERE device_ref_json = ? AND snapshot_json IS NOT NULL AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
+        )
+        .bind(serde_json::to_string(&device_ref)?)
+        .bind(before.map(|value| value.to_string()))
+        .bind(before.map(|value| value.to_string()))
+        .bind(i64::from(limit.min(101)))
+        .fetch_all(&self.pool)
+        .await?;
         rows.iter().map(decode_record).collect()
     }
 
@@ -611,8 +673,6 @@ pub enum RuntimeStoreError {
     Database(#[from] sqlx::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
-    #[error("Bridge Runtime database schema version {0} is newer than this build")]
-    UnsupportedSchemaVersion(i64),
     #[error("the request ID already exists with a different device or command")]
     RequestConflict,
     #[error("the local task record was not found")]

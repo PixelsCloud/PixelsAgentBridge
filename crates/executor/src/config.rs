@@ -13,7 +13,6 @@ pub struct ExecutorConfig {
     pub control_url: String,
     pub relay_urls: Vec<RelayUrl>,
     pub endpoint_secret_file: PathBuf,
-    pub device_credential_file: PathBuf,
     pub task_database_file: PathBuf,
     pub control_ca_cert: Option<PathBuf>,
     pub relay_ca_cert: Option<PathBuf>,
@@ -29,12 +28,8 @@ impl ExecutorConfig {
         mut lookup: impl FnMut(&str) -> Option<OsString>,
     ) -> Result<Self, ExecutorConfigError> {
         let endpoint_secret_path = lookup("PAB_ENDPOINT_SECRET_FILE").map(PathBuf::from);
-        let credential_path = lookup("PAB_DEVICE_CREDENTIAL_FILE").map(PathBuf::from);
         let database_path = lookup("PAB_TASK_DATABASE").map(PathBuf::from);
-        let data_paths = if endpoint_secret_path.is_none()
-            || credential_path.is_none()
-            || database_path.is_none()
-        {
+        let data_paths = if endpoint_secret_path.is_none() || database_path.is_none() {
             Some(DataPaths::for_scope_with(DataScope::Machine, &mut lookup)?)
         } else {
             None
@@ -56,12 +51,6 @@ impl ExecutorConfig {
                     .as_ref()
                     .expect("default paths requested")
                     .executor_endpoint_secret()
-            }),
-            device_credential_file: credential_path.unwrap_or_else(|| {
-                data_paths
-                    .as_ref()
-                    .expect("default paths requested")
-                    .executor_credential()
             }),
             task_database_file: database_path.unwrap_or_else(|| {
                 data_paths
@@ -181,10 +170,6 @@ mod tests {
                 "PAB_ENDPOINT_SECRET_FILE".to_owned(),
                 OsString::from("endpoint.key"),
             ),
-            (
-                "PAB_DEVICE_CREDENTIAL_FILE".to_owned(),
-                OsString::from("device-credential.json"),
-            ),
         ])
     }
 
@@ -207,15 +192,10 @@ mod tests {
     fn default_identity_and_database_paths_survive_a_binary_move() {
         let mut values = valid_values();
         values.remove("PAB_ENDPOINT_SECRET_FILE");
-        values.remove("PAB_DEVICE_CREDENTIAL_FILE");
         let config = ExecutorConfig::from_lookup(|name| values.get(name).cloned()).unwrap();
         assert_eq!(
             config.endpoint_secret_file,
             PathBuf::from("persistent-data/device-endpoint.key")
-        );
-        assert_eq!(
-            config.device_credential_file,
-            PathBuf::from("persistent-data/device-credential.json")
         );
         assert_eq!(
             config.task_database_file,
