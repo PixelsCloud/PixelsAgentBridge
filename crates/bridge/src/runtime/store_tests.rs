@@ -536,6 +536,50 @@ async fn task_history_pages_only_accepted_tasks() {
 }
 
 #[tokio::test]
+async fn history_count_includes_all_pages_and_filters_by_device() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    let first_device = device_ref();
+    let second_device = DeviceRef {
+        device_id: DeviceId::from_u128(44),
+        ..first_device
+    };
+    for (value, device_ref) in [(1, first_device), (2, second_device), (3, first_device)] {
+        let request_id = RequestId::from_u128(value);
+        store
+            .record_pending(device_ref, request_id, &command())
+            .await
+            .unwrap();
+        if value != 2 {
+            let mut accepted = snapshot(device_ref, request_id);
+            accepted.task_ref.task_id = TaskId::from_u128(value);
+            store.bind_snapshot(&accepted).await.unwrap();
+        }
+        store
+            .start_operation(
+                RequestId::from_u128(value + 100),
+                device_ref,
+                None,
+                "guest",
+                "upload",
+                "source",
+                "destination",
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    let local = BridgeLocalStore::open(&path).await.unwrap();
+    assert_eq!(local.history_count(None).await.unwrap(), 5);
+    assert_eq!(local.history_count(Some(first_device)).await.unwrap(), 4);
+    assert_eq!(local.history_count(Some(second_device)).await.unwrap(), 1);
+    assert_eq!(local.tasks_page(None, 1).await.unwrap().len(), 1);
+    assert_eq!(local.history_count(None).await.unwrap(), 5);
+}
+
+#[tokio::test]
 async fn device_history_pages_exclude_other_devices() {
     let directory = tempdir().unwrap();
     let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))

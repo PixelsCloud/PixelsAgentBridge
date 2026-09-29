@@ -2,6 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { App as AntdApp, ConfigProvider, Menu, theme as antdTheme } from "antd";
+import enUS from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
+import zhTW from "antd/locale/zh_TW";
 import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon, Settings2, Sun, UserRound, X } from "lucide-react";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
@@ -131,6 +135,31 @@ function App() {
     && device.control_phase.toLowerCase() === "authenticated";
 
   return (
+    <ConfigProvider
+      locale={language === "zh-CN" ? zhCN : language === "zh-TW" ? zhTW : enUS}
+      theme={{
+        algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        token: {
+          colorPrimary: theme === "dark" ? "#93d7c2" : "#218574",
+          colorSuccess: "#2ca777",
+          colorError: "#b9474b",
+          colorBgContainer: theme === "dark" ? "#2b3038" : "#ffffff",
+          colorBgElevated: theme === "dark" ? "#333a43" : "#ffffff",
+          colorBorder: theme === "dark" ? "#434b55" : "#d4e0e5",
+          colorText: theme === "dark" ? "#f0f3f5" : "#162637",
+          borderRadius: 9,
+          fontSize: 12,
+          controlHeight: 38,
+          fontFamily: 'Inter, "Segoe UI", "Noto Sans CJK SC", system-ui, sans-serif',
+        },
+        components: {
+          Input: { colorBgContainer: theme === "dark" ? "#242a32" : "#f9fbfc" },
+          Select: { colorBgContainer: theme === "dark" ? "#242a32" : "#f9fbfc" },
+          Menu: { itemBg: "transparent", itemSelectedBg: theme === "dark" ? "#345047" : "#dff1e9" },
+        },
+      }}
+    >
+    <AntdApp className="desktop-ant-app">
     <div className="window-frame">
       <div
         className="titlebar"
@@ -162,12 +191,9 @@ function App() {
       <div className="app-body">
         <aside className="sidebar">
           <nav aria-label={t.navigation}>
-            {navItems.map(({ id, icon: Icon }) => (
-              <button key={id} className={`nav-item ${view === id ? "selected" : ""}`} onClick={() => { setView(id); setError(""); }}>
-                <span className="nav-icon" aria-hidden="true"><Icon size={18} strokeWidth={1.8} /></span>
-                <span>{t.nav[id]}</span>
-              </button>
-            ))}
+            <Menu className="sidebar-menu" mode="inline" selectedKeys={[view]}
+              items={navItems.map(({ id, icon: Icon }) => ({ key: id, label: t.nav[id], icon: <Icon size={18} strokeWidth={1.8} /> }))}
+              onClick={({ key }) => { setView(key as View); setError(""); }} />
           </nav>
           <div className="sidebar-spacer" />
           <div className="sidebar-status-group">
@@ -221,6 +247,8 @@ function App() {
         </main>
       </div>
     </div>
+    </AntdApp>
+    </ConfigProvider>
   );
 }
 

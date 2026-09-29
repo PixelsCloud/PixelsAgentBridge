@@ -7,6 +7,7 @@ import type { HistoryPage, TaskEntry, TaskUpdate } from "./operatorTypes";
 const emptyHistory: HistoryPage = {
   tasks: [],
   operations: [],
+  totalCount: 0,
   taskBefore: null,
   operationBeforeStartedAtUnixMs: null,
   operationBeforeId: null,
@@ -51,6 +52,7 @@ export function DeviceHistoryPanel({ code, language, embedded = true, deviceOpti
         const previousTasks = new Map(current.tasks.map((task) => [task.id, task]));
         return {
           ...current,
+          totalCount: first.totalCount,
           tasks: [
             ...first.tasks.map((task) => {
               const old = previousTasks.get(task.id);
@@ -116,6 +118,7 @@ export function DeviceHistoryPanel({ code, language, embedded = true, deviceOpti
         const knownOperations = new Set(current.operations.map((operation) => operation.id));
         return {
           tasks: [...current.tasks, ...next.tasks.filter((task) => !knownTasks.has(task.id))],
+          totalCount: current.totalCount,
           operations: [
             ...current.operations,
             ...next.operations.filter((operation) => !knownOperations.has(operation.id)),
@@ -176,6 +179,7 @@ export function DeviceHistoryPanel({ code, language, embedded = true, deviceOpti
       language={language}
       tasks={history.tasks}
       operations={history.operations}
+      totalCount={history.totalCount}
       selectedId={selectedId}
       onSelect={setSelectedId}
       hasMore={history.hasMoreTasks || history.hasMoreOperations}

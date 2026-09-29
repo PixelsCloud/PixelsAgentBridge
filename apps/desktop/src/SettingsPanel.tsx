@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Button, Input, Menu, Select } from "antd";
 import { ArrowRight, Bot, Info, Languages, RotateCw, Server } from "lucide-react";
 import { messages, type Language } from "./i18n";
 
@@ -87,38 +88,13 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
   return (
     <>
       <nav className="surface settings-menu" aria-label={t.nav.settings}>
-        <button
-          className={section === "preferences" ? "active" : ""}
-          aria-current={section === "preferences" ? "page" : undefined}
-          onClick={() => setSection("preferences")}
-        >
-          <Languages size={17} />
-          <span>{t.settingsPreferences}</span>
-        </button>
-        <button
-          className={section === "ai" ? "active" : ""}
-          aria-current={section === "ai" ? "page" : undefined}
-          onClick={() => setSection("ai")}
-        >
-          <Bot size={17} />
-          <span>{t.settingsAi}</span>
-        </button>
-        <button
-          className={section === "server" ? "active" : ""}
-          aria-current={section === "server" ? "page" : undefined}
-          onClick={() => setSection("server")}
-        >
-          <Server size={17} />
-          <span>{t.settingsConnection}</span>
-        </button>
-        <button
-          className={section === "about" ? "active" : ""}
-          aria-current={section === "about" ? "page" : undefined}
-          onClick={() => setSection("about")}
-        >
-          <Info size={17} />
-          <span>{t.settingsAbout}</span>
-        </button>
+        <Menu mode="inline" selectedKeys={[section]} onClick={({ key }) => setSection(key as SettingsSection)}
+          items={[
+            { key: "preferences", icon: <Languages size={17} />, label: t.settingsPreferences },
+            { key: "ai", icon: <Bot size={17} />, label: t.settingsAi },
+            { key: "server", icon: <Server size={17} />, label: t.settingsConnection },
+            { key: "about", icon: <Info size={17} />, label: t.settingsAbout },
+          ]} />
       </nav>
 
       <section className="surface settings-detail">
@@ -126,12 +102,13 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
         <div className="surface-kicker"><Languages size={15} /> {t.settingsPreferences}</div>
         <h2>{t.language}</h2>
         <p>{t.languageHint}</p>
-        <select className="settings-language" aria-label={t.language} value={language}
-          onChange={(event) => onLanguageChange(event.target.value as Language)}>
-          <option value="zh-CN">简体中文</option>
-          <option value="zh-TW">繁體中文</option>
-          <option value="en">English</option>
-        </select>
+        <Select className="settings-language" aria-label={t.language} value={language}
+          onChange={(value: Language) => onLanguageChange(value)}
+          options={[
+            { value: "zh-CN", label: "简体中文" },
+            { value: "zh-TW", label: "繁體中文" },
+            { value: "en", label: "English" },
+          ]} />
       </div>}
 
       {section === "ai" && <div className="settings-ai">
@@ -143,9 +120,8 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
             <strong>Codex</strong>
             <span>{codexStatus}</span>
           </div>
-          <button className={codex?.enabled ? "quiet-button" : "primary-button"} disabled={!codex?.available || codex.occupied || codexBusy} onClick={() => void toggleCodex()}>
-            {codexBusy ? t.loading : codexAction}
-          </button>
+          <Button type={codex?.enabled ? "default" : "primary"} loading={codexBusy}
+            disabled={!codex?.available || codex.occupied} onClick={() => void toggleCodex()}>{codexAction}</Button>
         </div>
         {codexError && <p className="settings-error" role="alert">{codexError}</p>}
         <p className="settings-scope-note">{t.settingsAiNote}</p>
@@ -156,15 +132,15 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
         <h2>{t.settingsServerTitle}</h2>
         <p>{t.settingsServerHint}</p>
         <div className="settings-fields">
-          <label><span className="field-label">{t.settingsDeployment}</span><input value={settings.deploymentId} spellCheck={false} onChange={(event) => { setSettings({ ...settings, deploymentId: event.target.value }); setSaved(false); }} /></label>
-          <label><span className="field-label">{t.settingsControl}</span><input value={settings.controlUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, controlUrl: event.target.value }); setSaved(false); }} /></label>
-          <label><span className="field-label">{t.settingsRelay}</span><input value={settings.relayUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, relayUrl: event.target.value }); setSaved(false); }} /></label>
+          <label><span className="field-label">{t.settingsDeployment}</span><Input value={settings.deploymentId} spellCheck={false} onChange={(event) => { setSettings({ ...settings, deploymentId: event.target.value }); setSaved(false); }} /></label>
+          <label><span className="field-label">{t.settingsControl}</span><Input value={settings.controlUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, controlUrl: event.target.value }); setSaved(false); }} /></label>
+          <label><span className="field-label">{t.settingsRelay}</span><Input value={settings.relayUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, relayUrl: event.target.value }); setSaved(false); }} /></label>
         </div>
         <p className="settings-scope-note">{t.settingsScopeNote}</p>
         {error && <p className="settings-error" role="alert">{error}</p>}
         <div className="settings-actions">
-          <button className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? t.settingsSaving : t.settingsSave}<ArrowRight size={16} /></button>
-          {saved && <button className="quiet-button" onClick={() => void invoke("restart_desktop")}><RotateCw size={15} />{t.settingsRestart}</button>}
+          <Button type="primary" loading={busy} icon={<ArrowRight size={16} />} iconPlacement="end" onClick={() => void save()}>{t.settingsSave}</Button>
+          {saved && <Button type="link" icon={<RotateCw size={15} />} onClick={() => void invoke("restart_desktop")}>{t.settingsRestart}</Button>}
         </div>
       </div>}
       {section === "about" && <div className="settings-about">

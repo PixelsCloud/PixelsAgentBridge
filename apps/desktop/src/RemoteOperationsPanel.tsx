@@ -1,4 +1,5 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { Button, Checkbox, Input, Menu, Progress, Segmented } from "antd";
 import { DirectoryBrowser } from "./DirectoryBrowser";
 import { WindowBrowser } from "./WindowBrowser";
 import { ScreenshotBrowser } from "./ScreenshotBrowser";
@@ -61,19 +62,9 @@ export function RemoteOperationsPanel({
     <div className="remote-command device-command-content">
       {selected ? (
         <>
-          <nav className="operation-list" role="tablist" aria-orientation="vertical" aria-label={t.commandTitle}>
-            {operations.map(({ kind, label }) => (
-              <button
-                key={kind}
-                role="tab"
-                aria-selected={operation === kind}
-                className={operation === kind ? "active" : ""}
-                onClick={() => onOperationChange(kind)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
+          <Menu className="operation-list" mode="inline" selectedKeys={[operation]}
+            items={operations.map(({ kind, label }) => ({ key: kind, label }))}
+            onClick={({ key }) => onOperationChange(key as OperationKind)} />
           <div className="operation-panel" role="tabpanel">
             {!selected.connected && <p className="form-hint">{t.reconnectHint}</p>}
             {operation === "command" && (
@@ -82,56 +73,52 @@ export function RemoteOperationsPanel({
                 <div className="command-fields">
                   <label>
                     <span className="field-label">{t.program}</span>
-                    <input value={program} onChange={(event) => onProgramChange(event.target.value)} placeholder="powershell.exe / bash" />
+                    <Input value={program} onChange={(event) => onProgramChange(event.target.value)} placeholder="powershell.exe / bash" />
                   </label>
                   <label>
                     <span className="field-label">{t.arguments}</span>
-                    <textarea value={argumentsText} onChange={(event) => onArgumentsTextChange(event.target.value)} placeholder={t.argumentPlaceholder} />
+                    <Input.TextArea value={argumentsText} onChange={(event) => onArgumentsTextChange(event.target.value)} placeholder={t.argumentPlaceholder} />
                   </label>
                   <label>
                     <span className="field-label">{t.cwd}</span>
-                    <input value={cwd} onChange={(event) => onCwdChange(event.target.value)} />
+                    <Input value={cwd} onChange={(event) => onCwdChange(event.target.value)} />
                   </label>
                 </div>
-                <button
+                <Button type="primary"
                   className="primary-button"
-                  disabled={submitting || !selected.connected || !program.trim()}
+                  loading={submitting} disabled={!selected.connected || !program.trim()}
                   onClick={() => onRunCommand()}
                 >
                   {submitting ? t.runningCommand : t.runCommand}
                   <ArrowRight size={17} />
-                </button>
+                </Button>
               </>
             )}
             {operation === "transfer" && (
               <>
-                <div className="transfer-directions">
-                  <button className={transferDirection === "upload" ? "active" : ""} onClick={() => onTransferDirectionChange("upload")}>{t.upload}</button>
-                  <button className={transferDirection === "download" ? "active" : ""} onClick={() => onTransferDirectionChange("download")}>{t.download}</button>
-                </div>
+                <Segmented className="transfer-directions" block value={transferDirection}
+                  options={[{ value: "upload", label: t.upload }, { value: "download", label: t.download }]}
+                  onChange={(value) => onTransferDirectionChange(value as "upload" | "download")} />
                 <div className="command-fields">
-                  <label><span className="field-label">{transferDirection === "upload" ? t.localSource : t.remoteSource}</span><input value={transferSource} onChange={(event) => onTransferSourceChange(event.target.value)} /></label>
-                  <label><span className="field-label">{transferDirection === "upload" ? t.remoteDestination : t.localDestination}</span><input value={transferDestination} onChange={(event) => onTransferDestinationChange(event.target.value)} /></label>
+                  <label><span className="field-label">{transferDirection === "upload" ? t.localSource : t.remoteSource}</span><Input value={transferSource} onChange={(event) => onTransferSourceChange(event.target.value)} /></label>
+                  <label><span className="field-label">{transferDirection === "upload" ? t.remoteDestination : t.localDestination}</span><Input value={transferDestination} onChange={(event) => onTransferDestinationChange(event.target.value)} /></label>
                 </div>
-                <label className="check-row">
-                  <input type="checkbox" checked={transferOverwrite} onChange={(event) => onTransferOverwriteChange(event.target.checked)} />
-                  {t.overwriteExisting}
-                </label>
-                <button
+                <Checkbox className="check-row" checked={transferOverwrite} onChange={(event) => onTransferOverwriteChange(event.target.checked)}>{t.overwriteExisting}</Checkbox>
+                <Button type="primary"
                   className="primary-button"
-                  disabled={startingTransfer || transfer?.state === "running" || !selected.connected || !transferSource.trim() || !transferDestination.trim()}
+                  loading={startingTransfer} disabled={transfer?.state === "running" || !selected.connected || !transferSource.trim() || !transferDestination.trim()}
                   onClick={() => onStartTransfer()}
                 >
                   {startingTransfer ? t.startingTransfer : t.startTransfer}
                   <ArrowRight size={17} />
-                </button>
+                </Button>
                 {transfer && (
                   <div className="transfer-status">
                     <div><strong>{t.transferStates[transfer.state]}</strong><span>{transfer.size ? `${Math.round(transfer.offset / transfer.size * 100)}% · ${transfer.offset} / ${transfer.size} B` : ""}</span></div>
-                    <progress value={transfer.offset} max={Math.max(transfer.size, 1)} />
+                    <Progress percent={transfer.size ? Math.round(transfer.offset / transfer.size * 100) : 0} size="small" showInfo={false} />
                     {transfer.state === "cancel_requested" && <small>{t.transferCancelUnconfirmed}</small>}
                     {transfer.message && <small>{transfer.message}</small>}
-                    {transfer.state === "running" && <button className="quiet-button" onClick={() => onCancelTransfer()}>{t.cancelTransfer}</button>}
+                    {transfer.state === "running" && <Button type="text" onClick={() => onCancelTransfer()}>{t.cancelTransfer}</Button>}
                   </div>
                 )}
               </>

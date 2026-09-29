@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Button, Input } from "antd";
+import { ArrowRight } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
 
@@ -14,7 +15,6 @@ export function AccountConnectionPanel({ language, activeScope, onScopeChange }:
   const t = messages[language];
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,14 +61,12 @@ export function AccountConnectionPanel({ language, activeScope, onScopeChange }:
         {activeScope && <small>{t.accountId}: {activeScope.userId}</small>}
       </div>
       {activeScope ? (
-        <button className="home-account-disconnect" type="button" disabled={busy} onClick={() => void disconnect()}>
-          {t.accountDisconnect}
-        </button>
+        <Button className="home-account-disconnect" loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
       ) : (
         <form className="home-account-form" onSubmit={(event) => void connect(event)}>
           <label>
             <span className="field-label">{t.accountName}</span>
-            <input
+            <Input
               autoComplete="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
@@ -77,26 +75,16 @@ export function AccountConnectionPanel({ language, activeScope, onScopeChange }:
           <div className="home-account-password-field">
             <label className="field-label" htmlFor="home-account-password">{t.accountPassword}</label>
             <span className="home-account-password">
-              <input
+              <Input.Password
                 id="home-account-password"
-                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-              <button
-                type="button"
-                aria-label={showPassword ? t.hide : t.show}
-                title={showPassword ? t.hide : t.show}
-                onClick={() => setShowPassword((current) => !current)}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
             </span>
           </div>
-          <button className="primary-button" type="submit" disabled={busy || !username.trim() || !password}>
-            {busy ? t.connecting : t.accountConnect}<ArrowRight size={16} />
-          </button>
+          <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || !password}
+            icon={<ArrowRight size={16} />} iconPlacement="end">{t.accountConnect}</Button>
         </form>
       )}
       {error && <div className="inline-error" role="alert">{error}</div>}

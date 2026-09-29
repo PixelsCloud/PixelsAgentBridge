@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { Button, Input, Segmented } from "antd";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
 
@@ -42,11 +43,9 @@ export function DeviceDetailPanel({
 
   return (
     <section className="surface device-detail">
-      <div className="device-detail-tabs" role="tablist" aria-label={t.deviceDetails}>
-        <button role="tab" aria-selected={tab === "info"} className={tab === "info" ? "active" : ""} onClick={() => openTab("info")}>{t.deviceBasicInfo}</button>
-        <button role="tab" aria-selected={tab === "history"} className={tab === "history" ? "active" : ""} onClick={() => openTab("history")}>{t.deviceTaskHistory}</button>
-        <button role="tab" aria-selected={tab === "command"} className={tab === "command" ? "active" : ""} onClick={() => openTab("command")}>{t.commandTitle}</button>
-      </div>
+      <Segmented className="device-detail-tabs" aria-label={t.deviceDetails} block value={tab}
+        options={[{ value: "info", label: t.deviceBasicInfo }, { value: "history", label: t.deviceTaskHistory }, { value: "command", label: t.commandTitle }]}
+        onChange={(value) => openTab(value as DetailTab)} />
 
       {!selected ? (
         <div className="empty-panel"><span><ArrowUpRight /></span><strong>{t.selectDevice}</strong><p>{t.selectDeviceHint}</p></div>
@@ -61,13 +60,13 @@ export function DeviceDetailPanel({
           <div className="device-basic-alias">
             <label htmlFor="detail-device-alias">{t.deviceAlias}</label>
             <div>
-              <input
+              <Input
                 id="detail-device-alias"
                 value={aliasDraft}
                 maxLength={64}
                 onChange={(event) => onAliasDraftChange(event.target.value)}
               />
-              <button className="icon-text-button" disabled={aliasDraft.trim() === selected.alias} onClick={onRenameDevice}>{t.saveName}</button>
+              <Button disabled={aliasDraft.trim() === selected.alias} onClick={onRenameDevice}>{t.saveName}</Button>
             </div>
           </div>
         </div>

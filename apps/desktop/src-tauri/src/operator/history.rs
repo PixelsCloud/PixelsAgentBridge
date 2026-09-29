@@ -63,6 +63,7 @@ pub struct OperatorBootstrap {
 pub struct HistoryPage {
     tasks: Vec<HistoryTask>,
     operations: Vec<HistoryOperation>,
+    total_count: u64,
     task_before: Option<String>,
     operation_before_started_at_unix_ms: Option<i64>,
     operation_before_id: Option<String>,
@@ -300,6 +301,7 @@ async fn load_history_page(
     Ok(HistoryPage {
         tasks,
         operations,
+        total_count: local.history_count(device_ref).await.map_err(|error| error.to_string())?,
         task_before: task_cursor,
         operation_before_started_at_unix_ms: operation_cursor.as_ref().map(|value| value.0),
         operation_before_id: operation_cursor.map(|value| value.1),

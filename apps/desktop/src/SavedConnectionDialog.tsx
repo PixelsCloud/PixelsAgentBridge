@@ -1,6 +1,5 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { Check, RotateCw, X } from "lucide-react";
+import { Alert, Button, Modal, Spin, Steps } from "antd";
+import { RotateCw } from "lucide-react";
 import { formatDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
@@ -25,14 +24,6 @@ type Props = {
 
 export function SavedConnectionDialog({ language, connection, onClose, onRetry, onOpen }: Props) {
   const t = messages[language];
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
-
   const stage = {
     preparing: t.savedConnectPreparing,
     waiting: t.savedConnectWaiting,
@@ -45,65 +36,25 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
   const steps = [t.savedConnectStepInfo, t.savedConnectStepNetwork, t.savedConnectStepVerify];
   const isPending = connection.phase !== "connected" && connection.phase !== "failed";
 
-  return createPortal(
-    <div className="device-dialog-backdrop" onMouseDown={onClose}>
-      <div
-        className="device-dialog saved-connect-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="saved-connect-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="saved-connect-heading">
-          <div>
-            <h2 id="saved-connect-title">{t.savedConnectTitle}</h2>
-            <p>{formatDeviceCode(connection.deviceCode)}{connection.name ? ` · ${connection.name}` : ""}</p>
-          </div>
-          <button className="saved-connect-close" aria-label={t.savedConnectClose} autoFocus onClick={onClose}>
-            <X size={17} />
-          </button>
-        </div>
-        <div className={`saved-connect-stage ${connection.phase}`} role="status" aria-live="polite">
-          {isPending && <span className="saved-connect-spinner" aria-hidden="true" />}
-          {connection.phase === "connected" && <Check size={17} aria-hidden="true" />}
-          {connection.phase === "failed" && <X size={17} aria-hidden="true" />}
-          <span>{stage}</span>
-        </div>
-        <div className="saved-connect-progress-title">{t.savedConnectProgress}</div>
-        <ol className="saved-connect-steps">
-          {steps.map((label, index) => {
-            const status = index < connection.step
-              ? "done"
-              : index === connection.step && connection.phase === "failed"
-                ? "failed"
-                : index === connection.step && isPending
-                  ? "active"
-                  : "pending";
-            return (
-              <li className={status} key={label}>
-                <span className="saved-connect-step-icon">{status === "done" ? <Check size={13} /> : index + 1}</span>
-                <span>{label}</span>
-              </li>
-            );
-          })}
-        </ol>
-        {connection.phase === "failed" && connection.message && (
-          <p className="device-dialog-error saved-connect-error" role="alert">{connection.message}</p>
-        )}
-        {isPending && <p className="saved-connect-note">{t.savedConnectBackground}</p>}
-        <div className="device-dialog-actions">
-          <button onClick={onClose}>{t.savedConnectClose}</button>
-          {connection.phase === "failed" && (
-            <button className="saved-connect-action" onClick={onRetry}>
-              <RotateCw size={14} />{t.savedConnectRetry}
-            </button>
-          )}
-          {connection.phase === "connected" && (
-            <button className="saved-connect-action" onClick={onOpen}>{t.savedConnectOpen}</button>
-          )}
-        </div>
+  return (
+    <Modal open title={t.savedConnectTitle} width={430} className="saved-connect-dialog"
+      onCancel={onClose} footer={[
+        <Button key="close" onClick={onClose}>{t.savedConnectClose}</Button>,
+        connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} onClick={onRetry}>{t.savedConnectRetry}</Button>,
+        connection.phase === "connected" && <Button key="open" type="primary" onClick={onOpen}>{t.savedConnectOpen}</Button>,
+      ].filter(Boolean)}>
+      <p className="saved-connect-target">{formatDeviceCode(connection.deviceCode)}{connection.name ? ` · ${connection.name}` : ""}</p>
+      <div className={`saved-connect-stage ${connection.phase}`} role="status" aria-live="polite">
+        {isPending && <Spin size="small" />}
+        <span>{stage}</span>
       </div>
-    </div>,
-    document.body,
+      <div className="saved-connect-progress-title">{t.savedConnectProgress}</div>
+      <Steps direction="vertical" size="small" current={connection.step}
+        status={connection.phase === "failed" ? "error" : "process"}
+        items={steps.map((title) => ({ title }))} />
+      {connection.phase === "failed" && connection.message &&
+        <Alert className="saved-connect-error" type="error" showIcon message={connection.message} />}
+      {isPending && <p className="saved-connect-note">{t.savedConnectBackground}</p>}
+    </Modal>
   );
 }

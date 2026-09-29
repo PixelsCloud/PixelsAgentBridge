@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import type { FormEvent } from "react";
+import { Button, Input } from "antd";
+import { ArrowRight } from "lucide-react";
 import { formatDeviceCode, normalizeDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
@@ -23,7 +24,6 @@ export function HomeDeviceConnectionPanel({
   onConnect,
 }: Props) {
   const t = messages[language];
-  const [showPassword, setShowPassword] = useState(false);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,7 +36,7 @@ export function HomeDeviceConnectionPanel({
       <form className="home-connect-form" onSubmit={submit}>
         <label>
           <span className="field-label">{t.remoteCode}</span>
-          <input
+          <Input
             value={formatDeviceCode(code)}
             onChange={(event) => onCodeChange(normalizeDeviceCode(event.target.value))}
             inputMode="numeric"
@@ -47,23 +47,16 @@ export function HomeDeviceConnectionPanel({
         <div className="home-connect-password-field">
           <label className="field-label" htmlFor="home-connect-password">{t.remotePassword}</label>
           <span className="home-account-password">
-            <input
+            <Input.Password
               id="home-connect-password"
-              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(event) => onPasswordChange(event.target.value)}
               placeholder="••••••••"
             />
-            <button type="button" aria-label={showPassword ? t.hide : t.show}
-              title={showPassword ? t.hide : t.show}
-              onClick={() => setShowPassword((current) => !current)}>
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
           </span>
         </div>
-        <button className="primary-button" type="submit" disabled={connecting || code.length !== 9 || !password}>
-          {connecting ? t.connecting : t.connect}<ArrowRight size={16} />
-        </button>
+        <Button type="primary" htmlType="submit" loading={connecting} disabled={code.length !== 9 || !password}
+          icon={<ArrowRight size={16} />} iconPlacement="end">{t.connect}</Button>
       </form>
     </section>
   );

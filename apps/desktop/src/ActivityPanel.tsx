@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, List, Monitor, RotateCw, Terminal } from "lucide-react";
+import { Button, Pagination, Select, Tag } from "antd";
 import { HistoryScreenshot } from "./HistoryScreenshot";
 import { HistoryTerminal } from "./HistoryTerminal";
 import { messages, type Language } from "./i18n";
@@ -15,6 +16,7 @@ type Props = {
   language: Language;
   tasks: TaskEntry[];
   operations: OperationEntry[];
+  totalCount: number;
   selectedId: string;
   onSelect: (id: string) => void;
   hasMore: boolean;
@@ -32,7 +34,7 @@ type Props = {
 };
 
 export function ActivityPanel({
-  embedded = false, language, tasks, operations, selectedId, onSelect, hasMore,
+  embedded = false, language, tasks, operations, totalCount, selectedId, onSelect, hasMore,
   hasMoreTasks, hasMoreOperations, loadingMore, refreshing, refreshError, onLoadMore,
   deviceOptions, deviceCode = "", onDeviceChange, onRefresh, onRefreshTask,
 }: Props) {
@@ -81,15 +83,14 @@ export function ActivityPanel({
       <div className="surface-topline">
         <h2>{t.deviceTaskHistory}</h2>
         <div className="activity-actions">
-          {onDeviceChange && <select className="activity-device-select" aria-label={t.historyDeviceFilter} value={deviceCode} onChange={(event) => onDeviceChange(event.target.value)}>
-            <option value="">{t.historyAllDevices}</option>
-            {deviceOptions?.map((device) => <option key={device.code} value={device.code}>{device.label}</option>)}
-          </select>}
-          <span className="count-badge">{activity.length}{hasMore ? "+" : ""}</span>
-          <button className="quiet-button activity-refresh" disabled={refreshing} onClick={() => { setPage(1); onRefresh(); }}>
+          {onDeviceChange && <Select className="activity-device-select" aria-label={t.historyDeviceFilter} value={deviceCode}
+            options={[{ value: "", label: t.historyAllDevices }, ...(deviceOptions ?? []).map((device) => ({ value: device.code, label: device.label }))]}
+            onChange={(value) => { setPage(1); onDeviceChange(value); }} />}
+          <Tag className="count-badge">{totalCount}</Tag>
+          <Button type="text" className="activity-refresh" disabled={refreshing} onClick={() => { setPage(1); onRefresh(); }}>
             <RotateCw size={14} />
             {refreshing ? t.refreshingActivity : t.refreshActivity}
-          </button>
+          </Button>
         </div>
       </div>
       {refreshError && <p className="inline-error" role="alert">{refreshError}</p>}
@@ -113,7 +114,7 @@ export function ActivityPanel({
               {selectedTask.cwd && <div className="command-audit"><span>{t.cwd}</span><code>{selectedTask.cwd}</code></div>}
               <pre>{selectedTask.stdout || (!selectedTask.stderr && t.waitingOutput)}</pre>
               {selectedTask.stderr && <pre className="stderr-output">{selectedTask.stderr}</pre>}
-              {!selectedTask.complete && <button className="quiet-button" onClick={() => onRefreshTask(selectedTask.id)}>{t.loadMoreOutput}</button>}
+              {!selectedTask.complete && <Button type="text" onClick={() => onRefreshTask(selectedTask.id)}>{t.loadMoreOutput}</Button>}
             </>}
             {selectedOperation && <>
               <div className="output-heading"><strong>{operationLabel(selectedOperation)}</strong><span>{operationStateLabel(selectedOperation)}</span></div>
@@ -151,10 +152,13 @@ export function ActivityPanel({
           </div>
         </div>
       )}
-      {activity.length > 0 && <div className="activity-pagination">
-        <button className="quiet-button" disabled={page === 1 || loadingMore} onClick={() => setPage((current) => current - 1)}>{t.historyPreviousPage}</button>
-        <span>{t.historyPageLabel.replace("{page}", String(page))}</span>
-        <button className="quiet-button" disabled={!canGoNext || loadingMore} onClick={() => void nextPage()}>{loadingMore ? t.loadingHistory : t.historyNextPage}</button>
+      {totalCount > pageSize && <div className="activity-pagination">
+        <Pagination simple={{ readOnly: true }} current={page} pageSize={pageSize} total={totalCount}
+          showSizeChanger={false} disabled={loadingMore}
+          onChange={(next) => {
+            if (next === page + 1 && canGoNext) void nextPage();
+            else if (next < page) setPage(next);
+          }} />
       </div>}
     </section>
   );

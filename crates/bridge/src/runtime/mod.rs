@@ -120,6 +120,42 @@ impl BridgeLocalStore {
             .await
     }
 
+    pub async fn history_count(
+        &self,
+        device_ref: Option<DeviceRef>,
+    ) -> Result<u64, RuntimeStoreError> {
+        let (tasks, operations): (i64, i64) = match device_ref {
+            Some(device_ref) => {
+                let encoded = serde_json::to_string(&device_ref)?;
+                let tasks = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND device_ref_json = ?",
+                )
+                .bind(&encoded)
+                .fetch_one(&self.store.pool)
+                .await?;
+                let operations = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM runtime_operations WHERE device_ref_json = ?",
+                )
+                .bind(&encoded)
+                .fetch_one(&self.store.pool)
+                .await?;
+                (tasks, operations)
+            }
+            None => {
+                let tasks = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL",
+                )
+                .fetch_one(&self.store.pool)
+                .await?;
+                let operations = sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations")
+                    .fetch_one(&self.store.pool)
+                    .await?;
+                (tasks, operations)
+            }
+        };
+        Ok((tasks + operations) as u64)
+    }
+
     pub async fn operations(&self) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         self.store.operations().await
     }

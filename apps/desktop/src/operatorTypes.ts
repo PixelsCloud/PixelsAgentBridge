@@ -19,6 +19,7 @@ export type ScopeStatus = {
 export type HistoryPage = {
   tasks: TaskEntry[];
   operations: OperationEntry[];
+  totalCount: number;
   taskBefore: string | null;
   operationBeforeStartedAtUnixMs: number | null;
   operationBeforeId: string | null;

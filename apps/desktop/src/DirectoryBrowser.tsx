@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { File, Folder, Link2 } from "lucide-react";
+import { Button, Input } from "antd";
 import { messages, type Language } from "./i18n";
 
 type DirectoryEntry = {
@@ -73,13 +74,13 @@ export function DirectoryBrowser({ code, osFamily, connected, language, onAuditC
   return <div className="directory-browser">
     <label className="field-label" htmlFor="remote-directory-path">{t.directoryPath}</label>
     <div className="directory-path-row">
-      <input id="remote-directory-path" value={path} onChange={(event) => {
+      <Input id="remote-directory-path" value={path} onChange={(event) => {
         setPath(event.target.value);
         setPage(null);
         setAfter(null);
         setBack([]);
       }} />
-      <button className="quiet-button" disabled={!connected || loading || !path.trim()} onClick={() => void browse(path, null, "first")}>{loading ? t.loadingHistory : t.directoryBrowse}</button>
+      <Button loading={loading} disabled={!connected || !path.trim()} onClick={() => void browse(path, null, "first")}>{loading ? t.loadingHistory : t.directoryBrowse}</Button>
     </div>
     {error && <div className="inline-error" role="alert">{error}</div>}
     {page && <>
@@ -93,8 +94,8 @@ export function DirectoryBrowser({ code, osFamily, connected, language, onAuditC
         ))}
       </div>
       <div className="directory-pages">
-        <button className="quiet-button" disabled={back.length === 0 || loading} onClick={() => void browse(path, back[back.length - 1], "back")}>{t.directoryPrevious}</button>
-        <button className="quiet-button" disabled={!page.nextAfter || loading} onClick={() => void browse(path, page.nextAfter, "next")}>{t.directoryNext}</button>
+        <Button disabled={back.length === 0 || loading} onClick={() => void browse(path, back[back.length - 1], "back")}>{t.directoryPrevious}</Button>
+        <Button disabled={!page.nextAfter || loading} onClick={() => void browse(path, page.nextAfter, "next")}>{t.directoryNext}</Button>
       </div>
     </>}
   </div>;

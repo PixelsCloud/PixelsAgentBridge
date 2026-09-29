@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Terminal } from "@xterm/xterm";
 import { Terminal as TerminalIcon } from "lucide-react";
+import { Button } from "antd";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { messages, type Language } from "./i18n";
@@ -163,8 +164,8 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
   return <div className="terminal-browser" style={{ display: visible ? undefined : "none" }}>
     <p className="form-hint">{t.terminalHint}</p>
     <div className="terminal-actions">
-      <button className="primary-button" disabled={!connected || busy || !!session.current} onClick={() => void start()}>{t.openTerminal}<TerminalIcon size={17} /></button>
-      <button className="quiet-button" disabled={!session.current} onClick={() => void stop()}>{t.closeTerminal}</button>
+      <Button type="primary" loading={busy} disabled={!connected || !!session.current} onClick={() => void start()}>{t.openTerminal}<TerminalIcon size={17} /></Button>
+      <Button disabled={!session.current} onClick={() => void stop()}>{t.closeTerminal}</Button>
       {opened && <span>{opened.shell}</span>}
     </div>
     {error && <div className="inline-error" role="alert">{error}</div>}

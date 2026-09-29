@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, AppWindow } from "lucide-react";
+import { Button } from "antd";
 import { messages, type Language } from "./i18n";
 
 type WindowEntry = { title: string; process_id: number };
@@ -44,9 +45,9 @@ export function WindowBrowser({ code, connected, language, onAuditChange }: {
   return <div className="directory-browser">
     <div className="list-heading"><h3>{t.windowList}</h3><span>{entries.length}</span></div>
     <p className="form-hint">{t.windowListHint}</p>
-    <button className="primary-button" disabled={!connected || loading} onClick={() => void refresh()}>
+    <Button type="primary" loading={loading} disabled={!connected} onClick={() => void refresh()}>
       {loading ? t.loadingHistory : t.refreshWindows}<RefreshCw size={16} />
-    </button>
+    </Button>
     {error && <div className="inline-error" role="alert">{error}</div>}
     {entries.length === 0 && !error && !loading && <div className="empty-list">{t.noWindows}</div>}
     {visible.length > 0 && <>
@@ -56,8 +57,8 @@ export function WindowBrowser({ code, connected, language, onAuditChange }: {
         </div>)}
       </div>
       <div className="directory-pages">
-        <button className="quiet-button" disabled={page === 0} onClick={() => setPage(page - 1)}>{t.directoryPrevious}</button>
-        <button className="quiet-button" disabled={(page + 1) * 8 >= entries.length} onClick={() => setPage(page + 1)}>{t.directoryNext}</button>
+        <Button disabled={page === 0} onClick={() => setPage(page - 1)}>{t.directoryPrevious}</Button>
+        <Button disabled={(page + 1) * 8 >= entries.length} onClick={() => setPage(page + 1)}>{t.directoryNext}</Button>
       </div>
     </>}
   </div>;

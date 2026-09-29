@@ -2,7 +2,7 @@ import { OsLogo } from "./OsLogo";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
 import { formatDeviceCode } from "./deviceCode";
-import type { MouseEvent } from "react";
+import { Dropdown, type MenuProps } from "antd";
 
 type Props = {
   language: Language;
@@ -12,11 +12,11 @@ type Props = {
   selectedCode: string;
   onSelect: (device: ConnectedDevice) => void;
   onConnect: (device: ConnectedDevice) => void;
-  onDeviceContextMenu: (event: MouseEvent<HTMLButtonElement>, device: ConnectedDevice) => void;
+  onDeviceMenu: (device: ConnectedDevice) => MenuProps;
 };
 
 export function RemoteConnectionPanel({
-  language, error, devices, devicePresence, selectedCode, onSelect, onConnect, onDeviceContextMenu,
+  language, error, devices, devicePresence, selectedCode, onSelect, onConnect, onDeviceMenu,
 }: Props) {
   const t = messages[language];
   const sortedDevices = [...devices].sort((first, second) =>
@@ -37,9 +37,9 @@ export function RemoteConnectionPanel({
               : online ? t.online : t.offline;
             const deviceName = device.alias || presence?.name || t.unnamedDevice;
             return (
+              <Dropdown key={device.deviceCode} trigger={["contextMenu"]} menu={onDeviceMenu(device)}>
               <button
                 className={`home-recent-device ${selectedCode === device.deviceCode ? "selected" : ""}`}
-                key={device.deviceCode}
                 title={`${formatDeviceCode(device.deviceCode)} · ${deviceName} · ${status}`}
                 onClick={() => onSelect(device)}
                 onDoubleClick={() => onConnect(device)}
@@ -49,7 +49,6 @@ export function RemoteConnectionPanel({
                     onConnect(device);
                   }
                 }}
-                onContextMenu={(event) => onDeviceContextMenu(event, device)}
               >
                 <span className="home-recent-device-icon"><OsLogo family={device.osFamily} /></span>
                 <span className="home-recent-device-info">
@@ -67,6 +66,7 @@ export function RemoteConnectionPanel({
                   )}
                 </span>
               </button>
+              </Dropdown>
             );
           })}
         </div>

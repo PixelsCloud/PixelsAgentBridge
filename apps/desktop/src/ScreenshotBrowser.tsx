@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Camera, X } from "lucide-react";
+import { Button } from "antd";
 import { messages, type Language } from "./i18n";
 
 type Screenshot = {
@@ -127,16 +128,16 @@ export function ScreenshotBrowser({ code, connected, language, onAuditChange }: 
 
   return <div className="screenshot-browser">
     <p className="form-hint">{t.screenshotHint}</p>
-    <button className="primary-button" disabled={!connected || loading} onClick={() => void capture()}>
+    <Button type="primary" loading={loading} disabled={!connected} onClick={() => void capture()}>
       {loading ? t.loadingHistory : t.captureScreenshot}<Camera size={17} />
-    </button>
-    <button className="quiet-button" disabled={!connected} onClick={() => {
+    </Button>
+    <Button disabled={!connected} onClick={() => {
       setLive(!live);
       if (live) onAuditChange();
-    }}>{live ? t.stopRemoteControl : t.startRemoteControl}</button>
-    {live && <button className="quiet-button" disabled={!connected} onClick={() => {
+    }}>{live ? t.stopRemoteControl : t.startRemoteControl}</Button>
+    {live && <Button disabled={!connected} onClick={() => {
       void sendInput({ type: "secure_attention" }).finally(onAuditChange);
-    }}>{t.sendSecureAttention}</button>}
+    }}>{t.sendSecureAttention}</Button>}
     {error && <div className="inline-error" role="alert">{error}</div>}
     {live && <p className="form-hint">{t.remoteControlHint}</p>}
     {(live ? liveImage : image) && <>

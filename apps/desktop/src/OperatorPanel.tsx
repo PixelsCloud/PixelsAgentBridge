@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "react";
-import { createPortal } from "react-dom";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowUpRight, Copy, Pencil, Trash2, Unplug } from "lucide-react";
@@ -22,13 +22,12 @@ const RemoteOperationsPanel = lazy(() => import("./RemoteOperationsPanel").then(
 
 export function OperatorPanel({ language, view, onOpenRemote }: { language: Language; view: View; onOpenRemote: () => void }) {
   const t = messages[language];
+  const { notification } = AntdApp.useApp();
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [devices, setDevices] = useState<ConnectedDevice[]>([]);
   const [devicesLoaded, setDevicesLoaded] = useState(false);
   const [devicePresence, setDevicePresence] = useState<Record<string, { name: string; online: boolean | null }>>({});
-  const [contextMenu, setContextMenu] = useState<{ code: string; x: number; y: number } | null>(null);
-  const [copyToast, setCopyToast] = useState<{ message: string; error: boolean } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConnectedDevice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -45,6 +44,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const [cwd, setCwd] = useState("");
   const [tasks, setTasks] = useState<TaskEntry[]>([]);
   const [operations, setOperations] = useState<OperationEntry[]>([]);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
   const [taskBefore, setTaskBefore] = useState<string | null>(null);
   const [operationBeforeStartedAtUnixMs, setOperationBeforeStartedAtUnixMs] = useState<number | null>(null);
   const [operationBeforeId, setOperationBeforeId] = useState<string | null>(null);
@@ -74,7 +74,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
   const selected = devices.find((device) => device.deviceCode === selectedCode);
-  const menuDevice = devices.find((device) => device.deviceCode === contextMenu?.code);
   const connectedCodes = devices.filter((device) => device.connected).map((device) => device.deviceCode).join(",");
   const savedCodes = devices.map((device) => device.deviceCode).join(",");
 
@@ -174,31 +173,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }
 
   useEffect(() => {
-    if (!contextMenu) return;
-    const closeOnPointer = (event: PointerEvent) => {
-      if (!(event.target as Element).closest(".device-context-menu")) setContextMenu(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setContextMenu(null);
-    };
-    const closeOnScroll = () => setContextMenu(null);
-    window.addEventListener("pointerdown", closeOnPointer);
-    window.addEventListener("keydown", closeOnEscape);
-    window.addEventListener("scroll", closeOnScroll, true);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointer);
-      window.removeEventListener("keydown", closeOnEscape);
-      window.removeEventListener("scroll", closeOnScroll, true);
-    };
-  }, [contextMenu]);
-
-  useEffect(() => {
-    if (!copyToast) return;
-    const timer = window.setTimeout(() => setCopyToast(null), 2500);
-    return () => window.clearTimeout(timer);
-  }, [copyToast]);
-
-  useEffect(() => {
     if (!deleteTarget) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !deleting) setDeleteTarget(null);
@@ -207,29 +181,48 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [deleteTarget, deleting]);
 
-  function openDeviceMenu(event: MouseEvent<HTMLButtonElement>, device: ConnectedDevice) {
-    event.preventDefault();
-    setContextMenu({
-      code: device.deviceCode,
-      x: Math.min(event.clientX, window.innerWidth - 188),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 224)),
-    });
+  function deviceMenu(device: ConnectedDevice): MenuProps {
+    return {
+      items: [
+        { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
+        { key: "disconnect", icon: <Unplug size={16} />, label: t.disconnectDevice, disabled: !device.connected },
+        { key: "rename", icon: <Pencil size={16} />, label: t.renameDevice },
+        { key: "copy", icon: <Copy size={16} />, label: t.copyDeviceInfo },
+        { type: "divider" },
+        { key: "delete", icon: <Trash2 size={16} />, label: t.deleteDevice, danger: true },
+      ],
+      onClick: ({ key }) => {
+        if (key === "connect") void connectSaved(device);
+        if (key === "disconnect") {
+          setDisconnectError("");
+          setDisconnectTarget(device);
+        }
+        if (key === "rename") {
+          setRenameTarget(device);
+          setRenameDraft(device.alias);
+          setRenameError("");
+        }
+        if (key === "copy") void copyDeviceInfo(device);
+        if (key === "delete") {
+          setDeleteError("");
+          setDeleteTarget(device);
+        }
+      },
+    };
   }
 
   async function copyDeviceInfo(device: ConnectedDevice) {
-    setContextMenu(null);
     const name = device.alias || devicePresence[device.deviceCode]?.name || t.unnamedDevice;
     const info = `${t.deviceCode}: ${device.deviceCode.replace(/\s/g, "")}\n${t.deviceInfoName}: ${name}`;
     try {
       await navigator.clipboard.writeText(info);
-      setCopyToast({ message: t.deviceInfoCopied, error: false });
+      notification.success({ message: t.deviceInfoCopied, placement: "bottomRight", duration: 2.5 });
     } catch {
-      setCopyToast({ message: t.deviceInfoCopyFailed, error: true });
+      notification.error({ message: t.deviceInfoCopyFailed, placement: "bottomRight", duration: 2.5 });
     }
   }
 
   async function connectSaved(device: ConnectedDevice) {
-    setContextMenu(null);
     const attempt = ++savedConnectionAttemptRef.current;
     setSavedConnection({
       mode: "saved",
@@ -340,6 +333,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       loadTasks: true,
       loadOperations: true,
     }).then((page) => {
+      setHistoryTotalCount(page.totalCount);
       setTasks((current) => {
         const previous = new Map(current.map((task) => [task.id, task]));
         const fresh = new Set(page.tasks.map((task) => task.id));
@@ -500,6 +494,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
         setOperationBeforeId(saved.operationBeforeId);
         setHasMoreTasks(saved.hasMoreTasks);
         setHasMoreOperations(saved.hasMoreOperations);
+        setHistoryTotalCount(saved.totalCount);
         const latest = [...saved.tasks, ...saved.operations]
           .sort((a, b) => b.startedAtUnixMs - a.startedAtUnixMs)[0];
         setSelectedActivityId((current) => current || latest?.id || "");
@@ -855,9 +850,9 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                     : t.unknown;
 
                 return (
+                  <Dropdown key={device.deviceId} trigger={["contextMenu"]} menu={deviceMenu(device)}>
                   <button
                     className={`home-recent-device ${selectedCode === device.deviceCode ? "selected" : ""}`}
-                    key={device.deviceId}
                     title={`${formatDeviceCode(device.deviceCode)} · ${deviceName} · ${statusLabel}`}
                     onClick={() => setSelectedCode(device.deviceCode)}
                     onDoubleClick={() => void connectSaved(device)}
@@ -867,7 +862,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                         void connectSaved(device);
                       }
                     }}
-                    onContextMenu={(event) => openDeviceMenu(event, device)}
                   >
                     <span className="home-recent-device-icon">
                       <OsLogo family={device.osFamily} />
@@ -884,6 +878,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                       )}
                     </span>
                   </button>
+                  </Dropdown>
                 );
               })}
             </div>
@@ -900,7 +895,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
             selectedCode={selectedCode}
             onSelect={(device) => setSelectedCode(device.deviceCode)}
             onConnect={(device) => void connectSaved(device)}
-            onDeviceContextMenu={openDeviceMenu}
+            onDeviceMenu={deviceMenu}
           />
           <DeviceDetailPanel
             language={language}
@@ -962,6 +957,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
             language={language}
             tasks={tasks}
             operations={operations}
+            totalCount={historyTotalCount}
             selectedId={selectedActivityId}
             onSelect={setSelectedActivityId}
             hasMore={hasMoreTasks || hasMoreOperations}
@@ -980,115 +976,38 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
         </Suspense>
       )}
 
-      {contextMenu && menuDevice && createPortal(
-        <div className="device-context-menu" role="menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
-          <button role="menuitem" autoFocus onClick={() => void connectSaved(menuDevice)}>
-            <ArrowUpRight size={16} />{t.connect}
-          </button>
-          <button role="menuitem" disabled={!menuDevice.connected} onClick={() => {
-            setContextMenu(null);
-            setDisconnectError("");
-            setDisconnectTarget(menuDevice);
-          }}>
-            <Unplug size={16} />{t.disconnectDevice}
-          </button>
-          <button role="menuitem" onClick={() => {
-            setContextMenu(null);
-            setRenameTarget(menuDevice);
-            setRenameDraft(menuDevice.alias);
-            setRenameError("");
-          }}>
-            <Pencil size={16} />{t.renameDevice}
-          </button>
-          <button role="menuitem" onClick={() => void copyDeviceInfo(menuDevice)}>
-            <Copy size={16} />{t.copyDeviceInfo}
-          </button>
-          <button role="menuitem" className="danger" onClick={() => {
-            setContextMenu(null);
-            setDeleteError("");
-            setDeleteTarget(menuDevice);
-          }}>
-            <Trash2 size={16} />{t.deleteDevice}
-          </button>
-        </div>,
-        document.body,
-      )}
+      <Modal open={Boolean(renameTarget)} title={t.renameDevice} width={400}
+        onCancel={() => { if (!renaming) setRenameTarget(null); }}
+        onOk={() => void renameSavedDevice()} okText={t.saveName} okButtonProps={{ disabled: !renameTarget || aliasDraft.trim() === renameTarget.alias }}
+        confirmLoading={renaming} cancelText={t.cancel} maskClosable={!renaming}>
+        {renameTarget && <>
+          <strong>{formatDeviceCode(renameTarget.deviceCode)}</strong>
+          <label className="rename-device-label" htmlFor="rename-device-input">{t.deviceAlias}</label>
+          <Input id="rename-device-input" maxLength={64} value={renameDraft}
+            onChange={(event) => setRenameDraft(event.target.value)} onPressEnter={() => void renameSavedDevice()} />
+          {renameError && <p className="device-dialog-error" role="alert">{renameError}</p>}
+        </>}
+      </Modal>
 
-      {copyToast && createPortal(
-        <div className={`toast device-copy-toast ${copyToast.error ? "error" : ""}`} role="status">
-          {copyToast.message}
-        </div>,
-        document.body,
-      )}
+      <Modal open={Boolean(deleteTarget)} title={t.deleteDeviceConfirm} width={400}
+        onCancel={() => { if (!deleting) setDeleteTarget(null); }} onOk={() => void forgetDevice()}
+        okText={t.deleteDevice} okType="danger" confirmLoading={deleting} cancelText={t.cancel} maskClosable={!deleting}>
+        {deleteTarget && <>
+          <strong>{deleteTarget.alias || formatDeviceCode(deleteTarget.deviceCode)}</strong>
+          <p>{t.deleteDeviceHint}</p>
+          {deleteError && <p className="device-dialog-error" role="alert">{deleteError}</p>}
+        </>}
+      </Modal>
 
-      {renameTarget && createPortal(
-        <div className="device-dialog-backdrop" onMouseDown={() => { if (!renaming) setRenameTarget(null); }}>
-          <form
-            className="device-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="rename-device-title"
-            onMouseDown={(event) => event.stopPropagation()}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void renameSavedDevice();
-            }}
-          >
-            <h2 id="rename-device-title">{t.renameDevice}</h2>
-            <strong>{formatDeviceCode(renameTarget.deviceCode)}</strong>
-            <label className="rename-device-label" htmlFor="rename-device-input">{t.deviceAlias}</label>
-            <input
-              id="rename-device-input"
-              autoFocus
-              maxLength={64}
-              value={renameDraft}
-              onChange={(event) => setRenameDraft(event.target.value)}
-            />
-            {renameError && <p className="device-dialog-error" role="alert">{renameError}</p>}
-            <div className="device-dialog-actions">
-              <button type="button" disabled={renaming} onClick={() => setRenameTarget(null)}>{t.cancel}</button>
-              <button type="submit" className="saved-connect-action" disabled={renaming}>
-                {renaming ? t.loading : t.saveName}
-              </button>
-            </div>
-          </form>
-        </div>,
-        document.body,
-      )}
-
-      {deleteTarget && createPortal(
-        <div className="device-dialog-backdrop" onMouseDown={() => { if (!deleting) setDeleteTarget(null); }}>
-          <div className="device-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-device-title" onMouseDown={(event) => event.stopPropagation()}>
-            <h2 id="delete-device-title">{t.deleteDeviceConfirm}</h2>
-            <strong>{deleteTarget.alias || formatDeviceCode(deleteTarget.deviceCode)}</strong>
-            <p>{t.deleteDeviceHint}</p>
-            {deleteError && <p className="device-dialog-error" role="alert">{deleteError}</p>}
-            <div className="device-dialog-actions">
-              <button autoFocus disabled={deleting} onClick={() => setDeleteTarget(null)}>{t.cancel}</button>
-              <button className="danger" disabled={deleting} onClick={() => void forgetDevice()}>{deleting ? t.loading : t.deleteDevice}</button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-
-      {disconnectTarget && createPortal(
-        <div className="device-dialog-backdrop" onMouseDown={() => { if (!disconnecting) setDisconnectTarget(null); }}>
-          <div className="device-dialog" role="dialog" aria-modal="true" aria-labelledby="disconnect-device-title" onMouseDown={(event) => event.stopPropagation()}>
-            <h2 id="disconnect-device-title">{t.disconnectDeviceConfirm}</h2>
-            <strong>{disconnectTarget.alias || formatDeviceCode(disconnectTarget.deviceCode)}</strong>
-            <p>{t.disconnectDeviceHint}</p>
-            {disconnectError && <p className="device-dialog-error" role="alert">{disconnectError}</p>}
-            <div className="device-dialog-actions">
-              <button autoFocus disabled={disconnecting} onClick={() => setDisconnectTarget(null)}>{t.cancel}</button>
-              <button className="danger" disabled={disconnecting} onClick={() => void disconnectDevice()}>
-                {disconnecting ? t.loading : t.disconnectDevice}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+      <Modal open={Boolean(disconnectTarget)} title={t.disconnectDeviceConfirm} width={400}
+        onCancel={() => { if (!disconnecting) setDisconnectTarget(null); }} onOk={() => void disconnectDevice()}
+        okText={t.disconnectDevice} okType="danger" confirmLoading={disconnecting} cancelText={t.cancel} maskClosable={!disconnecting}>
+        {disconnectTarget && <>
+          <strong>{disconnectTarget.alias || formatDeviceCode(disconnectTarget.deviceCode)}</strong>
+          <p>{t.disconnectDeviceHint}</p>
+          {disconnectError && <p className="device-dialog-error" role="alert">{disconnectError}</p>}
+        </>}
+      </Modal>
 
       {savedConnection && (
         <SavedConnectionDialog
