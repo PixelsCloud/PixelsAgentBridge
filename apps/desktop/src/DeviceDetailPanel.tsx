@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { messages, type Language } from "./i18n";
-import { formatDeviceCode } from "./deviceCode";
-import { OsLogo } from "./OsLogo";
 import type { ConnectedDevice } from "./operatorTypes";
 
 type DetailTab = "info" | "history" | "command";
@@ -26,7 +24,6 @@ export function DeviceDetailPanel({
   const [tab, setTab] = useState<DetailTab>("info");
   const [historyOpened, setHistoryOpened] = useState(false);
   const [commandOpened, setCommandOpened] = useState(false);
-  const name = selected?.alias || presence?.name || t.unnamedDevice;
   const online = presence?.online === true ? t.online : presence?.online === false ? t.offline : t.unknown;
   const connection = selected?.connected ? t.connected : t.disconnected;
   const path = selected?.connected
@@ -55,10 +52,6 @@ export function DeviceDetailPanel({
         <div className="empty-panel"><span><ArrowUpRight /></span><strong>{t.selectDevice}</strong><p>{t.selectDeviceHint}</p></div>
       ) : <>
         <div className="device-basic-info" role="tabpanel" hidden={tab !== "info"}>
-          <div className="device-basic-heading">
-            <span className="device-basic-os"><OsLogo family={selected.osFamily} /></span>
-            <div><strong>{formatDeviceCode(selected.deviceCode)}</strong><span>{name}</span></div>
-          </div>
           <div className="device-basic-grid">
             <div><span>{t.targetOs}</span><strong>{selected.osFamily}</strong></div>
             <div><span>{t.deviceAvailability}</span><strong>{online}</strong></div>

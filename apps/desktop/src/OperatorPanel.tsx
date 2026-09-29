@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "re
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowUpRight, Pencil, Trash2, Unplug } from "lucide-react";
+import { ArrowUpRight, Copy, Pencil, Trash2, Unplug } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
 import type { View } from "./App";
@@ -28,6 +28,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const [devicesLoaded, setDevicesLoaded] = useState(false);
   const [devicePresence, setDevicePresence] = useState<Record<string, { name: string; online: boolean | null }>>({});
   const [contextMenu, setContextMenu] = useState<{ code: string; x: number; y: number } | null>(null);
+  const [copyToast, setCopyToast] = useState<{ message: string; error: boolean } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ConnectedDevice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -55,7 +56,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const [selectedActivityId, setSelectedActivityId] = useState("");
   const [historyDeviceCode, setHistoryDeviceCode] = useState("");
   const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState("");
   const [savedConnection, setSavedConnection] = useState<SavedConnection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -193,6 +193,12 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }, [contextMenu]);
 
   useEffect(() => {
+    if (!copyToast) return;
+    const timer = window.setTimeout(() => setCopyToast(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [copyToast]);
+
+  useEffect(() => {
     if (!deleteTarget) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !deleting) setDeleteTarget(null);
@@ -206,14 +212,27 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     setContextMenu({
       code: device.deviceCode,
       x: Math.min(event.clientX, window.innerWidth - 188),
-      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 184)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 224)),
     });
+  }
+
+  async function copyDeviceInfo(device: ConnectedDevice) {
+    setContextMenu(null);
+    const name = device.alias || devicePresence[device.deviceCode]?.name || t.unnamedDevice;
+    const info = `${t.deviceCode}: ${device.deviceCode.replace(/\s/g, "")}\n${t.deviceInfoName}: ${name}`;
+    try {
+      await navigator.clipboard.writeText(info);
+      setCopyToast({ message: t.deviceInfoCopied, error: false });
+    } catch {
+      setCopyToast({ message: t.deviceInfoCopyFailed, error: true });
+    }
   }
 
   async function connectSaved(device: ConnectedDevice) {
     setContextMenu(null);
     const attempt = ++savedConnectionAttemptRef.current;
     setSavedConnection({
+      mode: "saved",
       deviceId: device.deviceId,
       deviceCode: device.deviceCode,
       name: device.alias || devicePresence[device.deviceCode]?.name || t.unnamedDevice,
@@ -630,11 +649,22 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
 
   async function connect() {
     if (connecting || code.length !== 9 || !password) return;
+    const attempt = ++savedConnectionAttemptRef.current;
+    const deviceCode = code;
     setConnecting(true);
-    setConnectError("");
+    setSavedConnection({
+      mode: "manual",
+      deviceId: "",
+      deviceCode,
+      name: "",
+      phase: "connecting",
+      step: 1,
+      message: "",
+      attempt,
+    });
     try {
       const device = await invoke<ConnectedDevice>("operator_connect", {
-        code: code.trim(),
+        code: deviceCode,
         password,
       });
       setDevices((current) => [device, ...current.filter((item) => item.deviceCode !== device.deviceCode)]);
@@ -642,9 +672,13 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       setCode("");
       setPassword("");
       setAliasDraft(device.alias);
-      onOpenRemote();
-    } catch (error) {
-      setConnectError(`${t.connectFailed}: ${String(error)}`);
+      setSavedConnection((current) => current?.attempt === attempt
+        ? { ...current, deviceId: device.deviceId, name: device.alias || devicePresence[device.deviceCode]?.name || "", phase: "connected", step: 3 }
+        : current);
+    } catch (cause) {
+      setSavedConnection((current) => current?.attempt === attempt
+        ? { ...current, phase: "failed", message: `${t.connectFailed}: ${String(cause)}` }
+        : current);
     } finally {
       setConnecting(false);
     }
@@ -785,7 +819,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           code={code}
           password={password}
           connecting={connecting}
-          error={connectError}
           onCodeChange={setCode}
           onPasswordChange={setPassword}
           onConnect={() => void connect()}
@@ -967,6 +1000,9 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           }}>
             <Pencil size={16} />{t.renameDevice}
           </button>
+          <button role="menuitem" onClick={() => void copyDeviceInfo(menuDevice)}>
+            <Copy size={16} />{t.copyDeviceInfo}
+          </button>
           <button role="menuitem" className="danger" onClick={() => {
             setContextMenu(null);
             setDeleteError("");
@@ -974,6 +1010,13 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           }}>
             <Trash2 size={16} />{t.deleteDevice}
           </button>
+        </div>,
+        document.body,
+      )}
+
+      {copyToast && createPortal(
+        <div className={`toast device-copy-toast ${copyToast.error ? "error" : ""}`} role="status">
+          {copyToast.message}
         </div>,
         document.body,
       )}
@@ -1053,8 +1096,12 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           connection={savedConnection}
           onClose={() => setSavedConnection(null)}
           onRetry={() => {
-            const device = devices.find((item) => item.deviceId === savedConnection.deviceId);
-            if (device) void connectSaved(device);
+            if (savedConnection.mode === "manual") {
+              void connect();
+            } else {
+              const device = devices.find((item) => item.deviceId === savedConnection.deviceId);
+              if (device) void connectSaved(device);
+            }
           }}
           onOpen={() => {
             setSavedConnection(null);

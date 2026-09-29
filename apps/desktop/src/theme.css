@@ -65,14 +65,12 @@
 }
 
 [data-theme="dark"] .home-recent-device-icon img,
-[data-theme="dark"] .device-basic-os img,
 [data-theme="dark"] .device-avatar img {
   filter: brightness(0) invert(.88);
   opacity: 1;
 }
 
 [data-theme="dark"] .home-recent-device-icon,
-[data-theme="dark"] .device-basic-os,
 [data-theme="dark"] .device-avatar {
   color: #e0e7e8;
 }
@@ -86,7 +84,6 @@
 [data-theme="dark"] .account-current strong,
 [data-theme="dark"] .settings-about strong,
 [data-theme="dark"] .settings-agent-row strong,
-[data-theme="dark"] .device-basic-heading strong,
 [data-theme="dark"] .device-basic-grid strong,
 [data-theme="dark"] .device-dialog h2,
 [data-theme="dark"] .device-dialog strong,
@@ -108,7 +105,6 @@
 [data-theme="dark"] .home-recent-device-info small,
 [data-theme="dark"] .device-basic-grid span,
 [data-theme="dark"] .device-basic-alias label,
-[data-theme="dark"] .device-basic-heading span:not(.device-basic-os),
 [data-theme="dark"] .device-row small,
 [data-theme="dark"] .device-row-status,
 [data-theme="dark"] .task-row small,
@@ -147,14 +143,13 @@
 [data-theme="dark"] .home-account-disconnect,
 [data-theme="dark"] .icon-text-button,
 [data-theme="dark"] .device-dialog-actions button:not(.danger):not(.saved-connect-action),
-[data-theme="dark"] .settings-language button,
+[data-theme="dark"] .settings-language,
 [data-theme="dark"] .transfer-directions button {
   border-color: var(--dark-border);
   color: #d7dfe3;
   background: var(--dark-raised);
 }
 
-[data-theme="dark"] .settings-language button.active,
 [data-theme="dark"] .transfer-directions button.active {
   border-color: #649d89;
   color: var(--dark-accent);

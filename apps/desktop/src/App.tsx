@@ -60,8 +60,12 @@ function App() {
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem("pab.language", language);
   }, [language]);
+
+  function changeLanguage(value: Language) {
+    window.localStorage.setItem("pab.language", value);
+    setLanguage(value);
+  }
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -111,14 +115,16 @@ function App() {
     }
   }
 
-  const phase = (() => {
+  const serverStatus = (() => {
+    if (!device) return t.serverUnknown;
+    if (!device.executor_running) return t.serverDisconnected;
     switch (device?.control_phase?.toLowerCase()) {
-      case "authenticated": return t.phaseConnected;
+      case "authenticated": return t.serverConnected;
       case "connecting":
-      case "reconnecting": return t.phaseConnecting;
+      case "reconnecting": return t.serverConnecting;
       case "disconnected":
-      case "stopped": return t.phaseDisconnected;
-      default: return t.unknown;
+      case "stopped": return t.serverDisconnected;
+      default: return t.serverUnknown;
     }
   })();
   const controlConnected = device?.executor_running
@@ -167,11 +173,11 @@ function App() {
           <div className="sidebar-status-group">
             <div className="sidebar-status">
               <span className={`status-dot ${device?.executor_running ? "online" : ""}`} />
-              <span>{loading ? t.loading : !device ? t.operatorMode : device.executor_running ? t.running : t.stopped}</span>
+              <span>{loading ? t.localServiceLoading : !device ? t.localServiceUnknown : device.executor_running ? t.running : t.stopped}</span>
             </div>
             <div className="sidebar-status">
               <span className={`status-dot ${controlConnected ? "online" : ""}`} />
-              <span>{t.controlConnection}: {device ? phase : t.operatorMode}</span>
+              <span>{serverStatus}</span>
             </div>
           </div>
         </aside>
@@ -210,7 +216,7 @@ function App() {
               </section>
             )}
 
-            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={setLanguage} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
+            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
       </div>

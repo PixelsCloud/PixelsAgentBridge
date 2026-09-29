@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowRight, Bot, Languages, RotateCw, Server } from "lucide-react";
+import { ArrowRight, Bot, Info, Languages, RotateCw, Server } from "lucide-react";
 import { messages, type Language } from "./i18n";
 
 type ServerSettings = {
@@ -20,7 +20,7 @@ type Props = {
   onLanguageChange: (value: Language) => void;
 };
 
-type SettingsSection = "preferences" | "ai" | "server";
+type SettingsSection = "preferences" | "ai" | "server" | "about";
 
 export function SettingsPanel({ language, onLanguageChange }: Props) {
   const t = messages[language];
@@ -111,6 +111,14 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
           <Server size={17} />
           <span>{t.settingsConnection}</span>
         </button>
+        <button
+          className={section === "about" ? "active" : ""}
+          aria-current={section === "about" ? "page" : undefined}
+          onClick={() => setSection("about")}
+        >
+          <Info size={17} />
+          <span>{t.settingsAbout}</span>
+        </button>
       </nav>
 
       <section className="surface settings-detail">
@@ -118,15 +126,12 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
         <div className="surface-kicker"><Languages size={15} /> {t.settingsPreferences}</div>
         <h2>{t.language}</h2>
         <p>{t.languageHint}</p>
-        <div className="settings-language" role="group" aria-label={t.language}>
-          <button className={language === "zh-CN" ? "active" : ""} onClick={() => onLanguageChange("zh-CN")}>简体中文</button>
-          <button className={language === "en" ? "active" : ""} onClick={() => onLanguageChange("en")}>English</button>
-        </div>
-        <div className="settings-about">
-          <strong>Pixels Agent Bridge</strong>
-          <span>v0.1.0</span>
-          <p>{t.iconAttribution}</p>
-        </div>
+        <select className="settings-language" aria-label={t.language} value={language}
+          onChange={(event) => onLanguageChange(event.target.value as Language)}>
+          <option value="zh-CN">简体中文</option>
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+        </select>
       </div>}
 
       {section === "ai" && <div className="settings-ai">
@@ -161,6 +166,12 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
           <button className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? t.settingsSaving : t.settingsSave}<ArrowRight size={16} /></button>
           {saved && <button className="quiet-button" onClick={() => void invoke("restart_desktop")}><RotateCw size={15} />{t.settingsRestart}</button>}
         </div>
+      </div>}
+      {section === "about" && <div className="settings-about">
+        <div className="surface-kicker"><Info size={15} /> {t.settingsAbout}</div>
+        <h2>Pixels Agent Bridge</h2>
+        <p>v0.1.0</p>
+        <p>{t.iconAttribution}</p>
       </div>}
       </section>
     </>

@@ -1,5 +1,5 @@
-import type { FormEvent } from "react";
-import { ArrowRight } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { formatDeviceCode, normalizeDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
@@ -8,7 +8,6 @@ type Props = {
   code: string;
   password: string;
   connecting: boolean;
-  error: string;
   onCodeChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onConnect: () => void;
@@ -19,12 +18,12 @@ export function HomeDeviceConnectionPanel({
   code,
   password,
   connecting,
-  error,
   onCodeChange,
   onPasswordChange,
   onConnect,
 }: Props) {
   const t = messages[language];
+  const [showPassword, setShowPassword] = useState(false);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,20 +44,27 @@ export function HomeDeviceConnectionPanel({
             placeholder="000 000 000"
           />
         </label>
-        <label>
-          <span className="field-label">{t.remotePassword}</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => onPasswordChange(event.target.value)}
-            placeholder="••••••••"
-          />
-        </label>
+        <div className="home-connect-password-field">
+          <label className="field-label" htmlFor="home-connect-password">{t.remotePassword}</label>
+          <span className="home-account-password">
+            <input
+              id="home-connect-password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder="••••••••"
+            />
+            <button type="button" aria-label={showPassword ? t.hide : t.show}
+              title={showPassword ? t.hide : t.show}
+              onClick={() => setShowPassword((current) => !current)}>
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </span>
+        </div>
         <button className="primary-button" type="submit" disabled={connecting || code.length !== 9 || !password}>
           {connecting ? t.connecting : t.connect}<ArrowRight size={16} />
         </button>
       </form>
-      {error && <div className="inline-error" role="alert">{error}</div>}
     </section>
   );
 }

@@ -5,6 +5,7 @@ import { formatDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
 export type SavedConnection = {
+  mode: "manual" | "saved";
   deviceId: string;
   deviceCode: string;
   name: string;
@@ -56,7 +57,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
         <div className="saved-connect-heading">
           <div>
             <h2 id="saved-connect-title">{t.savedConnectTitle}</h2>
-            <p>{formatDeviceCode(connection.deviceCode)} · {connection.name}</p>
+            <p>{formatDeviceCode(connection.deviceCode)}{connection.name ? ` · ${connection.name}` : ""}</p>
           </div>
           <button className="saved-connect-close" aria-label={t.savedConnectClose} autoFocus onClick={onClose}>
             <X size={17} />
