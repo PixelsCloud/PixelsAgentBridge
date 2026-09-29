@@ -419,8 +419,8 @@ async fn history_task(
         complete: record.is_complete()
             && stdout_offset >= record.stdout.available_to
             && stderr_offset >= record.stderr.available_to,
-        stdout: String::from_utf8_lossy(&stdout.bytes).into_owned(),
-        stderr: String::from_utf8_lossy(&stderr.bytes).into_owned(),
+        stdout: super::decode_command_output(&stdout.bytes),
+        stderr: super::decode_command_output(&stderr.bytes),
         stdout_offset,
         stderr_offset,
         started_at_unix_ms: snapshot.created_at_unix_ms,

@@ -371,6 +371,9 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 
 .activity-panel { display: flex; flex-direction: column; }
 .activity-actions { display: flex; align-items: center; gap: 14px; }
+.activity-device-select { max-width: 210px; min-width: 130px; padding: 7px 28px 7px 10px; border: 1px solid #dbe6e9; border-radius: 8px; background: var(--surface, #fff); color: inherit; font: inherit; font-size: 11px; }
+.activity-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; font-size: 11px; }
+.activity-pagination .quiet-button { margin: 0; }
 .activity-refresh { display: inline-flex; align-items: center; gap: 5px; margin-top: 0; white-space: nowrap; }
 .activity-refresh:disabled { opacity: .55; cursor: default; }
 .task-layout { display: grid; grid-template-columns: minmax(220px, .4fr) minmax(0, .6fr); gap: 18px; flex: 1; min-height: 0; margin-top: 22px; }

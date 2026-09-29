@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowDown, ArrowUp, List, Monitor, RotateCw, Terminal } from "lucide-react";
 import { HistoryScreenshot } from "./HistoryScreenshot";
 import { HistoryTerminal } from "./HistoryTerminal";
@@ -17,24 +18,41 @@ type Props = {
   selectedId: string;
   onSelect: (id: string) => void;
   hasMore: boolean;
+  hasMoreTasks: boolean;
+  hasMoreOperations: boolean;
   loadingMore: boolean;
   refreshing: boolean;
   refreshError: string;
-  onLoadMore: () => void;
+  onLoadMore: () => Promise<boolean>;
+  deviceOptions?: { code: string; label: string }[];
+  deviceCode?: string;
+  onDeviceChange?: (code: string) => void;
   onRefresh: () => void;
   onRefreshTask: (id: string) => void;
 };
 
 export function ActivityPanel({
   embedded = false, language, tasks, operations, selectedId, onSelect, hasMore,
-  loadingMore, refreshing, refreshError, onLoadMore, onRefresh, onRefreshTask,
+  hasMoreTasks, hasMoreOperations, loadingMore, refreshing, refreshError, onLoadMore,
+  deviceOptions, deviceCode = "", onDeviceChange, onRefresh, onRefreshTask,
 }: Props) {
   const t = messages[language];
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const activity: Activity[] = [
     ...tasks.map((item): Activity => ({ kind: "command", item })),
     ...operations.map((item): Activity => ({ kind: "operation", item })),
   ].sort((a, b) => b.item.startedAtUnixMs - a.item.startedAtUnixMs);
-  const selected = activity.find(({ item }) => item.id === selectedId) ?? activity[0];
+  const visible = activity.slice((page - 1) * pageSize, page * pageSize);
+  const selected = visible.find(({ item }) => item.id === selectedId) ?? visible[0];
+  const canGoNext = page * pageSize < activity.length || hasMore;
+  async function nextPage() {
+    const target = (page + 1) * pageSize;
+    if ((hasMoreTasks && tasks.length < target) || (hasMoreOperations && operations.length < target)) {
+      if (!await onLoadMore()) return;
+    }
+    setPage((current) => current + 1);
+  }
   const selectedTask = selected?.kind === "command" ? selected.item : null;
   const selectedOperation = selected?.kind === "operation" ? selected.item : null;
   const formatTime = (value: number) => new Date(value).toLocaleString(language);
@@ -60,12 +78,15 @@ export function ActivityPanel({
 
   return (
     <section className={`${embedded ? "device-activity-panel" : "surface"} activity-panel`}>
-      {!embedded && <div className="surface-kicker">01 / {t.operationHistory}</div>}
       <div className="surface-topline">
-        <h2>{embedded ? t.deviceTaskHistory : t.operationHistory}</h2>
+        <h2>{t.deviceTaskHistory}</h2>
         <div className="activity-actions">
+          {onDeviceChange && <select className="activity-device-select" aria-label={t.historyDeviceFilter} value={deviceCode} onChange={(event) => onDeviceChange(event.target.value)}>
+            <option value="">{t.historyAllDevices}</option>
+            {deviceOptions?.map((device) => <option key={device.code} value={device.code}>{device.label}</option>)}
+          </select>}
           <span className="count-badge">{activity.length}{hasMore ? "+" : ""}</span>
-          <button className="quiet-button activity-refresh" disabled={refreshing} onClick={onRefresh}>
+          <button className="quiet-button activity-refresh" disabled={refreshing} onClick={() => { setPage(1); onRefresh(); }}>
             <RotateCw size={14} />
             {refreshing ? t.refreshingActivity : t.refreshActivity}
           </button>
@@ -75,14 +96,13 @@ export function ActivityPanel({
       {activity.length === 0 ? <div className="empty-panel"><span><List /></span><strong>{t.noTasks}</strong><p>{t.noTasksHint}</p></div> : (
         <div className="task-layout">
           <div className="task-list">
-            {activity.map(({ kind, item }) => (
+            {visible.map(({ kind, item }) => (
               <button className={`task-row ${selected?.item.id === item.id ? "active" : ""}`} key={item.id} onClick={() => onSelect(item.id)}>
                 <span className="task-icon">{kind === "command" ? <Terminal size={18} /> : item.kind === "directory" || item.kind === "windows" || item.kind === "screenshot" || item.kind === "desktop_input" ? <Monitor size={18} /> : item.direction === "upload" ? <ArrowUp size={18} /> : <ArrowDown size={18} />}</span>
                 <span><strong>{kind === "command" ? item.program : operationLabel(item)}</strong><small>{formatDeviceCode(item.deviceCode)} · {formatTime(item.startedAtUnixMs)}</small></span>
                 <em>{kind === "command" ? item.state : operationStateLabel(item)}</em>
               </button>
             ))}
-            {hasMore && <button className="quiet-button" disabled={loadingMore} onClick={onLoadMore}>{loadingMore ? t.loadingHistory : t.loadMoreHistory}</button>}
           </div>
           <div className="task-output" tabIndex={0}>
             {selectedTask && <>
@@ -131,6 +151,11 @@ export function ActivityPanel({
           </div>
         </div>
       )}
+      {activity.length > 0 && <div className="activity-pagination">
+        <button className="quiet-button" disabled={page === 1 || loadingMore} onClick={() => setPage((current) => current - 1)}>{t.historyPreviousPage}</button>
+        <span>{t.historyPageLabel.replace("{page}", String(page))}</span>
+        <button className="quiet-button" disabled={!canGoNext || loadingMore} onClick={() => void nextPage()}>{loadingMore ? t.loadingHistory : t.historyNextPage}</button>
+      </div>}
     </section>
   );
 }

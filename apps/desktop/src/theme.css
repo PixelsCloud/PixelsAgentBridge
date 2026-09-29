@@ -46,6 +46,7 @@
 }
 
 [data-theme="dark"] .surface,
+[data-theme="dark"] .activity-device-select,
 [data-theme="dark"] .device-context-menu,
 [data-theme="dark"] .device-dialog,
 [data-theme="dark"] .toast {

@@ -53,6 +53,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const [refreshingHistory, setRefreshingHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [selectedActivityId, setSelectedActivityId] = useState("");
+  const [historyDeviceCode, setHistoryDeviceCode] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
   const [savedConnection, setSavedConnection] = useState<SavedConnection | null>(null);
@@ -366,7 +367,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }
 
   async function loadMoreHistory() {
-    if (loadingHistory || (!hasMoreTasks && !hasMoreOperations)) return;
+    if (loadingHistory || (!hasMoreTasks && !hasMoreOperations)) return false;
     setLoadingHistory(true);
     try {
       const page = await invoke<HistoryPage>("operator_history_page", {
@@ -395,8 +396,10 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
         setOperationBeforeId(page.operationBeforeId);
         setHasMoreOperations(page.hasMoreOperations);
       }
+      return true;
     } catch {
       setHistoryError(t.historyLoadFailed);
+      return false;
     } finally {
       setLoadingHistory(false);
     }
@@ -915,20 +918,32 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
 
       {view === "activity" && (
         <Suspense fallback={<section className="surface activity-panel">{t.loadingHistory}</section>}>
-          <ActivityPanel
+          {historyDeviceCode ? <DeviceHistoryPanel
+            key={historyDeviceCode}
+            code={historyDeviceCode}
+            language={language}
+            embedded={false}
+            deviceOptions={devices.map((device) => ({ code: device.deviceCode, label: `${device.alias || devicePresence[device.deviceCode]?.name || formatDeviceCode(device.deviceCode)} · ${formatDeviceCode(device.deviceCode)}` }))}
+            onDeviceChange={setHistoryDeviceCode}
+          /> : <ActivityPanel
             language={language}
             tasks={tasks}
             operations={operations}
             selectedId={selectedActivityId}
             onSelect={setSelectedActivityId}
             hasMore={hasMoreTasks || hasMoreOperations}
+            hasMoreTasks={hasMoreTasks}
+            hasMoreOperations={hasMoreOperations}
             loadingMore={loadingHistory}
             refreshing={refreshingHistory}
             refreshError={historyError}
-            onLoadMore={() => void loadMoreHistory()}
+            onLoadMore={loadMoreHistory}
+            deviceOptions={devices.map((device) => ({ code: device.deviceCode, label: `${device.alias || devicePresence[device.deviceCode]?.name || formatDeviceCode(device.deviceCode)} · ${formatDeviceCode(device.deviceCode)}` }))}
+            deviceCode=""
+            onDeviceChange={setHistoryDeviceCode}
             onRefresh={() => void refreshActivityManually()}
             onRefreshTask={(id) => void refreshTask(id)}
-          />
+          />}
         </Suspense>
       )}
 

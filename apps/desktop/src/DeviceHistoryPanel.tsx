@@ -14,7 +14,15 @@ const emptyHistory: HistoryPage = {
   hasMoreOperations: false,
 };
 
-export function DeviceHistoryPanel({ code, language }: { code: string; language: Language }) {
+type Props = {
+  code: string;
+  language: Language;
+  embedded?: boolean;
+  deviceOptions?: { code: string; label: string }[];
+  onDeviceChange?: (code: string) => void;
+};
+
+export function DeviceHistoryPanel({ code, language, embedded = true, deviceOptions, onDeviceChange }: Props) {
   const t = messages[language];
   const [history, setHistory] = useState<HistoryPage>(emptyHistory);
   const [selectedId, setSelectedId] = useState("");
@@ -92,7 +100,7 @@ export function DeviceHistoryPanel({ code, language }: { code: string; language:
   }, [code, language]);
 
   async function loadMore() {
-    if (loadingMore || (!history.hasMoreTasks && !history.hasMoreOperations)) return;
+    if (loadingMore || (!history.hasMoreTasks && !history.hasMoreOperations)) return false;
     setLoadingMore(true);
     try {
       const next = await invoke<HistoryPage>("operator_device_history_page", {
@@ -125,8 +133,10 @@ export function DeviceHistoryPanel({ code, language }: { code: string; language:
             : current.hasMoreOperations,
         };
       });
+      return true;
     } catch (cause) {
       setError(`${t.historyLoadFailed}: ${String(cause)}`);
+      return false;
     } finally {
       setLoadingMore(false);
     }
@@ -162,17 +172,22 @@ export function DeviceHistoryPanel({ code, language }: { code: string; language:
 
   return (
     <ActivityPanel
-      embedded
+      embedded={embedded}
       language={language}
       tasks={history.tasks}
       operations={history.operations}
       selectedId={selectedId}
       onSelect={setSelectedId}
       hasMore={history.hasMoreTasks || history.hasMoreOperations}
+      hasMoreTasks={history.hasMoreTasks}
+      hasMoreOperations={history.hasMoreOperations}
       loadingMore={loadingMore}
       refreshing={refreshing}
       refreshError={error}
-      onLoadMore={() => void loadMore()}
+      onLoadMore={loadMore}
+      deviceOptions={deviceOptions}
+      deviceCode={code}
+      onDeviceChange={onDeviceChange}
       onRefresh={() => void refresh(true)}
       onRefreshTask={(id) => void refreshTask(id)}
     />

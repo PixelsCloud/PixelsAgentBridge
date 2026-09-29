@@ -744,11 +744,21 @@ pub async fn operator_task(
         complete: record.is_complete()
             && stdout_offset + stdout.bytes.len() as u64 >= record.stdout.available_to
             && stderr_offset + stderr.bytes.len() as u64 >= record.stderr.available_to,
-        stdout: String::from_utf8_lossy(&stdout.bytes).into_owned(),
-        stderr: String::from_utf8_lossy(&stderr.bytes).into_owned(),
+        stdout: decode_command_output(&stdout.bytes),
+        stderr: decode_command_output(&stderr.bytes),
         stdout_offset: stdout_offset + stdout.bytes.len() as u64,
         stderr_offset: stderr_offset + stderr.bytes.len() as u64,
     })
+}
+
+fn decode_command_output(bytes: &[u8]) -> String {
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return text.to_owned();
+    }
+    // Windows console programs on Chinese systems commonly write CP936 bytes.
+    // Keep the stored output and offsets as raw bytes; decode only for display.
+    let (text, _, _) = encoding_rs::GBK.decode(bytes);
+    text.into_owned()
 }
 
 #[tauri::command]
