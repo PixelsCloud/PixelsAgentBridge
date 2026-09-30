@@ -357,7 +357,7 @@ impl TaskService {
             )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 filesystem_schema_version: Some(3),
-                system_query_schema_version: Some(1),
+                system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),

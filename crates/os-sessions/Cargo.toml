@@ -1,0 +1,15 @@
+[package]
+name = "pab-os-sessions"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pab-protocol = { path = "../protocol" }
+tokio.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_RemoteDesktop"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus_systemd = { version = "=0.26100.0", default-features = false, features = ["login1", "zbus-async-tokio"] }

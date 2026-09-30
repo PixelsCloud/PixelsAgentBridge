@@ -27,35 +27,55 @@ impl TaskService {
         };
         jobs.insert(id);
         drop(jobs);
+        let mutation = query.is_mutation();
         let service = self.clone();
         let collector = self.system_collector.clone();
         let (send, receive) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let _permit = permit;
             let fallback = query.clone();
-            let result = tokio::task::spawn_blocking(move || match collector.try_lock() {
-                Ok(mut c) => c.query(id, &query),
+            let async_query = query.clone();
+            let async_result =
+                tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
+                    .await;
+            let r = match async_result {
+                Ok(Some(reply)) => reply,
+                Ok(None) => {
+                    let result = tokio::task::spawn_blocking(move || match collector.try_lock() {
+                        Ok(mut c) => c.query(id, &query),
+                        Err(_) => {
+                            let mut r = SystemQueryReply::pending(id, &query);
+                            r.state = "failed".into();
+                            r.error = Some("executor_busy: system collector unavailable".into());
+                            r
+                        }
+                    })
+                    .await;
+                    result.unwrap_or_else(|_| {
+                        let mut r = SystemQueryReply::pending(id, &fallback);
+                        r.state = "failed".into();
+                        r.error = Some("system collector stopped unexpectedly".into());
+                        r
+                    })
+                }
                 Err(_) => {
-                    let mut r = SystemQueryReply::pending(id, &query);
+                    let mut r = SystemQueryReply::pending(id, &fallback);
                     r.state = "failed".into();
-                    r.error = Some("executor_busy: system collector unavailable".into());
+                    r.error = Some("async query worker stopped unexpectedly".into());
                     r
                 }
-            })
-            .await;
-            let r = result.unwrap_or_else(|_| {
-                let mut r = SystemQueryReply::pending(id, &fallback);
-                r.state = "failed".into();
-                r.error = Some("system collector stopped unexpectedly".into());
-                r
-            });
+            };
             if let Err(e) = service.store.finish_system_query(&r).await {
                 tracing::warn!(%id,%e,"system query result persistence failed");
             }
             service.system_jobs.lock().await.remove(&id);
             let _ = send.send(());
         });
-        let _ = receive.await;
+        if mutation {
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(250), receive).await;
+        } else {
+            let _ = receive.await;
+        }
         self.get_system_query(actor, id).await
     }
     pub(super) async fn get_system_query(

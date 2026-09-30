@@ -45,7 +45,7 @@ impl RuntimeStore {
         if count >= 16 {
             return Err(RuntimeStoreError::SystemQueryBusy);
         }
-        sqlx::query("INSERT INTO runtime_operations (id,device_ref_json,device_code,initiated_by,kind,direction,source,destination,overwrite,state,started_at_unix_ms,owner_session_id) VALUES (?,?,?,?,?,'read','','',0,'running',?,?)").bind(id.to_string()).bind(serde_json::to_string(&device)?).bind(code.map(|c|c.to_string())).bind(actor).bind(query.kind()).bind(now_unix_ms()).bind(owner).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO runtime_operations (id,device_ref_json,device_code,initiated_by,kind,direction,source,destination,overwrite,state,started_at_unix_ms,owner_session_id) VALUES (?,?,?,?,?,?,'','',0,'running',?,?)").bind(id.to_string()).bind(serde_json::to_string(&device)?).bind(code.map(|c|c.to_string())).bind(actor).bind(query.kind()).bind(if query.is_mutation() {"control"} else {"read"}).bind(now_unix_ms()).bind(owner).execute(&mut *tx).await?;
         let mut pending = SystemQueryReply::pending(id, query);
         pending.state = "unconfirmed".into();
         sqlx::query("INSERT INTO runtime_system_results (id,query_json,reply_json) VALUES (?,?,?)")
@@ -224,6 +224,71 @@ impl TransferQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn lifecycle_records_are_control_operations_and_preserve_partial_failures_without_replay()
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bridge.sqlite3");
+        let queue = TransferQueue::open(&path, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&path).await.unwrap();
+        let device = DeviceRef {
+            deployment_id: DeploymentId::from_u128(1),
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let code = "123456789".parse().unwrap();
+        let id = RequestId::new();
+        let q = SystemQuery::ServiceControl {
+            name: "fixture".into(),
+            control: ServiceControlAction::Restart,
+            timeout_ms: 100,
+        };
+        assert!(
+            store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(store.operations().await.unwrap()[0].direction, "control");
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let mut r = SystemQueryReply::pending(id, &q);
+        r.state = "failed".into();
+        r.error = Some("timeout after service stopped".into());
+        r.data = Some(SystemQueryData::ServiceControl {
+            result: ServiceControlResult {
+                name: "fixture".into(),
+                control: ServiceControlAction::Restart,
+                outcome: "timeout".into(),
+                phase: "starting".into(),
+                changed: true,
+                job_path: None,
+                service: None,
+                error: r.error.clone(),
+            },
+        });
+        store.save_system_reply(&r).await.unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 0);
+        assert!(
+            !store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(queue.system_record(id, code).await.unwrap().1, r);
+        let wrong = SystemQuery::ServiceControl {
+            name: "other".into(),
+            control: ServiceControlAction::Restart,
+            timeout_ms: 100,
+        };
+        assert!(
+            store
+                .accept_system_query(id, &wrong, device, Some(code), "guest", "owner")
+                .await
+                .is_err()
+        );
+    }
     #[tokio::test]
     async fn sampled_results_are_owned_cached_listed_and_terminal_results_never_regress() {
         let dir = tempfile::tempdir().unwrap();

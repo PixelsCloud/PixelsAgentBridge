@@ -156,7 +156,7 @@ Replace the device code and paths with your own information.
 
 ## MCP tool reference
 
-The current source exposes **37 tools**. Hosts may display them with a namespace,
+The current source exposes **44 tools**. Hosts may display them with a namespace,
 for example `pixels.pab_connect`.
 
 | Tool | Purpose |
@@ -198,10 +198,58 @@ for example `pixels.pab_connect`.
 | `pab_list_processes` | Collect a bounded process list with PID/name/user filters; no live pagination |
 | `pab_get_process` | Query one current PID with available identity and resource fields |
 | `pab_list_network_interfaces` | Query addresses, MAC, MTU, state and cumulative byte counters |
+| `pab_list_network_connections` | Query TCP/UDP sockets, listeners and visible PIDs with address/port/state filters |
+| `pab_resolve_dns` | Query DNS records through the target machine's configured DNS servers |
+| `pab_list_sessions` | Query OS login sessions via Windows WTS or Linux logind |
+| `pab_terminate_process` | Verify native process identity, request exit and optionally force termination |
+| `pab_list_services` | Filter Windows SCM / Linux systemd service inventory by name and state |
+| `pab_get_service` | Query one service's state, startup mode and available runtime information |
+| `pab_service_control` | Asynchronously start, stop, restart, enable or disable a service |
 
 Call `pab_connect` first and retain its platform context. Most device tools require
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.
+
+Process termination and service management require system-query capability v3.
+Get `termination_identity` from `pab_get_process`, then pass it as `identity` to
+`pab_terminate_process`; seconds-resolution start time is not a substitute.
+Windows verifies native creation time and retains the same process handle during
+control. Linux retains the original pidfd with a bounded identity lease (10
+minutes, at most 256 leases); expired leases or Executor restart require another
+process query. There is no PID-only signal fallback.
+
+Termination defaults to `force=false` and a 5000 ms graceful timeout. Windows
+posts WM_CLOSE to top-level windows; windowless processes explicitly report
+unsupported graceful exit, and require `force=true` for direct termination.
+Linux sends SIGTERM through the retained pidfd and only escalates to SIGKILL on
+timeout with `force=true`. Force-exit confirmation allows up to 5 additional
+seconds. Only one process is controlled, not its tree; Executor and init/system
+processes are protected.
+
+Service queries use Windows SCM or the Linux systemd system bus (not user
+systemd); Linux requires an exact `.service` name. Inventory uses literal
+case-insensitive name filtering and exact backend-specific states, without live
+pagination. Use `pab_get_service` for configuration details. Windows inventory
+excludes kernel drivers; Linux includes installed `not_loaded` units.
+Enable/disable changes startup configuration only: Windows enable selects
+automatic startup, Linux changes persistent unit links without forcing masked
+units. Runtime actions wait for observed state; Linux also checks the original
+JobRemoved signal. Windows does not explicitly stop dependent services; systemd
+may execute dependencies defined by the unit transaction. Executor's own service
+cannot be stopped or restarted.
+
+The two control tools return `running` after about 250 ms if still active. Keep
+`request_id` and poll `pab_get_operation`. The same ID is never replayed;
+disconnection/caller cancellation does not undo accepted actions, and service
+timeouts never roll them back. Final results preserve phase, whether a change was
+submitted, Linux job path, observed state and errors. Unconfirmed does not mean
+unexecuted. Running operations currently expose overall state; detailed phases
+are part of the final result. Concurrent controls of the same resource return
+`resource_busy`. No new approval flow is added; OS permissions still apply.
+Service timeout defaults to 30000 ms (100–60000 ms); blocking native SCM calls
+cannot be forcibly interrupted. Dedicated Windows window/process and temporary
+SCM service fixtures plus isolated QUIC acceptance passed. Linux backends pass
+cross-compilation; Linux runtime and installed-host acceptance remain pending.
 
 System queries use `sysinfo` and require target system-query capability version 1.
 They return one sampled result with collection timestamps, not continuous monitoring
@@ -231,6 +279,34 @@ These tools passed Windows local tests, including native process lifecycle,
 result persistence and isolated QUIC. Installed-host, Windows/Linux two-machine
 and full NVIDIA hardware acceptance remain pending. Existing installers do not
 contain this batch.
+
+Network connection, DNS and OS session queries require system-query capability
+version 2; C1 queries remain usable with version 1. They share the same persisted
+sample, output budget, task history and original-ID lookup rules.
+
+Socket queries use `netstat2` with TCP/UDP, IPv4/IPv6, exact IP/port/PID and TCP
+state filters. Lists have no live pagination. UDP peer/state are unavailable;
+TCP listeners have null peers. Empty PID lists mean unobserved ownership. The scan
+stops at 100000 entries or a soft 5-second elapsed budget, with explicit truncation;
+blocking native inventory calls cannot be interrupted by that budget.
+
+DNS uses `hickory-resolver` with freshly read target system DNS configuration,
+without a public resolver fallback or local resolver cache. The default record type
+is A; AAAA/CNAME/MX/NS/PTR/SOA/SRV/TXT are also supported. PTR accepts an IP or
+reverse domain. Supply ASCII/IDNA names. Results contain owner/type/TTL and DNS
+presentation text; long values set `value_truncated`. The lookup timeout defaults
+to 5000 ms (100–10000); configuration loading is separate native I/O. This queries
+DNS rather than the native OS resolver: hosts, mDNS and Windows NRPT/VPN split-DNS
+policies are not consulted. Upstream servers may still cache responses.
+
+Session queries list OS sessions rather than accounts, MCP sessions or PAB terminals.
+Windows WTS can include service/listener sessions without a logged-in user. Linux
+uses logind on the system bus with a 5-second collection deadline; missing logind,
+access errors and unsupported platforms fail explicitly. Optional field failures
+are returned in each entry's `errors`. User and state filters match exactly.
+These three tools passed Windows local tests, deterministic local DNS fixtures and
+isolated QUIC; Linux collector cross-compilation passed. Linux/macOS runtime and
+installed-host acceptance remain pending.
 
 Text tools require an updated target Executor. They support UTF-8 and UTF-16,
 detect BOMs, and reject binary data instead of replacing undecodable bytes.

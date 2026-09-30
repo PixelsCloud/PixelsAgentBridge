@@ -33,11 +33,19 @@ impl SystemCollector {
             reply.error = Some(e.into());
             return reply;
         }
+        if let SystemQuery::Connections { filter, limit } = query {
+            return super::system_query_c2::connections(reply, filter, *limit);
+        }
         if !sysinfo::IS_SUPPORTED_SYSTEM {
             reply.state = "failed".into();
             reply.error = Some("unsupported operating system".into());
             return reply;
         }
+        let termination_identity = if let SystemQuery::Process { pid, .. } = query {
+            pab_os_control::process_identity(*pid).ok()
+        } else {
+            None
+        };
         reply.sampled_from_unix_ms = Some(now());
         let started = Instant::now();
         let processes = matches!(
@@ -85,6 +93,15 @@ impl SystemCollector {
             reply.cpu_sample_ms = Some(sample.elapsed().as_millis() as u64);
         }
         reply.data = match query {
+            SystemQuery::TerminateProcess { .. }
+            | SystemQuery::Services { .. }
+            | SystemQuery::Service { .. }
+            | SystemQuery::ServiceControl { .. }
+            | SystemQuery::Dns { .. }
+            | SystemQuery::Sessions { .. }
+            | SystemQuery::Connections { .. } => {
+                return failed(reply, "this query requires its dedicated collector");
+            }
             SystemQuery::Info { include_gpu, .. } => {
                 let Some(executor) = self.system.process(Pid::from_u32(std::process::id())) else {
                     return failed(reply, "executor process unavailable");
@@ -124,7 +141,19 @@ impl SystemCollector {
             }
             SystemQuery::Process { pid, .. } => match self.system.process(Pid::from_u32(*pid)) {
                 Some(p) => Some(SystemQueryData::Process {
-                    process: self.process(p, cpu, &identities),
+                    process: {
+                        let mut process = self.process(p, cpu, &identities);
+                        if let Some(token) = termination_identity.as_ref() {
+                            if pab_os_control::process_identity(*pid).as_ref().ok() != Some(token) {
+                                return failed(
+                                    reply,
+                                    "process identity changed during collection; query again",
+                                );
+                            }
+                        }
+                        process.termination_identity = termination_identity;
+                        process
+                    },
                 }),
                 None => return failed(reply, "process not found or not observable"),
             },
@@ -272,6 +301,7 @@ impl SystemCollector {
         identities: &HashMap<Pid, u64>,
     ) -> ProcessInfo {
         ProcessInfo {
+            termination_identity: None,
             pid: p.pid().as_u32(),
             parent_pid: p.parent().map(|p| p.as_u32()),
             name: bounded(&p.name().to_string_lossy(), 512),
@@ -388,14 +418,14 @@ impl SystemCollector {
         result
     }
 }
-fn now() -> i64 {
+pub(super) fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
         .min(i64::MAX as u128) as i64
 }
-fn bounded(s: &str, max: usize) -> String {
+pub(super) fn bounded(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_owned()
     } else {
@@ -411,16 +441,20 @@ fn basis_points(value: f32) -> Option<u32> {
         .is_finite()
         .then_some((value.max(0.) as f64 * 100.).round().min(u32::MAX as f64) as u32)
 }
-fn failed(mut r: SystemQueryReply, error: &str) -> SystemQueryReply {
+pub(super) fn failed(mut r: SystemQueryReply, error: &str) -> SystemQueryReply {
     r.state = "failed".into();
     r.error = Some(error.into());
     r.sampled_at_unix_ms = Some(now());
     r
 }
-fn bound_reply(reply: &mut SystemQueryReply) {
+pub(super) fn bound_reply(reply: &mut SystemQueryReply) {
     reply.warnings.truncate(8);
     loop {
         reply.returned_count = match &reply.data {
+            Some(SystemQueryData::Services { entries, .. }) => entries.len() as u32,
+            Some(SystemQueryData::Connections { entries, .. }) => entries.len() as u32,
+            Some(SystemQueryData::Sessions { entries, .. }) => entries.len() as u32,
+            Some(SystemQueryData::Dns { result }) => result.records.len() as u32,
             Some(SystemQueryData::Disks { entries }) => entries.len() as u32,
             Some(SystemQueryData::Processes { entries }) => entries.len() as u32,
             Some(SystemQueryData::Networks { entries }) => entries.len() as u32,
@@ -433,6 +467,10 @@ fn bound_reply(reply: &mut SystemQueryReply) {
         reply.truncated = true;
         reply.stop_reason = Some("output_bytes_limit".into());
         let removed = match &mut reply.data {
+            Some(SystemQueryData::Services { entries, .. }) => entries.pop().is_some(),
+            Some(SystemQueryData::Connections { entries, .. }) => entries.pop().is_some(),
+            Some(SystemQueryData::Sessions { entries, .. }) => entries.pop().is_some(),
+            Some(SystemQueryData::Dns { result }) => result.records.pop().is_some(),
             Some(SystemQueryData::Disks { entries }) => entries.pop().is_some(),
             Some(SystemQueryData::Processes { entries }) => entries.pop().is_some(),
             Some(SystemQueryData::Networks { entries }) => entries.pop().is_some(),
@@ -451,7 +489,7 @@ fn bound_reply(reply: &mut SystemQueryReply) {
     }
 }
 
-fn push_bounded<T: serde::Serialize>(
+pub(super) fn push_bounded<T: serde::Serialize>(
     entries: &mut Vec<T>,
     item: T,
     bytes: &mut usize,

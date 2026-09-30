@@ -627,7 +627,7 @@ impl OperationManager {
     async fn cancel(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if self.queue.system_record(id, code).await.is_ok() {
-            return Err("system queries do not support cancellation; read the sampled result using the original operation_ref".to_owned());
+            return Err("this system operation cannot be cancelled or rolled back; query the original operation_ref for its result".to_owned());
         }
         if let Ok((device, reply)) = self.queue.filesystem_record(id, code).await {
             if !pab_protocol::cancellable_filesystem_kind(&reply.kind) {

@@ -146,7 +146,7 @@ impl TransferQueue {
     }
 
     pub async fn active_for_device(&self, code: DeviceCode) -> Result<i64, RuntimeStoreError> {
-        Ok(sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations WHERE owner_session_id = ? AND device_code = ? AND kind IN ('file_transfer', 'file_stat', 'file_read', 'file_write', 'file_patch', 'file_search', 'file_hash', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'system_info', 'disks', 'processes', 'process', 'network_interfaces') AND finished_at_unix_ms IS NULL")
+        Ok(sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations WHERE owner_session_id = ? AND device_code = ? AND kind IN ('file_transfer', 'file_stat', 'file_read', 'file_write', 'file_patch', 'file_search', 'file_hash', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'system_info', 'disks', 'processes', 'process', 'network_interfaces', 'network_connections', 'dns', 'os_sessions', 'process_terminate', 'services', 'service', 'service_control') AND finished_at_unix_ms IS NULL")
             .bind(&self.session_id).bind(code.to_string()).fetch_one(&self.store.pool).await?)
     }
 

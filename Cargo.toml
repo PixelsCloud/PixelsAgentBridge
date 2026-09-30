@@ -5,6 +5,8 @@ members = [
     "crates/executor",
     "crates/logging",
     "crates/platform",
+    "crates/os-sessions",
+    "crates/os-control",
     "crates/protocol",
     "crates/relay",
     "crates/server",

@@ -136,7 +136,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ## MCP 工具
 
-当前源码提供 **37 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
+当前源码提供 **44 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
 
 | 工具 | 用途 |
 |---|---|
@@ -177,10 +177,25 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_list_processes` | 一次采集有界进程列表，支持 PID/名称/用户过滤，不实时分页 |
 | `pab_get_process` | 查询指定 PID 当前可获得的身份和资源信息 |
 | `pab_list_network_interfaces` | 查询网卡地址、MAC、MTU、状态和累计收发字节 |
+| `pab_list_network_connections` | 查询 TCP/UDP、监听端口和可见 PID，支持地址/端口/状态过滤 |
+| `pab_resolve_dns` | 通过目标机器配置的 DNS 服务器查询记录 |
+| `pab_list_sessions` | 通过 Windows WTS 或 Linux logind 查询 OS 登录会话 |
+| `pab_terminate_process` | 核对原生进程身份后请求退出，可显式允许超时强制终止 |
+| `pab_list_services` | 按名称和状态查询 Windows SCM / Linux systemd 服务 |
+| `pab_get_service` | 查询指定服务的状态、启动方式和运行信息 |
+| `pab_service_control` | 异步启动、停止、重启服务或修改启用/禁用配置 |
 
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。
+
+进程终止和服务管理要求 system-query 能力版本 3。先用 `pab_get_process` 获取 `termination_identity`，再传入 `pab_terminate_process` 的 `identity`；不能用秒级启动时间代替。Windows 使用原生创建时间并在操作期间持有同一个进程句柄。Linux 持有原进程的 pidfd，身份租约有效 10 分钟、最多 256 个；过期或 Executor 重启后需要重新查询，不回退到按 PID 发信号。
+
+终止默认 `force=false`、等待 5000 ms。Windows 对顶层窗口发送 WM_CLOSE；无窗口进程明确返回不支持正常退出，显式 `force=true` 才直接强制终止。Linux 先发 SIGTERM，超时且 `force=true` 才发 SIGKILL；强制后的退出确认另有最多 5 秒等待。只操作一个进程，不终止进程树，不允许终止 Executor 自身或系统 init。
+
+服务查询使用 Windows SCM 或 Linux systemd 系统总线，Linux 要求完整 `.service` 名称。列表按名称字面子串、状态精确过滤，不实时分页；列表是摘要，详细配置使用 `pab_get_service`。Windows 列表不含内核驱动，Linux 会包含未加载的已安装服务（`not_loaded`）。启用/禁用只改启动配置，Windows 启用设为自动启动；Linux 修改持久化 unit 链接，不强制解除屏蔽。启动、停止、重启等待实际状态，Linux 还核对原 job 完成信号。Windows 不额外停止依赖服务；systemd 仍可能执行 unit 定义的依赖事务。不能停止或重启 Executor 自己所在的服务。
+
+这两个控制工具是异步操作：约 250 ms 后仍未完成就返回 `running`，使用原 `request_id` 和 `pab_get_operation` 查询结果。相同 ID 永远不重放，断开或调用方取消不会撤销已提交动作，服务超时也不回滚。结果保留阶段、是否提交过修改、Linux job 路径、观测状态和错误；未确认不等于未执行。运行中目前只报告总状态，细分阶段在最终结果中返回。相同资源的并发控制返回 `resource_busy`；不增加审批流程，OS 权限错误直接返回。服务控制超时默认 30000 ms，范围 100–60000 ms；原生阻塞 SCM 调用不能硬中断。Windows 专用窗口、临时服务及隔离 QUIC 验证已通过，Linux 原生后端已交叉编译检查，Linux 真机及安装后验收仍待完成。
 
 系统查询使用 `sysinfo`，要求目标支持 system-query 能力版本 1。每次返回带采集起止时间的一次结果，不持续监控，也不是 OS 原子快照。列表默认 100 项，最多 1000 项，同时受 32 KiB 实际序列化预算限制；`truncated=true` 时使用过滤缩小范围，不做实时分页。可选字段不可读取时返回 null，不采集进程命令参数和环境变量。
 
@@ -189,6 +204,14 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 `include_gpu=true` 时通过动态加载的 `nvml-wrapper` 查询 NVIDIA。GPU 分区单独报告状态与字段错误；NVML 不可用不能解释为没有显卡。AMD/Intel 后端尚未实现。系统查询等待完成，暂不支持取消；阻塞 OS/驱动调用没有硬中断期限，后台准入有界，采集器忙时返回 `executor_busy`。每个 MCP 最多 16 个未解决的系统查询。相同 `request_id` 通过 `pab_get_operation` 读取原采样，省略 ID 才产生新采样；中断或结果未确认时不自动重跑。Desktop 任务记录显示查询类型和返回项数。
 
 这组工具已通过 Windows 本地测试，包含真实进程生命周期、结果持久化和隔离 QUIC。安装后的宿主、Windows/Linux 双机和完整 NVIDIA 硬件验收仍待完成；现有安装包不含本批改动。
+
+网络连接、DNS 和 OS 会话查询要求 system-query 能力版本 2，C1 工具继续兼容版本 1。复用原采样持久化、输出预算、任务记录和原 ID 查询规则。
+
+连接表使用 `netstat2`，支持 TCP/UDP、IPv4/IPv6、精确 IP/端口/PID 和 TCP 状态过滤，不做实时分页。UDP 没有可观察的远端及状态；TCP 监听条目的远端为 null，空 PID 列表表示未观察到归属。扫描受到 100000 项和软性 5 秒期限约束，截断明确报告；这不能硬中断库的阻塞枚举调用。
+
+DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退公共 DNS、不使用本地解析缓存。默认 A，另支持 AAAA/CNAME/MX/NS/PTR/SOA/SRV/TXT；PTR 可输入 IP 或反向域名，域名使用 ASCII/IDNA。返回名称、类型、TTL 和 DNS 展示文本，长值有 `value_truncated` 标记。查询超时默认 5000 ms，范围 100–10000；读取系统配置属于另行完成的原生 I/O。这是 DNS 查询，不等同于系统原生解析器：不读取 hosts，不处理 mDNS 或 Windows NRPT/VPN 分流策略，上游 DNS 仍可能有缓存。
+
+会话查询列出 OS 会话，不是账户、MCP 会话或 PAB 终端。Windows WTS 可以包含尚无登录用户的服务/监听会话。Linux 通过系统总线访问 logind，采集期限为 5 秒；logind 缺失、访问失败或不支持的平台明确失败，可选字段失败写入每项 `errors`。用户名和状态过滤均为精确匹配。这三个工具已通过 Windows 本地测试、本地 DNS 替身和隔离 QUIC；Linux 采集库交叉编译检查通过。Linux/macOS 运行时和安装后的宿主验收仍待完成。
 
 文本工具要求目标 Executor 也升级。支持 UTF-8、UTF-16 和 BOM 检测，不静默替换
 无法解码的字节。文件上限 4 MiB，单次最多返回 16 KiB UTF-8 文本，写入及补丁

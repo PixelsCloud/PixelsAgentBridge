@@ -14,5 +14,12 @@ serde_json.workspace = true
 sysinfo = { version = "=0.39.6", default-features = false, features = ["system", "disk", "network", "user"] }
 nvml-wrapper = "=0.13.0"
 
+netstat2 = "=0.11.2"
+hickory-resolver = { version = "=0.26.3", default-features = false, features = ["tokio", "system-config"] }
+tokio.workspace = true
+pab-os-sessions = { path = "../os-sessions" }
+
+pab-os-control = { path = "../os-control" }
+
 [dev-dependencies]
 pab-task-runtime = { path = "../task-runtime" }

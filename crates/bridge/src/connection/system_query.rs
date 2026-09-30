@@ -21,7 +21,7 @@ impl AuthenticatedDeviceConnection {
                 system_query_schema_version,
                 ..
             } if context.device_ref == self.device_ref => {
-                if system_query_schema_version.is_none_or(|v| v < SYSTEM_QUERY_SCHEMA_VERSION) {
+                if system_query_schema_version.is_none_or(|v| v < query.required_version()) {
                     return Err(BridgeError::UnsupportedSystemQuery);
                 }
             }
@@ -73,7 +73,18 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
         )
         && matches!(
             r.kind.as_str(),
-            "system_info" | "disks" | "processes" | "process" | "network_interfaces"
+            "system_info"
+                | "disks"
+                | "processes"
+                | "process"
+                | "network_interfaces"
+                | "network_connections"
+                | "dns"
+                | "os_sessions"
+                | "process_terminate"
+                | "services"
+                | "service"
+                | "service_control"
         )
         && r.returned_count <= 1000
         && r.warnings.len() <= 8
@@ -81,7 +92,22 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
         && (r.state != "completed"
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
-                ("system_info", Some(SystemQueryData::Info { .. }))
+                (
+                    "network_connections",
+                    Some(SystemQueryData::Connections { .. })
+                ) | ("dns", Some(SystemQueryData::Dns { .. }))
+                    | ("os_sessions", Some(SystemQueryData::Sessions { .. }))
+                    | ("services", Some(SystemQueryData::Services { .. }))
+                    | ("service", Some(SystemQueryData::Service { .. }))
+                    | (
+                        "process_terminate",
+                        Some(SystemQueryData::ProcessTermination { .. })
+                    )
+                    | (
+                        "service_control",
+                        Some(SystemQueryData::ServiceControl { .. })
+                    )
+                    | ("system_info", Some(SystemQueryData::Info { .. }))
                     | ("disks", Some(SystemQueryData::Disks { .. }))
                     | ("processes", Some(SystemQueryData::Processes { .. }))
                     | ("process", Some(SystemQueryData::Process { .. }))
