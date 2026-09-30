@@ -1,0 +1,249 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 890" role="img" aria-labelledby="title description">
+  <title id="title">Pixels Agent Bridge — from an AI request to a remote result / AI 远程操作工作流程</title>
+  <desc id="description">An AI agent calls an independent local MCP Bridge over stdio. A TLS control service resolves and authorizes the remote device. Operation data uses P2P or Relay to reach the Executor, which runs commands, transfers files, and handles terminals and desktop operations. Results return to the agent. Local SQLite records and WebSocket status reports make activity visible in Desktop. The animation cycles through request, authorization, connection, execution, and results every sixteen seconds.</desc>
+  <defs>
+    <style>
+      text { font-family: 'Segoe UI', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif; fill: #e5edf5; }
+      .mono { font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace; }
+      .eyebrow { font-size: 11px; font-weight: 650; letter-spacing: 1.4px; fill: #91a5ba; }
+      .name { font-size: 21px; font-weight: 650; }
+      .sub { font-size: 13px; fill: #a4b5c7; }
+      .small { font-size: 12px; fill: #91a5ba; }
+      .label { font-size: 12px; font-weight: 550; }
+      .region { fill: #0e1b2c; stroke: #2a3b50; stroke-width: 1; }
+      .node { fill: #142638; stroke: #3e6775; stroke-width: 1.5; }
+      .control { fill: #162735; stroke: #5c8a9a; stroke-width: 1.5; }
+      .relay { fill: #2c271f; stroke: #c3a064; stroke-width: 1.5; }
+      .record { fill: #211f36; stroke: #7365a3; stroke-width: 1.5; }
+      .route { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+      .control-route { stroke: #67b9d2; stroke-dasharray: 6 6; opacity: .66; }
+      .direct-route { stroke: #67d9c6; opacity: .86; }
+      .relay-route { stroke: #e6b96f; opacity: .65; }
+      .status-route { stroke: #b0a0ed; stroke-dasharray: 4 5; opacity: .7; }
+      .packet { opacity: 0; }
+      .stage-box { fill: #132235; stroke: #304257; stroke-width: 1.2; }
+      .request-glow { animation: request 16s linear infinite; }
+      .auth-glow { animation: auth 16s linear infinite; }
+      .connect-glow { animation: connect 16s linear infinite; }
+      .execute-glow { animation: execute 16s linear infinite; }
+      .return-glow { animation: result 16s linear infinite; }
+      .relay-glow { animation: relay 16s linear infinite; }
+      .progress { transform-origin: 1058px 474px; animation: progress 16s linear infinite; }
+      @keyframes request { 0%, 13% { stroke: #67d9c6; } 16%, 100% { stroke: #304257; } }
+      @keyframes auth { 0%, 13%, 34%, 100% { stroke: #304257; } 16%, 30% { stroke: #67b9d2; } }
+      @keyframes connect { 0%, 28%, 63%, 100% { stroke: #304257; } 32%, 59% { stroke: #67d9c6; } }
+      @keyframes execute { 0%, 57%, 81%, 100% { stroke: #304257; } 61%, 77% { stroke: #67d9c6; } }
+      @keyframes result { 0%, 76%, 100% { stroke: #304257; } 80%, 97% { stroke: #b0a0ed; } }
+      @keyframes relay { 0%, 42%, 63%, 100% { stroke: #c3a064; } 46%, 59% { stroke: #ffcf85; } }
+      @keyframes progress { 0%, 59%, 100% { transform: scaleX(0); } 60% { transform: scaleX(.04); } 77%, 97% { transform: scaleX(1); } }
+      @media (prefers-reduced-motion: reduce) {
+        .packet { display: none; }
+        .request-glow, .auth-glow, .connect-glow, .execute-glow, .return-glow, .relay-glow, .progress { animation: none; }
+      }
+    </style>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101d2c"/><stop offset="1" stop-color="#0b1422"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#26374a" stroke-width=".5" opacity=".35"/>
+    </pattern>
+    <marker id="arrow-control" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1L7 4L1 7" fill="none" stroke="#67b9d2" stroke-width="1.5"/>
+    </marker>
+    <marker id="arrow-direct" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1L7 4L1 7" fill="none" stroke="#67d9c6" stroke-width="1.5"/>
+    </marker>
+    <marker id="arrow-relay" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1L7 4L1 7" fill="none" stroke="#e6b96f" stroke-width="1.5"/>
+    </marker>
+    <marker id="arrow-status" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1L7 4L1 7" fill="none" stroke="#b0a0ed" stroke-width="1.5"/>
+    </marker>
+    <path id="request-path" d="M260 425H360"/>
+    <path id="agent-result-path" d="M360 460H260"/>
+    <path id="lookup-path" d="M585 398H617Q635 398 635 380V318Q635 300 653 300H700"/>
+    <path id="lookup-result-path" d="M700 300H653Q635 300 635 318V380Q635 398 617 398H585"/>
+    <path id="presence-path" d="M1150 382V318Q1150 300 1132 300H930"/>
+    <path id="p2p-path" d="M585 425H1040"/>
+    <path id="result-path" d="M1040 454H585"/>
+    <path id="relay-path" d="M585 478H632Q650 478 650 496V591Q650 609 668 609H720M720 609H930M930 609H967Q985 609 985 591V496Q985 478 1003 478H1040"/>
+    <path id="status-path" d="M395 492V518Q395 536 377 536H183Q165 536 165 554V565"/>
+    <path id="record-path" d="M505 492V565"/>
+    <path id="read-path" d="M355 617H270"/>
+  </defs>
+
+  <!-- Background and regions. All text and lines remain useful without animation. -->
+  <rect width="1280" height="890" rx="24" fill="url(#background)"/>
+  <rect width="1280" height="890" rx="24" fill="url(#grid)"/>
+  <rect x="40" y="170" width="565" height="535" rx="18" class="region"/>
+  <rect x="640" y="170" width="350" height="535" rx="18" fill="#102030" stroke="#3c505e" stroke-dasharray="7 6"/>
+  <rect x="1020" y="170" width="220" height="535" rx="18" class="region"/>
+
+  <!-- Connections first, opaque node surfaces below prevent lines showing through. -->
+  <use href="#request-path" class="route direct-route" marker-end="url(#arrow-direct)"/>
+  <use href="#agent-result-path" class="route status-route" marker-end="url(#arrow-status)"/>
+  <use href="#lookup-path" class="route control-route" marker-end="url(#arrow-control)"/>
+  <use href="#presence-path" class="route control-route" marker-end="url(#arrow-control)"/>
+  <use href="#p2p-path" class="route direct-route" marker-end="url(#arrow-direct)"/>
+  <use href="#result-path" class="route direct-route" opacity=".65" marker-end="url(#arrow-direct)"/>
+  <path d="M585 478H632Q650 478 650 496V591Q650 609 668 609H720" class="route relay-route" marker-end="url(#arrow-relay)"/>
+  <path d="M930 609H967Q985 609 985 591V496Q985 478 1003 478H1040" class="route relay-route" marker-end="url(#arrow-relay)"/>
+  <use href="#status-path" class="route status-route" marker-end="url(#arrow-status)"/>
+  <use href="#record-path" class="route status-route" marker-end="url(#arrow-status)"/>
+  <use href="#read-path" class="route status-route" marker-end="url(#arrow-status)"/>
+
+  <!-- Animated packets; SMIL has no script or external resource dependency. -->
+  <circle r="4" fill="#8ee8d9" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.02;0.12;1"><mpath href="#request-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;0.02;0.10;0.12;1"/>
+  </circle>
+  <circle r="4" fill="#89d4eb" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.14;0.22;1"><mpath href="#lookup-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.13;0.14;0.21;0.22;1"/>
+  </circle>
+  <circle r="3.5" fill="#89d4eb" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.14;0.22;1"><mpath href="#presence-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.13;0.14;0.21;0.22;1"/>
+  </circle>
+  <circle r="4" fill="#89d4eb" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.23;0.30;1"><mpath href="#lookup-result-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.22;0.23;0.29;0.30;1"/>
+  </circle>
+  <circle r="5" fill="#8ee8d9" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.33;0.43;1"><mpath href="#p2p-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.32;0.33;0.42;0.43;1"/>
+  </circle>
+  <circle r="5" fill="#f3ce8b" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.45;0.60;1"><mpath href="#relay-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.44;0.45;0.59;0.60;1"/>
+  </circle>
+  <circle r="5" fill="#8ee8d9" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.79;0.89;1"><mpath href="#result-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.78;0.79;0.88;0.89;1"/>
+  </circle>
+  <circle r="4" fill="#c4b3ff" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.90;0.98;1"><mpath href="#agent-result-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.89;0.90;0.97;0.98;1"/>
+  </circle>
+  <circle r="4" fill="#c4b3ff" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.80;0.96;1"><mpath href="#status-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.79;0.80;0.95;0.96;1"/>
+  </circle>
+  <circle r="3.5" fill="#c4b3ff" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.81;0.87;1"><mpath href="#record-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.80;0.81;0.86;0.87;1"/>
+  </circle>
+  <circle r="3.5" fill="#c4b3ff" class="packet">
+    <animateMotion dur="16s" repeatCount="indefinite" calcMode="linear" keyPoints="0;0;1;1" keyTimes="0;0.88;0.96;1"><mpath href="#read-path"/></animateMotion>
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.87;0.88;0.95;0.96;1"/>
+  </circle>
+
+  <!-- Component cards. -->
+  <rect x="60" y="382" width="200" height="110" rx="14" class="node request-glow"/>
+  <rect x="360" y="382" width="225" height="110" rx="14" class="node connect-glow"/>
+  <rect x="1040" y="382" width="180" height="110" rx="14" class="node execute-glow"/>
+  <rect x="700" y="242" width="230" height="100" rx="14" class="control auth-glow"/>
+  <rect x="720" y="562" width="210" height="92" rx="14" class="relay relay-glow"/>
+  <rect x="60" y="565" width="210" height="105" rx="14" class="node return-glow"/>
+  <rect x="355" y="565" width="230" height="105" rx="14" class="record return-glow"/>
+
+  <text x="60" y="198" class="eyebrow">YOUR COMPUTER / 操作端</text>
+  <text x="60" y="222" class="sub">One MCP process per agent / 各 Agent 独立运行</text>
+  <text x="660" y="198" class="eyebrow">NETWORK / 网络</text>
+  <text x="660" y="222" class="sub">Your deployment / 自部署服务</text>
+  <text x="1040" y="198" class="eyebrow">TARGET / 目标设备</text>
+  <text x="1040" y="222" class="sub">Windows · Linux</text>
+
+  <text x="80" y="408" class="eyebrow">MCP CLIENT</text>
+  <text x="80" y="438" class="name">Your AI agent</text>
+  <text x="80" y="464" class="sub">你的 AI Agent</text>
+  <text x="380" y="408" class="eyebrow">MCP + BRIDGE</text>
+  <text x="380" y="438" class="name">Pixels MCP</text>
+  <text x="380" y="464" class="sub mono">pab-mcp · stdio</text>
+  <text x="1058" y="408" class="eyebrow">DEVICE SERVICE</text>
+  <text x="1058" y="438" class="name">Executor</text>
+  <text x="1058" y="462" class="sub">目标设备执行器</text>
+  <rect x="1058" y="473" width="144" height="3" rx="1.5" fill="#263e4c"/>
+  <rect x="1058" y="473" width="144" height="3" rx="1.5" fill="#67d9c6" class="progress"/>
+
+  <text x="720" y="265" class="eyebrow">CONTROL PLANE</text>
+  <text x="720" y="292" font-size="20" font-weight="650">Control service</text>
+  <text x="720" y="318" class="sub">身份 · 寻址 · 授权</text>
+  <text x="740" y="589" font-size="20" font-weight="650" fill="#f3ce8b">Relay</text>
+  <text x="740" y="614" class="sub">Fallback / 回退传输</text>
+  <text x="740" y="637" class="small">Authorized / 授权转发</text>
+
+  <g stroke="#67d9c6" stroke-width="1.5" fill="none" stroke-linecap="round">
+    <rect x="80" y="586" width="26" height="18" rx="3"/>
+    <path d="M93 604V610M87 610H99"/>
+  </g>
+  <text x="120" y="604" font-size="19" font-weight="650">Desktop</text>
+  <text x="80" y="630" class="sub">设备与状态 / live status</text>
+  <text x="80" y="653" class="small">Activity / 汇总展示</text>
+  <text x="375" y="604" font-size="19" font-weight="650">Local records</text>
+  <text x="375" y="630" class="sub">SQLite · 任务与历史</text>
+  <text x="375" y="653" class="small">Task history / 持久化记录</text>
+
+  <!-- Connection labels. -->
+  <text x="310" y="410" text-anchor="middle" class="label">MCP / stdio</text>
+  <text x="310" y="483" text-anchor="middle" class="small">Result / 结果</text>
+  <text x="666" y="286" text-anchor="middle" class="small">WSS</text>
+  <text x="1065" y="282" text-anchor="middle" class="small">Presence / 设备在线</text>
+  <rect x="704" y="386" width="222" height="26" rx="13" fill="#173b3b"/>
+  <text x="815" y="404" text-anchor="middle" class="label" style="fill:#8ee8d9">P2P · direct / 首选直连</text>
+  <text x="815" y="486" text-anchor="middle" class="label">Results + progress / 结果与进度</text>
+  <text x="815" y="542" text-anchor="middle" class="small">When direct is unavailable / 无法直连时</text>
+  <text x="174" y="523" class="small" style="fill:#c0b0f2">Status / 状态上报</text>
+  <text x="516" y="550" class="small">Tasks / 任务</text>
+  <text x="313" y="602" text-anchor="middle" class="small">Read</text>
+  <text x="60" y="690" class="small">Desktop observes; MCP operates / Desktop 汇总，MCP 独立操作</text>
+  <text x="815" y="690" text-anchor="middle" class="small">P2P or Relay / 按连接状态选择路径</text>
+
+  <text x="1040" y="538" font-size="14" font-weight="600">Operations / 原生操作</text>
+  <g class="sub">
+    <circle cx="1045" cy="563" r="3" fill="#67d9c6"/><text x="1058" y="568">Commands / 命令</text>
+    <circle cx="1045" cy="591" r="3" fill="#67d9c6"/><text x="1058" y="596">Files / 文件</text>
+    <circle cx="1045" cy="619" r="3" fill="#67d9c6"/><text x="1058" y="624">Terminal / 终端</text>
+    <circle cx="1045" cy="647" r="3" fill="#67d9c6"/><text x="1058" y="652">Desktop / 桌面</text>
+  </g>
+
+  <!-- Five-stage timeline and footer, outside all region boundaries. -->
+  <text x="40" y="745" class="eyebrow">ONE REQUEST, END TO END / 一次请求的完整流程</text>
+  <g transform="translate(40 763)">
+    <rect width="230" height="64" rx="12" class="stage-box request-glow"/>
+    <text x="18" y="26" font-size="17" font-weight="600">01  Request</text><text x="18" y="48" class="sub">发起工具调用</text>
+  </g>
+  <g transform="translate(282 763)">
+    <rect width="230" height="64" rx="12" class="stage-box auth-glow"/>
+    <text x="18" y="26" font-size="17" font-weight="600">02  Authorize</text><text x="18" y="48" class="sub">设备寻址与认证</text>
+  </g>
+  <g transform="translate(524 763)">
+    <rect width="230" height="64" rx="12" class="stage-box connect-glow"/>
+    <text x="18" y="26" font-size="17" font-weight="600">03  Connect</text><text x="18" y="48" class="sub">P2P 或 Relay 连接</text>
+  </g>
+  <g transform="translate(766 763)">
+    <rect width="230" height="64" rx="12" class="stage-box execute-glow"/>
+    <text x="18" y="26" font-size="17" font-weight="600">04  Execute</text><text x="18" y="48" class="sub">目标设备执行操作</text>
+  </g>
+  <g transform="translate(1008 763)">
+    <rect width="230" height="64" rx="12" class="stage-box return-glow"/>
+    <text x="18" y="26" font-size="17" font-weight="600">05  Return</text><text x="18" y="48" class="sub">返回结果与更新记录</text>
+  </g>
+  <text x="40" y="859" class="small">Independent agent connections · Native execution · Live task visibility</text>
+  <text x="1240" y="859" text-anchor="end" class="small">16s loop / 循环演示</text>
+
+  <!-- Title and legend. -->
+  <g transform="translate(44 42)" stroke="#67d9c6" stroke-width="3" fill="#67d9c6" stroke-linejoin="round">
+    <path d="M24 4L4 39H44Z" fill="none"/><circle cx="24" cy="4" r="5"/><circle cx="4" cy="39" r="5"/><circle cx="44" cy="39" r="5"/>
+  </g>
+  <text x="111" y="67" font-size="29" font-weight="650">Pixels Agent Bridge</text>
+  <text x="111" y="97" font-size="15" fill="#a4b5c7">From a prompt to a remote result / 从一句指令到远程执行结果</text>
+  <line x1="40" y1="133" x2="71" y2="133" class="route control-route"/>
+  <text x="84" y="137" class="small">Control / 控制与寻址</text>
+  <line x1="374" y1="133" x2="405" y2="133" class="route direct-route"/>
+  <text x="418" y="137" class="small">P2P data / 直连传输</text>
+  <line x1="687" y1="133" x2="718" y2="133" class="route relay-route"/>
+  <text x="731" y="137" class="small">Relay data / 中继传输</text>
+  <line x1="1000" y1="133" x2="1031" y2="133" class="route status-route"/>
+  <text x="1044" y="137" class="small">Status / 状态与记录</text>
+</svg>

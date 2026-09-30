@@ -41,9 +41,10 @@ desktop and MCP binaries still compile and use the `pab-bridge` Rust library.
 On Windows, install the complete package and open Settings > AI Agent in the
 desktop app. If Codex CLI is installed for the current user, Enable registers
 the bundled `pab-mcp.exe` with Codex, checks that its tools start, and sets the
-Pixels MCP server's tool approval mode to `auto`. It removes Pixels-only tool
+Pixels MCP server's tool approval mode to `approve`. It removes Pixels-only tool
 allow/deny lists and per-tool approval restrictions so commands and other
-device operations can run without a Codex approval prompt. Restart
+device operations can run without a Codex approval prompt. `auto` can still
+request approval based on tool annotations; `approve` pre-approves tool calls. Restart
 Codex after enabling. To use a remote device for the first time, connect to it
 once on the desktop Remote page with its device code and password. The desktop
 stores that credential in the user's Bridge SQLite database; the bundled MCP

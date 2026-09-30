@@ -1,8 +1,11 @@
 /.env/
 /references/
 /docs/
-/diagram/
-/README.md
+/diagram/*
+!/diagram/workflow/
+/diagram/workflow/*
+!/diagram/workflow/agent-workflow.svg
+!/diagram/workflow/agent-workflow@2x.png
 /target/
 /tools/nsis/
 /apps/desktop/src-tauri/icons/android/
