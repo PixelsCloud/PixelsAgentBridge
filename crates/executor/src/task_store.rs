@@ -16,7 +16,9 @@ const CHANGE_BUFFER: usize = 1024;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
 mod directory;
+mod filesystem;
 mod operation;
+mod system_query;
 mod terminal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +59,7 @@ impl TaskStore {
             .await?;
         let mut tx = pool.begin().await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS system_query_results (request_id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(request_id) REFERENCES read_operations(request_id) ON DELETE CASCADE)",
             r#"
             CREATE TABLE IF NOT EXISTS task_records (
                 task_id TEXT PRIMARY KEY,
@@ -132,6 +135,7 @@ impl TaskStore {
         ] {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
+        sqlx::query("CREATE TABLE IF NOT EXISTS filesystem_results (request_id TEXT PRIMARY KEY REFERENCES read_operations(request_id), fingerprint TEXT NOT NULL, reply_json TEXT)").execute(&mut *tx).await?;
         tx.commit().await?;
         let (changes, _) = broadcast::channel(CHANGE_BUFFER);
         Ok(Self { pool, changes })

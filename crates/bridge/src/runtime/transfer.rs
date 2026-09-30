@@ -8,6 +8,52 @@ use pab_protocol::{DeviceRef, RequestId};
 use super::{BridgeRuntime, RuntimeError};
 
 impl BridgeRuntime {
+    /// Execute a submission that has already been durably accepted by TransferQueue.
+    /// The queue, not this adapter, decides the final observation after a failure.
+    pub async fn execute_queued_transfer(
+        &self,
+        spec: &super::TransferRequest,
+        control: &crate::TransferControl,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), RuntimeError> {
+        let resolved = self.resolve_cached_device_code(spec.device_code).await?;
+        if resolved != spec.device_ref {
+            return Err(RuntimeError::TaskOperation(
+                "device code now identifies another device".to_owned(),
+            ));
+        }
+        let connection = self
+            .inner
+            .device(spec.device_ref)
+            .await
+            .connection()
+            .await?;
+        if spec.direction == "upload" {
+            connection
+                .upload_file_controlled(
+                    spec.request_id,
+                    std::path::Path::new(&spec.source),
+                    &spec.destination,
+                    spec.overwrite,
+                    control,
+                    progress,
+                )
+                .await?;
+        } else {
+            connection
+                .download_file_controlled(
+                    spec.request_id,
+                    &spec.source,
+                    std::path::Path::new(&spec.destination),
+                    spec.overwrite,
+                    control,
+                    progress,
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
     pub async fn prepare_transfer_record(
         &self,
         id: RequestId,

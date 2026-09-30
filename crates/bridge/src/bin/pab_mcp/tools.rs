@@ -10,11 +10,30 @@ pub(super) async fn call_tool(
     arguments: &Value,
 ) -> Result<Value, String> {
     match name {
+        "pab_system_info"
+        | "pab_list_disks"
+        | "pab_list_processes"
+        | "pab_get_process"
+        | "pab_list_network_interfaces" => {
+            super::mcp_system_query::call(runtime, name, arguments).await
+        }
+        "pab_file_stat"
+        | "pab_file_read"
+        | "pab_file_write"
+        | "pab_file_patch"
+        | "pab_file_search"
+        | "pab_file_hash"
+        | "pab_mkdir"
+        | "pab_file_copy"
+        | "pab_file_move"
+        | "pab_file_delete"
+        | "pab_archive_create"
+        | "pab_archive_extract" => super::mcp_filesystem::call(runtime, name, arguments).await,
         "pab_list_devices" => list_local_devices().await,
         "pab_connect" => {
             let device_ref = resolve_target(runtime, arguments).await?;
             let context = runtime
-                .current_environment(device_ref)
+                .connect_device(device_ref)
                 .await
                 .map_err(|error| error.to_string())?;
             Ok(json!({
@@ -52,6 +71,7 @@ pub(super) async fn call_tool(
                 .map_err(|error| error.to_string())?;
             Ok(json!({
                 "task": snapshot,
+                "operation_ref": { "device_code": arguments["device_code"], "operation_id": snapshot.request_id, "kind": "command", "task_id": snapshot.task_ref.task_id },
                 "os_reminder": target.compact_reminder()
             }))
         }
@@ -223,60 +243,6 @@ pub(super) async fn call_tool(
                 .map_err(|error| error.to_string())?;
             Ok(json!({ "session_id": id, "closed": true }))
         }
-        "pab_upload_file" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let source = required_text(arguments, "source")?;
-            let destination = required_text(arguments, "destination")?;
-            let overwrite = arguments
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let transferred = std::sync::atomic::AtomicU64::new(0);
-            let total = std::sync::atomic::AtomicU64::new(0);
-            runtime
-                .upload_file(
-                    device_ref,
-                    std::path::Path::new(source),
-                    destination,
-                    overwrite,
-                    |offset, size| {
-                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
-                        total.store(size, std::sync::atomic::Ordering::Relaxed);
-                    },
-                )
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(
-                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
-            )
-        }
-        "pab_download_file" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let source = required_text(arguments, "source")?;
-            let destination = required_text(arguments, "destination")?;
-            let overwrite = arguments
-                .get("overwrite")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let transferred = std::sync::atomic::AtomicU64::new(0);
-            let total = std::sync::atomic::AtomicU64::new(0);
-            runtime
-                .download_file(
-                    device_ref,
-                    source,
-                    std::path::Path::new(destination),
-                    overwrite,
-                    |offset, size| {
-                        transferred.store(offset, std::sync::atomic::Ordering::Relaxed);
-                        total.store(size, std::sync::atomic::Ordering::Relaxed);
-                    },
-                )
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(
-                json!({ "transferred_bytes": transferred.load(std::sync::atomic::Ordering::Relaxed), "total_bytes": total.load(std::sync::atomic::Ordering::Relaxed) }),
-            )
-        }
         _ => Err(format!("unknown tool: {name}")),
     }
 }
@@ -305,7 +271,7 @@ pub(super) async fn list_local_devices() -> Result<Value, String> {
     Ok(json!({ "devices": devices }))
 }
 
-async fn resolve_target(
+pub(super) async fn resolve_target(
     runtime: &BridgeRuntime,
     arguments: &Value,
 ) -> Result<pab_protocol::DeviceRef, String> {

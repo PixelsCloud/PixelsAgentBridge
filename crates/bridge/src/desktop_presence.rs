@@ -337,7 +337,12 @@ impl ToolCallGuard {
                         break;
                     }
                 }
-                for path in ["/task/request_id", "/snapshot/request_id", "/request_id"] {
+                for path in [
+                    "/task/request_id",
+                    "/snapshot/request_id",
+                    "/request_id",
+                    "/operation_ref/operation_id",
+                ] {
                     if let Some(value) = result.pointer(path).and_then(|value| value.as_str()) {
                         call.request_id = Some(value.to_owned());
                         break;

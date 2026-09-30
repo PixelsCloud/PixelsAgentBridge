@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 pub(super) fn tools() -> Vec<Value> {
-    vec![
+    let mut tools = vec![
         tool(
             "pab_list_devices",
             "List devices previously connected from this computer, including their 9-digit codes, names and OS. Works while the server is offline.",
@@ -199,15 +199,48 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_upload_file",
-            "Upload a binary file to a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
+            "Queue a binary upload and immediately return operation_ref. Query pab_get_operation for progress/outcome. Reuse request_id to deduplicate; never resubmit an unconfirmed result with a new ID. Absolute paths; overwrite replaces only after verification; wait_ms optionally waits up to 5000 ms.",
             file_tool_schema(),
         ),
         tool(
             "pab_download_file",
-            "Download a binary file from a selected device. Paths must be absolute. Set overwrite=true to replace an existing regular file after verification.",
+            "Queue a binary download and immediately return operation_ref. Query pab_get_operation for progress/outcome. Reuse request_id to deduplicate; never resubmit an unconfirmed result with a new ID. Absolute paths; overwrite replaces only after verification; wait_ms optionally waits up to 5000 ms.",
             file_tool_schema(),
         ),
-    ]
+        tool(
+            "pab_get_operation",
+            "Read durable transfer or command status by original request ID and device code. Works offline for cached records; unconfirmed transfers are checked in the background. Cached OS context is explicitly marked.",
+            operation_schema(),
+        ),
+        tool(
+            "pab_cancel_operation",
+            "Request cancellation of an operation owned by this MCP session. cancel_requested is intent, not confirmation. Completion wins if publication already succeeded. Query the original operation for the outcome.",
+            operation_schema(),
+        ),
+        tool(
+            "pab_list_operations",
+            "List this MCP session's operations, newest first, using a stable before cursor. Optional device and state filters.",
+            json!({
+                "type": "object", "properties": {
+                    "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
+                    "state": { "type": "string", "enum": ["running", "cancel_requested", "completed", "failed", "cancelled"] },
+                    "before": { "type": "string", "maxLength": 128 },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+                }, "additionalProperties": false
+            }),
+        ),
+        tool(
+            "pab_disconnect",
+            "Disconnect this MCP session from one device. Other MCP and Desktop connections are independent. Finish or cancel active transfers first; explicitly pab_connect to reconnect.",
+            json!({
+                "type": "object", "properties": { "device_code": { "type": "string", "pattern": "^[0-9]{9}$" } },
+                "required": ["device_code"], "additionalProperties": false
+            }),
+        ),
+    ];
+    tools.extend(super::mcp_filesystem::tools());
+    tools.extend(super::mcp_system_query::tools());
+    tools
 }
 
 fn terminal_session_schema() -> Value {
@@ -224,13 +257,105 @@ fn file_tool_schema() -> Value {
         "type": "object",
         "properties": {
             "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
-            "source": { "type": "string" },
-            "destination": { "type": "string" },
-            "overwrite": { "type": "boolean", "default": false }
+            "source": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "destination": { "type": "string", "minLength": 1, "maxLength": 4096 },
+            "overwrite": { "type": "boolean", "default": false },
+            "request_id": { "type": "string", "format": "uuid" },
+            "wait_ms": { "type": "integer", "minimum": 0, "maximum": 5000, "default": 0 }
         },
         "required": ["device_code", "source", "destination"],
         "additionalProperties": false
     })
+}
+
+fn operation_schema() -> Value {
+    json!({ "type": "object", "properties": {
+        "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
+        "operation_id": { "type": "string", "format": "uuid" }
+    }, "required": ["device_code", "operation_id"], "additionalProperties": false })
+}
+
+pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String> {
+    let definition = tools()
+        .into_iter()
+        .find(|tool| tool["name"] == name)
+        .ok_or_else(|| format!("unknown tool: {name}"))?;
+    validate_value(args, &definition["inputSchema"], "arguments")
+}
+
+fn validate_value(value: &Value, schema: &Value, path: &str) -> Result<(), String> {
+    let valid_type = match schema["type"].as_str() {
+        Some("object") => value.is_object(),
+        Some("array") => value.is_array(),
+        Some("string") => value.is_string(),
+        Some("boolean") => value.is_boolean(),
+        Some("integer") => value.as_i64().is_some() || value.as_u64().is_some(),
+        _ => true,
+    };
+    if !valid_type {
+        return Err(format!("{path}: expected {}", schema["type"]));
+    }
+    if let Some(options) = schema["enum"].as_array()
+        && !options.contains(value)
+    {
+        return Err(format!("{path}: unsupported value"));
+    }
+    if let Some(number) = value.as_f64()
+        && (schema["minimum"].as_f64().is_some_and(|min| number < min)
+            || schema["maximum"].as_f64().is_some_and(|max| number > max))
+    {
+        return Err(format!("{path}: outside the permitted range"));
+    }
+    if let Some(string) = value.as_str() {
+        let count = string.chars().count() as u64;
+        if schema["minLength"].as_u64().is_some_and(|min| count < min)
+            || schema["maxLength"].as_u64().is_some_and(|max| count > max)
+        {
+            return Err(format!("{path}: invalid length"));
+        }
+        if schema["pattern"] == "^[0-9]{9}$"
+            && (string.len() != 9 || !string.bytes().all(|b| b.is_ascii_digit()))
+        {
+            return Err(format!(
+                "{path}: expected a 9-digit device code without spaces"
+            ));
+        }
+        if schema["format"] == "uuid" && string.parse::<pab_protocol::RequestId>().is_err() {
+            return Err(format!("{path}: expected a UUID"));
+        }
+    }
+    if let Some(object) = value.as_object() {
+        if let Some(required) = schema["required"].as_array() {
+            for key in required.iter().filter_map(Value::as_str) {
+                if !object.contains_key(key) {
+                    return Err(format!("{path}: missing {key}"));
+                }
+            }
+        }
+        for (key, value) in object {
+            if let Some(child) = schema["properties"].get(key) {
+                validate_value(value, child, &format!("{path}.{key}"))?;
+            } else if schema["additionalProperties"] == false {
+                return Err(format!("{path}: unknown field {key}"));
+            }
+        }
+    }
+    if let Some(array) = value.as_array()
+        && (schema["minItems"]
+            .as_u64()
+            .is_some_and(|min| array.len() < min as usize)
+            || schema["maxItems"]
+                .as_u64()
+                .is_some_and(|max| array.len() > max as usize))
+    {
+        return Err(format!("{path}: invalid item count"));
+    }
+    if let Some(array) = value.as_array() {
+        for (index, value) in array.iter().enumerate() {
+            validate_value(value, &schema["items"], &format!("{path}[{index}]"))?;
+        }
+    }
+    Ok(())
 }
 
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {
@@ -239,4 +364,32 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
         "description": description,
         "inputSchema": input_schema
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn catalog_rejects_invalid_arguments_before_accepting_work() {
+        for args in [
+            json!({"device_code":"123 456 789","operation_id":"bad"}),
+            json!({"device_code":"123456789","operation_id":"bad"}),
+            json!({"device_code":"123456789","operation_id":pab_protocol::RequestId::new(),"extra":true}),
+        ] {
+            assert!(validate_arguments("pab_get_operation", &args).is_err());
+        }
+        assert!(validate_arguments("pab_list_operations", &json!({"limit":0})).is_err());
+        assert!(validate_arguments("pab_list_operations", &json!({"limit":1.5})).is_err());
+        assert!(validate_arguments("pab_list_operations", &json!({"state":"invented"})).is_err());
+        assert!(validate_arguments("pab_upload_file",&json!({"device_code":"123456789","source":"/tmp/source","destination":"/tmp/dest","wait_ms":5001})).is_err());
+        assert!(
+            validate_arguments(
+                "pab_run_command",
+                &json!({"device_code":"123456789","program":"echo","args":[9]})
+            )
+            .is_err()
+        );
+        assert!(validate_arguments("pab_disconnect", &json!({"device_code":"123456789"})).is_ok());
+        assert!(validate_arguments("pab_list_operations", &json!({})).is_ok());
+    }
 }

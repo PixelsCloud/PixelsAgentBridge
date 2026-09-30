@@ -61,8 +61,23 @@ impl RuntimePresenceSource {
                 id: op.id,
                 device_ref: op.device_ref,
                 device_code: op.device_code.map(|code| code.to_string()),
-                // A command operation's source could contain arguments. Only transfer paths are reported.
-                source: if op.kind == "file_transfer" {
+                // Report only known file paths; never include text contents or command arguments.
+                source: if matches!(
+                    op.kind.as_str(),
+                    "file_transfer"
+                        | "file_stat"
+                        | "file_read"
+                        | "file_write"
+                        | "file_patch"
+                        | "file_search"
+                        | "file_hash"
+                        | "mkdir"
+                        | "file_copy"
+                        | "file_move"
+                        | "file_delete"
+                        | "archive_create"
+                        | "archive_extract"
+                ) {
                     op.source
                 } else {
                     String::new()
@@ -74,7 +89,13 @@ impl RuntimePresenceSource {
                 },
                 kind: op.kind,
                 direction: op.direction,
-                state: op.state,
+                state: if op.state == "running"
+                    && op.execution_observation.as_deref() == Some("unconfirmed")
+                {
+                    "unconfirmed".to_owned()
+                } else {
+                    op.state
+                },
                 completed_bytes: op.offset,
                 total_bytes: op.size,
                 started_at_unix_ms: op.started_at_unix_ms,

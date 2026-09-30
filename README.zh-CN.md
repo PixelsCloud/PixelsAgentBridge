@@ -136,7 +136,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ## MCP 工具
 
-当前提供 **16 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
+当前源码提供 **37 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
 
 | 工具 | 用途 |
 |---|---|
@@ -154,12 +154,64 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_terminal_read` | 读取终端输出 |
 | `pab_terminal_resize` | 调整终端尺寸 |
 | `pab_terminal_close` | 关闭终端会话 |
-| `pab_upload_file` | 上传二进制文件，可显式覆盖已有普通文件 |
-| `pab_download_file` | 下载二进制文件，可显式覆盖已有普通文件 |
+| `pab_upload_file` | 异步上传二进制文件，校验后可显式覆盖已有普通文件 |
+| `pab_download_file` | 异步下载二进制文件，校验后可显式覆盖已有普通文件 |
+| `pab_get_operation` | 按原请求 ID 读取持久化的传输、命令、文件操作或系统查询结果 |
+| `pab_list_operations` | 列出本 MCP 的传输、命令、文件操作和系统查询，支持设备/状态过滤及游标 |
+| `pab_cancel_operation` | 请求取消操作，查询原请求以确认结果 |
+| `pab_disconnect` | 断开本 MCP 与设备的连接，与 Desktop 和其他 MCP 相互独立 |
+| `pab_file_stat` | 查看目标文件、目录和链接的元数据 |
+| `pab_file_read` | 按行或字节范围读取文本，返回 SHA-256 版本 |
+| `pab_file_write` | 暂存后发布文本，显式覆盖，可检查原文件版本 |
+| `pab_file_patch` | 核对原版本后进行精确替换 |
+| `pab_file_search` | 按名称或文本搜索，支持 glob 和明确的结果上限 |
+| `pab_file_hash` | 后台分块计算 SHA-256，支持进度查询及取消 |
+| `pab_mkdir` | 创建目录，显式控制父目录和已存在行为，报告部分结果 |
+| `pab_file_copy` | 目标机内复制文件或显式递归目录 |
+| `pab_file_move` | 复制并核对目标后移除源，支持跨文件系统 |
+| `pab_file_delete` | 删除有界、显式递归的计划项，报告实际删除结果 |
+| `pab_archive_create` | 按明确源路径生成 ZIP，校验后发布 |
+| `pab_archive_extract` | 解压 ZIP，预检路径、类型、冲突和限额，逐文件校验 |
+| `pab_system_info` | 查询主机、OS、CPU、内存/Swap 和 Executor 身份，可选 NVIDIA 显卡信息 |
+| `pab_list_disks` | 查询磁盘/挂载点、文件系统、容量和可用空间 |
+| `pab_list_processes` | 一次采集有界进程列表，支持 PID/名称/用户过滤，不实时分页 |
+| `pab_get_process` | 查询指定 PID 当前可获得的身份和资源信息 |
+| `pab_list_network_interfaces` | 查询网卡地址、MAC、MTU、状态和累计收发字节 |
 
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。
+
+系统查询使用 `sysinfo`，要求目标支持 system-query 能力版本 1。每次返回带采集起止时间的一次结果，不持续监控，也不是 OS 原子快照。列表默认 100 项，最多 1000 项，同时受 32 KiB 实际序列化预算限制；`truncated=true` 时使用过滤缩小范围，不做实时分页。可选字段不可读取时返回 null，不采集进程命令参数和环境变量。
+
+`sample_cpu` 在系统信息中默认开启，在进程查询中默认关闭。开启后按库的最小间隔采样两次，`cpu_sample_ms` 表示区间；`cpu_usage_basis_points` 中 10000 等于 100%，进程跨核 CPU 可超过 100%。容量单位为字节；频率是第一个逻辑 CPU 的 MHz，不是所有核心的平均值。网卡返回库提供的累计计数，不是瞬时速度。
+
+`include_gpu=true` 时通过动态加载的 `nvml-wrapper` 查询 NVIDIA。GPU 分区单独报告状态与字段错误；NVML 不可用不能解释为没有显卡。AMD/Intel 后端尚未实现。系统查询等待完成，暂不支持取消；阻塞 OS/驱动调用没有硬中断期限，后台准入有界，采集器忙时返回 `executor_busy`。每个 MCP 最多 16 个未解决的系统查询。相同 `request_id` 通过 `pab_get_operation` 读取原采样，省略 ID 才产生新采样；中断或结果未确认时不自动重跑。Desktop 任务记录显示查询类型和返回项数。
+
+这组工具已通过 Windows 本地测试，包含真实进程生命周期、结果持久化和隔离 QUIC。安装后的宿主、Windows/Linux 双机和完整 NVIDIA 硬件验收仍待完成；现有安装包不含本批改动。
+
+文本工具要求目标 Executor 也升级。支持 UTF-8、UTF-16 和 BOM 检测，不静默替换
+无法解码的字节。文件上限 4 MiB，单次最多返回 16 KiB UTF-8 文本，写入及补丁
+输入上限 128 KiB。继续读取时使用 `next_offset`，把返回的 `metadata.sha256`
+作为 `expected_hash`。补丁的每项包含 `find`、`replace` 和 `expected_matches`
+（默认 1），全部针对原文匹配，不允许重叠。写入与修改返回 `operation_ref`，
+重复提交沿用 `request_id`；结果未确认时用 `pab_get_operation` 查询原请求。
+这一组有界文本操作等待完成返回，暂不支持取消。文件正文使用设备二进制通道，
+不写入任务记录。版本检查与 PAB 路径锁不等于针对外部编辑器的操作系统级原子 CAS。
+
+搜索、Hash 和创建目录要求目标 Executor 的文件能力版本为 2，原有文本工具仍兼容版本 1。搜索使用字面子串，不是正则表达式；默认按名称、区分大小写，glob 使用 `/` 分隔的相对路径，例如 `**/*.rs`。会包含隐藏文件，不应用 gitignore。每次最多返回 100 项；内容匹配返回行号、最多 160 字符的行首预览和该文件的 SHA-256。扫描受到 4096 项、64 MiB 读取计费预算、5 秒和输出字节上限约束；通过 `truncated`、`stop_reason`、跳过数和有限警告说明不完整结果，不提供变化中目录的实时分页。
+
+`pab_file_hash` 在远端确认接收后返回 `operation_ref`，后台按 256 KiB 分块计算，不全量载入大文件。使用 `pab_get_operation` 查询 `progress.completed_bytes`、`progress.total_bytes` 和最终 `metadata.sha256`；使用 `pab_cancel_operation` 请求停止。只有 `cancelled` 才确认已停止。Executor 同时最多 4 个 Hash 作业，每个最多 30 分钟，单次读取超时为 30 秒。相同 `request_id` 返回原操作，文件后续变化也不会触发重算。观察到大小、修改时间或可用身份变化时明确失败，不宣称提供外部并发写入下的原子快照。MCP 会周期刷新活动记录；离线查询可能返回最后保存的状态，应结合进度时间判断新鲜度。
+
+`pab_mkdir` 默认 `parents=false`、`exist_ok=false`，通过 `created_paths` 报告实际创建目录及失败前的部分结果，不自动回滚。结果不明时查询原 ID，不自动重放。每个 MCP 最多保留 32 个未解决的活动文件操作，达到上限应先核对已有结果。上述工具不主动跟随符号链接或 Windows reparse 点；路径复核及 PAB 自身锁不能消除外部程序的全部并发竞态。
+
+复制、移动、删除和 ZIP 要求目标 Executor 的文件能力版本至少为 3。远端接收后返回 `operation_ref`，随后后台执行；通过既有操作工具查询或取消。源和目标是精确路径，不自动附加文件名。默认 `recursive=false`、`overwrite=false`；目录复制/移动显式覆盖时可合并目录，保留目标中的无关条目。移动在同盘和跨盘都采用复制、校验、删源的顺序，需要额外 I/O 和暂存空间。
+
+后台使用 64 KiB 缓冲区，Executor 同时最多 4 个批量作业，协作式期限为 30 分钟。默认 4096 项、1 GiB 文件数据、64 层；`max_bytes` 最大可设 8 GiB。解压的项目限额包含隐含父目录和目标根目录；ZIP 输入和暂存最多为 `max_bytes + 2 MiB`，中央目录元数据最多 2 MiB。只解压未加密的 Stored/Deflate ZIP，路径必须是 UTF-8 可移植名称；拒绝链接、越界、大小写重名和文件/目录冲突，逐文件通过 CRC、长度和暂存 hash 后才发布。`max_ratio` 默认 200，范围 1–1000；高压缩率的正常压缩包也可能因限额被拒绝。
+
+`mutation` 返回阶段、计划/处理项数、写入/删除数、`partial`、`source_removed` 和有限逐项结果（64 项或 8 KiB）。取消在检查点停止，阻塞 OS I/O 可能延迟停止；只有 `cancelled` 确认 worker 已退出。失败或取消保留已生效项，包括后续 ZIP 条目 CRC 损坏前已解出的文件，不自动回滚。删除只移除计划项，拒绝盘符/根目录。结果未确认时查询原 ID，不重新执行。PAB 路径锁覆盖祖先和子路径，但不提供对外部程序的原子目录操作；ZIP 不保留 ACL、属主和扩展元数据。
+
+新文件工具已完成 Windows 本地自动化验证，包括隔离 QUIC 与 MCP stdio。安装后的宿主调用、物理跨盘和 Windows/Linux 双机验收仍待完成；旧安装包不含这些新增工具。
 
 ### 示例：执行命令与读取结果
 
@@ -196,7 +248,36 @@ Bridge 不会隐式添加 Shell，使用 Shell 语法时需要明确指定解释
 }
 ```
 
-当前文件工具等待传输完成后返回。大文件可能达到宿主工具调用的超时时间，重试前应核实操作结果。
+### 示例：异步传输
+
+上传下载立即返回 `operation_ref`，后台继续连接和传输。可选 `wait_ms` 最多等待
+5000 毫秒，它不会限制传输时长。两端路径均须使用各自系统的绝对路径，最多 4096 个字符。
+
+```json
+{
+  "device_code": "123456789",
+  "source": "C:\\work\\artifact.zip",
+  "destination": "C:\\incoming\\artifact.zip",
+  "overwrite": true,
+  "request_id": "c746c0d6-f349-4e4d-92fa-9e3fb25abcf4"
+}
+```
+
+将返回的引用传给 `pab_get_operation`，取消时使用相同参数调用 `pab_cancel_operation`：
+
+```json
+{ "device_code": "123456789", "operation_id": "c746c0d6-f349-4e4d-92fa-9e3fb25abcf4" }
+```
+
+相同 `request_id` 和参数会返回原记录，完成后或重启后重复提交也不会再次执行。
+省略该参数会生成新 ID。`cancel_requested` 表示取消意图，`cancelled` 才表示已确认停止；
+已经发布的文件仍为完成。`unconfirmed` 表示正在核对原请求，不能改用新 ID 重做。
+每个 MCP 同时最多接受 8 个结果尚未确认的传输。传输须结束或核对出结果后再断开；
+断开后的设备需要显式调用 `pab_connect` 重新连接。已退出会话的记录可查询，但其他会话不能取消。
+缓存的系统环境会标记为 `remembered_device`。
+
+重新构建安装并重启 AI 客户端后才能加载新工具。旧 MCP 安装包保留原工具集和行为；
+使用文本工具还需要升级目标机器上的 Executor。
 
 ## 连接管理与活动展示
 

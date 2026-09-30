@@ -24,12 +24,17 @@ use crate::{BridgeConfig, BridgeConfigError};
 
 mod directory;
 mod file_transfer;
+mod filesystem;
 mod screenshot;
+mod system_query;
 mod terminal;
+mod transfer_control;
 mod windows;
 
+pub use filesystem::FileSystemResult;
 pub use screenshot::Screenshot;
 pub use terminal::{TerminalOpened, TerminalOutput};
+pub use transfer_control::TransferControl;
 
 pub struct BridgeClient {
     connector: BridgeConnector,
@@ -249,7 +254,7 @@ impl AuthenticatedDeviceConnection {
             })
             .await?
         {
-            DeviceTaskResponse::Environment { context }
+            DeviceTaskResponse::Environment { context, .. }
                 if context.device_ref == self.device_ref
                     && context.source == TargetContextSource::ExecutorVerified
                     && context.freshness == ContextFreshness::Current =>
@@ -607,6 +612,12 @@ pub enum BridgeError {
     },
     #[error("Executor returned an unexpected task response: {0}")]
     UnexpectedTaskResponse(String),
+    #[error(
+        "target Executor does not support filesystem tools; upgrade the target installation first"
+    )]
+    UnsupportedFileSystem,
+    #[error("target Executor does not support system-query capability v1")]
+    UnsupportedSystemQuery,
     #[error("file transfer failed: {0}")]
     FileTransfer(String),
     #[error("terminal operation failed: {0}")]

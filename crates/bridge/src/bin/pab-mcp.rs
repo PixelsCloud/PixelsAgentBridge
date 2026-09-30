@@ -1,7 +1,15 @@
+#[path = "pab_mcp/system_query.rs"]
+mod mcp_system_query;
 use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 #[path = "pab_mcp/catalog.rs"]
 mod mcp_catalog;
+#[path = "pab_mcp/filesystem.rs"]
+mod mcp_filesystem;
+#[path = "pab_mcp/filesystem_bulk.rs"]
+mod mcp_filesystem_bulk;
+#[path = "pab_mcp/operations.rs"]
+mod mcp_operations;
 #[path = "pab_mcp/settings.rs"]
 mod mcp_settings;
 #[path = "pab_mcp/tools.rs"]
@@ -25,7 +33,7 @@ use rmcp::{
 use serde_json::{Value, json};
 
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. The device password stays in the local Bridge database; never pass it as a tool argument.";
+const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. Upload/download return an operation_ref immediately; file_hash and bulk file/ZIP operations return after remote acceptance and execute in the background. Cancellation does not roll back completed filesystem effects. Use the dedicated file tools before shell fallback, and preserve expected_hash when editing or continuing reads; query pab_get_operation with its device_code and operation_id. Reuse request_id for deduplication. An unconfirmed result is not failure: query the original request, never replay it with a new ID. cancel_requested is intent; only a terminal cancelled result confirms it stopped. pab_disconnect affects only this MCP session. The device password stays in the local Bridge database; never pass it as a tool argument.";
 
 fn main() {
     if let Err(error) = mcp_settings::apply_at_start() {
@@ -67,6 +75,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         runtime: Default::default(),
         reporter: reporter.clone(),
         runtime_reporting: Default::default(),
+        operations: Default::default(),
     };
     let result = async {
         let service = server.clone().serve(stdio()).await?;
@@ -80,21 +89,28 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;
+    if let Some(operations) = server.operations.lock().await.take() {
+        operations.shutdown().await;
+    }
     reporting.shutdown().await;
     if let Some(task) = server.runtime_reporting.lock().await.take() {
         task.abort();
     }
     if let Some(runtime) = server.runtime.lock().await.take() {
-        runtime.shutdown().await?;
+        Arc::try_unwrap(runtime)
+            .map_err(|_| "MCP runtime is still in use after shutdown")?
+            .shutdown()
+            .await?;
     }
     result
 }
 
 #[derive(Clone)]
 struct McpServer {
-    runtime: Arc<tokio::sync::Mutex<Option<BridgeRuntime>>>,
+    runtime: Arc<tokio::sync::Mutex<Option<Arc<BridgeRuntime>>>>,
     reporter: McpReporter,
     runtime_reporting: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    operations: Arc<tokio::sync::Mutex<Option<Arc<mcp_operations::OperationManager>>>>,
 }
 
 impl ServerHandler for McpServer {
@@ -120,47 +136,107 @@ impl ServerHandler for McpServer {
     ) -> Result<CallToolResponse, ErrorData> {
         let arguments = Value::Object(request.arguments.unwrap_or_default());
         let mut call = self.reporter.begin_call(&request.name, &arguments);
-        let result = if request.name == "pab_list_devices" {
+        let result = if let Err(error) = mcp_catalog::validate_arguments(&request.name, &arguments)
+        {
+            Err(error)
+        } else if request.name == "pab_list_devices" {
             mcp_tools::list_local_devices().await
-        } else {
-            let mut runtime = self.runtime.lock().await;
-            if runtime.is_none() {
-                self.reporter.set_runtime(RuntimeReport {
-                    control_phase: "initializing".to_owned(),
-                    ..Default::default()
-                });
+        } else if mcp_operations::handles(&request.name) {
+            match self.operation_manager().await {
+                Ok(manager) => manager.call(&request.name, &arguments).await,
+                Err(error) => Err(error),
             }
-            match ensure_runtime(&mut runtime).await {
-                Ok(runtime) => {
-                    let mut monitor = self.runtime_reporting.lock().await;
-                    if monitor.is_none() {
-                        *monitor = Some(self.reporter.attach_runtime(runtime.presence_source()));
+        } else {
+            match self.operation_manager().await {
+                Err(error) => Err(error),
+                Ok(manager) => match manager.runtime().await {
+                    Ok(runtime) => {
+                        let result =
+                            mcp_tools::call_tool(&runtime, &request.name, &arguments).await;
+                        if let Ok(value) = &result
+                            && let Some(id) =
+                                value.pointer("/task/request_id").and_then(Value::as_str)
+                            && let Ok(id) = id.parse()
+                        {
+                            manager
+                                .queue
+                                .track_task(id)
+                                .await
+                                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+                        }
+                        result
                     }
-                    drop(monitor);
-                    mcp_tools::call_tool(runtime, &request.name, &arguments).await
-                }
-                Err(error) => {
-                    self.reporter.set_runtime(RuntimeReport {
-                        control_phase: "initialization_failed".to_owned(),
-                        last_error: Some(error.clone()),
-                        ..Default::default()
-                    });
-                    Err(error)
-                }
+                    Err(error) => {
+                        self.reporter.set_runtime(RuntimeReport {
+                            control_phase: "initialization_failed".to_owned(),
+                            last_error: Some(error.clone()),
+                            ..Default::default()
+                        });
+                        Err(error)
+                    }
+                },
             }
         };
         if let Ok(value) = &result {
             call.observe_result(value);
         }
-        call.finish(result.is_ok());
+        let tool_failed = result.as_ref().is_ok_and(|value| {
+            matches!(
+                request.name.as_ref(),
+                "pab_file_stat"
+                    | "pab_file_read"
+                    | "pab_file_write"
+                    | "pab_file_patch"
+                    | "pab_file_search"
+                    | "pab_system_info"
+                    | "pab_list_disks"
+                    | "pab_list_processes"
+                    | "pab_get_process"
+                    | "pab_list_network_interfaces"
+                    | "pab_file_hash"
+                    | "pab_mkdir"
+                    | "pab_file_copy"
+                    | "pab_file_move"
+                    | "pab_file_delete"
+                    | "pab_archive_create"
+                    | "pab_archive_extract"
+            ) && value.pointer("/result/state").and_then(Value::as_str) == Some("failed")
+        });
+        call.finish(result.is_ok() && !tool_failed);
         Ok(match result {
-            Ok(value) => CallToolResult::structured(value).into(),
+            Ok(value) => {
+                let mut response = CallToolResult::structured(value);
+                if tool_failed {
+                    response.is_error = Some(true);
+                }
+                response.into()
+            }
             Err(error) => CallToolResult::error(vec![ContentBlock::text(error)]).into(),
         })
     }
 }
 
-async fn ensure_runtime(runtime: &mut Option<BridgeRuntime>) -> Result<&BridgeRuntime, String> {
+impl McpServer {
+    async fn operation_manager(&self) -> Result<Arc<mcp_operations::OperationManager>, String> {
+        let mut manager = self.operations.lock().await;
+        if manager.is_none() {
+            *manager = Some(
+                mcp_operations::OperationManager::new(
+                    self.runtime.clone(),
+                    self.runtime_reporting.clone(),
+                    self.reporter.clone(),
+                )
+                .await?,
+            );
+        }
+        Ok(manager.as_ref().unwrap().clone())
+    }
+}
+
+async fn ensure_runtime(
+    runtime: &mut Option<Arc<BridgeRuntime>>,
+    session_id: &str,
+) -> Result<Arc<BridgeRuntime>, String> {
     if runtime.is_none() {
         let config = if env::var("PAB_MCP_GUEST").as_deref() != Ok("0") {
             tokio::time::timeout(
@@ -185,13 +261,17 @@ async fn ensure_runtime(runtime: &mut Option<BridgeRuntime>) -> Result<&BridgeRu
         ))));
         let mut runtime_config = BridgeRuntimeConfig::new(database_path);
         runtime_config.resume_incomplete_on_start = false;
-        *runtime = Some(
+        runtime_config.session_id = Some(session_id.to_owned());
+        *runtime = Some(Arc::new(
             BridgeRuntime::start(config, runtime_config, passwords)
                 .await
                 .map_err(|error| error.to_string())?,
-        );
+        ));
     }
-    Ok(runtime.as_ref().expect("Bridge Runtime was initialized"))
+    Ok(runtime
+        .as_ref()
+        .expect("Bridge Runtime was initialized")
+        .clone())
 }
 
 #[cfg(test)]
@@ -202,7 +282,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 16);
+        assert_eq!(catalog.tools.len(), 37);
         let names = catalog
             .tools
             .iter()

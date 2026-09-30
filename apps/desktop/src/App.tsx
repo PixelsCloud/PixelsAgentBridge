@@ -153,6 +153,14 @@ function App() {
           fontFamily: 'Inter, "Segoe UI", "Noto Sans CJK SC", system-ui, sans-serif',
         },
         components: {
+          Button: {
+            primaryColor: theme === "dark" ? "#162637" : "#ffffff",
+            ...(theme === "light" ? {
+              colorPrimary: "#1e7b6c",
+              colorPrimaryHover: "#208372",
+              colorPrimaryActive: "#176354",
+            } : {}),
+          },
           Input: { colorBgContainer: theme === "dark" ? "#242a32" : "#f9fbfc" },
           Select: { colorBgContainer: theme === "dark" ? "#242a32" : "#f9fbfc" },
           Menu: { itemBg: "transparent", itemSelectedBg: theme === "dark" ? "#345047" : "#dff1e9" },

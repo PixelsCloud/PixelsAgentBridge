@@ -69,6 +69,24 @@ pub(super) async fn run_reconciliation(
         stale_cursor = next_cursor(&stale);
 
         for record in cancellations.into_iter().chain(stale) {
+            // The async worker owns live transfer outcomes. In particular, a
+            // remote sender being done is not evidence that a live downloader
+            // passed its local cancellation/publication gate. Recovery may
+            // inspect abandoned workers or those explicitly marked unconfirmed.
+            if record.transfer_phase.is_some()
+                && record.transfer_phase.as_deref() != Some("unconfirmed")
+            {
+                let live: Result<i64,_> = sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations o JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.id = ? AND s.stopped_at_unix_ms IS NULL AND s.heartbeat_at_unix_ms >= ?")
+                    .bind(&record.id).bind(super::unix_millis()-15_000).fetch_one(&inner.store.pool).await;
+                match live {
+                    Ok(0) => {}
+                    Ok(_) => continue,
+                    Err(error) => {
+                        tracing::warn!(%error,"cannot check async transfer owner");
+                        continue;
+                    }
+                }
+            }
             let Ok(request_id) = record.id.parse::<RequestId>() else {
                 tracing::warn!(operation_id = %record.id, "invalid stored transfer request ID");
                 continue;
@@ -113,7 +131,15 @@ pub(super) async fn run_reconciliation(
             if remote_incomplete_upload_failed(&record, &snapshot) {
                 match inner
                     .store
-                    .finish_operation(request_id, "failed", snapshot.message.as_deref())
+                    .finish_operation(
+                        request_id,
+                        if record.state == "cancel_requested" && snapshot.published == Some(false) {
+                            "cancelled"
+                        } else {
+                            "failed"
+                        },
+                        snapshot.message.as_deref(),
+                    )
                     .await
                 {
                     Ok(true) => tracing::info!(%request_id, "confirmed incomplete upload failure"),
@@ -126,6 +152,20 @@ pub(super) async fn run_reconciliation(
             }
             if !remote_completion_matches(&record, &snapshot) {
                 continue;
+            }
+            let expected: Result<Option<String>, _> =
+                sqlx::query_scalar("SELECT sha256 FROM runtime_async_transfers WHERE id = ?")
+                    .bind(&record.id)
+                    .fetch_optional(&inner.store.pool)
+                    .await
+                    .map(Option::flatten);
+            match expected {
+                Ok(Some(digest)) if snapshot.sha256.as_deref() != Some(digest.as_str()) => continue,
+                Err(error) => {
+                    tracing::warn!(%error, "cannot check expected transfer checksum");
+                    continue;
+                }
+                _ => {}
             }
             if record.direction == "download" {
                 let Some(digest) = snapshot.sha256.as_deref() else {
@@ -187,7 +227,7 @@ fn remote_incomplete_upload_failed(record: &OperationRecord, snapshot: &Transfer
     record.direction == "upload"
         && remote_target_matches(record, snapshot)
         && snapshot.state == "failed"
-        && snapshot.offset < snapshot.size
+        && (snapshot.offset < snapshot.size || snapshot.published == Some(false))
         && snapshot.finished_at_unix_ms.is_some()
 }
 
@@ -199,7 +239,7 @@ fn remote_target_matches(record: &OperationRecord, snapshot: &TransferSnapshot) 
     }
 }
 
-async fn published_file_matches(path: &Path, size: u64, digest: &str) -> bool {
+pub(super) async fn published_file_matches(path: &Path, size: u64, digest: &str) -> bool {
     let Ok(metadata) = tokio::fs::symlink_metadata(path).await else {
         return false;
     };
@@ -268,6 +308,8 @@ mod tests {
             finished_at_unix_ms: None,
             message: None,
             execution_observation: Some("unconfirmed".to_owned()),
+            transfer_phase: None,
+            filesystem_mutation: None,
         };
         let mut snapshot = TransferSnapshot {
             request_id,
@@ -280,6 +322,7 @@ mod tests {
             sha256: Some("a".repeat(64)),
             finished_at_unix_ms: Some(2),
             message: None,
+            published: None,
         };
         assert!(remote_completion_matches(&record, &snapshot));
         snapshot.path = "/tmp/other.bin".to_owned();

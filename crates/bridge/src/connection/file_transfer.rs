@@ -11,7 +11,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
-use super::{AuthenticatedDeviceConnection, BridgeError};
+use super::{AuthenticatedDeviceConnection, BridgeError, TransferControl};
 
 impl AuthenticatedDeviceConnection {
     pub async fn upload_file(
@@ -22,7 +22,28 @@ impl AuthenticatedDeviceConnection {
         overwrite: bool,
         progress: impl Fn(u64, u64) + Send + Sync,
     ) -> Result<(), BridgeError> {
-        let metadata = fs::metadata(source).await?;
+        self.upload_file_controlled(
+            request_id,
+            source,
+            destination,
+            overwrite,
+            &TransferControl::default(),
+            progress,
+        )
+        .await
+    }
+
+    pub async fn upload_file_controlled(
+        &self,
+        request_id: RequestId,
+        source: &Path,
+        destination: &str,
+        overwrite: bool,
+        control: &TransferControl,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), BridgeError> {
+        control.check()?;
+        let metadata = fs::symlink_metadata(source).await?;
         if !metadata.is_file() {
             return Err(BridgeError::FileTransfer(
                 "source is not a regular file".to_owned(),
@@ -30,9 +51,11 @@ impl AuthenticatedDeviceConnection {
         }
         let size = metadata.len();
         let sha256 = hash_file(source).await?;
+        control.set_digest(&sha256);
         let mut file = File::open(source).await?;
         let timeout = self.operation_timeout().max(Duration::from_secs(60));
         let mut stream = self.connection.open_bi(timeout).await?;
+        control.request()?;
         stream
             .send_frame_json(
                 &DeviceTaskRequest::UploadFile {
@@ -60,6 +83,7 @@ impl AuthenticatedDeviceConnection {
         let mut sent = offset;
         let mut buffer = vec![0_u8; MAX_BINARY_FRAME_BYTES.min(64 * 1024)];
         while sent < size {
+            control.check()?;
             let limit = usize::try_from((size - sent).min(buffer.len() as u64)).unwrap();
             let read = file.read(&mut buffer[..limit]).await?;
             if read == 0 {
@@ -93,6 +117,27 @@ impl AuthenticatedDeviceConnection {
         overwrite: bool,
         progress: impl Fn(u64, u64) + Send + Sync,
     ) -> Result<(), BridgeError> {
+        self.download_file_controlled(
+            request_id,
+            source,
+            destination,
+            overwrite,
+            &TransferControl::default(),
+            progress,
+        )
+        .await
+    }
+
+    pub async fn download_file_controlled(
+        &self,
+        request_id: RequestId,
+        source: &str,
+        destination: &Path,
+        overwrite: bool,
+        control: &TransferControl,
+        progress: impl Fn(u64, u64) + Send + Sync,
+    ) -> Result<(), BridgeError> {
+        control.check()?;
         if destination.file_name().is_none() {
             return Err(BridgeError::FileTransfer(
                 "destination is invalid".to_owned(),
@@ -113,7 +158,7 @@ impl AuthenticatedDeviceConnection {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
-        let partial = partial_path(destination);
+        let partial = partial_path(destination, request_id);
         if is_symlink(&partial).await? {
             return Err(BridgeError::FileTransfer(
                 "partial file is a symbolic link".to_owned(),
@@ -121,6 +166,7 @@ impl AuthenticatedDeviceConnection {
         }
         let mut file = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(&partial)
@@ -128,6 +174,7 @@ impl AuthenticatedDeviceConnection {
         let offset = file.metadata().await?.len();
         let timeout = self.operation_timeout().max(Duration::from_secs(60));
         let mut stream = self.connection.open_bi(timeout).await?;
+        control.request()?;
         stream
             .send_frame_json(
                 &DeviceTaskRequest::DownloadFile {
@@ -150,9 +197,11 @@ impl AuthenticatedDeviceConnection {
             other => return Err(unexpected(other)),
         };
         file.seek(std::io::SeekFrom::Start(offset)).await?;
+        control.set_digest(&sha256);
         progress(offset, size);
         let mut received = offset;
         while received < size {
+            control.check()?;
             let bytes = stream.receive_binary_frame(timeout).await?;
             let next = received.saturating_add(bytes.len() as u64);
             if next > size {
@@ -175,16 +224,21 @@ impl AuthenticatedDeviceConnection {
         file.sync_all().await?;
         drop(file);
         if hash_file(&partial).await? != sha256 {
-            fs::remove_file(&partial).await?;
+            if let Err(error) = fs::remove_file(&partial).await {
+                tracing::warn!(%error, "could not remove invalid download staging file");
+            }
             return Err(BridgeError::FileTransfer(
                 "download checksum mismatch".to_owned(),
             ));
         }
+        control.commit()?;
         if overwrite {
             fs::rename(&partial, destination).await?;
         } else {
             fs::hard_link(&partial, destination).await?;
-            fs::remove_file(&partial).await?;
+            if let Err(error) = fs::remove_file(&partial).await {
+                tracing::warn!(%error, "could not remove published download staging file");
+            }
         }
         Ok(())
     }
@@ -205,9 +259,9 @@ fn unexpected(response: DeviceTaskResponse) -> BridgeError {
     BridgeError::FileTransfer(format!("unexpected response: {response:?}"))
 }
 
-fn partial_path(destination: &Path) -> PathBuf {
+fn partial_path(destination: &Path, request_id: RequestId) -> PathBuf {
     let name = destination.file_name().unwrap().to_string_lossy();
-    destination.with_file_name(format!(".{name}.pab.part"))
+    destination.with_file_name(format!(".{name}.pab-{request_id}.part"))
 }
 
 fn valid_sha256(value: &str) -> bool {

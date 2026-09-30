@@ -110,6 +110,24 @@ pub struct PabBiStream {
 }
 
 impl PabBiStream {
+    /// Require the peer's FIN after an exact-size binary payload. An extra byte
+    /// is a protocol error, including an incomplete trailing frame header.
+    pub async fn expect_receive_end(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<(), PabConnectionError> {
+        let mut byte = [0_u8; 1];
+        match tokio::time::timeout(timeout, self.receive.read(&mut byte))
+            .await
+            .map_err(|_| PabConnectionError::Timeout)?
+            .map_err(|error| PabConnectionError::Stream(error.to_string()))?
+        {
+            None => Ok(()),
+            Some(_) => Err(PabConnectionError::Stream(
+                "unexpected bytes after payload".to_owned(),
+            )),
+        }
+    }
     pub async fn send_binary_frame(
         &mut self,
         bytes: &[u8],

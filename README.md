@@ -156,7 +156,7 @@ Replace the device code and paths with your own information.
 
 ## MCP tool reference
 
-The current server exposes **16 tools**. Hosts may display them with a namespace,
+The current source exposes **37 tools**. Hosts may display them with a namespace,
 for example `pixels.pab_connect`.
 
 | Tool | Purpose |
@@ -175,12 +175,136 @@ for example `pixels.pab_connect`.
 | `pab_terminal_read` | Read terminal output |
 | `pab_terminal_resize` | Resize a terminal |
 | `pab_terminal_close` | Close a terminal session |
-| `pab_upload_file` | Upload a binary file; optionally replace an existing regular file |
-| `pab_download_file` | Download a binary file; optionally replace an existing regular file |
+| `pab_upload_file` | Queue a binary upload; optionally replace an existing regular file after verification |
+| `pab_download_file` | Queue a binary download; optionally replace an existing regular file after verification |
+| `pab_get_operation` | Read persisted transfer, command, file-operation or system-query results using its original request ID |
+| `pab_list_operations` | List this MCP session's transfers, commands, file operations and system queries with device/state filters and a cursor |
+| `pab_cancel_operation` | Request cancellation; query until the outcome is confirmed |
+| `pab_disconnect` | Disconnect this MCP session from a device independently of Desktop and other MCPs |
+| `pab_file_stat` | Inspect target file/directory metadata and links |
+| `pab_file_read` | Read bounded text by line or byte range with a SHA-256 version |
+| `pab_file_write` | Stage and publish text with explicit overwrite and optional version checks |
+| `pab_file_patch` | Apply exact replacements against a checked original version |
+| `pab_file_search` | Search literal names or text with glob filters and explicit bounded results |
+| `pab_file_hash` | Start streaming SHA-256 in the background; query byte progress or cancel |
+| `pab_mkdir` | Create directories with explicit parent/existing behavior and partial results |
+| `pab_file_copy` | Copy files or explicit recursive trees within the target device |
+| `pab_file_move` | Copy and verify the destination before removing source entries, including across filesystems |
+| `pab_file_delete` | Remove a bounded, explicitly recursive manifest and report actual deletions |
+| `pab_archive_create` | Create and verify a staged ZIP with explicit sources and overwrite |
+| `pab_archive_extract` | Extract ZIP with path/type/conflict/size preflight and per-file integrity checks |
+| `pab_system_info` | Query OS/host, CPU, RAM/swap and Executor identity; optionally query NVIDIA GPU data |
+| `pab_list_disks` | Query mounts, filesystem, capacity, free space and disk flags |
+| `pab_list_processes` | Collect a bounded process list with PID/name/user filters; no live pagination |
+| `pab_get_process` | Query one current PID with available identity and resource fields |
+| `pab_list_network_interfaces` | Query addresses, MAC, MTU, state and cumulative byte counters |
 
 Call `pab_connect` first and retain its platform context. Most device tools require
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.
+
+System queries use `sysinfo` and require target system-query capability version 1.
+They return one sampled result with collection timestamps, not continuous monitoring
+or an atomic OS snapshot. Process and interface lists default to 100 entries, accept
+up to 1000, and are also bounded by a 32 KiB serialized result budget. Use filters
+when `truncated` is true; there is no live pagination. Unavailable optional fields
+are null. Process arguments and environment variables are not collected.
+
+`sample_cpu` defaults to true for `pab_system_info` and false for process queries.
+CPU sampling uses two observations at the library minimum interval;
+`cpu_sample_ms` records the interval. `cpu_usage_basis_points` uses 10000 for 100%,
+and process CPU may exceed 100% across cores. Capacities are bytes; CPU frequency
+is MHz from the first logical CPU, not an all-core average. Network counters are
+cumulative library counters, not instantaneous throughput.
+
+`include_gpu=true` enables optional NVIDIA queries through dynamically loaded
+`nvml-wrapper`. The GPU subsection reports its own status and field errors;
+unavailable NVML does not establish the absence of GPUs. AMD/Intel GPU backends
+are not implemented. System queries wait for completion and cannot be cancelled.
+Blocking OS/driver reads have no hard interruption deadline; worker admission is
+bounded, and a busy collector returns `executor_busy`. Each MCP permits 16 unresolved
+system-query records. Reusing `request_id` reads the original sample through
+`pab_get_operation`; omit it for a fresh sample. Interrupted or uncertain queries
+are not automatically rerun. Desktop history shows query type and returned count.
+
+These tools passed Windows local tests, including native process lifecycle,
+result persistence and isolated QUIC. Installed-host, Windows/Linux two-machine
+and full NVIDIA hardware acceptance remain pending. Existing installers do not
+contain this batch.
+
+Text tools require an updated target Executor. They support UTF-8 and UTF-16,
+detect BOMs, and reject binary data instead of replacing undecodable bytes.
+Reads return at most 16 KiB of UTF-8 text from files up to 4 MiB; writes/patch
+inputs are limited to 128 KiB. Continue with `next_offset` and the returned
+`metadata.sha256` as `expected_hash`. Patch edits use `find`, `replace`, and
+`expected_matches` (default 1), match the original text, and cannot overlap.
+Write/patch return `operation_ref`; reuse `request_id` for deduplication and use
+`pab_get_operation` to resolve uncertain results. These bounded text operations
+wait for completion and do not support cancellation. File bodies use the binary
+device channel and are not persisted in operation history. Version checks and
+PAB path locks do not provide atomic compare-and-swap against external editors.
+
+Search/hash/mkdir require a target Executor with filesystem capability version 2;
+existing text tools remain compatible with version 1. Search uses a literal
+substring (not a regular expression), defaults to case-sensitive name matching,
+and accepts `/`-separated relative globs such as `**/*.rs`. Hidden files are
+included; gitignore is not applied. It returns at most 100 matches with 160-character
+line previews and file hashes for content matches. Scans stop at 4096 entries,
+64 MiB of accounted read budget, 5 seconds, or the output budget, reporting
+`truncated`, `stop_reason`, skip counts and bounded warnings. Results are not an
+atomic directory snapshot and have no live paging cursor.
+
+`pab_file_hash` returns an `operation_ref` after remote acceptance and streams
+256 KiB chunks without loading the whole file. Query `pab_get_operation` for
+`progress.completed_bytes`, `progress.total_bytes` and the final `metadata.sha256`;
+`pab_cancel_operation` requests a stop. Cancellation is only confirmed by
+`cancelled`. The Executor permits four concurrent hash jobs, with a 30-minute
+job limit and 30-second read timeout. Repeating `request_id` returns the original
+operation, even if the file has since changed. Observed size/mtime/identity
+changes fail the hash; this is not an atomic snapshot against external writers.
+The MCP periodically refreshes active records; an offline query can return the
+last saved state, so use the progress timestamp to assess freshness.
+
+`pab_mkdir` defaults to `parents=false` and `exist_ok=false`. Its `created_paths`
+lists directories actually created, including partial failure; it does not roll
+back partial work. Uncertain results are queried using the original ID and are
+never automatically replayed. Each MCP permits 32 unresolved filesystem records;
+resolve existing operations before exceeding that limit. These tools do not
+intentionally traverse symlinks or Windows reparse points. Path rechecks and PAB
+locks do not eliminate races with external programs.
+
+Copy/move/delete/ZIP require target filesystem capability version 3. They return
+`operation_ref` after remote acceptance and run asynchronously; query or cancel
+with the existing operation tools. Paths are exact source/target paths, with no
+implicit basename append. `recursive=false` and `overwrite=false` are the defaults.
+Directory copy/move can explicitly merge into an existing destination while
+preserving unrelated entries. Move always copies and verifies before removing
+source, even on one volume; it needs extra I/O and temporary disk space.
+
+Bulk jobs use 64 KiB streaming buffers, four Executor workers and a cooperative
+30-minute deadline. Defaults are 4096 entries, 1 GiB of file data and depth 64;
+`max_bytes` can be raised to 8 GiB. ZIP extraction also counts implied directories
+and its destination root toward the entry limit. ZIP input/staging is bounded by
+`max_bytes + 2 MiB`; central-directory metadata is capped at 2 MiB. Extraction
+accepts unencrypted stored/deflated entries with strict UTF-8 portable names,
+rejects links, traversal, case collisions and file/directory conflicts, and checks
+CRC/size/hash before each file is published. `max_ratio` defaults to 200 (1–1000);
+highly compressible legitimate archives may be rejected by this limit.
+
+`mutation` reports phase, processed/total entries, published/deleted counts,
+`partial`, `source_removed` and bounded item results (64 items or 8 KiB).
+Cancellation stops at checked boundaries; blocking OS I/O may delay it. Only
+`cancelled` confirms the worker stopped. Completed effects remain after cancellation
+or failure, including files already extracted before a later CRC error; nothing
+is silently rolled back. Delete removes only planned entries and refuses roots.
+Uncertain mutations are queried using their original IDs, never replayed. PAB
+path locks now cover ancestors and descendants but do not eliminate external
+writer races or make a tree operation atomic. ZIP does not preserve ACLs,
+ownership or extended metadata.
+
+These new file tools have Windows local automated coverage, including isolated
+QUIC and MCP stdio tests. Installed-host, physical cross-volume and Windows/Linux
+two-machine acceptance are still pending; older installers do not include them.
 
 ### Example: run a command and read the result
 
@@ -217,8 +341,41 @@ until the task completes. Then read stdout with `pab_read_output`:
 }
 ```
 
-File tools currently wait for the transfer to finish. Large transfers can encounter
-the host's tool timeout; confirm the resulting state before retrying an operation.
+### Example: asynchronous transfer
+
+Upload/download return an `operation_ref` immediately, even while the target is
+connecting. `wait_ms` optionally waits up to 5000 ms; it does not limit the transfer.
+Paths must be absolute for their respective machines (maximum 4096 characters).
+
+```json
+{
+  "device_code": "123456789",
+  "source": "C:\\work\\artifact.zip",
+  "destination": "C:\\incoming\\artifact.zip",
+  "overwrite": true,
+  "request_id": "c746c0d6-f349-4e4d-92fa-9e3fb25abcf4"
+}
+```
+
+Call `pab_get_operation` (or `pab_cancel_operation`) with the returned reference:
+
+```json
+{ "device_code": "123456789", "operation_id": "c746c0d6-f349-4e4d-92fa-9e3fb25abcf4" }
+```
+
+Reuse `request_id` with identical parameters to deduplicate submission, including
+after completion or restart. Omitting it generates a new ID. `cancel_requested`
+records intent, while `cancelled` confirms stopping; an already published file
+still completes. `unconfirmed` means the original result is being checked, not
+that it failed. Never replay it under a new ID. At most eight unresolved transfers
+are accepted per MCP session. Active transfers must finish or resolve before
+disconnecting. A disconnected device needs an explicit `pab_connect` to reconnect.
+Historical records from an exited session can be queried but cannot be cancelled
+by another session. Cached OS context is marked `remembered_device`.
+
+Rebuild/install and restart the AI client to load the new tools. Older installed
+MCP binaries retain their previous tool set and behavior. Update the target
+Executor as well before using the text tools.
 
 ## Connections and activity
 

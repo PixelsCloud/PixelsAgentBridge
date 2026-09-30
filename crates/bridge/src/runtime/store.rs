@@ -76,6 +76,7 @@ impl RuntimeStore {
             .await?;
         let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS runtime_system_results (id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             r#"
                 CREATE TABLE IF NOT EXISTS runtime_tasks (
                     request_id TEXT PRIMARY KEY,
@@ -141,6 +142,11 @@ impl RuntimeStore {
                 "#,
             "CREATE INDEX IF NOT EXISTS runtime_operations_started ON runtime_operations (started_at_unix_ms DESC)",
             "CREATE INDEX IF NOT EXISTS runtime_operations_owner ON runtime_operations (owner_session_id)",
+            "CREATE TABLE IF NOT EXISTS runtime_async_transfers (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), phase TEXT NOT NULL, updated_at_unix_ms INTEGER NOT NULL, sha256 TEXT)",
+            "CREATE TABLE IF NOT EXISTS runtime_task_owners (request_id TEXT PRIMARY KEY REFERENCES runtime_tasks(request_id), owner_session_id TEXT NOT NULL, initiated_by TEXT NOT NULL, created_at_unix_ms INTEGER NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS runtime_task_owners_session ON runtime_task_owners (owner_session_id, created_at_unix_ms DESC)",
+            "CREATE TABLE IF NOT EXISTS runtime_download_claims (destination_key TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES runtime_operations(id))",
+            "CREATE TABLE IF NOT EXISTS runtime_filesystem_results (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), fingerprint TEXT NOT NULL, reply_json TEXT NOT NULL)",
             r#"
                 CREATE TABLE IF NOT EXISTS runtime_sessions (
                     id TEXT PRIMARY KEY,
@@ -675,6 +681,12 @@ pub enum RuntimeStoreError {
     Json(#[from] serde_json::Error),
     #[error("the request ID already exists with a different device or command")]
     RequestConflict,
+    #[error(
+        "this MCP has 32 unresolved filesystem operations; resolve them before submitting more"
+    )]
+    FilesystemBusy,
+    #[error("this MCP has 16 unresolved system queries; query existing IDs first")]
+    SystemQueryBusy,
     #[error("the local task record was not found")]
     NotFound,
     #[error("the remote task snapshot does not match the local request")]

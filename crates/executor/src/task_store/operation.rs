@@ -22,7 +22,7 @@ impl TaskStore {
         if stored_actor != initiated_by {
             return Err(TaskStoreError::NotFound);
         }
-        Ok(TransferSnapshot {
+        let mut snapshot = TransferSnapshot {
             request_id,
             initiated_by: stored_actor,
             direction: row.try_get("direction")?,
@@ -35,7 +35,27 @@ impl TaskStore {
             sha256: row.try_get("sha256")?,
             finished_at_unix_ms: row.try_get("finished_at_unix_ms")?,
             message: row.try_get("message")?,
-        })
+            published: match (
+                row.try_get::<String, _>("direction")?.as_str(),
+                row.try_get::<String, _>("state")?.as_str(),
+            ) {
+                ("receive", "completed") => Some(true),
+                ("receive", "failed") => Some(false),
+                _ => None,
+            },
+        };
+        // A process can stop between publishing a verified file and recording
+        // completion. Resolve that window using file evidence, never by replay.
+        if snapshot.direction == "receive"
+            && snapshot.state == "committing"
+            && publication_matches(&snapshot).await
+        {
+            self.finish_transfer(request_id, "completed", None).await?;
+            snapshot.state = "completed".to_owned();
+            snapshot.finished_at_unix_ms = Some(now_unix_ms());
+            snapshot.published = Some(true);
+        }
+        Ok(snapshot)
     }
 
     pub async fn interrupt_transfers(&self) -> Result<(), TaskStoreError> {
@@ -87,6 +107,25 @@ impl TaskStore {
         Ok(())
     }
 
+    pub async fn begin_transfer_publication(&self, id: RequestId) -> Result<(), TaskStoreError> {
+        let result = sqlx::query("UPDATE transfer_operations SET state = 'committing' WHERE request_id = ? AND state = 'running' AND offset = size")
+            .bind(id.to_string()).execute(&self.pool).await?;
+        if result.rows_affected() != 1 {
+            return Err(TaskStoreError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub async fn publication_failed(
+        &self,
+        id: RequestId,
+        message: &str,
+    ) -> Result<(), TaskStoreError> {
+        sqlx::query("UPDATE transfer_operations SET state = 'failed', message = ?, finished_at_unix_ms = ? WHERE request_id = ? AND state = 'committing'")
+            .bind(message).bind(now_unix_ms()).bind(id.to_string()).execute(&self.pool).await?;
+        Ok(())
+    }
+
     pub async fn transfer_progress(
         &self,
         request_id: RequestId,
@@ -111,19 +150,54 @@ impl TaskStore {
         message: Option<&str>,
     ) -> Result<(), TaskStoreError> {
         sqlx::query(
-            "UPDATE transfer_operations SET state = ?, message = ?, finished_at_unix_ms = ? WHERE request_id = ? AND state = 'running'",
+            "UPDATE transfer_operations SET state = ?, message = ?, finished_at_unix_ms = ? WHERE request_id = ? AND (state = 'running' OR (state = 'committing' AND ? = 'completed'))",
         )
         .bind(state)
         .bind(message)
         .bind(now_unix_ms())
         .bind(request_id.to_string())
+        .bind(state)
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 }
 
-fn now_unix_ms() -> i64 {
+async fn publication_matches(snapshot: &TransferSnapshot) -> bool {
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncReadExt;
+    let Some(expected) = snapshot.sha256.as_deref() else {
+        return false;
+    };
+    let Ok(metadata) = tokio::fs::symlink_metadata(&snapshot.path).await else {
+        return false;
+    };
+    if !metadata.is_file() || metadata.len() != snapshot.size {
+        return false;
+    }
+    let Ok(mut file) = tokio::fs::File::open(&snapshot.path).await else {
+        return false;
+    };
+    let mut digest = Sha256::new();
+    let mut buffer = [0; 65536];
+    let mut size = 0_u64;
+    loop {
+        let Ok(read) = file.read(&mut buffer).await else {
+            return false;
+        };
+        if read == 0 {
+            break;
+        }
+        size += read as u64;
+        if size > snapshot.size {
+            return false;
+        }
+        digest.update(&buffer[..read]);
+    }
+    size == snapshot.size && format!("{:x}", digest.finalize()) == expected
+}
+
+pub(super) fn now_unix_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

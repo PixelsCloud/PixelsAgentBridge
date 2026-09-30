@@ -30,9 +30,14 @@ impl UploadPathLocks {
             .active
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if !active.insert(key.clone()) {
+        // A directory operation excludes concurrent writers anywhere beneath it.
+        if active
+            .iter()
+            .any(|held| held.starts_with(&key) || key.starts_with(held))
+        {
             return Ok(None);
         }
+        active.insert(key.clone());
         Ok(Some(UploadPathGuard {
             active: Arc::clone(&self.active),
             key,
@@ -70,5 +75,38 @@ mod tests {
         assert!(locks.try_acquire(&other).await.unwrap().is_some());
         drop(first);
         assert!(locks.try_acquire(&destination).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn directory_locks_exclude_children_in_both_directions_and_normalize_aliases() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("tree");
+        tokio::fs::create_dir(&root).await.unwrap();
+        let child = root.join("child");
+        let locks = UploadPathLocks::default();
+        let guard = locks.try_acquire(&root).await.unwrap().unwrap();
+        assert!(locks.try_acquire(&child).await.unwrap().is_none());
+        assert!(
+            locks
+                .try_acquire(&dir.path().join("other"))
+                .await
+                .unwrap()
+                .is_some()
+        );
+        drop(guard);
+        let guard = locks.try_acquire(&child).await.unwrap().unwrap();
+        assert!(locks.try_acquire(&root).await.unwrap().is_none());
+        let alias = root.join("..").join("tree").join("child");
+        assert!(locks.try_acquire(&alias).await.unwrap().is_none());
+        #[cfg(windows)]
+        assert!(
+            locks
+                .try_acquire(&root.join("CHILD"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        drop(guard);
+        assert!(locks.try_acquire(&root).await.unwrap().is_some());
     }
 }

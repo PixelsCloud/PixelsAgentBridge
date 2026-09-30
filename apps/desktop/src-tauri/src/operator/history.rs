@@ -48,6 +48,20 @@ pub struct HistoryOperation {
     finished_at_unix_ms: Option<i64>,
     message: Option<String>,
     execution_observation: Option<String>,
+    phase: Option<String>,
+    mutation: Option<HistoryMutation>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoryMutation {
+    phase: String,
+    total_entries: u32,
+    processed_entries: u32,
+    published_entries: u32,
+    deleted_entries: u32,
+    partial: bool,
+    source_removed: bool,
 }
 
 #[derive(Serialize)]
@@ -105,7 +119,8 @@ pub async fn operator_bootstrap(
             connected: false,
         })
         .collect::<Vec<_>>();
-    let history = load_history_page(&local, &remembered, &state, None, None, true, true, None).await?;
+    let history =
+        load_history_page(&local, &remembered, &state, None, None, true, true, None).await?;
     if !state.events_started.swap(true, Ordering::AcqRel) {
         tauri::async_runtime::spawn(async move {
             loop {
@@ -228,10 +243,16 @@ async fn load_history_page(
     let mut has_more_tasks = false;
     if load_tasks {
         let mut records = match device_ref {
-            Some(device_ref) => local
-                .tasks_page_for_device(device_ref, task_before, HISTORY_PAGE_SIZE as u32 + 1)
-                .await,
-            None => local.tasks_page(task_before, HISTORY_PAGE_SIZE as u32 + 1).await,
+            Some(device_ref) => {
+                local
+                    .tasks_page_for_device(device_ref, task_before, HISTORY_PAGE_SIZE as u32 + 1)
+                    .await
+            }
+            None => {
+                local
+                    .tasks_page(task_before, HISTORY_PAGE_SIZE as u32 + 1)
+                    .await
+            }
         }
         .map_err(|error| error.to_string())?;
         has_more_tasks = records.len() > HISTORY_PAGE_SIZE;
@@ -275,16 +296,20 @@ async fn load_history_page(
     let mut has_more_operations = false;
     if load_operations {
         let mut records = match device_ref {
-            Some(device_ref) => local
-                .operations_page_for_device(
-                    device_ref,
-                    operation_before,
-                    HISTORY_PAGE_SIZE as u32 + 1,
-                )
-                .await,
-            None => local
-                .operations_page(operation_before, HISTORY_PAGE_SIZE as u32 + 1)
-                .await,
+            Some(device_ref) => {
+                local
+                    .operations_page_for_device(
+                        device_ref,
+                        operation_before,
+                        HISTORY_PAGE_SIZE as u32 + 1,
+                    )
+                    .await
+            }
+            None => {
+                local
+                    .operations_page(operation_before, HISTORY_PAGE_SIZE as u32 + 1)
+                    .await
+            }
         }
         .map_err(|error| error.to_string())?;
         has_more_operations = records.len() > HISTORY_PAGE_SIZE;
@@ -301,7 +326,10 @@ async fn load_history_page(
     Ok(HistoryPage {
         tasks,
         operations,
-        total_count: local.history_count(device_ref).await.map_err(|error| error.to_string())?,
+        total_count: local
+            .history_count(device_ref)
+            .await
+            .map_err(|error| error.to_string())?,
         task_before: task_cursor,
         operation_before_started_at_unix_ms: operation_cursor.as_ref().map(|value| value.0),
         operation_before_id: operation_cursor.map(|value| value.1),
@@ -354,6 +382,16 @@ fn history_operation(
         finished_at_unix_ms: record.finished_at_unix_ms,
         message: record.message,
         execution_observation: record.execution_observation,
+        phase: record.transfer_phase,
+        mutation: record.filesystem_mutation.map(|m| HistoryMutation {
+            phase: m.phase,
+            total_entries: m.total_entries,
+            processed_entries: m.processed_entries,
+            published_entries: m.published_entries,
+            deleted_entries: m.deleted_entries,
+            partial: m.partial,
+            source_removed: m.source_removed,
+        }),
     }
 }
 

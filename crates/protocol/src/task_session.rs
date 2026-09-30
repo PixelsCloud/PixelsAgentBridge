@@ -64,11 +64,35 @@ pub struct TransferSnapshot {
     pub sha256: Option<String>,
     pub finished_at_unix_ms: Option<i64>,
     pub message: Option<String>,
+    /// None on older peers or while publication cannot yet be proven.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub published: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskRequest {
+    SystemQuery {
+        schema_version: u16,
+        request_id: RequestId,
+        query: crate::SystemQuery,
+    },
+    GetSystemQuery {
+        schema_version: u16,
+        request_id: RequestId,
+    },
+    FileSystem {
+        schema_version: u16,
+        request: crate::FileSystemRequest,
+    },
+    CancelFileSystem {
+        schema_version: u16,
+        request_id: RequestId,
+    },
+    GetFileSystem {
+        schema_version: u16,
+        request_id: RequestId,
+    },
     GetEnvironment {
         schema_version: u16,
     },
@@ -181,7 +205,12 @@ pub enum DeviceTaskRequest {
 impl DeviceTaskRequest {
     pub const fn schema_version(&self) -> u16 {
         match self {
-            Self::GetEnvironment { schema_version }
+            Self::SystemQuery { schema_version, .. }
+            | Self::GetSystemQuery { schema_version, .. }
+            | Self::FileSystem { schema_version, .. }
+            | Self::CancelFileSystem { schema_version, .. }
+            | Self::GetFileSystem { schema_version, .. }
+            | Self::GetEnvironment { schema_version }
             | Self::GetPresence { schema_version }
             | Self::SubmitCommand { schema_version, .. }
             | Self::GetTask { schema_version, .. }
@@ -221,8 +250,18 @@ pub enum DeviceTaskErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
+    SystemQuery {
+        reply: Box<crate::SystemQueryReply>,
+    },
+    FileSystem {
+        reply: Box<crate::FileSystemReply>,
+    },
     Environment {
         context: Box<TargetContext>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        filesystem_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        system_query_schema_version: Option<u16>,
     },
     Presence {
         active_operators: u16,
@@ -360,6 +399,7 @@ mod tests {
                 sha256: Some("a".repeat(64)),
                 finished_at_unix_ms: Some(1_000),
                 message: None,
+                published: Some(true),
             },
         };
         let encoded = serde_json::to_vec(&response).unwrap();

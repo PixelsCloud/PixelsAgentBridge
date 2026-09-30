@@ -2,6 +2,7 @@ mod credential;
 mod device;
 mod directory;
 mod event;
+mod filesystem;
 mod operation;
 mod presence;
 mod reconciliation;
@@ -11,9 +12,11 @@ mod session;
 mod store;
 #[cfg(test)]
 mod store_tests;
+mod system_query;
 mod terminal;
 mod terminal_store;
 mod transfer;
+mod transfer_queue;
 mod windows;
 mod worker;
 
@@ -56,7 +59,9 @@ pub use remembered::RememberedDevice;
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
 pub use terminal_store::TerminalAuditEvent;
+pub use transfer_queue::{QueuedTransfer, TransferQueue, TransferRequest};
 
+#[derive(Clone)]
 pub struct BridgeLocalStore {
     store: RuntimeStore,
     screenshot_dir: PathBuf,
@@ -233,6 +238,7 @@ pub struct BridgeRuntimeConfig {
     pub retry_interval: Duration,
     pub event_buffer: usize,
     pub resume_incomplete_on_start: bool,
+    pub session_id: Option<String>,
 }
 
 impl BridgeRuntimeConfig {
@@ -242,6 +248,7 @@ impl BridgeRuntimeConfig {
             retry_interval: DEFAULT_RETRY_INTERVAL,
             event_buffer: DEFAULT_EVENT_BUFFER,
             resume_incomplete_on_start: true,
+            session_id: None,
         }
     }
 
@@ -320,7 +327,10 @@ impl BridgeRuntime {
         bridge_config.validate()?;
         runtime_config.validate()?;
         let store = RuntimeStore::open(&runtime_config.database_path).await?;
-        let session_id = RequestId::new().to_string();
+        let session_id = runtime_config
+            .session_id
+            .clone()
+            .unwrap_or_else(|| RequestId::new().to_string());
         store.start_session(&session_id).await?;
         let (events, _) = broadcast::channel(runtime_config.event_buffer);
         let (availability_sender, availability) = watch::channel(BridgeAvailability::Connecting);
@@ -528,6 +538,10 @@ impl BridgeRuntime {
             .inner
             .store
             .record_pending(device_ref, request_id, &command)
+            .await?;
+        self.inner
+            .store
+            .track_task_owner(request_id, &self.inner.session_id, &self.inner.initiated_by)
             .await?;
         if let Some(snapshot) = record.snapshot.clone() {
             if !record.is_complete() {

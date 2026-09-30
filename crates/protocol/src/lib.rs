@@ -6,6 +6,7 @@ mod device_code;
 mod device_network;
 mod directory;
 mod endpoint_proof;
+mod filesystem;
 mod ids;
 mod operator;
 mod peer;
@@ -38,6 +39,13 @@ pub use endpoint_proof::{
     ENDPOINT_PROOF_CLOCK_SKEW_MS, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey,
     EndpointProofChallenge, EndpointProofContractError, EndpointProofPrincipal,
     EndpointProofPurpose, EndpointProofResponse, EndpointSignature,
+};
+pub use filesystem::{
+    FileHashProgress, FileItemResult, FileMetadata, FileMutationSummary, FileOperationLimits,
+    FileSearchMatch, FileSearchMode, FileSearchSummary, FileSystemAction, FileSystemError,
+    FileSystemReply, FileSystemRequest, MAX_TEXT_EDITS, MAX_TEXT_FILE_BYTES,
+    MAX_TEXT_PAYLOAD_BYTES, MAX_TEXT_READ_BYTES, TextEdit, TextEncoding, TextReadPosition,
+    TextReadRange, cancellable_filesystem_kind, valid_file_hash,
 };
 pub use ids::{
     ChallengeId, ClaimId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId,
@@ -74,3 +82,6 @@ pub use task_session::{
     MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES, TransferSnapshot,
 };
 pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, WindowList};
+
+mod system_query;
+pub use system_query::*;

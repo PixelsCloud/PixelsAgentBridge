@@ -827,6 +827,7 @@ mod tests {
         let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
         let mut socket = connect_with_token(port, &token).await.unwrap();
         register_window_helper(&mut socket).await.unwrap();
+        let (done, received) = oneshot::channel::<()>();
         let helper = tokio::spawn(async move {
             loop {
                 match next_local_event(&mut socket).await.unwrap() {
@@ -839,6 +840,10 @@ mod tests {
                             }
                         );
                         reply_desktop_input(&mut socket, Ok(())).await.unwrap();
+                        // Keep the WebSocket alive until the service consumes
+                        // the reply; dropping a socket with unread status frames
+                        // can reset TCP on Windows under parallel test load.
+                        let _ = received.await;
                         break;
                     }
                     LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
@@ -852,6 +857,7 @@ mod tests {
         })
         .await
         .unwrap();
+        let _ = done.send(());
         helper.await.unwrap();
         server.abort();
     }

@@ -21,7 +21,18 @@ use tokio::sync::{Mutex, watch};
 mod command;
 mod directory;
 mod file_transfer;
+mod filesystem;
+mod filesystem_archive;
+mod filesystem_bulk;
+mod filesystem_bulk_io;
+mod filesystem_hash;
+mod filesystem_io;
+mod filesystem_mkdir;
+mod filesystem_publish;
+mod filesystem_search;
+mod filesystem_text;
 mod subscription;
+mod system_query;
 mod terminal;
 mod upload_lock;
 
@@ -42,6 +53,18 @@ pub(crate) struct TaskService {
     active: Arc<Mutex<HashMap<TaskId, watch::Sender<Option<String>>>>>,
     terminals: Arc<Mutex<HashMap<pab_protocol::RequestId, Arc<terminal::ActiveTerminal>>>>,
     upload_locks: upload_lock::UploadPathLocks,
+    filesystem_slots: Arc<tokio::sync::Semaphore>,
+    #[cfg(test)]
+    hash_test_gate: Arc<Mutex<Option<Arc<filesystem_hash::HashTestGate>>>>,
+    #[cfg(test)]
+    bulk_test_gate: Arc<Mutex<Option<Arc<filesystem_bulk::BulkTestGate>>>>,
+    bulk_slots: Arc<tokio::sync::Semaphore>,
+    bulk_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, filesystem_bulk::BulkJob>>>,
+    hash_slots: Arc<tokio::sync::Semaphore>,
+    hash_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, filesystem_hash::HashJob>>>,
+    system_collector: Arc<std::sync::Mutex<pab_platform::SystemCollector>>,
+    system_slots: Arc<tokio::sync::Semaphore>,
+    system_jobs: Arc<Mutex<std::collections::HashSet<pab_protocol::RequestId>>>,
     active_sessions: ActiveSessions,
 }
 
@@ -79,6 +102,20 @@ impl TaskService {
             active: Arc::new(Mutex::new(HashMap::new())),
             terminals: Arc::new(Mutex::new(HashMap::new())),
             upload_locks: upload_lock::UploadPathLocks::default(),
+            filesystem_slots: Arc::new(tokio::sync::Semaphore::new(8)),
+            #[cfg(test)]
+            hash_test_gate: Arc::new(Mutex::new(None)),
+            #[cfg(test)]
+            bulk_test_gate: Arc::new(Mutex::new(None)),
+            bulk_slots: Arc::new(tokio::sync::Semaphore::new(4)),
+            bulk_jobs: Arc::new(Mutex::new(HashMap::new())),
+            hash_slots: Arc::new(tokio::sync::Semaphore::new(4)),
+            hash_jobs: Arc::new(Mutex::new(HashMap::new())),
+            system_collector: Arc::new(std::sync::Mutex::new(
+                pab_platform::SystemCollector::default(),
+            )),
+            system_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+            system_jobs: Arc::new(Mutex::new(std::collections::HashSet::new())),
             active_sessions: ActiveSessions::default(),
         })
     }
@@ -103,6 +140,11 @@ impl TaskService {
                 "unsupported device task schema version",
             )
             .await;
+        }
+        if let DeviceTaskRequest::FileSystem { request, .. } = request {
+            return self
+                .filesystem_stream(initiated_by, request, &mut stream, timeout)
+                .await;
         }
         if let DeviceTaskRequest::Subscribe {
             task_ref,
@@ -290,7 +332,32 @@ impl TaskService {
         request: DeviceTaskRequest,
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
+            DeviceTaskRequest::SystemQuery {
+                request_id, query, ..
+            } => Ok(DeviceTaskResponse::SystemQuery {
+                reply: Box::new(self.system_query(initiated_by, request_id, query).await?),
+            }),
+            DeviceTaskRequest::GetSystemQuery { request_id, .. } => {
+                Ok(DeviceTaskResponse::SystemQuery {
+                    reply: Box::new(self.get_system_query(initiated_by, request_id).await?),
+                })
+            }
+            DeviceTaskRequest::CancelFileSystem { request_id, .. } => {
+                Ok(DeviceTaskResponse::FileSystem {
+                    reply: Box::new(self.cancel_hash(initiated_by, request_id).await?),
+                })
+            }
+            DeviceTaskRequest::GetFileSystem { request_id, .. } => {
+                Ok(DeviceTaskResponse::FileSystem {
+                    reply: Box::new(self.lookup_filesystem(initiated_by, request_id).await?),
+                })
+            }
+            DeviceTaskRequest::FileSystem { .. } => Err(TaskServiceError::InvalidRequest(
+                "filesystem requests require their binary stream handler",
+            )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
+                filesystem_schema_version: Some(3),
+                system_query_schema_version: Some(1),
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),
@@ -713,3 +780,6 @@ impl TaskServiceError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod transfer_tests;

@@ -15,14 +15,30 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
       resolved: t.mcpResolved, stopped: t.phaseDisconnected, pending: t.mcpPending, accepted: t.mcpPending,
       running: t.mcpBusy, cancel_requested: t.mcpCancelling, succeeded: t.mcpSucceeded, completed: t.mcpSucceeded,
       failed: t.mcpFailed, cancelled: t.mcpCancelled, interrupted: t.mcpInterrupted,
+      unconfirmed: t.transferUnconfirmedShort, not_initialized: t.mcpNotStarted,
     };
     return states[state] ?? state;
   };
   const stateTag = (state: string) => <Tag color={
     ["connected", "authenticated", "succeeded", "completed"].includes(state) ? "success"
       : ["failed", "interrupted", "initialization_failed"].includes(state) ? "error"
-        : ["running", "connecting", "retrying", "reconnecting"].includes(state) ? "processing" : "default"
+        : state === "unconfirmed" ? "warning"
+          : ["running", "connecting", "retrying", "reconnecting"].includes(state) ? "processing" : "default"
   }>{stateText(state)}</Tag>;
+
+  const clientState = (client: ConnectedMcp) => {
+    const { report } = client;
+    const running = report.activeCalls.length > 0
+      || report.runtime?.tasks.some(task => ["accepted", "running", "cancel_requested"].includes(task.state))
+      || report.runtime?.operations.some(operation => ["running", "cancel_requested"].includes(operation.state) && !operation.finishedAtUnixMs);
+    if (running) return "busy";
+    if (report.runtime?.operations.some(operation => operation.state === "unconfirmed" && !operation.finishedAtUnixMs)) return "unconfirmed";
+    return "idle";
+  };
+  const clientStatusTag = (client: ConnectedMcp) => {
+    const state = clientState(client);
+    return <Tag color={state === "busy" ? "processing" : state === "unconfirmed" ? "warning" : "default"}>{state === "busy" ? t.mcpBusy : state === "unconfirmed" ? t.transferUnconfirmedShort : t.mcpIdle}</Tag>;
+  };
 
   function details(client: ConnectedMcp) {
     const report = client.report;
@@ -91,7 +107,7 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
     {!status && !error ? <p>{t.loading}</p> : status?.running && <>
       {status.clients.length ? <Collapse size="small" items={status.clients.map(client => ({
         key: client.report.sessionId,
-        label: <Space wrap><strong>{client.report.clientName || "MCP"}</strong><Typography.Text type="secondary">PID {client.report.processId}</Typography.Text><Tag color={client.report.activeCalls.length ? "processing" : "default"}>{client.report.activeCalls.length ? t.mcpBusy : t.mcpIdle}</Tag></Space>,
+        label: <Space wrap><strong>{client.report.clientName || "MCP"}</strong><Typography.Text type="secondary">PID {client.report.processId}</Typography.Text>{clientStatusTag(client)}</Space>,
         children: details(client),
       }))} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t.mcpNoConnections} />}
     </>}

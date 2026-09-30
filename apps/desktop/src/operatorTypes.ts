@@ -30,6 +30,8 @@ export type HistoryPage = {
 export type OperatorBootstrap = HistoryPage & { devices: ConnectedDevice[] };
 
 export type OperationEntry = {
+  phase?: string | null;
+  mutation?: { phase: string; totalEntries: number; processedEntries: number; publishedEntries: number; deletedEntries: number; partial: boolean; sourceRemoved: boolean } | null;
   id: string;
   deviceCode: string;
   initiatedBy: string;

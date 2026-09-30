@@ -7,14 +7,15 @@ mod runtime;
 
 pub use config::{BridgeConfig, BridgeConfigError, BridgeIdentity, GuestConfigError};
 pub use connection::{
-    AuthenticatedDeviceConnection, BridgeClient, BridgeConnector, BridgeError, Screenshot,
-    TaskSubscription,
+    AuthenticatedDeviceConnection, BridgeClient, BridgeConnector, BridgeError, FileSystemResult,
+    Screenshot, TaskSubscription, TransferControl,
 };
 pub use pab_transport::ConnectionPath;
 pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
-    LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, RememberedDevice,
-    RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind, RuntimePresenceSource,
-    SqliteDevicePasswordProvider, TerminalAuditEvent,
+    LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, QueuedTransfer,
+    RememberedDevice, RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind,
+    RuntimePresenceSource, SqliteDevicePasswordProvider, TerminalAuditEvent, TransferQueue,
+    TransferRequest,
 };

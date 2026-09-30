@@ -51,6 +51,7 @@ pub(super) async fn upload(
     }
     let mut file = OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .open(&partial)
@@ -93,11 +94,23 @@ pub(super) async fn upload(
         fs::remove_file(&partial).await?;
         return reject(stream, timeout, "file checksum mismatch").await;
     }
-    if overwrite {
-        fs::rename(&partial, &destination).await?;
+    store.begin_transfer_publication(request_id).await?;
+    let publication = if overwrite {
+        fs::rename(&partial, &destination).await
     } else {
-        fs::hard_link(&partial, &destination).await?;
-        fs::remove_file(&partial).await?;
+        fs::hard_link(&partial, &destination).await
+    };
+    if let Err(error) = publication {
+        store
+            .publication_failed(request_id, &error.to_string())
+            .await?;
+        return Err(error.into());
+    }
+    // Record the actual publication before sending its receipt. A closed stream
+    // after this point must not change an already completed upload into a failure.
+    store.finish_transfer(request_id, "completed", None).await?;
+    if !overwrite && let Err(error) = fs::remove_file(&partial).await {
+        tracing::warn!(%error, "could not remove published upload staging file");
     }
     stream
         .send_json(
@@ -166,6 +179,7 @@ pub(super) async fn download(
         sent += read as u64;
         store.transfer_progress(request_id, sent, size).await?;
     }
+    store.finish_transfer(request_id, "completed", None).await?;
     stream
         .send_json(&DeviceTaskResponse::FileComplete { size, sha256 }, timeout)
         .await?;

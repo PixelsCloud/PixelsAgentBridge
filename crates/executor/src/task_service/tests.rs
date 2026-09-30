@@ -15,6 +15,112 @@ fn account(id: u128) -> OperatorRef {
 }
 
 #[tokio::test]
+async fn publication_record_wins_over_receipt_failure_and_cancel() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = TaskStore::open(&directory.path().join("db")).await.unwrap();
+    let id = RequestId::new();
+    let actor = account(9);
+    store
+        .start_transfer(
+            id,
+            actor,
+            "receive",
+            "/test/result",
+            3,
+            Some(&"a".repeat(64)),
+        )
+        .await
+        .unwrap();
+    assert!(store.begin_transfer_publication(id).await.is_err());
+    store.transfer_progress(id, 3, 3).await.unwrap();
+    store.begin_transfer_publication(id).await.unwrap();
+    store
+        .finish_transfer(id, "failed", Some("lost receipt"))
+        .await
+        .unwrap();
+    assert_eq!(
+        store.get_transfer(actor, id).await.unwrap().state,
+        "committing"
+    );
+    store.finish_transfer(id, "completed", None).await.unwrap();
+    store
+        .finish_transfer(id, "failed", Some("lost receipt"))
+        .await
+        .unwrap();
+    let snapshot = store.get_transfer(actor, id).await.unwrap();
+    assert_eq!(snapshot.state, "completed");
+    assert_eq!(snapshot.published, Some(true));
+}
+
+#[tokio::test]
+async fn publication_recovery_checks_actor_size_and_digest_without_replaying() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("db");
+    let store = TaskStore::open(&database).await.unwrap();
+    let id = RequestId::new();
+    let actor = account(9);
+    let destination = directory.path().join("中文 result.bin");
+    let digest = format!("{:x}", Sha256::digest(b"data"));
+    store
+        .start_transfer(
+            id,
+            actor,
+            "receive",
+            destination.to_str().unwrap(),
+            4,
+            Some(&digest),
+        )
+        .await
+        .unwrap();
+    store.transfer_progress(id, 4, 4).await.unwrap();
+    store.begin_transfer_publication(id).await.unwrap();
+    tokio::fs::write(&destination, b"evil").await.unwrap();
+    assert_eq!(
+        store.get_transfer(actor, id).await.unwrap().state,
+        "committing"
+    );
+    tokio::fs::write(&destination, b"data").await.unwrap();
+    assert!(matches!(
+        store.get_transfer(account(10), id).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    drop(store);
+    let reopened = TaskStore::open(&database).await.unwrap();
+    reopened.interrupt_transfers().await.unwrap();
+    let snapshot = reopened.get_transfer(actor, id).await.unwrap();
+    assert_eq!(snapshot.state, "completed");
+    assert_eq!(snapshot.published, Some(true));
+    assert_eq!(tokio::fs::read(destination).await.unwrap(), b"data");
+}
+
+#[tokio::test]
+async fn a_proven_publication_failure_is_distinct_from_a_lost_receipt() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = TaskStore::open(&directory.path().join("db")).await.unwrap();
+    let id = RequestId::new();
+    let actor = account(9);
+    store
+        .start_transfer(
+            id,
+            actor,
+            "receive",
+            "/missing/result",
+            0,
+            Some(&"a".repeat(64)),
+        )
+        .await
+        .unwrap();
+    store.begin_transfer_publication(id).await.unwrap();
+    store
+        .publication_failed(id, "rename failed before publication")
+        .await
+        .unwrap();
+    let snapshot = store.get_transfer(actor, id).await.unwrap();
+    assert_eq!(snapshot.state, "failed");
+    assert_eq!(snapshot.published, Some(false));
+}
+
+#[tokio::test]
 async fn executor_transfer_audit_survives_reopen_and_records_interruption() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("tasks.sqlite3");

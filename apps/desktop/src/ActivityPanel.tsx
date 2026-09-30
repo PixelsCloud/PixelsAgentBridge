@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, List, Monitor, RotateCw, Terminal } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, List, Monitor, RotateCw, Terminal } from "lucide-react";
 import { Button, Pagination, Select, Tag } from "antd";
 import { HistoryScreenshot } from "./HistoryScreenshot";
 import { HistoryTerminal } from "./HistoryTerminal";
@@ -59,7 +59,11 @@ export function ActivityPanel({
   const selectedOperation = selected?.kind === "operation" ? selected.item : null;
   const formatTime = (value: number) => new Date(value).toLocaleString(language);
   const formatActor = (actor: string) => actor === "guest" ? t.guestOperator : actor;
-  const operationLabel = (item: OperationEntry) => item.kind === "directory"
+  const isFileOperation = (kind: string) => Object.prototype.hasOwnProperty.call(t.fileOperations, kind);
+  const isSystemOperation = (kind: string) => Object.prototype.hasOwnProperty.call(t.systemOperations, kind);
+  const operationLabel = (item: OperationEntry) => isSystemOperation(item.kind) ? t.systemOperations[item.kind as keyof typeof t.systemOperations] : isFileOperation(item.kind)
+    ? t.fileOperations[item.kind as keyof typeof t.fileOperations]
+    : item.kind === "directory"
     ? t.directoryBrowse
     : item.kind === "windows"
     ? t.windowList
@@ -76,6 +80,8 @@ export function ActivityPanel({
     ? t.transferStates.cancel_requested
     : item.executionObservation === "unconfirmed"
     ? t.transferUnconfirmedShort
+    : item.kind === "file_transfer" && item.state === "running" && item.phase
+    ? t.transferPhases[item.phase as keyof typeof t.transferPhases] ?? t.transferStates.running
     : t.transferStates[item.state as keyof typeof t.transferStates] ?? item.state;
 
   return (
@@ -99,7 +105,7 @@ export function ActivityPanel({
           <div className="task-list">
             {visible.map(({ kind, item }) => (
               <button className={`task-row ${selected?.item.id === item.id ? "active" : ""}`} key={item.id} onClick={() => onSelect(item.id)}>
-                <span className="task-icon">{kind === "command" ? <Terminal size={18} /> : item.kind === "directory" || item.kind === "windows" || item.kind === "screenshot" || item.kind === "desktop_input" ? <Monitor size={18} /> : item.direction === "upload" ? <ArrowUp size={18} /> : <ArrowDown size={18} />}</span>
+                <span className="task-icon">{kind === "command" ? <Terminal size={18} /> : isSystemOperation(item.kind) ? <Monitor size={18} /> : isFileOperation(item.kind) ? <FileText size={18} /> : item.kind === "directory" || item.kind === "windows" || item.kind === "screenshot" || item.kind === "desktop_input" ? <Monitor size={18} /> : item.direction === "upload" ? <ArrowUp size={18} /> : <ArrowDown size={18} />}</span>
                 <span><strong>{kind === "command" ? item.program : operationLabel(item)}</strong><small>{formatDeviceCode(item.deviceCode)} · {formatTime(item.startedAtUnixMs)}</small></span>
                 <em>{kind === "command" ? item.state : operationStateLabel(item)}</em>
               </button>
@@ -127,8 +133,21 @@ export function ActivityPanel({
                 {selectedOperation.executionObservation === "unconfirmed" && <div><span>{t.transferObservation}</span><strong>{selectedOperation.state === "cancel_requested" ? t.transferCancelUnconfirmed : t.transferUnconfirmed}</strong></div>}
                 {selectedOperation.executionObservation === "unknown" && <div><span>{t.transferObservation}</span><strong>{t.transferUnknown}</strong></div>}
                 <div><span>{t.initiatedBy}</span><strong>{formatActor(selectedOperation.initiatedBy)}</strong></div>
-                <div><span>{t.direction}</span><strong>{selectedOperation.kind === "terminal" ? t.terminalDirection : selectedOperation.kind === "desktop_input" ? t.remoteInputDirection : selectedOperation.kind === "windows" ? t.windowRead : selectedOperation.kind === "directory" ? t.directoryRead : selectedOperation.direction === "upload" ? t.uploadDirection : t.downloadDirection}</strong></div>
+                <div><span>{t.direction}</span><strong>{isSystemOperation(selectedOperation.kind) ? t.systemOperations[selectedOperation.kind as keyof typeof t.systemOperations] : isFileOperation(selectedOperation.kind) ? t.fileOperations[selectedOperation.kind as keyof typeof t.fileOperations] : selectedOperation.kind === "terminal" ? t.terminalDirection : selectedOperation.kind === "desktop_input" ? t.remoteInputDirection : selectedOperation.kind === "windows" ? t.windowRead : selectedOperation.kind === "directory" ? t.directoryRead : selectedOperation.direction === "upload" ? t.uploadDirection : t.downloadDirection}</strong></div>
                 {selectedOperation.kind === "desktop_input" && <div><span>{t.remoteInputType}</span><strong>{selectedOperation.source}</strong></div>}
+                {isSystemOperation(selectedOperation.kind) && <div><span>{t.systemEntries}</span><strong>{selectedOperation.size.toLocaleString()}</strong></div>}
+                {isFileOperation(selectedOperation.kind) && <>
+                  <div><span>{t.sourcePath}</span><strong>{selectedOperation.source}</strong></div>
+                  {selectedOperation.destination && <div><span>{t.destinationPath}</span><strong>{selectedOperation.destination}</strong></div>}
+                  {selectedOperation.mutation && <>
+                    <div><span>{t.mutationLabels.entries}</span><strong>{selectedOperation.mutation.processedEntries} / {selectedOperation.mutation.totalEntries}</strong></div>
+                    <div><span>{t.mutationLabels.published}</span><strong>{selectedOperation.mutation.publishedEntries}</strong></div>
+                    <div><span>{t.mutationLabels.deleted}</span><strong>{selectedOperation.mutation.deletedEntries}</strong></div>
+                    {selectedOperation.mutation.partial && selectedOperation.state !== "running" && selectedOperation.state !== "cancel_requested" && <div><span>{t.result}</span><strong>{t.mutationLabels.partial}</strong></div>}
+                    {selectedOperation.kind === "file_move" && <div><span>{t.mutationLabels.sourceRemoved}</span><strong>{selectedOperation.mutation.sourceRemoved ? t.yes : t.no}</strong></div>}
+                  </>}
+                  {["file_hash", "file_copy", "file_move", "file_delete", "archive_create", "archive_extract"].includes(selectedOperation.kind) ? <div><span>{t.progress}</span><strong>{selectedOperation.offset.toLocaleString()} / {selectedOperation.size.toLocaleString()} B</strong></div> : !["file_search", "mkdir"].includes(selectedOperation.kind) && <div><span>{t.imageSize}</span><strong>{selectedOperation.size.toLocaleString()} B</strong></div>}
+                </>}
                 {selectedOperation.kind === "directory" && <>
                   <div><span>{t.sourcePath}</span><strong>{selectedOperation.source}</strong></div>
                   <div><span>{t.directoryEntries}</span><strong>{selectedOperation.size.toLocaleString()}</strong></div>

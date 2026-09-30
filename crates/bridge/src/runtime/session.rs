@@ -6,11 +6,14 @@ use super::store::{RuntimeStore, RuntimeStoreError};
 
 impl RuntimeStore {
     pub async fn start_session(&self, id: &str) -> Result<(), RuntimeStoreError> {
-        sqlx::query("INSERT INTO runtime_sessions (id, heartbeat_at_unix_ms) VALUES (?, ?)")
+        let result = sqlx::query("INSERT INTO runtime_sessions (id, heartbeat_at_unix_ms) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET heartbeat_at_unix_ms = excluded.heartbeat_at_unix_ms WHERE runtime_sessions.stopped_at_unix_ms IS NULL")
             .bind(id)
             .bind(super::unix_millis())
             .execute(&self.pool)
             .await?;
+        if result.rows_affected() != 1 {
+            return Err(RuntimeStoreError::RequestConflict);
+        }
         Ok(())
     }
 

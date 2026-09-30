@@ -69,11 +69,10 @@ h1, h2, h3, p { margin: 0; }
 .settings-actions { display: flex; align-items: center; gap: 18px; margin-top: auto; padding-top: 16px; }
 .settings-actions .quiet-button, .quiet-button:has(svg) { display: inline-flex; align-items: center; gap: 5px; }
 .settings-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 19px; }
-.settings-agent-row div { display: grid; gap: 4px; min-width: 0; }
-.settings-agent-row strong { color: #214356; font-size: 13px; }
-.settings-agent-row span { color: #718796; font-size: 11px; }
-.settings-agent-row .primary-button { width: auto; min-height: 35px; padding: 0 13px; white-space: nowrap; }
-.settings-agent-row .quiet-button { margin: 0; white-space: nowrap; }
+.settings-agent-row > div { display: grid; gap: 4px; min-width: 0; }
+.settings-agent-row > div > strong { color: #214356; font-size: 13px; }
+.settings-agent-row > div > span { color: #718796; font-size: 11px; }
+.settings-agent-row > .ant-btn { font-weight: 600; white-space: nowrap; }
 .settings-ai .settings-scope-note { margin-top: auto !important; padding-top: 10px; }
 .settings-detail:has(.mcp-reporting-panel) { overflow-y: auto; }
 .settings-ai:has(.mcp-reporting-panel) { flex: 0 0 auto; }
