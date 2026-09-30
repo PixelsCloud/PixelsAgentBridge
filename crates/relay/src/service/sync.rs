@@ -3,7 +3,9 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::Connector;
 
-use crate::{RelayControlClient, RelayControlClientError, RelayPolicyRuntime};
+use crate::{PolicySync, RelayControlClient, RelayControlClientError, RelayPolicyRuntime};
+
+const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct PolicySyncSettings {
     pub control_url: String,
@@ -36,12 +38,26 @@ pub fn spawn_refresh_loop(
     runtime: RelayPolicyRuntime,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let mut last_refresh = tokio::time::Instant::now();
         loop {
-            tokio::time::sleep(settings.refresh_interval).await;
-            if let Err(error) = client.sync_policy(&runtime).await {
-                tracing::warn!(%error, "relay policy refresh failed");
-                client = reconnect(&settings, connector.clone(), &runtime).await;
+            let on_demand = tokio::select! {
+                _ = tokio::time::sleep(settings.refresh_interval) => false,
+                _ = runtime.wait_for_refresh_request() => true,
+            };
+            // Coalesce packet-triggered refreshes and bound database work even
+            // when an admitted client continually sends to an unauthorized peer.
+            tokio::time::sleep_until(last_refresh + MIN_REFRESH_INTERVAL).await;
+            match client.sync_policy(&runtime).await {
+                Ok(PolicySync::Updated { policy_version }) => {
+                    tracing::info!(policy_version, on_demand, "relay policy updated");
+                }
+                Ok(PolicySync::Unchanged { .. }) => {}
+                Err(error) => {
+                    tracing::warn!(%error, "relay policy refresh failed");
+                    client = reconnect(&settings, connector.clone(), &runtime).await;
+                }
             }
+            last_refresh = tokio::time::Instant::now();
         }
     })
 }

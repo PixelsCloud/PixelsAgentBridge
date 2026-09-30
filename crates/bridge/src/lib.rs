@@ -2,6 +2,7 @@
 
 mod config;
 mod connection;
+pub mod desktop_presence;
 mod runtime;
 
 pub use config::{BridgeConfig, BridgeConfigError, BridgeIdentity, GuestConfigError};
@@ -14,6 +15,6 @@ pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
     LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, RememberedDevice,
-    RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind,
+    RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind, RuntimePresenceSource,
     SqliteDevicePasswordProvider, TerminalAuditEvent,
 };

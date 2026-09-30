@@ -24,6 +24,47 @@ async fn concurrent_stores_initialize_one_database() {
 }
 
 #[tokio::test]
+async fn reporting_operations_include_only_the_owning_runtime() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("bridge.sqlite3");
+    let first = RuntimeStore::open(&path).await.unwrap();
+    let second = RuntimeStore::open(&path).await.unwrap();
+    first.start_session("mcp-first").await.unwrap();
+    second.start_session("mcp-second").await.unwrap();
+    for (id, owner) in [
+        (RequestId::new(), "mcp-first"),
+        (RequestId::new(), "mcp-second"),
+    ] {
+        first
+            .start_operation(
+                id,
+                device_ref(),
+                None,
+                "guest",
+                "upload",
+                "local.bin",
+                "/tmp/remote.bin",
+                false,
+                Some(owner),
+            )
+            .await
+            .unwrap();
+    }
+    let first_records = first.operations_for_session("mcp-first").await.unwrap();
+    let second_records = second.operations_for_session("mcp-second").await.unwrap();
+    assert_eq!(first_records.len(), 1);
+    assert_eq!(second_records.len(), 1);
+    assert_ne!(first_records[0].id, second_records[0].id);
+    assert!(
+        first
+            .operations_for_session("desktop")
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
 async fn device_password_is_available_to_another_process_store() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("bridge.sqlite3");
@@ -827,6 +868,99 @@ fn device_ref() -> DeviceRef {
         tenant_id: TenantId::from_u128(2),
         device_id: DeviceId::from_u128(3),
     }
+}
+
+#[test]
+fn runtime_reporting_tracks_task_events_without_forwarding_output_or_command_arguments() {
+    let mut report = crate::desktop_presence::RuntimeReport::default();
+    let mut task = snapshot(device_ref(), RequestId::new());
+    task.display_summary = "program private-command-argument".to_owned();
+    let target = task.target_context();
+    super::presence::apply_event(
+        &mut report,
+        &super::RuntimeEvent {
+            sequence: 1,
+            occurred_at_unix_ms: 1000,
+            kind: super::RuntimeEventKind::TaskSnapshot {
+                target: target.clone(),
+                snapshot: Box::new(task.clone()),
+            },
+        },
+    );
+    super::presence::apply_event(
+        &mut report,
+        &super::RuntimeEvent {
+            sequence: 2,
+            occurred_at_unix_ms: 2000,
+            kind: super::RuntimeEventKind::TaskEvent {
+                target: target.clone(),
+                event: TaskEvent {
+                    schema_version: TASK_SCHEMA_VERSION,
+                    task_ref: task.task_ref,
+                    seq: 2,
+                    occurred_at_unix_ms: 2000,
+                    kind: TaskEventKind::Running,
+                },
+            },
+        },
+    );
+    assert_eq!(report.tasks[0].state, "running");
+    super::presence::apply_event(
+        &mut report,
+        &super::RuntimeEvent {
+            sequence: 3,
+            occurred_at_unix_ms: 2001,
+            kind: super::RuntimeEventKind::TaskOutput {
+                target: target.clone(),
+                chunk: OutputChunk {
+                    schema_version: TASK_SCHEMA_VERSION,
+                    task_ref: task.task_ref,
+                    stream: OutputStream::Stdout,
+                    offset: 0,
+                    bytes: b"private-output".to_vec(),
+                },
+                range: OutputRange {
+                    retained_from: 0,
+                    available_to: 14,
+                    complete: false,
+                },
+            },
+        },
+    );
+    assert_eq!(report.tasks[0].output.stdout.available_to, 14);
+    let serialized = serde_json::to_string(&report).unwrap();
+    assert!(!serialized.contains("private-output"));
+    assert!(!serialized.contains("private-command-argument"));
+    super::presence::apply_event(
+        &mut report,
+        &super::RuntimeEvent {
+            sequence: 4,
+            occurred_at_unix_ms: 3000,
+            kind: super::RuntimeEventKind::TaskEvent {
+                target,
+                event: TaskEvent {
+                    schema_version: TASK_SCHEMA_VERSION,
+                    task_ref: task.task_ref,
+                    seq: 3,
+                    occurred_at_unix_ms: 3000,
+                    kind: TaskEventKind::Succeeded {
+                        completion: TaskCompletion {
+                            summary: "private-summary".to_owned(),
+                            exit_code: Some(0),
+                        },
+                    },
+                },
+            },
+        },
+    );
+    assert_eq!(report.tasks[0].state, "succeeded");
+    assert_eq!(report.tasks[0].exit_code, Some(0));
+    assert_eq!(report.tasks[0].finished_at_unix_ms, Some(3000));
+    assert!(
+        !serde_json::to_string(&report)
+            .unwrap()
+            .contains("private-summary")
+    );
 }
 
 fn command() -> CommandTaskSpec {

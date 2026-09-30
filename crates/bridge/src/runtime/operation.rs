@@ -243,6 +243,24 @@ impl RuntimeStore {
             .collect()
     }
 
+    pub(super) async fn operations_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
+        let rows = sqlx::query(
+            "SELECT o.*, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o \
+             LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id \
+             WHERE o.owner_session_id = ? AND (o.finished_at_unix_ms IS NULL OR o.id IN \
+               (SELECT id FROM runtime_operations WHERE owner_session_id = ? AND finished_at_unix_ms IS NOT NULL \
+                ORDER BY started_at_unix_ms DESC, id DESC LIMIT 100)) \
+             ORDER BY o.started_at_unix_ms DESC, o.id DESC",
+        ).bind(session_id).bind(session_id).fetch_all(&self.pool).await?;
+        let stale_before = now_unix_ms().saturating_sub(SESSION_STALE_AFTER_MS);
+        rows.into_iter()
+            .map(|row| decode_operation(row, stale_before))
+            .collect()
+    }
+
     pub async fn operations_page(
         &self,
         before: Option<(i64, &str)>,

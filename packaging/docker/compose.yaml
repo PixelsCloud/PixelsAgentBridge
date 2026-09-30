@@ -77,7 +77,7 @@ services:
           - ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
 
   relay:
-    image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
+    image: ${PAB_RELAY_IMAGE:-${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}}
     command: ["pab-relay-server"]
     restart: unless-stopped
     init: true

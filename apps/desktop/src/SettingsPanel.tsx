@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button, Input, Menu, Select } from "antd";
 import { ArrowRight, Bot, Info, Languages, RotateCw, Server } from "lucide-react";
 import { messages, type Language } from "./i18n";
+import { McpConnectionsPanel } from "./McpConnectionsPanel";
 
 type ServerSettings = {
   deploymentId: string;
@@ -125,6 +126,7 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
         </div>
         {codexError && <p className="settings-error" role="alert">{codexError}</p>}
         <p className="settings-scope-note">{t.settingsAiNote}</p>
+        <McpConnectionsPanel language={language} />
       </div>}
 
       {section === "server" && <div className="settings-server">

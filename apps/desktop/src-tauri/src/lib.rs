@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 
 mod agent_integrations;
 mod desktop_input;
+mod mcp_reporting;
 mod operator;
 mod screenshot_session;
 mod server_settings;
@@ -167,8 +168,14 @@ pub fn run() {
     pab_logging::init("desktop", paths.root()).expect("could not initialize desktop log file");
     tauri::Builder::default()
         .manage(LocalStatus::default())
+        .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
         .setup(|app| {
+            let reporting = app
+                .state::<mcp_reporting::McpReportingState>()
+                .inner()
+                .clone();
+            tauri::async_runtime::block_on(mcp_reporting::start(app.handle().clone(), reporting));
             let handle = app.handle().clone();
             let status = app.state::<LocalStatus>().inner().clone();
             tauri::async_runtime::spawn(watch_local_service(handle, status));
@@ -176,6 +183,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             device_status,
+            mcp_reporting::mcp_reporting_status,
             approve_claim,
             server_settings::get_operator_server_settings,
             server_settings::save_operator_server_settings,
@@ -215,6 +223,11 @@ pub fn run() {
             operator::operator_login_account,
             operator::operator_use_guest_scope,
         ])
-        .run(tauri::generate_context!())
-        .expect("could not start Pixels Agent Bridge desktop application");
+        .build(tauri::generate_context!())
+        .expect("could not start Pixels Agent Bridge desktop application")
+        .run(|handle, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                handle.state::<mcp_reporting::McpReportingState>().stop();
+            }
+        });
 }

@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::Duration,
@@ -129,38 +128,38 @@ fn codex_config_path() -> Result<PathBuf, String> {
     Ok(home.join("config.toml"))
 }
 
-fn pixels_policy_is_auto() -> Result<bool, String> {
+fn pixels_policy_is_approved() -> Result<bool, String> {
     let config = fs::read_to_string(codex_config_path()?).map_err(|error| error.to_string())?;
     let document = config
         .parse::<DocumentMut>()
         .map_err(|error| error.to_string())?;
-    Ok(pixels_policy_is_auto_in(&document))
+    Ok(pixels_policy_is_approved_in(&document))
 }
 
-fn pixels_policy_is_auto_in(document: &DocumentMut) -> bool {
+fn pixels_policy_is_approved_in(document: &DocumentMut) -> bool {
     let Some(pixels) = document
         .get("mcp_servers")
         .and_then(|servers| servers.get("pixels"))
     else {
         return false;
     };
-    let defaults_to_auto = pixels
+    let defaults_to_approved = pixels
         .get("default_tools_approval_mode")
         .and_then(|mode| mode.as_str())
-        == Some("auto");
-    let all_tools_visible = pixels.get("enabled_tools").is_none()
-        && pixels.get("disabled_tools").is_none();
-    let overrides_are_auto = pixels
+        == Some("approve");
+    let all_tools_visible =
+        pixels.get("enabled_tools").is_none() && pixels.get("disabled_tools").is_none();
+    let overrides_are_approved = pixels
         .get("tools")
-        .and_then(|tools| tools.as_table())
+        .and_then(|tools| tools.as_table_like())
         .is_none_or(|tools| {
             tools.iter().all(|(_, tool)| {
                 tool.get("approval_mode")
                     .and_then(|mode| mode.as_str())
-                    .is_none_or(|mode| mode == "auto")
+                    .is_none_or(|mode| mode == "approve")
             })
         });
-    defaults_to_auto && all_tools_visible && overrides_are_auto
+    defaults_to_approved && all_tools_visible && overrides_are_approved
 }
 
 fn allow_all_pixels_tools() -> Result<(), String> {
@@ -179,12 +178,17 @@ fn allow_all_pixels_tools_in(document: &mut DocumentMut) -> Result<(), String> {
         .and_then(|servers| servers.get_mut("pixels"))
         .and_then(|pixels| pixels.as_table_mut())
         .ok_or("Pixels is missing from the Codex MCP configuration")?;
-    pixels["default_tools_approval_mode"] = value("auto");
+    // Codex's `auto` may still request approval based on tool annotations.
+    // Pixels integration explicitly enables all tools without approval prompts.
+    pixels["default_tools_approval_mode"] = value("approve");
     pixels.remove("enabled_tools");
     pixels.remove("disabled_tools");
-    if let Some(tools) = pixels.get_mut("tools").and_then(|tools| tools.as_table_mut()) {
+    if let Some(tools) = pixels
+        .get_mut("tools")
+        .and_then(|tools| tools.as_table_like_mut())
+    {
         for (_, tool) in tools.iter_mut() {
-            tool["approval_mode"] = value("auto");
+            tool["approval_mode"] = value("approve");
         }
     }
     Ok(())
@@ -286,7 +290,7 @@ fn status() -> Result<CodexIntegration, String> {
                 .as_ref()
                 .is_some_and(|path| same_path(path, &expected))
     });
-    if enabled && !pixels_policy_is_auto()? {
+    if enabled && !pixels_policy_is_approved()? {
         allow_all_pixels_tools()?;
     }
     Ok(CodexIntegration {
@@ -373,7 +377,7 @@ pub async fn set_codex_integration(enabled: bool) -> Result<CodexIntegration, St
 
 #[cfg(test)]
 mod tests {
-    use super::{allow_all_pixels_tools_in, pixels_policy_is_auto_in};
+    use super::{allow_all_pixels_tools_in, pixels_policy_is_approved_in};
     use toml_edit::DocumentMut;
 
     #[test]
@@ -381,30 +385,77 @@ mod tests {
         let config = r#"
 [mcp_servers.other]
 command = "other-mcp"
-default_tools_approval_mode = "approve"
+default_tools_approval_mode = "prompt"
 
 [mcp_servers.pixels]
 command = "pab-mcp.exe"
+default_tools_approval_mode = "auto"
 enabled_tools = ["pab_list_devices"]
 disabled_tools = ["pab_run_command"]
 
 [mcp_servers.pixels.tools.pab_list_devices]
+approval_mode = "auto"
+output_token_limit = 4096
+
+[mcp_servers.pixels.tools.pab_run_command]
+approval_mode = "prompt"
+
+[mcp_servers.pixels.tools.pab_connect]
 approval_mode = "approve"
 "#;
         let mut document = config.parse::<DocumentMut>().expect("valid TOML");
-        assert!(!pixels_policy_is_auto_in(&document));
+        assert!(!pixels_policy_is_approved_in(&document));
 
         allow_all_pixels_tools_in(&mut document).expect("Pixels exists");
 
-        assert!(pixels_policy_is_auto_in(&document));
+        assert!(pixels_policy_is_approved_in(&document));
         assert_eq!(
             document["mcp_servers"]["other"]["default_tools_approval_mode"].as_str(),
-            Some("approve")
+            Some("prompt")
         );
         assert_eq!(
             document["mcp_servers"]["pixels"]["tools"]["pab_list_devices"]["approval_mode"]
                 .as_str(),
-            Some("auto")
+            Some("approve")
         );
+        assert_eq!(
+            document["mcp_servers"]["pixels"]["tools"]["pab_list_devices"]["output_token_limit"]
+                .as_integer(),
+            Some(4096)
+        );
+        for tool in ["pab_run_command", "pab_connect"] {
+            assert_eq!(
+                document["mcp_servers"]["pixels"]["tools"][tool]["approval_mode"].as_str(),
+                Some("approve")
+            );
+        }
+        let approved = document.to_string();
+        allow_all_pixels_tools_in(&mut document).expect("Pixels exists");
+        assert_eq!(document.to_string(), approved);
+    }
+
+    #[test]
+    fn auto_policy_needs_migration_even_without_tool_overrides() {
+        let mut document = r#"
+[mcp_servers.pixels]
+command = "pab-mcp.exe"
+default_tools_approval_mode = "auto"
+"#
+        .parse::<DocumentMut>()
+        .expect("valid TOML");
+
+        assert!(!pixels_policy_is_approved_in(&document));
+        allow_all_pixels_tools_in(&mut document).expect("Pixels exists");
+        assert!(pixels_policy_is_approved_in(&document));
+        assert_eq!(
+            document["mcp_servers"]["pixels"]["default_tools_approval_mode"].as_str(),
+            Some("approve")
+        );
+
+        document["mcp_servers"]["pixels"]["tools"]["pab_upload_file"]["approval_mode"] =
+            toml_edit::value("auto");
+        assert!(!pixels_policy_is_approved_in(&document));
+        allow_all_pixels_tools_in(&mut document).expect("Pixels exists");
+        assert!(pixels_policy_is_approved_in(&document));
     }
 }

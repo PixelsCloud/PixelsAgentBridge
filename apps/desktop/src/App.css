@@ -75,6 +75,18 @@ h1, h2, h3, p { margin: 0; }
 .settings-agent-row .primary-button { width: auto; min-height: 35px; padding: 0 13px; white-space: nowrap; }
 .settings-agent-row .quiet-button { margin: 0; white-space: nowrap; }
 .settings-ai .settings-scope-note { margin-top: auto !important; padding-top: 10px; }
+.settings-detail:has(.mcp-reporting-panel) { overflow-y: auto; }
+.settings-ai:has(.mcp-reporting-panel) { flex: 0 0 auto; }
+.settings-ai:has(.mcp-reporting-panel) .settings-scope-note { margin-top: 12px !important; }
+.mcp-reporting-panel { margin-top: 20px; min-width: 0; }
+.mcp-reporting-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.mcp-reporting-heading h3 { font-size: 15px; }
+.mcp-process-details { min-width: 0; }
+.mcp-device-list { display: grid; gap: 8px; }
+.mcp-device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--ant-color-border-secondary, #434b5530); }
+.mcp-device-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.mcp-process-details .ant-descriptions-item-content { overflow-wrap: anywhere; }
+.mcp-process-details .ant-alert { margin: 8px 0; }
 .surface { min-width: 0; min-height: 0; padding: 25px 27px; border: 1px solid #e1e8ed; border-radius: 17px; background: #fff; box-shadow: 0 12px 36px #1c37500b; overflow: hidden; }
 .surface h2 { margin-top: 12px; color: #183044; font-size: 19px; font-weight: 760; letter-spacing: -.03em; }
 .surface p { color: #778996; font-size: 12px; line-height: 1.55; }

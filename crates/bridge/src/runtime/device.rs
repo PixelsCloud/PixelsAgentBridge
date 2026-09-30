@@ -119,11 +119,18 @@ impl DeviceSession {
                 retry_in_ms: None,
                 message: None,
             });
-            let password = self
-                .runtime
-                .passwords
-                .load_password(self.device_ref)
-                .await?;
+            let password = match self.runtime.passwords.load_password(self.device_ref).await {
+                Ok(password) => password,
+                Err(error) => {
+                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                        device_ref: self.device_ref,
+                        phase: DeviceConnectionPhase::Disconnected,
+                        retry_in_ms: None,
+                        message: Some(error.to_string()),
+                    });
+                    return Err(error.into());
+                }
+            };
             match connector.connect_device(self.device_ref, password).await {
                 Ok(connection) => {
                     if self.manually_disconnected.load(Ordering::Acquire) {
@@ -152,7 +159,15 @@ impl DeviceSession {
                         .wait_or_shutdown(self.runtime.retry_interval)
                         .await?;
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => {
+                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                        device_ref: self.device_ref,
+                        phase: DeviceConnectionPhase::Disconnected,
+                        retry_in_ms: None,
+                        message: Some(error.to_string()),
+                    });
+                    return Err(error.into());
+                }
             }
         }
     }
@@ -204,7 +219,33 @@ pub(super) async fn run_bridge_supervisor(
                 let _ =
                     availability.send(BridgeAvailability::Connected(Box::new(bridge.connector())));
                 runtime.publish(RuntimeEventKind::BridgeConnected);
-                let _ = shutdown.changed().await;
+                let mut control = bridge.control_status();
+                loop {
+                    {
+                        let status = control.borrow().clone();
+                        let mut presence =
+                            runtime.presence.lock().unwrap_or_else(|e| e.into_inner());
+                        presence.control_phase = match status.phase {
+                            pab_agent_core::ControlConnectionPhase::Disconnected => "disconnected",
+                            pab_agent_core::ControlConnectionPhase::Connecting => "connecting",
+                            pab_agent_core::ControlConnectionPhase::Authenticated => {
+                                "authenticated"
+                            }
+                            pab_agent_core::ControlConnectionPhase::Reconnecting => "reconnecting",
+                            pab_agent_core::ControlConnectionPhase::Stopped => "stopped",
+                        }
+                        .to_owned();
+                        presence.last_error = status.last_failure.map(|failure| failure.detail);
+                        presence.control_changed_at_unix_ms = status.changed_at_unix_ms;
+                        presence.control_generation = status.generation;
+                        presence.control_consecutive_failures = status.consecutive_failures;
+                        presence.control_retry_in_ms = status.retry_in_ms;
+                    }
+                    tokio::select! {
+                        _ = shutdown.changed() => break,
+                        changed = control.changed() => if changed.is_err() { break; },
+                    }
+                }
                 let _ = availability.send(BridgeAvailability::Stopped(
                     "Bridge Runtime is shutting down".to_owned(),
                 ));
@@ -216,6 +257,11 @@ pub(super) async fn run_bridge_supervisor(
                 return;
             }
             Err(error) => {
+                {
+                    let mut presence = runtime.presence.lock().unwrap_or_else(|e| e.into_inner());
+                    presence.control_phase = "retrying".to_owned();
+                    presence.last_error = Some(error.to_string());
+                }
                 runtime.publish(RuntimeEventKind::BridgeRetrying {
                     retry_in_ms: duration_millis(retry_interval),
                     message: error.to_string(),

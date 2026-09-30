@@ -115,6 +115,39 @@ MCP reuses resolved identities and authenticated connections. Address queries al
 have a twenty-target limit per control session. Offline devices and permanent
 server rejections fail explicitly instead of becoming generic connection timeouts.
 
+Codex integration configures Pixels tools with `default_tools_approval_mode =
+"approve"` and migrates existing per-tool overrides to `approve`, matching the
+requested behavior of running all Pixels tools without approval prompts. Codex's
+`auto` can still request approval based on tool annotations and therefore block
+commands and uploads when approval prompts are disabled. Policy migration supports
+regular and inline TOML tool tables while preserving unrelated server settings.
+The two configuration regression tests pass; the current Codex session also
+completed a forced installer upload to winserver and verified its remote SHA-256
+using the registered `pixels.pab_*` tools without approval prompts.
+
+The shared Bridge Host proposal was cancelled on 2026-09-30. Desktop and each
+MCP process retain independent runtimes and remote connections. Desktop's main UI
+process runs an Axum HTTP/WebSocket service on `0.0.0.0:26035`, without tokens or
+authentication as requested. MCP connects to `ws://127.0.0.1:26035/ws/mcp` at startup
+and reports process/client identity, tool calls, control status, used devices and
+their codes/names/connection phases/P2P-or-Relay paths, plus session-scoped task and
+operation/transfer summaries. HTTP `/health` and `/api/mcp` share the same listener.
+Snapshots are kept in memory and delivered to React through Tauri query/events.
+Reporting reconnects independently of tools when desktop is closed; a five-second
+heartbeat and twenty-second timeout clean up abandoned connections. Complete
+snapshots on reconnect and per-connection ownership prevent duplicate counts.
+Passwords, keys, command arguments, output and remote-operation payloads are excluded.
+Task facts remain in SQLite, with runtime/session ownership respected when reporting.
+The implementation plan is `docs/desktop_mcp_reporting_2026-09-30.md` (local design
+documents are intentionally ignored by Git). The service, reporting client and
+Settings / AI Agent live process/device/task/operation view are implemented. The
+tests cover independent connections, same-session replacement, timeout cleanup,
+late startup/restart, session-scoped operations and output/argument exclusion.
+A real stdio smoke test starts two `pab-mcp` processes, verifies registration before
+tools, calls a local tool, then verifies forced and normal exit cleanup. Run it after
+building `pab-mcp`, with `PAB_MCP_SMOKE_EXE` pointing to the new executable:
+`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib real_mcp_stdio_processes_register_before_tools_and_clean_up_on_exit -- --ignored`.
+
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
 file, local device-credential file, and optional control/Relay private CAs from
@@ -300,7 +333,12 @@ Relay nodes request a versioned full policy snapshot over the authenticated WSS
 channel. An unchanged response extends the snapshot lifetime without resetting
 rate buckets. A newer snapshot atomically replaces Endpoint ownership and removes
 revoked entries. Unknown endpoints, cross-tenant forwarding, and expired policy
-state fail closed. The production Relay service refreshes every 20 seconds and retries
+state fail closed. The production Relay service refreshes every 20 seconds. A cache
+miss during endpoint admission or pair forwarding requests an immediate refresh over
+the existing authenticated control channel, coalesced to at most one request per
+second. New endpoint admission waits up to three seconds for that refresh; pair
+forwarding drops unauthorized packets until the refreshed policy permits them, so
+QUIC retransmission can complete the first handshake. It retries
 the control connection indefinitely at a fixed three-second interval; the in-memory policy still expires if
 the control service remains unavailable.
 

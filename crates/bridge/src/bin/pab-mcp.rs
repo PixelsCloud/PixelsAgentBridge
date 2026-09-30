@@ -8,6 +8,7 @@ mod mcp_settings;
 mod mcp_tools;
 
 use pab_agent_core::{DataPaths, DataScope};
+use pab_bridge::desktop_presence::{McpReporter, RuntimeReport};
 use pab_bridge::{
     BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, MemoryDevicePasswordProvider,
     SqliteDevicePasswordProvider,
@@ -61,17 +62,39 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if env::args_os().len() != 1 {
         return Err("pab-mcp accepts no command-line arguments".into());
     }
-    let server = McpServer::default();
-    server.clone().serve(stdio()).await?.waiting().await?;
+    let (reporter, reporting) = McpReporter::start();
+    let server = McpServer {
+        runtime: Default::default(),
+        reporter: reporter.clone(),
+        runtime_reporting: Default::default(),
+    };
+    let result = async {
+        let service = server.clone().serve(stdio()).await?;
+        if let Some(info) = service.peer().peer_info() {
+            reporter.set_client(
+                info.client_info.name.clone(),
+                info.client_info.version.clone(),
+            );
+        }
+        service.waiting().await?;
+        Ok::<_, Box<dyn std::error::Error>>(())
+    }
+    .await;
+    reporting.shutdown().await;
+    if let Some(task) = server.runtime_reporting.lock().await.take() {
+        task.abort();
+    }
     if let Some(runtime) = server.runtime.lock().await.take() {
         runtime.shutdown().await?;
     }
-    Ok(())
+    result
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct McpServer {
     runtime: Arc<tokio::sync::Mutex<Option<BridgeRuntime>>>,
+    reporter: McpReporter,
+    runtime_reporting: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl ServerHandler for McpServer {
@@ -96,15 +119,40 @@ impl ServerHandler for McpServer {
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
         let arguments = Value::Object(request.arguments.unwrap_or_default());
+        let mut call = self.reporter.begin_call(&request.name, &arguments);
         let result = if request.name == "pab_list_devices" {
             mcp_tools::list_local_devices().await
         } else {
             let mut runtime = self.runtime.lock().await;
+            if runtime.is_none() {
+                self.reporter.set_runtime(RuntimeReport {
+                    control_phase: "initializing".to_owned(),
+                    ..Default::default()
+                });
+            }
             match ensure_runtime(&mut runtime).await {
-                Ok(runtime) => mcp_tools::call_tool(runtime, &request.name, &arguments).await,
-                Err(error) => Err(error),
+                Ok(runtime) => {
+                    let mut monitor = self.runtime_reporting.lock().await;
+                    if monitor.is_none() {
+                        *monitor = Some(self.reporter.attach_runtime(runtime.presence_source()));
+                    }
+                    drop(monitor);
+                    mcp_tools::call_tool(runtime, &request.name, &arguments).await
+                }
+                Err(error) => {
+                    self.reporter.set_runtime(RuntimeReport {
+                        control_phase: "initialization_failed".to_owned(),
+                        last_error: Some(error.clone()),
+                        ..Default::default()
+                    });
+                    Err(error)
+                }
             }
         };
+        if let Ok(value) = &result {
+            call.observe_result(value);
+        }
+        call.finish(result.is_ok());
         Ok(match result {
             Ok(value) => CallToolResult::structured(value).into(),
             Err(error) => CallToolResult::error(vec![ContentBlock::text(error)]).into(),

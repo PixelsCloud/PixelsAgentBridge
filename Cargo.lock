@@ -2862,6 +2862,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
+ "futures-util",
  "iroh-base",
  "pab-agent-core",
  "pab-logging",
@@ -2876,7 +2877,9 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-tungstenite",
  "tracing",
+ "uuid",
  "zeroize",
 ]
 
@@ -2957,9 +2960,11 @@ dependencies = [
  "pab-logging",
  "pab-protocol",
  "pab-transport",
+ "rcgen",
  "rustls",
  "rustls-pemfile",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tokio-rustls",

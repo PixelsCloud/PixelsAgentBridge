@@ -3,6 +3,9 @@
 This Compose stack runs PostgreSQL 17, the TLS control backend, and the TLS/QUIC
 iroh Relay. The image is compiled with Cargo's stripped Release profile.
 
+`PAB_RELAY_IMAGE` may override just the Relay image for an independent update;
+otherwise it uses `PAB_SERVER_IMAGE` like the backend.
+
 PostgreSQL uses the named `postgres-data` volume, so replacing images or running
 `docker compose down` keeps accounts, device UUID/code mappings, and grants. Do not
 use `docker compose down -v` for an ordinary uninstall or upgrade; removing that

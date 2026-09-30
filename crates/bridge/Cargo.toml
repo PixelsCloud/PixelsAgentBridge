@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+futures-util = "0.3"
 base64 = "0.22"
 argon2 = "0.5"
 iroh-base = { version = "=1.2.0", features = ["key"] }
@@ -20,6 +21,8 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 thiserror.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["fs"] }
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake"] }
+uuid.workspace = true
 sha2 = "0.10"
 zeroize = "1"
 

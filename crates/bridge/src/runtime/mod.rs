@@ -3,6 +3,7 @@ mod device;
 mod directory;
 mod event;
 mod operation;
+mod presence;
 mod reconciliation;
 mod remembered;
 mod screenshot;
@@ -50,6 +51,7 @@ pub use credential::{
 };
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
 pub use operation::OperationRecord;
+pub use presence::RuntimePresenceSource;
 pub use remembered::RememberedDevice;
 use store::RuntimeStore;
 pub use store::{LocalTaskRecord, RuntimeStoreError};
@@ -328,6 +330,20 @@ impl BridgeRuntime {
             crate::BridgeIdentity::Guest => "guest".to_owned(),
         };
         let inner = Arc::new(RuntimeInner {
+            presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
+                session_id: session_id.clone(),
+                deployment_id: bridge_config.deployment_id.to_string(),
+                tenant_id: bridge_config.tenant_id.to_string(),
+                identity: initiated_by.clone(),
+                control_url: bridge_config.control_url.to_string(),
+                relay_urls: bridge_config
+                    .relay_urls
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+                control_phase: "connecting".to_owned(),
+                ..Default::default()
+            }),
             store,
             screenshot_dir: screenshot::screenshot_dir(&runtime_config.database_path),
             terminal_dir: terminal::terminal_dir(&runtime_config.database_path),
@@ -379,6 +395,12 @@ impl BridgeRuntime {
         self.inner.events.subscribe()
     }
 
+    pub fn presence_source(&self) -> RuntimePresenceSource {
+        RuntimePresenceSource {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+
     pub async fn resolve_device_code(&self, code: DeviceCode) -> Result<DeviceRef, RuntimeError> {
         let mut availability = self.inner.availability.clone();
         loop {
@@ -392,6 +414,31 @@ impl BridgeRuntime {
                                 .lock()
                                 .await
                                 .insert(device_ref, code);
+                            {
+                                let mut presence = self
+                                    .inner
+                                    .presence
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner());
+                                presence::device_entry(&mut presence, device_ref).device_code =
+                                    Some(code.to_string());
+                            }
+                            let runtime = Arc::downgrade(&self.inner);
+                            let connector = *connector;
+                            tokio::spawn(async move {
+                                if let Ok(Ok(metadata)) = tokio::time::timeout(
+                                    Duration::from_secs(3),
+                                    connector.device_presence(code),
+                                )
+                                .await
+                                    && let Some(runtime) = runtime.upgrade()
+                                {
+                                    let mut presence =
+                                        runtime.presence.lock().unwrap_or_else(|e| e.into_inner());
+                                    presence::device_entry(&mut presence, device_ref).name =
+                                        Some(metadata.name);
+                                }
+                            });
                             return Ok(device_ref);
                         }
                         Err(BridgeError::NetworkResolution(
@@ -510,7 +557,18 @@ impl BridgeRuntime {
         loop {
             let connection = device.connection().await?;
             match connection.get_environment().await {
-                Ok(target) => return Ok(target),
+                Ok(target) => {
+                    presence::device_entry(
+                        &mut self
+                            .inner
+                            .presence
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner()),
+                        device_ref,
+                    )
+                    .environment = Some(target.execution.clone());
+                    return Ok(target);
+                }
                 Err(error) if error.is_recoverable_connection() => {
                     device.recover(&connection, &error).await?;
                 }
@@ -791,6 +849,7 @@ impl BridgeRuntime {
 }
 
 struct RuntimeInner {
+    presence: std::sync::Mutex<crate::desktop_presence::RuntimeReport>,
     store: RuntimeStore,
     screenshot_dir: PathBuf,
     terminal_dir: PathBuf,
@@ -821,11 +880,16 @@ impl RuntimeInner {
 
     fn publish(&self, kind: RuntimeEventKind) {
         let sequence = self.event_sequence.fetch_add(1, Ordering::Relaxed) + 1;
-        let _ = self.events.send(RuntimeEvent {
+        let event = RuntimeEvent {
             sequence,
             occurred_at_unix_ms: unix_millis(),
             kind,
-        });
+        };
+        presence::apply_event(
+            &mut self.presence.lock().unwrap_or_else(|e| e.into_inner()),
+            &event,
+        );
+        let _ = self.events.send(event);
     }
 
     fn publish_snapshot(&self, snapshot: &TaskSnapshot) {
