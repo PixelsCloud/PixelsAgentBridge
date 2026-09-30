@@ -32,7 +32,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
   返回结果携带经过验证的目标操作系统。
 - **传输文件**：用绝对路径上传、下载二进制文件，校验完整性，并显式决定是否覆盖。
 - **交互终端**：打开远程终端、发送输入、读取输出、调整尺寸和关闭会话。
-- **桌面能力**：在受支持的桌面会话中列出窗口、保存远程截图为本地 PNG，
+- **桌面能力**：在受支持的桌面会话中列出窗口、向 Agent 返回有界 JPEG 预览或保存 PNG 原图，
   发送鼠标、键盘或 Windows 安全注意序列事件。
 - **设备管理**：保存历史设备、重命名、复制信息，分别显示在线状态和连接状态；
   已连接卡片展示当前使用 P2P 还是 Relay。
@@ -147,7 +147,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_read_output` | 按偏移读取保存的 stdout 或 stderr |
 | `pab_list_directory` | 分页列出目录内容 |
 | `pab_list_windows` | 列出受支持桌面会话中的窗口 |
-| `pab_capture_screenshot` | 保存远程截图为本地 PNG，返回尺寸及哈希 |
+| `pab_capture_screenshot` | 返回有界 JPEG/PNG 预览图片，或保存原图，附带尺寸、格式和哈希 |
 | `pab_desktop_input` | 发送受支持的鼠标、键盘或安全注意序列事件 |
 | `pab_open_terminal` | 打开交互终端 |
 | `pab_terminal_input` | 发送终端输入 |
@@ -235,6 +235,41 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 `mutation` 返回阶段、计划/处理项数、写入/删除数、`partial`、`source_removed` 和有限逐项结果（64 项或 8 KiB）。取消在检查点停止，阻塞 OS I/O 可能延迟停止；只有 `cancelled` 确认 worker 已退出。失败或取消保留已生效项，包括后续 ZIP 条目 CRC 损坏前已解出的文件，不自动回滚。删除只移除计划项，拒绝盘符/根目录。结果未确认时查询原 ID，不重新执行。PAB 路径锁覆盖祖先和子路径，但不提供对外部程序的原子目录操作；ZIP 不保留 ACL、属主和扩展元数据。
 
 新文件工具已完成 Windows 本地自动化验证，包括隔离 QUIC 与 MCP stdio。安装后的宿主调用、物理跨盘和 Windows/Linux 双机验收仍待完成；旧安装包不含这些新增工具。
+
+### 截图预览与原图
+
+截图复用 [xcap](https://github.com/nashaofu/xcap) 采集画面，使用
+[image](https://github.com/image-rs/image) 缩放、编码 JPEG/PNG 和有界解码校验，不自行实现截图引擎。
+
+`pab_capture_screenshot` 默认 `mode="preview"`：JPEG，尺寸不超过 1600×1000，
+编码后不超过 512 KiB。质量从 75 开始，必要时降至 45，再缩小尺寸满足预算。
+返回 MCP 图片内容、已保存的文件和元数据；Base64 只出现在图片块中，不重复写入文本、
+结构化结果、SQLite 或活动上报。
+
+```json
+{"device_code":"214601537"}
+```
+
+`mode="original"` 默认 PNG，保留采集尺寸，编码预算 8 MiB。显式指定 JPEG 原图时，
+默认质量为 85。支持 `format`、仅 JPEG 的 `quality`、`max_bytes`、仅预览模式的
+`max_width/max_height`、`monitor_id` 和相对所选屏幕的 `region`。区域越界直接失败，
+不偷偷裁剪。采集最多 16 Mi 像素，单边最多 16384 像素。每次调用采集新画面；
+同帧高清区域和窗口截图尚未实现。
+
+```json
+{"device_code":"214601537","mode":"original","destination":"C:\\Temp\\screen.png","include_image":false}
+```
+
+`destination` 可省略。指定时必须为绝对路径，扩展名与图片格式一致；不覆盖已有文件。
+编码图片超过 512 KiB 时只保存文件，明确返回 `image_omitted_reason`，不输出过大的内联图片。
+`include_image=false` 可显式只要文件。元数据包含采集时间、屏幕标识、全局区域原点、
+源尺寸和编码尺寸、实际 JPEG 质量、字节数和 SHA-256。传输沿用二进制帧，校验实际编码、
+长度、尺寸和哈希。
+
+新选项要求升级目标 Executor 与桌面助手。旧端明确返回升级提示，不降级成其他屏幕或忽略区域。
+旧客户端的主屏 PNG 请求继续保留。当前已验证 Windows 编译、合成图片、隔离助手/QUIC
+及 MCP 响应；安装后宿主图片显示、原生 4K/多屏、macOS/Linux 图形机仍待验收。
+本阶段产品接口明确不支持 Wayland。
 
 ### 示例：执行命令与读取结果
 

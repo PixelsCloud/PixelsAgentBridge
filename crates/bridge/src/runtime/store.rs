@@ -76,6 +76,7 @@ impl RuntimeStore {
             .await?;
         let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS runtime_screenshot_results (id TEXT PRIMARY KEY, meta_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             "CREATE TABLE IF NOT EXISTS runtime_system_results (id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             r#"
                 CREATE TABLE IF NOT EXISTS runtime_tasks (

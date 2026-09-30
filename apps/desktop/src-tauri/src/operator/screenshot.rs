@@ -51,13 +51,18 @@ pub async fn operator_preview_desktop(
 }
 
 fn screenshot_view(image: pab_bridge::Screenshot) -> ScreenshotView {
+    let mime = if image.meta.format == "jpeg" {
+        "image/jpeg"
+    } else {
+        "image/png"
+    };
     ScreenshotView {
         request_id: image.meta.request_id,
         width: image.meta.width,
         height: image.meta.height,
         size: image.meta.size,
         sha256: image.meta.sha256,
-        data_url: format!("data:image/png;base64,{}", STANDARD.encode(image.bytes)),
+        data_url: format!("data:{mime};base64,{}", STANDARD.encode(image.bytes)),
     }
 }
 
@@ -71,5 +76,12 @@ pub async fn operator_screenshot_from_history(
         .screenshot_bytes(&id)
         .await
         .map_err(|error| error.to_string())?;
-    Ok(bytes.map(|bytes| format!("data:image/png;base64,{}", STANDARD.encode(bytes))))
+    Ok(bytes.map(|bytes| {
+        let mime = if bytes.starts_with(b"\xff\xd8\xff") {
+            "image/jpeg"
+        } else {
+            "image/png"
+        };
+        format!("data:{mime};base64,{}", STANDARD.encode(bytes))
+    }))
 }

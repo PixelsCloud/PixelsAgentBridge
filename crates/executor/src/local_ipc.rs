@@ -24,7 +24,8 @@ use tokio::{
     sync::{Semaphore, mpsc, oneshot},
 };
 use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, accept_async, connect_async, tungstenite::Message,
+    MaybeTlsStream, WebSocketStream, accept_async_with_config, connect_async,
+    tungstenite::{Message, protocol::WebSocketConfig},
 };
 
 use crate::{approve_claim, device_status::read_device_status_from_service};
@@ -35,12 +36,27 @@ const AUTH_TIMEOUT: Duration = Duration::from_secs(5);
 type HmacSha256 = Hmac<Sha256>;
 pub type LocalSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
+struct HelperRegistration(Option<u64>);
+impl Drop for HelperRegistration {
+    fn drop(&mut self) {
+        if let Some(id) = self.0
+            && let Ok(mut providers) = window_providers().lock()
+        {
+            providers.retain(|provider| provider.id != id);
+        }
+    }
+}
 struct WindowProvider {
     id: u64,
     sender: mpsc::Sender<HelperRequest>,
+    screenshot_schema_version: Option<u16>,
 }
 
 enum HelperRequest {
+    ScreenshotV2(
+        pab_protocol::ScreenshotOptions,
+        oneshot::Sender<Result<pab_screenshot::EncodedScreenshot, LocalIpcError>>,
+    ),
     Windows(oneshot::Sender<Result<Vec<WindowEntry>, LocalIpcError>>),
     Screenshot(oneshot::Sender<Result<Vec<u8>, LocalIpcError>>),
     DesktopInput(
@@ -50,6 +66,11 @@ enum HelperRequest {
 }
 
 enum PendingRequest {
+    ScreenshotV2 {
+        options: pab_protocol::ScreenshotOptions,
+        info: Option<pab_protocol::ScreenshotInfo>,
+        reply: oneshot::Sender<Result<pab_screenshot::EncodedScreenshot, LocalIpcError>>,
+    },
     Windows(oneshot::Sender<Result<Vec<WindowEntry>, LocalIpcError>>),
     Screenshot(oneshot::Sender<Result<Vec<u8>, LocalIpcError>>),
     DesktopInput(oneshot::Sender<Result<(), LocalIpcError>>),
@@ -103,6 +124,59 @@ pub(crate) async fn request_screenshot() -> Result<Vec<u8>, LocalIpcError> {
         .map_err(|_| LocalIpcError::WindowHelperUnavailable)?
 }
 
+pub(crate) async fn request_screenshot_v2(
+    options: pab_protocol::ScreenshotOptions,
+) -> Result<pab_screenshot::EncodedScreenshot, LocalIpcError> {
+    options
+        .validate()
+        .map_err(|_| LocalIpcError::InvalidScreenshot)?;
+    let sender = window_providers()
+        .lock()
+        .map_err(|_| LocalIpcError::Protocol)?
+        .last()
+        .filter(|provider| {
+            provider
+                .screenshot_schema_version
+                .is_some_and(|v| v >= pab_protocol::SCREENSHOT_SCHEMA_VERSION)
+        })
+        .map(|provider| provider.sender.clone())
+        .ok_or(LocalIpcError::WindowHelperUnavailable)?;
+    let operation = async {
+        let (reply, receiver) = oneshot::channel();
+        sender
+            .send(HelperRequest::ScreenshotV2(options, reply))
+            .await
+            .map_err(|_| LocalIpcError::WindowHelperUnavailable)?;
+        receiver
+            .await
+            .map_err(|_| LocalIpcError::WindowHelperUnavailable)?
+    };
+    tokio::time::timeout(Duration::from_secs(20), operation)
+        .await
+        .map_err(|_| LocalIpcError::Timeout)?
+}
+
+pub async fn reply_screenshot_v2(
+    socket: &mut LocalSocket,
+    image: &pab_screenshot::EncodedScreenshot,
+) -> Result<(), LocalIpcError> {
+    if pab_screenshot::dimensions(&image.bytes, image.info.format)
+        .map_err(|_| LocalIpcError::InvalidScreenshot)?
+        != (image.info.width, image.info.height)
+    {
+        return Err(LocalIpcError::InvalidScreenshot);
+    }
+    send_json(
+        socket,
+        &json!({"type":"screenshot_metadata","info":image.info}),
+    )
+    .await?;
+    socket
+        .send(Message::Binary(image.bytes.clone().into()))
+        .await?;
+    Ok(())
+}
+
 pub(crate) async fn request_desktop_input(event: DesktopInputEvent) -> Result<(), LocalIpcError> {
     let sender = window_providers()
         .lock()
@@ -127,11 +201,12 @@ pub enum LocalEvent {
     StatusUnavailable(String),
     ListWindows,
     CaptureScreenshot,
+    CaptureScreenshotV2(pab_protocol::ScreenshotOptions),
     DesktopInput(DesktopInputEvent),
 }
 
 pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
-    send_json(socket, &json!({"type":"register_window_helper"})).await?;
+    send_json(socket, &json!({"type":"register_window_helper","screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
@@ -148,31 +223,31 @@ pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), Loca
 }
 
 pub async fn next_local_event(socket: &mut LocalSocket) -> Result<LocalEvent, LocalIpcError> {
-    loop {
-        let frame = receive_json(socket).await?;
-        match frame["type"].as_str() {
-            Some("status") => {
-                return Ok(LocalEvent::Status(serde_json::from_value(
-                    frame["status"].clone(),
-                )?));
-            }
-            Some("list_windows") => return Ok(LocalEvent::ListWindows),
-            Some("capture_screenshot") => return Ok(LocalEvent::CaptureScreenshot),
-            Some("desktop_input") => {
-                return Ok(LocalEvent::DesktopInput(serde_json::from_value(
-                    frame["event"].clone(),
-                )?));
-            }
-            Some("error") => {
-                return Ok(LocalEvent::StatusUnavailable(
-                    frame["message"]
-                        .as_str()
-                        .unwrap_or("local service error")
-                        .to_owned(),
-                ));
-            }
-            _ => return Err(LocalIpcError::Protocol),
+    let frame = receive_json(socket).await?;
+    match frame["type"].as_str() {
+        Some("status") => Ok(LocalEvent::Status(serde_json::from_value(
+            frame["status"].clone(),
+        )?)),
+        Some("list_windows") => Ok(LocalEvent::ListWindows),
+        Some("capture_screenshot") => Ok(LocalEvent::CaptureScreenshot),
+        Some("capture_screenshot_v2") => {
+            let options: pab_protocol::ScreenshotOptions =
+                serde_json::from_value(frame["options"].clone())?;
+            options
+                .validate()
+                .map_err(|_| LocalIpcError::InvalidScreenshot)?;
+            Ok(LocalEvent::CaptureScreenshotV2(options))
         }
+        Some("desktop_input") => Ok(LocalEvent::DesktopInput(serde_json::from_value(
+            frame["event"].clone(),
+        )?)),
+        Some("error") => Ok(LocalEvent::StatusUnavailable(
+            frame["message"]
+                .as_str()
+                .unwrap_or("local service error")
+                .to_owned(),
+        )),
+        _ => Err(LocalIpcError::Protocol),
     }
 }
 
@@ -526,17 +601,29 @@ async fn handle_connection(
     root: &Path,
     token: &[u8; 32],
 ) -> Result<(), LocalIpcError> {
-    let mut socket = tokio::time::timeout(AUTH_TIMEOUT, accept_async(stream))
-        .await
-        .map_err(|_| LocalIpcError::Timeout)??;
+    let mut socket = tokio::time::timeout(
+        AUTH_TIMEOUT,
+        accept_async_with_config(
+            stream,
+            Some(
+                WebSocketConfig::default()
+                    .max_message_size(Some(MAX_SCREENSHOT_BYTES))
+                    .max_frame_size(Some(MAX_SCREENSHOT_BYTES)),
+            ),
+        ),
+    )
+    .await
+    .map_err(|_| LocalIpcError::Timeout)??;
     authenticate_server(&mut socket, token).await?;
     let mut updates = tokio::time::interval(Duration::from_secs(3));
-    let mut helper_id = None;
+    let mut registration = HelperRegistration(None);
     let (requests, mut receiver) = mpsc::channel::<HelperRequest>(1);
     let mut pending: Option<PendingRequest> = None;
-    let result = loop {
+    let mut screenshot_deadline = None;
+    loop {
         tokio::select! {
             _ = updates.tick() => {
+                if matches!(pending, Some(PendingRequest::ScreenshotV2 {..})) && screenshot_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline) { break Err(LocalIpcError::Timeout); }
                 match read_device_status_from_service(root).await {
                     Ok(status) => send_json(&mut socket, &json!({"type":"status","status":status})).await?,
                     Err(error) => send_json(&mut socket, &json!({"type":"error","message":error.to_string()})).await?,
@@ -545,11 +632,14 @@ async fn handle_connection(
             frame = receive_frame(&mut socket) => {
                 let frame = match frame { Ok(frame) => frame, Err(error) => break Err(error) };
                 if let Message::Binary(bytes) = frame {
-                    let Some(PendingRequest::Screenshot(reply)) = pending.take() else {
-                        break Err(LocalIpcError::Protocol);
-                    };
-                    let result = validate_png(&bytes).map(|_| bytes.to_vec());
-                    let _ = reply.send(result);
+                    match pending.take() {
+                        Some(PendingRequest::Screenshot(reply))=>{let result=validate_png(&bytes).map(|_|bytes.to_vec());let _=reply.send(result);},
+                        Some(PendingRequest::ScreenshotV2{options,info:Some(info),reply})=>{
+                            let result=if bytes.len()<=options.byte_limit() && info.validate(&options).is_ok() && pab_screenshot::dimensions(&bytes,info.format).is_ok_and(|d|d==(info.width,info.height)) {Ok(pab_screenshot::EncodedScreenshot{info,bytes:bytes.to_vec()})}else{Err(LocalIpcError::InvalidScreenshot)};
+                            let _=reply.send(result);
+                        },
+                        _=>break Err(LocalIpcError::Protocol),
+                    }
                     continue;
                 }
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
@@ -566,10 +656,10 @@ async fn handle_connection(
                             Err(error) => send_json(&mut socket, &json!({"type":"error","message":error.to_string()})).await?,
                         }
                     }
-                    Some("register_window_helper") if helper_id.is_none() => {
+                    Some("register_window_helper") if registration.0.is_none() => {
                         let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
-                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone() });
-                        helper_id = Some(id);
+                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()) });
+                        registration.0 = Some(id);
                         tracing::info!(helper_id = id, "interactive window helper registered");
                         send_json(&mut socket, &json!({"type":"window_helper_registered"})).await?;
                     }
@@ -582,6 +672,17 @@ async fn handle_connection(
                         });
                         if let Some(PendingRequest::Windows(reply)) = pending.take() { let _ = reply.send(result); }
                     }
+                    Some("screenshot_metadata") => {
+                        if let Some(PendingRequest::ScreenshotV2{options,info, ..})=pending.as_mut() {
+                            if info.is_some() {break Err(LocalIpcError::Protocol);}
+                            let metadata:pab_protocol::ScreenshotInfo=serde_json::from_value(frame["info"].clone())?;
+                            metadata.validate(options).map_err(|_|LocalIpcError::InvalidScreenshot)?;
+                            *info=Some(metadata);
+                        } else {break Err(LocalIpcError::Protocol);}
+                    },
+                    Some("screenshot_error") if matches!(pending, Some(PendingRequest::ScreenshotV2{..})) => {
+                        if let Some(PendingRequest::ScreenshotV2{reply,..})=pending.take() {let _=reply.send(Err(LocalIpcError::Remote(frame["message"].as_str().unwrap_or("screenshot unavailable").chars().take(1024).collect())));}
+                    },
                     Some("screenshot_error") if matches!(pending, Some(PendingRequest::Screenshot(_))) => {
                         if let Some(PendingRequest::Screenshot(reply)) = pending.take() {
                             let message = frame["message"].as_str().unwrap_or("screenshot unavailable");
@@ -601,13 +702,19 @@ async fn handle_connection(
                     _ => break Err(LocalIpcError::Protocol),
                 }
             }
-            request = receiver.recv(), if helper_id.is_some() && pending.is_none() => {
+            request = receiver.recv(), if registration.0.is_some() && pending.is_none() => {
                 if let Some(request) = request {
                     match request {
                         HelperRequest::Windows(reply) => {
                             send_json(&mut socket, &json!({"type":"list_windows"})).await?;
                             pending = Some(PendingRequest::Windows(reply));
                         }
+                        HelperRequest::ScreenshotV2(options,reply)=>{
+                            if reply.is_closed(){continue;}
+                            send_json(&mut socket,&json!({"type":"capture_screenshot_v2","options":options})).await?;
+                            screenshot_deadline = Some(tokio::time::Instant::now() + Duration::from_secs(30));
+                            pending=Some(PendingRequest::ScreenshotV2{options,info:None,reply});
+                        },
                         HelperRequest::Screenshot(reply) => {
                             send_json(&mut socket, &json!({"type":"capture_screenshot"})).await?;
                             pending = Some(PendingRequest::Screenshot(reply));
@@ -620,14 +727,7 @@ async fn handle_connection(
                 }
             }
         }
-    };
-    if let Some(id) = helper_id {
-        window_providers()
-            .lock()
-            .map_err(|_| LocalIpcError::Protocol)?
-            .retain(|provider| provider.id != id);
     }
-    result
 }
 
 #[derive(Debug, Error)]
@@ -667,6 +767,209 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static TEST_HELPER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    async fn screenshot_helper() -> (
+        tempfile::TempDir,
+        LocalSocket,
+        tokio::task::JoinHandle<Result<(), LocalIpcError>>,
+        u64,
+    ) {
+        let directory = tempfile::tempdir().unwrap();
+        let token = ensure_machine_token(directory.path()).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
+        let mut socket = connect_with_token(port, &token).await.unwrap();
+        register_window_helper(&mut socket).await.unwrap();
+        let id = window_providers().lock().unwrap().last().unwrap().id;
+        (directory, socket, server, id)
+    }
+    async fn next_screenshot(socket: &mut LocalSocket) -> pab_protocol::ScreenshotOptions {
+        loop {
+            match next_local_event(socket).await.unwrap() {
+                LocalEvent::CaptureScreenshotV2(options) => return options,
+                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                other => panic!("unexpected helper event: {other:?}"),
+            }
+        }
+    }
+    fn screenshot_fixture(
+        options: &pab_protocol::ScreenshotOptions,
+        width: u32,
+    ) -> pab_screenshot::EncodedScreenshot {
+        pab_screenshot::encode(
+            pab_screenshot::image::DynamicImage::new_rgb8(width, 60),
+            options,
+            Some(1),
+            (0, 0),
+        )
+        .unwrap()
+    }
+    async fn wait_helper_removed(id: u64) {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while window_providers()
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|p| p.id == id)
+            {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+    #[tokio::test]
+    async fn late_screenshot_stays_with_abandoned_request_and_next_capture_is_fresh() {
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_directory, mut socket, server, id) = screenshot_helper().await;
+        let first = tokio::spawn(request_screenshot_v2(Default::default()));
+        let options = next_screenshot(&mut socket).await;
+        first.abort();
+        let _ = first.await;
+        let second = tokio::spawn(request_screenshot_v2(Default::default()));
+        reply_screenshot_v2(&mut socket, &screenshot_fixture(&options, 90))
+            .await
+            .unwrap();
+        let second_options = next_screenshot(&mut socket).await;
+        reply_screenshot_v2(&mut socket, &screenshot_fixture(&second_options, 120))
+            .await
+            .unwrap();
+        assert_eq!(second.await.unwrap().unwrap().info.width, 120);
+        drop(socket);
+        wait_helper_removed(id).await;
+        server.abort();
+    }
+    #[tokio::test]
+    async fn missing_metadata_disconnects_helper_and_removes_registration() {
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_directory, mut socket, server, id) = screenshot_helper().await;
+        let request = tokio::spawn(request_screenshot_v2(Default::default()));
+        let options = next_screenshot(&mut socket).await;
+        socket
+            .send(Message::Binary(
+                screenshot_fixture(&options, 100).bytes.into(),
+            ))
+            .await
+            .unwrap();
+        assert!(request.await.unwrap().is_err());
+        wait_helper_removed(id).await;
+        drop(socket);
+        server.abort();
+    }
+    #[tokio::test]
+    async fn old_helper_is_not_sent_new_capture_options() {
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let directory = tempfile::tempdir().unwrap();
+        let token = ensure_machine_token(directory.path()).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
+        let mut socket = connect_with_token(port, &token).await.unwrap();
+        send_json(&mut socket, &json!({"type":"register_window_helper"}))
+            .await
+            .unwrap();
+        loop {
+            let frame = receive_json(&mut socket).await.unwrap();
+            if frame["type"] == "window_helper_registered" {
+                break;
+            }
+        }
+        let id = window_providers().lock().unwrap().last().unwrap().id;
+        assert!(matches!(
+            request_screenshot_v2(Default::default()).await,
+            Err(LocalIpcError::WindowHelperUnavailable)
+        ));
+        drop(socket);
+        wait_helper_removed(id).await;
+        server.abort();
+    }
+    #[tokio::test]
+    async fn jpeg_metadata_and_binary_cross_real_quic_without_json_image_payload() {
+        use crate::task_service::transfer_tests::{actor, pair, service};
+        use pab_protocol::{
+            DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId,
+        };
+        use sha2::Digest;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (directory, mut socket, local, id) = screenshot_helper().await;
+        let options = pab_protocol::ScreenshotOptions::default();
+        let (done, received) = oneshot::channel();
+        let helper = tokio::spawn(async move {
+            let options = next_screenshot(&mut socket).await;
+            let image = screenshot_fixture(&options, 120);
+            reply_screenshot_v2(&mut socket, &image).await.unwrap();
+            let _ = received.await;
+        });
+        let task_service = service(directory.path()).await;
+        let (first, second, client, remote) = pair().await;
+        let timeout = Duration::from_secs(5);
+        let handler = tokio::spawn(async move {
+            for _ in 0..2 {
+                task_service
+                    .handle_stream(actor(), remote.accept_bi(timeout).await.unwrap(), timeout)
+                    .await
+                    .unwrap();
+            }
+        });
+        let mut environment = client.open_bi(timeout).await.unwrap();
+        environment
+            .send_json(
+                &DeviceTaskRequest::GetEnvironment {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                },
+                timeout,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            environment
+                .receive_json::<DeviceTaskResponse>(timeout)
+                .await
+                .unwrap(),
+            DeviceTaskResponse::Environment {
+                screenshot_schema_version: Some(1),
+                ..
+            }
+        ));
+        let request_id = RequestId::new();
+        let mut stream = client.open_bi(timeout).await.unwrap();
+        stream
+            .send_json(
+                &DeviceTaskRequest::CaptureScreenshotV2 {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id,
+                    options: options.clone(),
+                },
+                timeout,
+            )
+            .await
+            .unwrap();
+        let DeviceTaskResponse::Screenshot { meta } = stream.receive_json(timeout).await.unwrap()
+        else {
+            panic!("expected screenshot metadata")
+        };
+        assert_eq!(meta.request_id, request_id);
+        assert_eq!(meta.format, "jpeg");
+        let mut bytes = Vec::new();
+        while bytes.len() < (meta.size as usize) {
+            bytes.extend(stream.receive_binary_frame(timeout).await.unwrap());
+        }
+        stream.expect_receive_end(timeout).await.unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&bytes)), meta.sha256);
+        pab_screenshot::verify(&bytes, meta.capture.as_ref().unwrap(), &options).unwrap();
+        handler.await.unwrap();
+        let _ = done.send(());
+        helper.await.unwrap();
+        wait_helper_removed(id).await;
+        local.abort();
+        first.close().await;
+        second.close().await;
+    }
 
     #[tokio::test]
     async fn authenticated_client_receives_status_and_rejects_wrong_token() {
@@ -743,7 +1046,9 @@ mod tests {
                         break;
                     }
                     Ok(LocalEvent::Status(_)) | Ok(LocalEvent::StatusUnavailable(_)) => {}
-                    Ok(LocalEvent::CaptureScreenshot) => panic!("unexpected screenshot request"),
+                    Ok(LocalEvent::CaptureScreenshot) | Ok(LocalEvent::CaptureScreenshotV2(_)) => {
+                        panic!("unexpected screenshot request")
+                    }
                     Ok(LocalEvent::DesktopInput(_)) => panic!("unexpected desktop input"),
                     Err(error) => panic!("helper connection failed: {error}"),
                 }
@@ -787,7 +1092,9 @@ mod tests {
                         break;
                     }
                     LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
-                    LocalEvent::CaptureScreenshot => panic!("unexpected screenshot request"),
+                    LocalEvent::CaptureScreenshot | LocalEvent::CaptureScreenshotV2(_) => {
+                        panic!("unexpected screenshot request")
+                    }
                     LocalEvent::DesktopInput(_) => panic!("unexpected desktop input"),
                 }
             }

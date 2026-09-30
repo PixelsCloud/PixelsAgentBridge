@@ -123,6 +123,11 @@ pub enum DeviceTaskRequest {
         schema_version: u16,
         request_id: RequestId,
     },
+    CaptureScreenshotV2 {
+        schema_version: u16,
+        request_id: RequestId,
+        options: crate::ScreenshotOptions,
+    },
     CaptureScreenshot {
         schema_version: u16,
         request_id: RequestId,
@@ -218,6 +223,7 @@ impl DeviceTaskRequest {
             | Self::ListDirectory { schema_version, .. }
             | Self::ListWindows { schema_version, .. }
             | Self::CaptureScreenshot { schema_version, .. }
+            | Self::CaptureScreenshotV2 { schema_version, .. }
             | Self::DesktopInput { schema_version, .. }
             | Self::OpenTerminal { schema_version, .. }
             | Self::TerminalInput { schema_version, .. }
@@ -262,6 +268,8 @@ pub enum DeviceTaskResponse {
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         system_query_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        screenshot_schema_version: Option<u16>,
     },
     Presence {
         active_operators: u16,

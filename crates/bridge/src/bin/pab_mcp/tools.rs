@@ -144,28 +144,6 @@ pub(super) async fn call_tool(
                 .map_err(|error| error.to_string())?;
             Ok(json!({ "list": list, "os_reminder": target.compact_reminder() }))
         }
-        "pab_capture_screenshot" => {
-            let device_ref = resolve_target(runtime, arguments).await?;
-            let destination = required_text(arguments, "destination")?;
-            let target = runtime
-                .current_environment(device_ref)
-                .await
-                .map_err(|error| error.to_string())?;
-            let image = runtime
-                .capture_screenshot(device_ref, Some(std::path::Path::new(destination)))
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "request_id": image.meta.request_id,
-                "format": image.meta.format,
-                "width": image.meta.width,
-                "height": image.meta.height,
-                "size": image.meta.size,
-                "sha256": image.meta.sha256,
-                "destination": destination,
-                "os_reminder": target.compact_reminder()
-            }))
-        }
         "pab_desktop_input" => {
             let device_ref = resolve_target(runtime, arguments).await?;
             let event: pab_protocol::DesktopInputEvent =

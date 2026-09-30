@@ -69,7 +69,7 @@ pub use relay_policy::{
     RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot,
     TeamRelayLimits, TrafficScope, mbps_to_bytes_per_second,
 };
-pub use screenshot::{MAX_SCREENSHOT_BYTES, MAX_SCREENSHOT_PIXELS, ScreenshotMeta};
+pub use screenshot::*;
 pub use task::{
     CapabilityRef, OutputAvailability, OutputChunk, OutputRange, OutputStream, TASK_SCHEMA_VERSION,
     TaskCompletion, TaskError, TaskEvent, TaskEventKind, TaskProgress, TaskRef, TaskSnapshot,

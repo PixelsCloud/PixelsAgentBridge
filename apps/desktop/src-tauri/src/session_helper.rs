@@ -78,6 +78,27 @@ async fn serve_requests(
                 };
                 reply.map_err(|error| error.to_string())?;
             }
+            LocalEvent::CaptureScreenshotV2(options) => {
+                let result = if desktop_is_active(expected_desktop) {
+                    screenshot_session::capture(&options)
+                } else {
+                    Err("interactive desktop changed".into())
+                };
+                let reply = match result {
+                    Ok(image) if desktop_is_active(expected_desktop) => {
+                        local_ipc::reply_screenshot_v2(socket, &image).await
+                    }
+                    Ok(_) => {
+                        local_ipc::reply_screenshot_error(
+                            socket,
+                            "interactive desktop changed during capture",
+                        )
+                        .await
+                    }
+                    Err(message) => local_ipc::reply_screenshot_error(socket, &message).await,
+                };
+                reply.map_err(|e| e.to_string())?;
+            }
             LocalEvent::DesktopInput(event) => {
                 let result = if desktop_is_active(expected_desktop) {
                     desktop_input::apply(event)

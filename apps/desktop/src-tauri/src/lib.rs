@@ -116,6 +116,47 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                                 break;
                             }
                         }
+                        Ok(Ok(pab_executor::local_ipc::LocalEvent::CaptureScreenshotV2(
+                            options,
+                        ))) => {
+                            let result = if !cfg!(windows)
+                                || session_helper::desktop_is_active(Some("Default"))
+                            {
+                                screenshot_session::capture(&options)
+                            } else {
+                                Err("interactive desktop changed".into())
+                            };
+                            let reply = match result {
+                                Ok(image)
+                                    if !cfg!(windows)
+                                        || session_helper::desktop_is_active(Some("Default")) =>
+                                {
+                                    pab_executor::local_ipc::reply_screenshot_v2(
+                                        &mut socket,
+                                        &image,
+                                    )
+                                    .await
+                                }
+                                Ok(_) => {
+                                    pab_executor::local_ipc::reply_screenshot_error(
+                                        &mut socket,
+                                        "interactive desktop changed during capture",
+                                    )
+                                    .await
+                                }
+                                Err(message) => {
+                                    pab_executor::local_ipc::reply_screenshot_error(
+                                        &mut socket,
+                                        &message,
+                                    )
+                                    .await
+                                }
+                            };
+                            if let Err(error) = reply {
+                                tracing::debug!(%error,"screenshot helper response failed");
+                                break;
+                            }
+                        }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopInput(event))) => {
                             let result = if cfg!(windows)
                                 && !session_helper::desktop_is_active(Some("Default"))

@@ -167,12 +167,37 @@ impl TaskService {
                 .await;
         }
 
-        if let DeviceTaskRequest::CaptureScreenshot { request_id, .. } = request {
+        if matches!(
+            &request,
+            DeviceTaskRequest::CaptureScreenshot { .. }
+                | DeviceTaskRequest::CaptureScreenshotV2 { .. }
+        ) {
+            let (request_id, options) = match request {
+                DeviceTaskRequest::CaptureScreenshot { request_id, .. } => (request_id, None),
+                DeviceTaskRequest::CaptureScreenshotV2 {
+                    request_id,
+                    options,
+                    ..
+                } => {
+                    if let Err(message) = options.validate() {
+                        return send_error(
+                            &mut stream,
+                            timeout,
+                            DeviceTaskErrorCode::InvalidRequest,
+                            message,
+                        )
+                        .await;
+                    }
+                    stream.expect_receive_end(timeout).await?;
+                    (request_id, Some(options))
+                }
+                _ => unreachable!(),
+            };
             self.store
                 .start_screenshot_read(request_id, initiated_by)
                 .await?;
             let result = self
-                .capture_screenshot_stream(request_id, &mut stream, timeout)
+                .capture_screenshot_stream(request_id, options, &mut stream, timeout)
                 .await;
             let (state, size, message) = match &result {
                 Ok(size) => ("completed", *size, None),
@@ -278,6 +303,7 @@ impl TaskService {
     async fn capture_screenshot_stream(
         &self,
         request_id: pab_protocol::RequestId,
+        options: Option<pab_protocol::ScreenshotOptions>,
         stream: &mut PabBiStream,
         timeout: Duration,
     ) -> Result<usize, TaskServiceError> {
@@ -288,18 +314,43 @@ impl TaskService {
         )) {
             return Err(TaskServiceError::Unsupported);
         }
-        let bytes = crate::local_ipc::request_screenshot()
+        let (bytes, width, height, format, capture) = if let Some(options) = options {
+            let image = crate::local_ipc::request_screenshot_v2(options.clone())
+                .await
+                .map_err(TaskServiceError::WindowHelper)?;
+            let image = tokio::task::spawn_blocking(move || {
+                pab_screenshot::verify(&image.bytes, &image.info, &options)?;
+                Ok::<_, String>(image)
+            })
             .await
-            .map_err(TaskServiceError::WindowHelper)?;
-        let (width, height) =
-            crate::local_ipc::validate_png(&bytes).map_err(TaskServiceError::WindowHelper)?;
+            .map_err(|_| TaskServiceError::InvalidRequest("screenshot validation worker stopped"))?
+            .map_err(|e| {
+                TaskServiceError::WindowHelper(crate::local_ipc::LocalIpcError::Remote(e))
+            })?;
+            let info = image.info;
+            (
+                image.bytes,
+                info.width,
+                info.height,
+                info.format.name().to_string(),
+                Some(info),
+            )
+        } else {
+            let bytes = crate::local_ipc::request_screenshot()
+                .await
+                .map_err(TaskServiceError::WindowHelper)?;
+            let (w, h) =
+                crate::local_ipc::validate_png(&bytes).map_err(TaskServiceError::WindowHelper)?;
+            (bytes, w, h, "png".into(), None)
+        };
         let meta = ScreenshotMeta {
             request_id,
-            format: "png".to_owned(),
+            format,
             width,
             height,
             size: bytes.len() as u64,
             sha256: hex::encode(Sha256::digest(&bytes)),
+            capture,
         };
         stream
             .send_frame_json(&DeviceTaskResponse::Screenshot { meta }, timeout)
@@ -358,6 +409,7 @@ impl TaskService {
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 filesystem_schema_version: Some(3),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
+                screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),
@@ -470,7 +522,10 @@ impl TaskService {
                 result?;
                 Ok(DeviceTaskResponse::DesktopInputApplied { request_id })
             }
-            DeviceTaskRequest::CaptureScreenshot { .. } => unreachable!("handled before dispatch"),
+            DeviceTaskRequest::CaptureScreenshot { .. }
+            | DeviceTaskRequest::CaptureScreenshotV2 { .. } => {
+                unreachable!("handled before dispatch")
+            }
             DeviceTaskRequest::OpenTerminal { .. }
             | DeviceTaskRequest::TerminalInput { .. }
             | DeviceTaskRequest::TerminalRead { .. }
@@ -782,4 +837,4 @@ impl TaskServiceError {
 mod tests;
 
 #[cfg(test)]
-mod transfer_tests;
+pub(crate) mod transfer_tests;

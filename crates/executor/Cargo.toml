@@ -16,6 +16,7 @@ pab-agent-core = { path = "../agent-core" }
 pab-logging = { path = "../logging" }
 pab-platform = { path = "../platform" }
 pab-protocol = { path = "../protocol" }
+pab-screenshot = { path = "../screenshot" }
 pab-task-runtime = { path = "../task-runtime" }
 pab-terminal = { path = "../terminal" }
 pab-transport = { path = "../transport" }

@@ -2806,6 +2806,8 @@ dependencies = [
  "moxcms",
  "num-traits",
  "png 0.18.1",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -4638,6 +4640,7 @@ dependencies = [
  "pab-agent-core",
  "pab-logging",
  "pab-protocol",
+ "pab-screenshot",
  "pab-transport",
  "rand_core 0.6.4",
  "rmcp",
@@ -4667,6 +4670,7 @@ dependencies = [
  "pab-executor",
  "pab-logging",
  "pab-protocol",
+ "pab-screenshot",
  "serde",
  "serde_json",
  "tauri",
@@ -4696,6 +4700,7 @@ dependencies = [
  "pab-logging",
  "pab-platform",
  "pab-protocol",
+ "pab-screenshot",
  "pab-task-runtime",
  "pab-terminal",
  "pab-transport",
@@ -4773,6 +4778,14 @@ dependencies = [
  "serde",
  "thiserror 2.0.20",
  "uuid",
+]
+
+[[package]]
+name = "pab-screenshot"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "pab-protocol",
 ]
 
 [[package]]
@@ -8856,6 +8869,21 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zune-core"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d56377fd46368984a170bc5aac5567e52ca5da874caa60bea39fcbca78fb658b"
+
+[[package]]
+name = "zune-jpeg"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
+dependencies = [
+ "zune-core",
+]
 
 [[package]]
 name = "zvariant"

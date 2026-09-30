@@ -10,6 +10,8 @@ mod mcp_filesystem;
 mod mcp_filesystem_bulk;
 #[path = "pab_mcp/operations.rs"]
 mod mcp_operations;
+#[path = "pab_mcp/screenshot.rs"]
+mod mcp_screenshot;
 #[path = "pab_mcp/settings.rs"]
 mod mcp_settings;
 #[path = "pab_mcp/tools.rs"]
@@ -136,6 +138,7 @@ impl ServerHandler for McpServer {
     ) -> Result<CallToolResponse, ErrorData> {
         let arguments = Value::Object(request.arguments.unwrap_or_default());
         let mut call = self.reporter.begin_call(&request.name, &arguments);
+        let mut image_content = None;
         let result = if let Err(error) = mcp_catalog::validate_arguments(&request.name, &arguments)
         {
             Err(error)
@@ -151,8 +154,16 @@ impl ServerHandler for McpServer {
                 Err(error) => Err(error),
                 Ok(manager) => match manager.runtime().await {
                     Ok(runtime) => {
-                        let result =
-                            mcp_tools::call_tool(&runtime, &request.name, &arguments).await;
+                        let result = if request.name == "pab_capture_screenshot" {
+                            mcp_screenshot::call(&runtime, &arguments).await.map(
+                                |(metadata, image)| {
+                                    image_content = image;
+                                    metadata
+                                },
+                            )
+                        } else {
+                            mcp_tools::call_tool(&runtime, &request.name, &arguments).await
+                        };
                         if let Ok(value) = &result
                             && let Some(id) =
                                 value.pointer("/task/request_id").and_then(Value::as_str)
@@ -213,6 +224,9 @@ impl ServerHandler for McpServer {
         Ok(match result {
             Ok(value) => {
                 let mut response = CallToolResult::structured(value);
+                if let Some(image) = image_content {
+                    response.content.push(image);
+                }
                 if tool_failed {
                     response.is_error = Some(true);
                 }

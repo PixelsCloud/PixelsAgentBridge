@@ -37,8 +37,9 @@ status are described below.
   integrity verification and explicit overwrite behavior.
 - **Interactive terminals:** open, send input, read output, resize, and close remote
   terminal sessions.
-- **Desktop capabilities:** enumerate windows, save remote screenshots as local PNG
-  files, and send supported mouse, keyboard, or Windows secure attention events.
+- **Desktop capabilities:** enumerate windows, return bounded JPEG screenshot previews
+  to the AI agent or save original PNG files, and send supported mouse, keyboard,
+  or Windows secure attention events.
 - **Device management:** remember and rename devices, copy their information, and
   distinguish online state from connection state. Connected cards show P2P or Relay.
 - **Task history:** filter records by device, browse paginated results, and view a
@@ -168,7 +169,7 @@ for example `pixels.pab_connect`.
 | `pab_read_output` | Read retained stdout or stderr by offset |
 | `pab_list_directory` | List a page of directory entries |
 | `pab_list_windows` | List windows in a supported desktop session |
-| `pab_capture_screenshot` | Save a remote screenshot to a local PNG; return dimensions and hash |
+| `pab_capture_screenshot` | Return a bounded JPEG/PNG preview as MCP image content, or save an original screenshot with metadata and hash |
 | `pab_desktop_input` | Send supported mouse, keyboard, or secure attention events |
 | `pab_open_terminal` | Open an interactive terminal |
 | `pab_terminal_input` | Send terminal input |
@@ -381,6 +382,50 @@ ownership or extended metadata.
 These new file tools have Windows local automated coverage, including isolated
 QUIC and MCP stdio tests. Installed-host, physical cross-volume and Windows/Linux
 two-machine acceptance are still pending; older installers do not include them.
+
+### Screenshot previews and original images
+
+Screenshots use [xcap](https://github.com/nashaofu/xcap) for native capture and
+[image](https://github.com/image-rs/image) for resizing, JPEG/PNG encoding and
+bounded decoding. The product does not implement its own capture engine.
+
+`pab_capture_screenshot` defaults to `mode="preview"`: JPEG, at most 1600×1000
+pixels and 512 KiB of encoded image data. Quality starts at 75, then adapts down
+to 45 and reduces dimensions if necessary. The response contains an MCP image
+content block, a saved file and metadata; base64 is confined to the image block,
+not repeated in text, structured results, SQLite or activity reports.
+
+```json
+{"device_code":"214601537"}
+```
+
+`mode="original"` defaults to PNG, preserves captured dimensions and uses an
+8 MiB byte budget. Original JPEG is available explicitly, with quality 85 by
+default. `format`, `quality` (JPEG only), `max_bytes`, preview-only `max_width`
+and `max_height`, `monitor_id`, and monitor-relative `region` are supported.
+Out-of-monitor regions fail instead of being clipped. Captures are limited to
+16 Mi pixels and 16384 pixels per dimension. Each call captures a new frame;
+same-frame region retrieval and window screenshots are not implemented yet.
+
+```json
+{"device_code":"214601537","mode":"original","destination":"C:\\Temp\\screen.png","include_image":false}
+```
+
+`destination` is optional. Its path must be absolute and its extension must
+match the format. Existing files are never overwritten. Images above 512 KiB
+are saved with an explicit `image_omitted_reason`, rather than returned as large
+inline MCP payloads. `include_image=false` requests a file-only result.
+Metadata includes the capture time, monitor, global crop origin, source and
+encoded dimensions, actual JPEG quality, encoded bytes and SHA-256. Transport
+uses existing binary frames, with codec, size, dimensions and hash validation.
+
+These options require an upgraded Executor and desktop helper; unsupported
+peers return an upgrade error, with no silent fallback to a different capture.
+The legacy primary-monitor PNG request remains available for older clients.
+Windows compilation, synthetic codec fixtures, isolated helper/QUIC tests and
+MCP response tests are covered. Installed-host image display, native 4K/multiple
+monitors and macOS/Linux graphical acceptance remain pending. Wayland capture
+is explicitly unsupported by this product interface in this stage.
 
 ### Example: run a command and read the result
 

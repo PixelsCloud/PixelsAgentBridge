@@ -7,7 +7,7 @@ use pab_transport::{PabConnection, PabEndpoint, PabEndpointAddress, PabEndpointC
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 
-pub(super) async fn pair() -> (PabEndpoint, PabEndpoint, PabConnection, PabConnection) {
+pub(crate) async fn pair() -> (PabEndpoint, PabEndpoint, PabConnection, PabConnection) {
     let config = PabEndpointConfig::new(vec!["https://127.0.0.1:1".parse().unwrap()]).unwrap();
     let first_key: [u8; 32] = Sha256::digest(RequestId::new().to_string().as_bytes()).into();
     let second_key: [u8; 32] = Sha256::digest(RequestId::new().to_string().as_bytes()).into();
@@ -57,14 +57,14 @@ pub(super) async fn pair() -> (PabEndpoint, PabEndpoint, PabConnection, PabConne
     (first, second, client, server)
 }
 
-pub(super) fn actor() -> OperatorRef {
+pub(crate) fn actor() -> OperatorRef {
     OperatorRef::account(
         UserId::from_u128(81),
         pab_protocol::EndpointKey::new([81; 32]),
     )
 }
 
-pub(super) async fn service(path: &Path) -> TaskService {
+pub(crate) async fn service(path: &Path) -> TaskService {
     TaskService::open(
         &path.join("executor.sqlite3"),
         DeviceRef {
