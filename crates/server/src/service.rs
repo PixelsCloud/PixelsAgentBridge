@@ -435,7 +435,7 @@ impl ControlPlane {
         endpoint: &RegisteredEndpoint,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, ServiceError> {
-        Ok(match endpoint.principal {
+        let snapshot = match endpoint.principal {
             EndpointProofPrincipal::User { user_id } => {
                 self.store
                     .device_network_snapshot(
@@ -454,7 +454,11 @@ impl ControlPlane {
             EndpointProofPrincipal::Device { .. } => {
                 return Err(ServiceError::UserEndpointRequired);
             }
-        })
+        };
+        if !self.active_endpoints.is_connected(snapshot.endpoint_key) {
+            return Err(ServiceError::DeviceOffline);
+        }
+        Ok(snapshot)
     }
 
     pub async fn resolve_device_code(
@@ -533,6 +537,8 @@ pub enum ServiceError {
     UserEndpointRequired,
     #[error("the peer endpoint does not have an active control connection")]
     PeerEndpointOffline,
+    #[error("the device is offline")]
+    DeviceOffline,
     #[error("agent version must contain between 1 and 64 characters")]
     InvalidAgentVersion,
     #[error("device observation time must be a positive Unix timestamp")]

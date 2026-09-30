@@ -42,6 +42,7 @@ pub struct ControlSession {
     pending_proof: Option<PendingProof>,
     open_registration_attempts: u8,
     guest_code_lookups: HashSet<pab_protocol::DeviceCode>,
+    device_network_lookups: HashSet<pab_protocol::DeviceRef>,
 }
 
 impl ControlSession {
@@ -60,6 +61,7 @@ impl ControlSession {
             pending_proof: None,
             open_registration_attempts: 0,
             guest_code_lookups: HashSet::new(),
+            device_network_lookups: HashSet::new(),
         }
     }
 
@@ -489,7 +491,7 @@ impl ControlSession {
     }
 
     async fn get_device_network(
-        &self,
+        &mut self,
         device_ref: pab_protocol::DeviceRef,
     ) -> Result<pab_protocol::DeviceNetworkSnapshot, ControlSessionError> {
         let endpoint = self
@@ -499,6 +501,12 @@ impl ControlSession {
         if device_ref.deployment_id != self.deployment_id {
             return Err(ControlSessionError::DeviceIdentityMismatch);
         }
+        if !self.device_network_lookups.contains(&device_ref)
+            && self.device_network_lookups.len() >= 20
+        {
+            return Err(ControlSessionError::RateLimited);
+        }
+        self.device_network_lookups.insert(device_ref);
         self.control
             .device_network_snapshot(endpoint, device_ref)
             .await

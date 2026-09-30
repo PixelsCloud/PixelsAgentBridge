@@ -313,7 +313,7 @@ async fn resolve_target(
         .parse()
         .map_err(|error: pab_protocol::DeviceCodeError| error.to_string())?;
     runtime
-        .resolve_device_code(code)
+        .resolve_cached_device_code(code)
         .await
         .map_err(|error| error.to_string())
 }

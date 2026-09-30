@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceId, DeviceNetworkUpdate, DeviceRef,
+    EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
     EndpointProofResponse, EndpointSignature, RelayLimitDefaults, TenantId,
 };
 use pab_server::{ControlPlane, EndpointProofSession, PasswordPolicy, PostgresStore};
@@ -138,6 +139,56 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         .registered_endpoint(EndpointKey::new(*device_secret.public().as_bytes()))
         .await
         .unwrap();
+    // Looking up a code only discovers identity; it must not open Relay access.
+    assert!(
+        store
+            .relay_policy_snapshot(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .connection_intents
+            .is_empty()
+    );
+    assert!(
+        store
+            .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
+            .await
+            .is_err()
+    );
+    assert!(
+        store
+            .guest_device_network_snapshot(guest_key, device_ref)
+            .await
+            .is_err()
+    );
+    assert!(
+        store
+            .relay_policy_snapshot(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .connection_intents
+            .is_empty()
+    );
+    control
+        .publish_device_network(
+            &device_endpoint,
+            &DeviceNetworkUpdate {
+                schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
+                device_ref,
+                endpoint_key: device_endpoint.endpoint_key,
+                endpoint_instance_id: EndpointInstanceId::new(),
+                address_revision: 1,
+                relay_urls: vec!["https://relay.example/".to_owned()],
+                direct_addresses: vec![],
+                observed_at_unix_ms: 1_795_000_000_000,
+            },
+        )
+        .await
+        .unwrap();
+    // Saved DeviceRefs reconnect directly, without another code lookup.
+    store
+        .guest_device_network_snapshot(guest_key, device_ref)
+        .await
+        .unwrap();
     let authorized = store
         .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
         .await
@@ -154,6 +205,76 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         .unwrap();
     assert_eq!(policy.connection_intents.len(), 1);
     assert_eq!(policy.connection_intents[0].device_id, first.id);
+    let revision = policy.policy_version;
+    store
+        .guest_device_network_snapshot(guest_key, device_ref)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .relay_policy_snapshot(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .policy_version,
+        revision
+    );
+    sqlx::query("UPDATE device_connection_intents SET expires_at = now() - interval '1 second'")
+        .execute(store.pool())
+        .await
+        .unwrap();
+    assert!(
+        store
+            .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
+            .await
+            .is_err()
+    );
+    // Peer checks may renew a live grant, but cannot resurrect an expired one.
+    store
+        .renew_connection_intent(guest_key, first.id)
+        .await
+        .unwrap();
+    assert!(
+        store
+            .authorize_guest_device_peer(&device_endpoint, first.id, guest_key)
+            .await
+            .is_err()
+    );
+    store
+        .guest_device_network_snapshot(guest_key, device_ref)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .relay_policy_snapshot(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .policy_version,
+        revision + 1
+    );
+    let invalid_ref = DeviceRef {
+        tenant_id: TenantId::new(),
+        ..device_ref
+    };
+    assert!(
+        store
+            .guest_device_network_snapshot(guest_key, invalid_ref)
+            .await
+            .is_err()
+    );
+    assert!(
+        store
+            .guest_device_network_snapshot(EndpointKey::new([99; 32]), device_ref)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        store
+            .relay_policy_snapshot(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .policy_version,
+        revision + 1
+    );
     sqlx::query(
         "UPDATE device_connection_intents \
          SET expires_at = now() + interval '4 minutes' \
@@ -231,6 +352,25 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         .await
         .unwrap();
     assert_eq!(resolved.tenant_id, first.tenant_id);
+    assert!(
+        store
+            .authorize_device_peer(
+                &device_endpoint,
+                first.id,
+                EndpointKey::new(*owner_key.public().as_bytes())
+            )
+            .await
+            .is_err()
+    );
+    store
+        .device_network_snapshot(
+            EndpointKey::new(*owner_key.public().as_bytes()),
+            account.id,
+            account.personal_tenant_id,
+            resolved,
+        )
+        .await
+        .unwrap();
     let authorized_owner = store
         .authorize_device_peer(
             &device_endpoint,

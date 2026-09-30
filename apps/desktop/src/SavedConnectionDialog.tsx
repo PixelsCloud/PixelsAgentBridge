@@ -37,7 +37,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
   const isPending = connection.phase !== "connected" && connection.phase !== "failed";
 
   return (
-    <Modal open title={t.savedConnectTitle} width={430} className="saved-connect-dialog"
+    <Modal open title={t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
       onCancel={onClose} footer={[
         <Button key="close" onClick={onClose}>{t.savedConnectClose}</Button>,
         connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} onClick={onRetry}>{t.savedConnectRetry}</Button>,
@@ -53,8 +53,20 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
         status={connection.phase === "failed" ? "error" : "process"}
         items={steps.map((title) => ({ title }))} />
       {connection.phase === "failed" && connection.message &&
-        <Alert className="saved-connect-error" type="error" showIcon message={connection.message} />}
+        <Alert className="saved-connect-error" type="error" showIcon message={connectionErrorMessage(connection.message, language)} />}
       {isPending && <p className="saved-connect-note">{t.savedConnectBackground}</p>}
     </Modal>
   );
+}
+
+function connectionErrorMessage(message: string, language: Language): string {
+  const t = messages[language];
+  const text = message.toLowerCase();
+  if (text.includes("the device is offline")) return t.connectDeviceOffline;
+  if (text.includes("the device rejected authentication")) return t.connectPasswordRejected;
+  if (text.includes("permissiondenied") || text.includes("invalidcredentials")) return t.connectPermissionDenied;
+  if (text.includes("ratelimited")) return t.connectRateLimited;
+  if (text.includes("notfound")) return t.connectDeviceNotFound;
+  if (text.includes("timed out")) return t.connectTimedOut;
+  return message;
 }

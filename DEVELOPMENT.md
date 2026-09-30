@@ -106,6 +106,15 @@ a command or MCP argument. Both serialized password buffers and the Executor's
 corresponding receive buffers are zeroized. A production desktop credential store
 remains future work.
 
+Device-code lookup only resolves identity. A validated network-address query
+atomically registers or refreshes the operator/device Relay grant, so reconnecting
+with a saved DeviceRef does not depend on a previous code lookup. Live Executor
+sessions renew their grants during peer rechecks; the ten-minute expiry cleans up
+leftover grants after sessions end. Bridge has no background code-lookup lease, and
+MCP reuses resolved identities and authenticated connections. Address queries also
+have a twenty-target limit per control session. Offline devices and permanent
+server rejections fail explicitly instead of becoming generic connection timeouts.
+
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
 deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
 file, local device-credential file, and optional control/Relay private CAs from

@@ -13,7 +13,6 @@ impl PostgresStore {
         code: DeviceCode,
         deployment_id: DeploymentId,
     ) -> Result<DeviceRef, StoreError> {
-        let mut tx = self.pool.begin().await?;
         let row = sqlx::query(
             r#"
             SELECT device.id, device.tenant_id
@@ -32,25 +31,11 @@ impl PostgresStore {
         )
         .bind(guest_key.as_bytes().as_slice())
         .bind(code.value() as i32)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&self.pool)
         .await?
         .ok_or(StoreError::NotFound)?;
         let device_id = DeviceId::from_uuid(row.try_get("id")?);
         let tenant_id = TenantId::from_uuid(row.try_get("tenant_id")?);
-        sqlx::query(
-            r#"
-            INSERT INTO device_connection_intents (operator_endpoint_key, device_id, expires_at)
-            VALUES ($1, $2, now() + interval '10 minutes')
-            ON CONFLICT (operator_endpoint_key, device_id)
-            DO UPDATE SET expires_at = EXCLUDED.expires_at
-            "#,
-        )
-        .bind(guest_key.as_bytes().as_slice())
-        .bind(device_id.as_uuid())
-        .execute(&mut *tx)
-        .await?;
-        support::bump_policy_revision(&mut tx).await?;
-        tx.commit().await?;
         Ok(DeviceRef {
             deployment_id,
             tenant_id,
@@ -63,6 +48,7 @@ impl PostgresStore {
         guest_key: EndpointKey,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, StoreError> {
+        let mut tx = self.pool.begin().await?;
         let row = sqlx::query(
             r#"
             SELECT network.endpoint_key,
@@ -72,42 +58,44 @@ impl PostgresStore {
                    network.direct_addresses::text AS direct_addresses,
                    network.observed_at_unix_ms,
                    network.accepted_at
-            FROM device_connection_intents intent
-            JOIN endpoints guest
-              ON guest.endpoint_key = intent.operator_endpoint_key
-             AND guest.owner_kind = 'guest'
-             AND guest.status = 'active'
+            FROM endpoints guest
+            JOIN tenants scope
+              ON scope.id = guest.tenant_id
+             AND scope.kind = 'guest'
+             AND scope.status = 'active'
             JOIN devices device
-              ON device.id = intent.device_id
+              ON device.id = $2
              AND device.status = 'active'
             JOIN device_network network
               ON network.tenant_id = device.tenant_id
              AND network.device_id = device.id
             JOIN endpoints target
               ON target.endpoint_key = network.endpoint_key
+             AND target.tenant_id = device.tenant_id
+             AND target.device_id = device.id
              AND target.owner_kind = 'device'
              AND target.status = 'active'
             JOIN deployments deployment
               ON deployment.singleton = true
              AND deployment.id = $4
-            WHERE intent.operator_endpoint_key = $1
-              AND intent.device_id = $2
+            WHERE guest.endpoint_key = $1
+              AND guest.owner_kind = 'guest'
+              AND guest.status = 'active'
               AND device.tenant_id = $3
-              AND intent.expires_at > now()
             "#,
         )
         .bind(guest_key.as_bytes().as_slice())
         .bind(device_ref.device_id.as_uuid())
         .bind(device_ref.tenant_id.as_uuid())
         .bind(device_ref.deployment_id.as_uuid())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or(StoreError::NotFound)?;
         let endpoint_key: [u8; 32] = row
             .try_get::<Vec<u8>, _>("endpoint_key")?
             .try_into()
             .map_err(|_| StoreError::InvalidData("endpoint key is not 32 bytes".to_owned()))?;
-        Ok(DeviceNetworkSnapshot {
+        let snapshot = DeviceNetworkSnapshot {
             schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
             device_ref,
             endpoint_key: EndpointKey::new(endpoint_key),
@@ -124,7 +112,11 @@ impl PostgresStore {
             .map_err(|error| StoreError::InvalidData(error.to_string()))?,
             observed_at_unix_ms: row.try_get("observed_at_unix_ms")?,
             accepted_at_unix_ms: support::unix_millis(row.try_get("accepted_at")?)?,
-        })
+        };
+        connection_intents::grant_device_connection(&mut tx, guest_key, device_ref.device_id)
+            .await?;
+        tx.commit().await?;
+        Ok(snapshot)
     }
 
     pub async fn authorize_guest_device_peer(

@@ -97,25 +97,11 @@ impl PostgresStore {
         .fetch_optional(&self.pool)
         .await?
         .ok_or(StoreError::NotFound)?;
-        let device_ref = DeviceRef {
+        Ok(DeviceRef {
             deployment_id,
             tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
             device_id: DeviceId::from_uuid(row.try_get("id")?),
-        };
-        let mut tx = self.pool.begin().await?;
-        sqlx::query(
-            "INSERT INTO device_connection_intents (operator_endpoint_key, device_id, expires_at) \
-             VALUES ($1, $2, now() + interval '10 minutes') \
-             ON CONFLICT (operator_endpoint_key, device_id) \
-             DO UPDATE SET expires_at = EXCLUDED.expires_at",
-        )
-        .bind(requester_key.as_bytes().as_slice())
-        .bind(device_ref.device_id.as_uuid())
-        .execute(&mut *tx)
-        .await?;
-        support::bump_policy_revision(&mut tx).await?;
-        tx.commit().await?;
-        Ok(device_ref)
+        })
     }
 
     pub async fn device_network_snapshot(
@@ -125,6 +111,7 @@ impl PostgresStore {
         requester_tenant: TenantId,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, StoreError> {
+        let mut tx = self.pool.begin().await?;
         let row = sqlx::query(
             r#"
             SELECT network.endpoint_key,
@@ -149,10 +136,6 @@ impl PostgresStore {
               ON device.id = $4
              AND device.tenant_id = $6
              AND device.status = 'active'
-            JOIN device_connection_intents intent
-              ON intent.operator_endpoint_key = requester.endpoint_key
-             AND intent.device_id = device.id
-             AND intent.expires_at > now()
             JOIN device_network network
               ON network.tenant_id = device.tenant_id
              AND network.device_id = device.id
@@ -175,7 +158,7 @@ impl PostgresStore {
         .bind(device_ref.device_id.as_uuid())
         .bind(device_ref.deployment_id.as_uuid())
         .bind(device_ref.tenant_id.as_uuid())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or(StoreError::NotFound)?;
 
@@ -191,7 +174,7 @@ impl PostgresStore {
         let direct_addresses =
             serde_json::from_str(row.try_get::<String, _>("direct_addresses")?.as_str())
                 .map_err(|error| StoreError::InvalidData(error.to_string()))?;
-        Ok(DeviceNetworkSnapshot {
+        let snapshot = DeviceNetworkSnapshot {
             schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
             device_ref,
             endpoint_key,
@@ -203,6 +186,10 @@ impl PostgresStore {
             direct_addresses,
             observed_at_unix_ms: row.try_get("observed_at_unix_ms")?,
             accepted_at_unix_ms: support::unix_millis(row.try_get("accepted_at")?)?,
-        })
+        };
+        connection_intents::grant_device_connection(&mut tx, requester_key, device_ref.device_id)
+            .await?;
+        tx.commit().await?;
+        Ok(snapshot)
     }
 }

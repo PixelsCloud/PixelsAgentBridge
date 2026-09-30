@@ -766,6 +766,58 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .expect("closed peer remained online");
     device_supervisor.shutdown().await.unwrap();
 
+    let mut offline_connection =
+        AuthenticatedControlConnection::connect(&agent_config, &secret, connector.clone())
+            .await
+            .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match offline_connection
+                .get_device_network(device_ref, Duration::from_secs(5))
+                .await
+            {
+                Err(pab_agent_core::EndpointControlError::Server {
+                    code: ControlErrorCode::NotFound,
+                    message,
+                }) if message == "the device is offline" => break,
+                Ok(_) => tokio::time::sleep(Duration::from_millis(20)).await,
+                other => panic!("unexpected offline lookup result: {other:?}"),
+            }
+        }
+    })
+    .await
+    .expect("offline device was not reported");
+    // Saved refs must not bypass the per-control-session target limit.
+    for _ in 0..19 {
+        let missing = DeviceRef {
+            device_id: pab_protocol::DeviceId::new(),
+            ..device_ref
+        };
+        assert!(matches!(
+            offline_connection
+                .get_device_network(missing, Duration::from_secs(5))
+                .await,
+            Err(pab_agent_core::EndpointControlError::Server {
+                code: ControlErrorCode::NotFound,
+                ..
+            })
+        ));
+    }
+    let missing = DeviceRef {
+        device_id: pab_protocol::DeviceId::new(),
+        ..device_ref
+    };
+    assert!(matches!(
+        offline_connection
+            .get_device_network(missing, Duration::from_secs(5))
+            .await,
+        Err(pab_agent_core::EndpointControlError::Server {
+            code: ControlErrorCode::RateLimited,
+            ..
+        })
+    ));
+    offline_connection.close().await.unwrap();
+
     let (mut login_socket, _) = tokio::time::timeout(
         Duration::from_secs(5),
         connect_async_tls_with_config(
@@ -1365,12 +1417,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     })
     .await
     .unwrap();
-    let guest_ref = guest
-        .connector()
-        .resolve_device_code(device_code)
-        .await
-        .unwrap();
-    assert_eq!(guest_ref, device_ref);
+    // Connect using a saved ref without looking up its code first.
     let (accepted, accepted_server) = connect_device_over_bridge(
         &mut guest,
         &device_endpoint,
@@ -1394,6 +1441,10 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         let connection = guest_device.accept().await.unwrap().unwrap();
         guest_acceptor.handle(connection).await
     });
+    // An expired leftover grant must not prevent a fresh connection.
+    sqlx::query("UPDATE device_connection_intents SET expires_at = now() - interval '1 second' WHERE operator_endpoint_key = $1")
+        .bind(guest_secret.public().as_bytes().as_slice())
+        .execute(inspection_control.store().pool()).await.unwrap();
     let guest_connection_result = guest
         .connect_device(
             device_ref,
@@ -1430,14 +1481,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         let connection = second_account_device.accept().await.unwrap().unwrap();
         second_account_acceptor.handle(connection).await
     });
-    assert_eq!(
-        second_bridge
-            .connector()
-            .resolve_device_code(device_code)
-            .await
-            .unwrap(),
-        device_ref
-    );
     let second_account_connection = second_bridge
         .connect_device(
             device_ref,

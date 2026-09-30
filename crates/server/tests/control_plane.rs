@@ -515,20 +515,43 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
             .unwrap(),
         device_ref
     );
-    assert_eq!(
+    // This test has no live WSS device session: the service reports offline,
+    // while store-level discovery validates identity and creates the pair grant.
+    assert!(matches!(
         control
             .device_network_snapshot(&alice_endpoint, device_ref)
+            .await,
+        Err(ServiceError::DeviceOffline)
+    ));
+    assert_eq!(
+        control
+            .store()
+            .device_network_snapshot(
+                alice_endpoint.endpoint_key,
+                alice.id,
+                alice_endpoint.tenant_id,
+                device_ref
+            )
             .await
             .unwrap()
             .endpoint_key,
         EndpointKey::new(*device_key.public().as_bytes())
     );
-    assert!(matches!(
+    // A valid account can connect by a saved DeviceRef before resolving its code.
+    assert_eq!(
         control
-            .device_network_snapshot(&bob_endpoint, device_ref)
-            .await,
-        Err(ServiceError::Store(StoreError::NotFound))
-    ));
+            .store()
+            .device_network_snapshot(
+                bob_endpoint.endpoint_key,
+                bob.id,
+                bob_endpoint.tenant_id,
+                device_ref
+            )
+            .await
+            .unwrap()
+            .device_ref,
+        device_ref
+    );
     assert_eq!(
         control
             .resolve_device_code(&bob_endpoint, device.code, deployment_id)
@@ -538,12 +561,51 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     );
     assert_eq!(
         control
-            .device_network_snapshot(&bob_endpoint, device_ref)
+            .store()
+            .device_network_snapshot(
+                bob_endpoint.endpoint_key,
+                bob.id,
+                bob_endpoint.tenant_id,
+                device_ref
+            )
             .await
             .unwrap()
             .device_ref,
         device_ref
     );
+    let invalid_ref = DeviceRef {
+        tenant_id: TenantId::new(),
+        ..device_ref
+    };
+    assert!(matches!(
+        control
+            .store()
+            .device_network_snapshot(
+                bob_endpoint.endpoint_key,
+                bob.id,
+                bob_endpoint.tenant_id,
+                invalid_ref
+            )
+            .await,
+        Err(StoreError::NotFound)
+    ));
+    sqlx::query("UPDATE endpoints SET status = 'revoked' WHERE endpoint_key = $1")
+        .bind(bob_endpoint.endpoint_key.as_bytes().as_slice())
+        .execute(control.store().pool())
+        .await
+        .unwrap();
+    assert!(matches!(
+        control
+            .store()
+            .device_network_snapshot(
+                bob_endpoint.endpoint_key,
+                bob.id,
+                bob_endpoint.tenant_id,
+                device_ref
+            )
+            .await,
+        Err(StoreError::NotFound)
+    ));
     sqlx::query("DELETE FROM device_network WHERE device_id = $1")
         .bind(device.id.as_uuid())
         .execute(control.store().pool())

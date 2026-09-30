@@ -4,7 +4,7 @@ use pab_protocol::{RequestId, TransferSnapshot};
 use sha2::{Digest, Sha256};
 use tokio::{fs::File, io::AsyncReadExt, sync::watch};
 
-use super::{RuntimeError, RuntimeInner, device::BridgeAvailability, operation::OperationRecord};
+use super::{RuntimeError, RuntimeInner, operation::OperationRecord};
 
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 const QUERY_TIMEOUT: Duration = Duration::from_secs(10);
@@ -74,7 +74,6 @@ pub(super) async fn run_reconciliation(
                 continue;
             };
             let query = async {
-                refresh_guest_grant(&inner, &record).await?;
                 let device = inner.device(record.device_ref).await;
                 let connection = device.connection().await?;
                 connection
@@ -175,34 +174,6 @@ fn next_cursor(records: &[OperationRecord]) -> Option<(i64, String)> {
     records
         .last()
         .map(|record| (record.started_at_unix_ms, record.id.clone()))
-}
-
-async fn refresh_guest_grant(
-    inner: &Arc<RuntimeInner>,
-    record: &OperationRecord,
-) -> Result<(), RuntimeError> {
-    if !inner.guest_identity {
-        return Ok(());
-    }
-    let code = record.device_code.ok_or_else(|| {
-        RuntimeError::BridgeUnavailable("transfer has no saved guest device code".to_owned())
-    })?;
-    if inner.guest_codes.lock().await.contains(&code) {
-        return Ok(());
-    }
-    let BridgeAvailability::Connected(connector) = inner.availability.borrow().clone() else {
-        return Err(RuntimeError::BridgeUnavailable(
-            "Bridge is not connected for guest transfer recovery".to_owned(),
-        ));
-    };
-    let resolved = connector.resolve_device_code(code).await?;
-    if resolved != record.device_ref {
-        return Err(RuntimeError::BridgeUnavailable(
-            "saved device code no longer resolves to the transfer target".to_owned(),
-        ));
-    }
-    inner.start_guest_lease(code).await;
-    Ok(())
 }
 
 fn remote_completion_matches(record: &OperationRecord, snapshot: &TransferSnapshot) -> bool {

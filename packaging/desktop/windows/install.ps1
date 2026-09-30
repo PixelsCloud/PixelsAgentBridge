@@ -44,11 +44,6 @@ foreach ($name in $requiredFiles) {
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
 $taskName = 'PixelsAgentBridgeExecutor'
 $supervisorTaskName = 'PixelsAgentBridgeSessionSupervisor'
-$existingService = Get-Service -Name $taskName -ErrorAction SilentlyContinue
-if ($existingService) {
-    Stop-Service -Name $taskName -ErrorAction SilentlyContinue
-    $existingService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15))
-}
 $existingSupervisorTask = Get-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
 if ($existingSupervisorTask) {
     Stop-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
@@ -57,6 +52,39 @@ $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyConti
 if ($existingTask) {
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+}
+$existingService = Get-Service -Name $taskName -ErrorAction SilentlyContinue
+if ($existingService) {
+    Stop-Service -Name $taskName -ErrorAction SilentlyContinue
+    try {
+        $existingService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(10))
+    } catch [System.Management.Automation.MethodInvocationException] {
+        if ($_.Exception.InnerException -isnot [System.ServiceProcess.TimeoutException]) { throw }
+    }
+    $existingService.Refresh()
+    if ($existingService.Status -ne 'Stopped') {
+        $serviceProcessId = (Get-CimInstance Win32_Service -Filter "Name = '$taskName'").ProcessId
+        $serviceProcess = if ($serviceProcessId -gt 0) {
+            Get-CimInstance Win32_Process -Filter "ProcessId = $serviceProcessId"
+        }
+        if (-not $serviceProcess) {
+            $existingService.Refresh()
+            if ($existingService.Status -ne 'Stopped') {
+                throw "Executor service did not stop, and its process could not be found: $taskName (PID $serviceProcessId)"
+            }
+        } elseif ($serviceProcess.ExecutablePath -ine (Join-Path $InstallRoot 'pab-executor.exe')) {
+            throw "Executor service did not stop, and its process could not be verified: $taskName (PID $serviceProcessId)"
+        } else {
+            Write-Output "Executor service did not stop within 10 seconds; terminating its verified process (PID $serviceProcessId)."
+            Stop-Process -Id $serviceProcessId -Force
+            try {
+                $existingService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(10))
+            } catch [System.Management.Automation.MethodInvocationException] {
+                if ($_.Exception.InnerException -isnot [System.ServiceProcess.TimeoutException]) { throw }
+                throw "Executor service is still not stopped after its process was terminated: $taskName (PID $serviceProcessId)"
+            }
+        }
+    }
 }
 $binaryNames = @('pab-mcp', 'pab-bridge', 'pab-executor', 'pab-desktop')
 foreach ($name in $binaryNames) {

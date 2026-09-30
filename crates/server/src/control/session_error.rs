@@ -95,6 +95,10 @@ pub(super) fn error_response(
             ControlErrorCode::NotFound,
             "peer endpoint is unavailable".to_owned(),
         ),
+        ControlSessionError::Service(ServiceError::DeviceOffline) => (
+            ControlErrorCode::NotFound,
+            "the device is offline".to_owned(),
+        ),
         ControlSessionError::Service(ServiceError::UnsupportedDeviceSessionSchema(_))
         | ControlSessionError::Service(ServiceError::UnsupportedDeviceNetworkSchema(_))
         | ControlSessionError::Service(ServiceError::InvalidAgentVersion)

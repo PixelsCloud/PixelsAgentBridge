@@ -141,6 +141,7 @@ impl DeviceSession {
                     return Ok(connection);
                 }
                 Err(error) if error.is_recoverable_connection() => {
+                    tracing::warn!(device_id = %self.device_ref.device_id, %error, "device connection attempt failed, retrying");
                     self.runtime.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Retrying,

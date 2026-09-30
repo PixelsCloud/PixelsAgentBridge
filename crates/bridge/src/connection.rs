@@ -2,9 +2,9 @@ use std::fs;
 
 use pab_agent_core::{
     ControlConnectionStatus, DeviceNetworkResolutionError, DeviceNetworkResolver,
-    EndpointControlConfig, EndpointControlSupervisor, EndpointControlSupervisorHandle,
-    EndpointSecretError, ReconnectPolicy, ReconnectPolicyError, TlsConnectorError,
-    read_endpoint_secret, tls_connector,
+    EndpointControlConfig, EndpointControlError, EndpointControlSupervisor,
+    EndpointControlSupervisorHandle, EndpointSecretError, ReconnectPolicy, ReconnectPolicyError,
+    TlsConnectorError, read_endpoint_secret, tls_connector,
 };
 use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
@@ -617,9 +617,60 @@ pub enum BridgeError {
 
 impl BridgeError {
     pub const fn is_recoverable_connection(&self) -> bool {
-        matches!(
-            self,
-            Self::NetworkResolution(_) | Self::Endpoint(_) | Self::Connection(_)
-        )
+        match self {
+            Self::NetworkResolution(
+                DeviceNetworkResolutionError::Unavailable
+                | DeviceNetworkResolutionError::Timeout
+                | DeviceNetworkResolutionError::Control(
+                    EndpointControlError::Timeout
+                    | EndpointControlError::Closed
+                    | EndpointControlError::WebSocket(_),
+                ),
+            )
+            | Self::Endpoint(_)
+            | Self::Connection(_) => true,
+            Self::NetworkResolution(DeviceNetworkResolutionError::Control(
+                EndpointControlError::Server { code, .. },
+            )) => matches!(code, pab_protocol::ControlErrorCode::Internal),
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn server_rejections_do_not_turn_into_connection_timeouts() {
+        use pab_protocol::ControlErrorCode;
+        for code in [
+            ControlErrorCode::NotFound,
+            ControlErrorCode::PermissionDenied,
+            ControlErrorCode::InvalidCredentials,
+            ControlErrorCode::InvalidState,
+            ControlErrorCode::RateLimited,
+        ] {
+            let error = BridgeError::NetworkResolution(DeviceNetworkResolutionError::Control(
+                EndpointControlError::Server {
+                    code,
+                    message: "rejected".to_owned(),
+                },
+            ));
+            assert!(!error.is_recoverable_connection(), "{code:?}");
+        }
+        assert!(
+            BridgeError::NetworkResolution(DeviceNetworkResolutionError::Timeout)
+                .is_recoverable_connection()
+        );
+        assert!(
+            BridgeError::NetworkResolution(DeviceNetworkResolutionError::Control(
+                EndpointControlError::Server {
+                    code: ControlErrorCode::Internal,
+                    message: "temporary".to_owned()
+                },
+            ))
+            .is_recoverable_connection()
+        );
     }
 }

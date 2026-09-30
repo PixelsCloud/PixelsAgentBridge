@@ -979,7 +979,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       <Modal open={Boolean(renameTarget)} title={t.renameDevice} width={400}
         onCancel={() => { if (!renaming) setRenameTarget(null); }}
         onOk={() => void renameSavedDevice()} okText={t.saveName} okButtonProps={{ disabled: !renameTarget || aliasDraft.trim() === renameTarget.alias }}
-        confirmLoading={renaming} cancelText={t.cancel} maskClosable={!renaming}>
+        confirmLoading={renaming} cancelText={t.cancel} maskClosable={false} keyboard={false}>
         {renameTarget && <>
           <strong>{formatDeviceCode(renameTarget.deviceCode)}</strong>
           <label className="rename-device-label" htmlFor="rename-device-input">{t.deviceAlias}</label>
@@ -991,7 +991,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
 
       <Modal open={Boolean(deleteTarget)} title={t.deleteDeviceConfirm} width={400}
         onCancel={() => { if (!deleting) setDeleteTarget(null); }} onOk={() => void forgetDevice()}
-        okText={t.deleteDevice} okType="danger" confirmLoading={deleting} cancelText={t.cancel} maskClosable={!deleting}>
+        okText={t.deleteDevice} okType="danger" confirmLoading={deleting} cancelText={t.cancel} maskClosable={false} keyboard={false}>
         {deleteTarget && <>
           <strong>{deleteTarget.alias || formatDeviceCode(deleteTarget.deviceCode)}</strong>
           <p>{t.deleteDeviceHint}</p>
@@ -1001,7 +1001,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
 
       <Modal open={Boolean(disconnectTarget)} title={t.disconnectDeviceConfirm} width={400}
         onCancel={() => { if (!disconnecting) setDisconnectTarget(null); }} onOk={() => void disconnectDevice()}
-        okText={t.disconnectDevice} okType="danger" confirmLoading={disconnecting} cancelText={t.cancel} maskClosable={!disconnecting}>
+        okText={t.disconnectDevice} okType="danger" confirmLoading={disconnecting} cancelText={t.cancel} maskClosable={false} keyboard={false}>
         {disconnectTarget && <>
           <strong>{disconnectTarget.alias || formatDeviceCode(disconnectTarget.deviceCode)}</strong>
           <p>{t.disconnectDeviceHint}</p>

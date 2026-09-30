@@ -497,7 +497,7 @@ pub async fn operator_connect(
         .set_password(device_ref.device_id, password.to_string())
         .map_err(|error| error.to_string())?;
     let target = tokio::time::timeout(
-        std::time::Duration::from_secs(30),
+        std::time::Duration::from_secs(60),
         runtime.connect_device(device_ref),
     )
     .await
@@ -559,7 +559,7 @@ pub async fn operator_connect_saved(
         .ok_or_else(|| "saved device was not found".to_owned())?;
     let runtime = state.runtime().await?;
     let target = tokio::time::timeout(
-        std::time::Duration::from_secs(30),
+        std::time::Duration::from_secs(60),
         runtime.connect_device(remembered.device_ref),
     )
     .await

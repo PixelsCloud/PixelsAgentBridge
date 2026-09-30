@@ -2,6 +2,30 @@ use pab_protocol::{DeviceId, EndpointKey};
 
 use super::*;
 
+/// Grant only after a validated address lookup. Repeated lookups within the
+/// renewal window do not invalidate the Relay policy cache.
+pub(super) async fn grant_device_connection(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    operator: EndpointKey,
+    device_id: DeviceId,
+) -> Result<(), StoreError> {
+    let granted = sqlx::query(
+        "INSERT INTO device_connection_intents (operator_endpoint_key, device_id, expires_at) \
+         VALUES ($1, $2, now() + interval '10 minutes') \
+         ON CONFLICT (operator_endpoint_key, device_id) \
+         DO UPDATE SET expires_at = EXCLUDED.expires_at \
+         WHERE device_connection_intents.expires_at < now() + interval '5 minutes'",
+    )
+    .bind(operator.as_bytes().as_slice())
+    .bind(device_id.as_uuid())
+    .execute(&mut **tx)
+    .await?;
+    if granted.rows_affected() > 0 {
+        support::bump_policy_revision(tx).await?;
+    }
+    Ok(())
+}
+
 impl PostgresStore {
     pub async fn delete_expired_connection_intents(&self) -> Result<u64, StoreError> {
         let mut tx = self.pool.begin().await?;
