@@ -1,7 +1,7 @@
 //! Image payloads stay in MCP content, never in JSON metadata or presence reports.
 use base64::{Engine, engine::general_purpose::STANDARD};
 use pab_bridge::{BridgeRuntime, Screenshot};
-use pab_protocol::{MAX_INLINE_SCREENSHOT_BYTES, ScreenshotOptions};
+use pab_protocol::ScreenshotOptions;
 use rmcp::model::ContentBlock;
 use serde_json::{Value, json};
 
@@ -9,16 +9,7 @@ pub async fn call(
     runtime: &BridgeRuntime,
     args: &Value,
 ) -> Result<(Value, Option<ContentBlock>), String> {
-    let mut capture_args = args
-        .as_object()
-        .ok_or("arguments must be an object")?
-        .clone();
-    for field in ["device_code", "destination", "include_image"] {
-        capture_args.remove(field);
-    }
-    let options: ScreenshotOptions =
-        serde_json::from_value(Value::Object(capture_args)).map_err(|e| e.to_string())?;
-    options.validate().map_err(str::to_owned)?;
+    let options = parse_options(args)?;
     let destination = args
         .get("destination")
         .map(|v| v.as_str().ok_or("destination must be a string"))
@@ -47,25 +38,41 @@ pub async fn call(
     metadata["os_reminder"] = json!(target.compact_reminder());
     Ok((metadata, content))
 }
+fn parse_options(args: &Value) -> Result<ScreenshotOptions, String> {
+    let mut capture_args = args
+        .as_object()
+        .ok_or("arguments must be an object")?
+        .clone();
+    for field in ["device_code", "destination", "include_image"] {
+        capture_args.remove(field);
+    }
+    let options: ScreenshotOptions =
+        serde_json::from_value(Value::Object(capture_args)).map_err(|e| e.to_string())?;
+    options.validate().map_err(str::to_owned)?;
+    if options.mode != pab_protocol::ScreenshotMode::Jpeg {
+        return Err("screenshots preserve captured resolution and return JPEG".into());
+    }
+    Ok(options)
+}
 fn response(image: Screenshot, include_image: bool) -> (Value, Option<ContentBlock>) {
-    let fits = image.bytes.len() <= MAX_INLINE_SCREENSHOT_BYTES;
     let mime = if image.meta.format == "jpeg" {
         "image/jpeg"
     } else {
         "image/png"
     };
-    let content =
-        (include_image && fits).then(|| ContentBlock::image(STANDARD.encode(&image.bytes), mime));
+    let content = include_image.then(|| ContentBlock::image(STANDARD.encode(&image.bytes), mime));
+    let mapping=image.meta.capture.as_ref().map(|info| {
+        let (w,h)=info.desktop_rect.as_ref().map(|r|(r.width,r.height)).unwrap_or((info.source_width,info.source_height));
+        json!({"coordinate_space":"xcap_native", "origin_x":info.origin_x,"origin_y":info.origin_y,
+            "scale_x":f64::from(w)/f64::from(info.width),"scale_y":f64::from(h)/f64::from(info.height),
+            "formula":"desktop = origin + preview_pixel * scale; mapping describes capture time, recheck window before input"})
+    });
     let mut metadata = serde_json::to_value(image.meta).expect("ScreenshotMeta is serializable");
+    metadata["preview_to_desktop"] = json!(mapping);
     metadata["image_included"] = json!(content.is_some());
-    metadata["inline_max_bytes"] = json!(MAX_INLINE_SCREENSHOT_BYTES);
     if !include_image {
         metadata["image_omitted_reason"] =
             json!("include_image is false; image is saved to destination");
-    } else if !fits {
-        metadata["image_omitted_reason"] = json!(
-            "encoded image exceeds inline_max_bytes; image is saved to destination; use preview for inline display"
-        );
     }
     (metadata, content)
 }
@@ -89,6 +96,63 @@ mod tests {
         }
     }
     #[test]
+    fn screenshot_entry_uses_native_jpeg_and_rejects_resize_options() {
+        assert!(parse_options(&json!({})).is_ok());
+        assert!(parse_options(&json!({"mode":"original"})).is_err());
+        assert!(parse_options(&json!({"max_bytes":524289})).is_err());
+        assert!(parse_options(&json!({"max_width":1600})).is_err());
+        assert!(parse_options(&json!({"max_height":1000})).is_err());
+        assert!(parse_options(&json!({"mode":"preview"})).is_err());
+        assert_eq!(
+            parse_options(&json!({})).unwrap().mode,
+            pab_protocol::ScreenshotMode::Jpeg
+        );
+        let reference = RequestId::new().to_string();
+        assert!(parse_options(&json!({"window_ref":reference})).is_ok());
+        assert!(parse_options(&json!({"window_ref":reference,"monitor_id":1})).is_err());
+        assert!(
+            super::super::mcp_catalog::validate_arguments(
+                "pab_capture_screenshot",
+                &json!({"device_code":"123456789","mode":"original"})
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn mapping_uses_window_coordinate_extent_instead_of_dpi_scaled_source_pixels() {
+        use pab_protocol::*;
+        let mut image = fixture(500);
+        image.meta.width = 800;
+        image.meta.height = 600;
+        image.meta.capture = Some(ScreenshotInfo {
+            window_ref: Some(RequestId::new().to_string()),
+            desktop_rect: Some(ScreenshotDesktopRect {
+                x: -800,
+                y: 30,
+                width: 400,
+                height: 300,
+            }),
+            captured_at_unix_ms: 1,
+            mode: ScreenshotMode::Jpeg,
+            format: ScreenshotFormat::Jpeg,
+            width: 800,
+            height: 600,
+            source_width: 800,
+            source_height: 600,
+            monitor_id: Some(1),
+            origin_x: -800,
+            origin_y: 30,
+            quality: Some(85),
+            resized: false,
+        });
+        let (meta, content) = response(image, true);
+        assert!(content.is_some());
+        assert_eq!(meta["preview_to_desktop"]["scale_x"], 0.5);
+        assert_eq!(meta["preview_to_desktop"]["scale_y"], 0.5);
+        assert_eq!(meta["preview_to_desktop"]["origin_x"], -800);
+        assert!(meta.get("data").is_none());
+    }
+    #[test]
     fn image_is_present_only_in_image_content_not_json_or_text() {
         let (meta, content) = response(fixture(500), true);
         assert_eq!(meta["image_included"], true);
@@ -108,16 +172,17 @@ mod tests {
         assert!(json["structuredContent"].get("data").is_none());
     }
     #[test]
-    fn inline_byte_limit_and_explicit_file_only_are_honored() {
-        assert!(
-            response(fixture(MAX_INLINE_SCREENSHOT_BYTES), true)
-                .1
-                .is_some()
-        );
-        let (meta, image) = response(fixture(MAX_INLINE_SCREENSHOT_BYTES + 1), true);
-        assert!(image.is_none());
-        assert_eq!(meta["image_included"], false);
-        assert!(meta["image_omitted_reason"].is_string());
+    fn full_image_is_returned_above_old_limits_unless_file_only_is_requested() {
+        for size in [512 * 1024 + 1, 8 * 1024 * 1024 + 1] {
+            let (meta, image) = response(fixture(size), true);
+            assert_eq!(meta["image_included"], true);
+            assert!(meta.get("image_omitted_reason").is_none());
+            let value = serde_json::to_value(image.unwrap()).unwrap();
+            assert_eq!(
+                STANDARD.decode(value["data"].as_str().unwrap()).unwrap(),
+                vec![42; size]
+            );
+        }
         assert!(response(fixture(100), false).1.is_none());
     }
 }

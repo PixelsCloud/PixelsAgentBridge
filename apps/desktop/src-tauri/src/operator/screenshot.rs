@@ -1,5 +1,5 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use pab_protocol::RequestId;
+use pab_protocol::{RequestId, ScreenshotOptions};
 use serde::Serialize;
 use tauri::State;
 
@@ -13,6 +13,7 @@ pub struct ScreenshotView {
     height: u32,
     size: u64,
     sha256: String,
+    format: String,
     data_url: String,
 }
 
@@ -27,7 +28,7 @@ pub async fn operator_capture_screenshot(
         .await
         .map_err(|error| error.to_string())?;
     let image = runtime
-        .capture_screenshot(device_ref, None)
+        .capture_screenshot_with_options(device_ref, None, &ScreenshotOptions::default())
         .await
         .map_err(|error| error.to_string())?;
     Ok(screenshot_view(image))
@@ -62,6 +63,7 @@ fn screenshot_view(image: pab_bridge::Screenshot) -> ScreenshotView {
         height: image.meta.height,
         size: image.meta.size,
         sha256: image.meta.sha256,
+        format: image.meta.format,
         data_url: format!("data:{mime};base64,{}", STANDARD.encode(image.bytes)),
     }
 }

@@ -62,8 +62,12 @@ pub(super) async fn read_screenshot(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(RuntimeStoreError::Io(error)),
     };
+    let native_jpeg = meta
+        .as_ref()
+        .and_then(|m| m.capture.as_ref())
+        .is_some_and(|i| i.mode == pab_protocol::ScreenshotMode::Jpeg);
     if metadata.len() == 0
-        || metadata.len() > MAX_SCREENSHOT_BYTES as u64
+        || (!native_jpeg && metadata.len() > MAX_SCREENSHOT_BYTES as u64)
         || i64::try_from(metadata.len()).ok() != Some(expected_size)
     {
         return Ok(None);
@@ -71,8 +75,8 @@ pub(super) async fn read_screenshot(
     let file = tokio::fs::File::open(path)
         .await
         .map_err(RuntimeStoreError::Io)?;
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take(MAX_SCREENSHOT_BYTES as u64 + 1)
+    let mut bytes = Vec::new();
+    file.take(metadata.len().saturating_add(1))
         .read_to_end(&mut bytes)
         .await
         .map_err(RuntimeStoreError::Io)?;
@@ -85,9 +89,11 @@ pub(super) async fn read_screenshot(
             }
             let info = meta.capture?;
             let options = ScreenshotOptions {
+                window_ref: info.window_ref.clone(),
                 mode: info.mode,
                 format: Some(info.format),
-                max_bytes: Some(MAX_SCREENSHOT_BYTES as u32),
+                max_bytes: (info.mode != pab_protocol::ScreenshotMode::Jpeg)
+                    .then_some(MAX_SCREENSHOT_BYTES as u32),
                 max_width: (info.mode == pab_protocol::ScreenshotMode::Preview).then_some(8192),
                 max_height: (info.mode == pab_protocol::ScreenshotMode::Preview).then_some(8192),
                 quality: info.quality,
@@ -292,25 +298,37 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn jpeg_history_survives_reopen_and_rejects_tampering() {
+    async fn large_native_jpeg_history_survives_reopen_and_rejects_tampering() {
         let directory = tempdir().unwrap();
         let database = directory.path().join("bridge.sqlite3");
         let store = RuntimeStore::open(&database).await.unwrap();
         let id = RequestId::new();
         let options = ScreenshotOptions::default();
+        let mut seed = 17u32;
+        let pixels = pab_screenshot::image::RgbImage::from_fn(3840, 2160, |_, _| {
+            let mut pixel = [0u8; 3];
+            for value in &mut pixel {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                *value = seed as u8;
+            }
+            pab_screenshot::image::Rgb(pixel)
+        });
         let encoded = pab_screenshot::encode(
-            pab_screenshot::image::DynamicImage::new_rgb8(100, 80),
+            pab_screenshot::image::DynamicImage::ImageRgb8(pixels),
             &options,
             Some(1),
             (0, 0),
         )
         .unwrap();
         let image = encoded.bytes;
+        assert!(image.len() > pab_protocol::MAX_SCREENSHOT_BYTES);
         let meta = ScreenshotMeta {
             request_id: id,
             format: "jpeg".into(),
-            width: 100,
-            height: 80,
+            width: 3840,
+            height: 2160,
             size: image.len() as u64,
             sha256: format!("{:x}", Sha256::digest(&image)),
             capture: Some(encoded.info),

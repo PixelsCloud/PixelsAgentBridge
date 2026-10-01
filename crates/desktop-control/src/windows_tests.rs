@@ -281,3 +281,160 @@ fn malformed_query_does_not_start_native_action() {
     };
     assert!(!snapshot.action_started);
 }
+
+#[test]
+#[ignore = "fixture child entry; launched only by native capture acceptance"]
+fn owned_fixture_child() {
+    let ready = std::env::var_os("PAB_D3_FIXTURE_READY").expect("parent fixture path required");
+    let fixture = Fixture::new(false);
+    std::fs::write(
+        ready,
+        serde_json::to_vec(
+            &serde_json::json!({"pid":std::process::id(),"id":fixture.id,"edit":fixture.edit}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    while unsafe { IsWindow(fixture.id as usize as HWND) } != 0 {
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+#[test]
+#[ignore = "explicit native acceptance: only captures/controls an owned fixture child window"]
+fn native_referenced_window_preview_and_cross_process_unicode() {
+    use std::process::{Command, Stdio};
+    struct OwnedChild(std::process::Child);
+    impl Drop for OwnedChild {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let ready = std::env::temp_dir().join(format!("pab-d3-fixture-{}.json", RequestId::new()));
+    let _child = OwnedChild(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "windows_tests::owned_fixture_child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("PAB_D3_FIXTURE_READY", &ready)
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !ready.exists() {
+        assert!(std::time::Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(10));
+    }
+    let data: serde_json::Value = serde_json::from_slice(&std::fs::read(&ready).unwrap()).unwrap();
+    let _ = std::fs::remove_file(&ready);
+    let id = data["id"].as_u64().unwrap() as u32;
+    let pid = data["pid"].as_u64().unwrap() as u32;
+    let mut session = DesktopSession::new();
+    let reference = session.reference(id, pid).unwrap();
+    let options = ScreenshotOptions {
+        window_ref: Some(reference.clone()),
+        ..Default::default()
+    };
+    let image = session.capture_window(&options).unwrap();
+    assert_eq!(image.info.window_ref, Some(reference.clone()));
+    assert!(image.info.desktop_rect.is_some());
+    assert_eq!(image.info.format, ScreenshotFormat::Jpeg);
+    assert_eq!(image.info.quality, Some(85));
+    assert!(!image.info.resized);
+    assert_eq!(
+        (image.info.width, image.info.height),
+        (image.info.source_width, image.info.source_height)
+    );
+    assert_eq!(image.info.format, ScreenshotFormat::Jpeg);
+    pab_screenshot::verify(&image.bytes, &image.info, &options).unwrap();
+    assert!(DesktopSession::new().capture_window(&options).is_err());
+    let focus = run(
+        &mut session,
+        DesktopQuery::Focus {
+            window_ref: reference.clone(),
+        },
+    );
+    if focus.state == "completed" {
+        let r = run(
+            &mut session,
+            DesktopQuery::TypeText {
+                window_ref: reference.clone(),
+                text: "Pixels 中文🙂".into(),
+            },
+        );
+        assert_eq!(r.state, "completed", "{r:?}");
+        let edit = data["edit"].as_u64().unwrap() as usize as HWND;
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            let mut text = [0u16; 1024];
+            let mut n = 0usize;
+            assert_ne!(
+                unsafe {
+                    SendMessageTimeoutW(
+                        edit,
+                        WM_GETTEXT,
+                        text.len(),
+                        text.as_mut_ptr() as isize,
+                        SMTO_ABORTIFHUNG,
+                        1000,
+                        &mut n,
+                    )
+                },
+                0
+            );
+            if String::from_utf16(&text[..n]).ok().as_deref() == Some("Pixels 中文🙂") {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "unexpected fixture UTF-16: {:?}",
+                &text[..n]
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+        eprintln!("UNICODE_DELIVERY_VERIFIED: owned cross-process EDIT received Chinese and emoji");
+    } else {
+        assert!(
+            focus
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("foreground policy")
+        );
+        eprintln!("UNICODE_ACCEPTANCE_PENDING: Windows foreground policy refused focus");
+    }
+    let r = run(
+        &mut session,
+        DesktopQuery::Control {
+            window_ref: reference.clone(),
+            control: WindowControlAction::Minimize,
+        },
+    );
+    assert_eq!(r.state, "completed");
+    assert!(session.capture_window(&options).is_err());
+    let r = run(
+        &mut session,
+        DesktopQuery::Control {
+            window_ref: reference.clone(),
+            control: WindowControlAction::Restore,
+        },
+    );
+    assert_eq!(r.state, "completed");
+    let marker = session.windows.get(&reference).unwrap().marker;
+    native::unmark(id, pid, &session.key, marker);
+    assert!(session.capture_window(&options).is_err());
+    let fresh = session.reference(id, pid).unwrap();
+    let r = run(
+        &mut session,
+        DesktopQuery::Control {
+            window_ref: fresh,
+            control: WindowControlAction::Close,
+        },
+    );
+    assert_eq!(r.state, "completed");
+    assert!(session.capture_window(&options).is_err());
+}

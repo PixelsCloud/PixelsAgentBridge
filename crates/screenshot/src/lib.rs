@@ -46,6 +46,42 @@ pub fn encode(
 ) -> Result<EncodedScreenshot, String> {
     options.validate().map_err(str::to_owned)?;
     let (source_width, source_height) = (image.width(), image.height());
+    if options.mode == ScreenshotMode::Jpeg {
+        if source_width == 0
+            || source_height == 0
+            || source_width > u16::MAX as u32
+            || source_height > u16::MAX as u32
+        {
+            return Err("capture dimensions are not representable by JPEG".into());
+        }
+        let quality = options.quality.unwrap_or(85);
+        let mut bytes = Vec::new();
+        JpegEncoder::new_with_quality(&mut bytes, quality)
+            .encode_image(&image.into_rgb8())
+            .map_err(|e| e.to_string())?;
+        let info = ScreenshotInfo {
+            window_ref: None,
+            desktop_rect: None,
+            captured_at_unix_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+                .min(i64::MAX as u128) as i64,
+            mode: ScreenshotMode::Jpeg,
+            format: ScreenshotFormat::Jpeg,
+            width: source_width,
+            height: source_height,
+            source_width,
+            source_height,
+            monitor_id,
+            origin_x: origin.0,
+            origin_y: origin.1,
+            quality: Some(quality),
+            resized: false,
+        };
+        info.validate(options).map_err(str::to_owned)?;
+        return Ok(EncodedScreenshot { info, bytes });
+    }
     if source_width == 0
         || source_height == 0
         || u64::from(source_width) * u64::from(source_height) > MAX_SCREENSHOT_PIXELS
@@ -89,6 +125,8 @@ pub fn encode(
         match result {
             Ok(()) => {
                 let info = ScreenshotInfo {
+                    window_ref: None,
+                    desktop_rect: None,
                     captured_at_unix_ms: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -134,9 +172,13 @@ pub fn encode(
     }
     Err("preview could not fit max_bytes within 10 bounded encoding attempts".into())
 }
-/// Strict dimension limits plus best-effort decoder allocation limits; not a hard process memory quota.
+/// Current JPEG screenshots preserve the captured dimensions; legacy PNG keeps its old limits.
 fn reader(bytes: &[u8], f: ScreenshotFormat) -> ImageReader<Cursor<&[u8]>> {
     let mut r = ImageReader::with_format(Cursor::new(bytes), format(f));
+    if f == ScreenshotFormat::Jpeg {
+        r.limits(Limits::no_limits());
+        return r;
+    }
     let mut limits = Limits::default();
     limits.max_image_width = Some(16384);
     limits.max_image_height = Some(16384);
@@ -146,7 +188,7 @@ fn reader(bytes: &[u8], f: ScreenshotFormat) -> ImageReader<Cursor<&[u8]>> {
 }
 pub fn dimensions(bytes: &[u8], f: ScreenshotFormat) -> Result<(u32, u32), String> {
     if bytes.is_empty()
-        || bytes.len() > MAX_SCREENSHOT_BYTES
+        || (f == ScreenshotFormat::Png && bytes.len() > MAX_SCREENSHOT_BYTES)
         || image::guess_format(bytes).map_err(|e| e.to_string())? != format(f)
     {
         return Err("invalid screenshot format or encoded size".into());
@@ -154,7 +196,10 @@ pub fn dimensions(bytes: &[u8], f: ScreenshotFormat) -> Result<(u32, u32), Strin
     let (w, h) = reader(bytes, f)
         .into_dimensions()
         .map_err(|e| e.to_string())?;
-    if w == 0 || h == 0 || u64::from(w) * u64::from(h) > MAX_SCREENSHOT_PIXELS {
+    if w == 0
+        || h == 0
+        || (f == ScreenshotFormat::Png && u64::from(w) * u64::from(h) > MAX_SCREENSHOT_PIXELS)
+    {
         return Err("screenshot exceeds pixel budget".into());
     }
     Ok((w, h))
@@ -204,8 +249,62 @@ mod tests {
         }))
     }
     #[test]
+    fn native_jpeg_preserves_large_resolution_and_requested_quality_without_byte_caps() {
+        let options = ScreenshotOptions {
+            quality: Some(85),
+            ..Default::default()
+        };
+        let image = encode(noisy(4096, 4097), &options, Some(7), (-4096, 0)).unwrap();
+        assert!(image.bytes.len() > MAX_SCREENSHOT_BYTES);
+        assert!(u64::from(image.info.width) * u64::from(image.info.height) > MAX_SCREENSHOT_PIXELS);
+        assert_eq!((image.info.width, image.info.height), (4096, 4097));
+        assert_eq!(
+            (image.info.source_width, image.info.source_height),
+            (4096, 4097)
+        );
+        assert_eq!(image.info.quality, Some(85));
+        assert!(!image.info.resized);
+        verify(&image.bytes, &image.info, &options).unwrap();
+    }
+    #[test]
+    fn window_verification_rejects_other_references_or_invalid_coordinate_metadata() {
+        let options = ScreenshotOptions {
+            window_ref: Some(RequestId::new().to_string()),
+            ..Default::default()
+        };
+        let mut image = encode(
+            noisy(120, 80),
+            &ScreenshotOptions::default(),
+            Some(1),
+            (-400, 20),
+        )
+        .unwrap();
+        image.info.window_ref = options.window_ref.clone();
+        image.info.desktop_rect = Some(ScreenshotDesktopRect {
+            x: -400,
+            y: 20,
+            width: 60,
+            height: 40,
+        });
+        verify(&image.bytes, &image.info, &options).unwrap();
+        let mut wrong = image.info.clone();
+        wrong.window_ref = Some(RequestId::new().to_string());
+        assert!(verify(&image.bytes, &wrong, &options).is_err());
+        wrong = image.info.clone();
+        wrong.desktop_rect = None;
+        assert!(verify(&image.bytes, &wrong, &options).is_err());
+        wrong = image.info.clone();
+        wrong.desktop_rect.as_mut().unwrap().x += 1;
+        assert!(verify(&image.bytes, &wrong, &options).is_err());
+        wrong = image.info.clone();
+        wrong.desktop_rect.as_mut().unwrap().width = 0;
+        assert!(verify(&image.bytes, &wrong, &options).is_err());
+        assert!(verify(&image.bytes, &image.info, &ScreenshotOptions::default()).is_err());
+    }
+    #[test]
     fn noisy_preview_adapts_quality_and_dimensions_to_budget() {
         let options = ScreenshotOptions {
+            mode: ScreenshotMode::Preview,
             max_bytes: Some(16384),
             max_width: Some(640),
             max_height: Some(400),

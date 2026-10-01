@@ -117,25 +117,23 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_capture_screenshot",
-            "Capture the target interactive desktop via binary transport. Default preview: JPEG, <=1600x1000 and <=512 KiB, returned as MCP image content plus metadata and an archived file. Original defaults to unscaled PNG (<=8 MiB); images above 512 KiB are file-only. Select monitor_id and/or a monitor-relative region; unsupported old targets require upgrade. destination is optional, absolute, create-only with a matching .jpg/.jpeg/.png extension. Pixel budget 16 Mi; no permission bypass or headless/locked-session guarantee.",
+            "Capture the current desktop or referenced window via xcap, encode once as JPEG at its captured resolution (quality 85 by default), and return the complete MCP image plus saved .jpg file. No resizing, image byte limit, adaptive quality, raw-frame cache or capture_id. Requires screenshot capability v3 and upgraded helper. window_ref comes from pab_list_windows and cannot combine with monitor_id/region; stale, minimized or changing windows fail. Desktop region is monitor-relative. Coordinate mapping describes capture time; no protected-window/headless guarantee. destination is optional, absolute and create-only; extension .jpg/.jpeg.",
             json!({
                 "type": "object",
                 "properties": {
                     "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
                     "destination": { "type": "string", "minLength": 1, "maxLength": 4096 },
                     "include_image": { "type": "boolean", "default": true },
-                    "mode": { "type": "string", "enum": ["preview", "original"], "default": "preview" },
-                    "format": { "type": "string", "enum": ["jpeg", "png"] },
+                    "mode": { "type": "string", "enum": ["jpeg"], "default": "jpeg" },
+                    "format": { "type": "string", "enum": ["jpeg"], "default": "jpeg" },
+                    "window_ref": { "type": "string", "format": "uuid" },
                     "monitor_id": { "type": "integer", "minimum": 0, "maximum": 4294967295u64 },
                     "region": { "type": "object", "properties": {
                         "x": { "type": "integer", "minimum": 0, "maximum": 4294967295u64 },
                         "y": { "type": "integer", "minimum": 0, "maximum": 4294967295u64 },
-                        "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
-                        "height": { "type": "integer", "minimum": 1, "maximum": 16384 }
+                        "width": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                        "height": { "type": "integer", "minimum": 1, "maximum": 65535 }
                     }, "required": ["x", "y", "width", "height"], "additionalProperties": false },
-                    "max_width": { "type": "integer", "minimum": 64, "maximum": 8192 },
-                    "max_height": { "type": "integer", "minimum": 64, "maximum": 8192 },
-                    "max_bytes": { "type": "integer", "minimum": 16384, "maximum": 8388608 },
                     "quality": { "type": "integer", "minimum": 30, "maximum": 95 }
                 },
                 "required": ["device_code"],

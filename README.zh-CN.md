@@ -32,7 +32,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
   返回结果携带经过验证的目标操作系统。
 - **传输文件**：用绝对路径上传、下载二进制文件，校验完整性，并显式决定是否覆盖。
 - **交互终端**：打开远程终端、发送输入、读取输出、调整尺寸和关闭会话。
-- **桌面能力**：在受支持的桌面会话中列出窗口、向 Agent 返回有界 JPEG 预览或保存 PNG 原图，
+- **桌面能力**：在受支持的桌面会话中列出窗口、向 Agent 返回桌面或指定窗口的有界压缩预览，
   发送鼠标、键盘或 Windows 安全注意序列事件。
 - **设备管理**：保存历史设备、重命名、复制信息，分别显示在线状态和连接状态；
   已连接卡片展示当前使用 P2P 还是 Relay。
@@ -151,7 +151,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_focus_window` | 聚焦指定引用窗口，遵守系统前台限制 |
 | `pab_window_control` | 最小化、最大化、还原或请求正常关闭窗口 |
 | `pab_type_text` | 向明确指定的前台窗口输入 Unicode 文字 |
-| `pab_capture_screenshot` | 返回有界 JPEG/PNG 预览图片，或保存原图，附带尺寸、格式和哈希 |
+| `pab_capture_screenshot` | 以采集分辨率返回桌面或指定窗口的 JPEG，附带坐标、尺寸和哈希 |
 | `pab_desktop_input` | 发送受支持的鼠标、键盘或安全注意序列事件 |
 | `pab_open_terminal` | 打开交互终端 |
 | `pab_terminal_input` | 发送终端输入 |
@@ -266,40 +266,47 @@ helper 连接；重连、切换桌面、窗口销毁或身份标记丢失后失�
 BLAKE3 摘要，不保存原文；摘要不是加密，不能防止对可预测文字的猜测。目标应用和 AI
 宿主仍可能保留输入文字。
 
-### 截图预览与原图
+### 当前桌面与窗口截图
 
-截图复用 [xcap](https://github.com/nashaofu/xcap) 采集画面，使用
-[image](https://github.com/image-rs/image) 缩放、编码 JPEG/PNG 和有界解码校验，不自行实现截图引擎。
-
-`pab_capture_screenshot` 默认 `mode="preview"`：JPEG，尺寸不超过 1600×1000，
-编码后不超过 512 KiB。质量从 75 开始，必要时降至 45，再缩小尺寸满足预算。
-返回 MCP 图片内容、已保存的文件和元数据；Base64 只出现在图片块中，不重复写入文本、
-结构化结果、SQLite 或活动上报。
+截图复用 [xcap](https://github.com/nashaofu/xcap) 与 [image](https://github.com/image-rs/image)。
+`pab_capture_screenshot` 按采集分辨率编码一次 JPEG，默认质量 85（可选 `quality`：30–95）。
+不缩放、不自动降低质量，不限制图片字节数。MCP 不提供 `max_width`、`max_height`、
+`max_bytes`、PNG 或原始图片模式。每次获取当前画面，编码后释放源像素；不保留原始画面
+缓存、`capture_id` 或同帧区域查询。
 
 ```json
 {"device_code":"214601537"}
 ```
 
-`mode="original"` 默认 PNG，保留采集尺寸，编码预算 8 MiB。显式指定 JPEG 原图时，
-默认质量为 85。支持 `format`、仅 JPEG 的 `quality`、`max_bytes`、仅预览模式的
-`max_width/max_height`、`monitor_id` 和相对所选屏幕的 `region`。区域越界直接失败，
-不偷偷裁剪。采集最多 16 Mi 像素，单边最多 16384 像素。每次调用采集新画面；
-同帧高清区域和窗口截图尚未实现。
+指定窗口时，先从 `pab_list_windows` 获取 `window_ref`：
 
 ```json
-{"device_code":"214601537","mode":"original","destination":"C:\\Temp\\screen.png","include_image":false}
+{"device_code":"214601537","window_ref":"<窗口列表返回的引用>"}
 ```
 
-`destination` 可省略。指定时必须为绝对路径，扩展名与图片格式一致；不覆盖已有文件。
-编码图片超过 512 KiB 时只保存文件，明确返回 `image_omitted_reason`，不输出过大的内联图片。
-`include_image=false` 可显式只要文件。元数据包含采集时间、屏幕标识、全局区域原点、
-源尺寸和编码尺寸、实际 JPEG 质量、字节数和 SHA-256。传输沿用二进制帧，校验实际编码、
-长度、尺寸和哈希。
+JPEG 截图要求截图能力 v3 及新版活动 helper 连接；窗口截图不主动聚焦或还原窗口。引用失效、
+最小化、窗口不可用，或采集中观察到窗口位置/尺寸/显示器变化时明确失败，不截取其他窗口。
+采集遵循 xcap 的可见性和权限限制，不保证保护窗口或 GPU 渲染应用可获取有效内容。
+`window_ref` 不能与 `monitor_id` / `region` 混用；桌面区域仍相对所选显示器，越界报错。
 
-新选项要求升级目标 Executor 与桌面助手。旧端明确返回升级提示，不降级成其他屏幕或忽略区域。
-旧客户端的主屏 PNG 请求继续保留。当前已验证 Windows 编译、合成图片、隔离助手/QUIC
-及 MCP 响应；安装后宿主图片显示、原生 4K/多屏、macOS/Linux 图形机仍待验收。
-本阶段产品接口明确不支持 Wayland。
+元数据包含窗口引用及客户区坐标范围、采集时间、显示器、原点、源/预览尺寸、实际质量、
+字节数和 SHA-256。`preview_to_desktop` 按 `桌面坐标 = 原点 + 预览像素 × 比例` 映射到
+xcap 原生坐标，即使 DPI 使源图像像素数与窗口坐标范围不同也按窗口范围计算。映射描述
+采集时刻，输入前应重新核对窗口；不能直接当作 0..65535 的归一化鼠标输入值。此 JPEG
+模式不沿用 16 Mi 像素、单边 16384 的旧预算；JPEG 格式本身每边可表示至 65535。
+位置校验也不是原子锁。
+
+已有截图历史只保存返回的压缩图片。`destination` 可省略，指定时必须绝对路径、`.jpg` 或
+`.jpeg` 扩展名，且不覆盖已有文件；`include_image=false` 仅返回压缩文件和元数据。
+Base64 仅在 MCP 图片内容块，不重复进入 JSON、SQLite 或活动上报。助手和网络均分块
+传输二进制，不限制图片总大小，并校验实际编码、尺寸、长度和哈希。桌面端截图和实时
+预览也使用此 JPEG 模式。
+
+JPEG 模式的显示器和窗口采集均要求 v3，旧 helper 返回升级提示。内部旧客户端的预览和
+主屏 PNG 请求保持兼容。已验证 Windows 专用子进程窗口截图、负原点/DPI 映射、大分辨率
+JPEG 编码及超过 8 MiB 图片的隔离助手/QUIC/历史记录/MCP 返回；
+物理 4K/多屏、安装后宿主呈图，以及 Linux/macOS 图形环境仍待验收。
+
 
 ### 示例：执行命令与读取结果
 

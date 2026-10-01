@@ -153,7 +153,11 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             let result = if !cfg!(windows)
                                 || session_helper::desktop_is_active(Some("Default"))
                             {
-                                screenshot_session::capture(&options)
+                                if options.window_ref.is_some() {
+                                    desktop_session.capture_window(&options)
+                                } else {
+                                    screenshot_session::capture(&options)
+                                }
                             } else {
                                 Err("interactive desktop changed".into())
                             };

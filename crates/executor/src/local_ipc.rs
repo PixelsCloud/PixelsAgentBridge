@@ -80,6 +80,8 @@ enum PendingRequest {
     ScreenshotV2 {
         options: pab_protocol::ScreenshotOptions,
         info: Option<pab_protocol::ScreenshotInfo>,
+        encoded_size: Option<usize>,
+        bytes: Vec<u8>,
         reply: oneshot::Sender<Result<pab_screenshot::EncodedScreenshot, LocalIpcError>>,
     },
     Windows(oneshot::Sender<Result<Vec<WindowEntry>, LocalIpcError>>),
@@ -148,7 +150,7 @@ pub(crate) async fn request_screenshot_v2(
         .filter(|provider| {
             provider
                 .screenshot_schema_version
-                .is_some_and(|v| v >= pab_protocol::SCREENSHOT_SCHEMA_VERSION)
+                .is_some_and(|v| v >= options.required_version())
         })
         .map(|provider| provider.sender.clone())
         .ok_or(LocalIpcError::WindowHelperUnavailable)?;
@@ -177,14 +179,22 @@ pub async fn reply_screenshot_v2(
     {
         return Err(LocalIpcError::InvalidScreenshot);
     }
-    send_json(
-        socket,
-        &json!({"type":"screenshot_metadata","info":image.info}),
-    )
-    .await?;
-    socket
-        .send(Message::Binary(image.bytes.clone().into()))
+    if image.info.mode == pab_protocol::ScreenshotMode::Jpeg {
+        send_json(socket,&json!({"type":"screenshot_metadata","info":image.info,"encoded_size":image.bytes.len()})).await?;
+        for chunk in image.bytes.chunks(64 * 1024) {
+            socket.send(Message::Binary(chunk.to_vec().into())).await?;
+        }
+        send_json(socket, &json!({"type":"screenshot_end"})).await?;
+    } else {
+        send_json(
+            socket,
+            &json!({"type":"screenshot_metadata","info":image.info}),
+        )
         .await?;
+        socket
+            .send(Message::Binary(image.bytes.clone().into()))
+            .await?;
+    }
     Ok(())
 }
 
@@ -696,7 +706,13 @@ async fn handle_connection(
                 if let Message::Binary(bytes) = frame {
                     match pending.take() {
                         Some(PendingRequest::Screenshot(reply))=>{let result=validate_png(&bytes).map(|_|bytes.to_vec());let _=reply.send(result);},
-                        Some(PendingRequest::ScreenshotV2{options,info:Some(info),reply})=>{
+                        Some(PendingRequest::ScreenshotV2{options,info:Some(info),encoded_size:Some(size),bytes:mut collected,reply}) if options.mode==pab_protocol::ScreenshotMode::Jpeg=>{
+                            if bytes.is_empty() || bytes.len()>size.saturating_sub(collected.len()) {break Err(LocalIpcError::InvalidScreenshot);}
+                            collected.try_reserve(bytes.len()).map_err(|_|LocalIpcError::Remote("insufficient memory receiving JPEG".into()))?;
+                            collected.extend_from_slice(&bytes);
+                            pending=Some(PendingRequest::ScreenshotV2{options,info:Some(info),encoded_size:Some(size),bytes:collected,reply});
+                        },
+                        Some(PendingRequest::ScreenshotV2{options,info:Some(info),reply,..}) if options.mode!=pab_protocol::ScreenshotMode::Jpeg=>{
                             let result=if bytes.len()<=options.byte_limit() && info.validate(&options).is_ok() && pab_screenshot::dimensions(&bytes,info.format).is_ok_and(|d|d==(info.width,info.height)) {Ok(pab_screenshot::EncodedScreenshot{info,bytes:bytes.to_vec()})}else{Err(LocalIpcError::InvalidScreenshot)};
                             let _=reply.send(result);
                         },
@@ -742,11 +758,21 @@ async fn handle_connection(
                         } else {break Err(LocalIpcError::Protocol);}
                     },
                     Some("screenshot_metadata") => {
-                        if let Some(PendingRequest::ScreenshotV2{options,info, ..})=pending.as_mut() {
+                        if let Some(PendingRequest::ScreenshotV2{options,info,encoded_size, ..})=pending.as_mut() {
                             if info.is_some() {break Err(LocalIpcError::Protocol);}
                             let metadata:pab_protocol::ScreenshotInfo=serde_json::from_value(frame["info"].clone())?;
                             metadata.validate(options).map_err(|_|LocalIpcError::InvalidScreenshot)?;
+                            if options.mode==pab_protocol::ScreenshotMode::Jpeg {
+                                let size=frame["encoded_size"].as_u64().and_then(|v|usize::try_from(v).ok()).filter(|v|*v>0).ok_or(LocalIpcError::InvalidScreenshot)?;
+                                *encoded_size=Some(size);
+                            }
                             *info=Some(metadata);
+                        } else {break Err(LocalIpcError::Protocol);}
+                    },
+                    Some("screenshot_end") => {
+                        if let Some(PendingRequest::ScreenshotV2{options,info:Some(info),encoded_size:Some(size),bytes,reply})=pending.take() {
+                            if options.mode!=pab_protocol::ScreenshotMode::Jpeg || bytes.len()!=size {break Err(LocalIpcError::InvalidScreenshot);}
+                            let _=reply.send(Ok(pab_screenshot::EncodedScreenshot{info,bytes}));
                         } else {break Err(LocalIpcError::Protocol);}
                     },
                     Some("screenshot_error") if matches!(pending, Some(PendingRequest::ScreenshotV2{..})) => {
@@ -788,7 +814,7 @@ async fn handle_connection(
                             if reply.is_closed(){continue;}
                             send_json(&mut socket,&json!({"type":"capture_screenshot_v2","options":options})).await?;
                             screenshot_deadline = Some(tokio::time::Instant::now() + Duration::from_secs(30));
-                            pending=Some(PendingRequest::ScreenshotV2{options,info:None,reply});
+                            pending=Some(PendingRequest::ScreenshotV2{options,info:None,encoded_size:None,bytes:Vec::new(),reply});
                         },
                         HelperRequest::Screenshot(reply) => {
                             send_json(&mut socket, &json!({"type":"capture_screenshot"})).await?;
@@ -831,7 +857,7 @@ pub enum LocalIpcError {
     Remote(String),
     #[error("interactive window helper is unavailable")]
     WindowHelperUnavailable,
-    #[error("interactive screenshot is invalid or exceeds the size limit")]
+    #[error("interactive screenshot data is invalid")]
     InvalidScreenshot,
 }
 
@@ -874,13 +900,25 @@ mod tests {
         options: &pab_protocol::ScreenshotOptions,
         width: u32,
     ) -> pab_screenshot::EncodedScreenshot {
-        pab_screenshot::encode(
+        let mut codec_options = options.clone();
+        codec_options.window_ref = None;
+        let mut image = pab_screenshot::encode(
             pab_screenshot::image::DynamicImage::new_rgb8(width, 60),
-            options,
+            &codec_options,
             Some(1),
             (0, 0),
         )
-        .unwrap()
+        .unwrap();
+        if let Some(reference) = &options.window_ref {
+            image.info.window_ref = Some(reference.clone());
+            image.info.desktop_rect = Some(pab_protocol::ScreenshotDesktopRect {
+                x: 0,
+                y: 0,
+                width,
+                height: 60,
+            });
+        }
+        image
     }
     async fn wait_helper_removed(id: u64) {
         tokio::time::timeout(Duration::from_secs(2), async {
@@ -1077,6 +1115,102 @@ mod tests {
         server.abort();
     }
     #[tokio::test]
+    async fn malformed_chunked_jpeg_disconnects_helper_without_completing_capture() {
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        for fault in [
+            "missing_size",
+            "zero_size",
+            "duplicate_metadata",
+            "overflow",
+            "truncated",
+            "early_end",
+        ] {
+            let (_directory, mut socket, server, id) = screenshot_helper().await;
+            let request = tokio::spawn(request_screenshot_v2(Default::default()));
+            let options = next_screenshot(&mut socket).await;
+            let image = screenshot_fixture(&options, 100);
+            if fault == "early_end" {
+                send_json(&mut socket, &json!({"type":"screenshot_end"}))
+                    .await
+                    .unwrap();
+            } else {
+                let mut metadata = json!({"type":"screenshot_metadata", "info":image.info, "encoded_size":image.bytes.len()});
+                if fault == "missing_size" {
+                    metadata.as_object_mut().unwrap().remove("encoded_size");
+                }
+                if fault == "zero_size" {
+                    metadata["encoded_size"] = json!(0);
+                }
+                send_json(&mut socket, &metadata).await.unwrap();
+                match fault {
+                    "duplicate_metadata" => send_json(&mut socket, &metadata).await.unwrap(),
+                    "overflow" => {
+                        socket
+                            .send(Message::Binary(vec![0; image.bytes.len() + 1].into()))
+                            .await
+                            .unwrap();
+                    }
+                    "truncated" => {
+                        socket
+                            .send(Message::Binary(
+                                image.bytes[..image.bytes.len() - 1].to_vec().into(),
+                            ))
+                            .await
+                            .unwrap();
+                        send_json(&mut socket, &json!({"type":"screenshot_end"}))
+                            .await
+                            .unwrap();
+                    }
+                    _ => {}
+                }
+            }
+            assert!(
+                tokio::time::timeout(Duration::from_secs(3), request)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .is_err(),
+                "{fault}"
+            );
+            wait_helper_removed(id).await;
+            drop(socket);
+            server.abort();
+        }
+    }
+    #[tokio::test]
+    async fn v1_helper_can_capture_monitor_but_rejects_window_before_dispatch() {
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_dir, mut socket, local, id) = screenshot_helper().await;
+        window_providers()
+            .lock()
+            .unwrap()
+            .last_mut()
+            .unwrap()
+            .screenshot_schema_version = Some(1);
+        assert!(matches!(
+            request_screenshot_v2(ScreenshotOptions {
+                window_ref: Some(RequestId::new().to_string()),
+                ..Default::default()
+            })
+            .await,
+            Err(LocalIpcError::WindowHelperUnavailable)
+        ));
+        assert!(matches!(
+            request_screenshot_v2(ScreenshotOptions::default()).await,
+            Err(LocalIpcError::WindowHelperUnavailable)
+        ));
+        let request = tokio::spawn(request_screenshot_v2(ScreenshotOptions::legacy_preview()));
+        let options = next_screenshot(&mut socket).await;
+        reply_screenshot_v2(&mut socket, &screenshot_fixture(&options, 120))
+            .await
+            .unwrap();
+        assert!(request.await.unwrap().is_ok());
+        drop(socket);
+        wait_helper_removed(id).await;
+        local.abort();
+    }
+    #[tokio::test]
     async fn old_helper_is_not_sent_new_capture_options() {
         let _guard = TEST_HELPER_LOCK.lock().await;
         let directory = tempfile::tempdir().unwrap();
@@ -1106,7 +1240,8 @@ mod tests {
         server.abort();
     }
     #[tokio::test]
-    async fn jpeg_metadata_and_binary_cross_real_quic_without_json_image_payload() {
+    async fn large_native_jpeg_crosses_helper_and_real_quic_without_size_caps_or_json_image_payload()
+     {
         use crate::task_service::transfer_tests::{actor, pair, service};
         use pab_protocol::{
             DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId,
@@ -1115,6 +1250,118 @@ mod tests {
         let _guard = TEST_HELPER_LOCK.lock().await;
         let (directory, mut socket, local, id) = screenshot_helper().await;
         let options = pab_protocol::ScreenshotOptions::default();
+        let mut seed = 17u32;
+        let pixels = pab_screenshot::image::RgbImage::from_fn(3840, 2160, |_, _| {
+            let mut pixel = [0u8; 3];
+            for value in &mut pixel {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                *value = seed as u8;
+            }
+            pab_screenshot::image::Rgb(pixel)
+        });
+        let image = pab_screenshot::encode(
+            pab_screenshot::image::DynamicImage::ImageRgb8(pixels),
+            &options,
+            Some(1),
+            (-3840, 0),
+        )
+        .unwrap();
+        assert!(image.bytes.len() > pab_protocol::MAX_SCREENSHOT_BYTES);
+        let expected_size = image.bytes.len();
+        let expected_hash = format!("{:x}", Sha256::digest(&image.bytes));
+        let (done, received) = oneshot::channel();
+        let helper = tokio::spawn(async move {
+            let options = next_screenshot(&mut socket).await;
+            assert_eq!(options.mode, pab_protocol::ScreenshotMode::Jpeg);
+            reply_screenshot_v2(&mut socket, &image).await.unwrap();
+            let _ = received.await;
+        });
+        let task_service = service(directory.path()).await;
+        let (first, second, client, remote) = pair().await;
+        let timeout = Duration::from_secs(5);
+        let handler = tokio::spawn(async move {
+            for _ in 0..2 {
+                task_service
+                    .handle_stream(actor(), remote.accept_bi(timeout).await.unwrap(), timeout)
+                    .await
+                    .unwrap();
+            }
+        });
+        let mut environment = client.open_bi(timeout).await.unwrap();
+        environment
+            .send_json(
+                &DeviceTaskRequest::GetEnvironment {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                },
+                timeout,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            environment
+                .receive_json::<DeviceTaskResponse>(timeout)
+                .await
+                .unwrap(),
+            DeviceTaskResponse::Environment {
+                screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
+                ..
+            }
+        ));
+        let request_id = RequestId::new();
+        let mut stream = client.open_bi(timeout).await.unwrap();
+        stream
+            .send_json(
+                &DeviceTaskRequest::CaptureScreenshotV2 {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id,
+                    options: options.clone(),
+                },
+                timeout,
+            )
+            .await
+            .unwrap();
+        let DeviceTaskResponse::Screenshot { meta } = stream.receive_json(timeout).await.unwrap()
+        else {
+            panic!("expected screenshot metadata")
+        };
+        assert_eq!(meta.request_id, request_id);
+        assert_eq!(meta.format, "jpeg");
+        assert_eq!((meta.width, meta.height), (3840, 2160));
+        assert_eq!(meta.size, expected_size as u64);
+        assert_eq!(meta.sha256, expected_hash);
+        assert!(!meta.capture.as_ref().unwrap().resized);
+        assert_eq!(meta.capture.as_ref().unwrap().quality, Some(85));
+        let mut bytes = Vec::new();
+        while bytes.len() < (meta.size as usize) {
+            bytes.extend(stream.receive_binary_frame(timeout).await.unwrap());
+        }
+        stream.expect_receive_end(timeout).await.unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&bytes)), meta.sha256);
+        pab_screenshot::verify(&bytes, meta.capture.as_ref().unwrap(), &options).unwrap();
+        handler.await.unwrap();
+        let _ = done.send(());
+        helper.await.unwrap();
+        wait_helper_removed(id).await;
+        local.abort();
+        first.close().await;
+        second.close().await;
+    }
+
+    #[tokio::test]
+    async fn window_metadata_and_binary_cross_real_quic_without_json_image_payload() {
+        use crate::task_service::transfer_tests::{actor, pair, service};
+        use pab_protocol::{
+            DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId,
+        };
+        use sha2::Digest;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (directory, mut socket, local, id) = screenshot_helper().await;
+        let options = pab_protocol::ScreenshotOptions {
+            window_ref: Some(RequestId::new().to_string()),
+            ..Default::default()
+        };
         let (done, received) = oneshot::channel();
         let helper = tokio::spawn(async move {
             let options = next_screenshot(&mut socket).await;
@@ -1149,7 +1396,7 @@ mod tests {
                 .await
                 .unwrap(),
             DeviceTaskResponse::Environment {
-                screenshot_schema_version: Some(1),
+                screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 ..
             }
         ));

@@ -37,8 +37,8 @@ status are described below.
   integrity verification and explicit overwrite behavior.
 - **Interactive terminals:** open, send input, read output, resize, and close remote
   terminal sessions.
-- **Desktop capabilities:** enumerate windows, return bounded JPEG screenshot previews
-  to the AI agent or save original PNG files, and send supported mouse, keyboard,
+- **Desktop capabilities:** enumerate windows, return JPEG screenshots at captured resolution
+  to the AI agent, capture referenced windows, and send supported mouse, keyboard,
   or Windows secure attention events.
 - **Device management:** remember and rename devices, copy their information, and
   distinguish online state from connection state. Connected cards show P2P or Relay.
@@ -173,7 +173,7 @@ for example `pixels.pab_connect`.
 | `pab_focus_window` | Focus a referenced window, respecting OS foreground policy |
 | `pab_window_control` | Minimize, maximize, restore or request normal close of a referenced window |
 | `pab_type_text` | Enter Unicode text into an explicitly referenced foreground window |
-| `pab_capture_screenshot` | Return a bounded JPEG/PNG preview as MCP image content, or save an original screenshot with metadata and hash |
+| `pab_capture_screenshot` | Capture current desktop or referenced window as JPEG at captured resolution, with metadata and hash |
 | `pab_desktop_input` | Send supported mouse, keyboard, or secure attention events |
 | `pab_open_terminal` | Open an interactive terminal |
 | `pab_terminal_input` | Send terminal input |
@@ -425,49 +425,58 @@ The persistent identity stores a BLAKE3 digest of input text, not the raw text;
 this is audit minimization, not encryption, and does not protect predictable text
 from guessing. Text still reaches the target and may be retained by the AI host.
 
-### Screenshot previews and original images
+### Current desktop and window screenshots
 
-Screenshots use [xcap](https://github.com/nashaofu/xcap) for native capture and
-[image](https://github.com/image-rs/image) for resizing, JPEG/PNG encoding and
-bounded decoding. The product does not implement its own capture engine.
-
-`pab_capture_screenshot` defaults to `mode="preview"`: JPEG, at most 1600×1000
-pixels and 512 KiB of encoded image data. Quality starts at 75, then adapts down
-to 45 and reduces dimensions if necessary. The response contains an MCP image
-content block, a saved file and metadata; base64 is confined to the image block,
-not repeated in text, structured results, SQLite or activity reports.
+Screenshots use [xcap](https://github.com/nashaofu/xcap) and [image](https://github.com/image-rs/image).
+`pab_capture_screenshot` encodes once as JPEG at the captured resolution, with
+quality 85 by default (optional `quality`: 30–95). It does not resize, adapt quality,
+or impose an image byte limit. `max_width`, `max_height`, `max_bytes`, PNG and raw-image
+mode are absent from the MCP interface. Each call captures the current picture
+and drops the source pixels after encoding; no raw-frame cache or `capture_id` is kept.
 
 ```json
 {"device_code":"214601537"}
 ```
 
-`mode="original"` defaults to PNG, preserves captured dimensions and uses an
-8 MiB byte budget. Original JPEG is available explicitly, with quality 85 by
-default. `format`, `quality` (JPEG only), `max_bytes`, preview-only `max_width`
-and `max_height`, `monitor_id`, and monitor-relative `region` are supported.
-Out-of-monitor regions fail instead of being clipped. Captures are limited to
-16 Mi pixels and 16384 pixels per dimension. Each call captures a new frame;
-same-frame region retrieval and window screenshots are not implemented yet.
+For a specific window, first obtain its `window_ref` from `pab_list_windows`:
 
 ```json
-{"device_code":"214601537","mode":"original","destination":"C:\\Temp\\screen.png","include_image":false}
+{"device_code":"214601537","window_ref":"<window_ref from pab_list_windows>"}
 ```
 
-`destination` is optional. Its path must be absolute and its extension must
-match the format. Existing files are never overwritten. Images above 512 KiB
-are saved with an explicit `image_omitted_reason`, rather than returned as large
-inline MCP payloads. `include_image=false` requests a file-only result.
-Metadata includes the capture time, monitor, global crop origin, source and
-encoded dimensions, actual JPEG quality, encoded bytes and SHA-256. Transport
-uses existing binary frames, with codec, size, dimensions and hash validation.
+JPEG capture requires screenshot capability v3 and an upgraded active
+helper connection. It does not focus/restore the window. Stale references,
+minimized/unavailable windows or geometry/display changes observed during capture
+fail; no alternative window is selected. It follows xcap's capture/visibility and
+permission limitations; protected/GPU-rendered surfaces are not guaranteed.
+`window_ref` cannot be combined with `monitor_id` or `region`. For desktop captures,
+`region` remains relative to the selected monitor and out-of-bounds regions fail.
 
-These options require an upgraded Executor and desktop helper; unsupported
-peers return an upgrade error, with no silent fallback to a different capture.
-The legacy primary-monitor PNG request remains available for older clients.
-Windows compilation, synthetic codec fixtures, isolated helper/QUIC tests and
-MCP response tests are covered. Installed-host image display, native 4K/multiple
-monitors and macOS/Linux graphical acceptance remain pending. Wayland capture
-is explicitly unsupported by this product interface in this stage.
+Metadata includes the window reference/client rectangle when applicable, capture
+time, monitor, origin, source/encoded dimensions, actual quality, size and SHA-256.
+`preview_to_desktop` maps `desktop = origin + preview_pixel * scale` into xcap native
+coordinates; it uses the captured window coordinate extent, including when DPI
+makes source image pixels differ. It describes capture time, so recheck the window
+before input. These coordinates are not normalized 0..65535 mouse input values.
+The former 16 Mi pixel and 16384-dimension budgets do not apply to this JPEG mode.
+JPEG itself represents dimensions up to 65535 per axis. Geometry checks do not
+atomically lock a window.
+
+Compressed results remain in the existing screenshot history. `destination` is
+optional, absolute, create-only, with a `.jpg` or `.jpeg` extension;
+`include_image=false` returns only the compressed file and metadata. Base64 appears
+only in the MCP image content block, never duplicated in JSON/SQLite/reports.
+The helper and network send binary chunks, without a total image size cap, and
+verify actual codec, dimensions, size and hash. Desktop capture and live preview
+also use this JPEG mode.
+
+JPEG mode requires v3 even for monitor captures; older helpers fail with an upgrade
+message. Legacy internal preview/primary-monitor PNG requests remain compatible.
+Windows owned-window capture/negative-origin-DPI mapping, large JPEG encoding,
+and images above 8 MiB through isolated helper/QUIC/history/MCP response tests have
+been exercised. Physical 4K/multi-screen,
+installed-host display, Linux/macOS graphical acceptance remain pending.
+
 
 ### Example: run a command and read the result
 

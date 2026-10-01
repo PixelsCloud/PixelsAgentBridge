@@ -35,6 +35,9 @@ pub fn capture(
     use pab_screenshot::image::DynamicImage;
     use xcap::Monitor;
     options.validate().map_err(str::to_owned)?;
+    if options.window_ref.is_some() {
+        return Err("window capture must use the referenced desktop session".into());
+    }
     if cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some() {
         return Err("Wayland screenshot selection is not supported by this PAB interface".into());
     }
@@ -86,11 +89,15 @@ pub fn capture(
     } else {
         if w == 0
             || h == 0
-            || w > 16384
-            || h > 16384
-            || u64::from(w) * u64::from(h) > pab_protocol::MAX_SCREENSHOT_PIXELS
+            || (options.mode != pab_protocol::ScreenshotMode::Jpeg
+                && (w > 16384
+                    || h > 16384
+                    || u64::from(w) * u64::from(h) > pab_protocol::MAX_SCREENSHOT_PIXELS))
+            || (options.mode == pab_protocol::ScreenshotMode::Jpeg && (w > 65535 || h > 65535))
         {
-            return Err("monitor exceeds capture pixel budget; choose a bounded region".into());
+            return Err(
+                "monitor dimensions cannot be encoded with the requested screenshot format".into(),
+            );
         }
         (
             monitor.capture_image().map_err(|e| e.to_string())?,

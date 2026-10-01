@@ -10,6 +10,7 @@ type Screenshot = {
   height: number;
   size: number;
   sha256: string;
+  format: string;
   dataUrl: string;
 };
 
@@ -141,7 +142,7 @@ export function ScreenshotBrowser({ code, connected, language, onAuditChange }: 
     {error && <div className="inline-error" role="alert">{error}</div>}
     {live && <p className="form-hint">{t.remoteControlHint}</p>}
     {(live ? liveImage : image) && <>
-      <div className="screenshot-meta">{(live ? liveImage : image)!.width} × {(live ? liveImage : image)!.height} · PNG</div>
+      <div className="screenshot-meta">{(live ? liveImage : image)!.width} × {(live ? liveImage : image)!.height} · {(live ? liveImage : image)!.format.toUpperCase()}</div>
       {live && liveImage ? <div className="screenshot-preview remote-desktop-preview">
         <img
           src={liveImage.dataUrl}

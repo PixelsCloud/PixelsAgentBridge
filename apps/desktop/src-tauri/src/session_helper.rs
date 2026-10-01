@@ -103,7 +103,11 @@ async fn serve_requests(
             }
             LocalEvent::CaptureScreenshotV2(options) => {
                 let result = if desktop_is_active(expected_desktop) {
-                    screenshot_session::capture(&options)
+                    if options.window_ref.is_some() {
+                        desktop_session.capture_window(&options)
+                    } else {
+                        screenshot_session::capture(&options)
+                    }
                 } else {
                     Err("interactive desktop changed".into())
                 };

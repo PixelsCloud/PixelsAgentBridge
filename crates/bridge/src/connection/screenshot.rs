@@ -1,8 +1,7 @@
 use super::{AuthenticatedDeviceConnection, BridgeError, unexpected_task_response};
 use pab_protocol::{
-    DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId,
-    SCREENSHOT_SCHEMA_VERSION, ScreenshotFormat, ScreenshotInfo, ScreenshotMeta, ScreenshotMode,
-    ScreenshotOptions,
+    DEVICE_TASK_SCHEMA_VERSION, DeviceTaskRequest, DeviceTaskResponse, RequestId, ScreenshotFormat,
+    ScreenshotInfo, ScreenshotMeta, ScreenshotMode, ScreenshotOptions,
 };
 use sha2::{Digest, Sha256};
 
@@ -38,7 +37,7 @@ impl AuthenticatedDeviceConnection {
                 screenshot_schema_version,
                 ..
             } if context.device_ref == self.device_ref => {
-                if screenshot_schema_version.is_none_or(|v| v < SCREENSHOT_SCHEMA_VERSION) {
+                if screenshot_schema_version.is_none_or(|v| v < options.required_version()) {
                     return Err(BridgeError::FileTransfer("target does not support screenshot options; upgrade its Executor and desktop helper".into()));
                 }
             }
@@ -93,16 +92,27 @@ impl AuthenticatedDeviceConnection {
             }
             response => return Err(unexpected_task_response(response)),
         };
-        let mut bytes = Vec::with_capacity(meta.size as usize);
+        let size = usize::try_from(meta.size).map_err(|_| {
+            BridgeError::FileTransfer("screenshot length is not representable".into())
+        })?;
+        let mut bytes = Vec::new();
         let mut frames = 0;
-        while bytes.len() < meta.size as usize {
+        while bytes.len() < size {
             let chunk = stream.receive_binary_frame(timeout).await?;
-            frames += 1;
-            if chunk.is_empty() || frames > 4096 || chunk.len() > meta.size as usize - bytes.len() {
+            if verification_is_legacy(options) {
+                frames += 1;
+            }
+            if chunk.is_empty()
+                || (verification_is_legacy(options) && frames > 4096)
+                || chunk.len() > size - bytes.len()
+            {
                 return Err(BridgeError::FileTransfer(
                     "invalid screenshot binary frame".into(),
                 ));
             }
+            bytes.try_reserve(chunk.len()).map_err(|_| {
+                BridgeError::FileTransfer("insufficient memory receiving screenshot".into())
+            })?;
             bytes.extend_from_slice(&chunk);
         }
         stream.expect_receive_end(timeout).await?;
@@ -114,6 +124,8 @@ impl AuthenticatedDeviceConnection {
                 ));
             }
             let info = meta.capture.clone().unwrap_or(ScreenshotInfo {
+                window_ref: None,
+                desktop_rect: None,
                 captured_at_unix_ms: 0,
                 mode: ScreenshotMode::Original,
                 format: ScreenshotFormat::Png,
@@ -135,6 +147,9 @@ impl AuthenticatedDeviceConnection {
         .map_err(|e| BridgeError::FileTransfer(e.to_string()))?
     }
 }
+fn verification_is_legacy(options: Option<&ScreenshotOptions>) -> bool {
+    options.is_none_or(|o| o.mode != ScreenshotMode::Jpeg)
+}
 fn valid_meta(meta: &ScreenshotMeta, id: RequestId, options: Option<&ScreenshotOptions>) -> bool {
     let original = ScreenshotOptions::original();
     let limits = options.unwrap_or(&original);
@@ -143,7 +158,8 @@ fn valid_meta(meta: &ScreenshotMeta, id: RequestId, options: Option<&ScreenshotO
         || meta.size > limits.byte_limit() as u64
         || meta.width == 0
         || meta.height == 0
-        || u64::from(meta.width) * u64::from(meta.height) > pab_protocol::MAX_SCREENSHOT_PIXELS
+        || (limits.mode != ScreenshotMode::Jpeg
+            && u64::from(meta.width) * u64::from(meta.height) > pab_protocol::MAX_SCREENSHOT_PIXELS)
         || meta.sha256.len() != 64
         || !meta.sha256.bytes().all(|b| b.is_ascii_hexdigit())
         || meta.format != limits.format().name()
@@ -315,7 +331,7 @@ mod tests {
             let mut wrong = meta.clone();
             match field {
                 "format" => wrong.format = "png".into(),
-                "size" => wrong.size = options.byte_limit() as u64 + 1,
+                "size" => wrong.size = 0,
                 "hash" => wrong.sha256 = "z".repeat(64),
                 "dimensions" => wrong.width += 1,
                 _ => wrong.capture = None,

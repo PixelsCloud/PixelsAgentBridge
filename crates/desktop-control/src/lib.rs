@@ -37,6 +37,92 @@ impl DesktopSession {
             windows: HashMap::new(),
         }
     }
+    /// Capture the currently referenced window once, encode and drop the source pixels.
+    #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+    pub fn capture_window(
+        &self,
+        options: &ScreenshotOptions,
+    ) -> Result<pab_screenshot::EncodedScreenshot, String> {
+        options.validate().map_err(str::to_owned)?;
+        check_session()?;
+        let reference = options
+            .window_ref
+            .as_ref()
+            .ok_or("window_ref is required")?;
+        let e = self
+            .windows
+            .get(reference)
+            .ok_or("window reference is stale or belongs to another helper; list windows again")?;
+        native::verify(e.id, e.pid, &self.key, e.marker)?;
+        let window = xcap::Window::all()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|w| w.id().ok() == Some(e.id) && w.pid().ok() == Some(e.pid))
+            .ok_or("referenced window is unavailable or excluded by xcap; list windows again")?;
+        if window.is_minimized().map_err(|e| e.to_string())? {
+            return Err("window is minimized; restore it before capture".into());
+        }
+        let rect = window_rect(&window)?;
+        let monitor = window.current_monitor().map_err(|e| e.to_string())?;
+        let scale = monitor.scale_factor().map_err(|e| e.to_string())?;
+        if !scale.is_finite() || scale <= 0.0 || scale > 8.0 {
+            return Err("invalid display scaling".into());
+        }
+        // xcap may allocate DPI-scaled pixels before returning; a conservative preflight.
+        let factor = if cfg!(windows) {
+            f64::from(scale.max(1.0))
+        } else {
+            1.0
+        };
+        if options.mode != ScreenshotMode::Jpeg
+            && f64::from(rect.width) * f64::from(rect.height) * factor * factor
+                > MAX_SCREENSHOT_PIXELS as f64
+        {
+            return Err("window exceeds capture pixel budget; resize it before capture".into());
+        }
+        let id = monitor.id().map_err(|e| e.to_string())?;
+        let captured_at = now();
+        native::verify(e.id, e.pid, &self.key, e.marker)?;
+        let image = window.capture_image().map_err(|e| e.to_string())?;
+        native::verify(e.id, e.pid, &self.key, e.marker)?;
+        if window.is_minimized().map_err(|e| e.to_string())?
+            || window_rect(&window)? != rect
+            || window
+                .current_monitor()
+                .map_err(|e| e.to_string())?
+                .id()
+                .map_err(|e| e.to_string())?
+                != id
+            || window
+                .current_monitor()
+                .map_err(|e| e.to_string())?
+                .scale_factor()
+                .map_err(|e| e.to_string())?
+                != scale
+        {
+            return Err("window geometry/display changed during capture; retry with fresh window information".into());
+        }
+        let mut codec_options = options.clone();
+        codec_options.window_ref = None;
+        let mut encoded = pab_screenshot::encode(
+            pab_screenshot::image::DynamicImage::ImageRgba8(image),
+            &codec_options,
+            Some(id),
+            (rect.x, rect.y),
+        )?;
+        encoded.info.window_ref = Some(reference.clone());
+        encoded.info.desktop_rect = Some(rect);
+        encoded.info.captured_at_unix_ms = captured_at;
+        encoded.info.validate(options).map_err(str::to_owned)?;
+        Ok(encoded)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    pub fn capture_window(
+        &self,
+        _: &ScreenshotOptions,
+    ) -> Result<pab_screenshot::EncodedScreenshot, String> {
+        Err("window screenshots are unsupported on this platform".into())
+    }
     pub fn query(&mut self, id: RequestId, query: &DesktopQuery) -> SystemQueryReply {
         let system = SystemQuery::Desktop {
             query: query.clone(),
@@ -288,3 +374,23 @@ fn check_session() -> Result<(), String> {
 #[cfg(all(test, windows))]
 #[path = "windows_tests.rs"]
 mod windows_tests;
+
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+fn window_rect(window: &xcap::Window) -> Result<ScreenshotDesktopRect, String> {
+    let rect = ScreenshotDesktopRect {
+        x: window.x().map_err(|e| e.to_string())?,
+        y: window.y().map_err(|e| e.to_string())?,
+        width: window.width().map_err(|e| e.to_string())?,
+        height: window.height().map_err(|e| e.to_string())?,
+    };
+    if rect.width == 0
+        || rect.height == 0
+        || rect.width > 65535
+        || rect.height > 65535
+        || i64::from(rect.x) + i64::from(rect.width) > i64::from(i32::MAX)
+        || i64::from(rect.y) + i64::from(rect.height) > i64::from(i32::MAX)
+    {
+        return Err("window coordinates/dimensions exceed capture budget".into());
+    }
+    Ok(rect)
+}
