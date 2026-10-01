@@ -19,6 +19,7 @@ use thiserror::Error;
 use tokio::sync::{Mutex, watch};
 
 mod command;
+mod container;
 mod directory;
 mod file_transfer;
 mod filesystem;
@@ -31,6 +32,7 @@ mod filesystem_mkdir;
 mod filesystem_publish;
 mod filesystem_search;
 mod filesystem_text;
+mod git;
 mod subscription;
 mod system_query;
 mod terminal;
@@ -47,6 +49,8 @@ const MAX_ACTIVE_TERMINALS: usize = 8;
 
 #[derive(Clone)]
 pub(crate) struct TaskService {
+    #[cfg(test)]
+    container_client: Option<(bollard::Docker, String)>,
     store: TaskStore,
     device_ref: DeviceRef,
     execution_context: ExecutionContext,
@@ -65,6 +69,7 @@ pub(crate) struct TaskService {
     system_collector: Arc<std::sync::Mutex<pab_platform::SystemCollector>>,
     system_slots: Arc<tokio::sync::Semaphore>,
     system_jobs: Arc<Mutex<std::collections::HashSet<pab_protocol::RequestId>>>,
+    cancellable_system_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, watch::Sender<bool>>>>,
     active_sessions: ActiveSessions,
 }
 
@@ -96,6 +101,8 @@ impl TaskService {
                 .await?;
         }
         Ok(Self {
+            #[cfg(test)]
+            container_client: None,
             store,
             device_ref,
             execution_context,
@@ -116,6 +123,7 @@ impl TaskService {
             )),
             system_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             system_jobs: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            cancellable_system_jobs: Arc::new(Mutex::new(HashMap::new())),
             active_sessions: ActiveSessions::default(),
         })
     }
@@ -391,6 +399,11 @@ impl TaskService {
             DeviceTaskRequest::GetSystemQuery { request_id, .. } => {
                 Ok(DeviceTaskResponse::SystemQuery {
                     reply: Box::new(self.get_system_query(initiated_by, request_id).await?),
+                })
+            }
+            DeviceTaskRequest::CancelSystemQuery { request_id, .. } => {
+                Ok(DeviceTaskResponse::SystemQuery {
+                    reply: Box::new(self.cancel_system_query(initiated_by, request_id).await?),
                 })
             }
             DeviceTaskRequest::CancelFileSystem { request_id, .. } => {

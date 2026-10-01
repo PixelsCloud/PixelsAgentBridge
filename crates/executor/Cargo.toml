@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bollard = { version = "=0.21.1", default-features = false, features = ["pipe"] }
 argon2 = "0.5"
 futures-util = "0.3"
 hmac = "0.12"
@@ -32,6 +33,8 @@ zeroize = "1"
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [dev-dependencies]
+axum = "0.8"
+bollard = { version = "=0.21.1", default-features = false, features = ["http"] }
 tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]

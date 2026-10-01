@@ -77,6 +77,18 @@ impl RuntimePresenceSource {
                         | "file_delete"
                         | "archive_create"
                         | "archive_extract"
+                        | "containers"
+                        | "container"
+                        | "container_logs"
+                        | "container_control"
+                        | "git_status"
+                        | "git_diff"
+                        | "git_log"
+                        | "git_commit"
+                        | "git_checkout"
+                        | "git_fetch"
+                        | "git_pull"
+                        | "git_push"
                 ) {
                     op.source
                 } else {

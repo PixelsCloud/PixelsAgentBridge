@@ -2,11 +2,17 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 4;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SystemQuery {
+    Container {
+        query: crate::ContainerQuery,
+    },
+    Git {
+        query: crate::GitQuery,
+    },
     Desktop {
         query: crate::DesktopQuery,
     },
@@ -70,6 +76,8 @@ pub enum SystemQuery {
 impl SystemQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Container { query } => query.kind(),
+            Self::Git { query } => query.kind(),
             Self::Desktop { query } => query.kind(),
             Self::TerminateProcess { .. } => "process_terminate",
             Self::Services { .. } => "services",
@@ -86,6 +94,12 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::Container { .. }) {
+            return 6;
+        }
+        if matches!(self, Self::Git { .. }) {
+            return 5;
+        }
         if matches!(self, Self::Desktop { .. }) {
             return 4;
         }
@@ -108,6 +122,12 @@ impl SystemQuery {
         }
     }
     pub fn is_mutation(&self) -> bool {
+        if let Self::Container { query } = self {
+            return query.is_mutation();
+        }
+        if let Self::Git { query } = self {
+            return query.is_mutation();
+        }
         if let Self::Desktop { query } = self {
             return query.is_mutation();
         }
@@ -116,9 +136,19 @@ impl SystemQuery {
             Self::TerminateProcess { .. } | Self::ServiceControl { .. }
         )
     }
-    /// Persistence-only identity; plaintext input never enters the audit database.
+    /// Persistence-only identity; mutation text is hashed rather than stored here.
     pub fn persistence_form(&self) -> Self {
         let mut value = self.clone();
+        if let Self::Git {
+            query:
+                crate::GitQuery {
+                    action: crate::GitAction::Commit { message, .. },
+                    ..
+                },
+        } = &mut value
+        {
+            *message = format!("blake3:{}", blake3::hash(message.as_bytes()));
+        }
         if let Self::Desktop {
             query: crate::DesktopQuery::TypeText { text, .. },
         } = &mut value
@@ -128,6 +158,12 @@ impl SystemQuery {
         value
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Container { query } = self {
+            return query.validate();
+        }
+        if let Self::Git { query } = self {
+            return query.validate();
+        }
         if let Self::Desktop { query } = self {
             return query.validate();
         }
@@ -258,6 +294,12 @@ impl SystemQueryReply {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SystemQueryData {
+    Container {
+        snapshot: Box<crate::ContainerSnapshot>,
+    },
+    Git {
+        snapshot: crate::GitSnapshot,
+    },
     Desktop {
         snapshot: crate::DesktopSnapshot,
     },

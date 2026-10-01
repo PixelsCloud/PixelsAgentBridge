@@ -3,6 +3,35 @@ use pab_protocol::{OperatorRef, RequestId, SystemQuery, SystemQueryReply};
 use sqlx::Row;
 
 impl TaskStore {
+    pub async fn unresolved_container_control(
+        &self,
+        engine: &str,
+        container: &str,
+        current: RequestId,
+    ) -> Result<bool, TaskStoreError> {
+        let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM read_operations o JOIN system_query_results q ON q.request_id=o.request_id WHERE o.kind='container_control' AND o.state IN ('running','unconfirmed') AND o.request_id<>? AND json_extract(q.reply_json,'$.data.snapshot.engine_id')=? AND json_extract(q.reply_json,'$.data.snapshot.container_id')=? AND json_extract(q.reply_json,'$.data.snapshot.submission_started')=1")
+            .bind(current.to_string()).bind(engine).bind(container).fetch_one(&self.pool).await?;
+        Ok(count > 0)
+    }
+
+    pub async fn system_query_spec(
+        &self,
+        actor: OperatorRef,
+        id: RequestId,
+    ) -> Result<SystemQuery, TaskStoreError> {
+        self.get_system_query(actor, id).await?;
+        let value: String =
+            sqlx::query_scalar("SELECT query_json FROM system_query_results WHERE request_id=?")
+                .bind(id.to_string())
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(serde_json::from_str(&value)?)
+    }
+    pub async fn save_system_progress(&self, r: &SystemQueryReply) -> Result<(), TaskStoreError> {
+        sqlx::query("UPDATE system_query_results SET reply_json=? WHERE request_id=? AND EXISTS (SELECT 1 FROM read_operations o WHERE o.request_id=system_query_results.request_id AND o.state='running')")
+            .bind(serde_json::to_string(r)?).bind(r.request_id.to_string()).execute(&self.pool).await?;
+        Ok(())
+    }
     pub async fn accept_system_query(
         &self,
         actor: OperatorRef,
@@ -25,7 +54,7 @@ impl TaskStore {
             }
             return Ok(false);
         }
-        sqlx::query("INSERT INTO read_operations (request_id,initiated_by_json,kind,path,state,started_at_unix_ms) VALUES (?,?,?,'','running',?)").bind(id.to_string()).bind(serde_json::to_string(&actor)?).bind(query.kind()).bind(super::operation::now_unix_ms()).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO read_operations (request_id,initiated_by_json,kind,path,state,started_at_unix_ms) VALUES (?,?,?,?,'running',?)").bind(id.to_string()).bind(serde_json::to_string(&actor)?).bind(query.kind()).bind(match query {SystemQuery::Git{query}=>query.repo.as_str(),SystemQuery::Container{query}=>query.selector(),_=>""}).bind(super::operation::now_unix_ms()).execute(&mut *tx).await?;
         sqlx::query(
             "INSERT INTO system_query_results (request_id,query_json,reply_json) VALUES (?,?,?)",
         )

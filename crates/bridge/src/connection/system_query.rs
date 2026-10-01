@@ -49,6 +49,20 @@ impl AuthenticatedDeviceConnection {
         )
         .await
     }
+    pub async fn cancel_system_query(
+        &self,
+        id: RequestId,
+    ) -> Result<SystemQueryReply, BridgeError> {
+        self.system_query_request(
+            DeviceTaskRequest::CancelSystemQuery {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id: id,
+            },
+            id,
+            None,
+        )
+        .await
+    }
     async fn system_query_request(
         &self,
         request: DeviceTaskRequest,
@@ -69,11 +83,29 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
     r.request_id == id
         && matches!(
             r.state.as_str(),
-            "running" | "completed" | "failed" | "unconfirmed" | "interrupted"
+            "running"
+                | "completed"
+                | "failed"
+                | "unconfirmed"
+                | "interrupted"
+                | "cancel_requested"
+                | "cancelled"
         )
         && matches!(
             r.kind.as_str(),
-            "monitors"
+            "containers"
+                | "container"
+                | "container_logs"
+                | "container_control"
+                | "git_status"
+                | "git_diff"
+                | "git_log"
+                | "git_commit"
+                | "git_checkout"
+                | "git_fetch"
+                | "git_pull"
+                | "git_push"
+                | "monitors"
                 | "desktop_windows"
                 | "window_focus"
                 | "window_control"
@@ -98,6 +130,19 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
                 (
+                    "containers" | "container" | "container_logs" | "container_control",
+                    Some(SystemQueryData::Container { .. })
+                ) | (
+                    "git_status"
+                        | "git_diff"
+                        | "git_log"
+                        | "git_commit"
+                        | "git_checkout"
+                        | "git_fetch"
+                        | "git_pull"
+                        | "git_push",
+                    Some(SystemQueryData::Git { .. })
+                ) | (
                     "monitors"
                         | "desktop_windows"
                         | "window_focus"

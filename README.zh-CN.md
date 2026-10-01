@@ -32,7 +32,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
   返回结果携带经过验证的目标操作系统。
 - **传输文件**：用绝对路径上传、下载二进制文件，校验完整性，并显式决定是否覆盖。
 - **交互终端**：打开远程终端、发送输入、读取输出、调整尺寸和关闭会话。
-- **桌面能力**：在受支持的桌面会话中列出窗口、向 Agent 返回桌面或指定窗口的有界压缩预览，
+- **桌面能力**：在受支持的桌面会话中列出窗口、向 Agent 返回桌面或指定窗口的原分辨率 JPEG，
   发送鼠标、键盘或 Windows 安全注意序列事件。
 - **设备管理**：保存历史设备、重命名、复制信息，分别显示在线状态和连接状态；
   已连接卡片展示当前使用 P2P 还是 Relay。
@@ -136,7 +136,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ## MCP 工具
 
-当前源码提供 **48 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
+当前源码提供 **60 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
 
 | 工具 | 用途 |
 |---|---|
@@ -188,10 +188,65 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_list_services` | 按名称和状态查询 Windows SCM / Linux systemd 服务 |
 | `pab_get_service` | 查询指定服务的状态、启动方式和运行信息 |
 | `pab_service_control` | 异步启动、停止、重启服务或修改启用/禁用配置 |
+| `pab_git_status` | 查询仓库状态、分支/HEAD、上游和冲突 |
+| `pab_git_diff` | 按明确文件读取工作区、暂存区或提交间的有界差异 |
+| `pab_git_log` | 固定起始提交后分页读取历史 |
+| `pab_git_commit` | 提交明确选择的文件，保留其他已暂存修改 |
+| `pab_git_checkout` | 切换已有本地分支，或检出指定提交的 detached HEAD |
+| `pab_git_fetch` | 异步获取已配置远端的提交 |
+| `pab_git_pull` | 显式选择 ff-only、merge 或 rebase，异步拉取 |
+| `pab_git_push` | 异步推送指定分支，强制模式使用明确的远端引用租约 |
+| `pab_list_containers` | 按名称、状态和标签查询目标 Docker 容器 |
+| `pab_get_container` | 查询固定容器的状态、镜像、端口、挂载、网络和健康检查 |
+| `pab_container_logs` | 按时间和流读取有限、有界的 Docker 日志 |
+| `pab_container_control` | 异步启动、停止、重启，并核对观测状态 |
 
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。
+
+### Docker 容器操作
+
+四个工具复用 [Bollard 0.21.1](https://docs.rs/bollard/0.21.1/bollard/) 访问 [Docker Engine API](https://docs.docker.com/reference/api/engine/)，要求目标 system-query 能力 **v6**，以及 Executor 运行账户能够访问的 Docker Engine，不依赖 Docker CLI。连接采用本地 `DOCKER_HOST`（Unix socket／Windows named pipe）或标准本机端点；不会隐式复用 Docker CLI context、登录用户的 Docker Desktop 环境或远程 TCP／SSH 端点。Rootless／非标准 socket 需配置给 Executor。协商后的 API 版本通过 Bollard 请求修饰接口明确应用到请求路径。
+
+列表默认只显示运行中的容器（`all=false`），`all=true` 包含已停止容器。名称按不区分大小写的字面子串匹配，`states` 使用准确状态，标签使用 `key` 或 `key=value`。不做实时分页或原子快照；最多扫描 10000 项，返回 `limit` 项（默认100、最多1000），同时受实际序列化结果 32 KiB 上限约束，明确报告截断。
+
+详情、日志和控制接受**准确名称或完整64字符ID**，拒绝缩写ID。解析后固定完整ID，后续不重新按名称选择容器。结果还返回Engine的OS、架构和版本，与Executor的OS分别描述。详情只返回状态、健康检查、镜像、端口、挂载、网络、重启策略和日志驱动等选定字段，不返回环境变量、命令参数或原始 inspect；标签与日志仍可能包含应用提供的敏感内容。列表字段、字符串和详情集合都有明确上限。
+
+日志默认 `tail=200`、时间戳和两种流开启，`follow=false`。`since`／`until` 是 Unix 秒，最大2147483647，until须大于0；tail使用Docker自身的行数选择，最多1000，不保证每种流分别返回该行数。文本保留字节受 `max_bytes`（默认／最多16384，最少1024）和序列化结果预算共同约束。返回按流分组，不保证跨流次序；TTY输出混合，不能仅选stderr。同流跨块UTF-8先拼接，非法编码明确提示替换。这是有限的日志尾部，不是无损续读游标；不支持的日志驱动和Docker错误直接返回。
+
+控制支持 `start`、`stop`、`restart`。约250ms后仍运行就返回操作引用，使用原ID和 `pab_get_operation` 查询。启动／停止已处于目标状态时不提交动作；重启需运行状态且 `StartedAt` 改变。停止／重启采用Docker正常超时（`stop_timeout_seconds=10`，0–120），期限后Docker可能kill容器。仅收到HTTP成功回执不会标记完成。工具本身不创建／删除容器或拉取镜像。
+
+结果分别记录 `submission_started`（进入提交阶段，可能已发送动作）、`daemon_acknowledged` 和 `desired_state_observed`。取消只结束等待，不撤销Docker已接收的动作。超时、断线或重启可能留下 `unconfirmed`，相同ID不重执行；该Engine／容器上未确认的已提交控制会持续阻止另一PAB控制，包括Executor重启后。查询原请求，只读核对原Engine和完整容器ID；目标状态匹配不等于能确定是谁执行的。外部Docker客户端仍可能并发改变状态。
+
+HTTP替身、QUIC、stdio及Windows named pipe连接Docker Desktop Linux Engine的临时容器流程已通过，包含中文stdout、stderr、启动／重启／停止、详情；测试容器已清理。安装后的Pixels工具调用、Linux/macOS Executor运行时及Windows容器尚未验收。本批需更新MCP和Executor、重启AI客户端，尚未制作安装包。
+
+### Git 操作
+
+Git 工具要求目标 system-query 能力 **v5**，以及原生 Git（`switch` 需要 2.23 或更新版本）。复用成熟的 [Git](https://git-scm.com/docs) 仓库、传输、凭据和 hooks 实现，通过明确的程序参数调用，不拼接 Shell。Git 配置属于 Executor 的运行账户：Windows 服务若以 SYSTEM 运行，不会自动使用登录用户的 SSH 私钥和提交身份。缺少 Git、认证和权限问题直接返回错误。远端参数使用已配置的名字，如 `origin`，不接收 URL 或密码。
+
+`repo` 必须是**目标计算机**的绝对路径。Status 是有界的当前观测，不是原子仓库快照。Diff 禁用外部 diff/textconv，二进制变化返回摘要。历史分页保留返回的 `start_commit`，后续传入 `start`，并使用返回的 `next_skip`；因字节预算截短时也不会跳过未返回的提交。单个结果最多 32 KiB，明确标记截断；请求总量最多 60 KiB。
+
+`pab_git_log` 参数示例：
+
+```json
+{
+  "device_code": "123456789",
+  "repo": "C:\\work\\project",
+  "limit": 20,
+  "request_id": "8b7f1714-32dc-4b79-bd87-96a1d2101af0"
+}
+```
+
+Commit 要求明确的相对文件路径和提交说明，支持已跟踪文件的删除，拒绝目录。只暂存指定路径并提交其当前工作区内容，保留无关的暂存修改；失败时已选文件可能仍留在暂存区。Checkout 不强制覆盖、不自动 stash。Pull 要求干净且已检出分支的工作区，必须指定 `strategy`：`ff_only`、`merge` 或 `rebase`；冲突保留给后续检查，不自动 abort。
+
+修改类操作约 250 ms 后仍运行就返回操作引用，保留 `request_id`，通过 `pab_get_operation` 查询；相同 ID 永远不重执行。网络操作默认期限 300000 ms，其他默认 30000 ms。取消请求停止本次 Git 进程，不承诺回滚，SSH/hooks 子进程可能继续存在。已开始的修改遇到超时或取消，结果可以是 `unconfirmed`。同一实际 Git 目录上的其他 PAB 操作返回忙；外部程序仍由 Git 自身锁保护。
+
+Push 固定选定的提交 ID，默认 `force=false`；`force=true` 使用刚观测的远端引用作为明确 lease。推送回执丢失后，查询可核对原提交与远端引用，不会重推；引用匹配只证明目标状态已经存在，不归因于某个进程。不自动 reset、强推、创建提交身份或绕过 hooks。请求身份对提交说明做摘要，Git 输出与任务历史仍可能包含提交说明。
+
+Windows 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 测试已通过。安装后的宿主 SSH 认证及 Linux/macOS 运行时验收仍待完成。本批需要重新构建 MCP 与目标 Executor，并重启 AI 客户端；现有安装包不含这些改动。
+
+### 系统查询
 
 进程终止和服务管理要求 system-query 能力版本 3。先用 `pab_get_process` 获取 `termination_identity`，再传入 `pab_terminate_process` 的 `identity`；不能用秒级启动时间代替。Windows 使用原生创建时间并在操作期间持有同一个进程句柄。Linux 持有原进程的 pidfd，身份租约有效 10 分钟、最多 256 个；过期或 Executor 重启后需要重新查询，不回退到按 PID 发信号。
 

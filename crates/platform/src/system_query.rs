@@ -98,7 +98,9 @@ impl SystemCollector {
                 reply.error = Some("desktop query requires the interactive helper".into());
                 return reply;
             }
-            SystemQuery::TerminateProcess { .. }
+            SystemQuery::Container { .. }
+            | SystemQuery::Git { .. }
+            | SystemQuery::TerminateProcess { .. }
             | SystemQuery::Services { .. }
             | SystemQuery::Service { .. }
             | SystemQuery::ServiceControl { .. }

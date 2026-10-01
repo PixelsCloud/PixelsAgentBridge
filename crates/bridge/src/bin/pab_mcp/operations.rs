@@ -626,8 +626,31 @@ impl OperationManager {
 
     async fn cancel(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
-        if self.queue.system_record(id, code).await.is_ok() {
-            return Err("this system operation cannot be cancelled or rolled back; query the original operation_ref for its result".to_owned());
+        if let Ok((device, reply)) = self.queue.system_record(id, code).await {
+            if !reply.kind.starts_with("git_")
+                && ![
+                    "containers",
+                    "container",
+                    "container_logs",
+                    "container_control",
+                ]
+                .contains(&reply.kind.as_str())
+            {
+                return Err("this system operation cannot be cancelled or rolled back; query the original operation_ref for its result".to_owned());
+            }
+            let runtime = self.runtime().await?;
+            let reply = tokio::time::timeout(
+                Duration::from_secs(5),
+                runtime.cancel_system_query(device, id),
+            )
+            .await
+            .map_err(
+                |_| "Docker/Git cancellation outcome is unconfirmed; query the original operation_ref",
+            )?
+            .map_err(|e| e.to_string())?;
+            return Ok(
+                json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},"result":reply}),
+            );
         }
         if let Ok((device, reply)) = self.queue.filesystem_record(id, code).await {
             if !pab_protocol::cancellable_filesystem_kind(&reply.kind) {

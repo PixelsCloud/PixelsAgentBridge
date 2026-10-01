@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+mod container;
+pub use container::*;
 mod desktop_query;
 pub use desktop_query::*;
 
@@ -87,3 +89,5 @@ pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, Window
 
 mod system_query;
 pub use system_query::*;
+mod git;
+pub use git::*;

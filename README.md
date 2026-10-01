@@ -157,7 +157,7 @@ Replace the device code and paths with your own information.
 
 ## MCP tool reference
 
-The current source exposes **48 tools**. Hosts may display them with a namespace,
+The current source exposes **60 tools**. Hosts may display them with a namespace,
 for example `pixels.pab_connect`.
 
 | Tool | Purpose |
@@ -210,10 +210,145 @@ for example `pixels.pab_connect`.
 | `pab_list_services` | Filter Windows SCM / Linux systemd service inventory by name and state |
 | `pab_get_service` | Query one service's state, startup mode and available runtime information |
 | `pab_service_control` | Asynchronously start, stop, restart, enable or disable a service |
+| `pab_git_status` | Read repository status, branch/HEAD, upstream and conflicts |
+| `pab_git_diff` | Read bounded worktree, staged or commit diffs with literal file selections |
+| `pab_git_log` | Page commit history from a pinned starting commit |
+| `pab_git_commit` | Commit explicitly selected files while preserving unrelated staged changes |
+| `pab_git_checkout` | Switch an existing local branch or detach at a selected commit |
+| `pab_git_fetch` | Asynchronously fetch a configured remote |
+| `pab_git_pull` | Asynchronously pull with an explicit ff-only, merge or rebase strategy |
+| `pab_git_push` | Asynchronously push a selected branch, with an explicit lease for force mode |
+| `pab_list_containers` | List target Docker containers with name, state and label filters |
+| `pab_get_container` | Inspect a pinned container's state, image, ports, mounts, networks and health |
+| `pab_container_logs` | Read finite, bounded Docker logs with stream and time selection |
+| `pab_container_control` | Asynchronously start, stop or restart and confirm the observed state |
 
 Call `pab_connect` first and retain its platform context. Most device tools require
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.
+
+### Docker container operations
+
+The four Docker tools use [Bollard 0.21.1](https://docs.rs/bollard/0.21.1/bollard/)
+to access the [Docker Engine API](https://docs.docker.com/reference/api/engine/).
+They require target system-query capability **v6** and a running Engine accessible
+to the Executor's OS identity; the Docker CLI is not required. The connection uses
+local `DOCKER_HOST` (Unix socket or Windows named pipe) or the standard local
+endpoint. Docker CLI contexts, a logged-in user's Docker Desktop environment,
+and remote TCP/SSH endpoints are not implicitly reused. Rootless or nonstandard
+sockets must be configured for Executor. API version negotiation is applied to
+actual request paths through Bollard's request modifier.
+
+`pab_list_containers` defaults to running containers (`all=false`). Use `all=true`
+for stopped containers; `name` is a case-insensitive literal substring, `states`
+contains exact native states, and `labels` uses `key` or `key=value` filters.
+There is no live pagination or atomic snapshot. It scans up to 10000 entries and
+returns at most `limit` (default 100, maximum 1000), additionally subject to the
+32 KiB serialized result budget. Truncation is explicit.
+
+Get/log/control select an **exact name or full 64-character ID**. Abbreviated IDs
+are rejected; after resolution, all follow-up actions use the original full ID.
+Results also identify the Engine OS, architecture and version, separately from the
+Executor OS. Inspect returns selected state/health, ports, mounts, networks, restart policy,
+image and log-driver fields; environment, command arguments and raw inspect data
+are excluded. Labels and logs are application-provided data and can still contain
+sensitive values. Detail collections and individual strings are bounded.
+
+Logs default to `tail=200`, timestamps and both streams enabled, `follow=false`.
+`since`/`until` use Unix seconds up to 2147483647 (`until` must be positive);
+`tail` is Docker's native selection, at most 1000, without a per-stream line-count
+guarantee. Raw retained text is limited by `max_bytes` (default/maximum 16384,
+minimum 1024), then by the serialized result budget. Text is grouped by stream,
+without a cross-stream ordering guarantee. TTY output is merged; stderr-only
+selection fails. Split UTF-8 is assembled within each stream; invalid encoding
+has an explicit replacement warning. This is a finite log tail, not a lossless
+resume cursor. Unsupported log drivers and Engine errors are returned directly.
+
+Control accepts `start`, `stop` or `restart`. It returns running after about
+250 ms, with the original request ID usable through `pab_get_operation`.
+Start/stop already at the desired state sends no action. Restart requires both
+running state and a different `StartedAt`. Stop/restart use Docker's normal
+stop timeout (`stop_timeout_seconds=10`, range 0–120); Docker may kill the
+container after that timeout. A successful HTTP acknowledgement alone does not
+mark the operation completed. No container creation/removal or image pull is
+part of these tools.
+
+Results distinguish `submission_started` (the submission phase was entered;
+it may have sent an action), `daemon_acknowledged`, and
+`desired_state_observed`. Cancellation stops waiting, not Docker's accepted
+action. Timeout, connection loss or restart can leave an `unconfirmed` result;
+the same request ID never replays it. Other PAB controls on that engine/container
+stay busy while a submitted result is unresolved, including after Executor
+restart. Query the original request to inspect the pinned engine/container
+without resubmission. Matching state confirms the desired outcome, not which
+caller caused it; external Docker clients can still change state concurrently.
+
+Local HTTP-fixture tests, QUIC, stdio and a real Windows named-pipe workflow on
+Docker Desktop's Linux Engine pass. The live test creates and removes its own
+isolated container and verifies Chinese stdout, stderr, start/restart/stop and
+inspection. Installed-host Pixels calls, Linux/macOS Executor runtime and Windows
+containers remain unverified. Upgrade both MCP and Executor and restart the AI
+client to use these source changes; this batch has not been packaged.
+
+### Git operations
+
+Git tools require target system-query capability **v5** and native Git (2.23 or
+newer for `switch`). They reuse [Git](https://git-scm.com/docs)'s repository,
+transport, credentials and hooks through explicit program arguments without a
+shell. Configuration belongs to the Executor's OS identity; a Windows service
+running as SYSTEM does not automatically use the logged-in user's SSH keys or
+Git author configuration. Missing Git, authentication and permissions errors are
+returned directly. Remote parameters name existing configured remotes, such as
+`origin`; URLs and passwords are not tool arguments.
+
+`repo` is an absolute path on the **target** computer. Status is a current,
+bounded observation, not an atomic repository snapshot. Diff disables external
+programs/text conversion and summarizes binary changes. For history pagination,
+retain `start_commit`, use it as the next request's `start`, and use the returned
+`next_skip`; this also handles pages shortened by the byte budget. Each result
+fits 32 KiB, with explicit truncation; requests must fit 60 KiB.
+
+Example tool arguments:
+
+```json
+{
+  "device_code": "123456789",
+  "repo": "C:\\work\\project",
+  "limit": 20,
+  "request_id": "8b7f1714-32dc-4b79-bd87-96a1d2101af0"
+}
+```
+
+Use these with `pab_git_log`. Commit requires individual literal relative paths
+(or tracked deletions) and an explicit message; directories are rejected. It
+stages only those paths and commits their current worktree contents, leaving
+unrelated staged changes intact. A failed commit may leave selected files staged.
+Checkout does not force overwrites or stash. Pull requires a clean, attached
+working tree and an explicit `strategy`: `ff_only`, `merge`, or `rebase`.
+Conflicts remain available for inspection; they are not automatically aborted.
+
+Mutations still running after about 250 ms return an operation reference. Keep
+`request_id` and query `pab_get_operation`; repeating the same ID never reruns the
+operation. Network deadlines default to 300000 ms, others to 30000 ms.
+`pab_cancel_operation` requests stopping the owned Git process, not rollback;
+SSH or hook descendants may outlive it. Once a mutation starts, timeout or
+cancellation can leave its result `unconfirmed`. Other PAB operations on the same
+discovered Git directory return busy while it runs; Git's own locks still apply.
+
+Push pins the selected commit ID. `force=false` is the default; `force=true`
+uses an explicit lease against the observed remote reference. If a push receipt
+is lost, a later query can check that exact commit/reference without pushing
+again. A matching reference confirms the desired remote state, not which process
+published it. No automatic reset, force-push, identity creation or hook bypass is
+performed. Request identity hashes the commit message; Git results may still
+contain commit messages and are retained in task history.
+
+Windows temporary-repository, local bare-remote, cancellation, persistence,
+QUIC and stdio tests pass. Installed-host SSH authentication and Linux/macOS
+runtime acceptance remain pending. Rebuild both MCP and Executor and restart the
+AI client to use this batch; existing installers do not contain these changes.
+
+### System queries
 
 Process termination and service management require system-query capability v3.
 Get `termination_identity` from `pab_get_process`, then pass it as `identity` to

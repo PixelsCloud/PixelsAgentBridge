@@ -81,6 +81,10 @@ pub enum DeviceTaskRequest {
         schema_version: u16,
         request_id: RequestId,
     },
+    CancelSystemQuery {
+        schema_version: u16,
+        request_id: RequestId,
+    },
     FileSystem {
         schema_version: u16,
         request: crate::FileSystemRequest,
@@ -212,6 +216,7 @@ impl DeviceTaskRequest {
         match self {
             Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
+            | Self::CancelSystemQuery { schema_version, .. }
             | Self::FileSystem { schema_version, .. }
             | Self::CancelFileSystem { schema_version, .. }
             | Self::GetFileSystem { schema_version, .. }

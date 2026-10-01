@@ -135,6 +135,8 @@ export function ActivityPanel({
                 <div><span>{t.initiatedBy}</span><strong>{formatActor(selectedOperation.initiatedBy)}</strong></div>
                 <div><span>{t.direction}</span><strong>{isSystemOperation(selectedOperation.kind) ? t.systemOperations[selectedOperation.kind as keyof typeof t.systemOperations] : isFileOperation(selectedOperation.kind) ? t.fileOperations[selectedOperation.kind as keyof typeof t.fileOperations] : selectedOperation.kind === "terminal" ? t.terminalDirection : selectedOperation.kind === "desktop_input" ? t.remoteInputDirection : selectedOperation.kind === "windows" ? t.windowRead : selectedOperation.kind === "directory" ? t.directoryRead : selectedOperation.direction === "upload" ? t.uploadDirection : t.downloadDirection}</strong></div>
                 {selectedOperation.kind === "desktop_input" && <div><span>{t.remoteInputType}</span><strong>{selectedOperation.source}</strong></div>}
+                {["container", "container_logs", "container_control"].includes(selectedOperation.kind) && <div><span>{t.containerTarget}</span><strong>{selectedOperation.source}</strong></div>}
+                {selectedOperation.kind.startsWith("git_") && <div><span>{t.gitRepository}</span><strong>{selectedOperation.source}</strong></div>}
                 {isSystemOperation(selectedOperation.kind) && <div><span>{t.systemEntries}</span><strong>{selectedOperation.size.toLocaleString()}</strong></div>}
                 {isFileOperation(selectedOperation.kind) && <>
                   <div><span>{t.sourcePath}</span><strong>{selectedOperation.source}</strong></div>

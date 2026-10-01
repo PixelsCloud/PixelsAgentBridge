@@ -29,6 +29,19 @@ pub(super) fn tools() -> Vec<Value> {
     }).collect()
 }
 pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), String> {
+    if [
+        "pab_list_containers",
+        "pab_get_container",
+        "pab_container_logs",
+        "pab_container_control",
+    ]
+    .contains(&name)
+    {
+        return super::mcp_container::parse(name, args);
+    }
+    if name.starts_with("pab_git_") {
+        return super::mcp_git::parse(name, args);
+    }
     let id = args
         .get("request_id")
         .map(|v| {

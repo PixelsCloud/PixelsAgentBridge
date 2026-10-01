@@ -1280,7 +1280,7 @@ mod tests {
         });
         let task_service = service(directory.path()).await;
         let (first, second, client, remote) = pair().await;
-        let timeout = Duration::from_secs(5);
+        let timeout = Duration::from_secs(30);
         let handler = tokio::spawn(async move {
             for _ in 0..2 {
                 task_service

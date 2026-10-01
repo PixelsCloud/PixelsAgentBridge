@@ -26,6 +26,16 @@ impl TaskService {
             }
         };
         jobs.insert(id);
+        let (git_cancel, cancelled) = tokio::sync::watch::channel(false);
+        if matches!(
+            query,
+            SystemQuery::Git { .. } | SystemQuery::Container { .. }
+        ) {
+            self.cancellable_system_jobs
+                .lock()
+                .await
+                .insert(id, git_cancel);
+        }
         drop(jobs);
         let mutation = query.is_mutation();
         let service = self.clone();
@@ -38,7 +48,35 @@ impl TaskService {
             let async_result =
                 tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
                     .await;
-            let r = if let SystemQuery::Desktop { query: desktop } = &query {
+            let r = if let SystemQuery::Container { query: container } = &query {
+                {
+                    #[cfg(test)]
+                    if let Some((docker, endpoint)) = &service.container_client {
+                        super::container::query_with_client(
+                            id,
+                            container,
+                            cancelled,
+                            Some(service.store.clone()),
+                            docker.clone(),
+                            endpoint.clone(),
+                        )
+                        .await
+                    } else {
+                        super::container::query(
+                            id,
+                            container,
+                            cancelled,
+                            Some(service.store.clone()),
+                        )
+                        .await
+                    }
+                    #[cfg(not(test))]
+                    super::container::query(id, container, cancelled, Some(service.store.clone()))
+                        .await
+                }
+            } else if let SystemQuery::Git { query: git } = &query {
+                super::git::query(id, git, cancelled, Some(service.store.clone())).await
+            } else if let SystemQuery::Desktop { query: desktop } = &query {
                 match crate::local_ipc::request_desktop_query(id, desktop.clone()).await {
                     Ok(r) => r,
                     Err(error) => {
@@ -92,6 +130,7 @@ impl TaskService {
                 tracing::warn!(%id,%e,"system query result persistence failed");
             }
             service.system_jobs.lock().await.remove(&id);
+            service.cancellable_system_jobs.lock().await.remove(&id);
             let _ = send.send(());
         });
         if mutation {
@@ -113,6 +152,56 @@ impl TaskService {
                 r.state = "unconfirmed".into();
                 r.error = Some("worker unavailable; original result cannot be confirmed".into());
             }
+        }
+        if r.state == "unconfirmed"
+            && r.kind == "git_push"
+            && !self.system_jobs.lock().await.contains(&id)
+            && let SystemQuery::Git { query } = self.store.system_query_spec(actor, id).await?
+            && let Some(updated) = super::git::reconcile_push(&query, &r).await
+        {
+            self.store.finish_system_query(&updated).await?;
+            r = updated;
+        }
+        if r.state == "unconfirmed"
+            && r.kind == "container_control"
+            && !self.system_jobs.lock().await.contains(&id)
+            && let SystemQuery::Container { query } =
+                self.store.system_query_spec(actor, id).await?
+            && let Some(updated) = super::container::reconcile(&query, &r).await
+        {
+            self.store.finish_system_query(&updated).await?;
+            r = updated;
+        }
+        Ok(r)
+    }
+    pub(crate) async fn cancel_system_query(
+        &self,
+        actor: OperatorRef,
+        id: RequestId,
+    ) -> Result<SystemQueryReply, TaskServiceError> {
+        let mut r = self.store.get_system_query(actor, id).await?;
+        if !r.kind.starts_with("git_")
+            && ![
+                "containers",
+                "container",
+                "container_logs",
+                "container_control",
+            ]
+            .contains(&r.kind.as_str())
+        {
+            return Err(TaskServiceError::InvalidRequest(
+                "this system operation cannot be cancelled",
+            ));
+        }
+        if r.state != "running" {
+            return Ok(r);
+        }
+        if let Some(cancel) = self.cancellable_system_jobs.lock().await.get(&id) {
+            let _ = cancel.send(true);
+            r.state = "cancel_requested".into();
+            r.error = Some(
+                "cancellation requested; accepted Docker/Git effects are not rolled back".into(),
+            );
         }
         Ok(r)
     }

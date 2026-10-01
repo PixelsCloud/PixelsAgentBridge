@@ -10,6 +10,18 @@ pub(super) async fn call_tool(
     arguments: &Value,
 ) -> Result<Value, String> {
     match name {
+        "pab_list_containers"
+        | "pab_get_container"
+        | "pab_container_logs"
+        | "pab_container_control"
+        | "pab_git_status"
+        | "pab_git_diff"
+        | "pab_git_log"
+        | "pab_git_commit"
+        | "pab_git_checkout"
+        | "pab_git_fetch"
+        | "pab_git_pull"
+        | "pab_git_push" => super::mcp_system_query::call(runtime, name, arguments).await,
         "pab_list_network_connections"
         | "pab_resolve_dns"
         | "pab_list_sessions"

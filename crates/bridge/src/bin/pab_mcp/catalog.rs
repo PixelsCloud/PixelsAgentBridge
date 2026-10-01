@@ -247,6 +247,8 @@ pub(super) fn tools() -> Vec<Value> {
     ];
     tools.extend(super::mcp_filesystem::tools());
     tools.extend(super::mcp_system_query::tools());
+    tools.extend(super::mcp_git::tools());
+    tools.extend(super::mcp_container::tools());
     tools.extend(super::mcp_desktop::tools());
     tools
 }

@@ -1,3 +1,7 @@
+#[path = "pab_mcp/container.rs"]
+mod mcp_container;
+#[path = "pab_mcp/git.rs"]
+mod mcp_git;
 #[path = "pab_mcp/system_query.rs"]
 mod mcp_system_query;
 use std::{env, path::PathBuf, sync::Arc, time::Duration};
@@ -312,7 +316,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 48);
+        assert_eq!(catalog.tools.len(), 60);
         let names = catalog
             .tools
             .iter()
