@@ -66,6 +66,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                 {
                     tracing::debug!(%error, "window helper registration failed");
                 }
+                let mut desktop_session = pab_desktop_control::DesktopSession::new();
                 loop {
                     #[cfg(windows)]
                     if !session_helper::desktop_is_active(Some("Default")) {
@@ -85,6 +86,36 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             tracing::debug!(%message, "local device status unavailable");
                             *status.0.write().await = None;
                             let _ = handle.emit("local-device-offline", ());
+                        }
+                        Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopQuery(id, query))) => {
+                            let mut reply = if !cfg!(windows)
+                                || session_helper::desktop_is_active(Some("Default"))
+                            {
+                                desktop_session.query(id, &query)
+                            } else {
+                                let mut reply = pab_protocol::SystemQueryReply::pending(
+                                    id,
+                                    &pab_protocol::SystemQuery::Desktop {
+                                        query: query.clone(),
+                                    },
+                                );
+                                reply.state = "failed".into();
+                                reply.error = Some("interactive desktop changed".into());
+                                reply
+                            };
+                            if cfg!(windows) && !session_helper::desktop_is_active(Some("Default"))
+                            {
+                                reply.state = "unconfirmed".into();
+                                reply.error =
+                                    Some("interactive desktop changed during operation".into());
+                            }
+                            if let Err(error) =
+                                pab_executor::local_ipc::reply_desktop_query(&mut socket, &reply)
+                                    .await
+                            {
+                                tracing::debug!(%error,"desktop query response failed");
+                                break;
+                            }
                         }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::ListWindows)) => {
                             let entries = window_session::list_windows();

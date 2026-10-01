@@ -468,7 +468,11 @@ impl TaskService {
                 self.store
                     .start_window_read(request_id, initiated_by)
                     .await?;
-                let result = if cfg!(windows) {
+                let result = if cfg!(any(
+                    target_os = "windows",
+                    target_os = "linux",
+                    target_os = "macos"
+                )) {
                     crate::local_ipc::request_window_list()
                         .await
                         .map(|entries| WindowList {

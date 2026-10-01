@@ -18,7 +18,9 @@ impl TaskStore {
             if row.try_get::<Option<String>, _>("query_json")?.is_none() {
                 return Err(TaskStoreError::RequestConflict);
             }
-            if serde_json::from_str::<SystemQuery>(row.try_get("query_json")?)? != *query {
+            if serde_json::from_str::<SystemQuery>(row.try_get("query_json")?)?
+                != query.persistence_form()
+            {
                 return Err(TaskStoreError::RequestConflict);
             }
             return Ok(false);
@@ -28,7 +30,7 @@ impl TaskStore {
             "INSERT INTO system_query_results (request_id,query_json,reply_json) VALUES (?,?,?)",
         )
         .bind(id.to_string())
-        .bind(serde_json::to_string(query)?)
+        .bind(serde_json::to_string(&query.persistence_form())?)
         .bind(serde_json::to_string(&SystemQueryReply::pending(
             id, query,
         ))?)
@@ -65,5 +67,63 @@ impl TaskStore {
         }
         tx.commit().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pab_protocol::*;
+    #[tokio::test]
+    async fn text_identity_is_private_deduplicated_owned_and_unconfirmed_after_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tasks.sqlite3");
+        let store = TaskStore::open(&path).await.unwrap();
+        let actor = crate::task_service::transfer_tests::actor();
+        let id = RequestId::new();
+        let q = SystemQuery::Desktop {
+            query: DesktopQuery::TypeText {
+                window_ref: RequestId::new().to_string(),
+                text: "secret中文🙂".into(),
+            },
+        };
+        assert!(store.accept_system_query(actor, id, &q).await.unwrap());
+        assert!(!store.accept_system_query(actor, id, &q).await.unwrap());
+        let saved: String =
+            sqlx::query_scalar("SELECT query_json FROM system_query_results WHERE request_id=?")
+                .bind(id.to_string())
+                .fetch_one(&store.pool)
+                .await
+                .unwrap();
+        assert!(!saved.contains("secret"));
+        assert!(saved.contains("blake3:"));
+        let mut changed = q.clone();
+        if let SystemQuery::Desktop {
+            query: DesktopQuery::TypeText { text, .. },
+        } = &mut changed
+        {
+            *text = "different".into();
+        }
+        assert!(matches!(
+            store.accept_system_query(actor, id, &changed).await,
+            Err(TaskStoreError::RequestConflict)
+        ));
+        let other = OperatorRef::account(UserId::from_u128(900), EndpointKey::new([90; 32]));
+        assert!(matches!(
+            store.get_system_query(other, id).await,
+            Err(TaskStoreError::NotFound)
+        ));
+        assert!(matches!(
+            store.accept_system_query(other, id, &q).await,
+            Err(TaskStoreError::NotFound)
+        ));
+        store.interrupt_read_operations().await.unwrap();
+        drop(store);
+        let store = TaskStore::open(&path).await.unwrap();
+        assert_eq!(
+            store.get_system_query(actor, id).await.unwrap().state,
+            "unconfirmed"
+        );
+        assert!(!store.accept_system_query(actor, id, &q).await.unwrap());
     }
 }

@@ -51,6 +51,7 @@ async fn serve_requests(
     socket: &mut LocalSocket,
     expected_desktop: Option<&str>,
 ) -> Result<(), String> {
+    let mut desktop_session = pab_desktop_control::DesktopSession::new();
     loop {
         if !desktop_is_active(expected_desktop) {
             tracing::info!("session helper paused for desktop switch");
@@ -65,6 +66,28 @@ async fn serve_requests(
             };
         match event {
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+            LocalEvent::DesktopQuery(id, query) => {
+                let mut reply = if desktop_is_active(expected_desktop) {
+                    desktop_session.query(id, &query)
+                } else {
+                    let mut reply = pab_protocol::SystemQueryReply::pending(
+                        id,
+                        &pab_protocol::SystemQuery::Desktop {
+                            query: query.clone(),
+                        },
+                    );
+                    reply.state = "failed".into();
+                    reply.error = Some("interactive desktop changed".into());
+                    reply
+                };
+                if !desktop_is_active(expected_desktop) {
+                    reply.state = "unconfirmed".into();
+                    reply.error = Some("interactive desktop changed during operation".into());
+                }
+                local_ipc::reply_desktop_query(socket, &reply)
+                    .await
+                    .map_err(|e| e.to_string())?;
+            }
             LocalEvent::ListWindows => {
                 let entries = window_session::list_windows();
                 local_ipc::reply_window_list(socket, &entries)

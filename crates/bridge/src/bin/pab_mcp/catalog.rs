@@ -112,13 +112,8 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_list_windows",
-            "List visible windows in the target device's interactive desktop session. Requires a connected local desktop helper; headless devices report unsupported.",
-            json!({
-                "type": "object",
-                "properties": { "device_code": { "type": "string", "pattern": "^[0-9]{9}$" } },
-                "required": ["device_code"],
-                "additionalProperties": false
-            }),
+            "List windows via xcap with title, process, geometry, minimized/maximized/focused state and opaque window_ref (or control_error if unavailable). References are bound to the current desktop helper, checked for handle reuse and invalid after window destruction/helper reconnect/desktop switch or marker loss. Returns a bounded 32 KiB snapshot, max 64 entries; use window_ref for focus/control/text. Requires capability v4 and upgraded helper; macOS enumeration only, Windows/X11 control. xcap enumeration filters may omit helper-owned, hidden or cloaked windows.",
+            json!({"type":"object","properties":{"device_code":{"type":"string","pattern":"^[0-9]{9}$"},"request_id":{"type":"string","format":"uuid"}},"required":["device_code"],"additionalProperties":false}),
         ),
         tool(
             "pab_capture_screenshot",
@@ -254,6 +249,7 @@ pub(super) fn tools() -> Vec<Value> {
     ];
     tools.extend(super::mcp_filesystem::tools());
     tools.extend(super::mcp_system_query::tools());
+    tools.extend(super::mcp_desktop::tools());
     tools
 }
 

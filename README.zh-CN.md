@@ -136,7 +136,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ## MCP 工具
 
-当前源码提供 **44 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
+当前源码提供 **48 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
 
 | 工具 | 用途 |
 |---|---|
@@ -146,7 +146,11 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_get_task` | 查询状态、进度、完成信息和输出范围 |
 | `pab_read_output` | 按偏移读取保存的 stdout 或 stderr |
 | `pab_list_directory` | 分页列出目录内容 |
-| `pab_list_windows` | 列出受支持桌面会话中的窗口 |
+| `pab_list_windows` | 获取包含窗口引用、位置、尺寸、PID、显示器和状态的有限快照 |
+| `pab_list_monitors` | 列出显示器 ID、原点、尺寸、主屏、缩放和旋转 |
+| `pab_focus_window` | 聚焦指定引用窗口，遵守系统前台限制 |
+| `pab_window_control` | 最小化、最大化、还原或请求正常关闭窗口 |
+| `pab_type_text` | 向明确指定的前台窗口输入 Unicode 文字 |
 | `pab_capture_screenshot` | 返回有界 JPEG/PNG 预览图片，或保存原图，附带尺寸、格式和哈希 |
 | `pab_desktop_input` | 发送受支持的鼠标、键盘或安全注意序列事件 |
 | `pab_open_terminal` | 打开交互终端 |
@@ -235,6 +239,32 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 `mutation` 返回阶段、计划/处理项数、写入/删除数、`partial`、`source_removed` 和有限逐项结果（64 项或 8 KiB）。取消在检查点停止，阻塞 OS I/O 可能延迟停止；只有 `cancelled` 确认 worker 已退出。失败或取消保留已生效项，包括后续 ZIP 条目 CRC 损坏前已解出的文件，不自动回滚。删除只移除计划项，拒绝盘符/根目录。结果未确认时查询原 ID，不重新执行。PAB 路径锁覆盖祖先和子路径，但不提供对外部程序的原子目录操作；ZIP 不保留 ACL、属主和扩展元数据。
 
 新文件工具已完成 Windows 本地自动化验证，包括隔离 QUIC 与 MCP stdio。安装后的宿主调用、物理跨盘和 Windows/Linux 双机验收仍待完成；旧安装包不含这些新增工具。
+
+### 窗口引用、控制与 Unicode 输入
+
+显示器与窗口枚举复用 [xcap](https://github.com/nashaofu/xcap)，文字输入复用
+[Enigo](https://github.com/enigo-rs/enigo)，外部窗口操作使用 Windows 官方绑定或
+[x11rb](https://github.com/psychon/x11rb) 的标准 EWMH 消息。这些工具要求 Executor
+系统能力 v4 和新版活动桌面 helper。Windows 与 Linux/X11 适配已实现；Linux 图形环境
+实机验收待补。Wayland 明确返回不支持。macOS 可以通过 xcap 枚举，暂不支持窗口控制和
+文字输入，也尚未在 Mac 上验证。
+
+先用 `pab_list_windows` 获取 `window_ref`，再对该引用执行操作。输入前先调用
+`pab_focus_window`。窗口列表最多 64 个，显示器最多 32 个，响应最多 32 KiB，超限明确
+标记截断。枚举遵循 xcap 的筛选规则（Windows 排除 helper 自身进程及隐藏窗口等），
+采样中消失或无法读取属性的条目跳过。坐标采用 xcap 原生坐标，不能直接当作缩略截图像素坐标。引用仅属于当前
+helper 连接；重连、切换桌面、窗口销毁或身份标记丢失后失效。执行前校验 PID 与窗口
+身份标记，但外部应用仍可在校验与操作之间改变窗口或焦点，这不是原子窗口锁。
+
+文字限制为 1–4096 个 UTF-8 字节，不允许 NUL，不替换剪贴板。输入 API 接受不代表应用
+最终文本正确；焦点变化或应用行为可能造成部分输入。关闭只发送正常关闭请求，不结束
+进程；保存提示框或应用拒绝关闭时，会返回失败并标明副作用尚未确认。
+
+保留 `request_id` / `operation_ref`，同一个请求不会重复执行。慢操作先返回 `running`，
+断线后通过 `pab_get_operation` 获取原结果。已派发操作丢失 helper 后标记未确认，Executor
+重启后也不重放已接受的修改操作。这些操作不能取消或撤销。持久化记录仅保存输入文字的
+BLAKE3 摘要，不保存原文；摘要不是加密，不能防止对可预测文字的猜测。目标应用和 AI
+宿主仍可能保留输入文字。
 
 ### 截图预览与原图
 

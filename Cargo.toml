@@ -8,6 +8,7 @@ members = [
     "crates/os-sessions",
     "crates/os-control",
     "crates/screenshot",
+    "crates/desktop-control",
     "crates/protocol",
     "crates/relay",
     "crates/server",

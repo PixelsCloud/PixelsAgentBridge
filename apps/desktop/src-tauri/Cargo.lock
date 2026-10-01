@@ -4667,6 +4667,7 @@ dependencies = [
  "futures-util",
  "pab-agent-core",
  "pab-bridge",
+ "pab-desktop-control",
  "pab-executor",
  "pab-logging",
  "pab-protocol",
@@ -4684,6 +4685,18 @@ dependencies = [
  "windows-sys 0.61.2",
  "xcap",
  "zeroize",
+]
+
+[[package]]
+name = "pab-desktop-control"
+version = "0.1.0"
+dependencies = [
+ "enigo",
+ "pab-protocol",
+ "serde_json",
+ "windows-sys 0.61.2",
+ "x11rb",
+ "xcap",
 ]
 
 [[package]]

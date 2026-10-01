@@ -27,7 +27,8 @@ impl RuntimeStore {
                     .try_get::<Option<String>, _>("owner_session_id")?
                     .as_deref()
                     != Some(owner)
-                || serde_json::from_str::<SystemQuery>(row.try_get("query_json")?)? != *query
+                || serde_json::from_str::<SystemQuery>(row.try_get("query_json")?)?
+                    != query.persistence_form()
             {
                 return Err(RuntimeStoreError::RequestConflict);
             }
@@ -50,7 +51,7 @@ impl RuntimeStore {
         pending.state = "unconfirmed".into();
         sqlx::query("INSERT INTO runtime_system_results (id,query_json,reply_json) VALUES (?,?,?)")
             .bind(id.to_string())
-            .bind(serde_json::to_string(query)?)
+            .bind(serde_json::to_string(&query.persistence_form())?)
             .bind(serde_json::to_string(&pending)?)
             .execute(&mut *tx)
             .await?;
@@ -224,6 +225,71 @@ impl TransferQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn desktop_audit_counts_active_operations_and_never_stores_raw_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bridge.sqlite3");
+        let queue = TransferQueue::open(&path, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&path).await.unwrap();
+        let device = DeviceRef {
+            deployment_id: DeploymentId::from_u128(1),
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let code: DeviceCode = "123456789".parse().unwrap();
+        let id = RequestId::new();
+        let q = SystemQuery::Desktop {
+            query: DesktopQuery::TypeText {
+                window_ref: RequestId::new().to_string(),
+                text: "private中文🙂".into(),
+            },
+        };
+        assert!(
+            store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let saved: String =
+            sqlx::query_scalar("SELECT query_json FROM runtime_system_results WHERE id=?")
+                .bind(id.to_string())
+                .fetch_one(&store.pool)
+                .await
+                .unwrap();
+        assert!(!saved.contains("private"));
+        assert!(saved.contains("blake3:"));
+        assert!(
+            !store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert!(
+            store
+                .accept_system_query(id, &q, device, Some(code), "other", "owner")
+                .await
+                .is_err()
+        );
+        let mut r = SystemQueryReply::pending(id, &q);
+        r.state = "completed".into();
+        r.data = Some(SystemQueryData::Desktop {
+            snapshot: DesktopSnapshot::new("fixture".into(), "test"),
+        });
+        store.save_system_reply(&r).await.unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 0);
+        assert_eq!(queue.system_record(id, code).await.unwrap().1, r);
+        assert_eq!(
+            queue
+                .operation_page(Some(code), None, None, 20)
+                .await
+                .unwrap()[0]["kind"],
+            "type_text"
+        );
+    }
     #[tokio::test]
     async fn lifecycle_records_are_control_operations_and_preserve_partial_failures_without_replay()
     {

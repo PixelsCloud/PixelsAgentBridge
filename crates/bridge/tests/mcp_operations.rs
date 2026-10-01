@@ -96,7 +96,7 @@ async fn offline_submission_query_cancel_dedup_and_two_sessions_use_real_stdio()
     });
     let (first, first_child) = start(&directory.path().join("first"), &database, port).await;
     let (second, second_child) = start(&directory.path().join("second"), &database, port).await;
-    assert_eq!(first.list_all_tools().await.unwrap().len(), 44);
+    assert_eq!(first.list_all_tools().await.unwrap().len(), 48);
     let request_id = RequestId::new().to_string();
     let args = json!({"device_code":"123456789","source":source,"destination":if cfg!(windows){"C:\\fixture\\remote.bin"}else{"/tmp/fixture-remote.bin"},"request_id":request_id});
     let submitted = result(call(&first, "pab_upload_file", args.clone()).await);

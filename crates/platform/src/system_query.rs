@@ -93,6 +93,11 @@ impl SystemCollector {
             reply.cpu_sample_ms = Some(sample.elapsed().as_millis() as u64);
         }
         reply.data = match query {
+            SystemQuery::Desktop { .. } => {
+                reply.state = "failed".into();
+                reply.error = Some("desktop query requires the interactive helper".into());
+                return reply;
+            }
             SystemQuery::TerminateProcess { .. }
             | SystemQuery::Services { .. }
             | SystemQuery::Service { .. }

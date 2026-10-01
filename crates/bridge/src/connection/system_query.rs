@@ -73,7 +73,12 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
         )
         && matches!(
             r.kind.as_str(),
-            "system_info"
+            "monitors"
+                | "desktop_windows"
+                | "window_focus"
+                | "window_control"
+                | "type_text"
+                | "system_info"
                 | "disks"
                 | "processes"
                 | "process"
@@ -93,6 +98,13 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
                 (
+                    "monitors"
+                        | "desktop_windows"
+                        | "window_focus"
+                        | "window_control"
+                        | "type_text",
+                    Some(SystemQueryData::Desktop { .. })
+                ) | (
                     "network_connections",
                     Some(SystemQueryData::Connections { .. })
                 ) | ("dns", Some(SystemQueryData::Dns { .. }))

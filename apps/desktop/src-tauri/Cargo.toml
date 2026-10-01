@@ -21,6 +21,7 @@ pab-bridge = { path = "../../../crates/bridge" }
 pab-agent-core = { path = "../../../crates/agent-core" }
 pab-logging = { path = "../../../crates/logging" }
 pab-protocol = { path = "../../../crates/protocol" }
+pab-desktop-control = { path = "../../../crates/desktop-control" }
 pab-screenshot = { path = "../../../crates/screenshot" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

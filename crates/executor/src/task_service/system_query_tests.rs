@@ -396,7 +396,10 @@ async fn c2_socket_inventory_and_original_sample_cross_quic_after_socket_closes(
             DeviceTaskResponse::Environment {
                 system_query_schema_version,
                 ..
-            } => assert_eq!(system_query_schema_version, Some(3)),
+            } => assert_eq!(
+                system_query_schema_version,
+                Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION)
+            ),
             DeviceTaskResponse::SystemQuery { reply } => {
                 assert_eq!(reply.state, "completed", "{reply:?}");
                 assert_eq!(reply.returned_count, 1);

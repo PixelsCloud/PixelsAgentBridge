@@ -4,6 +4,8 @@ use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 #[path = "pab_mcp/catalog.rs"]
 mod mcp_catalog;
+#[path = "pab_mcp/desktop.rs"]
+mod mcp_desktop;
 #[path = "pab_mcp/filesystem.rs"]
 mod mcp_filesystem;
 #[path = "pab_mcp/filesystem_bulk.rs"]
@@ -161,6 +163,8 @@ impl ServerHandler for McpServer {
                                     metadata
                                 },
                             )
+                        } else if mcp_desktop::handles(&request.name) {
+                            mcp_desktop::call(&runtime, &request.name, &arguments).await
                         } else {
                             mcp_tools::call_tool(&runtime, &request.name, &arguments).await
                         };
@@ -194,7 +198,12 @@ impl ServerHandler for McpServer {
         let tool_failed = result.as_ref().is_ok_and(|value| {
             matches!(
                 request.name.as_ref(),
-                "pab_file_stat"
+                "pab_list_monitors"
+                    | "pab_list_windows"
+                    | "pab_focus_window"
+                    | "pab_window_control"
+                    | "pab_type_text"
+                    | "pab_file_stat"
                     | "pab_file_read"
                     | "pab_file_write"
                     | "pab_file_patch"
@@ -303,7 +312,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 44);
+        assert_eq!(catalog.tools.len(), 48);
         let names = catalog
             .tools
             .iter()

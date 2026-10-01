@@ -2,11 +2,14 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 3;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SystemQuery {
+    Desktop {
+        query: crate::DesktopQuery,
+    },
     TerminateProcess {
         pid: u32,
         identity: String,
@@ -67,6 +70,7 @@ pub enum SystemQuery {
 impl SystemQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Desktop { query } => query.kind(),
             Self::TerminateProcess { .. } => "process_terminate",
             Self::Services { .. } => "services",
             Self::Service { .. } => "service",
@@ -82,6 +86,9 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::Desktop { .. }) {
+            return 4;
+        }
         if matches!(
             self,
             Self::TerminateProcess { .. }
@@ -101,12 +108,29 @@ impl SystemQuery {
         }
     }
     pub fn is_mutation(&self) -> bool {
+        if let Self::Desktop { query } = self {
+            return query.is_mutation();
+        }
         matches!(
             self,
             Self::TerminateProcess { .. } | Self::ServiceControl { .. }
         )
     }
+    /// Persistence-only identity; plaintext input never enters the audit database.
+    pub fn persistence_form(&self) -> Self {
+        let mut value = self.clone();
+        if let Self::Desktop {
+            query: crate::DesktopQuery::TypeText { text, .. },
+        } = &mut value
+        {
+            *text = format!("blake3:{}", blake3::hash(text.as_bytes()));
+        }
+        value
+    }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Desktop { query } = self {
+            return query.validate();
+        }
         match self {
             Self::TerminateProcess {
                 pid,
@@ -234,6 +258,9 @@ impl SystemQueryReply {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SystemQueryData {
+    Desktop {
+        snapshot: crate::DesktopSnapshot,
+    },
     Services {
         backend: String,
         entries: Vec<ServiceInfo>,

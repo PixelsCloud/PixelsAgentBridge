@@ -2,7 +2,7 @@ use super::{TaskService, TaskServiceError};
 use pab_protocol::{OperatorRef, RequestId, SystemQuery, SystemQueryReply};
 
 impl TaskService {
-    pub(super) async fn system_query(
+    pub(crate) async fn system_query(
         &self,
         actor: OperatorRef,
         id: RequestId,
@@ -38,31 +38,54 @@ impl TaskService {
             let async_result =
                 tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
                     .await;
-            let r = match async_result {
-                Ok(Some(reply)) => reply,
-                Ok(None) => {
-                    let result = tokio::task::spawn_blocking(move || match collector.try_lock() {
-                        Ok(mut c) => c.query(id, &query),
-                        Err(_) => {
-                            let mut r = SystemQueryReply::pending(id, &query);
-                            r.state = "failed".into();
-                            r.error = Some("executor_busy: system collector unavailable".into());
-                            r
+            let r = if let SystemQuery::Desktop { query: desktop } = &query {
+                match crate::local_ipc::request_desktop_query(id, desktop.clone()).await {
+                    Ok(r) => r,
+                    Err(error) => {
+                        let mut r = SystemQueryReply::pending(id, &query);
+                        r.state = if query.is_mutation()
+                            && !matches!(
+                                error,
+                                crate::local_ipc::LocalIpcError::WindowHelperUnavailable
+                            ) {
+                            "unconfirmed"
+                        } else {
+                            "failed"
                         }
-                    })
-                    .await;
-                    result.unwrap_or_else(|_| {
+                        .into();
+                        r.error = Some(error.to_string());
+                        r
+                    }
+                }
+            } else {
+                match async_result {
+                    Ok(Some(reply)) => reply,
+                    Ok(None) => {
+                        let result =
+                            tokio::task::spawn_blocking(move || match collector.try_lock() {
+                                Ok(mut c) => c.query(id, &query),
+                                Err(_) => {
+                                    let mut r = SystemQueryReply::pending(id, &query);
+                                    r.state = "failed".into();
+                                    r.error =
+                                        Some("executor_busy: system collector unavailable".into());
+                                    r
+                                }
+                            })
+                            .await;
+                        result.unwrap_or_else(|_| {
+                            let mut r = SystemQueryReply::pending(id, &fallback);
+                            r.state = "failed".into();
+                            r.error = Some("system collector stopped unexpectedly".into());
+                            r
+                        })
+                    }
+                    Err(_) => {
                         let mut r = SystemQueryReply::pending(id, &fallback);
                         r.state = "failed".into();
-                        r.error = Some("system collector stopped unexpectedly".into());
+                        r.error = Some("async query worker stopped unexpectedly".into());
                         r
-                    })
-                }
-                Err(_) => {
-                    let mut r = SystemQueryReply::pending(id, &fallback);
-                    r.state = "failed".into();
-                    r.error = Some("async query worker stopped unexpectedly".into());
-                    r
+                    }
                 }
             };
             if let Err(e) = service.store.finish_system_query(&r).await {
@@ -78,7 +101,7 @@ impl TaskService {
         }
         self.get_system_query(actor, id).await
     }
-    pub(super) async fn get_system_query(
+    pub(crate) async fn get_system_query(
         &self,
         actor: OperatorRef,
         id: RequestId,

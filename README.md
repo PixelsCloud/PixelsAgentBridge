@@ -157,7 +157,7 @@ Replace the device code and paths with your own information.
 
 ## MCP tool reference
 
-The current source exposes **44 tools**. Hosts may display them with a namespace,
+The current source exposes **48 tools**. Hosts may display them with a namespace,
 for example `pixels.pab_connect`.
 
 | Tool | Purpose |
@@ -168,7 +168,11 @@ for example `pixels.pab_connect`.
 | `pab_get_task` | Query state, progress, completion, and output ranges |
 | `pab_read_output` | Read retained stdout or stderr by offset |
 | `pab_list_directory` | List a page of directory entries |
-| `pab_list_windows` | List windows in a supported desktop session |
+| `pab_list_windows` | List a bounded window snapshot with opaque references, geometry, PID, monitor and observed state |
+| `pab_list_monitors` | List display IDs, origins, dimensions, primary state, scaling and rotation |
+| `pab_focus_window` | Focus a referenced window, respecting OS foreground policy |
+| `pab_window_control` | Minimize, maximize, restore or request normal close of a referenced window |
+| `pab_type_text` | Enter Unicode text into an explicitly referenced foreground window |
 | `pab_capture_screenshot` | Return a bounded JPEG/PNG preview as MCP image content, or save an original screenshot with metadata and hash |
 | `pab_desktop_input` | Send supported mouse, keyboard, or secure attention events |
 | `pab_open_terminal` | Open an interactive terminal |
@@ -382,6 +386,44 @@ ownership or extended metadata.
 These new file tools have Windows local automated coverage, including isolated
 QUIC and MCP stdio tests. Installed-host, physical cross-volume and Windows/Linux
 two-machine acceptance are still pending; older installers do not include them.
+
+### Referenced window control and Unicode input
+
+Display/window enumeration uses [xcap](https://github.com/nashaofu/xcap); Unicode
+input uses [Enigo](https://github.com/enigo-rs/enigo). Foreign-window state changes
+use the Windows official bindings or [x11rb](https://github.com/psychon/x11rb)
+with standard EWMH messages. These tools require Executor system capability v4
+and an upgraded, active desktop helper. Windows and Linux/X11 adapters are
+implemented; Linux graphical runtime acceptance is pending. Wayland is rejected
+explicitly. macOS enumeration is available through xcap, but control/input are
+currently unsupported and unverified on a Mac.
+
+Call `pab_list_windows`, take the returned `window_ref`, then focus or control
+that reference. Call `pab_focus_window` before `pab_type_text`. Window lists contain
+at most 64 entries, monitor lists at most 32, and replies at most 32 KiB; truncation
+is explicit. Enumeration follows xcap filters (on Windows it excludes the helper's
+own process, hidden/cloaked windows); entries disappearing or becoming inaccessible
+during sampling are skipped. Coordinates use the native xcap coordinate space, not screenshot
+preview pixels. A reference belongs to one helper connection and is invalid after
+reconnection, desktop switching, window destruction or removal of its identity
+marker. The helper checks the PID and marker before acting. External applications
+can still change windows or focus between checks; these checks are not an atomic
+window lock.
+
+Text accepts 1–4096 UTF-8 bytes, including Unicode, without NUL. It does not replace
+the clipboard. API acceptance does not verify the application's resulting text;
+focus changes or application behavior may cause partial input. Close sends a
+normal close request and never terminates the process. A save dialog/refusal can
+produce a failed result with an unconfirmed side effect.
+
+Keep `request_id`/`operation_ref`: repeated IDs never repeat a mutation. A slow
+mutation returns `running`; query `pab_get_operation` to retrieve the original
+result after disconnecting. A dispatched operation whose helper disappears has
+an unconfirmed outcome. Executor restart preserves accepted mutations as
+unconfirmed and never replays them. These operations cannot be cancelled/undone.
+The persistent identity stores a BLAKE3 digest of input text, not the raw text;
+this is audit minimization, not encryption, and does not protect predictable text
+from guessing. Text still reaches the target and may be retained by the AI host.
 
 ### Screenshot previews and original images
 

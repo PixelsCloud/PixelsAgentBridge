@@ -1,0 +1,15 @@
+[package]
+name = "pab-desktop-control"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+[dependencies]
+pab-protocol = { path = "../protocol" }
+serde_json.workspace = true
+[target.'cfg(any(target_os="windows",target_os="linux",target_os="macos"))'.dependencies]
+xcap = "=0.8.2"
+enigo = { version="=0.5.0",default-features=false,features=["x11rb"] }
+[target.'cfg(windows)'.dependencies]
+windows-sys = {version="0.61",features=["Win32_Foundation","Win32_UI_WindowsAndMessaging","Win32_Graphics_Gdi","Win32_System_LibraryLoader","Win32_UI_Input_KeyboardAndMouse"]}
+[target.'cfg(target_os="linux")'.dependencies]
+x11rb = "=0.13.2"

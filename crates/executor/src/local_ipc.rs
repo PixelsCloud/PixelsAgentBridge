@@ -50,9 +50,15 @@ struct WindowProvider {
     id: u64,
     sender: mpsc::Sender<HelperRequest>,
     screenshot_schema_version: Option<u16>,
+    desktop_schema_version: Option<u16>,
 }
 
 enum HelperRequest {
+    DesktopQuery(
+        pab_protocol::RequestId,
+        pab_protocol::DesktopQuery,
+        oneshot::Sender<Result<pab_protocol::SystemQueryReply, LocalIpcError>>,
+    ),
     ScreenshotV2(
         pab_protocol::ScreenshotOptions,
         oneshot::Sender<Result<pab_screenshot::EncodedScreenshot, LocalIpcError>>,
@@ -66,6 +72,11 @@ enum HelperRequest {
 }
 
 enum PendingRequest {
+    DesktopQuery {
+        id: pab_protocol::RequestId,
+        kind: String,
+        reply: oneshot::Sender<Result<pab_protocol::SystemQueryReply, LocalIpcError>>,
+    },
     ScreenshotV2 {
         options: pab_protocol::ScreenshotOptions,
         info: Option<pab_protocol::ScreenshotInfo>,
@@ -202,11 +213,12 @@ pub enum LocalEvent {
     ListWindows,
     CaptureScreenshot,
     CaptureScreenshotV2(pab_protocol::ScreenshotOptions),
+    DesktopQuery(pab_protocol::RequestId, pab_protocol::DesktopQuery),
     DesktopInput(DesktopInputEvent),
 }
 
 pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
-    send_json(socket, &json!({"type":"register_window_helper","screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION})).await?;
+    send_json(socket, &json!({"type":"register_window_helper","screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
@@ -238,6 +250,12 @@ pub async fn next_local_event(socket: &mut LocalSocket) -> Result<LocalEvent, Lo
                 .map_err(|_| LocalIpcError::InvalidScreenshot)?;
             Ok(LocalEvent::CaptureScreenshotV2(options))
         }
+        Some("desktop_query") => {
+            let id = serde_json::from_value(frame["request_id"].clone())?;
+            let query: pab_protocol::DesktopQuery = serde_json::from_value(frame["query"].clone())?;
+            query.validate().map_err(|_| LocalIpcError::Protocol)?;
+            Ok(LocalEvent::DesktopQuery(id, query))
+        }
         Some("desktop_input") => Ok(LocalEvent::DesktopInput(serde_json::from_value(
             frame["event"].clone(),
         )?)),
@@ -249,6 +267,50 @@ pub async fn next_local_event(socket: &mut LocalSocket) -> Result<LocalEvent, Lo
         )),
         _ => Err(LocalIpcError::Protocol),
     }
+}
+
+pub(crate) async fn request_desktop_query(
+    id: pab_protocol::RequestId,
+    query: pab_protocol::DesktopQuery,
+) -> Result<pab_protocol::SystemQueryReply, LocalIpcError> {
+    query.validate().map_err(|_| LocalIpcError::Protocol)?;
+    let sender = window_providers()
+        .lock()
+        .map_err(|_| LocalIpcError::Protocol)?
+        .last()
+        .filter(|p| {
+            p.desktop_schema_version
+                .is_some_and(|v| v >= pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION)
+        })
+        .map(|p| p.sender.clone())
+        .ok_or(LocalIpcError::WindowHelperUnavailable)?;
+    tokio::time::timeout(Duration::from_secs(20), async {
+        let (reply, receive) = oneshot::channel();
+        sender
+            .send(HelperRequest::DesktopQuery(id, query, reply))
+            .await
+            .map_err(|_| LocalIpcError::WindowHelperUnavailable)?;
+        receive.await.map_err(|_| {
+            LocalIpcError::Remote(
+                "desktop helper disconnected after dispatch; outcome unconfirmed".into(),
+            )
+        })?
+    })
+    .await
+    .map_err(|_| LocalIpcError::Timeout)?
+}
+pub async fn reply_desktop_query(
+    socket: &mut LocalSocket,
+    reply: &pab_protocol::SystemQueryReply,
+) -> Result<(), LocalIpcError> {
+    if serde_json::to_vec(reply)?.len() > pab_protocol::MAX_SYSTEM_REPLY_BYTES {
+        return Err(LocalIpcError::Protocol);
+    }
+    send_json(
+        socket,
+        &json!({"type":"desktop_query_result","reply":reply}),
+    )
+    .await
 }
 
 pub async fn reply_window_list(
@@ -623,7 +685,7 @@ async fn handle_connection(
     loop {
         tokio::select! {
             _ = updates.tick() => {
-                if matches!(pending, Some(PendingRequest::ScreenshotV2 {..})) && screenshot_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline) { break Err(LocalIpcError::Timeout); }
+                if matches!(pending, Some(PendingRequest::ScreenshotV2 {..})|Some(PendingRequest::DesktopQuery {..})) && screenshot_deadline.is_some_and(|deadline| tokio::time::Instant::now() >= deadline) { break Err(LocalIpcError::Timeout); }
                 match read_device_status_from_service(root).await {
                     Ok(status) => send_json(&mut socket, &json!({"type":"status","status":status})).await?,
                     Err(error) => send_json(&mut socket, &json!({"type":"error","message":error.to_string()})).await?,
@@ -658,7 +720,7 @@ async fn handle_connection(
                     }
                     Some("register_window_helper") if registration.0.is_none() => {
                         let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
-                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()) });
+                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()) });
                         registration.0 = Some(id);
                         tracing::info!(helper_id = id, "interactive window helper registered");
                         send_json(&mut socket, &json!({"type":"window_helper_registered"})).await?;
@@ -672,6 +734,13 @@ async fn handle_connection(
                         });
                         if let Some(PendingRequest::Windows(reply)) = pending.take() { let _ = reply.send(result); }
                     }
+                    Some("desktop_query_result") => {
+                        let result:pab_protocol::SystemQueryReply=serde_json::from_value(frame["reply"].clone())?;
+                        if let Some(PendingRequest::DesktopQuery {id,kind,reply})=pending.take() {
+                            if result.request_id!=id || result.kind!=kind || serde_json::to_vec(&result)?.len()>pab_protocol::MAX_SYSTEM_REPLY_BYTES || !matches!(result.state.as_str(),"completed"|"failed"|"unconfirmed") {break Err(LocalIpcError::Protocol);}
+                            let _=reply.send(Ok(result));
+                        } else {break Err(LocalIpcError::Protocol);}
+                    },
                     Some("screenshot_metadata") => {
                         if let Some(PendingRequest::ScreenshotV2{options,info, ..})=pending.as_mut() {
                             if info.is_some() {break Err(LocalIpcError::Protocol);}
@@ -705,6 +774,12 @@ async fn handle_connection(
             request = receiver.recv(), if registration.0.is_some() && pending.is_none() => {
                 if let Some(request) = request {
                     match request {
+                        HelperRequest::DesktopQuery(id,query,reply)=>{
+                            if reply.is_closed(){continue;}
+                            send_json(&mut socket,&json!({"type":"desktop_query","request_id":id,"query":query})).await?;
+                            screenshot_deadline=Some(tokio::time::Instant::now()+Duration::from_secs(30));
+                            pending=Some(PendingRequest::DesktopQuery {id,kind:query.kind().into(),reply});
+                        },
                         HelperRequest::Windows(reply) => {
                             send_json(&mut socket, &json!({"type":"list_windows"})).await?;
                             pending = Some(PendingRequest::Windows(reply));
@@ -820,6 +895,148 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    async fn next_desktop(
+        socket: &mut LocalSocket,
+    ) -> (pab_protocol::RequestId, pab_protocol::DesktopQuery) {
+        loop {
+            match next_local_event(socket).await.unwrap() {
+                LocalEvent::DesktopQuery(id, q) => return (id, q),
+                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                other => panic!("unexpected event {other:?}"),
+            }
+        }
+    }
+    #[tokio::test]
+    async fn desktop_mutation_survives_quic_drop_deduplicates_and_replies_by_identity() {
+        use crate::task_service::transfer_tests::{actor, pair, service};
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (directory, mut socket, local, provider) = screenshot_helper().await;
+        let svc = service(directory.path()).await;
+        let id = RequestId::new();
+        let query = SystemQuery::Desktop {
+            query: DesktopQuery::TypeText {
+                window_ref: RequestId::new().to_string(),
+                text: "fixture🙂".into(),
+            },
+        };
+        let (a, b, client, server) = pair().await;
+        let worker = {
+            let svc = svc.clone();
+            tokio::spawn(async move {
+                svc.handle_stream(
+                    actor(),
+                    server.accept_bi(Duration::from_secs(5)).await.unwrap(),
+                    Duration::from_secs(5),
+                )
+                .await
+                .unwrap();
+            })
+        };
+        let mut stream = client.open_bi(Duration::from_secs(5)).await.unwrap();
+        stream
+            .send_json(
+                &DeviceTaskRequest::SystemQuery {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id: id,
+                    query: query.clone(),
+                },
+                Duration::from_secs(5),
+            )
+            .await
+            .unwrap();
+        let (seen, q) = next_desktop(&mut socket).await;
+        assert_eq!(seen, id);
+        assert_eq!(SystemQuery::Desktop { query: q }, query);
+        let response: DeviceTaskResponse =
+            stream.receive_json(Duration::from_secs(5)).await.unwrap();
+        assert!(
+            matches!(response,DeviceTaskResponse::SystemQuery{reply} if reply.state=="running")
+        );
+        drop(stream);
+        worker.await.unwrap();
+        assert_eq!(
+            svc.system_query(actor(), id, query.clone())
+                .await
+                .unwrap()
+                .state,
+            "running"
+        );
+        let mut reply = SystemQueryReply::pending(id, &query);
+        reply.state = "completed".into();
+        reply.data = Some(SystemQueryData::Desktop {
+            snapshot: DesktopSnapshot::new("fixture".into(), "test"),
+        });
+        reply_desktop_query(&mut socket, &reply).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if svc.get_system_query(actor(), id).await.unwrap().state == "completed" {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            svc.system_query(actor(), id, query).await.unwrap().state,
+            "completed"
+        );
+        // A completed duplicate must not dispatch another input to the helper.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), next_desktop(&mut socket))
+                .await
+                .is_err()
+        );
+        drop(socket);
+        wait_helper_removed(provider).await;
+        local.abort();
+        a.close().await;
+        b.close().await;
+    }
+    #[tokio::test]
+    async fn mismatched_desktop_reply_disconnects_helper_and_leaves_mutation_unconfirmed() {
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_dir, mut socket, server, provider) = screenshot_helper().await;
+        let id = RequestId::new();
+        let q = DesktopQuery::Focus {
+            window_ref: RequestId::new().to_string(),
+        };
+        let request = tokio::spawn(request_desktop_query(id, q.clone()));
+        assert_eq!(next_desktop(&mut socket).await.0, id);
+        let mut wrong =
+            SystemQueryReply::pending(RequestId::new(), &SystemQuery::Desktop { query: q });
+        wrong.state = "failed".into();
+        reply_desktop_query(&mut socket, &wrong).await.unwrap();
+        assert!(matches!(
+            request.await.unwrap(),
+            Err(LocalIpcError::Remote(_))
+        ));
+        wait_helper_removed(provider).await;
+        drop(socket);
+        server.abort();
+    }
+    #[tokio::test]
+    async fn old_helper_cannot_receive_new_desktop_commands() {
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_dir, socket, server, provider) = screenshot_helper().await;
+        window_providers()
+            .lock()
+            .unwrap()
+            .last_mut()
+            .unwrap()
+            .desktop_schema_version = None;
+        assert!(matches!(
+            request_desktop_query(RequestId::new(), DesktopQuery::Windows {}).await,
+            Err(LocalIpcError::WindowHelperUnavailable)
+        ));
+        drop(socket);
+        wait_helper_removed(provider).await;
+        server.abort();
     }
     #[tokio::test]
     async fn late_screenshot_stays_with_abandoned_request_and_next_capture_is_fresh() {
@@ -1050,6 +1267,7 @@ mod tests {
                         panic!("unexpected screenshot request")
                     }
                     Ok(LocalEvent::DesktopInput(_)) => panic!("unexpected desktop input"),
+                    Ok(LocalEvent::DesktopQuery(..)) => panic!("unexpected desktop query"),
                     Err(error) => panic!("helper connection failed: {error}"),
                 }
             }
@@ -1096,6 +1314,7 @@ mod tests {
                         panic!("unexpected screenshot request")
                     }
                     LocalEvent::DesktopInput(_) => panic!("unexpected desktop input"),
+                    LocalEvent::DesktopQuery(..) => panic!("unexpected desktop query"),
                 }
             }
         });

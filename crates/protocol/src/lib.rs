@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+mod desktop_query;
+pub use desktop_query::*;
 
 mod control;
 mod device;
