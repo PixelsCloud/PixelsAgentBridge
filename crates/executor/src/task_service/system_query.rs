@@ -15,22 +15,25 @@ impl TaskService {
             drop(jobs);
             return self.get_system_query(actor, id).await;
         }
-        let permit = match self.system_slots.clone().try_acquire_owned() {
+        let permit = match self.system_pending_slots.clone().try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
                 let mut r = SystemQueryReply::pending(id, &query);
                 r.state = "failed".into();
-                r.error = Some("executor_busy: two system queries are active".into());
+                r.error =
+                    Some("executor_busy: system query queue is full (16 accepted queries)".into());
                 self.store.finish_system_query(&r).await?;
                 return Ok(r);
             }
         };
         jobs.insert(id);
-        let (git_cancel, cancelled) = tokio::sync::watch::channel(false);
-        if matches!(
+        self.system_queued.lock().await.insert(id);
+        let (git_cancel, mut cancelled) = tokio::sync::watch::channel(false);
+        let cancellable = matches!(
             query,
             SystemQuery::Git { .. } | SystemQuery::Container { .. }
-        ) {
+        );
+        if cancellable {
             self.cancellable_system_jobs
                 .lock()
                 .await
@@ -43,6 +46,37 @@ impl TaskService {
         let (send, receive) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
             let _permit = permit;
+            let active_wait = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                service.system_slots.clone().acquire_owned(),
+            );
+            let active = tokio::select! {
+                biased;
+                _ = cancelled.wait_for(|value| *value), if cancellable => None,
+                result = active_wait => Some(result),
+            };
+            service.system_queued.lock().await.remove(&id);
+            let _active = match active {
+                Some(Ok(Ok(p))) if !*cancelled.borrow() => p,
+                _ => {
+                    let mut r = SystemQueryReply::pending(id, &query);
+                    if *cancelled.borrow() {
+                        r.state = "cancelled".into();
+                        r.error = Some("cancelled before execution".into());
+                    } else {
+                        r.state = "failed".into();
+                        r.error =
+                            Some("queue_timeout: system query did not start within 5000 ms".into());
+                    }
+                    if let Err(e) = service.store.finish_system_query(&r).await {
+                        tracing::warn!(%id, %e, "queued system query result persistence failed");
+                    }
+                    service.system_jobs.lock().await.remove(&id);
+                    service.cancellable_system_jobs.lock().await.remove(&id);
+                    let _ = send.send(());
+                    return;
+                }
+            };
             let fallback = query.clone();
             let async_query = query.clone();
             let async_result =
@@ -99,18 +133,24 @@ impl TaskService {
                 match async_result {
                     Ok(Some(reply)) => reply,
                     Ok(None) => {
-                        let result =
-                            tokio::task::spawn_blocking(move || match collector.try_lock() {
-                                Ok(mut c) => c.query(id, &query),
-                                Err(_) => {
-                                    let mut r = SystemQueryReply::pending(id, &query);
-                                    r.state = "failed".into();
-                                    r.error =
-                                        Some("executor_busy: system collector unavailable".into());
-                                    r
-                                }
-                            })
-                            .await;
+                        service.system_queued.lock().await.insert(id);
+                        let guard = tokio::time::timeout(
+                            std::time::Duration::from_secs(5),
+                            collector.lock_owned(),
+                        )
+                        .await;
+                        service.system_queued.lock().await.remove(&id);
+                        let result = match guard {
+                            Ok(mut c) => {
+                                tokio::task::spawn_blocking(move || c.query(id, &query)).await
+                            }
+                            Err(_) => {
+                                let mut r = SystemQueryReply::pending(id, &query);
+                                r.state = "failed".into();
+                                r.error = Some("queue_timeout: system collector did not become available within 5000 ms".into());
+                                Ok(r)
+                            }
+                        };
                         result.unwrap_or_else(|_| {
                             let mut r = SystemQueryReply::pending(id, &fallback);
                             r.state = "failed".into();
@@ -133,11 +173,11 @@ impl TaskService {
             service.cancellable_system_jobs.lock().await.remove(&id);
             let _ = send.send(());
         });
-        if mutation {
-            let _ = tokio::time::timeout(std::time::Duration::from_millis(250), receive).await;
-        } else {
-            let _ = receive.await;
-        }
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_millis(if mutation { 250 } else { 5000 }),
+            receive,
+        )
+        .await;
         self.get_system_query(actor, id).await
     }
     pub(crate) async fn get_system_query(
@@ -146,6 +186,10 @@ impl TaskService {
         id: RequestId,
     ) -> Result<SystemQueryReply, TaskServiceError> {
         let mut r = self.store.get_system_query(actor, id).await?;
+        if r.state == "running" && self.system_queued.lock().await.contains(&id) {
+            r.warnings
+                .push("queued: waiting for a system query execution slot".into());
+        }
         if r.state == "running" && !self.system_jobs.lock().await.contains(&id) {
             r = self.store.get_system_query(actor, id).await?;
             if r.state == "running" {

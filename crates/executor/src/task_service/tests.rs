@@ -509,6 +509,7 @@ fn test_command(context: &ExecutionContext) -> CommandTaskSpec {
         ],
     );
     CommandTaskSpec {
+        options: Default::default(),
         program,
         args,
         cwd: None,
@@ -518,4 +519,228 @@ fn test_command(context: &ExecutionContext) -> CommandTaskSpec {
         },
         display_summary: "task service integration test".to_owned(),
     }
+}
+
+#[tokio::test]
+async fn output_reads_match_ranges_during_concurrent_append_and_trim() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("output-race.sqlite3");
+    let reader = TaskStore::open(&path).await.unwrap();
+    // Independent pools exercise the same WAL concurrency as separate processes.
+    let writer = TaskStore::open(&path).await.unwrap();
+    let context = detect_native_execution_context().unwrap();
+    let actor = account(9);
+    let device = DeviceRef {
+        deployment_id: DeploymentId::new(),
+        tenant_id: TenantId::new(),
+        device_id: DeviceId::new(),
+    };
+    let accepted = writer
+        .accept_command(
+            device,
+            actor,
+            RequestId::new(),
+            &test_command(&context),
+            context,
+            1_000,
+        )
+        .await
+        .unwrap();
+    let AcceptTaskOutcome::Created(snapshot) = accepted else {
+        panic!("new task")
+    };
+    let task = snapshot.task_ref;
+    writer
+        .record_event(task, TaskEventKind::Running, 1_001)
+        .await
+        .unwrap();
+    let append = async {
+        for i in 0..128u64 {
+            let bytes: Vec<_> = (i * 257..(i + 1) * 257).map(|n| (n % 251) as u8).collect();
+            writer
+                .append_output(task, OutputStream::Stdout, &bytes)
+                .await
+                .unwrap();
+            tokio::task::yield_now().await;
+        }
+    };
+    let read = async {
+        for _ in 0..128 {
+            let (chunk, range) = reader
+                .read_output(actor, task, OutputStream::Stdout, 0, 65536)
+                .await
+                .unwrap();
+            assert!(
+                chunk.offset + chunk.bytes.len() as u64 <= range.available_to,
+                "bytes and declared range must describe one snapshot"
+            );
+            assert_eq!(chunk.bytes.len() as u64, range.available_to);
+            assert!(
+                chunk
+                    .bytes
+                    .iter()
+                    .enumerate()
+                    .all(|(i, byte)| *byte == (i as u64 % 251) as u8)
+            );
+        }
+    };
+    tokio::join!(append, read);
+
+    // Cross the retention boundary, then race another trim against a read.
+    let start = 128 * 257u64;
+    let end = 16 * 1024 * 1024u64 + 100;
+    let bytes: Vec<_> = (start..end).map(|n| (n % 251) as u8).collect();
+    writer
+        .append_output(task, OutputStream::Stdout, &bytes)
+        .await
+        .unwrap();
+    let bytes: Vec<_> = (end..end + 257).map(|n| (n % 251) as u8).collect();
+    let (written, read) = tokio::join!(
+        writer.append_output(task, OutputStream::Stdout, &bytes),
+        reader.read_output(actor, task, OutputStream::Stdout, 100, 4096)
+    );
+    assert_eq!(written.unwrap().retained_from, 357);
+    match read {
+        Ok((chunk, range)) => {
+            assert_eq!(range.retained_from, 100);
+            assert!(
+                chunk
+                    .bytes
+                    .iter()
+                    .enumerate()
+                    .all(|(i, byte)| *byte == ((100 + i as u64) % 251) as u8)
+            );
+        }
+        Err(TaskStoreError::InvalidOutputOffset) => {} // trim committed before the read
+        Err(error) => panic!("unexpected read failure: {error}"),
+    }
+    writer
+        .complete_output(task, OutputStream::Stdout)
+        .await
+        .unwrap();
+    let (chunk, range) = reader
+        .read_output(actor, task, OutputStream::Stdout, end + 257, 10)
+        .await
+        .unwrap();
+    assert!(range.complete);
+    assert!(chunk.bytes.is_empty());
+    assert!(matches!(
+        reader
+            .read_output(account(10), task, OutputStream::Stdout, 357, 10)
+            .await,
+        Err(TaskStoreError::NotFound)
+    ));
+}
+
+#[tokio::test]
+async fn command_options_deliver_stdin_env_deduplicate_and_stop_at_deadline() {
+    let dir = tempfile::tempdir().unwrap();
+    let context = detect_native_execution_context().unwrap();
+    let svc = TaskService::open(
+        &dir.path().join("tasks.db"),
+        DeviceRef {
+            deployment_id: DeploymentId::from_u128(1),
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        },
+        context.clone(),
+    )
+    .await
+    .unwrap();
+    let mut command = test_command(&context);
+    let marker = dir.path().join("executions.txt");
+    command
+        .options
+        .env
+        .insert("PAB_TEST_VALUE".into(), "中文".into());
+    command.options.env.insert(
+        "PAB_TEST_MARKER".into(),
+        marker.to_string_lossy().into_owned(),
+    );
+    command.options.stdin_text = Some("stdin 😀".into());
+    command.options.timeout_ms = Some(15000);
+    #[cfg(windows)]
+    {
+        command.program = "powershell.exe".into();
+        command.args=vec!["-NoProfile".into(),"-NonInteractive".into(),"-Command".into(),"[Console]::InputEncoding=[Text.UTF8Encoding]::new($false);[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);[IO.File]::AppendAllText($env:PAB_TEST_MARKER,'x');[Console]::Out.Write($env:PAB_TEST_VALUE+':'+[Console]::In.ReadToEnd())".into()];
+    }
+    #[cfg(not(windows))]
+    {
+        command.program = "/bin/sh".into();
+        command.args = vec![
+            "-c".into(),
+            "printf x >> \"$PAB_TEST_MARKER\"; printf '%s:' \"$PAB_TEST_VALUE\"; cat".into(),
+        ];
+    }
+    let id = RequestId::new();
+    let first = svc
+        .submit_command(account(5), id, command.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        svc.submit_command(account(5), id, command.clone())
+            .await
+            .unwrap()
+            .task_ref,
+        first.task_ref
+    );
+    let completed = wait_command(&svc, first.task_ref).await;
+    assert_eq!(
+        completed.state,
+        TaskState::Succeeded,
+        "{:?}",
+        completed.error
+    );
+    assert_eq!(std::fs::read_to_string(marker).unwrap(), "x");
+    let (output, _) = svc
+        .store
+        .read_output(account(5), first.task_ref, OutputStream::Stdout, 0, 8192)
+        .await
+        .unwrap();
+    assert_eq!(String::from_utf8(output.bytes).unwrap(), "中文:stdin 😀");
+    command.options.stdin_text = Some("different".into());
+    assert!(
+        svc.submit_command(account(5), id, command.clone())
+            .await
+            .is_err()
+    );
+    command.options = pab_protocol::CommandOptions {
+        timeout_ms: Some(50),
+        ..Default::default()
+    };
+    #[cfg(windows)]
+    {
+        command.args = vec![
+            "-NoProfile".into(),
+            "-NonInteractive".into(),
+            "-Command".into(),
+            "Start-Sleep -Seconds 10".into(),
+        ];
+    }
+    #[cfg(not(windows))]
+    {
+        command.program = "/bin/sleep".into();
+        command.args = vec!["10".into()];
+    }
+    let task = svc
+        .submit_command(account(5), RequestId::new(), command)
+        .await
+        .unwrap();
+    let completed = wait_command(&svc, task.task_ref).await;
+    assert_eq!(completed.state, TaskState::Failed);
+    assert_eq!(completed.error.unwrap().code, "execution_timeout");
+}
+
+async fn wait_command(svc: &TaskService, task: TaskRef) -> TaskSnapshot {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            let record = svc.store.get_task(account(5), task).await.unwrap();
+            if record.state.is_terminal() {
+                return record;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
 }

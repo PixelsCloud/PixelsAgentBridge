@@ -226,9 +226,9 @@ async fn quota_restart_and_missing_worker_do_not_resample_original_id() {
     let q = SystemQuery::Disks { limit: 1 };
     let id = RequestId::new();
     let permits = svc
-        .system_slots
+        .system_pending_slots
         .clone()
-        .acquire_many_owned(2)
+        .acquire_many_owned(16)
         .await
         .unwrap();
     let r = svc.system_query(actor(), id, q.clone()).await.unwrap();
@@ -252,31 +252,115 @@ async fn quota_restart_and_missing_worker_do_not_resample_original_id() {
 }
 
 #[tokio::test]
-async fn collector_busy_is_bounded_and_other_queries_can_resume() {
+async fn collector_contention_queues_and_resumes_without_resampling() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path()).await;
     let q = SystemQuery::Disks { limit: 1 };
-    let collector = svc.system_collector.clone();
-    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
-    let (release_tx, release_rx) = std::sync::mpsc::channel();
-    let holder = std::thread::spawn(move || {
-        let _guard = collector.lock().unwrap();
-        ready_tx.send(()).unwrap();
-        let _ = release_rx.recv();
-    });
-    ready_rx.await.unwrap();
+    let guard = svc.system_collector.clone().lock_owned().await;
     let id = RequestId::new();
-    let r = svc.system_query(actor(), id, q.clone()).await.unwrap();
-    assert_eq!(r.state, "failed");
-    assert!(r.error.unwrap().contains("executor_busy"));
-    release_tx.send(()).unwrap();
-    holder.join().unwrap();
-    assert_eq!(
-        svc.system_query(actor(), RequestId::new(), q)
+    let worker_svc = svc.clone();
+    let worker_q = q.clone();
+    let worker = tokio::spawn(async move {
+        worker_svc
+            .system_query(actor(), id, worker_q)
             .await
             .unwrap()
-            .state,
-        "completed"
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !svc.system_jobs.lock().await.contains(&id) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        svc.get_system_query(actor(), id).await.unwrap().state,
+        "running"
+    );
+    drop(guard);
+    let r = worker.await.unwrap();
+    assert_eq!(r.state, "completed");
+    assert_eq!(svc.system_query(actor(), id, q).await.unwrap(), r);
+}
+
+#[tokio::test]
+async fn queued_cancellation_never_executes_and_queue_deadline_is_persisted() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let permits = svc
+        .system_slots
+        .clone()
+        .acquire_many_owned(2)
+        .await
+        .unwrap();
+    let id = RequestId::new();
+    let query = SystemQuery::Git {
+        query: pab_protocol::GitQuery {
+            repo: dir
+                .path()
+                .join("not-a-repository")
+                .to_string_lossy()
+                .into_owned(),
+            action: pab_protocol::GitAction::Checkout {
+                reference: "main".into(),
+                detach: false,
+            },
+            timeout_ms: 1000,
+        },
+    };
+    let pending = svc.system_query(actor(), id, query.clone()).await.unwrap();
+    assert_eq!(pending.state, "running");
+    assert!(pending.warnings.iter().any(|w| w.starts_with("queued:")));
+    assert_eq!(
+        svc.cancel_system_query(actor(), id).await.unwrap().state,
+        "cancel_requested"
+    );
+    let cancelled = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let value = svc.get_system_query(actor(), id).await.unwrap();
+            if value.state != "running" {
+                break value;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(cancelled.state, "cancelled");
+    assert_eq!(
+        cancelled.error.as_deref(),
+        Some("cancelled before execution")
+    );
+    assert_eq!(
+        svc.system_query(actor(), id, query).await.unwrap(),
+        cancelled
+    );
+    let id = RequestId::new();
+    let query = SystemQuery::Disks { limit: 1 };
+    let _ = svc.system_query(actor(), id, query.clone()).await.unwrap();
+    let terminal = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let value = svc.get_system_query(actor(), id).await.unwrap();
+            if value.state != "running" {
+                break value;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(terminal.state, "failed");
+    assert!(
+        terminal
+            .error
+            .as_deref()
+            .unwrap()
+            .starts_with("queue_timeout:")
+    );
+    drop(permits);
+    assert_eq!(
+        svc.system_query(actor(), id, query).await.unwrap(),
+        terminal
     );
 }
 

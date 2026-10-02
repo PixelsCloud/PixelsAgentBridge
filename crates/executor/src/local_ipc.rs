@@ -290,7 +290,7 @@ pub(crate) async fn request_desktop_query(
         .last()
         .filter(|p| {
             p.desktop_schema_version
-                .is_some_and(|v| v >= pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION)
+                .is_some_and(|v| v >= query.required_helper_version())
         })
         .map(|p| p.sender.clone())
         .ok_or(LocalIpcError::WindowHelperUnavailable)?;
@@ -1072,6 +1072,141 @@ mod tests {
             request_desktop_query(RequestId::new(), DesktopQuery::Windows {}).await,
             Err(LocalIpcError::WindowHelperUnavailable)
         ));
+        drop(socket);
+        wait_helper_removed(provider).await;
+        server.abort();
+    }
+    #[tokio::test]
+    async fn helper_v1_accepts_single_commands_but_rejects_batches_before_dispatch() {
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (_dir, mut socket, server, provider) = screenshot_helper().await;
+        window_providers()
+            .lock()
+            .unwrap()
+            .last_mut()
+            .unwrap()
+            .desktop_schema_version = Some(1);
+        let query = DesktopQuery::Batch {
+            window_ref: RequestId::new().to_string(),
+            actions: vec![DesktopAction::Focus {}],
+            timeout_ms: 5000,
+        };
+        assert!(matches!(
+            request_desktop_query(RequestId::new(), query).await,
+            Err(LocalIpcError::WindowHelperUnavailable)
+        ));
+        let id = RequestId::new();
+        let request = tokio::spawn(request_desktop_query(id, DesktopQuery::Windows {}));
+        let (seen, q) = next_desktop(&mut socket).await;
+        assert_eq!(seen, id);
+        assert_eq!(q, DesktopQuery::Windows {});
+        let mut reply = SystemQueryReply::pending(id, &SystemQuery::Desktop { query: q });
+        reply.state = "completed".into();
+        reply_desktop_query(&mut socket, &reply).await.unwrap();
+        assert_eq!(request.await.unwrap().unwrap().state, "completed");
+        drop(socket);
+        wait_helper_removed(provider).await;
+        server.abort();
+    }
+    #[tokio::test]
+    async fn concurrent_batches_serialize_at_helper_and_duplicate_never_redispatches() {
+        use crate::task_service::transfer_tests::{actor, service};
+        use pab_protocol::*;
+        let _guard = TEST_HELPER_LOCK.lock().await;
+        let (dir, mut socket, server, provider) = screenshot_helper().await;
+        let svc = service(dir.path()).await;
+        let first = RequestId::new();
+        let second = RequestId::new();
+        let q = SystemQuery::Desktop {
+            query: DesktopQuery::Batch {
+                window_ref: RequestId::new().to_string(),
+                timeout_ms: 5000,
+                actions: vec![
+                    DesktopAction::Focus {},
+                    DesktopAction::TypeText {
+                        text: "test".into(),
+                    },
+                ],
+            },
+        };
+        assert_eq!(
+            svc.system_query(actor(), first, q.clone())
+                .await
+                .unwrap()
+                .state,
+            "running"
+        );
+        assert_eq!(next_desktop(&mut socket).await.0, first);
+        let other = OperatorRef::account(UserId::from_u128(991), EndpointKey::new([91; 32]));
+        assert_eq!(
+            svc.system_query(other, second, q.clone())
+                .await
+                .unwrap()
+                .state,
+            "running"
+        );
+        assert_eq!(
+            svc.system_query(actor(), first, q.clone())
+                .await
+                .unwrap()
+                .state,
+            "running"
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), next_desktop(&mut socket))
+                .await
+                .is_err()
+        );
+        let mut reply = SystemQueryReply::pending(first, &q);
+        reply.state = "failed".into();
+        let mut snapshot = DesktopSnapshot::new("fixture".into(), "fake");
+        snapshot.batch = Some(DesktopBatchReport {
+            completed_steps: 1,
+            failed_step: Some(1),
+            steps: vec![
+                DesktopBatchStep {
+                    index: 0,
+                    kind: "focus".into(),
+                    state: "completed".into(),
+                    action_started: true,
+                    verification: Some("foreground_observed".into()),
+                    error: None,
+                },
+                DesktopBatchStep {
+                    index: 1,
+                    kind: "type_text".into(),
+                    state: "failed".into(),
+                    action_started: false,
+                    verification: None,
+                    error: Some("focus lost".into()),
+                },
+            ],
+        });
+        reply.data = Some(SystemQueryData::Desktop { snapshot });
+        reply_desktop_query(&mut socket, &reply).await.unwrap();
+        assert_eq!(next_desktop(&mut socket).await.0, second);
+        let mut second_reply = SystemQueryReply::pending(second, &q);
+        second_reply.state = "completed".into();
+        reply_desktop_query(&mut socket, &second_reply)
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if svc.get_system_query(actor(), first).await.unwrap().state == "failed" {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(svc.system_query(actor(), first, q).await.unwrap(), reply);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), next_desktop(&mut socket))
+                .await
+                .is_err()
+        );
         drop(socket);
         wait_helper_removed(provider).await;
         server.abort();

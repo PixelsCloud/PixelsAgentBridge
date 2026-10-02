@@ -18,6 +18,7 @@ fn request(path: &Path, operation: FileSystemAction) -> FileSystemRequest {
 
 fn search(mode: FileSearchMode, query: &str) -> FileSystemAction {
     FileSystemAction::Search {
+        options: Default::default(),
         mode,
         query: query.to_owned(),
         glob: "**/*".to_owned(),

@@ -3,6 +3,8 @@ mod container;
 pub use container::*;
 mod desktop_query;
 pub use desktop_query::*;
+mod desktop_batch;
+pub use desktop_batch::*;
 
 mod control;
 mod device;
@@ -80,10 +82,10 @@ pub use task::{
     TaskState, TransferDirection, TransferPhase, TransferProgress,
 };
 pub use task_session::{
-    CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent, DesktopMouseButton,
-    DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse, MAX_COMMAND_ARGUMENT_BYTES,
-    MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES, MAX_OUTPUT_READ_BYTES,
-    MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES, TransferSnapshot,
+    CommandOptions, CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent,
+    DesktopMouseButton, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
+    MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES,
+    MAX_OUTPUT_READ_BYTES, MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES, TransferSnapshot,
 };
 pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, WindowList};
 
@@ -91,3 +93,5 @@ mod system_query;
 pub use system_query::*;
 mod git;
 pub use git::*;
+
+pub use filesystem::{FileSearchOptions, LogReadState, PatchPreview, SearchContextLine};

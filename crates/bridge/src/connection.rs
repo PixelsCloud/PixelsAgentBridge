@@ -284,6 +284,25 @@ impl AuthenticatedDeviceConnection {
         request_id: RequestId,
         command: CommandTaskSpec,
     ) -> Result<TaskSnapshot, BridgeError> {
+        command
+            .options
+            .validate()
+            .map_err(|e| BridgeError::UnexpectedTaskResponse(e.into()))?;
+        if !command.options.is_default() {
+            match self
+                .task_request(DeviceTaskRequest::GetEnvironment {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                })
+                .await?
+            {
+                DeviceTaskResponse::Environment {
+                    context,
+                    command_schema_version: Some(v),
+                    ..
+                } if context.device_ref == self.device_ref && v >= 2 => {}
+                _ => return Err(BridgeError::UnsupportedCommandOptions),
+            }
+        }
         match self
             .task_request(DeviceTaskRequest::SubmitCommand {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
@@ -571,6 +590,10 @@ fn read_file(path: &std::path::Path, kind: &'static str) -> Result<Vec<u8>, Brid
 
 #[derive(Debug, Error)]
 pub enum BridgeError {
+    #[error(
+        "target Executor does not support command options v2; upgrade it before using env, stdin_text or timeout_ms"
+    )]
+    UnsupportedCommandOptions,
     #[error(transparent)]
     Config(#[from] BridgeConfigError),
     #[error(transparent)]

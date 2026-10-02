@@ -1,10 +1,10 @@
-use std::process::Stdio;
+use std::{process::Stdio, time::Duration};
 
 use pab_protocol::{
     CommandTaskSpec, OutputStream, TaskCompletion, TaskError, TaskEventKind, TaskRef,
 };
 use tokio::{
-    io::{AsyncRead, AsyncReadExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::Command,
     sync::watch,
 };
@@ -27,7 +27,13 @@ impl TaskService {
         let mut process = Command::new(&command.program);
         process
             .args(&command.args)
-            .stdin(Stdio::null())
+            .envs(&command.options.env)
+            .kill_on_drop(true)
+            .stdin(if command.options.stdin_text.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         if let Some(cwd) = &command.cwd {
@@ -55,13 +61,20 @@ impl TaskService {
         };
         let stdout = child.stdout.take().expect("stdout was piped");
         let stderr = child.stderr.take().expect("stderr was piped");
-        let stdout_task = tokio::spawn(drain_output(
+        let stdin_task = command.options.stdin_text.map(|text| {
+            let mut stdin = child.stdin.take().expect("stdin was piped");
+            tokio::spawn(async move {
+                stdin.write_all(text.as_bytes()).await?;
+                stdin.shutdown().await
+            })
+        });
+        let mut stdout_task = tokio::spawn(drain_output(
             self.store.clone(),
             task_ref,
             OutputStream::Stdout,
             stdout,
         ));
-        let stderr_task = tokio::spawn(drain_output(
+        let mut stderr_task = tokio::spawn(drain_output(
             self.store.clone(),
             task_ref,
             OutputStream::Stderr,
@@ -69,8 +82,21 @@ impl TaskService {
         ));
 
         let mut cancelled = None;
+        let mut timed_out = false;
+        let deadline = async {
+            match command.options.timeout_ms {
+                Some(ms) => tokio::time::sleep(Duration::from_millis(ms)).await,
+                None => std::future::pending::<()>().await,
+            }
+        };
         let status = tokio::select! {
+            biased;
             result = child.wait() => result,
+            _ = deadline => {
+                timed_out = true;
+                child.kill().await?;
+                child.wait().await
+            },
             changed = cancel.changed() => {
                 if changed.is_ok() {
                     cancelled = cancel.borrow().clone();
@@ -80,12 +106,46 @@ impl TaskService {
             }
         };
         let status = status?;
-        stdout_task.await??;
-        stderr_task.await??;
+        let mut input_failed = false;
+        if let Some(mut task) = stdin_task {
+            match tokio::time::timeout(Duration::from_secs(1), &mut task).await {
+                Ok(result) => {
+                    input_failed = !matches!(result, Ok(Ok(())));
+                }
+                Err(_) => {
+                    input_failed = true;
+                    task.abort();
+                    let _ = task.await;
+                }
+            }
+        }
+        let mut output_incomplete = false;
+        for task in [&mut stdout_task, &mut stderr_task] {
+            match tokio::time::timeout(Duration::from_secs(3), &mut *task).await {
+                Ok(result) => result??,
+                Err(_) => {
+                    output_incomplete = true;
+                    task.abort();
+                    let _ = task.await;
+                }
+            }
+        }
         self.finish_outputs(task_ref).await?;
 
-        let event = if let Some(reason) = cancelled {
+        let event = if timed_out {
+            TaskEventKind::Failed { error: TaskError {
+                code: "execution_timeout".into(),
+                message: "Command deadline exceeded; the direct child process was stopped. Descendant processes may remain.".into(),
+                exit_code: status.code(),
+            }}
+        } else if let Some(reason) = cancelled {
             TaskEventKind::Cancelled { reason }
+        } else if input_failed || output_incomplete {
+            TaskEventKind::Failed { error: TaskError {
+                code: if input_failed { "stdin_write_failed" } else { "output_drain_timeout" }.into(),
+                message: "The process exited, but input delivery or complete output capture could not be confirmed".into(),
+                exit_code: status.code(),
+            }}
         } else if status.success() {
             TaskEventKind::Succeeded {
                 completion: TaskCompletion {

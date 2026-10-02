@@ -89,6 +89,51 @@ pub(super) fn tools() -> Vec<Value> {
         vec!["device_code", "path"],
         false,
     );
+    for tool in &mut tools {
+        let name = tool["name"].as_str().unwrap().to_owned();
+        let props = tool["inputSchema"]["properties"].as_object_mut().unwrap();
+        if name == "pab_file_read" {
+            props.insert(
+                "mode".into(),
+                json!({"type":"string","enum":["lines","bytes","tail","follow"],"default":"lines"}),
+            );
+            props.insert(
+                "tail_bytes".into(),
+                json!({"type":"integer","minimum":4,"maximum":16384,"default":16384}),
+            );
+            props.insert(
+                "cursor".into(),
+                json!({"type":"string","minLength":1,"maxLength":4096}),
+            );
+            props.insert(
+                "wait_ms".into(),
+                json!({"type":"integer","minimum":0,"maximum":5000,"default":0}),
+            );
+            tool["description"] = json!(
+                "Read text. lines/bytes read files up to 4 MiB with full SHA-256 and expected_hash. tail/follow stream large logs without a full-file scan (filesystem v4): tail reads final tail_bytes; follow resumes cursor or raw offset, optionally waiting wait_ms<=5000. Return result.log.cursor, raw next_offset, encoding, incomplete_character and wait_expired. Preserve incomplete UTF-8/UTF-16 characters for the next call, no lossy replacements. Cursor checks file identity plus head/boundary anchors, reports replacement/truncation; it is not a full-file snapshot. Resume with mode=follow, cursor and the same encoding. tail/follow cannot use expected_hash or line selectors. max_bytes bounds raw input, text capped at 16 KiB; offsets must be encoded-character boundaries."
+            );
+        } else if name == "pab_file_search" {
+            props.insert("regex".into(), json!({"type":"boolean","default":false}));
+            props.insert("exclude".into(),json!({"type":"array","maxItems":32,"items":{"type":"string","minLength":1,"maxLength":1024}}));
+            props.insert(
+                "context_lines".into(),
+                json!({"type":"integer","minimum":0,"maximum":5,"default":0}),
+            );
+            props.insert(
+                "cursor".into(),
+                json!({"type":"string","minLength":1,"maxLength":4096}),
+            );
+            tool["description"] = json!(
+                "Search relative paths with globset and literal text or Rust regex (regex=true). exclude globs prune matching directories; hidden files included, no gitignore or link traversal. context_lines adds up to 5 lines before/after, previews limited to 160 characters. Up to 100 matches, 4096 inventory entries, 64 MiB scanned, 5 seconds per call. Continue with result.search.next_cursor and identical query/filters; observed directory changes return search_changed. Continuation is metadata-checked, not an atomic snapshot. No cursor when inventory is incomplete; inspect truncated, stop_reason and warnings. Content UTF-8/UTF-16 BOM, max 4 MiB/file. Enhanced options require filesystem v4; plain search stays v2 compatible."
+            );
+        } else if name == "pab_file_patch" {
+            props.insert("dry_run".into(), json!({"type":"boolean","default":false}));
+            let original = tool["description"].as_str().unwrap();
+            tool["description"] = json!(format!(
+                "{original} dry_run=true (filesystem v4) validates all edits and reports result.patch_preview hashes, size and match counts without publication. Applying requires a NEW request_id and the original expected_hash; preview is not a reservation."
+            ));
+        }
+    }
     tools.extend(super::mcp_filesystem_bulk::tools());
     tools
 }
@@ -118,6 +163,17 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(FileSystemRequest, Vec<
         | "pab_archive_create"
         | "pab_archive_extract" => super::mcp_filesystem_bulk::parse(name, args)?,
         "pab_file_search" => FileSystemAction::Search {
+            options: pab_protocol::FileSearchOptions {
+                regex: args["regex"].as_bool().unwrap_or(false),
+                exclude: args
+                    .get("exclude")
+                    .map(|v| serde_json::from_value(v.clone()))
+                    .transpose()
+                    .map_err(|e| e.to_string())?
+                    .unwrap_or_default(),
+                context_lines: args["context_lines"].as_u64().unwrap_or(0) as u32,
+                cursor: args["cursor"].as_str().map(str::to_owned),
+            },
             mode: serde_json::from_value::<FileSearchMode>(
                 args.get("mode").cloned().unwrap_or(json!("name")),
             )
@@ -164,6 +220,14 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(FileSystemRequest, Vec<
                 .unwrap_or(false),
         },
         "pab_file_read" => {
+            let mode = args["mode"].as_str().unwrap_or("lines");
+            if !matches!(mode, "tail" | "follow")
+                && ["tail_bytes", "cursor", "wait_ms"]
+                    .iter()
+                    .any(|k| args.get(k).is_some())
+            {
+                return Err("tail_bytes/cursor/wait_ms require tail/follow mode".into());
+            }
             let range = match args.get("mode").and_then(Value::as_str).unwrap_or("lines") {
                 "lines" => {
                     if args.get("offset").is_some() || args.get("max_bytes").is_some() {
@@ -186,7 +250,28 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(FileSystemRequest, Vec<
                             .unwrap_or(16384) as u32,
                     }
                 }
-                _ => return Err("mode must be lines or bytes".to_owned()),
+                "tail" | "follow" => {
+                    if args.get("start_line").is_some() || args.get("count").is_some() {
+                        return Err("line selectors require mode=lines".into());
+                    }
+                    if mode == "tail"
+                        && (args.get("cursor").is_some() || args.get("offset").is_some())
+                    {
+                        return Err("tail cannot use cursor/offset".into());
+                    }
+                    if mode == "follow" && args.get("tail_bytes").is_some() {
+                        return Err("tail_bytes requires mode=tail".into());
+                    }
+                    TextReadRange::Stream {
+                        offset: args["offset"].as_u64(),
+                        tail_bytes: (mode == "tail")
+                            .then(|| args["tail_bytes"].as_u64().unwrap_or(16384) as u32),
+                        cursor: args["cursor"].as_str().map(str::to_owned),
+                        max_bytes: args["max_bytes"].as_u64().unwrap_or(16384) as u32,
+                        wait_ms: args["wait_ms"].as_u64().unwrap_or(0) as u32,
+                    }
+                }
+                _ => return Err("mode must be lines, bytes, tail or follow".to_owned()),
             };
             FileSystemAction::Read {
                 range,
@@ -240,6 +325,7 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(FileSystemRequest, Vec<
             }
             payload = serde_json::to_vec(&edits).map_err(|error| error.to_string())?;
             FileSystemAction::Patch {
+                dry_run: args["dry_run"].as_bool().unwrap_or(false),
                 expected_hash: expected_hash.ok_or("expected_hash is required")?,
                 encoding,
             }
@@ -301,13 +387,39 @@ pub(super) async fn call(
 mod tests {
     use super::*;
     #[test]
+    fn enhanced_modes_have_strict_selectors_and_preserve_cursor_and_preview() {
+        for args in [
+            json!({"path":"/tmp/log","mode":"tail","offset":0}),
+            json!({"path":"/tmp/log","mode":"follow","cursor":"x","offset":0}),
+            json!({"path":"/tmp/log","mode":"follow","wait_ms":5001}),
+            json!({"path":"/tmp/log","mode":"follow","expected_hash":"a".repeat(64)}),
+            json!({"path":"/tmp/log","mode":"lines","cursor":"x"}),
+        ] {
+            assert!(parse("pab_file_read", &args).is_err());
+        }
+        let (request, _) = parse(
+            "pab_file_read",
+            &json!({"path":"/tmp/log","mode":"follow","cursor":"cursor","wait_ms":1000}),
+        )
+        .unwrap();
+        assert_eq!(request.operation.schema_version(), 4);
+        assert!(
+            matches!(request.operation,FileSystemAction::Read{range:TextReadRange::Stream{cursor:Some(c),wait_ms:1000,..},..} if c=="cursor")
+        );
+        let (request,_) = parse("pab_file_patch",&json!({"path":"/tmp/file","expected_hash":"a".repeat(64),"dry_run":true,"edits":[{"find":"a","replace":"b"}]})).unwrap();
+        assert_eq!(request.operation.schema_version(), 4);
+        assert!(!request.operation.mutates());
+        let (request,_) = parse("pab_file_search",&json!({"path":"/tmp/work","query":"err.*","regex":true,"exclude":["node_modules/**"],"context_lines":2,"cursor":"cursor"})).unwrap();
+        assert_eq!(request.operation.schema_version(), 4);
+    }
+    #[test]
     fn b2_tools_validate_limits_and_mkdir_never_requires_a_binary_payload() {
         let (_, payload) = parse("pab_mkdir", &json!({ "path":"/tmp/new" })).unwrap();
         assert!(payload.is_empty());
         for args in [
             json!({"device_code":"123456789","path":"/tmp/root","query":"x","max_results":101}),
             json!({"device_code":"123456789","path":"/tmp/root","query":"x","max_depth":0}),
-            json!({"device_code":"123456789","path":"/tmp/root","query":"x","regex":true}),
+            json!({"device_code":"123456789","path":"/tmp/root","query":"x","regex":"true"}),
         ] {
             assert!(
                 super::super::mcp_catalog::validate_arguments("pab_file_search", &args).is_err()

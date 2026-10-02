@@ -104,6 +104,55 @@ mod tests {
     use super::*;
     use pab_protocol::*;
     #[tokio::test]
+    async fn batch_deduplication_binds_all_steps_without_persisting_text_or_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::open(&dir.path().join("tasks.sqlite3"))
+            .await
+            .unwrap();
+        let actor = crate::task_service::transfer_tests::actor();
+        let id = RequestId::new();
+        let mut q = SystemQuery::Desktop {
+            query: DesktopQuery::Batch {
+                window_ref: RequestId::new().to_string(),
+                timeout_ms: 5000,
+                actions: vec![
+                    DesktopAction::TypeText {
+                        text: "batch秘密".into(),
+                    },
+                    DesktopAction::KeyChord {
+                        modifiers: vec![],
+                        key: "x".into(),
+                    },
+                ],
+            },
+        };
+        assert!(store.accept_system_query(actor, id, &q).await.unwrap());
+        assert!(!store.accept_system_query(actor, id, &q).await.unwrap());
+        let saved: String =
+            sqlx::query_scalar("SELECT query_json FROM system_query_results WHERE request_id=?")
+                .bind(id.to_string())
+                .fetch_one(&store.pool)
+                .await
+                .unwrap();
+        assert!(!saved.contains("秘密") && !saved.contains(r#""key":"x""#));
+        assert_eq!(saved.matches("blake3:").count(), 2);
+        if let SystemQuery::Desktop {
+            query: DesktopQuery::Batch { actions, .. },
+        } = &mut q
+        {
+            actions.reverse();
+        }
+        assert!(matches!(
+            store.accept_system_query(actor, id, &q).await,
+            Err(TaskStoreError::RequestConflict)
+        ));
+        store.interrupt_read_operations().await.unwrap();
+        assert_eq!(
+            store.get_system_query(actor, id).await.unwrap().state,
+            "unconfirmed"
+        );
+    }
+    #[tokio::test]
     async fn text_identity_is_private_deduplicated_owned_and_unconfirmed_after_restart() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("tasks.sqlite3");

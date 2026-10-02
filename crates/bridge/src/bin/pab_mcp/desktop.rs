@@ -41,6 +41,25 @@ pub fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), Strin
             .ok_or("window_ref required")
     };
     let query = match name {
+        "pab_desktop_input" => {
+            if args.get("event").is_some() {
+                return Err("event and batch actions are mutually exclusive".into());
+            }
+            DesktopQuery::Batch {
+                window_ref: reference()?,
+                actions: serde_json::from_value(
+                    args.get("actions").cloned().ok_or("actions required")?,
+                )
+                .map_err(|e| e.to_string())?,
+                timeout_ms: match args.get("timeout_ms") {
+                    None => 5000,
+                    Some(v) => v
+                        .as_u64()
+                        .and_then(|v| u32::try_from(v).ok())
+                        .ok_or("timeout_ms must be an integer")?,
+                },
+            }
+        }
         "pab_list_monitors" => DesktopQuery::Monitors {},
         "pab_list_windows" => DesktopQuery::Windows {},
         "pab_focus_window" => DesktopQuery::Focus {
@@ -66,6 +85,39 @@ pub fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), Strin
     query.validate().map_err(str::to_owned)?;
     Ok((id, SystemQuery::Desktop { query }))
 }
+
+pub fn enhance_input_tool(tool: &mut Value) {
+    tool["description"] = json!(
+        "Send legacy event OR a window-bound ordered batch (actions), never both. Batch requires window_ref from pab_list_windows, Executor system v7 and helper v2. 1..32 actions: focus, control, type_text, key_chord, click, scroll, wait. Text total <=4096 UTF-8 bytes. Stops on first error, reports zero-based per-step completed/failed/unconfirmed/skipped results; no rollback or automatic replay. Use request_id for batch deduplication; query original operation_ref when running/unconfirmed. timeout_ms (default 5000, 100..10000) is checked between actions, not a hard OS-call deadline. Helper serializes the whole batch with other helper input, but cannot exclude physical input/other software. Keys/buttons are released on ordinary failures. Click coordinates are pixels relative to the current outer window rectangle, NOT screenshot image pixels. Click/scroll require the pointer to target this foreground window; text/keys also require foreground, so start with focus if needed. Input API acceptance does not verify application effects. Legacy event retains its existing behavior and does not accept batch parameters: mouse_move (x/y 0..65535), mouse_button (button left/right/middle, down), mouse_wheel (delta), key (virtual_key, down), secure_attention (Windows Ctrl+Alt+Delete)."
+    );
+    let p = &mut tool["inputSchema"]["properties"];
+    p["window_ref"] = json!({"type":"string","format":"uuid"});
+    p["request_id"] = json!({"type":"string","format":"uuid"});
+    p["timeout_ms"] = json!({"type":"integer","minimum":100,"maximum":10000,"default":5000});
+    let action = |kind: &str, extra: Value, required: Vec<&str>| {
+        let mut properties = json!({"type":{"type":"string","const":kind}});
+        for (k, v) in extra.as_object().unwrap() {
+            properties[k] = v.clone();
+        }
+        let mut fields = vec!["type"];
+        fields.extend(required);
+        json!({"type":"object","properties":properties,"required":fields,"additionalProperties":false})
+    };
+    p["actions"] = json!({"type":"array","minItems":1,"maxItems":32,"items":{"oneOf":[
+        action("focus",json!({}),vec![]),
+        action("control",json!({"control":{"type":"string","enum":["minimize","maximize","restore","close"]}}),vec!["control"]),
+        action("type_text",json!({"text":{"type":"string","minLength":1,"maxLength":4096}}),vec!["text"]),
+        action("click",json!({"x":{"type":"integer","minimum":0,"maximum":65535},"y":{"type":"integer","minimum":0,"maximum":65535},"button":{"type":"string","enum":["left","right","middle"]}}),vec!["x","y","button"]),
+        action("key_chord",json!({"modifiers":{"type":"array","maxItems":4,"uniqueItems":true,"items":{"type":"string","enum":["control","alt","shift","meta"]}},"key":{"type":"string","pattern":"^([a-z0-9]|enter|tab|escape|space|backspace|delete|left|right|up|down|home|end|page_up|page_down|f([1-9]|1[0-2]))$"}}),vec!["modifiers","key"]),
+        action("scroll",json!({"axis":{"type":"string","enum":["horizontal","vertical"]},"amount":{"type":"integer","minimum":-100,"maximum":100,"not":{"const":0}}}),vec!["axis","amount"]),
+        action("wait",json!({"ms":{"type":"integer","minimum":1,"maximum":2000}}),vec!["ms"])
+    ]}});
+    tool["inputSchema"]["required"] = json!(["device_code"]);
+    tool["inputSchema"]["oneOf"] = json!([
+        {"required":["event"],"not":{"anyOf":[{"required":["actions"]},{"required":["window_ref"]},{"required":["timeout_ms"]},{"required":["request_id"]}]}},
+        {"required":["actions","window_ref"],"not":{"required":["event"]}}
+    ]);
+}
 pub async fn call(runtime: &BridgeRuntime, name: &str, args: &Value) -> Result<Value, String> {
     let (id, query) = parse(name, args)?;
     let device = super::mcp_tools::resolve_target(runtime, args).await?;
@@ -85,6 +137,44 @@ pub async fn call(runtime: &BridgeRuntime, name: &str, args: &Value) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn input_batch_schema_and_parser_reject_mixed_or_incomplete_requests() {
+        let reference = RequestId::new().to_string();
+        let valid = json!({"device_code":"123456789","window_ref":reference,"actions":[{"type":"focus"},{"type":"key_chord","modifiers":["control"],"key":"a"},{"type":"type_text","text":"中文"}]});
+        assert!(super::super::mcp_catalog::validate_arguments("pab_desktop_input", &valid).is_ok());
+        let (_, query) = parse("pab_desktop_input", &valid).unwrap();
+        assert_eq!(query.required_version(), 7);
+        assert_eq!(query.kind(), "desktop_batch");
+        let legacy =
+            json!({"device_code":"123456789","event":{"type":"key","virtual_key":13,"down":true}});
+        assert!(
+            super::super::mcp_catalog::validate_arguments("pab_desktop_input", &legacy).is_ok()
+        );
+        for invalid in [
+            json!({"device_code":"123456789"}),
+            json!({"device_code":"123456789","actions":[]}),
+            json!({"device_code":"123456789","window_ref":reference,"actions":[{"type":"focus","extra":true}]}),
+            json!({"device_code":"123456789","window_ref":reference,"actions":[{"type":"scroll","axis":"vertical","amount":0}]}),
+            json!({"device_code":"123456789","window_ref":reference,"actions":[{"type":"key_chord","modifiers":[],"key":"inject"}]}),
+        ] {
+            assert!(
+                super::super::mcp_catalog::validate_arguments("pab_desktop_input", &invalid)
+                    .is_err(),
+                "{invalid}"
+            );
+        }
+        let mut mixed = valid.clone();
+        mixed["event"] = legacy["event"].clone();
+        assert!(
+            super::super::mcp_catalog::validate_arguments("pab_desktop_input", &mixed).is_err()
+        );
+        let mut bad_legacy = legacy;
+        bad_legacy["request_id"] = json!(RequestId::new());
+        assert!(
+            super::super::mcp_catalog::validate_arguments("pab_desktop_input", &bad_legacy)
+                .is_err()
+        );
+    }
     #[test]
     fn desktop_tools_validate_references_control_and_utf8_budget_before_dispatch() {
         let reference = RequestId::new().to_string();

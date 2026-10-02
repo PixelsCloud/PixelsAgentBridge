@@ -478,6 +478,57 @@ mod tests {
         );
     }
     #[tokio::test]
+    async fn desktop_batch_counts_as_active_and_persists_failure_without_replay() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bridge.sqlite3");
+        let queue = TransferQueue::open(&path, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&path).await.unwrap();
+        let device = DeviceRef {
+            deployment_id: DeploymentId::from_u128(1),
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let code = "123456789".parse().unwrap();
+        let id = RequestId::new();
+        let q = SystemQuery::Desktop {
+            query: DesktopQuery::Batch {
+                window_ref: RequestId::new().to_string(),
+                actions: vec![DesktopAction::TypeText {
+                    text: "private batch".into(),
+                }],
+                timeout_ms: 5000,
+            },
+        };
+        assert!(
+            store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let saved: String =
+            sqlx::query_scalar("SELECT query_json FROM runtime_system_results WHERE id=?")
+                .bind(id.to_string())
+                .fetch_one(&store.pool)
+                .await
+                .unwrap();
+        assert!(!saved.contains("private batch"));
+        let mut reply = SystemQueryReply::pending(id, &q);
+        reply.state = "failed".into();
+        reply.error = Some("batch stopped".into());
+        store.save_system_reply(&reply).await.unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 0);
+        assert!(
+            !store
+                .accept_system_query(id, &q, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(queue.system_record(id, code).await.unwrap().1, reply);
+    }
+    #[tokio::test]
     async fn lifecycle_records_are_control_operations_and_preserve_partial_failures_without_replay()
     {
         let dir = tempfile::tempdir().unwrap();

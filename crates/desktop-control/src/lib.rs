@@ -1,6 +1,7 @@
 //! Product policy around xcap/enigo and native foreign-window operations.
 use pab_protocol::*;
 use std::collections::HashMap;
+mod batch;
 #[cfg(windows)]
 #[path = "windows.rs"]
 mod native;
@@ -124,6 +125,15 @@ impl DesktopSession {
         Err("window screenshots are unsupported on this platform".into())
     }
     pub fn query(&mut self, id: RequestId, query: &DesktopQuery) -> SystemQueryReply {
+        self.query_guarded(id, query, || Ok(()))
+    }
+    /// The helper checks its active desktop between actions, including while waiting.
+    pub fn query_guarded(
+        &mut self,
+        id: RequestId,
+        query: &DesktopQuery,
+        mut guard: impl FnMut() -> Result<(), String>,
+    ) -> SystemQueryReply {
         let system = SystemQuery::Desktop {
             query: query.clone(),
         };
@@ -131,10 +141,27 @@ impl DesktopSession {
         let start = now();
         reply.sampled_from_unix_ms = Some(start);
         let mut snapshot = DesktopSnapshot::new(self.instance.clone(), native::BACKEND);
-        let result = query
-            .validate()
-            .map_err(str::to_owned)
-            .and_then(|_| self.execute(query, &mut snapshot));
+        let result = query.validate().map_err(str::to_owned).and_then(|_| {
+            if let DesktopQuery::Batch {
+                window_ref,
+                actions,
+                timeout_ms,
+            } = query
+            {
+                check_session()?;
+                batch::run(
+                    window_ref,
+                    actions,
+                    *timeout_ms,
+                    &mut snapshot,
+                    &mut guard,
+                    |action, step| self.batch_action(window_ref, action, step),
+                )
+            } else {
+                guard()?;
+                self.execute(query, &mut snapshot)
+            }
+        });
         reply.state = if result.is_ok() {
             "completed"
         } else {
@@ -146,7 +173,10 @@ impl DesktopSession {
             snapshot.verification =
                 Some("unconfirmed; re-list windows/check application; never replay this ID".into());
         }
-        reply.returned_count = (snapshot.monitors.len() + snapshot.windows.len()) as u32;
+        reply.returned_count = snapshot.batch.as_ref().map_or(
+            (snapshot.monitors.len() + snapshot.windows.len()) as u32,
+            |batch| batch.steps.len() as u32,
+        );
         reply.sampled_at_unix_ms = Some(now());
         reply.data = Some(SystemQueryData::Desktop { snapshot });
         while serde_json::to_vec(&reply).is_ok_and(|v| v.len() > MAX_SYSTEM_REPLY_BYTES) {
@@ -185,6 +215,7 @@ impl DesktopSession {
     ) -> Result<(), String> {
         check_session()?;
         match query {
+            DesktopQuery::Batch { .. } => unreachable!("batches are dispatched by query_guarded"),
             DesktopQuery::Monitors {} => {
                 let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
                 let overflow = monitors.len() > 32;

@@ -152,7 +152,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_window_control` | 最小化、最大化、还原或请求正常关闭窗口 |
 | `pab_type_text` | 向明确指定的前台窗口输入 Unicode 文字 |
 | `pab_capture_screenshot` | 以采集分辨率返回桌面或指定窗口的 JPEG，附带坐标、尺寸和哈希 |
-| `pab_desktop_input` | 发送受支持的鼠标、键盘或安全注意序列事件 |
+| `pab_desktop_input` | 发送原有单事件，或按顺序执行绑定窗口的桌面操作批次 |
 | `pab_open_terminal` | 打开交互终端 |
 | `pab_terminal_input` | 发送终端输入 |
 | `pab_terminal_read` | 读取终端输出 |
@@ -204,6 +204,14 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。
+
+### 工具分组设置
+
+在 **设置 → MCP 工具** 中选择六组工具。默认启用全部60个工具，延续现有使用方式。连接与任务（14）必选；文件（15）、系统（12）、桌面（7）、Git（8）、Docker（4）可以分别关闭。保存后通过AI客户端重启MCP进程生效；只重启Desktop不会重新加载已运行的MCP。
+
+当前用户的配置保存在PAB数据目录（设置了 `PAB_DATA_DIR` 时使用该目录）下的 `mcp-tools.json`。每个MCP只在启动时读取一次，运行中的进程和已接受的操作继续使用原有行为。关闭可选分组后，已有操作的查询和取消仍可用。工具目录与调用入口使用同一选择，手动调用已关闭工具会在初始化Runtime前失败。分组控制工具发现与调用范围，不改变设备权限或工具自动执行配置。
+
+配置使用版本1和必需的 `enabledGroups` 数组，支持 `core`、`file`、`system`、`desktop`、`git`、`container`，其中 `core` 必须保留。未知字段/分组、重复分组、未知版本或损坏配置会明确阻止MCP启动，不静默启用全部。设置页显示读取错误，允许用户重新选择并保存修复。保存复用tempfile的原子替换，避免MCP启动读到半个JSON。
 
 ### Docker 容器操作
 
@@ -260,7 +268,7 @@ Windows 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 
 
 `sample_cpu` 在系统信息中默认开启，在进程查询中默认关闭。开启后按库的最小间隔采样两次，`cpu_sample_ms` 表示区间；`cpu_usage_basis_points` 中 10000 等于 100%，进程跨核 CPU 可超过 100%。容量单位为字节；频率是第一个逻辑 CPU 的 MHz，不是所有核心的平均值。网卡返回库提供的累计计数，不是瞬时速度。
 
-`include_gpu=true` 时通过动态加载的 `nvml-wrapper` 查询 NVIDIA。GPU 分区单独报告状态与字段错误；NVML 不可用不能解释为没有显卡。AMD/Intel 后端尚未实现。系统查询等待完成，暂不支持取消；阻塞 OS/驱动调用没有硬中断期限，后台准入有界，采集器忙时返回 `executor_busy`。每个 MCP 最多 16 个未解决的系统查询。相同 `request_id` 通过 `pab_get_operation` 读取原采样，省略 ID 才产生新采样；中断或结果未确认时不自动重跑。Desktop 任务记录显示查询类型和返回项数。
+`include_gpu=true` 时通过动态加载的 `nvml-wrapper` 查询 NVIDIA。GPU 分区单独报告状态与字段错误；NVML 不可用不能解释为没有显卡。AMD/Intel 后端尚未实现。系统读取最多等待 5 秒后返回当前状态，未完成时用原 ID 查询；暂不支持取消阻塞 OS/驱动读取。Executor 同时执行最多 2 个系统查询，共接受最多 16 个执行中或排队请求；等待执行槽位和采集器锁各最多 5 秒。队列满返回 `executor_busy`，排队超时返回 `queue_timeout`，不会重新采样。Git/Docker 排队请求支持取消，取消后不派发执行。每个 MCP 最多 16 个未解决的系统查询。相同 `request_id` 通过 `pab_get_operation` 读取原采样，省略 ID 才产生新采样；中断或结果未确认时不自动重跑。Desktop 任务记录显示查询类型和返回项数。
 
 这组工具已通过 Windows 本地测试，包含真实进程生命周期、结果持久化和隔离 QUIC。安装后的宿主、Windows/Linux 双机和完整 NVIDIA 硬件验收仍待完成；现有安装包不含本批改动。
 
@@ -273,7 +281,7 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 会话查询列出 OS 会话，不是账户、MCP 会话或 PAB 终端。Windows WTS 可以包含尚无登录用户的服务/监听会话。Linux 通过系统总线访问 logind，采集期限为 5 秒；logind 缺失、访问失败或不支持的平台明确失败，可选字段失败写入每项 `errors`。用户名和状态过滤均为精确匹配。这三个工具已通过 Windows 本地测试、本地 DNS 替身和隔离 QUIC；Linux 采集库交叉编译检查通过。Linux/macOS 运行时和安装后的宿主验收仍待完成。
 
 文本工具要求目标 Executor 也升级。支持 UTF-8、UTF-16 和 BOM 检测，不静默替换
-无法解码的字节。文件上限 4 MiB，单次最多返回 16 KiB UTF-8 文本，写入及补丁
+无法解码的字节。普通按行/按字节读取及修改的文件上限 4 MiB，单次最多返回 16 KiB UTF-8 文本，写入及补丁
 输入上限 128 KiB。继续读取时使用 `next_offset`，把返回的 `metadata.sha256`
 作为 `expected_hash`。补丁的每项包含 `find`、`replace` 和 `expected_matches`
 （默认 1），全部针对原文匹配，不允许重叠。写入与修改返回 `operation_ref`，
@@ -281,7 +289,25 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 这一组有界文本操作等待完成返回，暂不支持取消。文件正文使用设备二进制通道，
 不写入任务记录。版本检查与 PAB 路径锁不等于针对外部编辑器的操作系统级原子 CAS。
 
-搜索、Hash 和创建目录要求目标 Executor 的文件能力版本为 2，原有文本工具仍兼容版本 1。搜索使用字面子串，不是正则表达式；默认按名称、区分大小写，glob 使用 `/` 分隔的相对路径，例如 `**/*.rs`。会包含隐藏文件，不应用 gitignore。每次最多返回 100 项；内容匹配返回行号、最多 160 字符的行首预览和该文件的 SHA-256。扫描受到 4096 项、64 MiB 读取计费预算、5 秒和输出字节上限约束；通过 `truncated`、`stop_reason`、跳过数和有限警告说明不完整结果，不提供变化中目录的实时分页。
+搜索、Hash 和创建目录要求目标 Executor 的文件能力版本为 2，原有文本工具仍兼容版本 1。搜索默认使用字面子串；默认按名称、区分大小写，glob 使用 `/` 分隔的相对路径，例如 `**/*.rs`。会包含隐藏文件，不应用 gitignore。每次最多返回 100 项；内容匹配返回行号、最多 160 字符的行首预览和该文件的 SHA-256。扫描受到 4096 项、64 MiB 读取计费预算、5 秒和输出字节上限约束；通过 `truncated`、`stop_reason`、跳过数和有限警告说明不完整结果，目录不会被当作原子快照；新版支持带版本复核的续查，见下文。
+
+文件能力 v4 在原工具上增加以下参数：
+
+- `pab_file_read` 的 `mode: "tail"` 读取文件末尾，`tail_bytes` 默认 16384；`mode: "follow"` 使用 `cursor` 或原始字节 `offset` 续读，`wait_ms` 为 0–5000。这两种模式按块读取大日志，不受普通文本读取的 4 MiB 文件上限约束，不计算整文件哈希，也不接受 `expected_hash`。`max_bytes` 为 4–16384，返回文本也最多 16 KiB。每次返回 `result.log.cursor`；下一次携带该 cursor 和原编码，使用新读取请求。末尾不完整的 UTF-8 字符、UTF-16 单元/代理对保留到下一次，`incomplete_character` 明确标记；没有新内容时返回 `wait_expired`。文件身份由 `same-file` 获取，cursor 校验文件头及读取边界附近的字节，观察到轮转、截断或相关字节变化时返回 `log_changed`。这不是整文件历史快照，不能检测所有中间区域的外部改写。尾部读取从字符边界开始，可能省略窗口开头的不完整字符；UTF-16 无 BOM 时仍需显式指定编码。
+- `pab_file_search` 增加 `regex`、`exclude`、`context_lines`、`cursor`。正则采用 [Rust regex](https://docs.rs/regex/1.13.1/regex/struct.RegexBuilder.html)，使用有限编译预算；不支持的语法明确报错。排除规则继续使用 `globset`，例如 `["node_modules/**", ".git/**"]`，匹配目录时剪枝。上下文最多前后各 5 行，每行预览最多 160 字符。返回 `result.search.next_cursor` 后，保持查询及过滤参数继续调用；会复核排序后的目录元数据清单和续读文件哈希，观察到变化时返回 `search_changed`。清单因深度、条数或时间预算不完整时不发续查 cursor；检查 `truncated`、`stop_reason`、warnings。5 秒为按 I/O/行检查的扫描预算，不承诺硬中断单个底层调用或正则匹配。
+- `pab_file_patch` 增加 `dry_run: true`。复用已有多处非重叠替换和哈希检查，返回 `patch_preview` 的原哈希、预计结果哈希/大小、是否变化和各项匹配次数，不发布文件。正式应用使用**新 request_id**、`dry_run: false` 和原 `expected_hash`；文件期间变化则拒绝写入。预览不是锁定文件的预约，也不是新审批步骤。
+
+例如读取最后 8 KiB 并继续等待日志：
+
+```json
+{ "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "tail", "tail_bytes": 8192 }
+```
+
+```json
+{ "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "follow", "cursor": "上次 result.log.cursor", "wait_ms": 5000 }
+```
+
+这些增强需要新 MCP 和支持文件能力 v4 的 Executor；旧端会在执行前被拒绝，不会忽略新参数。基础参数仍保持旧版线格式及请求去重指纹。Windows 本机自动化和隔离 QUIC 已验证；安装版真实宿主及 Linux/macOS 原生验收仍待完成。
 
 `pab_file_hash` 在远端确认接收后返回 `operation_ref`，后台按 256 KiB 分块计算，不全量载入大文件。使用 `pab_get_operation` 查询 `progress.completed_bytes`、`progress.total_bytes` 和最终 `metadata.sha256`；使用 `pab_cancel_operation` 请求停止。只有 `cancelled` 才确认已停止。Executor 同时最多 4 个 Hash 作业，每个最多 30 分钟，单次读取超时为 30 秒。相同 `request_id` 返回原操作，文件后续变化也不会触发重算。观察到大小、修改时间或可用身份变化时明确失败，不宣称提供外部并发写入下的原子快照。MCP 会周期刷新活动记录；离线查询可能返回最后保存的状态，应结合进度时间判断新鲜度。
 
@@ -320,6 +346,44 @@ helper 连接；重连、切换桌面、窗口销毁或身份标记丢失后失�
 重启后也不重放已接受的修改操作。这些操作不能取消或撤销。持久化记录仅保存输入文字的
 BLAKE3 摘要，不保存原文；摘要不是加密，不能防止对可预测文字的猜测。目标应用和 AI
 宿主仍可能保留输入文字。
+
+### 桌面批量操作
+
+`pab_desktop_input` 保留原有 `event`，并新增互斥的批量形式：`window_ref`、
+`actions`、可选 `request_id` 和 `timeout_ms`（默认 5000，范围 100–10000）。
+批量操作要求 Executor 系统能力 v7、桌面 helper v2；旧 helper 仍可使用原有单窗口工具。
+列出窗口后，用实际返回的引用替换示例值：
+
+```json
+{
+  "device_code": "123456789",
+  "window_ref": "替换为返回的窗口引用",
+  "actions": [
+    {"type": "focus"},
+    {"type": "key_chord", "modifiers": ["control"], "key": "a"},
+    {"type": "type_text", "text": "Hello 世界"}
+  ]
+}
+```
+
+每批 1–32 步，支持 `focus`、`control`、`type_text`、`key_chord`、`click`、
+`scroll`、`wait`，全部绑定同一窗口。文字合计最多 4096 UTF-8 字节；单次等待
+1–2000 ms，等待总和须小于整批期限。快捷键使用不重复的 `control/alt/shift/meta`
+修饰键，以及小写字母、数字、`f1`–`f12` 或 `enter/tab/page_down` 等命名键。
+点击坐标相对执行时的窗口外框，采用 xcap 原生坐标，不是截图像素。点击前校验鼠标
+实际指向的窗口；滚动要求鼠标已位于目标前台窗口内，`axis` 为 `horizontal/vertical`，
+`amount` 为 -100 至 100 的非零值，正数向右/下。
+
+当前 helper 将整批作为一个请求处理，其他 Agent 的 helper 输入不会穿插其中，但
+无法排除用户或其他软件的操作。输入前校验窗口身份和焦点，每步之间及等待期间校验
+活动桌面。任一步出错即停止后续步骤；`result.data.snapshot.batch` 返回从 0 开始的
+索引、完成数、失败步骤，以及各步 `completed/failed/unconfirmed/skipped` 状态。
+已发生的效果不回滚，输入 API 接受也不代表应用内容正确。普通错误路径会释放按键和
+鼠标按钮；进程被强制结束时无法保证清理。
+
+期限控制后续步骤是否开始，不能硬中断阻塞的系统调用。耗时请求可先返回 `running`，
+使用原 `operation_ref` 查询；同一 `request_id` 不重放。持久化请求身份对输入文字和
+快捷键值做哈希。helper 断开或 Executor 重启可能留下结果未确认的记录，不自动重试。
 
 ### 当前桌面与窗口截图
 
@@ -362,6 +426,18 @@ JPEG 模式的显示器和窗口采集均要求 v3，旧 helper 返回升级提�
 JPEG 编码及超过 8 MiB 图片的隔离助手/QUIC/历史记录/MCP 返回；
 物理 4K/多屏、安装后宿主呈图，以及 Linux/macOS 图形环境仍待验收。
 
+
+### 命令、等待和输出增强
+
+- `pab_run_command` 支持 `request_id`、`env`、`stdin_text`、`timeout_ms` 和 `wait_ms`。相同 ID、相同参数读取原任务，参数不同报冲突；重试时沿用原 ID。
+- `env` 合并到目标进程继承的环境，最多 64 项、总计 8 KiB；`stdin_text` 最多 16 KiB UTF-8，写完关闭标准输入。`timeout_ms` 为 1–86400000，省略则不增加执行期限。超时停止直接子进程，不保证清理全部后代；输出排空失败也会明确报告。
+- 命令 `wait_ms` 默认 0，最多 30000，仅控制远端接收后的结果等待，不限制建立连接或提交的时间。等待内完成时附带 stdout/stderr 各最后 8 KiB；更早的内容通过 `pab_read_output` 读取。等待到期返回原任务引用，不表示执行失败。
+- `pab_get_task` / `pab_get_operation` 支持 `wait_ms`、`wait_until: "change" | "complete"`、`after_revision`，返回 `revision`、`changed`、`wait_expired`。下一次查询带上上次的 revision；等待预算包含首个快照读取，但首次读取本身不会被强行取消。
+- `pab_read_output` 支持 `max_bytes`（4–65536）、`tail_bytes`（1–65536，与 offset 互斥）、`contains` 和 `wait_ms`。使用 `next_offset` 续读；过滤只针对当前返回块的文本行，不保证跨块匹配，游标仍跳过全部已扫描字节。保留期导致的缺口通过 `gap` 报告；非完整 UTF-8 解码替换通过 `decoding_replacements` 报告。
+- `pab_connect` 默认等待 5000 ms，可设置 0–30000。未完成时返回 `state: "connecting"` 和 `connection_ref`；再次调用相同设备复用正在进行的尝试，`pab_disconnect` 可停止等待中的尝试。单次后台连接最多约 120 秒，失败后返回明确错误，可重新发起。
+- 工具错误保留原消息，同时返回 `error.code`、`phase`、`retry_action` 和可用的请求引用；网络结果未确认时应查询原操作，不自动换 ID 重做。
+
+`env`、`stdin_text`、`timeout_ms` 需要目标 Executor 支持 command schema v2；旧端会在发送命令前被明确拒绝，不会静默丢弃参数。旧的普通命令保持兼容。以上是源码能力，升级 MCP 和目标 Executor 后生效。
 
 ### 示例：执行命令与读取结果
 
@@ -433,6 +509,14 @@ Bridge 不会隐式添加 Shell，使用 Shell 语法时需要明确指定解释
 
 Desktop 和每个 MCP 进程分别维护设备连接。在 Desktop 中断开设备，
 不会自动断开 Agent 的 MCP 连接；多个 Agent 也分别拥有自己的 Runtime。
+
+默认访客模式下，每个 MCP 在用户数据目录的 `mcp-endpoints/guest-<槽位>.key`
+中保留独立身份。操作系统文件锁保证运行中的进程不会占用同一槽位；正常退出或崩溃后
+释放占用，后续进程可复用空闲槽位，连接重试则保持原身份。
+Desktop 继续使用 `guest-endpoint.key`，设备记录和保存的密码仍共用原数据库。
+MCP 运行期间不要删除槽位密钥或锁文件。手工配置账号模式（`PAB_MCP_GUEST=0`）时，
+并发进程需分别配置已注册的 `PAB_ENDPOINT_SECRET_FILE`，占用中的密钥会明确报错。
+安装此修复后，需要重启已有 MCP 进程才能生效。
 
 Desktop 主进程在 `0.0.0.0:26035` 提供 Axum 状态服务：
 

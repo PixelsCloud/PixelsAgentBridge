@@ -286,6 +286,9 @@ impl TaskService {
                 encoding,
                 expected_hash,
             } => {
+                if matches!(range, pab_protocol::TextReadRange::Stream { .. }) {
+                    return super::filesystem_log::read(path, range, *encoding, reply).await;
+                }
                 let (bytes, value) = load(path).await?;
                 check_hash(&bytes, expected_hash.as_deref())?;
                 let doc = text::decode(&bytes, *encoding)?;
@@ -327,6 +330,7 @@ impl TaskService {
             FileSystemAction::Patch {
                 expected_hash,
                 encoding,
+                dry_run,
             } => {
                 let edits: Vec<TextEdit> = serde_json::from_slice(payload)
                     .map_err(|error| FileError::new("invalid_edits", "input", error.to_string()))?;
@@ -347,6 +351,16 @@ impl TaskService {
                 let doc = text::decode(&original, *encoding)?;
                 let updated = text::patch(&doc.text, &edits)?;
                 let bytes = text::encode(&updated, doc.encoding, doc.bom > 0)?;
+                if *dry_run {
+                    reply.patch_preview = Some(pab_protocol::PatchPreview {
+                        original_sha256: digest(&original),
+                        result_sha256: digest(&bytes),
+                        result_size: bytes.len() as u64,
+                        changed: original != bytes,
+                        matched_edits: edits.iter().map(|e| e.expected_matches).collect(),
+                    });
+                    return Ok(Vec::new());
+                }
                 self.publish_locked(
                     request,
                     &bytes,
@@ -373,3 +387,7 @@ mod b2_tests;
 #[cfg(test)]
 #[path = "filesystem_b3_tests.rs"]
 mod b3_tests;
+
+#[cfg(test)]
+#[path = "filesystem_enhanced_tests.rs"]
+mod enhanced_tests;

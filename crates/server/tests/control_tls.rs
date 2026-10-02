@@ -1221,6 +1221,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .submit_command(
             RequestId::new(),
             CommandTaskSpec {
+                options: Default::default(),
                 program,
                 args,
                 cwd: None,
@@ -1306,6 +1307,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .submit_command(
             RequestId::new(),
             CommandTaskSpec {
+                options: Default::default(),
                 program: cancel_program,
                 args: cancel_args,
                 cwd: None,
@@ -1534,6 +1536,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .submit_command(
             RequestId::new(),
             CommandTaskSpec {
+                options: Default::default(),
                 program: second_program,
                 args: second_args,
                 cwd: None,
@@ -1589,6 +1592,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .submit_command(
             RequestId::new(),
             CommandTaskSpec {
+                options: Default::default(),
                 program: guest_program,
                 args: guest_args,
                 cwd: None,

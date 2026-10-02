@@ -45,11 +45,56 @@ pub enum DesktopMouseButton {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandTaskSpec {
+    #[serde(default, skip_serializing_if = "CommandOptions::is_default")]
+    pub options: CommandOptions,
     pub program: String,
     pub args: Vec<String>,
     pub cwd: Option<String>,
     pub expected_environment: ExpectedEnvironment,
     pub display_summary: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CommandOptions {
+    #[serde(default)]
+    pub env: std::collections::BTreeMap<String, String>,
+    pub stdin_text: Option<String>,
+    pub timeout_ms: Option<u64>,
+}
+
+impl CommandOptions {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.env.len() > 64
+            || self.env.iter().any(|(k, v)| {
+                k.is_empty() || k.len() > 256 || k.contains(['=', '\0']) || v.contains('\0')
+            })
+        {
+            return Err("invalid command environment");
+        }
+        if self
+            .env
+            .iter()
+            .map(|(k, v)| k.len() + v.len())
+            .sum::<usize>()
+            > 8192
+        {
+            return Err("command environment exceeds 8192 bytes");
+        }
+        if self.stdin_text.as_ref().is_some_and(|v| v.len() > 16384) {
+            return Err("stdin_text exceeds 16384 UTF-8 bytes");
+        }
+        if self
+            .timeout_ms
+            .is_some_and(|v| !(1..=86400000).contains(&v))
+        {
+            return Err("timeout_ms must be between 1 and 86400000");
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,6 +315,8 @@ pub enum DeviceTaskResponse {
     Environment {
         context: Box<TargetContext>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        command_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         system_query_schema_version: Option<u16>,
@@ -365,6 +412,31 @@ mod tests {
     use crate::{DeploymentId, DeviceId, DeviceRef, TaskId, TenantId};
 
     use super::*;
+
+    #[test]
+    fn legacy_commands_default_options_and_enhanced_options_are_byte_bounded() {
+        let value = serde_json::json!({"program":"echo", "args":[], "cwd":null,
+            "expected_environment":{"os_family":"windows","environment_revision":"test"},
+            "display_summary":"echo"});
+        let command: CommandTaskSpec = serde_json::from_value(value.clone()).unwrap();
+        assert!(command.options.is_default());
+        assert_eq!(serde_json::to_value(command).unwrap(), value);
+        let mut options = CommandOptions::default();
+        options.env.insert("BAD=KEY".into(), "x".into());
+        assert!(options.validate().is_err());
+        options.env.clear();
+        options.stdin_text = Some("中".repeat(5462));
+        assert!(options.validate().is_err());
+        options.stdin_text = Some("中".repeat(5461));
+        assert!(options.validate().is_ok());
+        options.timeout_ms = Some(0);
+        assert!(options.validate().is_err());
+        options.timeout_ms = Some(86400000);
+        options.env.insert("KEY".into(), "x".repeat(8192));
+        assert!(options.validate().is_err());
+        options.env.clear();
+        assert!(options.validate().is_ok());
+    }
 
     #[test]
     fn task_requests_are_explicitly_versioned() {

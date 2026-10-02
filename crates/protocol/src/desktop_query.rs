@@ -1,10 +1,16 @@
 use crate::RequestId;
+use crate::{DesktopAction, DesktopBatchReport, validate_desktop_batch};
 use serde::{Deserialize, Serialize};
-pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 1;
+pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 2;
 pub const MAX_DESKTOP_TEXT_BYTES: usize = 4096;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DesktopQuery {
+    Batch {
+        window_ref: String,
+        actions: Vec<DesktopAction>,
+        timeout_ms: u32,
+    },
     Monitors {},
     Windows {},
     Focus {
@@ -30,6 +36,7 @@ pub enum WindowControlAction {
 impl DesktopQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Batch { .. } => "desktop_batch",
             Self::Monitors {} => "monitors",
             Self::Windows {} => "desktop_windows",
             Self::Focus { .. } => "window_focus",
@@ -42,13 +49,22 @@ impl DesktopQuery {
     }
     pub fn window_ref(&self) -> Option<&str> {
         match self {
-            Self::Focus { window_ref }
+            Self::Batch { window_ref, .. }
+            | Self::Focus { window_ref }
             | Self::Control { window_ref, .. }
             | Self::TypeText { window_ref, .. } => Some(window_ref),
             _ => None,
         }
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Batch {
+            actions,
+            timeout_ms,
+            ..
+        } = self
+        {
+            validate_desktop_batch(actions, *timeout_ms)?;
+        }
         if self
             .window_ref()
             .is_some_and(|r| r.parse::<RequestId>().is_err())
@@ -61,6 +77,13 @@ impl DesktopQuery {
             return Err("text must be 1..4096 UTF-8 bytes, without NUL");
         }
         Ok(())
+    }
+    pub fn required_helper_version(&self) -> u16 {
+        if matches!(self, Self::Batch { .. }) {
+            2
+        } else {
+            1
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +115,8 @@ pub struct DesktopWindowInfo {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch: Option<DesktopBatchReport>,
     pub helper_instance: String,
     pub backend: String,
     pub coordinate_space: String,
@@ -104,6 +129,7 @@ pub struct DesktopSnapshot {
 impl DesktopSnapshot {
     pub fn new(instance: String, backend: &str) -> Self {
         Self {
+            batch: None,
             helper_instance: instance,
             backend: backend.into(),
             coordinate_space: "xcap_native".into(),

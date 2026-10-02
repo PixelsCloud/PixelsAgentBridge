@@ -201,3 +201,6 @@
 [data-theme="dark"] .device-dialog-error {
   color: #ffb9bc !important;
 }
+
+[data-theme="dark"] .settings-tool-group { border-color: var(--dark-border); }
+[data-theme="dark"] .settings-tool-group p { color: var(--dark-muted); }

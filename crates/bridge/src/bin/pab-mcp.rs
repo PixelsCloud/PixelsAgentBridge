@@ -10,6 +10,8 @@ use std::{env, path::PathBuf, sync::Arc, time::Duration};
 mod mcp_catalog;
 #[path = "pab_mcp/desktop.rs"]
 mod mcp_desktop;
+#[path = "pab_mcp/endpoint.rs"]
+mod mcp_endpoint;
 #[path = "pab_mcp/filesystem.rs"]
 mod mcp_filesystem;
 #[path = "pab_mcp/filesystem_bulk.rs"]
@@ -22,6 +24,8 @@ mod mcp_screenshot;
 mod mcp_settings;
 #[path = "pab_mcp/tools.rs"]
 mod mcp_tools;
+#[path = "pab_mcp/waiting.rs"]
+mod mcp_waiting;
 
 use pab_agent_core::{DataPaths, DataScope};
 use pab_bridge::desktop_presence::{McpReporter, RuntimeReport};
@@ -32,8 +36,8 @@ use pab_bridge::{
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     model::{
-        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
-        ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig,
+        CallToolRequestParams, CallToolResponse, CallToolResult, Implementation, ListToolsResult,
+        PaginatedRequestParams, ServerCapabilities, ServerConfig,
     },
     service::RequestContext,
     transport::stdio,
@@ -78,8 +82,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if env::args_os().len() != 1 {
         return Err("pab-mcp accepts no command-line arguments".into());
     }
+    let tool_settings = pab_bridge::mcp_tool_settings::McpToolSettings::load(
+        &pab_bridge::mcp_tool_settings::McpToolSettings::path()?,
+    )?;
     let (reporter, reporting) = McpReporter::start();
     let server = McpServer {
+        tool_settings: Arc::new(tool_settings),
         runtime: Default::default(),
         reporter: reporter.clone(),
         runtime_reporting: Default::default(),
@@ -115,6 +123,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Clone)]
 struct McpServer {
+    tool_settings: Arc<pab_bridge::mcp_tool_settings::McpToolSettings>,
     runtime: Arc<tokio::sync::Mutex<Option<Arc<BridgeRuntime>>>>,
     reporter: McpReporter,
     runtime_reporting: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
@@ -133,7 +142,7 @@ impl ServerHandler for McpServer {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        serde_json::from_value(json!({ "tools": mcp_catalog::tools() }))
+        serde_json::from_value(json!({ "tools": mcp_catalog::enabled_tools(&self.tool_settings) }))
             .map_err(|error| ErrorData::internal_error(error.to_string(), None))
     }
 
@@ -142,11 +151,28 @@ impl ServerHandler for McpServer {
         request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let arguments = Value::Object(request.arguments.unwrap_or_default());
+        let mut arguments = Value::Object(request.arguments.unwrap_or_default());
+        if (request.name == "pab_run_command"
+            || (request.name == "pab_desktop_input" && arguments.get("actions").is_some()))
+            && arguments.get("request_id").is_none()
+        {
+            arguments["request_id"] = json!(pab_protocol::RequestId::new());
+        }
         let mut call = self.reporter.begin_call(&request.name, &arguments);
         let mut image_content = None;
-        let result = if let Err(error) = mcp_catalog::validate_arguments(&request.name, &arguments)
-        {
+        let error_phase = if !self.tool_settings.allows(&request.name) {
+            "discovery"
+        } else if mcp_catalog::validate_arguments(&request.name, &arguments).is_err() {
+            "validation"
+        } else {
+            "execution"
+        };
+        let result = if !self.tool_settings.allows(&request.name) {
+            Err(format!(
+                "Tool is unavailable in this MCP process: {}. Enable its group and restart MCP.",
+                request.name
+            ))
+        } else if let Err(error) = mcp_catalog::validate_arguments(&request.name, &arguments) {
             Err(error)
         } else if request.name == "pab_list_devices" {
             mcp_tools::list_local_devices().await
@@ -200,6 +226,9 @@ impl ServerHandler for McpServer {
             call.observe_result(value);
         }
         let tool_failed = result.as_ref().is_ok_and(|value| {
+            if request.name == "pab_run_command" {
+                return value.pointer("/task/state").and_then(Value::as_str) == Some("failed");
+            }
             matches!(
                 request.name.as_ref(),
                 "pab_list_monitors"
@@ -207,6 +236,7 @@ impl ServerHandler for McpServer {
                     | "pab_focus_window"
                     | "pab_window_control"
                     | "pab_type_text"
+                    | "pab_desktop_input"
                     | "pab_file_stat"
                     | "pab_file_read"
                     | "pab_file_write"
@@ -235,7 +265,20 @@ impl ServerHandler for McpServer {
         });
         call.finish(result.is_ok() && !tool_failed);
         Ok(match result {
-            Ok(value) => {
+            Ok(mut value) => {
+                if tool_failed {
+                    let source = value
+                        .pointer("/task/error")
+                        .or_else(|| value.pointer("/result/error"))
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    value["error"] = json!({
+                        "code": source.get("code").and_then(Value::as_str).unwrap_or("remote_operation_failed"),
+                        "phase":"execution",
+                        "message":source.get("message").cloned().unwrap_or(source),
+                        "retry_action":"inspect_original_result"
+                    });
+                }
                 let mut response = CallToolResult::structured(value);
                 if let Some(image) = image_content {
                     response.content.push(image);
@@ -245,7 +288,24 @@ impl ServerHandler for McpServer {
                 }
                 response.into()
             }
-            Err(error) => CallToolResult::error(vec![ContentBlock::text(error)]).into(),
+            Err(error) => {
+                let code = match error_phase {
+                    "discovery" => "tool_unavailable",
+                    "validation" => "invalid_arguments",
+                    _ => "operation_error",
+                };
+                let id = arguments
+                    .get("operation_id")
+                    .or_else(|| arguments.get("request_id"));
+                let operation_ref =
+                    id.map(|id| json!({"device_code":arguments["device_code"],"operation_id":id}));
+                let mut response = CallToolResult::structured(
+                    json!({"error":{"code":code,"phase":error_phase,"message":error,
+                    "retry_action":if error_phase!="execution" {"correct_request"} else if id.is_some() {"query_original_operation"}else{"inspect_state_before_retry"}},"operation_ref":operation_ref}),
+                );
+                response.is_error = Some(true);
+                response.into()
+            }
         })
     }
 }
@@ -275,7 +335,7 @@ async fn ensure_runtime(
         let config = if env::var("PAB_MCP_GUEST").as_deref() != Ok("0") {
             tokio::time::timeout(
                 Duration::from_secs(12),
-                BridgeConfig::register_guest_from_env(),
+                BridgeConfig::register_guest_with_secret(mcp_endpoint::guest_secret_path()?),
             )
             .await
             .map_err(|_| {
@@ -284,7 +344,9 @@ async fn ensure_runtime(
             })?
             .map_err(|error| error.to_string())?
         } else {
-            BridgeConfig::from_env().map_err(|error| error.to_string())?
+            let config = BridgeConfig::from_env().map_err(|error| error.to_string())?;
+            mcp_endpoint::reserve_account_secret(&config.endpoint_secret_file)?;
+            config
         };
         let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
         let database_path = env::var_os("PAB_BRIDGE_DATABASE")

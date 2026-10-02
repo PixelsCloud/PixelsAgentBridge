@@ -10,6 +10,9 @@ pub fn unmark(_: u32, _: u32, _: &str, _: u32) {}
 pub fn focused(_: u32) -> Result<bool, String> {
     Err("foreground verification unsupported".into())
 }
+pub fn pointer_targets_window(_: u32) -> Result<bool, String> {
+    Err("pointer target verification unsupported".into())
+}
 pub fn act(
     id: u32,
     pid: u32,

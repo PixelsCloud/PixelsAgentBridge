@@ -306,6 +306,7 @@ async fn commands_and_transfers_share_listing_but_not_another_sessions_controls(
         .unwrap();
     let command_id = RequestId::new();
     let command = CommandTaskSpec {
+        options: Default::default(),
         program: "printf".into(),
         args: vec!["fixture".into()],
         cwd: None,

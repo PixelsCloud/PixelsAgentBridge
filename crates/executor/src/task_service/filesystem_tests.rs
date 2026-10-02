@@ -79,6 +79,7 @@ async fn write_read_patch_preserves_bom_newlines_and_permissions_for_all_encodin
         let patch = request(
             &path,
             FileSystemAction::Patch {
+                dry_run: false,
                 expected_hash: hash,
                 encoding: None,
             },
@@ -126,6 +127,7 @@ async fn conflicts_leave_the_original_bytes_and_no_staging_file() {
         ),
         (
             FileSystemAction::Patch {
+                dry_run: false,
                 expected_hash: hash.clone(),
                 encoding: None,
             },
@@ -139,6 +141,7 @@ async fn conflicts_leave_the_original_bytes_and_no_staging_file() {
         ),
         (
             FileSystemAction::Patch {
+                dry_run: false,
                 expected_hash: hash.clone(),
                 encoding: None,
             },
@@ -578,6 +581,7 @@ async fn bomless_utf16_patch_keeps_the_explicit_encoding_and_missing_bom() {
     let req = request(
         &path,
         FileSystemAction::Patch {
+            dry_run: false,
             expected_hash: digest(&original),
             encoding: Some(TextEncoding::Utf16Le),
         },
@@ -693,7 +697,7 @@ async fn overload_rejects_before_acceptance_and_old_environment_payload_still_de
     assert!(matches!(
         &response,
         DeviceTaskResponse::Environment {
-            filesystem_schema_version: Some(3),
+            filesystem_schema_version: Some(4),
             ..
         }
     ));
@@ -794,6 +798,7 @@ async fn exact_file_limit_utf16_expansion_and_empty_writes_are_supported() {
     let req = request(
         &path,
         FileSystemAction::Patch {
+            dry_run: false,
             expected_hash: digest(&original),
             encoding: None,
         },

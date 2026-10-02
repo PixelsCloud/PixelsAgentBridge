@@ -139,6 +139,7 @@ pub(super) fn read(
 ) -> Result<(Vec<u8>, TextReadPosition), FileError> {
     let text = doc.text.as_str();
     let (start, wanted_end, raw_budget, next_line) = match range {
+        TextReadRange::Stream { .. } => unreachable!("stream reads use bounded file IO"),
         TextReadRange::Bytes { offset, max_bytes } => {
             let offset = usize::try_from(*offset)
                 .map_err(|_| FileError::new("invalid_range", "read", "byte offset is too large"))?;

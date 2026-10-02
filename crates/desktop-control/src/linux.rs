@@ -64,6 +64,24 @@ pub fn focused(id: u32) -> Result<bool, String> {
     let (c, root) = connect()?;
     Ok(values(&c, root, "_NET_ACTIVE_WINDOW", AtomEnum::WINDOW)?.first() == Some(&id))
 }
+pub fn pointer_targets_window(id: u32) -> Result<bool, String> {
+    let (c, mut current) = connect()?;
+    for _ in 0..32 {
+        if current == id {
+            return Ok(true);
+        }
+        let hit = c
+            .query_pointer(current)
+            .map_err(|e| e.to_string())?
+            .reply()
+            .map_err(|e| e.to_string())?;
+        if !hit.same_screen || hit.child == 0 {
+            return Ok(false);
+        }
+        current = hit.child;
+    }
+    Ok(false)
+}
 fn send(c: &RustConnection, root: u32, id: u32, name: &str, data: [u32; 5]) -> Result<(), String> {
     let event = ClientMessageEvent::new(32, id, atom(c, name)?, data);
     c.send_event(

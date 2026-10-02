@@ -965,6 +965,7 @@ fn runtime_reporting_tracks_task_events_without_forwarding_output_or_command_arg
 
 fn command() -> CommandTaskSpec {
     CommandTaskSpec {
+        options: Default::default(),
         program: "printf".to_owned(),
         args: vec!["hello".to_owned()],
         cwd: Some("/tmp".to_owned()),

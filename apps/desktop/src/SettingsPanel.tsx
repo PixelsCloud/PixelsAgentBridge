@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Input, Menu, Select } from "antd";
-import { ArrowRight, Bot, Info, Languages, RotateCw, Server } from "lucide-react";
+import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "lucide-react";
 import { messages, type Language } from "./i18n";
+import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 
 type ServerSettings = {
@@ -22,7 +23,7 @@ type Props = {
   onLanguageChange: (value: Language) => void;
 };
 
-type SettingsSection = "preferences" | "ai" | "server" | "about";
+type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
 
 export function SettingsPanel({ language, onLanguageChange }: Props) {
   const t = messages[language];
@@ -93,6 +94,7 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
           items={[
             { key: "preferences", icon: <Languages size={17} />, label: t.settingsPreferences },
             { key: "ai", icon: <Bot size={17} />, label: t.settingsAi },
+            { key: "tools", icon: <Wrench size={17} />, label: t.settingsTools },
             { key: "server", icon: <Server size={17} />, label: t.settingsConnection },
             { key: "about", icon: <Info size={17} />, label: t.settingsAbout },
           ]} />
@@ -145,6 +147,7 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
           {saved && <Button type="link" icon={<RotateCw size={15} />} onClick={() => void invoke("restart_desktop")}>{t.settingsRestart}</Button>}
         </div>
       </div>}
+      {section === "tools" && <McpToolSettingsPanel language={language} />}
       {section === "about" && <div className="settings-about">
         <div className="surface-kicker"><Info size={15} /> {t.settingsAbout}</div>
         <h2>Pixels Agent Bridge</h2>

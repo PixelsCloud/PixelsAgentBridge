@@ -128,6 +128,77 @@ fn run(session: &mut DesktopSession, q: DesktopQuery) -> SystemQueryReply {
     session.query(RequestId::new(), &q)
 }
 #[test]
+#[ignore = "explicit native batch acceptance: controls only its own fixture window"]
+fn native_batch_unicode_shortcut_and_partial_stop() {
+    let fixture = Fixture::new(false);
+    let mut session = DesktopSession::new();
+    let reference = session.reference(fixture.id, std::process::id()).unwrap();
+    let batch = DesktopQuery::Batch {
+        window_ref: reference.clone(),
+        timeout_ms: 5000,
+        actions: vec![
+            DesktopAction::Focus {},
+            DesktopAction::TypeText {
+                text: "Original".into(),
+            },
+            DesktopAction::Wait { ms: 50 },
+            DesktopAction::KeyChord {
+                modifiers: vec![DesktopModifier::Control],
+                key: "home".into(),
+            },
+            // Classic EDIT supports Ctrl+Home/Ctrl+Shift+End, but does not implement Ctrl+A.
+            DesktopAction::KeyChord {
+                modifiers: vec![DesktopModifier::Control, DesktopModifier::Shift],
+                key: "end".into(),
+            },
+            DesktopAction::TypeText {
+                text: "批量中文🙂".into(),
+            },
+        ],
+    };
+    let result = run(&mut session, batch);
+    assert_eq!(result.state, "completed", "{result:?}");
+    let Some(SystemQueryData::Desktop { snapshot }) = result.data else {
+        panic!()
+    };
+    assert_eq!(snapshot.batch.unwrap().completed_steps, 6);
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while fixture.text() != "批量中文🙂" {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "unexpected text {:?}",
+            fixture.text()
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    let batch = DesktopQuery::Batch {
+        window_ref: reference,
+        timeout_ms: 5000,
+        actions: vec![
+            DesktopAction::Control {
+                control: WindowControlAction::Minimize,
+            },
+            DesktopAction::TypeText {
+                text: "must-not-type".into(),
+            },
+            DesktopAction::Control {
+                control: WindowControlAction::Restore,
+            },
+        ],
+    };
+    let result = run(&mut session, batch);
+    assert_eq!(result.state, "failed", "{result:?}");
+    let Some(SystemQueryData::Desktop { snapshot }) = result.data else {
+        panic!()
+    };
+    let report = snapshot.batch.unwrap();
+    assert_eq!(report.completed_steps, 1);
+    assert_eq!(report.failed_step, Some(1));
+    assert_eq!(report.steps[2].state, "skipped");
+    assert_eq!(fixture.text(), "批量中文🙂");
+    assert_ne!(unsafe { IsIconic(fixture.id as usize as HWND) }, 0);
+}
+#[test]
 #[ignore = "explicit native desktop acceptance: creates/focuses only owned test windows"]
 fn native_window_lifecycle_unicode_and_stale_references() {
     let fixture = Fixture::new(false);
@@ -397,6 +468,35 @@ fn native_referenced_window_preview_and_cross_process_unicode() {
             thread::sleep(Duration::from_millis(10));
         }
         eprintln!("UNICODE_DELIVERY_VERIFIED: owned cross-process EDIT received Chinese and emoji");
+        let mut rect: RECT = unsafe { std::mem::zeroed() };
+        assert_ne!(unsafe { GetWindowRect(edit, &mut rect) }, 0);
+        let origin = image.info.desktop_rect.as_ref().unwrap();
+        let click = run(
+            &mut session,
+            DesktopQuery::Batch {
+                window_ref: reference.clone(),
+                timeout_ms: 5000,
+                actions: vec![
+                    DesktopAction::Click {
+                        x: u16::try_from(rect.left + 5 - origin.x).unwrap(),
+                        y: u16::try_from(rect.top + 5 - origin.y).unwrap(),
+                        button: DesktopMouseButton::Left,
+                    },
+                    DesktopAction::Scroll {
+                        axis: DesktopScrollAxis::Vertical,
+                        amount: 1,
+                    },
+                ],
+            },
+        );
+        assert_eq!(click.state, "completed", "{click:?}");
+        let Some(SystemQueryData::Desktop { snapshot }) = click.data else {
+            panic!()
+        };
+        assert_eq!(snapshot.batch.unwrap().completed_steps, 2);
+        eprintln!(
+            "BATCH_CLICK_SCROLL_VERIFIED: owned cross-process window accepted click and scroll"
+        );
     } else {
         assert!(
             focus

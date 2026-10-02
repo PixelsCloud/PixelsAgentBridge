@@ -49,7 +49,14 @@ impl BridgeIdentity {
 impl BridgeConfig {
     pub async fn register_guest_from_env() -> Result<Self, GuestConfigError> {
         let paths = DataPaths::for_scope(DataScope::User)?;
-        let secret_path = paths.root().join("guest-endpoint.key");
+        Self::register_guest_with_secret(paths.root().join("guest-endpoint.key")).await
+    }
+
+    /// Register the exact identity reserved by the caller. MCP processes use
+    /// separate persistent slots; Desktop keeps its existing guest identity.
+    pub async fn register_guest_with_secret(
+        secret_path: PathBuf,
+    ) -> Result<Self, GuestConfigError> {
         let secret = load_or_create_endpoint_secret(&secret_path)?;
         let control_url = env::var("PAB_CONTROL_URL")
             .map_err(|_| GuestConfigError::Missing("PAB_CONTROL_URL"))?;

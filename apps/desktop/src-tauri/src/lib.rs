@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 mod agent_integrations;
 mod desktop_input;
 mod mcp_reporting;
+mod mcp_tool_settings;
 mod operator;
 mod screenshot_session;
 mod server_settings;
@@ -261,6 +262,8 @@ pub fn run() {
             device_status,
             mcp_reporting::mcp_reporting_status,
             approve_claim,
+            mcp_tool_settings::get_mcp_tool_settings,
+            mcp_tool_settings::save_mcp_tool_settings,
             server_settings::get_operator_server_settings,
             server_settings::save_operator_server_settings,
             server_settings::restart_desktop,

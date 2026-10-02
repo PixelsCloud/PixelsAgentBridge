@@ -353,7 +353,21 @@ impl TaskStore {
         offset: u64,
         max_bytes: u32,
     ) -> Result<(OutputChunk, OutputRange), TaskStoreError> {
-        let snapshot = self.get_task(initiated_by, task_ref).await?;
+        // Keep the range and bytes in one SQLite read snapshot. Output can be
+        // appended or trimmed between awaits, including by another process.
+        let mut tx = self.pool.begin().await?;
+        let row = sqlx::query(
+            "SELECT snapshot_json FROM task_records WHERE task_id = ? AND initiated_by = ?",
+        )
+        .bind(task_ref.task_id.to_string())
+        .bind(initiated_by.storage_key())
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(TaskStoreError::NotFound)?;
+        let snapshot = decode_snapshot(row.get("snapshot_json"))?;
+        if snapshot.task_ref != task_ref {
+            return Err(TaskStoreError::NotFound);
+        }
         let range = output_range(&snapshot, stream);
         if offset < range.retained_from || offset > range.available_to {
             return Err(TaskStoreError::InvalidOutputOffset);
@@ -371,8 +385,9 @@ impl TaskStore {
         .bind(length)
         .bind(task_ref.task_id.to_string())
         .bind(stream_name(stream))
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok((
             OutputChunk {
                 schema_version: TASK_SCHEMA_VERSION,

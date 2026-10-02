@@ -1,12 +1,32 @@
 use super::{filesystem::FileError, filesystem_io as io, filesystem_text as text};
-use globset::GlobBuilder;
-use pab_protocol::{FileSearchMatch, FileSearchMode, FileSearchSummary, FileSystemAction};
-use std::path::Path;
+use globset::{GlobBuilder, GlobSetBuilder};
+use pab_protocol::{
+    FileSearchMatch, FileSearchMode, FileSearchSummary, FileSystemAction, SearchContextLine,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tokio::fs;
-
 const MAX_ENTRIES: u32 = 4096;
 const MAX_SCAN_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_RESULT_BYTES: usize = 16 * 1024;
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Cursor {
+    version: u8,
+    request: String,
+    tree: String,
+    index: usize,
+    line: usize,
+    file_hash: Option<String>,
+}
+struct Entry {
+    path: PathBuf,
+    relative: String,
+    meta: std::fs::Metadata,
+}
 
 pub(super) async fn search(
     path: &Path,
@@ -20,21 +40,77 @@ pub(super) async fn search(
         max_results,
         max_depth,
         max_file_bytes,
+        options,
     } = operation
     else {
         unreachable!()
     };
-    let matcher = GlobBuilder::new(glob)
-        .case_insensitive(!case_sensitive)
-        .literal_separator(true)
-        .backslash_escape(true)
+    let compile = |pattern: &str| {
+        GlobBuilder::new(pattern)
+            .case_insensitive(!case_sensitive)
+            .literal_separator(true)
+            .backslash_escape(true)
+            .build()
+            .map_err(|e| FileError::new("invalid_glob", "validate", e.to_string()))
+    };
+    let matcher = compile(glob)?.compile_matcher();
+    let mut excludes = GlobSetBuilder::new();
+    for pattern in &options.exclude {
+        excludes.add(compile(pattern)?);
+    }
+    let excludes = excludes
         .build()
-        .map_err(|error| FileError::new("invalid_glob", "validate", error.to_string()))?
-        .compile_matcher();
+        .map_err(|e| FileError::new("invalid_glob", "validate", e.to_string()))?;
+    let expression = if options.regex {
+        query.clone()
+    } else {
+        regex::escape(query)
+    };
+    let regex = regex::RegexBuilder::new(&expression)
+        .case_insensitive(!case_sensitive)
+        .size_limit(1024 * 1024)
+        .dfa_size_limit(1024 * 1024)
+        .build()
+        .map_err(|e| FileError::new("invalid_regex", "validate", e.to_string()))?;
+    let key = io::digest(
+        &serde_json::to_vec(&(
+            path.to_string_lossy(),
+            mode,
+            query,
+            glob,
+            case_sensitive,
+            max_depth,
+            max_file_bytes,
+            options.regex,
+            &options.exclude,
+            options.context_lines,
+        ))
+        .map_err(|e| FileError::new("invalid_request", "validate", e.to_string()))?,
+    );
+    let cursor: Option<Cursor> = options
+        .cursor
+        .as_ref()
+        .map(|s| {
+            serde_json::from_str(s)
+                .map_err(|_| FileError::new("invalid_cursor", "validate", "invalid search cursor"))
+        })
+        .transpose()?;
+    if cursor.as_ref().is_some_and(|c| {
+        c.version != 1
+            || c.request != key
+            || c.index > MAX_ENTRIES as usize
+            || c.line > 4 * 1024 * 1024
+    }) {
+        return Err(FileError::new(
+            "invalid_cursor",
+            "validate",
+            "cursor does not match the search parameters",
+        ));
+    }
     io::no_links(path, false).await?;
     if !fs::metadata(path)
         .await
-        .map_err(|error| io::io_error("stat", error))?
+        .map_err(|e| io::io_error("stat", e))?
         .is_dir()
     {
         return Err(FileError::new(
@@ -43,39 +119,30 @@ pub(super) async fn search(
             "search root must be a directory",
         ));
     }
-    let needle = if *case_sensitive {
-        query.clone()
-    } else {
-        query.to_lowercase()
-    };
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     let mut summary = FileSearchSummary::default();
-    let scan = async {
-        let mut pending = vec![(path.to_path_buf(), 0u32)];
-        while let Some((directory, depth)) = pending.pop() {
-            if let Err(error) = io::no_links(&directory, false).await {
-                warn(&mut summary, &directory, &error.0.code);
-                continue;
-            }
-            let mut entries = match fs::read_dir(&directory).await {
-                Ok(entries) => entries,
-                Err(error) => {
-                    warn(&mut summary, &directory, &error.to_string());
+    let mut entries = Vec::new();
+    let mut pending = vec![(path.to_path_buf(), 0u32)];
+    // Build a bounded, sorted metadata inventory. A continuation refuses observed tree changes.
+    let inventory = async {
+        while let Some((dir, depth)) = pending.pop() {
+            io::no_links(&dir, false).await?;
+            let mut iter = match fs::read_dir(&dir).await {
+                Ok(v) => v,
+                Err(e) => {
+                    warn(&mut summary, &dir, &e.to_string());
                     continue;
                 }
             };
-            loop {
+            while let Some(entry) = iter
+                .next_entry()
+                .await
+                .map_err(|e| io::io_error("read_dir", e))?
+            {
                 if summary.scanned_entries >= MAX_ENTRIES {
                     stop(&mut summary, "entry_limit");
-                    return;
+                    return Ok::<_, FileError>(());
                 }
-                let entry = match entries.next_entry().await {
-                    Ok(Some(entry)) => entry,
-                    Ok(None) => break,
-                    Err(error) => {
-                        warn(&mut summary, &directory, &error.to_string());
-                        break;
-                    }
-                };
                 summary.scanned_entries += 1;
                 let full = entry.path();
                 let Some(relative) = full.strip_prefix(path).ok().and_then(Path::to_str) else {
@@ -84,12 +151,17 @@ pub(super) async fn search(
                 };
                 let relative = relative.replace('\\', "/");
                 let value = match fs::symlink_metadata(&full).await {
-                    Ok(value) => value,
-                    Err(error) => {
-                        warn(&mut summary, &full, &error.to_string());
+                    Ok(v) => v,
+                    Err(e) => {
+                        warn(&mut summary, &full, &e.to_string());
                         continue;
                     }
                 };
+                if excludes.is_match(&relative)
+                    || (value.is_dir() && excludes.is_match(format!("{relative}/")))
+                {
+                    continue;
+                }
                 if io::is_link(&value) {
                     warn(&mut summary, &full, "link_not_followed");
                     continue;
@@ -102,129 +174,307 @@ pub(super) async fn search(
                         stop(&mut summary, "depth_limit");
                     }
                 }
-                if !matcher.is_match(&relative) {
-                    continue;
-                }
-                if *mode == FileSearchMode::Name {
-                    let name = entry.file_name();
-                    let Some(name) = name.to_str() else {
-                        warn(&mut summary, &full, "non_utf8_path");
-                        continue;
-                    };
-                    let name = if *case_sensitive {
-                        name.to_owned()
-                    } else {
-                        name.to_lowercase()
-                    };
-                    if name.contains(&needle)
-                        && !push(
-                            &mut summary,
-                            FileSearchMatch {
-                                path: full.to_string_lossy().into_owned(),
-                                kind: if value.is_dir() {
-                                    "directory"
-                                } else if value.is_file() {
-                                    "file"
-                                } else {
-                                    "other"
-                                }
-                                .to_owned(),
-                                line: None,
-                                preview: None,
-                                sha256: None,
-                            },
-                            *max_results,
-                        )
-                    {
-                        return;
-                    }
-                } else if value.is_file() {
-                    if value.len() > *max_file_bytes as u64 {
-                        warn(&mut summary, &full, "file_size_limit");
-                        continue;
-                    }
-                    if summary.scanned_bytes + *max_file_bytes as u64 + 1 > MAX_SCAN_BYTES {
-                        stop(&mut summary, "scan_bytes_limit");
-                        return;
-                    }
-                    // Charge the upper bound before reading, including skipped invalid text.
-                    summary.scanned_bytes += *max_file_bytes as u64 + 1;
-                    let (bytes, _) = match io::load_limited(&full, *max_file_bytes as usize).await {
-                        Ok(pair) => pair,
-                        Err(error) => {
-                            warn(&mut summary, &full, &error.0.code);
-                            continue;
-                        }
-                    };
-                    summary.scanned_bytes -=
-                        (*max_file_bytes as usize + 1).saturating_sub(bytes.len()) as u64;
-                    if bytes.len() > *max_file_bytes as usize {
-                        warn(&mut summary, &full, "file_size_changed");
-                        continue;
-                    }
-                    let doc = match text::decode(&bytes, None) {
-                        Ok(doc) => doc,
-                        Err(error) => {
-                            warn(&mut summary, &full, &error.0.code);
-                            continue;
-                        }
-                    };
-                    let hash = io::digest(&bytes);
-                    // Treat CRLF as one line break, and support bare CR/LF.
-                    let normalized = doc.text.replace("\r\n", "\n").replace('\r', "\n");
-                    for (line, content) in normalized.split('\n').enumerate() {
-                        let candidate = if *case_sensitive {
-                            content.to_owned()
-                        } else {
-                            content.to_lowercase()
-                        };
-                        if candidate.contains(&needle)
-                            && !push(
-                                &mut summary,
-                                FileSearchMatch {
-                                    path: full.to_string_lossy().into_owned(),
-                                    kind: "file".to_owned(),
-                                    line: Some(line as u64 + 1),
-                                    preview: Some(content.chars().take(160).collect()),
-                                    sha256: Some(hash.clone()),
-                                },
-                                *max_results,
-                            )
-                        {
-                            return;
-                        }
-                    }
-                }
+                entries.push(Entry {
+                    path: full,
+                    relative,
+                    meta: value,
+                });
             }
         }
+        Ok(())
     };
-    if tokio::time::timeout(std::time::Duration::from_secs(5), scan)
-        .await
-        .is_err()
-    {
+    if let Ok(result) = tokio::time::timeout_at(deadline, inventory).await {
+        result?;
+    } else {
         stop(&mut summary, "time_limit");
+    }
+    entries.sort_by(|a, b| a.relative.cmp(&b.relative));
+    let mut fingerprint = String::new();
+    for e in &entries {
+        fingerprint.push_str(&format!(
+            "{:?}|{}|{:?}|{:?}|{}\n",
+            e.relative,
+            e.meta.len(),
+            e.meta.modified().ok(),
+            e.meta.created().ok(),
+            e.meta.is_dir()
+        ));
+    }
+    let tree = io::digest(fingerprint.as_bytes());
+    if let Some(c) = &cursor
+        && (c.tree != tree || c.index > entries.len() || summary.truncated)
+    {
+        return Err(FileError::new(
+            "search_changed",
+            "search",
+            "directory inventory changed; start a fresh search",
+        ));
+    }
+    let resumable = !summary.truncated;
+    let begin = cursor.as_ref().map_or(0, |c| c.index);
+    for (index, entry) in entries.iter().enumerate().skip(begin) {
+        let mut line_start = if index == begin {
+            cursor.as_ref().map_or(0, |c| c.line)
+        } else {
+            0
+        };
+        if tokio::time::Instant::now() >= deadline {
+            resume(
+                &mut summary,
+                "time_limit",
+                resumable,
+                &key,
+                &tree,
+                index,
+                line_start,
+                cursor
+                    .as_ref()
+                    .filter(|_| index == begin)
+                    .and_then(|c| c.file_hash.clone()),
+            );
+            break;
+        }
+        if !matcher.is_match(&entry.relative) {
+            continue;
+        }
+        if *mode == FileSearchMode::Name {
+            if regex.is_match(
+                entry
+                    .path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(""),
+            ) {
+                let m = FileSearchMatch {
+                    path: entry.path.to_string_lossy().into_owned(),
+                    kind: if entry.meta.is_dir() {
+                        "directory"
+                    } else {
+                        "file"
+                    }
+                    .into(),
+                    line: None,
+                    preview: None,
+                    sha256: None,
+                    context: vec![],
+                };
+                if !push(&mut summary, m) {
+                    if summary.matches.is_empty() {
+                        return Err(FileError::new(
+                            "result_too_large",
+                            "search",
+                            "one match exceeds the output budget; reduce context_lines or narrow the search",
+                        ));
+                    }
+                    resume(
+                        &mut summary,
+                        "output_bytes_limit",
+                        resumable,
+                        &key,
+                        &tree,
+                        index,
+                        0,
+                        None,
+                    );
+                    break;
+                }
+                if summary.matches.len() >= *max_results as usize {
+                    resume(
+                        &mut summary,
+                        "match_limit",
+                        resumable,
+                        &key,
+                        &tree,
+                        index + 1,
+                        0,
+                        None,
+                    );
+                    break;
+                }
+            }
+            continue;
+        }
+        if !entry.meta.is_file() {
+            continue;
+        }
+        if entry.meta.len() > *max_file_bytes as u64 {
+            warn(&mut summary, &entry.path, "file_size_limit");
+            continue;
+        }
+        if summary.scanned_bytes + *max_file_bytes as u64 + 1 > MAX_SCAN_BYTES {
+            resume(
+                &mut summary,
+                "scan_bytes_limit",
+                resumable,
+                &key,
+                &tree,
+                index,
+                line_start,
+                None,
+            );
+            break;
+        }
+        summary.scanned_bytes += *max_file_bytes as u64 + 1;
+        let loaded = tokio::time::timeout_at(
+            deadline,
+            io::load_limited(&entry.path, *max_file_bytes as usize),
+        )
+        .await;
+        let (bytes, _) = match loaded {
+            Ok(Ok(v)) => v,
+            Ok(Err(e)) => {
+                warn(&mut summary, &entry.path, &e.0.code);
+                continue;
+            }
+            Err(_) => {
+                resume(
+                    &mut summary,
+                    "time_limit",
+                    resumable,
+                    &key,
+                    &tree,
+                    index,
+                    line_start,
+                    None,
+                );
+                break;
+            }
+        };
+        summary.scanned_bytes -= (*max_file_bytes as usize + 1).saturating_sub(bytes.len()) as u64;
+        let hash = io::digest(&bytes);
+        if index == begin
+            && cursor
+                .as_ref()
+                .and_then(|c| c.file_hash.as_ref())
+                .is_some_and(|h| *h != hash)
+        {
+            return Err(FileError::new(
+                "search_changed",
+                "search",
+                "continuation file contents changed",
+            ));
+        }
+        let doc = match text::decode(&bytes, None) {
+            Ok(v) => v,
+            Err(e) => {
+                warn(&mut summary, &entry.path, &e.0.code);
+                continue;
+            }
+        };
+        let normalized = doc.text.replace("\r\n", "\n").replace('\r', "\n");
+        let lines: Vec<_> = normalized.split('\n').collect();
+        if line_start > lines.len() {
+            return Err(FileError::new("invalid_cursor", "search", "line past EOF"));
+        }
+        while line_start < lines.len() {
+            if tokio::time::Instant::now() >= deadline {
+                resume(
+                    &mut summary,
+                    "time_limit",
+                    resumable,
+                    &key,
+                    &tree,
+                    index,
+                    line_start,
+                    Some(hash.clone()),
+                );
+                return Ok(summary);
+            }
+            let content = lines[line_start];
+            if regex.is_match(content) {
+                let context = options.context_lines as usize;
+                let m = FileSearchMatch {
+                    path: entry.path.to_string_lossy().into_owned(),
+                    kind: "file".into(),
+                    line: Some(line_start as u64 + 1),
+                    preview: Some(content.chars().take(160).collect()),
+                    sha256: Some(hash.clone()),
+                    context: if context == 0 {
+                        vec![]
+                    } else {
+                        (line_start.saturating_sub(context)
+                            ..(line_start + context + 1).min(lines.len()))
+                            .map(|i| SearchContextLine {
+                                line: i as u64 + 1,
+                                text: lines[i].chars().take(160).collect(),
+                            })
+                            .collect()
+                    },
+                };
+                if !push(&mut summary, m) {
+                    if summary.matches.is_empty() {
+                        return Err(FileError::new(
+                            "result_too_large",
+                            "search",
+                            "one match exceeds the output budget; reduce context_lines or narrow the search",
+                        ));
+                    }
+                    resume(
+                        &mut summary,
+                        "output_bytes_limit",
+                        resumable,
+                        &key,
+                        &tree,
+                        index,
+                        line_start,
+                        Some(hash),
+                    );
+                    return Ok(summary);
+                }
+                if summary.matches.len() >= *max_results as usize {
+                    resume(
+                        &mut summary,
+                        "match_limit",
+                        resumable,
+                        &key,
+                        &tree,
+                        index,
+                        line_start + 1,
+                        Some(hash),
+                    );
+                    return Ok(summary);
+                }
+            }
+            line_start += 1;
+        }
     }
     Ok(summary)
 }
-
-fn push(summary: &mut FileSearchSummary, value: FileSearchMatch, limit: u32) -> bool {
+fn push(summary: &mut FileSearchSummary, value: FileSearchMatch) -> bool {
     summary.matches.push(value);
-    if serde_json::to_vec(summary).map_or(true, |bytes| bytes.len() > MAX_RESULT_BYTES) {
+    if serde_json::to_vec(summary).map_or(true, |b| b.len() > MAX_RESULT_BYTES - 2048) {
         summary.matches.pop();
-        stop(summary, "output_bytes_limit");
-        return false;
-    }
-    if summary.matches.len() >= limit as usize {
-        stop(summary, "match_limit");
         return false;
     }
     true
 }
-
-fn warn(summary: &mut FileSearchSummary, path: &Path, reason: &str) {
-    summary.skipped_entries += 1;
-    if summary.warnings.len() < 8 {
-        summary.warnings.push(
+fn resume(
+    s: &mut FileSearchSummary,
+    reason: &str,
+    allowed: bool,
+    key: &str,
+    tree: &str,
+    index: usize,
+    line: usize,
+    file_hash: Option<String>,
+) {
+    stop(s, reason);
+    if allowed {
+        s.next_cursor = serde_json::to_string(&Cursor {
+            version: 1,
+            request: key.into(),
+            tree: tree.into(),
+            index,
+            line,
+            file_hash,
+        })
+        .ok();
+    }
+}
+fn warn(s: &mut FileSearchSummary, path: &Path, reason: &str) {
+    s.skipped_entries += 1;
+    if s.warnings.len() < 8 {
+        s.warnings.push(
             format!("{}: {reason}", path.display())
                 .chars()
                 .take(160)
@@ -232,10 +482,9 @@ fn warn(summary: &mut FileSearchSummary, path: &Path, reason: &str) {
         );
     }
 }
-
-fn stop(summary: &mut FileSearchSummary, reason: &str) {
-    summary.truncated = true;
-    if summary.stop_reason.is_none() {
-        summary.stop_reason = Some(reason.to_owned());
+fn stop(s: &mut FileSearchSummary, reason: &str) {
+    s.truncated = true;
+    if s.stop_reason.is_none() {
+        s.stop_reason = Some(reason.into());
     }
 }

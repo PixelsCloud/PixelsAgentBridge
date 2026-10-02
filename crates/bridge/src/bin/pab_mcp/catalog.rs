@@ -250,7 +250,96 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_git::tools());
     tools.extend(super::mcp_container::tools());
     tools.extend(super::mcp_desktop::tools());
+    super::mcp_desktop::enhance_input_tool(
+        tools
+            .iter_mut()
+            .find(|t| t["name"] == "pab_desktop_input")
+            .unwrap(),
+    );
+    for entry in &mut tools {
+        let name = entry["name"].as_str().unwrap().to_owned();
+        let properties = entry["inputSchema"]["properties"].as_object_mut().unwrap();
+        if matches!(
+            name.as_str(),
+            "pab_run_command"
+                | "pab_get_task"
+                | "pab_get_operation"
+                | "pab_read_output"
+                | "pab_connect"
+        ) {
+            properties.insert("wait_ms".into(),json!({"type":"integer","minimum":0,"maximum":30000,"default":if name=="pab_connect"{5000}else{0}}));
+        }
+        if matches!(name.as_str(), "pab_get_task" | "pab_get_operation") {
+            properties.insert(
+                "after_revision".into(),
+                json!({"type":"string","pattern":"^[a-f0-9]{64}$"}),
+            );
+            properties.insert(
+                "wait_until".into(),
+                json!({"type":"string","enum":["change","complete"],"default":"change"}),
+            );
+        }
+        if name == "pab_run_command" {
+            properties.insert(
+                "request_id".into(),
+                json!({"type":"string","format":"uuid"}),
+            );
+            properties.insert("env".into(),json!({"type":"object","maxProperties":64,"additionalProperties":{"type":"string"}}));
+            properties.insert(
+                "stdin_text".into(),
+                json!({"type":"string","maxLength":16384}),
+            );
+            properties.insert(
+                "timeout_ms".into(),
+                json!({"type":"integer","minimum":1,"maximum":86400000}),
+            );
+        }
+        if name == "pab_read_output" {
+            properties.insert(
+                "max_bytes".into(),
+                json!({"type":"integer","minimum":4,"maximum":65536,"default":65536}),
+            );
+            properties.insert(
+                "tail_bytes".into(),
+                json!({"type":"integer","minimum":1,"maximum":65536}),
+            );
+            properties.insert(
+                "contains".into(),
+                json!({"type":"string","minLength":1,"maxLength":1024}),
+            );
+        }
+        let extra = match name.as_str() {
+            "pab_run_command" => {
+                " Reuse request_id to deduplicate. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Output ranges are returned; use pab_read_output for bytes."
+            }
+            "pab_get_task" | "pab_get_operation" => {
+                " wait_ms optionally waits up to 30s for change or completion. Reuse after_revision to avoid missing updates. Expiry returns observed facts, not a task failure."
+            }
+            "pab_read_output" => {
+                " tail_bytes and offset are exclusive. max_bytes bounds scanned bytes. contains filters only lines/fragments in this returned chunk; no whole-log or cross-chunk match guarantee. next_offset advances over scanned bytes. gap reports discarded retained output. wait_ms waits for new bytes or EOF."
+            }
+            "pab_connect" => {
+                " wait_ms defaults to 5000; if pending, returns connection_ref and connected=false. Call pab_connect again to observe the same in-flight attempt. At most 120s per attempt; pab_disconnect stops this session's attempt."
+            }
+            _ => "",
+        };
+        let description = entry["description"].as_str().unwrap().to_owned() + extra;
+        entry["description"] = json!(description);
+    }
     tools
+}
+
+pub(super) fn enabled_tools(
+    settings: &pab_bridge::mcp_tool_settings::McpToolSettings,
+) -> Vec<Value> {
+    tools()
+        .into_iter()
+        .filter(|tool| {
+            tool["name"]
+                .as_str()
+                .is_some_and(|name| settings.allows(name))
+        })
+        .collect()
 }
 
 fn terminal_session_schema() -> Value {
@@ -290,7 +379,46 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
         .into_iter()
         .find(|tool| tool["name"] == name)
         .ok_or_else(|| format!("unknown tool: {name}"))?;
-    validate_value(args, &definition["inputSchema"], "arguments")
+    validate_value(args, &definition["inputSchema"], "arguments")?;
+    if name == "pab_desktop_input" {
+        if args.get("actions").is_some() {
+            super::mcp_desktop::parse(name, args)?;
+        } else {
+            if ["window_ref", "timeout_ms", "request_id"]
+                .iter()
+                .any(|key| args.get(key).is_some())
+            {
+                return Err("batch parameters require actions".into());
+            }
+            serde_json::from_value::<pab_protocol::DesktopInputEvent>(
+                args.get("event")
+                    .cloned()
+                    .ok_or("event or actions required")?,
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    if matches!(name, "pab_file_read" | "pab_file_search" | "pab_file_patch") {
+        super::mcp_filesystem::parse(name, args)?;
+    }
+    if name == "pab_run_command" {
+        let options = pab_protocol::CommandOptions {
+            env: args
+                .get("env")
+                .map(|v| serde_json::from_value(v.clone()))
+                .transpose()
+                .map_err(|e| e.to_string())?
+                .unwrap_or_default(),
+            stdin_text: args["stdin_text"].as_str().map(str::to_owned),
+            timeout_ms: args["timeout_ms"].as_u64(),
+        };
+        options.validate().map_err(str::to_owned)?;
+    }
+    if name == "pab_read_output" && args.get("offset").is_some() && args.get("tail_bytes").is_some()
+    {
+        return Err("offset and tail_bytes are mutually exclusive".into());
+    }
+    Ok(())
 }
 
 fn validate_value(value: &Value, schema: &Value, path: &str) -> Result<(), String> {
@@ -333,8 +461,24 @@ fn validate_value(value: &Value, schema: &Value, path: &str) -> Result<(), Strin
         if schema["format"] == "uuid" && string.parse::<pab_protocol::RequestId>().is_err() {
             return Err(format!("{path}: expected a UUID"));
         }
+        if schema["pattern"] == "^[a-f0-9]{64}$"
+            && (string.len() != 64
+                || !string
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+        {
+            return Err(format!(
+                "{path}: expected a revision returned by the previous query"
+            ));
+        }
     }
     if let Some(object) = value.as_object() {
+        if schema["maxProperties"]
+            .as_u64()
+            .is_some_and(|max| object.len() > max as usize)
+        {
+            return Err(format!("{path}: too many properties"));
+        }
         if let Some(required) = schema["required"].as_array() {
             for key in required.iter().filter_map(Value::as_str) {
                 if !object.contains_key(key) {
@@ -347,6 +491,12 @@ fn validate_value(value: &Value, schema: &Value, path: &str) -> Result<(), Strin
                 validate_value(value, child, &format!("{path}.{key}"))?;
             } else if schema["additionalProperties"] == false {
                 return Err(format!("{path}: unknown field {key}"));
+            } else if schema["additionalProperties"].is_object() {
+                validate_value(
+                    value,
+                    &schema["additionalProperties"],
+                    &format!("{path}.{key}"),
+                )?;
             }
         }
     }
@@ -380,6 +530,44 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 mod tests {
     use super::*;
     #[test]
+    fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
+        use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
+        let all = tools();
+        assert_eq!(all.len(), 60);
+        assert_eq!(enabled_tools(&McpToolSettings::default()), all);
+        for group in ToolGroup::ALL {
+            let settings = McpToolSettings {
+                version: 1,
+                enabled_groups: if group == ToolGroup::Core {
+                    vec![group]
+                } else {
+                    vec![ToolGroup::Core, group]
+                },
+            };
+            let filtered = enabled_tools(&settings);
+            assert_eq!(
+                filtered.len(),
+                ToolGroup::Core.tools().len()
+                    + if group == ToolGroup::Core {
+                        0
+                    } else {
+                        group.tools().len()
+                    }
+            );
+            for tool in &filtered {
+                assert!(all.contains(tool));
+            }
+        }
+        for group in ToolGroup::ALL {
+            for name in group.tools() {
+                assert!(all.iter().any(|t| t["name"] == *name), "{name}");
+            }
+        }
+        for tool in all {
+            assert!(ToolGroup::for_tool(tool["name"].as_str().unwrap()).is_some());
+        }
+    }
+    #[test]
     fn catalog_rejects_invalid_arguments_before_accepting_work() {
         for args in [
             json!({"device_code":"123 456 789","operation_id":"bad"}),
@@ -401,5 +589,32 @@ mod tests {
         );
         assert!(validate_arguments("pab_disconnect", &json!({"device_code":"123456789"})).is_ok());
         assert!(validate_arguments("pab_list_operations", &json!({})).is_ok());
+    }
+
+    #[test]
+    fn enhanced_arguments_reject_invalid_environment_and_waits_before_networking() {
+        let base = json!({"device_code":"123456789","program":"echo","args":[]});
+        for (key, value) in [
+            ("env", json!({"NAME":3})),
+            ("env", json!({"BAD=KEY":"value"})),
+            ("stdin_text", json!("中".repeat(6000))),
+            ("timeout_ms", json!(0)),
+            ("wait_ms", json!(30001)),
+            ("request_id", json!("invalid")),
+        ] {
+            let mut args = base.clone();
+            args[key] = value;
+            assert!(
+                validate_arguments("pab_run_command", &args).is_err(),
+                "{key}"
+            );
+        }
+        let mut args = base;
+        args["env"] = json!({"KEY":"中文"});
+        args["timeout_ms"] = json!(5000);
+        args["wait_ms"] = json!(30000);
+        assert!(validate_arguments("pab_run_command", &args).is_ok());
+        assert!(validate_arguments("pab_get_operation",&json!({"device_code":"123456789","operation_id":pab_protocol::RequestId::new(),"after_revision":"bad"})).is_err());
+        assert!(validate_arguments("pab_read_output",&json!({"device_code":"123456789","task_id":pab_protocol::TaskId::new(),"stream":"stdout","tail_bytes":4,"offset":0})).is_err());
     }
 }

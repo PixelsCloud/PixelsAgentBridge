@@ -53,6 +53,17 @@ pub fn unmark(id: u32, pid: u32, name: &str, marker: u32) {
 pub fn focused(id: u32) -> Result<bool, String> {
     Ok(unsafe { GetForegroundWindow() == hwnd(id) })
 }
+pub fn pointer_targets_window(id: u32) -> Result<bool, String> {
+    // SAFETY: local writable POINT, valid USER handles checked by Windows.
+    unsafe {
+        let mut point = std::mem::zeroed();
+        if GetCursorPos(&mut point) == 0 {
+            return Err(error());
+        }
+        let hit = WindowFromPoint(point);
+        Ok(!hit.is_null() && (hit == hwnd(id) || GetAncestor(hit, GA_ROOT) == hwnd(id)))
+    }
+}
 pub fn act(
     id: u32,
     pid: u32,

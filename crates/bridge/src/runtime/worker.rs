@@ -86,6 +86,7 @@ async fn follow_record(
         .as_ref()
         .ok_or(RuntimeError::MissingTaskSnapshot)?
         .task_ref;
+    let mut invalid_subscription_retries = 0;
     loop {
         let connection = device.connection().await?;
         let remote_snapshot = match connection.get_task(task_ref).await {
@@ -189,6 +190,21 @@ async fn follow_record(
                         &error,
                     );
                     device.recover(&connection, &error).await?;
+                    break;
+                }
+                Err(error @ crate::BridgeError::UnexpectedTaskResponse(_))
+                    if invalid_subscription_retries < 3 =>
+                {
+                    // A rejected output frame must not strand the cached task
+                    // in Running. Re-read the authoritative snapshot and resume
+                    // from locally verified offsets, never submit the command again.
+                    invalid_subscription_retries += 1;
+                    runtime.publish_task_retry(
+                        record.snapshot.as_ref().map(TaskSnapshot::target_context),
+                        record.request_id,
+                        &error,
+                    );
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     break;
                 }
                 Err(error) => return Err(error.into()),

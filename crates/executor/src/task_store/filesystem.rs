@@ -81,6 +81,8 @@ impl TaskStore {
             serde_json::from_str::<FileSystemReply>(&json)?
         } else {
             FileSystemReply {
+                log: None,
+                patch_preview: None,
                 request_id: id,
                 path: row.try_get("path")?,
                 kind: row.try_get("kind")?,

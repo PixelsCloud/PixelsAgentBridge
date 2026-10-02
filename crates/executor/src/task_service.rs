@@ -28,6 +28,7 @@ mod filesystem_bulk;
 mod filesystem_bulk_io;
 mod filesystem_hash;
 mod filesystem_io;
+mod filesystem_log;
 mod filesystem_mkdir;
 mod filesystem_publish;
 mod filesystem_search;
@@ -66,8 +67,10 @@ pub(crate) struct TaskService {
     bulk_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, filesystem_bulk::BulkJob>>>,
     hash_slots: Arc<tokio::sync::Semaphore>,
     hash_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, filesystem_hash::HashJob>>>,
-    system_collector: Arc<std::sync::Mutex<pab_platform::SystemCollector>>,
+    system_collector: Arc<tokio::sync::Mutex<pab_platform::SystemCollector>>,
     system_slots: Arc<tokio::sync::Semaphore>,
+    system_pending_slots: Arc<tokio::sync::Semaphore>,
+    system_queued: Arc<Mutex<std::collections::HashSet<pab_protocol::RequestId>>>,
     system_jobs: Arc<Mutex<std::collections::HashSet<pab_protocol::RequestId>>>,
     cancellable_system_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, watch::Sender<bool>>>>,
     active_sessions: ActiveSessions,
@@ -118,10 +121,12 @@ impl TaskService {
             bulk_jobs: Arc::new(Mutex::new(HashMap::new())),
             hash_slots: Arc::new(tokio::sync::Semaphore::new(4)),
             hash_jobs: Arc::new(Mutex::new(HashMap::new())),
-            system_collector: Arc::new(std::sync::Mutex::new(
+            system_collector: Arc::new(tokio::sync::Mutex::new(
                 pab_platform::SystemCollector::default(),
             )),
             system_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+            system_pending_slots: Arc::new(tokio::sync::Semaphore::new(16)),
+            system_queued: Arc::new(Mutex::new(std::collections::HashSet::new())),
             system_jobs: Arc::new(Mutex::new(std::collections::HashSet::new())),
             cancellable_system_jobs: Arc::new(Mutex::new(HashMap::new())),
             active_sessions: ActiveSessions::default(),
@@ -420,7 +425,8 @@ impl TaskService {
                 "filesystem requests require their binary stream handler",
             )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
-                filesystem_schema_version: Some(3),
+                command_schema_version: Some(2),
+                filesystem_schema_version: Some(4),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
@@ -696,6 +702,19 @@ impl TaskService {
 }
 
 fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
+    command
+        .options
+        .validate()
+        .map_err(TaskServiceError::InvalidRequest)?;
+    if serde_json::to_vec(command)
+        .map_err(|_| TaskServiceError::InvalidRequest("invalid command"))?
+        .len()
+        > 48 * 1024
+    {
+        return Err(TaskServiceError::InvalidRequest(
+            "command exceeds wire size limit",
+        ));
+    }
     if command.program.trim().is_empty() || command.program.len() > MAX_COMMAND_PROGRAM_BYTES {
         return Err(TaskServiceError::InvalidRequest(
             "program is empty or too long",

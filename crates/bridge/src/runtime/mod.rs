@@ -515,6 +515,7 @@ impl BridgeRuntime {
         let target = self.current_environment(device_ref).await?;
         let display_summary = display_summary(&program, &args);
         let command = CommandTaskSpec {
+            options: Default::default(),
             program,
             args,
             cwd,
@@ -642,6 +643,27 @@ impl BridgeRuntime {
                         let _ = self.start_record(updated, None).await;
                     }
                     return Ok(snapshot);
+                }
+                Err(
+                    error @ BridgeError::RemoteTask {
+                        code: pab_protocol::DeviceTaskErrorCode::NotCancellable,
+                        ..
+                    },
+                ) => {
+                    // Completion can win the race with cancellation, or our
+                    // local subscription may be stale. Preserve the real outcome.
+                    let snapshot = connection.get_task(task_ref).await?;
+                    let updated = self.inner.store.update_snapshot(&snapshot).await?;
+                    self.inner.publish_snapshot(&snapshot);
+                    if !updated.is_complete() {
+                        let _ = self.start_record(updated, None).await;
+                    }
+                    if snapshot.state.is_terminal()
+                        || snapshot.state == pab_protocol::TaskState::CancelRequested
+                    {
+                        return Ok(snapshot);
+                    }
+                    return Err(error.into());
                 }
                 Err(error) if error.is_recoverable_connection() => {
                     self.inner.publish_task_retry(

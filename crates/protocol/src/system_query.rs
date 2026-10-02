@@ -2,7 +2,7 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 6;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
@@ -94,6 +94,14 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(
+            self,
+            Self::Desktop {
+                query: crate::DesktopQuery::Batch { .. }
+            }
+        ) {
+            return 7;
+        }
         if matches!(self, Self::Container { .. }) {
             return 6;
         }
@@ -154,6 +162,19 @@ impl SystemQuery {
         } = &mut value
         {
             *text = format!("blake3:{}", blake3::hash(text.as_bytes()));
+        }
+        if let Self::Desktop {
+            query: crate::DesktopQuery::Batch { actions, .. },
+        } = &mut value
+        {
+            for action in actions {
+                if let crate::DesktopAction::TypeText { text } = action {
+                    *text = format!("blake3:{}", blake3::hash(text.as_bytes()));
+                }
+                if let crate::DesktopAction::KeyChord { key, .. } = action {
+                    *key = format!("blake3:{}", blake3::hash(key.as_bytes()));
+                }
+            }
         }
         value
     }

@@ -607,7 +607,10 @@ async fn container_result_and_capability_cross_real_quic() {
             DeviceTaskResponse::Environment {
                 system_query_schema_version,
                 ..
-            } => assert_eq!(system_query_schema_version, Some(6)),
+            } => assert_eq!(
+                system_query_schema_version,
+                Some(SYSTEM_QUERY_SCHEMA_VERSION)
+            ),
             DeviceTaskResponse::SystemQuery { reply } => {
                 assert_eq!(reply.state, "completed");
                 if let Some(prior) = &original {

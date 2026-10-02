@@ -24,6 +24,10 @@ use tokio::{
 
 type RuntimeSlot = Arc<Mutex<Option<Arc<BridgeRuntime>>>>;
 type MonitorSlot = Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>;
+type ConnectionJob = (
+    watch::Receiver<Option<Result<Value, String>>>,
+    JoinHandle<()>,
+);
 const MAX_JOBS: usize = 8;
 
 struct Job {
@@ -40,6 +44,7 @@ pub(super) struct OperationManager {
     reporter: McpReporter,
     jobs: Mutex<HashMap<RequestId, Job>>,
     rechecks: Mutex<HashMap<RequestId, JoinHandle<()>>>,
+    connections: Mutex<HashMap<DeviceCode, ConnectionJob>>,
     closed: AtomicBool,
     filesystem_rotation: AtomicU64,
     heartbeat: Mutex<Option<tokio::task::JoinHandle<()>>>,
@@ -48,7 +53,8 @@ pub(super) struct OperationManager {
 pub(super) fn handles(name: &str) -> bool {
     matches!(
         name,
-        "pab_upload_file"
+        "pab_connect"
+            | "pab_upload_file"
             | "pab_download_file"
             | "pab_get_operation"
             | "pab_list_operations"
@@ -71,6 +77,77 @@ struct FileArgs {
 }
 
 impl OperationManager {
+    async fn connect(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
+        let code: DeviceCode = args["device_code"]
+            .as_str()
+            .ok_or("device_code required")?
+            .parse()
+            .map_err(|_| "invalid device code")?;
+        let mut connections = self.connections.lock().await;
+        if self.closed.load(Ordering::Acquire) {
+            return Err("MCP is shutting down".into());
+        }
+        let previous = connections
+            .get(&code)
+            .and_then(|(rx, _)| rx.borrow().clone());
+        if let Some(result) = previous {
+            connections.remove(&code);
+            result?;
+        }
+        if !connections.contains_key(&code) {
+            if connections.len() >= 64 {
+                connections.retain(|_, (rx, job)| rx.borrow().is_none() && !job.is_finished());
+            }
+            if connections.len() >= 64 {
+                return Err("connection capacity reached".into());
+            }
+            let (tx, rx) = watch::channel(None);
+            let manager = self.clone();
+            let arguments = args.clone();
+            let job = tokio::spawn(async move {
+                let future = async {
+                    let runtime = manager.runtime().await?;
+                    let mut value =
+                        super::mcp_tools::call_tool(&runtime, "pab_connect", &arguments).await?;
+                    value["connected"] = json!(true);
+                    Ok::<_, String>(value)
+                };
+                let result = match tokio::time::timeout(Duration::from_secs(120), future).await {
+                    Ok(result) => result,
+                    Err(_) => {
+                        if let Some(runtime) = manager.runtime_slot.lock().await.clone()
+                            && let Ok(device) = manager.queue.remembered_device(code).await
+                        {
+                            runtime.disconnect_device(device.device_ref).await;
+                        }
+                        Err("connection_timeout: no verified connection within 120 seconds".into())
+                    }
+                };
+                let _ = tx.send(Some(result));
+            });
+            connections.insert(code, (rx, job));
+        }
+        let mut receiver = connections[&code].0.clone();
+        drop(connections);
+        let deadline = tokio::time::Instant::now()
+            + Duration::from_millis(args["wait_ms"].as_u64().unwrap_or(5000));
+        loop {
+            if let Some(result) = receiver.borrow_and_update().clone() {
+                return result;
+            }
+            if tokio::time::timeout_at(deadline, receiver.changed())
+                .await
+                .is_err()
+            {
+                return Ok(
+                    json!({"connected":false,"state":"connecting","connection_ref":{"device_code":code},"wait_expired":true,"next_action":"pab_connect"}),
+                );
+            }
+            if receiver.borrow().is_none() && receiver.has_changed().is_err() {
+                return Err("connection attempt stopped".into());
+            }
+        }
+    }
     pub async fn new(
         runtime_slot: RuntimeSlot,
         monitor: MonitorSlot,
@@ -101,6 +178,7 @@ impl OperationManager {
             reporter,
             jobs: Mutex::new(HashMap::new()),
             rechecks: Mutex::new(HashMap::new()),
+            connections: Mutex::new(HashMap::new()),
             closed: AtomicBool::new(false),
             filesystem_rotation: AtomicU64::new(0),
             heartbeat: Mutex::new(None),
@@ -232,6 +310,7 @@ impl OperationManager {
 
     pub async fn call(self: &Arc<Self>, name: &str, args: &Value) -> Result<Value, String> {
         match name {
+            "pab_connect" => self.connect(args).await,
             "pab_upload_file" | "pab_download_file" => self.submit(name, args).await,
             "pab_get_operation" => self.get(args).await,
             "pab_list_operations" => self.list(args).await,
@@ -502,13 +581,22 @@ impl OperationManager {
     }
 
     async fn get(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
+        super::mcp_waiting::wait_value(args, || self.get_once(args)).await
+    }
+    async fn get_once(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if let Ok((device, cached)) = self.queue.system_record(id, code).await {
-            let result = self
-                .runtime()
-                .await?
-                .get_system_query(device, id)
+            let lookup = async {
+                self.runtime()
+                    .await?
+                    .get_system_query(device, id)
+                    .await
+                    .map_err(|e| e.to_string())
+            };
+            let result = tokio::time::timeout(Duration::from_millis(250), lookup)
                 .await
+                .ok()
+                .and_then(Result::ok)
                 .unwrap_or(cached);
             return Ok(
                 json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":result.kind},"result":result}),
@@ -746,26 +834,35 @@ impl OperationManager {
         {
             return Err("device has unresolved operations; cancel or finish them and confirm their outcomes before disconnecting".to_owned());
         }
-        let device = self
-            .queue
-            .remembered_device(code)
-            .await
-            .map_err(|e| e.to_string())?;
+        let pending = self.connections.lock().await.remove(&code);
+        let had_pending = pending.is_some();
+        if let Some((_, job)) = pending {
+            job.abort();
+            let _ = job.await;
+        }
+        let device = match self.queue.remembered_device(code).await {
+            Ok(device) => Some(device),
+            Err(_) if had_pending => None,
+            Err(e) => return Err(e.to_string()),
+        };
         let runtime = self
             .runtime_slot
             .try_lock()
             .map_err(|_| "MCP runtime is initializing; retry disconnect")?
             .clone();
-        if let Some(runtime) = runtime {
+        if let (Some(runtime), Some(device)) = (runtime, &device) {
             runtime.disconnect_device(device.device_ref).await;
         }
         Ok(
-            json!({ "device_code": code, "disconnected": true, "scope": "current_mcp_session", "os_reminder": device.os_reminder }),
+            json!({ "device_code": code, "disconnected": true, "scope": "current_mcp_session", "os_reminder": device.map(|d|d.os_reminder) }),
         )
     }
 
     pub async fn shutdown(&self) {
         self.closed.store(true, Ordering::Release);
+        for (_, (_, job)) in self.connections.lock().await.drain() {
+            job.abort();
+        }
         if let Some(task) = self.heartbeat.lock().await.take() {
             task.abort();
             let _ = task.await;

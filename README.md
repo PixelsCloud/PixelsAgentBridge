@@ -174,7 +174,7 @@ for example `pixels.pab_connect`.
 | `pab_window_control` | Minimize, maximize, restore or request normal close of a referenced window |
 | `pab_type_text` | Enter Unicode text into an explicitly referenced foreground window |
 | `pab_capture_screenshot` | Capture current desktop or referenced window as JPEG at captured resolution, with metadata and hash |
-| `pab_desktop_input` | Send supported mouse, keyboard, or secure attention events |
+| `pab_desktop_input` | Send a legacy input event or an ordered window-bound batch of desktop actions |
 | `pab_open_terminal` | Open an interactive terminal |
 | `pab_terminal_input` | Send terminal input |
 | `pab_terminal_read` | Read terminal output |
@@ -226,6 +226,14 @@ for example `pixels.pab_connect`.
 Call `pab_connect` first and retain its platform context. Most device tools require
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.
+
+### Tool group settings
+
+Open **Settings → MCP tools** to choose six static groups. All 60 tools are enabled by default, preserving existing use. Connections/tasks (14) are required; files (15), system (12), desktop (7), Git (8), and Docker (4) can be disabled individually. Save, then restart the MCP process through your AI client to load the selection. Restarting only Desktop does not reload an already running MCP process.
+
+Preferences are stored per user in `mcp-tools.json` under the PAB data directory (`PAB_DATA_DIR` when set). Each MCP reads a fixed startup snapshot; existing processes and accepted operations retain their behavior. Required operation query/cancel tools remain available when optional groups are disabled. Tool listing and dispatch use the same selection, so explicitly calling an omitted tool fails before runtime initialization. Groups control discovery and dispatch, not device permissions or approval policy; calls retain the configured automatic execution behavior.
+
+Configuration has version 1 and a required `enabledGroups` array of `core`, `file`, `system`, `desktop`, `git`, `container`; `core` must be present. Unknown fields/groups, duplicate groups, unsupported versions and malformed files fail MCP startup with an error rather than silently enabling everything. The settings editor displays the error and allows an explicit replacement by saving a valid selection. Saves use tempfile atomic replacement, so startup never sees partially written JSON.
 
 ### Docker container operations
 
@@ -408,9 +416,12 @@ cumulative library counters, not instantaneous throughput.
 `include_gpu=true` enables optional NVIDIA queries through dynamically loaded
 `nvml-wrapper`. The GPU subsection reports its own status and field errors;
 unavailable NVML does not establish the absence of GPUs. AMD/Intel GPU backends
-are not implemented. System queries wait for completion and cannot be cancelled.
-Blocking OS/driver reads have no hard interruption deadline; worker admission is
-bounded, and a busy collector returns `executor_busy`. Each MCP permits 16 unresolved
+are not implemented. System reads return their current state after waiting up to five seconds; query
+the original ID if still running. Blocking OS/driver reads cannot be interrupted.
+The Executor runs at most two system queries and admits sixteen running/queued
+requests, with a five-second wait for each execution slot or collector lock.
+A full queue returns `executor_busy`; an expired queue wait returns `queue_timeout`,
+without resampling. Queued Git/Docker requests can be cancelled before dispatch. Each MCP permits 16 unresolved
 system-query records. Reusing `request_id` reads the original sample through
 `pab_get_operation`; omit it for a fresh sample. Interrupted or uncertain queries
 are not automatically rerun. Desktop history shows query type and returned count.
@@ -450,7 +461,7 @@ installed-host acceptance remain pending.
 
 Text tools require an updated target Executor. They support UTF-8 and UTF-16,
 detect BOMs, and reject binary data instead of replacing undecodable bytes.
-Reads return at most 16 KiB of UTF-8 text from files up to 4 MiB; writes/patch
+Normal lines/bytes reads return at most 16 KiB of UTF-8 text from files up to 4 MiB; writes/patch
 inputs are limited to 128 KiB. Continue with `next_offset` and the returned
 `metadata.sha256` as `expected_hash`. Patch edits use `find`, `replace`, and
 `expected_matches` (default 1), match the original text, and cannot overlap.
@@ -462,13 +473,31 @@ PAB path locks do not provide atomic compare-and-swap against external editors.
 
 Search/hash/mkdir require a target Executor with filesystem capability version 2;
 existing text tools remain compatible with version 1. Search uses a literal
-substring (not a regular expression), defaults to case-sensitive name matching,
+substring by default, defaults to case-sensitive name matching,
 and accepts `/`-separated relative globs such as `**/*.rs`. Hidden files are
 included; gitignore is not applied. It returns at most 100 matches with 160-character
 line previews and file hashes for content matches. Scans stop at 4096 entries,
 64 MiB of accounted read budget, 5 seconds, or the output budget, reporting
 `truncated`, `stop_reason`, skip counts and bounded warnings. Results are not an
-atomic directory snapshot and have no live paging cursor.
+atomic directory snapshot; newer Executors support checked continuation as described below.
+
+Filesystem capability v4 enhances the existing tools:
+
+- `pab_file_read`: `mode: "tail"` reads the final `tail_bytes` (default 16384); `mode: "follow"` resumes a `cursor` or raw byte `offset`, optionally waiting `wait_ms` (0–5000). These modes use bounded reads for large logs without the normal 4 MiB file ceiling, do not calculate a full-file hash, and reject `expected_hash`. `max_bytes` is 4–16384 and returned UTF-8 text is also capped at 16 KiB. Resume using `result.log.cursor` and the same encoding in a new read request. Incomplete final UTF-8 characters and UTF-16 code units/surrogates remain for the next call and set `incomplete_character`; an empty wait sets `wait_expired`. File identity uses `same-file`; head/boundary byte anchors detect observed replacement, truncation and relevant rewrites as `log_changed`. This is not a full-file historical snapshot and cannot detect every external rewrite in the middle. Tail starts at an encoded-character boundary and may omit an incomplete initial character. BOM-less UTF-16 still requires explicit encoding.
+- `pab_file_search`: `regex`, `exclude`, `context_lines`, and `cursor`. [Rust regex](https://docs.rs/regex/1.13.1/regex/struct.RegexBuilder.html) supplies regular expressions with bounded compilation; unsupported syntax fails explicitly. `globset` exclusions such as `["node_modules/**", ".git/**"]` prune directories. Context includes up to five lines on each side, with 160-character previews per line. Resume `result.search.next_cursor` with the same query and filters. Sorted directory metadata and the continuation file hash are checked; observed changes return `search_changed`. Incomplete inventory (depth, entry or time budget) supplies no continuation cursor: inspect `truncated`, `stop_reason`, and warnings. The five-second scan budget is checked between I/O/lines, not a hard interruption of a native call or regex match.
+- `pab_file_patch`: `dry_run: true` reuses the existing nonoverlapping multi-edit and hash checks. `patch_preview` reports original/result hashes, result size, whether content changes, and per-edit match counts without publication. Apply with a **new request_id**, `dry_run: false`, and the original `expected_hash`; intervening changes are rejected. Preview neither reserves the file nor introduces an approval step.
+
+For example, read the last 8 KiB and then wait for appended text:
+
+```json
+{ "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "tail", "tail_bytes": 8192 }
+```
+
+```json
+{ "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "follow", "cursor": "previous result.log.cursor", "wait_ms": 5000 }
+```
+
+Enhanced options require updated MCP and filesystem-v4 Executor installations; older peers reject them before execution rather than ignoring them. Basic requests retain their legacy wire format and deduplication fingerprints. Windows local automation and isolated QUIC tests passed; installed-host and native Linux/macOS acceptance remain pending.
 
 `pab_file_hash` returns an `operation_ref` after remote acceptance and streams
 256 KiB chunks without loading the whole file. Query `pab_get_operation` for
@@ -560,6 +589,51 @@ The persistent identity stores a BLAKE3 digest of input text, not the raw text;
 this is audit minimization, not encryption, and does not protect predictable text
 from guessing. Text still reaches the target and may be retained by the AI host.
 
+### Ordered desktop actions
+
+`pab_desktop_input` accepts either its original `event` or a batch with `window_ref`,
+`actions`, optional `request_id`, and `timeout_ms` (default 5000, range 100–10000).
+Batch support requires Executor system capability v7 and desktop helper v2; older
+helpers continue to support the original single-window tools. For example, after
+listing windows, pass an actual returned reference:
+
+```json
+{
+  "device_code": "123456789",
+  "window_ref": "REPLACE_WITH_RETURNED_WINDOW_REF",
+  "actions": [
+    {"type": "focus"},
+    {"type": "key_chord", "modifiers": ["control"], "key": "a"},
+    {"type": "type_text", "text": "Hello 世界"}
+  ]
+}
+```
+
+A batch contains 1–32 steps: `focus`, `control`, `type_text`, `key_chord`, `click`,
+`scroll`, or `wait`. All steps target the same window. Text totals at most 4096
+UTF-8 bytes; waits are 1–2000 ms each and total less than the batch deadline.
+Key chords use unique `control/alt/shift/meta` modifiers and a lowercase letter,
+digit, `f1`–`f12`, or a named navigation key such as `enter`, `tab`, or `page_down`.
+Clicks use `x/y` relative to the current **outer window** in xcap native coordinates,
+not screenshot pixels. Clicks verify the pointer target; scrolling requires the
+pointer already over the referenced foreground window (`axis=horizontal/vertical`,
+nonzero `amount` between -100 and 100; positive means right/down).
+
+The active helper handles the entire batch before the next helper request, including
+requests from other agents. This does not exclude physical input or other programs.
+Input steps check window identity and foreground; the helper checks its active
+desktop between steps and during waits. On failure, later steps are skipped. Read
+`result.data.snapshot.batch` for zero-based indices, completed count, failed step,
+and each step's `completed/failed/unconfirmed/skipped` state. Completed effects are
+not rolled back; API acceptance does not prove application content. Keys/buttons
+are released on ordinary error paths, but process termination cannot guarantee cleanup.
+
+The timeout stops dispatching further steps; it cannot interrupt a blocked native
+call. A slow batch may return `running`: query its original `operation_ref`.
+Reuse `request_id` to observe the same batch, never to replay it. Text and chord-key
+values are hashed in persistent request identity. Helper loss or Executor restart
+may leave the result unconfirmed; it is never automatically resubmitted.
+
 ### Current desktop and window screenshots
 
 Screenshots use [xcap](https://github.com/nashaofu/xcap) and [image](https://github.com/image-rs/image).
@@ -612,6 +686,18 @@ and images above 8 MiB through isolated helper/QUIC/history/MCP response tests h
 been exercised. Physical 4K/multi-screen,
 installed-host display, Linux/macOS graphical acceptance remain pending.
 
+
+### Enhanced commands, waits and output
+
+- `pab_run_command` accepts `request_id`, `env`, `stdin_text`, `timeout_ms` and `wait_ms`. Reusing an ID with identical parameters returns the original task; conflicting parameters are rejected. Keep the original ID when retrying.
+- `env` overrides the child's inherited environment (64 entries / 8 KiB total). `stdin_text` accepts up to 16 KiB of UTF-8 and closes stdin after writing. `timeout_ms` accepts 1–86400000; omitting it adds no execution deadline. Timeout stops the direct child, without guaranteeing descendant cleanup. Incomplete output draining is reported as a failure.
+- Command `wait_ms` defaults to 0 and permits up to 30000. It applies after remote acceptance, not to connection or submission time. Completion within the wait includes the final 8 KiB of each output stream; use `pab_read_output` for earlier bytes. Wait expiry returns the original reference, not a failed task.
+- `pab_get_task` / `pab_get_operation` accept `wait_ms`, `wait_until: "change" | "complete"`, and `after_revision`. They return `revision`, `changed`, and `wait_expired`. Carry the revision into the next query. The wait budget includes the initial snapshot read, but that first read is not forcibly cancelled.
+- `pab_read_output` accepts `max_bytes` (4–65536), `tail_bytes` (1–65536, mutually exclusive with offset), `contains`, and `wait_ms`. Resume with `next_offset`. Filtering matches lines in the returned chunk only, without cross-chunk guarantees; the cursor advances over all scanned bytes. Retention gaps appear in `gap`; lossy UTF-8 decoding appears in `decoding_replacements`.
+- `pab_connect` waits 5000 ms by default (configurable 0–30000). Pending calls return `state: "connecting"` and a `connection_ref`. Another call for the same device reuses the active attempt; `pab_disconnect` can stop it. A background attempt lasts approximately 120 seconds at most and reports failure before a new attempt can be started.
+- Tool errors preserve the message and include `error.code`, `phase`, `retry_action`, and an available request reference. Query the original operation when the network outcome is uncertain; do not automatically retry with a new ID.
+
+`env`, `stdin_text`, and `timeout_ms` require command schema v2 on the target Executor. Older peers are rejected before command submission instead of silently ignoring options. Plain legacy commands remain compatible. These source features require updated MCP and target Executor installations.
 
 ### Example: run a command and read the result
 
@@ -689,6 +775,16 @@ Executor as well before using the text tools.
 Desktop and every MCP process maintain independent connections. Disconnecting a
 device in Desktop does not, by itself, disconnect an agent's MCP connection.
 Multiple agents also retain independent runtimes.
+
+Default guest MCP processes reserve separate persistent keys under
+`mcp-endpoints/guest-<slot>.key` in the user data directory. OS file locks keep
+live processes in distinct slots and release the slots on exit or a crash;
+retries keep the same identity, and later processes can reuse free slots.
+Desktop retains `guest-endpoint.key`. Device history and saved passwords remain
+in the shared database. Do not delete slot keys or lock files while MCP is running.
+Manually configured account MCPs (`PAB_MCP_GUEST=0`) require a separately registered
+`PAB_ENDPOINT_SECRET_FILE` per concurrent process; a busy key returns an error.
+Existing MCP processes must be restarted after installing this fix.
 
 Desktop's main process exposes an Axum reporting service on `0.0.0.0:26035`:
 

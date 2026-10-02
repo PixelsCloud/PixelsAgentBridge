@@ -19,8 +19,38 @@ pub enum TextEncoding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TextReadRange {
-    Bytes { offset: u64, max_bytes: u32 },
-    Lines { start_line: u64, count: u32 },
+    Bytes {
+        offset: u64,
+        max_bytes: u32,
+    },
+    Lines {
+        start_line: u64,
+        count: u32,
+    },
+    Stream {
+        offset: Option<u64>,
+        tail_bytes: Option<u32>,
+        cursor: Option<String>,
+        max_bytes: u32,
+        wait_ms: u32,
+    },
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileSearchOptions {
+    #[serde(default)]
+    pub regex: bool,
+    #[serde(default)]
+    pub exclude: Vec<String>,
+    #[serde(default)]
+    pub context_lines: u32,
+    pub cursor: Option<String>,
+}
+impl FileSearchOptions {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +84,8 @@ pub enum FileSystemAction {
         limits: FileOperationLimits,
     },
     Search {
+        #[serde(default, skip_serializing_if = "FileSearchOptions::is_default")]
+        options: FileSearchOptions,
         mode: FileSearchMode,
         query: String,
         glob: String,
@@ -81,6 +113,8 @@ pub enum FileSystemAction {
         expected_hash: Option<String>,
     },
     Patch {
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        dry_run: bool,
         expected_hash: String,
         encoding: Option<TextEncoding>,
     },
@@ -131,8 +165,14 @@ impl FileSystemAction {
         matches!(self, Self::Write { .. } | Self::Patch { .. })
     }
 
-    pub const fn schema_version(&self) -> u16 {
+    pub fn schema_version(&self) -> u16 {
         match self {
+            Self::Read {
+                range: TextReadRange::Stream { .. },
+                ..
+            }
+            | Self::Patch { dry_run: true, .. } => 4,
+            Self::Search { options, .. } if !options.is_default() => 4,
             Self::Copy { .. }
             | Self::Move { .. }
             | Self::Delete { .. }
@@ -147,7 +187,7 @@ impl FileSystemAction {
         self.is_bulk()
             || matches!(
                 self,
-                Self::Write { .. } | Self::Patch { .. } | Self::Mkdir { .. }
+                Self::Write { .. } | Self::Patch { dry_run: false, .. } | Self::Mkdir { .. }
             )
     }
 }
@@ -185,6 +225,20 @@ impl FileSystemRequest {
             return Err("destination requires 1..4096 bytes without NUL");
         }
         match &self.operation {
+            FileSystemAction::Search { options, .. }
+                if options.exclude.len() > 32
+                    || options
+                        .exclude
+                        .iter()
+                        .any(|s| s.is_empty() || s.len() > 1024 || s.contains('\0'))
+                    || options.exclude.iter().map(String::len).sum::<usize>() > 8192
+                    || options.context_lines > 5
+                    || options.cursor.as_ref().is_some_and(|s| s.len() > 4096) =>
+            {
+                return Err(
+                    "invalid search options: max 32 exclusions / 8 KiB, 5 context lines, 4096-byte cursor",
+                );
+            }
             FileSystemAction::Copy { limits, .. }
             | FileSystemAction::Move { limits, .. }
             | FileSystemAction::Delete { limits, .. } => limits.validate()?,
@@ -241,6 +295,26 @@ impl FileSystemRequest {
                 ..
             } => {
                 match range {
+                    TextReadRange::Stream {
+                        offset,
+                        tail_bytes,
+                        cursor,
+                        max_bytes,
+                        wait_ms,
+                    } if !(4..=16384).contains(max_bytes)
+                        || *wait_ms > 5000
+                        || tail_bytes.is_some_and(|n| !(4..=16384).contains(&n))
+                        || usize::from(offset.is_some())
+                            + usize::from(tail_bytes.is_some())
+                            + usize::from(cursor.is_some())
+                            > 1
+                        || cursor.as_ref().is_some_and(|s| s.len() > 4096)
+                        || expected_hash.is_some() =>
+                    {
+                        return Err(
+                            "stream reads require one of offset/tail_bytes/cursor, 4..16384 bytes, wait_ms<=5000 and no expected_hash",
+                        );
+                    }
                     TextReadRange::Bytes { max_bytes, .. }
                         if !(4..=MAX_TEXT_READ_BYTES as u32).contains(max_bytes) =>
                     {
@@ -330,6 +404,10 @@ pub struct FileSystemError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSystemReply {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log: Option<LogReadState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch_preview: Option<PatchPreview>,
     pub request_id: RequestId,
     pub path: String,
     pub kind: String,
@@ -354,6 +432,8 @@ pub struct FileSystemReply {
 impl FileSystemReply {
     pub fn pending(request: &FileSystemRequest) -> Self {
         Self {
+            log: None,
+            patch_preview: None,
             request_id: request.request_id,
             path: request.path.clone(),
             kind: request.operation.kind().to_owned(),
@@ -381,6 +461,8 @@ pub enum FileSearchMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSearchMatch {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub context: Vec<SearchContextLine>,
     pub path: String,
     pub kind: String,
     pub line: Option<u64>,
@@ -390,6 +472,8 @@ pub struct FileSearchMatch {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FileSearchSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
     pub matches: Vec<FileSearchMatch>,
     pub scanned_entries: u32,
     pub scanned_bytes: u64,
@@ -397,6 +481,26 @@ pub struct FileSearchSummary {
     pub truncated: bool,
     pub stop_reason: Option<String>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchContextLine {
+    pub line: u64,
+    pub text: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LogReadState {
+    pub cursor: String,
+    pub wait_expired: bool,
+    pub incomplete_character: bool,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PatchPreview {
+    pub original_sha256: String,
+    pub result_sha256: String,
+    pub result_size: u64,
+    pub changed: bool,
+    pub matched_edits: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -410,11 +514,60 @@ pub struct FileHashProgress {
 mod tests {
     use super::*;
     #[test]
+    fn legacy_requests_keep_their_fingerprint_and_enhancements_require_v4() {
+        for value in [
+            serde_json::json!({"action":"patch","expected_hash":"a".repeat(64),"encoding":null}),
+            serde_json::json!({"action":"search","mode":"content","query":"x","glob":"**/*","case_sensitive":true,"max_results":10,"max_depth":8,"max_file_bytes":1024}),
+        ] {
+            let action: FileSystemAction = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(&action).unwrap(), value);
+            assert!(action.schema_version() < 4);
+        }
+        let action = FileSystemAction::Patch {
+            expected_hash: "a".repeat(64),
+            encoding: None,
+            dry_run: true,
+        };
+        assert_eq!(action.schema_version(), 4);
+        assert!(!action.mutates());
+        assert!(action.has_payload());
+        let action = FileSystemAction::Read {
+            range: TextReadRange::Stream {
+                offset: None,
+                tail_bytes: None,
+                cursor: None,
+                max_bytes: 4,
+                wait_ms: 5000,
+            },
+            encoding: None,
+            expected_hash: None,
+        };
+        assert_eq!(action.schema_version(), 4);
+        let mut request = FileSystemRequest {
+            request_id: RequestId::new(),
+            path: "/tmp/log".into(),
+            operation: action,
+            payload_size: 0,
+            payload_sha256: None,
+        };
+        assert!(request.validate().is_ok());
+        if let FileSystemAction::Read {
+            range: TextReadRange::Stream { offset, cursor, .. },
+            ..
+        } = &mut request.operation
+        {
+            *offset = Some(0);
+            *cursor = Some("cursor".into());
+        }
+        assert!(request.validate().is_err());
+    }
+    #[test]
     fn search_uses_byte_limits_and_non_payload_mutations_are_explicit() {
         let mut request = FileSystemRequest {
             request_id: RequestId::new(),
             path: "/tmp/root".to_owned(),
             operation: FileSystemAction::Search {
+                options: Default::default(),
                 mode: FileSearchMode::Content,
                 query: "中".repeat(342),
                 glob: "**/*".to_owned(),

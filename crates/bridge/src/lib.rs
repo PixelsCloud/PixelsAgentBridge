@@ -3,6 +3,7 @@
 mod config;
 mod connection;
 pub mod desktop_presence;
+pub mod mcp_tool_settings;
 mod runtime;
 
 pub use config::{BridgeConfig, BridgeConfigError, BridgeIdentity, GuestConfigError};

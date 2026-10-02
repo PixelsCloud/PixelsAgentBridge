@@ -84,50 +84,75 @@ pub(super) async fn call_tool(
                 .current_environment(device_ref)
                 .await
                 .map_err(|error| error.to_string())?;
+            let options = pab_protocol::CommandOptions {
+                env: serde_json::from_value(arguments.get("env").cloned().unwrap_or(json!({})))
+                    .map_err(|e| e.to_string())?,
+                stdin_text: arguments["stdin_text"].as_str().map(str::to_owned),
+                timeout_ms: arguments["timeout_ms"].as_u64(),
+            };
+            options.validate().map_err(str::to_owned)?;
+            let id = arguments["request_id"]
+                .as_str()
+                .map(str::parse::<RequestId>)
+                .transpose()
+                .map_err(|e| e.to_string())?
+                .unwrap_or_default();
+            let command = pab_protocol::CommandTaskSpec {
+                display_summary: format!("{}{}", program, if args.is_empty() { "" } else { " …" })
+                    .chars()
+                    .take(512)
+                    .collect(),
+                program,
+                args,
+                cwd,
+                options,
+                expected_environment: pab_protocol::ExpectedEnvironment {
+                    os_family: target.execution.os_family,
+                    environment_revision: target.execution.environment_revision.clone(),
+                },
+            };
             let snapshot = runtime
-                .submit_command(device_ref, RequestId::new(), program, args, cwd)
+                .submit_command_spec(device_ref, id, command)
                 .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "task": snapshot,
-                "operation_ref": { "device_code": arguments["device_code"], "operation_id": snapshot.request_id, "kind": "command", "task_id": snapshot.task_ref.task_id },
-                "os_reminder": target.compact_reminder()
-            }))
+                .map_err(|e| e.to_string())?;
+            let mut wait_args = arguments.clone();
+            wait_args["wait_until"] = json!("complete");
+            let mut result = super::mcp_waiting::wait_value(&wait_args, || async {
+                let record = runtime.task(snapshot.task_ref).await.map_err(|e| e.to_string())?;
+                Ok(json!({"task":record.snapshot,"complete":record.is_complete(),"stdout":record.stdout,"stderr":record.stderr,
+                    "operation_ref":{"device_code":arguments["device_code"],"operation_id":id,"kind":"command","task_id":snapshot.task_ref.task_id},"os_reminder":target.compact_reminder()}))
+            }).await?;
+            if result["complete"] == true && super::mcp_waiting::wait_ms(arguments) > 0 {
+                let record = runtime
+                    .task(snapshot.task_ref)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                for (name, stream, range) in [
+                    ("stdout", OutputStream::Stdout, record.stdout),
+                    ("stderr", OutputStream::Stderr, record.stderr),
+                ] {
+                    let offset = range
+                        .available_to
+                        .saturating_sub(8192)
+                        .max(range.retained_from);
+                    let (chunk, _) = runtime
+                        .read_output(snapshot.task_ref, stream, offset, 8192)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    result["output"][name] = json!({"text":String::from_utf8_lossy(&chunk.bytes),"offset":offset,"next_offset":offset+chunk.bytes.len() as u64,"truncated":offset>0});
+                }
+            }
+            Ok(result)
         }
         "pab_get_task" => {
             let task_ref = resolve_task(runtime, arguments).await?;
-            let record = runtime
-                .task(task_ref)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "task_ref": task_ref,
-                "snapshot": record.snapshot,
-                "complete": record.is_complete(),
-                "last_event_seq": record.last_event_seq,
-                "stdout": record.stdout,
-                "stderr": record.stderr
-            }))
+            super::mcp_waiting::wait_value(arguments, || async {
+                let record = runtime.task(task_ref).await.map_err(|e|e.to_string())?;
+                Ok(json!({"task_ref":task_ref,"snapshot":record.snapshot,"complete":record.is_complete(),"last_event_seq":record.last_event_seq,"stdout":record.stdout,"stderr":record.stderr}))
+            }).await
         }
-        "pab_read_output" => {
-            let task_ref = resolve_task(runtime, arguments).await?;
-            let stream = match required_text(arguments, "stream")? {
-                "stdout" => OutputStream::Stdout,
-                "stderr" => OutputStream::Stderr,
-                _ => return Err("stream must be stdout or stderr".to_owned()),
-            };
-            let offset = arguments.get("offset").and_then(Value::as_u64).unwrap_or(0);
-            let (chunk, range) = runtime
-                .read_output(task_ref, stream, offset, 64 * 1024)
-                .await
-                .map_err(|error| error.to_string())?;
-            Ok(json!({
-                "text": String::from_utf8_lossy(&chunk.bytes),
-                "offset": offset,
-                "next_offset": offset + chunk.bytes.len() as u64,
-                "range": range
-            }))
-        }
+        "pab_read_output" => read_output(runtime, arguments).await,
+
         "pab_list_directory" => {
             let device_ref = resolve_target(runtime, arguments).await?;
             let path = required_text(arguments, "path")?;
@@ -157,6 +182,17 @@ pub(super) async fn call_tool(
             Ok(json!({ "list": list, "os_reminder": target.compact_reminder() }))
         }
         "pab_desktop_input" => {
+            if arguments.get("actions").is_some() {
+                return super::mcp_desktop::call(runtime, name, arguments).await;
+            }
+            if ["window_ref", "timeout_ms", "request_id"]
+                .iter()
+                .any(|key| arguments.get(key).is_some())
+            {
+                return Err(
+                    "batch parameters require actions; legacy event cannot use them".into(),
+                );
+            }
             let device_ref = resolve_target(runtime, arguments).await?;
             let event: pab_protocol::DesktopInputEvent =
                 serde_json::from_value(arguments.get("event").cloned().ok_or("event is required")?)
@@ -312,4 +348,119 @@ fn terminal_size(arguments: &Value, key: &str, default: u16) -> Result<u16, Stri
         .and_then(Value::as_u64)
         .unwrap_or(u64::from(default));
     u16::try_from(value).map_err(|_| format!("invalid {key}"))
+}
+
+async fn read_output(runtime: &BridgeRuntime, args: &Value) -> Result<Value, String> {
+    let task_ref = resolve_task(runtime, args).await?;
+    let stream = match required_text(args, "stream")? {
+        "stdout" => OutputStream::Stdout,
+        "stderr" => OutputStream::Stderr,
+        _ => return Err("invalid stream".into()),
+    };
+    if args.get("offset").is_some() && args.get("tail_bytes").is_some() {
+        return Err("offset and tail_bytes are mutually exclusive".into());
+    }
+    let maximum = args["max_bytes"].as_u64().unwrap_or(65536).min(65536) as u32;
+    let deadline = tokio::time::Instant::now()
+        + std::time::Duration::from_millis(super::mcp_waiting::wait_ms(args));
+    let mut requested = args["offset"].as_u64();
+    loop {
+        let record = runtime.task(task_ref).await.map_err(|e| e.to_string())?;
+        let range = match stream {
+            OutputStream::Stdout => record.stdout,
+            OutputStream::Stderr => record.stderr,
+        };
+        let wanted = *requested.get_or_insert_with(|| {
+            args["tail_bytes"]
+                .as_u64()
+                .map(|n| range.available_to.saturating_sub(n))
+                .unwrap_or(0)
+        });
+        let offset = wanted.max(range.retained_from);
+        let (chunk, actual_range) = runtime
+            .read_output(task_ref, stream, offset, maximum)
+            .await
+            .map_err(|e| e.to_string())?;
+        if !chunk.bytes.is_empty()
+            || actual_range.complete
+            || tokio::time::Instant::now() >= deadline
+        {
+            return Ok(output_result(
+                args,
+                wanted,
+                offset,
+                &chunk.bytes,
+                &actual_range,
+            ));
+        }
+        tokio::time::sleep_until(
+            deadline.min(tokio::time::Instant::now() + std::time::Duration::from_millis(100)),
+        )
+        .await;
+    }
+}
+
+fn output_result(
+    args: &Value,
+    wanted: u64,
+    offset: u64,
+    bytes: &[u8],
+    range: &pab_protocol::OutputRange,
+) -> Value {
+    let text = String::from_utf8_lossy(bytes);
+    let filtered = args["contains"].as_str().map(|pattern| {
+        text.lines()
+            .filter(|line| line.contains(pattern))
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
+    json!({"text":filtered.as_deref().unwrap_or(&text),"offset":offset,"next_offset":offset+bytes.len() as u64,"range":range,
+        "gap":if offset>wanted {Some(json!({"from":wanted,"to":offset}))}else{None},
+        "decoding_replacements":matches!(text,std::borrow::Cow::Owned(_)),
+        "filter_scope":if filtered.is_some(){Some("returned_chunk_lines")}else{None},
+        "wait_expired":bytes.is_empty() && !range.complete && super::mcp_waiting::wait_ms(args)>0})
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::*;
+    #[test]
+    fn filtered_output_advances_over_all_bytes_and_reports_retention_gaps_and_invalid_utf8() {
+        let bytes = "skip\n保留 😀\n".as_bytes();
+        let range = pab_protocol::OutputRange {
+            retained_from: 100,
+            available_to: 100 + bytes.len() as u64,
+            complete: false,
+        };
+        let result = output_result(&json!({"contains":"保留"}), 0, 100, bytes, &range);
+        assert_eq!(result["text"], "保留 😀");
+        assert_eq!(result["next_offset"], range.available_to);
+        assert_eq!(result["gap"], json!({"from":0,"to":100}));
+        assert_eq!(result["decoding_replacements"], false);
+        let empty = output_result(&json!({"contains":"absent"}), 100, 100, bytes, &range);
+        assert_eq!(empty["text"], "");
+        assert_eq!(empty["next_offset"], range.available_to);
+        let invalid = output_result(&json!({}), 100, 100, &[0xff], &range);
+        assert_eq!(invalid["decoding_replacements"], true);
+        let pending = output_result(
+            &json!({"wait_ms":5}),
+            range.available_to,
+            range.available_to,
+            &[],
+            &range,
+        );
+        assert_eq!(pending["wait_expired"], true);
+        assert_eq!(pending["next_offset"], range.available_to);
+        let done = output_result(
+            &json!({"wait_ms":5}),
+            range.available_to,
+            range.available_to,
+            &[],
+            &pab_protocol::OutputRange {
+                complete: true,
+                ..range
+            },
+        );
+        assert_eq!(done["wait_expired"], false);
+    }
 }

@@ -68,7 +68,16 @@ async fn serve_requests(
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
             LocalEvent::DesktopQuery(id, query) => {
                 let mut reply = if desktop_is_active(expected_desktop) {
-                    desktop_session.query(id, &query)
+                    desktop_session.query_guarded(id, &query, || {
+                        if desktop_is_active(expected_desktop) {
+                            Ok(())
+                        } else {
+                            Err(
+                                "interactive desktop changed; remaining batch actions stopped"
+                                    .into(),
+                            )
+                        }
+                    })
                 } else {
                     let mut reply = pab_protocol::SystemQueryReply::pending(
                         id,

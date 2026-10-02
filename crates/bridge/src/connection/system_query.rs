@@ -110,6 +110,7 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "window_focus"
                 | "window_control"
                 | "type_text"
+                | "desktop_batch"
                 | "system_info"
                 | "disks"
                 | "processes"
@@ -147,7 +148,8 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                         | "desktop_windows"
                         | "window_focus"
                         | "window_control"
-                        | "type_text",
+                        | "type_text"
+                        | "desktop_batch",
                     Some(SystemQueryData::Desktop { .. })
                 ) | (
                     "network_connections",
@@ -197,6 +199,25 @@ mod tests {
         assert!(!valid(&r, r.request_id));
         r.kind = "disks".into();
         r.warnings = vec!["x".repeat(33 * 1024)];
+        assert!(!valid(&r, r.request_id));
+    }
+    #[test]
+    fn batch_reply_is_valid_with_desktop_data_and_rejects_wrong_kind_data() {
+        let q = SystemQuery::Desktop {
+            query: DesktopQuery::Batch {
+                window_ref: RequestId::new().to_string(),
+                actions: vec![DesktopAction::Focus {}],
+                timeout_ms: 5000,
+            },
+        };
+        let mut r = SystemQueryReply::pending(RequestId::new(), &q);
+        assert!(valid(&r, r.request_id));
+        r.state = "completed".into();
+        r.data = Some(SystemQueryData::Desktop {
+            snapshot: DesktopSnapshot::new("test".into(), "fake"),
+        });
+        assert!(valid(&r, r.request_id));
+        r.data = Some(SystemQueryData::Disks { entries: vec![] });
         assert!(!valid(&r, r.request_id));
     }
 }
