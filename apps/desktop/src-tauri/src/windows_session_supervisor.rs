@@ -1,8 +1,8 @@
 use std::{
-    ffi::{OsStr, c_void},
+    ffi::{OsStr, OsString, c_void},
     io,
-    os::windows::ffi::OsStrExt,
-    path::Path,
+    os::windows::ffi::{OsStrExt, OsStringExt},
+    path::{Path, PathBuf},
     ptr, slice, thread,
     time::Duration,
 };
@@ -11,19 +11,22 @@ use pab_agent_core::{DataPaths, DataScope};
 use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE, WAIT_TIMEOUT},
     Security::{
-        DuplicateTokenEx, SecurityImpersonation, TOKEN_ALL_ACCESS, TOKEN_DUPLICATE, TOKEN_QUERY,
-        TokenPrimary,
+        DuplicateTokenEx, GetTokenInformation, SecurityImpersonation, TOKEN_ALL_ACCESS,
+        TOKEN_DUPLICATE, TOKEN_LINKED_TOKEN, TOKEN_QUERY, TOKEN_STATISTICS, TokenElevationType,
+        TokenElevationTypeLimited, TokenLinkedToken, TokenPrimary, TokenStatistics,
     },
     System::{
+        Environment::{CreateEnvironmentBlock, DestroyEnvironmentBlock},
         RemoteDesktop::{
             WTS_CURRENT_SERVER_HANDLE, WTS_PROCESS_INFOW, WTS_SESSION_INFOW, WTSActive,
             WTSEnumerateProcessesW, WTSEnumerateSessionsW, WTSFreeMemory,
-            WTSGetActiveConsoleSessionId, WTSQuerySessionInformationW, WTSUserName,
+            WTSGetActiveConsoleSessionId, WTSQuerySessionInformationW, WTSQueryUserToken,
+            WTSUserName,
         },
         Threading::{
-            CreateProcessAsUserW, OpenProcess, OpenProcessToken, PROCESS_INFORMATION,
-            PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW, STARTUPINFOW,
-            TerminateProcess, WaitForSingleObject,
+            CREATE_UNICODE_ENVIRONMENT, CreateProcessAsUserW, OpenProcess, OpenProcessToken,
+            PROCESS_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+            STARTUPINFOW, TerminateProcess, WaitForSingleObject,
         },
     },
 };
@@ -59,6 +62,7 @@ struct Target {
     session_id: u32,
     desktop: DesktopKind,
     winlogon_pid: u32,
+    user_logon_id: Option<(u32, i32)>,
 }
 
 struct Worker {
@@ -97,6 +101,7 @@ pub fn run() -> Result<(), String> {
                 workers.retain(|worker| {
                     worker.target.session_id == target.session_id
                         && worker.target.winlogon_pid == target.winlogon_pid
+                        && worker.target.user_logon_id == target.user_logon_id
                         && desktops.contains(&worker.target.desktop)
                         && worker.is_running()
                 });
@@ -177,6 +182,11 @@ fn active_target() -> io::Result<Option<Target>> {
         session_id,
         desktop,
         winlogon_pid,
+        user_logon_id: if desktop == DesktopKind::Default {
+            Some(logon_id(&user_token(session_id)?)?)
+        } else {
+            None
+        },
     }))
 }
 
@@ -254,7 +264,7 @@ fn wide(value: &OsStr) -> Vec<u16> {
     value.encode_wide().chain(std::iter::once(0)).collect()
 }
 
-fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
+fn winlogon_token(target: Target) -> io::Result<OwnedHandle> {
     // SAFETY: The PID comes from WTS and the handle is validated before use.
     let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, target.winlogon_pid) };
     if process.is_null() {
@@ -296,7 +306,152 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
     {
         return Err(io::Error::last_os_error());
     }
-    let primary = OwnedHandle(primary);
+    Ok(OwnedHandle(primary))
+}
+
+fn user_token(session_id: u32) -> io::Result<OwnedHandle> {
+    let mut token = ptr::null_mut();
+    // SAFETY: the SYSTEM supervisor queries the session selected by WTS.
+    if unsafe { WTSQueryUserToken(session_id, &mut token) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(OwnedHandle(token))
+}
+
+fn logon_id(token: &OwnedHandle) -> io::Result<(u32, i32)> {
+    let mut statistics: TOKEN_STATISTICS = unsafe { std::mem::zeroed() };
+    let mut needed = 0;
+    // SAFETY: buffer type and length match TokenStatistics.
+    if unsafe {
+        GetTokenInformation(
+            token.0,
+            TokenStatistics,
+            (&mut statistics as *mut TOKEN_STATISTICS).cast(),
+            std::mem::size_of_val(&statistics) as u32,
+            &mut needed,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok((
+        statistics.AuthenticationId.LowPart,
+        statistics.AuthenticationId.HighPart,
+    ))
+}
+
+fn interactive_token(target: Target) -> io::Result<OwnedHandle> {
+    let token = user_token(target.session_id)?;
+    if Some(logon_id(&token)?) != target.user_logon_id {
+        return Err(io::Error::other(
+            "interactive user changed before helper launch",
+        ));
+    }
+    let mut elevation = 0i32;
+    let mut needed = 0;
+    // SAFETY: TokenElevationType returns a TOKEN_ELEVATION_TYPE (i32).
+    if unsafe {
+        GetTokenInformation(
+            token.0,
+            TokenElevationType,
+            (&mut elevation as *mut i32).cast(),
+            std::mem::size_of_val(&elevation) as u32,
+            &mut needed,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    if elevation != TokenElevationTypeLimited {
+        return Ok(token);
+    }
+    // Use the same administrator's linked token to support elevated windows.
+    // Standard users have no linked token and remain standard users.
+    let mut linked: TOKEN_LINKED_TOKEN = unsafe { std::mem::zeroed() };
+    if unsafe {
+        GetTokenInformation(
+            token.0,
+            TokenLinkedToken,
+            (&mut linked as *mut TOKEN_LINKED_TOKEN).cast(),
+            std::mem::size_of_val(&linked) as u32,
+            &mut needed,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(OwnedHandle(linked.LinkedToken))
+}
+
+struct UserEnvironment(*mut c_void);
+impl Drop for UserEnvironment {
+    fn drop(&mut self) {
+        // SAFETY: created by CreateEnvironmentBlock and owned here.
+        unsafe { DestroyEnvironmentBlock(self.0) };
+    }
+}
+
+impl UserEnvironment {
+    fn new(token: &OwnedHandle) -> io::Result<Self> {
+        let mut block = ptr::null_mut();
+        // Do not inherit the supervisor's PAB_DATA_DIR or SYSTEM user profile.
+        if unsafe { CreateEnvironmentBlock(&mut block, token.0, 0) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(Self(block))
+    }
+
+    fn local_data(&self) -> io::Result<PathBuf> {
+        let mut entry = self.0.cast::<u16>();
+        // SAFETY: CreateEnvironmentBlock returns double-NUL terminated UTF-16
+        // entries; this block is alive for the complete traversal.
+        unsafe {
+            while *entry != 0 {
+                let mut length = 0;
+                while *entry.add(length) != 0 {
+                    length += 1;
+                }
+                let units = slice::from_raw_parts(entry, length);
+                if let Some(value) = environment_value(units, "LOCALAPPDATA") {
+                    let root = PathBuf::from(value);
+                    if root.is_absolute() {
+                        return Ok(root.join("PixelsAgentBridge"));
+                    }
+                    break;
+                }
+                entry = entry.add(length + 1);
+            }
+        }
+        Err(io::Error::other(
+            "interactive user LOCALAPPDATA is unavailable",
+        ))
+    }
+}
+
+fn environment_value(entry: &[u16], name: &str) -> Option<OsString> {
+    let separator = entry.iter().position(|value| *value == u16::from(b'='))?;
+    String::from_utf16_lossy(&entry[..separator])
+        .eq_ignore_ascii_case(name)
+        .then(|| OsString::from_wide(&entry[separator + 1..]))
+}
+
+fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
+    // Window properties on a user's desktop must be accessed in that user's
+    // logon context. Keep SYSTEM confined to the Winlogon helper.
+    let primary = match target.desktop {
+        DesktopKind::Default => interactive_token(target)?,
+        DesktopKind::Winlogon => winlogon_token(target)?,
+    };
+    let environment = if target.desktop == DesktopKind::Default {
+        let environment = UserEnvironment::new(&primary)?;
+        pab_executor::local_ipc::issue_local_access(
+            &environment.local_data()?.join("local-access.key"),
+        )
+        .map_err(io::Error::other)?;
+        Some(environment)
+    } else {
+        None
+    };
 
     let executable_wide = wide(executable.as_os_str());
     let mut command = wide(OsStr::new(&format!(
@@ -314,7 +469,7 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
     startup.lpDesktop = desktop.as_mut_ptr();
     let mut created: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
     // SAFETY: Paths and command line remain alive for the call. The token is a
-    // primary token from this session's SYSTEM Winlogon process.
+    // primary token for the selected desktop. Its environment remains alive.
     if unsafe {
         CreateProcessAsUserW(
             primary.0,
@@ -323,8 +478,14 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
             ptr::null(),
             ptr::null(),
             0,
-            0,
-            ptr::null::<c_void>(),
+            if environment.is_some() {
+                CREATE_UNICODE_ENVIRONMENT
+            } else {
+                0
+            },
+            environment
+                .as_ref()
+                .map_or(ptr::null(), |block| block.0.cast_const()),
             ptr::null(),
             &startup,
             &mut created,

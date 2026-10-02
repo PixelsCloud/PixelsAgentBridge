@@ -185,7 +185,10 @@ impl RuntimeStore {
         request_id: RequestId,
         command: &CommandTaskSpec,
     ) -> Result<LocalTaskRecord, RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        // Reserve the writer before reading. A deferred WAL transaction can
+        // fail its read-to-write upgrade immediately when another MCP commits,
+        // even with busy_timeout configured. Use IMMEDIATE for write transactions.
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         if let Some(row) = sqlx::query("SELECT * FROM runtime_tasks WHERE request_id = ?")
             .bind(request_id.to_string())
             .fetch_optional(&mut *tx)
@@ -214,7 +217,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<LocalTaskRecord, RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = sqlx::query("SELECT * FROM runtime_tasks WHERE request_id = ?")
             .bind(snapshot.request_id.to_string())
             .fetch_optional(&mut *tx)
@@ -281,7 +284,7 @@ impl RuntimeStore {
     }
 
     pub async fn record_event(&self, event: &TaskEvent) -> Result<bool, RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = row_by_task(&mut tx, event.task_ref).await?;
         let record = decode_record(&row)?;
         if event.seq <= record.last_event_seq {
@@ -319,7 +322,7 @@ impl RuntimeStore {
         chunk: &OutputChunk,
         range: &OutputRange,
     ) -> Result<bool, RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = row_by_task(&mut tx, chunk.task_ref).await?;
         let record = decode_record(&row)?;
         let local = match chunk.stream {
@@ -377,7 +380,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<LocalTaskRecord, RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = row_by_task(&mut tx, snapshot.task_ref).await?;
         let record = decode_record(&row)?;
         if record.request_id != snapshot.request_id {
@@ -404,7 +407,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<(LocalTaskRecord, Vec<OutputGap>), RuntimeStoreError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = row_by_task(&mut tx, snapshot.task_ref).await?;
         let record = decode_record(&row)?;
         if record.request_id != snapshot.request_id {
@@ -578,7 +581,10 @@ impl RuntimeStore {
         offset: u64,
         max_bytes: u32,
     ) -> Result<(OutputChunk, OutputRange), RuntimeStoreError> {
-        let record = self.get_by_task(task_ref).await?;
+        // Range and bytes must come from the same WAL snapshot while other
+        // MCP processes append or trim their cached output.
+        let mut tx = self.pool.begin().await?;
+        let record = decode_record(&row_by_task(&mut tx, task_ref).await?)?;
         let range = match stream {
             OutputStream::Stdout => record.stdout,
             OutputStream::Stderr => record.stderr,
@@ -598,8 +604,9 @@ impl RuntimeStore {
             .bind(to_i64(relative)?)
             .bind(i64::from(max_bytes))
             .bind(task_ref.task_id.to_string())
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await?;
+        tx.commit().await?;
         Ok((
             OutputChunk {
                 schema_version: pab_protocol::TASK_SCHEMA_VERSION,
