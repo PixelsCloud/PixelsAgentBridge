@@ -219,6 +219,7 @@ function App() {
 
         <main className="workspace">
           {error && <div className="toast error" role="status">{error}</div>}
+          <DeviceClaims language={language} enabled={!!device?.executor_running} />
 
           <div className={`page-content page-${view}`}>
             {view === "home" && (
@@ -251,7 +252,6 @@ function App() {
               </section>
             )}
 
-            <DeviceClaims language={language} enabled={!!device?.executor_running} />
             {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
