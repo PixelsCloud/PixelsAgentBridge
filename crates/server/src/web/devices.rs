@@ -21,7 +21,6 @@ pub(crate) struct DeviceQuery {
     status: Option<String>,
     system: Option<String>,
     scope: Option<String>,
-    owner: Option<String>,
 }
 impl DeviceQuery {
     fn validate(&self, me: &Viewer) -> Result<(i64, i64, bool), WebError> {
@@ -37,7 +36,6 @@ impl DeviceQuery {
                 self.system.as_deref(),
                 None | Some("windows" | "linux" | "macos")
             )
-            || !matches!(self.owner.as_deref(), None | Some("claimed" | "unclaimed"))
             || !matches!(self.scope.as_deref(), None | Some("mine" | "all"))
         {
             return Err(WebError::invalid());
@@ -53,15 +51,12 @@ impl DeviceQuery {
 // Every row is authorized by CURRENT personal ownership, never claim history.
 const BASE: &str = r#"FROM devices d
  LEFT JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id
- LEFT JOIN users u ON u.id=p.user_id
  LEFT JOIN device_runtime r ON r.device_id=d.id AND r.tenant_id=d.tenant_id
  WHERE ($1 OR p.user_id=$2)
  AND (position(lower($3) in lower(d.name))>0 OR position(replace($3,' ','') in d.code::text)>0)
  AND ($4::text IS NULL OR ($4='online')=EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($5::bytea[])))
- AND ($6::text IS NULL OR r.execution_context->>'os_family'=$6)
- AND ($7::text IS NULL OR ($7='unclaimed')=(d.owner_tenant_id IS NULL))"#;
+ AND ($6::text IS NULL OR r.execution_context->>'os_family'=$6)"#;
 const FIELDS: &str = r#"d.id,d.code,d.name,d.revision,d.status,
- u.username AS owner, p.user_id AS owner_id,
  r.execution_context->>'os_family' AS system,r.execution_context->>'os_name' AS os_name,
  r.execution_context->>'os_version' AS os_version,r.execution_context->>'architecture' AS architecture,
  r.agent_version, (extract(epoch from d.created_at)*1000)::bigint AS created_at,
@@ -72,8 +67,7 @@ fn device(row: sqlx::postgres::PgRow) -> Result<Value, sqlx::Error> {
     Ok(
         json!({"id":row.try_get::<Uuid,_>("id")?,"code":format!("{:09}",row.try_get::<i32,_>("code")?),
       "name":row.try_get::<String,_>("name")?,"revision":row.try_get::<i64,_>("revision")?,
-      "status":row.try_get::<String,_>("status")?,"owner":row.try_get::<Option<String>,_>("owner")?,
-      "owner_id":row.try_get::<Option<Uuid>,_>("owner_id")?,"system":row.try_get::<Option<String>,_>("system")?,
+      "status":row.try_get::<String,_>("status")?,"system":row.try_get::<Option<String>,_>("system")?,
       "os_name":row.try_get::<Option<String>,_>("os_name")?,"os_version":row.try_get::<Option<String>,_>("os_version")?,
       "architecture":row.try_get::<Option<String>,_>("architecture")?,"agent_version":row.try_get::<Option<String>,_>("agent_version")?,
       "created_at":row.try_get::<i64,_>("created_at")?,"last_online_at":row.try_get::<Option<i64>,_>("last_online_at")?,
@@ -101,11 +95,10 @@ pub(crate) async fn list(
         .bind(&query.status)
         .bind(&keys)
         .bind(&query.system)
-        .bind(&query.owner)
         .fetch_one(&mut *tx)
         .await?;
     let rows = sqlx::query(&format!(
-        "SELECT {FIELDS} {BASE} ORDER BY online DESC,lower(d.name),d.id LIMIT $8 OFFSET $9"
+        "SELECT {FIELDS} {BASE} ORDER BY online DESC,lower(d.name),d.id LIMIT $7 OFFSET $8"
     ))
     .bind(all)
     .bind(me.id)
@@ -113,7 +106,6 @@ pub(crate) async fn list(
     .bind(&query.status)
     .bind(&keys)
     .bind(&query.system)
-    .bind(&query.owner)
     .bind(size)
     .bind((page - 1) * size)
     .fetch_all(&mut *tx)
@@ -135,7 +127,7 @@ pub(crate) async fn detail(
 ) -> Result<Json<Value>, WebError> {
     let me = viewer(&state, &headers).await?;
     let query = DeviceQuery::default();
-    let sql = format!("SELECT {FIELDS} {BASE} AND d.id=$8");
+    let sql = format!("SELECT {FIELDS} {BASE} AND d.id=$7");
     let row = sqlx::query(&sql)
         .bind(me.server_admin)
         .bind(me.id)
@@ -143,7 +135,6 @@ pub(crate) async fn detail(
         .bind(&query.status)
         .bind(state.control.online_endpoint_keys())
         .bind(&query.system)
-        .bind(&query.owner)
         .bind(id)
         .fetch_one(state.control.store().pool())
         .await?;
@@ -158,13 +149,10 @@ pub(crate) async fn overview(
     let row=sqlx::query(r#"WITH visible AS (SELECT d.*,
       EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($3::bytea[])) online
       FROM devices d LEFT JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id WHERE ($1 OR p.user_id=$2))
-      SELECT count(*) total,count(*) FILTER (WHERE online) online,count(*) FILTER (WHERE NOT online) offline,
-      count(*) FILTER (WHERE owner_tenant_id IS NULL) unclaimed FROM visible"#)
+      SELECT count(*) total,count(*) FILTER (WHERE online) online,count(*) FILTER (WHERE NOT online) offline FROM visible"#)
         .bind(me.server_admin).bind(me.id).bind(state.control.online_endpoint_keys()).fetch_one(state.control.store().pool()).await?;
-    let pending: i64 = sqlx::query_scalar("SELECT count(*) FROM device_claim_requests WHERE requested_by_user_id=$1 AND resolution='pending' AND expires_at>now()")
-        .bind(me.id).fetch_one(state.control.store().pool()).await?;
     let mut result = json!({"total":row.try_get::<i64,_>("total")?,"online":row.try_get::<i64,_>("online")?,
-        "offline":row.try_get::<i64,_>("offline")?,"unclaimed":row.try_get::<i64,_>("unclaimed")?,"pendingClaims":pending});
+        "offline":row.try_get::<i64,_>("offline")?});
     if me.server_admin {
         let counts = sqlx::query("SELECT (SELECT count(*) FROM users) accounts,(SELECT count(*) FROM teams JOIN tenants ON tenants.id=teams.tenant_id WHERE tenants.status='active') teams,(SELECT count(*) FROM relay_nodes WHERE server_instance=$1 AND last_seen_at>now()-interval '120 seconds') relays")
             .bind(state.server_instance).fetch_one(state.control.store().pool()).await?;

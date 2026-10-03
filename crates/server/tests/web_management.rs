@@ -23,7 +23,7 @@ async fn unclaimed_fixture(pool: &PgPool) -> pab_server::RegisteredEndpoint {
         .await
         .unwrap();
     sqlx::query(
-        "INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'Claim fixture',345678901)",
+        "INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'Unassigned fixture',345678901)",
     )
     .bind(device)
     .bind(tenant)
@@ -41,221 +41,235 @@ async fn unclaimed_fixture(pool: &PgPool) -> pab_server::RegisteredEndpoint {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn claim_approval_is_device_bound_idempotent_and_unbinding_removes_visibility(pool: PgPool) {
+async fn removed_claim_routes_cannot_change_devices(pool: PgPool) {
     let (app, control) = app(pool.clone(), true).await;
-    let endpoint = unclaimed_fixture(&pool).await;
+    unclaimed_fixture(&pool).await;
     let (_, cookie, _) = call(
         &app,
         "POST",
         "/api/web/register",
         "",
-        json!({"username":"claim-user","password":"test password long enough"}),
+        json!({"username":"former-claim-user","password":"test password long enough"}),
     )
     .await;
-    let id = uuid::Uuid::new_v4();
-    let body = json!({"device_code":"345 678 901","request_id":id});
-    for _ in 0..2 {
-        assert_eq!(
-            call(&app, "POST", "/api/web/claims", &cookie, body.clone())
+    // Both ordinary users and administrators must get 404, including stale requests.
+    for admin in [false, true] {
+        if admin {
+            pab_server::web::bootstrap_admin(&control, "former-claim-user")
+                .await
+                .unwrap();
+        }
+        for (method, path) in [
+            ("GET", "/api/web/claims".to_owned()),
+            ("POST", "/api/web/claims".to_owned()),
+            (
+                "POST",
+                format!("/api/web/claims/{}/cancel", uuid::Uuid::new_v4()),
+            ),
+        ] {
+            assert_eq!(
+                call(
+                    &app,
+                    method,
+                    &path,
+                    &cookie,
+                    json!({"device_code":"345678901","request_id":uuid::Uuid::new_v4()})
+                )
                 .await
                 .0,
-            StatusCode::OK
+                StatusCode::NOT_FOUND
+            );
+        }
+        let overview = call(&app, "GET", "/api/web/overview", &cookie, Value::Null).await;
+        assert_eq!(overview.0, StatusCode::OK);
+        assert!(overview.2.get("pendingClaims").is_none());
+        assert!(overview.2.get("unclaimed").is_none());
+        assert_eq!(
+            call(
+                &app,
+                "GET",
+                "/api/web/devices?owner=unclaimed",
+                &cookie,
+                Value::Null
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
         );
     }
-    assert_eq!(
-        call(&app, "GET", "/api/web/claims", &cookie, Value::Null)
-            .await
-            .2["total"],
-        1
-    );
-    assert_eq!(
-        control
-            .store()
-            .pending_device_claims(&endpoint)
-            .await
-            .unwrap()
-            .len(),
-        1
-    );
-    let claim = pab_protocol::ClaimId::from_uuid(id);
-    let mut impostor = endpoint;
-    impostor.endpoint_key = pab_protocol::EndpointKey::new([20; 32]);
-    assert!(
-        control
-            .approve_device_claim(&impostor, claim)
-            .await
-            .is_err()
-    );
-    let (device, _) = control
-        .approve_device_claim(&endpoint, claim)
-        .await
-        .unwrap();
-    assert!(control.approve_device_claim(&endpoint, claim).await.is_ok());
-    assert_eq!(
-        call(&app, "GET", "/api/web/claims", &cookie, Value::Null)
-            .await
-            .2["items"][0]["status"],
-        "approved"
-    );
-    assert_eq!(
-        call(&app, "GET", "/api/web/devices", &cookie, Value::Null)
-            .await
-            .2["total"],
-        1
-    );
-    let result = call(
+    let devices = call(
         &app,
-        "POST",
-        &format!("/api/web/devices/{device}/unbind"),
+        "GET",
+        "/api/web/devices?scope=all",
         &cookie,
-        json!({"revision":2}),
+        Value::Null,
     )
     .await;
-    assert_eq!(result.0, StatusCode::OK, "{}", result.2);
-    assert_eq!(
-        call(&app, "GET", "/api/web/devices", &cookie, Value::Null)
-            .await
-            .2["total"],
-        0
-    );
+    assert_eq!(devices.0, StatusCode::OK);
+    assert_eq!(devices.2["total"], 1);
+    let device = &devices.2["items"][0];
+    assert!(device.get("owner").is_none());
+    assert!(device.get("owner_id").is_none());
     assert_eq!(
         call(
             &app,
-            "GET",
-            &format!("/api/web/devices/{device}"),
+            "PATCH",
+            &format!("/api/web/devices/{}", device["id"].as_str().unwrap()),
             &cookie,
-            Value::Null
+            json!({"name":"Managed without claiming","revision":device["revision"]})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM device_claim_requests")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn legacy_control_claim_requests_are_rejected_without_disconnect(pool: PgPool) {
+    use pab_protocol::{
+        ClaimId, ControlClientMessage as Client, ControlServerMessage as Server, RequestId,
+        TenantId,
+    };
+    let (_, control) = app(pool.clone(), true).await;
+    unclaimed_fixture(&pool).await;
+    let mut session =
+        pab_server::ControlSession::new(control, DeploymentId::new(), ControlApiConfig::default());
+    let request_id = RequestId::new();
+    for request in [
+        Client::BeginDeviceClaim {
+            request_id,
+            device_code: "345678901".parse().unwrap(),
+            owner_tenant_id: TenantId::new(),
+        },
+        Client::ListDeviceClaims { request_id },
+        Client::ApproveDeviceClaim {
+            request_id,
+            claim_id: ClaimId::new(),
+        },
+        Client::RejectDeviceClaim {
+            request_id,
+            claim_id: ClaimId::new(),
+        },
+    ] {
+        assert!(
+            matches!(session.handle(request).await, Server::Error { request_id:Some(id), code:pab_protocol::ControlErrorCode::InvalidMessage, .. } if id == request_id)
+        );
+    }
+    assert!(matches!(
+        session
+            .handle(Client::RegisterAccount {
+                request_id,
+                username: "after-removed-claim".into(),
+                password: "test password long enough".into()
+            })
+            .await,
+        Server::AccountAuthenticated { .. }
+    ));
+    let owner: Option<uuid::Uuid> =
+        sqlx::query_scalar("SELECT owner_tenant_id FROM devices WHERE code=345678901")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(owner.is_none());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn removed_unbind_preserves_existing_access(pool: PgPool) {
+    let (app, control) = app(pool.clone(), true).await;
+    let endpoint = unclaimed_fixture(&pool).await;
+    let pab_protocol::EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
+        panic!("expected device")
+    };
+    let (_, cookie, me) = call(
+        &app,
+        "POST",
+        "/api/web/register",
+        "",
+        json!({"username":"existing-owner","password":"test password long enough"}),
+    )
+    .await;
+    let user = uuid::Uuid::parse_str(me["id"].as_str().unwrap()).unwrap();
+    // Seed ownership that predates removal of the claim feature.
+    sqlx::query("UPDATE devices SET owner_tenant_id=(SELECT tenant_id FROM personal_tenants WHERE user_id=$1) WHERE id=$2")
+        .bind(user).bind(device_id.as_uuid()).execute(&pool).await.unwrap();
+    let path = format!("/api/web/devices/{device_id}");
+    let detail = call(&app, "GET", &path, &cookie, Value::Null).await;
+    assert_eq!(detail.0, StatusCode::OK);
+    let (_, stranger, _) = call(
+        &app,
+        "POST",
+        "/api/web/register",
+        "",
+        json!({"username":"other-owner","password":"test password long enough"}),
+    )
+    .await;
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &format!("{path}/unbind"),
+            &stranger,
+            json!({"revision":detail.2["revision"]})
         )
         .await
         .0,
         StatusCode::NOT_FOUND
     );
-    assert!(
-        control
-            .approve_device_claim(&endpoint, claim)
-            .await
-            .is_err()
-    );
-    assert!(
-        call(&app, "GET", "/api/web/claims", &cookie, Value::Null)
-            .await
-            .2["items"][0]["name"]
-            .is_null()
-    );
-}
-
-#[sqlx::test(migrations = "./migrations")]
-async fn competing_claims_cancel_reject_expiry_and_disabled_applicants(pool: PgPool) {
-    let (app, control) = app(pool.clone(), true).await;
-    let endpoint = unclaimed_fixture(&pool).await;
-    let (_, a, ua) = call(
-        &app,
-        "POST",
-        "/api/web/register",
-        "",
-        json!({"username":"claim-a","password":"test password long enough"}),
-    )
-    .await;
-    let (_, b, _) = call(
-        &app,
-        "POST",
-        "/api/web/register",
-        "",
-        json!({"username":"claim-b","password":"test password long enough"}),
-    )
-    .await;
-    for resolution in ["cancelled", "rejected", "expired"] {
-        let id = uuid::Uuid::new_v4();
-        assert_eq!(
-            call(
-                &app,
-                "POST",
-                "/api/web/claims",
-                &a,
-                json!({"device_code":"345678901","request_id":id})
-            )
-            .await
-            .0,
-            StatusCode::OK
-        );
-        match resolution {
-            "cancelled" => {
-                assert_eq!(
-                    call(
-                        &app,
-                        "POST",
-                        &format!("/api/web/claims/{id}/cancel"),
-                        &a,
-                        Value::Null
-                    )
-                    .await
-                    .0,
-                    StatusCode::OK
-                );
-            }
-            "rejected" => {
-                control
-                    .store()
-                    .reject_device_claim(&endpoint, pab_protocol::ClaimId::from_uuid(id))
-                    .await
-                    .unwrap();
-            }
-            _ => {
-                sqlx::query("UPDATE device_claim_requests SET created_at=now()-interval '20 minutes',expires_at=now()-interval '10 minutes' WHERE id=$1").bind(id).execute(&pool).await.unwrap();
-            }
-        }
-        assert!(
-            control
-                .approve_device_claim(&endpoint, pab_protocol::ClaimId::from_uuid(id))
-                .await
-                .is_err()
-        );
-    }
-    let a_id = pab_protocol::ClaimId::new();
-    let b_id = pab_protocol::ClaimId::new();
     assert_eq!(
         call(
             &app,
             "POST",
-            "/api/web/claims",
-            &a,
-            json!({"device_code":"345678901","request_id":a_id})
+            &format!("{path}/unbind"),
+            &cookie,
+            json!({"revision":detail.2["revision"]})
         )
         .await
         .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(&app, "GET", &path, &cookie, Value::Null).await.0,
         StatusCode::OK
     );
+    assert_eq!(
+        call(&app, "GET", &path, &stranger, Value::Null).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert!(detail.2.get("owner").is_none());
+    assert!(detail.2.get("owner_id").is_none());
+    pab_server::web::bootstrap_admin(&control, "existing-owner")
+        .await
+        .unwrap();
     assert_eq!(
         call(
             &app,
             "POST",
-            "/api/web/claims",
-            &b,
-            json!({"device_code":"345678901","request_id":b_id})
+            &format!("{path}/unbind"),
+            &cookie,
+            json!({"revision":detail.2["revision"]})
         )
         .await
         .0,
-        StatusCode::OK
+        StatusCode::NOT_FOUND
     );
-    sqlx::query("UPDATE users SET status='disabled' WHERE id=$1")
-        .bind(uuid::Uuid::parse_str(ua["id"].as_str().unwrap()).unwrap())
-        .execute(&pool)
-        .await
-        .unwrap();
-    assert!(control.approve_device_claim(&endpoint, a_id).await.is_err());
-    sqlx::query("UPDATE users SET status='active' WHERE id=$1")
-        .bind(uuid::Uuid::parse_str(ua["id"].as_str().unwrap()).unwrap())
-        .execute(&pool)
-        .await
-        .unwrap();
-    let (a_result, b_result) = tokio::join!(
-        control.approve_device_claim(&endpoint, a_id),
-        control.approve_device_claim(&endpoint, b_id)
-    );
-    assert_ne!(
-        a_result.is_ok(),
-        b_result.is_ok(),
-        "Exactly one competing claim may succeed"
+    let identity: (uuid::Uuid, i32, Option<uuid::Uuid>) =
+        sqlx::query_as("SELECT tenant_id,code,owner_tenant_id FROM devices WHERE id=$1")
+            .bind(device_id.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        identity,
+        (
+            endpoint.tenant_id.as_uuid(),
+            345678901,
+            Some(uuid::Uuid::parse_str(me["personal_tenant_id"].as_str().unwrap()).unwrap())
+        )
     );
 }
 
@@ -814,7 +828,6 @@ async fn input_boundaries_privileged_configuration_and_no_task_routes(pool: PgPo
         "/api/web/devices?page_size=101",
         "/api/web/devices?status=anything",
         "/api/web/devices?sort=name;DROP",
-        "/api/web/claims?page=1000001",
         "/api/web/devices/not-a-uuid",
     ] {
         let response = call(&app, "GET", path, &cookie, Value::Null).await;
@@ -943,6 +956,11 @@ async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) 
         .await
         .unwrap();
     let endpoint = unclaimed_fixture(&pool).await;
+    let pab_protocol::EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
+        panic!("expected device")
+    };
+    sqlx::query("INSERT INTO device_claim_requests(id,device_id,owner_tenant_id,requested_by_user_id,expires_at) VALUES($1,$2,$3,$4,now()+interval '10 minutes')")
+        .bind(uuid::Uuid::new_v4()).bind(device_id.as_uuid()).bind(account.personal_tenant_id.as_uuid()).bind(account.id.as_uuid()).execute(&pool).await.unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap(); // Restart is idempotent.
     let count: i64 = sqlx::query_scalar(
@@ -953,14 +971,20 @@ async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) 
     .await
     .unwrap();
     assert_eq!(count, 1);
-    assert!(
-        control
-            .store()
-            .pending_device_claims(&endpoint)
+    let resolution: String =
+        sqlx::query_scalar("SELECT resolution FROM device_claim_requests WHERE device_id=$1")
+            .bind(device_id.as_uuid())
+            .fetch_one(&pool)
             .await
-            .unwrap()
-            .is_empty()
-    );
+            .unwrap();
+    assert_eq!(resolution, "cancelled");
+    let identity: (uuid::Uuid, i32, Option<uuid::Uuid>) =
+        sqlx::query_as("SELECT tenant_id,code,owner_tenant_id FROM devices WHERE id=$1")
+            .bind(device_id.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(identity, (endpoint.tenant_id.as_uuid(), 345678901, None));
     let (app, _) = app_from_existing(control);
     let response = call(
         &app,
@@ -987,22 +1011,65 @@ fn app_from_existing(control: ControlPlane) -> (Router, ControlPlane) {
 #[sqlx::test(migrations = "./migrations")]
 async fn event_subscriptions_are_bounded_and_release_capacity(pool: PgPool) {
     use futures_util::{SinkExt, StreamExt};
-    use tokio_tungstenite::{connect_async, tungstenite::{client::IntoClientRequest, Message}};
-    let (app,_) = app(pool,true).await;
-    let (_,cookie,_) = call(&app,"POST","/api/web/register","",json!({"username":"ws-budget","password":"test password long enough"})).await;
-    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();let address=listener.local_addr().unwrap();
-    let server=tokio::spawn(async move{axum::serve(listener,app).await.unwrap()});
-    let request=||{let mut req=format!("ws://{address}/api/web/events").into_client_request().unwrap();req.headers_mut().insert("origin",format!("https://{address}").parse().unwrap());req.headers_mut().insert("cookie",cookie.split(';').next().unwrap().parse().unwrap());req};
-    let mut sockets=Vec::new();
+    use tokio_tungstenite::{
+        connect_async,
+        tungstenite::{Message, client::IntoClientRequest},
+    };
+    let (app, _) = app(pool, true).await;
+    let (_, cookie, _) = call(
+        &app,
+        "POST",
+        "/api/web/register",
+        "",
+        json!({"username":"ws-budget","password":"test password long enough"}),
+    )
+    .await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let request = || {
+        let mut req = format!("ws://{address}/api/web/events")
+            .into_client_request()
+            .unwrap();
+        req.headers_mut()
+            .insert("origin", format!("https://{address}").parse().unwrap());
+        req.headers_mut()
+            .insert("cookie", cookie.split(';').next().unwrap().parse().unwrap());
+        req
+    };
+    let mut sockets = Vec::new();
     for _ in 0..256 {
-        let(mut socket,_)=connect_async(request()).await.unwrap();
-        let initial=tokio::time::timeout(std::time::Duration::from_secs(5),socket.next()).await.unwrap().unwrap().unwrap();
-        let Message::Text(text)=initial else{panic!("missing refresh")};let body:Value=serde_json::from_str(&text).unwrap();assert_eq!(body.as_object().unwrap().len(),2);assert_eq!(body["type"],"refresh");sockets.push(socket);
+        let (mut socket, _) = connect_async(request()).await.unwrap();
+        let initial = tokio::time::timeout(std::time::Duration::from_secs(5), socket.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let Message::Text(text) = initial else {
+            panic!("missing refresh")
+        };
+        let body: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(body.as_object().unwrap().len(), 2);
+        assert_eq!(body["type"], "refresh");
+        sockets.push(socket);
     }
-    let rejected=connect_async(request()).await.unwrap_err();
-    assert!(matches!(rejected,tokio_tungstenite::tungstenite::Error::Http(response) if response.status()==StatusCode::TOO_MANY_REQUESTS));
-    let mut released=sockets.pop().unwrap();released.send(Message::Close(None)).await.unwrap();drop(released);
-    let mut replacement=None;
-    for _ in 0..20 {if let Ok((socket,_))=connect_async(request()).await{replacement=Some(socket);break;}tokio::time::sleep(std::time::Duration::from_millis(25)).await;}
-    assert!(replacement.is_some());drop(replacement);drop(sockets);server.abort();
+    let rejected = connect_async(request()).await.unwrap_err();
+    assert!(
+        matches!(rejected,tokio_tungstenite::tungstenite::Error::Http(response) if response.status()==StatusCode::TOO_MANY_REQUESTS)
+    );
+    let mut released = sockets.pop().unwrap();
+    released.send(Message::Close(None)).await.unwrap();
+    drop(released);
+    let mut replacement = None;
+    for _ in 0..20 {
+        if let Ok((socket, _)) = connect_async(request()).await {
+            replacement = Some(socket);
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    assert!(replacement.is_some());
+    drop(replacement);
+    drop(sockets);
+    server.abort();
 }

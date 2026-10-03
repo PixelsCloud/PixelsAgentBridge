@@ -12,7 +12,7 @@ use std::{
 use futures_util::{SinkExt, StreamExt};
 use hmac::{Hmac, Mac};
 use pab_agent_core::{DataPaths, DataScope, ensure_data_parent, restrict_private_file};
-use pab_protocol::{ClaimId, DesktopInputEvent};
+use pab_protocol::DesktopInputEvent;
 use pab_protocol::{MAX_SCREENSHOT_BYTES, MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry};
 use rand_core::{OsRng, RngCore};
 use serde_json::{Value, json};
@@ -28,7 +28,7 @@ use tokio_tungstenite::{
     tungstenite::{Message, protocol::WebSocketConfig},
 };
 
-use crate::{approve_claim, device_status::read_device_status_from_service};
+use crate::device_status::read_device_status_from_service;
 
 const TOKEN_FILE: &str = "local-access.key";
 const DEFAULT_PORT: u16 = 7843;
@@ -601,67 +601,6 @@ pub async fn next_status(socket: &mut LocalSocket) -> Result<crate::DeviceStatus
     }
 }
 
-pub async fn approve_local_claim(claim_id: ClaimId) -> Result<(), LocalIpcError> {
-    let mut socket = connect_local().await?;
-    send_json(
-        &mut socket,
-        &json!({"type":"approve_claim","claim_id":claim_id.to_string()}),
-    )
-    .await?;
-    tokio::time::timeout(Duration::from_secs(30), async {
-        loop {
-            let frame = receive_json(&mut socket).await?;
-            match frame["type"].as_str() {
-                Some("approved") => return Ok(()),
-                Some("error") => {
-                    return Err(LocalIpcError::Remote(
-                        frame["message"]
-                            .as_str()
-                            .unwrap_or("approval failed")
-                            .to_owned(),
-                    ));
-                }
-                _ => {}
-            }
-        }
-    })
-    .await
-    .map_err(|_| LocalIpcError::Timeout)?
-}
-
-pub async fn local_claim_request(
-    claim_id: Option<ClaimId>,
-) -> Result<Vec<pab_protocol::DeviceClaimEntry>, LocalIpcError> {
-    let mut socket = connect_local().await?;
-    let request = match claim_id {
-        Some(id) => json!({"type":"reject_claim","claim_id":id}),
-        None => json!({"type":"list_device_claims"}),
-    };
-    send_json(&mut socket, &request).await?;
-    tokio::time::timeout(Duration::from_secs(30), async {
-        loop {
-            let frame = receive_json(&mut socket).await?;
-            match frame["type"].as_str() {
-                Some("device_claims") => {
-                    return serde_json::from_value(frame["claims"].clone()).map_err(Into::into);
-                }
-                Some("claim_rejected") => return Ok(Vec::new()),
-                Some("error") => {
-                    return Err(LocalIpcError::Remote(
-                        frame["message"]
-                            .as_str()
-                            .unwrap_or("claim request failed")
-                            .to_owned(),
-                    ));
-                }
-                _ => {}
-            }
-        }
-    })
-    .await
-    .map_err(|_| LocalIpcError::Timeout)?
-}
-
 pub async fn run_local_service(root: PathBuf) -> Result<(), LocalIpcError> {
     let token = ensure_machine_token(&root)?;
     let port = local_port()?;
@@ -756,30 +695,6 @@ async fn handle_connection(
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
-                    Some("list_device_claims") => {
-                        match crate::list_device_claims().await {
-                            Ok(claims)=>send_json(&mut socket,&json!({"type":"device_claims","claims":claims})).await?,
-                            Err(error)=>send_json(&mut socket,&json!({"type":"error","message":error.to_string()})).await?,
-                        }
-                    }
-                    Some("reject_claim") => {
-                        let id=frame["claim_id"].as_str().ok_or(LocalIpcError::Protocol)?.parse::<ClaimId>().map_err(|_|LocalIpcError::Protocol)?;
-                        match crate::reject_claim(id).await {
-                            Ok(())=>send_json(&mut socket,&json!({"type":"claim_rejected"})).await?,
-                            Err(error)=>send_json(&mut socket,&json!({"type":"error","message":error.to_string()})).await?,
-                        }
-                    }
-                    Some("approve_claim") => {
-                        let claim_id = frame["claim_id"]
-                            .as_str()
-                            .ok_or(LocalIpcError::Protocol)?
-                            .parse::<ClaimId>()
-                            .map_err(|_| LocalIpcError::Protocol)?;
-                        match approve_claim(claim_id).await {
-                            Ok(()) => send_json(&mut socket, &json!({"type":"approved"})).await?,
-                            Err(error) => send_json(&mut socket, &json!({"type":"error","message":error.to_string()})).await?,
-                        }
-                    }
                     Some("register_window_helper") if registration.0.is_none() => {
                         let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
                         window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()) });

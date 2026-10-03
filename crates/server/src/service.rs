@@ -74,30 +74,6 @@ impl ControlPlane {
             .await?)
     }
 
-    pub async fn begin_device_claim(
-        &self,
-        actor: pab_protocol::UserId,
-        code: pab_protocol::DeviceCode,
-        owner_tenant_id: pab_protocol::TenantId,
-    ) -> Result<pab_protocol::ClaimId, ServiceError> {
-        Ok(self
-            .store
-            .begin_device_claim(actor, code, owner_tenant_id)
-            .await?)
-    }
-
-    pub async fn approve_device_claim(
-        &self,
-        endpoint: &RegisteredEndpoint,
-        claim_id: pab_protocol::ClaimId,
-    ) -> Result<(pab_protocol::DeviceId, pab_protocol::TenantId), ServiceError> {
-        if !matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
-            return Err(ServiceError::DeviceEndpointRequired);
-        }
-        let result = self.store.approve_device_claim(endpoint, claim_id).await?;
-        self.web_changed();
-        Ok(result)
-    }
     pub fn new(
         store: PostgresStore,
         password_policy: PasswordPolicy,

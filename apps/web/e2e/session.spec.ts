@@ -11,10 +11,12 @@ test('real registration, refresh, device list, preferences, password and logout'
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
-  await page.getByRole('menuitem', { name: 'My devices', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'My devices', exact: true })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Device list', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Device list', exact: true })).toBeVisible();
   await expect(page.getByText('No data', { exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Device list', exact: true })).toHaveCount(1);
   await expect(page.getByRole('menuitem', { name: 'All devices', exact: true })).toHaveCount(0);
+  expect((await page.request.get('/api/web/devices?scope=all')).status()).toBe(403);
   await page.getByRole('button', { name: 'Dark', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.reload();

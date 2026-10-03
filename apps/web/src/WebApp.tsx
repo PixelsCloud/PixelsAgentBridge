@@ -17,7 +17,6 @@ const TeamMembersPage = lazy(() => import('./ManagementPages').then(m => ({ defa
 const AuditPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AuditPage })));
 const TrafficPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TrafficPage })));
 const ServiceSettings = lazy(() => import('./ManagementPages').then(m => ({ default: m.ServiceSettings })));
-import { ClaimsPage } from './ClaimsPage';
 
 function stored(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
 function savePreference(key: string, value: string) { try { localStorage.setItem(key, value); } catch { /* Privacy modes can deny preference storage. */ } }
@@ -59,9 +58,7 @@ function Console(props: Preferences) {
   const items = [
     { key: '/', icon: <LayoutDashboard size={18}/>, label: t('overview') },
     { key: '/devices', icon: <Monitor size={18}/>, label: t('devices') },
-    { key: '/claims', icon: <Monitor size={18}/>, label: t('claim') },
     { key: '/online', icon: <Activity size={18}/>, label: t('onlineDevices') },
-    ...(me.server_admin ? [{ key: '/all-devices', icon: <Monitor size={18}/>, label: t('allDevices') }] : []),
     ...(me.server_admin ? [{ key: '/accounts', icon: <Users size={18}/>, label: t('accounts') }] : []),
     { key: '/teams', icon: <Users size={18}/>, label: t('teams') },
     { key: '/relay', icon: <Network size={18}/>, label: t('relay') },
@@ -76,11 +73,10 @@ function Console(props: Preferences) {
   </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t('console')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
     <Layout.Content className="console-content">{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes>
       <Route path="/" element={<Overview liveRevision={liveRevision}/>}/>
-      <Route path="/devices" element={<DeviceListPage key="mine" me={me} mode="mine" liveRevision={liveRevision}/>}/>
+      <Route path="/devices" element={<DeviceListPage key="list" me={me} mode="list" liveRevision={liveRevision}/>}/>
       <Route path="/online" element={<DeviceListPage key="online" me={me} mode="online" liveRevision={liveRevision}/>}/>
-      <Route path="/all-devices" element={me.server_admin ? <DeviceListPage key="all" me={me} mode="all" liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
+      <Route path="/all-devices" element={<Navigate to={{ pathname: '/devices', search: location.search, hash: location.hash }} replace/>}/>
       <Route path="/devices/:id" element={<DeviceDetail liveRevision={liveRevision}/>}/>
-      <Route path="/claims" element={<ClaimsPage liveRevision={liveRevision}/>}/>
       <Route path="/accounts" element={me.server_admin ? <AccountsPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
       <Route path="/teams" element={<TeamsPage me={me} liveRevision={liveRevision}/>}/>
       <Route path="/teams/:id" element={me.server_admin ? <TeamMembersPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>

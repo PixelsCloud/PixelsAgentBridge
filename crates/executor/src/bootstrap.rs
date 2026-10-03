@@ -8,12 +8,10 @@ use std::{
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use pab_agent_core::{
-    AuthenticatedControlConnection, DataPaths, DataScope, EndpointControlConfig,
-    OpenRegistrationKind, load_or_create_endpoint_secret, register_open_endpoint, tls_connector,
+    DataPaths, DataScope, OpenRegistrationKind, load_or_create_endpoint_secret,
+    register_open_endpoint, tls_connector,
 };
-use pab_protocol::{
-    ClaimId, DeploymentId, DeviceId, EndpointProofPrincipal, EndpointRegistrationResult, TenantId,
-};
+use pab_protocol::EndpointRegistrationResult;
 use rand_core::{OsRng, RngCore};
 use thiserror::Error;
 
@@ -200,67 +198,6 @@ pub async fn show_access() -> Result<(), BootstrapError> {
     let access = crate::device_access::load(&paths.executor_database()).await?;
     println!("Device code: {}", access.device_code);
     println!("Temporary password: {}", access.temporary_password);
-    Ok(())
-}
-
-async fn claim_connection() -> Result<(AuthenticatedControlConnection, DeviceId), BootstrapError> {
-    let paths = DataPaths::for_scope(DataScope::Machine)?;
-    let access = crate::device_access::load(&paths.executor_database()).await?;
-    let deployment_id: DeploymentId = access
-        .deployment_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let tenant_id: TenantId = access
-        .tenant_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let device_id: DeviceId = access
-        .device_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let secret_path = env::var_os("PAB_ENDPOINT_SECRET_FILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| paths.executor_endpoint_secret());
-    let secret = pab_agent_core::read_endpoint_secret(&secret_path)?;
-    let ca = env::var_os("PAB_CONTROL_CA_CERT")
-        .map(fs::read)
-        .transpose()?;
-    let config = EndpointControlConfig {
-        url: required("PAB_CONTROL_URL")?,
-        deployment_id,
-        tenant_id,
-        principal: EndpointProofPrincipal::Device { device_id },
-        operation_timeout: Duration::from_secs(10),
-    };
-    let connection =
-        AuthenticatedControlConnection::connect(&config, &secret, tls_connector(ca.as_deref())?)
-            .await?;
-    Ok((connection, device_id))
-}
-
-pub async fn list_device_claims() -> Result<Vec<pab_protocol::DeviceClaimEntry>, BootstrapError> {
-    let (mut connection, _) = claim_connection().await?;
-    Ok(connection
-        .list_device_claims(Duration::from_secs(10))
-        .await?)
-}
-
-pub async fn reject_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
-    let (mut connection, _) = claim_connection().await?;
-    Ok(connection
-        .reject_device_claim(claim_id, Duration::from_secs(10))
-        .await?)
-}
-
-pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
-    let (mut connection, device_id) = claim_connection().await?;
-    let (claimed_device, owner_tenant_id) = connection
-        .approve_device_claim(claim_id, Duration::from_secs(10))
-        .await?;
-    if claimed_device != device_id {
-        return Err(BootstrapError::InvalidResult);
-    }
-    println!("Approved claim {claim_id} for device {device_id} into {owner_tenant_id}");
     Ok(())
 }
 

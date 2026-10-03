@@ -10,7 +10,6 @@ import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { DeviceClaims } from "./DeviceClaims";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
@@ -219,7 +218,6 @@ function App() {
 
         <main className="workspace">
           {error && <div className="toast error" role="status">{error}</div>}
-          <DeviceClaims language={language} enabled={!!device?.executor_running} />
 
           <div className={`page-content page-${view}`}>
             {view === "home" && (

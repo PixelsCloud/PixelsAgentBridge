@@ -72,8 +72,9 @@ File transfer shows live progress, supports cancellation and retry from a partia
 file, and replaces an existing destination only when explicitly requested.
 The installer gives its current Windows user a private local WebSocket token.
 Other local users require a separate privileged `pab-executor issue-local-access
-<user-token-file>` operation before they can view this device's password or
-approve ownership from the desktop window.
+<user-token-file>` operation before they can view this device's password from
+the desktop window. Device claims and ownership approval have been removed;
+server administrators manage devices directly in the Web console.
 The eight-character device password remains valid across ordinary Executor
 restarts and package upgrades. Use the explicit `pab-executor rotate-password`
 command when rotation is needed; reconnecting operators then need the new

@@ -11,7 +11,6 @@ use tokio::sync::{Mutex, Semaphore};
 
 use crate::{ControlApiState, ControlPlane};
 
-mod claims;
 mod devices;
 mod events;
 mod management;
@@ -78,9 +77,6 @@ pub fn router(control: ControlApiState) -> Router {
             "/api/web/accounts/{id}/teams",
             get(management::eligible_teams),
         )
-        .route("/api/web/claims", get(claims::list).post(claims::begin))
-        .route("/api/web/claims/{id}/cancel", post(claims::cancel))
-        .route("/api/web/devices/{id}/unbind", post(claims::unbind))
         .route(
             "/api",
             any(|| async { WebError::new(axum::http::StatusCode::NOT_FOUND, "not_found") }),

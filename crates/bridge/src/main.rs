@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use pab_agent_core::{DataPaths, DataScope, begin_personal_device_claim, tls_connector};
+use pab_agent_core::{DataPaths, DataScope};
 use pab_bridge::{
     BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, DevicePasswordProvider,
     DirectoryDevicePasswordProvider, FileDevicePasswordProvider, RuntimeError,
@@ -44,41 +44,22 @@ async fn run() -> Result<(), CliError> {
     let Some(command) = args.next() else {
         return Err(CliError::Usage);
     };
+    if !matches!(
+        command.as_str(),
+        "command"
+            | "guest-command"
+            | "follow"
+            | "guest-follow"
+            | "transfer-status"
+            | "guest-transfer-status"
+    ) {
+        return Err(CliError::Usage);
+    }
     let device_code = args
         .next()
         .ok_or(CliError::Usage)?
         .parse::<DeviceCode>()
         .map_err(|error| CliError::DeviceCode(error.to_string()))?;
-    if command == "claim" {
-        if args.next().is_some() {
-            return Err(CliError::Usage);
-        }
-        let username =
-            env::var("PAB_ACCOUNT_USERNAME").map_err(|_| CliError::MissingAccountUsername)?;
-        let password_path =
-            env::var_os("PAB_ACCOUNT_PASSWORD_FILE").ok_or(CliError::MissingAccountPassword)?;
-        let password = zeroize::Zeroizing::new(
-            std::fs::read_to_string(password_path)?
-                .trim_end()
-                .to_owned(),
-        );
-        let url = env::var("PAB_CONTROL_URL").map_err(|_| CliError::MissingControlUrl)?;
-        let ca = env::var_os("PAB_CONTROL_CA_CERT")
-            .map(std::fs::read)
-            .transpose()?;
-        let (claim_id, _) = begin_personal_device_claim(
-            &url,
-            username,
-            password,
-            device_code,
-            tls_connector(ca.as_deref())?,
-            std::time::Duration::from_secs(10),
-        )
-        .await?;
-        println!("Claim request: {claim_id}");
-        println!("On the device run: pab-executor approve-claim {claim_id}");
-        return Ok(());
-    }
     let guest = command.starts_with("guest-");
     let config = if guest {
         BridgeConfig::register_guest_from_env().await?
@@ -301,21 +282,11 @@ const fn stream_name(stream: OutputStream) -> &'static str {
 #[derive(Debug, Error)]
 enum CliError {
     #[error(transparent)]
-    Claim(#[from] pab_agent_core::ClaimError),
-    #[error("PAB_ACCOUNT_USERNAME must be set")]
-    MissingAccountUsername,
-    #[error("PAB_ACCOUNT_PASSWORD_FILE must be set")]
-    MissingAccountPassword,
-    #[error(transparent)]
     GuestConfig(#[from] pab_bridge::GuestConfigError),
-    #[error(transparent)]
-    Tls(#[from] pab_agent_core::TlsConnectorError),
-    #[error("PAB_CONTROL_URL must be set")]
-    MissingControlUrl,
     #[error(transparent)]
     DataPath(#[from] pab_agent_core::DataPathError),
     #[error(
-        "usage: pab-bridge command|guest-command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow|guest-follow <9-digit-device-code> <task-id>\n       pab-bridge transfer-status|guest-transfer-status <9-digit-device-code> <request-id>\n       pab-bridge claim <9-digit-device-code>"
+        "usage: pab-bridge command|guest-command <9-digit-device-code> <program> [argument ...]\n       pab-bridge follow|guest-follow <9-digit-device-code> <task-id>\n       pab-bridge transfer-status|guest-transfer-status <9-digit-device-code> <request-id>"
     )]
     Usage,
     #[error("device code is invalid: {0}")]

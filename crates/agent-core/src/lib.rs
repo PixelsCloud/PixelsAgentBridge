@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 mod account_scope;
-mod claim;
 mod connection_io;
 mod connection_state;
 mod control;
@@ -18,7 +17,6 @@ pub use account_scope::{
     AccountScopeError, AccountScopeRegistration, login_traffic_scopes,
     register_account_traffic_scope,
 };
-pub use claim::{ClaimError, begin_device_claim, begin_personal_device_claim};
 pub use connection_state::{
     ConnectionFailure, ConnectionFailureKind, ControlConnectionPhase, ControlConnectionStatus,
     DeviceHelloConfigError, DeviceNetworkConfigError, ReconnectPolicy, ReconnectPolicyError,

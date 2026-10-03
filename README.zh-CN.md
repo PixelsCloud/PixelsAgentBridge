@@ -14,7 +14,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 
 ## 目录
 
-新增 **Server Web 管理端**：React + Ant Design，支持账号、当前设备归属与实时在线状态、认领、Team、Relay 策略健康和管理变更记录；提供简体中文、繁体中文、英文及亮暗主题。远程任务记录仅保存在本地。见[部署指南](WEB_DEPLOYMENT.md)和[完整开发与测试计划](WEB_DEVELOPMENT.md)。
+新增 **Server Web 管理端**：React + Ant Design，支持账号、设备列表与实时在线状态、Team、Relay 策略健康和管理变更记录；管理员直接管理全站设备，无需设备认领。提供简体中文、繁体中文、英文及亮暗主题。远程任务记录仅保存在本地。见[部署指南](WEB_DEPLOYMENT.md)和[完整开发与测试计划](WEB_DEVELOPMENT.md)。
 
 - [主要能力](#主要能力)
 - [工作流程与组件](#工作流程)

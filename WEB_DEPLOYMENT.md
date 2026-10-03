@@ -2,7 +2,7 @@
 
 ## Scope / 范围
 
-The React + Ant Design console is served by `pab-server` on its existing HTTPS listener. No Node runtime is required in production. Server stores account, ownership, Team and Relay management data only; remote task history, command output, files and screenshots remain local to Bridge/Executor. Device **online** means an authenticated device control connection is alive. This release supports one active control Server per deployment.
+The React + Ant Design console is served by `pab-server` on its existing HTTPS listener. No Node runtime is required in production. Server stores account, device, Team and Relay management data only; remote task history, command output, files and screenshots remain local to Bridge/Executor. Device **online** means an authenticated device control connection is alive. This release supports one active control Server per deployment.
 
 Web 与现有 `/control`、`/relay-control` 共用 HTTPS 端口，不新增公开端口。任务记录只保存在本地，不上传 Server，也不在 Web 展示。多条设备控制连接使用引用计数，全部断开后才显示离线。Team 仅用于 Relay 流量归属，不授予成员设备访问权。
 
@@ -47,13 +47,13 @@ pab-server web-admin existing-username
 
 For Compose, run this command in the backend container with its existing environment. Registration never automatically grants administrator access. With registration disabled, provision an existing account through the established control registration flow before disabling registration. At least one active administrator is preserved by Web edits.
 
-Web 设备认领：输入九位设备码 → 目标设备 Desktop 确认/拒绝 → Web 实时更新。申请10分钟过期，也可以主动取消。旧 Desktop 不支持待确认列表时需先升级 Desktop/Executor；原有设备连接协议不受影响。解绑仅清除归属，不删除设备身份、设备码或本地任务数据。
+管理员在“设备列表”和“在线设备”直接查看、管理全站设备，无需认领或 Desktop 确认。设备归属统计/筛选/列/详情及解绑已移除。“我的设备”与“全部设备”已合并为 `/devices`；旧 `/all-devices` 链接保留筛选参数并跳转。普通账号的查询仍受原有权限过滤，不因入口合并获得全站权限。认领页面、HTTP 接口、Desktop 弹窗/轮询及 CLI 已移除；旧控制协议认领消息返回明确错误。迁移16取消存量待处理申请，保留现有设备身份、归属及历史管理记录。旧解绑接口返回404，不改变设备数据。旧owner筛选API参数返回400，浏览器自动清除旧URL中的owner参数及旧页码。已有底层权限关系与历史记录保留，Team流量归集继续独立工作。
 
 ## Upgrade and rollback / 升级与回滚
 
 1. Back up PostgreSQL with `pg_dump` and record the current binaries/image, configuration and deployment UUID. Check the backup can be restored into a separate database.
-2. Stop the old backend, deploy the new binary **together with its matching `web/`**, then run `pab-server migrate` (or normal `init`/`serve`). New migrations13–15 add management sessions/audit, claim resolution and Relay health. Published migrations1–12 are unchanged.
-3. Start Server and Relay. Verify `/health`, `/api/web/config`, login, current ownership, live device status and SPA deep links. Promote the initial administrator explicitly when needed.
+2. Stop the old backend, deploy the new binary **together with its matching `web/`**, then run `pab-server migrate` (or normal `init`/`serve`). Migrations13–15 added management sessions/audit, historical claim resolution and Relay health. Migration16 retires pending claims without changing device identities or ownership. Published migrations1–15 are unchanged. Deploy the matching Desktop/Executor to remove old client prompts; the new server already rejects legacy claim operations.
+3. Start Server and Relay. Verify `/health`, `/api/web/config`, login, device visibility, live device status and SPA deep links. Promote the initial administrator explicitly when needed.
 4. For rollback, stop the new backend and restore the pre-upgrade database backup plus matching old binaries/image. Do not edit `_sqlx_migrations`, remove Docker database volumes or pretend an older binary can safely downgrade the schema.
 
 在线状态来自当前 Server 内存，重启后由设备重新连接恢复。Relay 节点健康同时绑定 Server 实例和120秒上报时限，避免重启后错误沿用旧在线状态。该状态不表示数据传输路径或吞吐质量。

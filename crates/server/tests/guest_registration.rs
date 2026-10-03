@@ -302,7 +302,7 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     assert!(renewed);
 
     let account = control
-        .register_account("claim-owner", "long enough test password")
+        .register_account("registered-operator", "long enough test password")
         .await
         .unwrap();
     let owner_key = SecretKey::generate();
@@ -317,30 +317,6 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         ))
         .await
         .unwrap();
-    let claim_id = control
-        .begin_device_claim(account.id, first.code, account.personal_tenant_id)
-        .await
-        .unwrap();
-    let (claimed_id, owner_tenant) = control
-        .approve_device_claim(&device_endpoint, claim_id)
-        .await
-        .unwrap();
-    assert_eq!(
-        (claimed_id, owner_tenant),
-        (first.id, account.personal_tenant_id)
-    );
-    assert!(
-        control
-            .approve_device_claim(&device_endpoint, claim_id)
-            .await
-            .is_ok()
-    );
-    assert!(
-        control
-            .begin_device_claim(account.id, first.code, account.personal_tenant_id)
-            .await
-            .is_err()
-    );
     let resolved = store
         .resolve_device_code(
             EndpointKey::new(*owner_key.public().as_bytes()),

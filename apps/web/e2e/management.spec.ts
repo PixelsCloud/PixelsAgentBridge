@@ -26,29 +26,50 @@ async function fixture(name: string) {
   return { child, ready, command: async (action: string, fields?: object) => { child.stdin.write(`${JSON.stringify({ action, ...fields })}\n`); await next(value => value.done === action); } };
 }
 
-test('real device presence, multi-connection, claim, rename and unbind', async ({ page, request }) => {
+test('administrator manages an unassigned device without claiming', async ({ page, request }) => {
   test.setTimeout(90000);
   const username = `owner-${Date.now()}`;
   const registration = await request.post('/api/web/register', { headers: { Origin: 'https://localhost:38443' }, data: { username, password: 'test password long enough' } });
   expect(registration.ok()).toBeTruthy();
+  const me = await registration.json();
+  expect(me.id).toMatch(/^[a-f0-9-]{36}$/);
+  sql(`UPDATE users SET server_admin=true WHERE id='${me.id}'`);
   await page.context().addCookies((await request.storageState()).cookies);
   const device = await fixture(`web-fixture-${Date.now()}`);
   try {
     const code = String(device.ready.device_code);
-    await page.goto('/claims');
-    await page.getByLabel('Device code', { exact: true }).fill(code);
-    await page.getByRole('button', { name: 'Claim device', exact: true }).click();
-    await expect(page.getByText('Awaiting device approval', { exact: true })).toBeVisible();
-    const claims = await (await request.get('/api/web/claims')).json();
-    await device.command('approve', { claim_id: claims.items[0].id });
-    await expect(page.getByText('Approved', { exact: true })).toBeVisible();
-    await page.getByRole('menuitem', { name: 'My devices', exact: true }).click();
+    await page.goto('/all-devices?q=' + code + '&owner=unclaimed&page=2');
+    await expect(page).toHaveURL('/devices?q=' + code);
+    await expect(page.getByRole('menuitem', { name: 'Device list', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('menuitem', { name: 'My devices', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'All devices', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Device list', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Owner', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Owner', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'Claim device', exact: true })).toHaveCount(0);
+    expect((await request.post('/api/web/claims', { headers: { Origin: 'https://localhost:38443' }, data: { device_code: code, request_id: crypto.randomUUID() } })).status()).toBe(404);
     await expect(page.getByText('Online', { exact: true }).last()).toBeVisible();
     await device.command('second'); await device.command('drop_second');
     await expect(page.getByText('Online', { exact: true }).last()).toBeVisible();
     await device.command('disconnect');
     await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Offline');
     await device.command('reconnect');
+    await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Online');
+    await page.goto('/online?q=' + code);
+    await expect(page.getByRole('heading', { name: 'Online devices', exact: true })).toBeVisible();
+    await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Online');
+    await device.command('disconnect');
+    await expect(page.getByText('No data', { exact: true })).toBeVisible();
+    await page.goto('/devices?q=' + code + '&status=offline');
+    await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Offline');
+    await device.command('reconnect');
+    await page.goto('/');
+    await expect(page.getByText('Unassigned', { exact: true })).toHaveCount(0);
+    expect((await (await request.get('/api/web/overview')).json()).unclaimed).toBeUndefined();
+    await page.getByRole('button', { name: 'Device list', exact: true }).click();
+    await expect(page).toHaveURL('/devices');
+    await page.getByPlaceholder('Search name or device code').fill(code);
+    await page.getByPlaceholder('Search name or device code').press('Enter');
     await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Online');
     await page.locator('.device-link').click();
     await page.getByRole('button', { name: 'Rename', exact: true }).click();
@@ -57,10 +78,13 @@ test('real device presence, multi-connection, claim, rename and unbind', async (
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Renamed browser fixture', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Remove ownership', exact: true }).click();
-    await page.getByRole('button', { name: 'Confirm', exact: true }).click();
-    await expect(page.getByText('No data', { exact: true })).toBeVisible();
-    expect((await request.get(`/api/web/devices/${device.ready.device_id}`)).status()).toBe(404);
+    await expect(page.getByRole('button', { name: 'Remove ownership', exact: true })).toHaveCount(0);
+    const detail = await request.get(`/api/web/devices/${device.ready.device_id}`);
+    expect(detail.status()).toBe(200);
+    const info = await detail.json();
+    expect(info.owner).toBeUndefined(); expect(info.owner_id).toBeUndefined();
+    await expect(page.getByText('Owner', { exact: true })).toHaveCount(0);
+    expect((await request.post(`/api/web/devices/${device.ready.device_id}/unbind`, { headers: { Origin: 'https://localhost:38443' }, data: { revision: info.revision } })).status()).toBe(404);
   } finally { device.child.kill(); }
 });
 
@@ -73,7 +97,7 @@ test('administrator team workflow and all management pages', async ({ page, requ
   sql(`UPDATE users SET server_admin=true WHERE id='${me.id}'`);
   await page.context().addCookies((await request.storageState()).cookies);
   await page.goto('/');
-  for (const name of ['All devices', 'Accounts', 'Management changes', 'Relay']) {
+  for (const name of ['Device list', 'Accounts', 'Management changes', 'Relay']) {
     await page.getByRole('menuitem', { name, exact: true }).click();
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(page.getByText('The service is unavailable. Please try again.', { exact: true })).toHaveCount(0);
@@ -117,7 +141,7 @@ test('responsive languages, URL state, transient failure, reconnect and revoked 
     await page.screenshot({path:resolve(root,`.build/web-test/devices-${width}.png`),animations:'disabled'});
   }
   await page.setViewportSize({width:1280,height:900});
-  for(const [language,heading] of [['繁體中文','我的裝置'],['简体中文','我的设备'],['English','My devices']]) {
+  for(const [language,heading] of [['繁體中文','裝置清單'],['简体中文','设备列表'],['English','Device list']]) {
     await page.locator('.console-header .ant-select').click();await page.locator('.ant-select-item-option-content').getByText(language,{exact:true}).click();
     await expect(page.getByRole('heading',{name:heading,exact:true})).toBeVisible();
   }

@@ -4,7 +4,7 @@ use std::{
 };
 
 use pab_agent_core::{
-    DataPaths, DataScope, begin_personal_device_claim, login_traffic_scopes, read_endpoint_secret,
+    DataPaths, DataScope, login_traffic_scopes, read_endpoint_secret,
     register_account_traffic_scope, tls_connector,
 };
 use pab_bridge::{
@@ -210,13 +210,6 @@ pub struct TaskUpdate {
     stderr: String,
     stdout_offset: u64,
     stderr_offset: u64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClaimResult {
-    claim_id: String,
-    owner_tenant_id: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -759,33 +752,4 @@ fn decode_command_output(bytes: &[u8]) -> String {
     // Keep the stored output and offsets as raw bytes; decode only for display.
     let (text, _, _) = encoding_rs::GBK.decode(bytes);
     text.into_owned()
-}
-
-#[tauri::command]
-pub async fn operator_claim(
-    code: String,
-    username: String,
-    password: String,
-) -> Result<ClaimResult, String> {
-    if username.trim().is_empty() || password.is_empty() {
-        return Err("account and password are required".to_owned());
-    }
-    let code = parse_code(&code)?;
-    let control_url = std::env::var("PAB_CONTROL_URL")
-        .map_err(|_| "PAB_CONTROL_URL is not configured".to_owned())?;
-    let ca = std::env::var_os("PAB_CONTROL_CA_CERT")
-        .map(std::fs::read)
-        .transpose()
-        .map_err(|error| error.to_string())?;
-    let connector = tls_connector(ca.as_deref()).map_err(|error| error.to_string())?;
-    let password = Zeroizing::new(password);
-    let timeout = std::time::Duration::from_secs(10);
-    let (claim_id, tenant_id) =
-        begin_personal_device_claim(&control_url, username, password, code, connector, timeout)
-            .await
-            .map_err(|error| error.to_string())?;
-    Ok(ClaimResult {
-        claim_id: claim_id.to_string(),
-        owner_tenant_id: tenant_id.to_string(),
-    })
 }

@@ -58,24 +58,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut primary =
         Some(AuthenticatedControlConnection::connect(&config, &secret, connector.clone()).await?);
     let mut secondary: Option<AuthenticatedControlConnection> = None;
+    let hello = DeviceHello {
+        schema_version: DEVICE_SESSION_SCHEMA_VERSION,
+        device_ref: DeviceRef {
+            deployment_id,
+            tenant_id,
+            device_id,
+        },
+        agent_version: "web-e2e".into(),
+        observed_at_unix_ms: (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000)
+            as i64,
+        execution_context: pab_platform::detect_native_execution_context()?,
+    };
     primary
         .as_mut()
         .unwrap()
-        .publish_device_hello(
-            &DeviceHello {
-                schema_version: DEVICE_SESSION_SCHEMA_VERSION,
-                device_ref: DeviceRef {
-                    deployment_id,
-                    tenant_id,
-                    device_id,
-                },
-                agent_version: "web-e2e".into(),
-                observed_at_unix_ms: (time::OffsetDateTime::now_utc().unix_timestamp_nanos()
-                    / 1_000_000) as i64,
-                execution_context: pab_platform::detect_native_execution_context()?,
-            },
-            Duration::from_secs(10),
-        )
+        .publish_device_hello(&hello, Duration::from_secs(10))
         .await?;
     emit(json!({"ready":true,"device_id":device_id,"device_code":device_code}));
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
@@ -83,8 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         tokio::select! {
             _=interval.tick()=>{
-                if let Some(connection)=primary.as_mut(){let _=connection.list_device_claims(Duration::from_secs(5)).await?;}
-                if let Some(connection)=secondary.as_mut(){let _:Vec<pab_protocol::DeviceClaimEntry>=connection.list_device_claims(Duration::from_secs(5)).await?;}
+                if let Some(connection)=primary.as_mut(){connection.publish_device_hello(&hello, Duration::from_secs(5)).await?;}
+                if let Some(connection)=secondary.as_mut(){connection.publish_device_hello(&hello, Duration::from_secs(5)).await?;}
             }
             line=lines.next_line()=>{
                 let Some(line)=line? else{break;};let input:Value=serde_json::from_str(&line)?;
@@ -93,10 +91,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some("drop_second")=>{secondary=None;},
                     Some("disconnect")=>{primary=None;secondary=None;},
                     Some("reconnect")=>{primary=Some(AuthenticatedControlConnection::connect(&config,&secret,connector.clone()).await?);},
-                    Some("approve")=>{
-                        let claim=input["claim_id"].as_str().ok_or("claim id required")?.parse()?;
-                        primary.as_mut().ok_or("offline")?.approve_device_claim(claim,Duration::from_secs(5)).await?;
-                    },
                     Some("quit")=>break,
                     _=>return Err("unknown fixture action".into()),
                 }

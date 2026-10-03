@@ -77,6 +77,7 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         peer_endpoint_key: EndpointKey,
     },
+    // Legacy wire messages: retained for decoding only. The server rejects all claims.
     BeginDeviceClaim {
         request_id: RequestId,
         device_code: DeviceCode,

@@ -14,7 +14,7 @@ mod task_store;
 pub mod windows_sas;
 
 pub use bootstrap::{
-    BootstrapError, approve_claim, bootstrapped_config, list_device_claims, reject_claim,
+    BootstrapError, bootstrapped_config,
     rotate_temporary_password, show_access,
 };
 pub use config::{ExecutorConfig, ExecutorConfigError};
