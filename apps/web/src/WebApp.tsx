@@ -16,7 +16,7 @@ const TeamsPage = lazy(() => import('./ManagementPages').then(m => ({ default: m
 const TeamMembersPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TeamMembersPage })));
 const AuditPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AuditPage })));
 const TrafficPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TrafficPage })));
-const ServiceSettings = lazy(() => import('./ManagementPages').then(m => ({ default: m.ServiceSettings }))); 
+const ServiceSettings = lazy(() => import('./ManagementPages').then(m => ({ default: m.ServiceSettings })));
 import { ClaimsPage } from './ClaimsPage';
 
 function stored(key: string) { try { return localStorage.getItem(key); } catch { return null; } }

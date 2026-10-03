@@ -230,7 +230,10 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             tracing::debug!(%error, "local WebSocket disconnected");
                             break;
                         }
-                        Err(_) => break,
+                        // This one-second wake-up checks whether Windows changed
+                        // desktops. Status updates arrive every three seconds;
+                        // an idle tick is not a disconnected local service.
+                        Err(_) => continue,
                     }
                 }
             }

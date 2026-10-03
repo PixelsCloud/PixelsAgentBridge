@@ -35,6 +35,10 @@ Keep the existing database, deployment UUID, TLS and Relay control secret config
 
 Origin must contain only scheme, host and optional port. Proxy HTTPS and WebSocket upgrades on the same public origin, preserve `Host`, and do not cache `/api/`. Never expose the application through plain HTTP: its session cookie is Secure + HttpOnly + SameSite=Strict. No browser credentials are stored in localStorage. Sessions last12 hours; password, account status and role changes revoke existing sessions. Reverse proxies must allow the `/api/web/events` WebSocket and the existing device/Relay control paths.
 
+An [Nginx configuration example](packaging/server/nginx.conf.example) keeps upstream certificate verification enabled and forwards Web and control WebSockets. Replace the public domain, certificate paths and backend certificate name; set `PAB_WEB_ORIGIN` to that exact public HTTPS origin. Run `nginx -t` before reload. This handles the Server HTTPS endpoint; keep the existing separate Relay HTTPS and UDP configuration.
+
+已在隔离 Nginx 容器中验证 HTTPS → HTTPS、Secure/HttpOnly/SameSite Cookie、页面刷新、静态缓存、`/api/web/events` 和 `/control` Upgrade。此结果不等同于正式域名证书、生产网络和现网代理配置已经验收。
+
 浏览器注册普通账号后，在服务端本机明确指定管理员：
 
 ```sh
