@@ -30,6 +30,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let store = PostgresStore::connect(&database_url, 5).await?;
 
     match command.as_str() {
+        "web-admin" => {
+            let [username] = arguments.as_slice() else {
+                return Err("usage: pab-server web-admin <existing-username>".into());
+            };
+            store.migrate().await?;
+            let control = ControlPlane::new(store, PasswordPolicy::default())?;
+            pab_server::web::bootstrap_admin(&control, username).await?;
+            println!("Server administrator enabled");
+        }
         "check" => {
             sqlx::query("SELECT 1").execute(store.pool()).await?;
             println!("PostgreSQL connection OK");
@@ -185,6 +194,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or(true);
             let relay_control_secret = required_secret("PAB_RELAY_CONTROL_SECRET")?;
             let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
+            let presence_control = control_plane.clone();
             let state = ControlApiState::new(
                 control_plane,
                 deployment_id,
@@ -208,12 +218,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             });
+            let presence = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(30));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    interval.tick().await;
+                    if presence_control.touch_online_devices().await.is_err() {
+                        tracing::warn!("could not checkpoint online device timestamps");
+                    }
+                }
+            });
             let result = serve_tls(address, certificate_path, private_key_path, state).await;
             maintenance.abort();
+            presence.abort();
             result?;
         }
         _ => return Err(
-            "usage: pab-server [check|migrate|init|serve|account-id|team-create|team-add-member|team-remove-member|team-set-limits|account-set-default-team]"
+            "usage: pab-server [check|migrate|init|serve|web-admin|account-id|team-create|team-add-member|team-remove-member|team-set-limits|account-set-default-team]"
                 .into(),
         ),
     }

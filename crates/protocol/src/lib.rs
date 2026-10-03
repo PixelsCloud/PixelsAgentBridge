@@ -25,8 +25,9 @@ mod task_session;
 mod window;
 
 pub use control::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
-    EndpointRegistration, EndpointRegistrationResult, TeamTrafficScope, TrafficScopeOptions,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeviceClaimEntry,
+    EndpointAuthenticationResult, EndpointRegistration, EndpointRegistrationResult,
+    TeamTrafficScope, TrafficScopeOptions,
 };
 pub use device::{
     DEVICE_SESSION_SCHEMA_VERSION, DeviceDirectoryEntry, DeviceHello, DeviceHelloResult,

@@ -24,9 +24,27 @@ pub struct ControlPlane {
     passwords: PasswordEngine,
     dummy_password_hash: String,
     active_endpoints: Arc<ActiveEndpoints>,
+    web_revision: tokio::sync::watch::Sender<u64>,
 }
 
 impl ControlPlane {
+    pub(crate) fn web_changes(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.web_revision.subscribe()
+    }
+
+    pub(crate) fn web_changed(&self) {
+        self.web_revision
+            .send_modify(|revision| *revision = revision.wrapping_add(1));
+    }
+
+    pub async fn touch_online_devices(&self) -> Result<(), StoreError> {
+        sqlx::query("UPDATE devices d SET last_online_at=clock_timestamp() WHERE EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($1::bytea[]))")
+            .bind(self.online_endpoint_keys()).execute(self.store.pool()).await?;
+        Ok(())
+    }
+    pub(crate) fn online_endpoint_keys(&self) -> Vec<Vec<u8>> {
+        self.active_endpoints.keys()
+    }
     pub async fn list_traffic_scopes(
         &self,
         account: &Account,
@@ -76,7 +94,9 @@ impl ControlPlane {
         if !matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
             return Err(ServiceError::DeviceEndpointRequired);
         }
-        Ok(self.store.approve_device_claim(endpoint, claim_id).await?)
+        let result = self.store.approve_device_claim(endpoint, claim_id).await?;
+        self.web_changed();
+        Ok(result)
     }
     pub fn new(
         store: PostgresStore,
@@ -89,6 +109,7 @@ impl ControlPlane {
             passwords,
             dummy_password_hash,
             active_endpoints: Arc::new(ActiveEndpoints::default()),
+            web_revision: tokio::sync::watch::channel(0).0,
         })
     }
 
@@ -307,11 +328,29 @@ impl ControlPlane {
     }
 
     pub(crate) fn endpoint_connected(&self, endpoint_key: EndpointKey) {
-        self.active_endpoints.connected(endpoint_key);
+        if self.active_endpoints.connected(endpoint_key) {
+            self.web_changed();
+            self.touch_device_endpoint(endpoint_key);
+        }
     }
 
     pub(crate) fn endpoint_disconnected(&self, endpoint_key: EndpointKey) {
-        self.active_endpoints.disconnected(endpoint_key);
+        if self.active_endpoints.disconnected(endpoint_key) {
+            self.web_changed();
+            self.touch_device_endpoint(endpoint_key);
+        }
+    }
+
+    fn touch_device_endpoint(&self, endpoint_key: EndpointKey) {
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            let pool = self.store.pool().clone();
+            runtime.spawn(async move {
+                if sqlx::query("UPDATE devices d SET last_online_at=clock_timestamp() WHERE EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.endpoint_key=$1)")
+                    .bind(endpoint_key.as_bytes().as_slice()).execute(&pool).await.is_err() {
+                    tracing::warn!("could not save device last-online time");
+                }
+            });
+        }
     }
 
     pub async fn authorize_device_peer(

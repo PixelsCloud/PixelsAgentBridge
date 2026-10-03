@@ -72,6 +72,42 @@ impl ControlSession {
     pub async fn handle(&mut self, message: ControlClientMessage) -> ControlServerMessage {
         let request_id = message.request_id();
         let result = match message {
+            ControlClientMessage::ListDeviceClaims { .. } => match self.endpoint.as_ref() {
+                Some(endpoint) => self
+                    .control
+                    .store()
+                    .pending_device_claims(endpoint)
+                    .await
+                    .map(|claims| ControlServerMessage::DeviceClaims { request_id, claims })
+                    .map_err(|error| {
+                        ControlSessionError::Service(crate::ServiceError::Store(error))
+                    }),
+                None => Err(ControlSessionError::Service(
+                    crate::ServiceError::DeviceEndpointRequired,
+                )),
+            },
+            ControlClientMessage::RejectDeviceClaim { claim_id, .. } => {
+                match self.endpoint.as_ref() {
+                    Some(endpoint) => self
+                        .control
+                        .store()
+                        .reject_device_claim(endpoint, claim_id)
+                        .await
+                        .map(|()| {
+                            self.control.web_changed();
+                            ControlServerMessage::DeviceClaimRejected {
+                                request_id,
+                                claim_id,
+                            }
+                        })
+                        .map_err(|error| {
+                            ControlSessionError::Service(crate::ServiceError::Store(error))
+                        }),
+                    None => Err(ControlSessionError::Service(
+                        crate::ServiceError::DeviceEndpointRequired,
+                    )),
+                }
+            }
             ControlClientMessage::RegisterAccount {
                 username, password, ..
             } => {

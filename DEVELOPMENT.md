@@ -1,5 +1,9 @@
 # Development
 
+The Server Web delivery and test contract is tracked in [WEB_DEVELOPMENT.md](WEB_DEVELOPMENT.md).
+Remote task history is local to Bridge/Executor only. The server and Web do not
+receive, retain, or display task history, command output, or task-derived statistics.
+
 Pixels Agent Bridge has a first remotely operable vertical slice: an enrolled Bridge
 can authenticate through the PostgreSQL control plane, reach an Executor through
 iroh, execute an explicit native program, and stream persistent task events and
@@ -75,7 +79,7 @@ connection close cannot overtake a completed authentication result.
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
 frames at 64 KiB, validates every challenge identity field before signing, and keeps
-the authenticated socket available for later task-sync protocols. Its supervisor
+the authenticated socket available for device control and ownership messages. Task history remains local and is never synchronized to Server. Its supervisor
 requires matching pong heartbeats, retries indefinitely at a fixed three-second
 interval after recoverable failures, increments a connection generation after every successful
 authentication, and publishes current connection state through a Tokio watch channel

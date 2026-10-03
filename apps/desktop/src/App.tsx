@@ -10,6 +10,7 @@ import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { DeviceClaims } from "./DeviceClaims";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
@@ -250,6 +251,7 @@ function App() {
               </section>
             )}
 
+            <DeviceClaims language={language} enabled={!!device?.executor_running} />
             {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>

@@ -9,6 +9,10 @@ pub enum RelayControlClientMessage {
         request_id: RequestId,
         deployment_id: DeploymentId,
         known_policy_version: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent_version: Option<String>,
     },
 }
 

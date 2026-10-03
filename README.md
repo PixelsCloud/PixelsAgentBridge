@@ -29,6 +29,12 @@ status are described below.
 
 ## Features
 
+- **Server Web console:** React + Ant Design management for accounts, current device
+  ownership and live online status, claims, Teams, Relay policy health and management
+  changes. English, Simplified/Traditional Chinese and light/dark themes are included.
+  Remote task records stay local. See the [deployment guide](WEB_DEPLOYMENT.md)
+  and [development/test plan](WEB_DEVELOPMENT.md).
+
 - **Agent-driven operations:** select devices and perform remote operations through
   a consistent set of `pab_*` MCP tools. Codex integration is implemented.
 - **Native commands:** execute a program with an explicit argument array, query its

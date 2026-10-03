@@ -45,6 +45,7 @@ services:
       PAB_TLS_CERT: /run/pab-certs/backend-cert.pem
       PAB_TLS_KEY: /run/pab-certs/backend-key.pem
       PAB_REGISTRATION_ENABLED: ${PAB_REGISTRATION_ENABLED:-true}
+      PAB_WEB_ORIGIN: ${PAB_WEB_ORIGIN:-https://pab.rgaa.vip}
       PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret
       PAB_BACKEND_TLS_NAME: ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
     secrets:
@@ -77,6 +78,7 @@ services:
           - ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
 
   relay:
+    # Multiple Relay instances must each set a distinct persistent node ID.
     image: ${PAB_RELAY_IMAGE:-${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}}
     command: ["pab-relay-server"]
     restart: unless-stopped
@@ -91,6 +93,7 @@ services:
       PAB_RELAY_HTTPS_ADDR: 0.0.0.0:31443
       PAB_RELAY_QUIC_ADDR: 0.0.0.0:7842
       PAB_RELAY_TLS_NAME: ${PAB_RELAY_TLS_NAME:-pab-relay.rgaa.vip}
+      PAB_RELAY_NODE_ID: ${PAB_RELAY_NODE_ID:-primary}
     secrets:
       - pab_relay_control_secret
     volumes:

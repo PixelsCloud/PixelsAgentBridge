@@ -629,6 +629,39 @@ pub async fn approve_local_claim(claim_id: ClaimId) -> Result<(), LocalIpcError>
     .map_err(|_| LocalIpcError::Timeout)?
 }
 
+pub async fn local_claim_request(
+    claim_id: Option<ClaimId>,
+) -> Result<Vec<pab_protocol::DeviceClaimEntry>, LocalIpcError> {
+    let mut socket = connect_local().await?;
+    let request = match claim_id {
+        Some(id) => json!({"type":"reject_claim","claim_id":id}),
+        None => json!({"type":"list_device_claims"}),
+    };
+    send_json(&mut socket, &request).await?;
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let frame = receive_json(&mut socket).await?;
+            match frame["type"].as_str() {
+                Some("device_claims") => {
+                    return serde_json::from_value(frame["claims"].clone()).map_err(Into::into);
+                }
+                Some("claim_rejected") => return Ok(Vec::new()),
+                Some("error") => {
+                    return Err(LocalIpcError::Remote(
+                        frame["message"]
+                            .as_str()
+                            .unwrap_or("claim request failed")
+                            .to_owned(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .map_err(|_| LocalIpcError::Timeout)?
+}
+
 pub async fn run_local_service(root: PathBuf) -> Result<(), LocalIpcError> {
     let token = ensure_machine_token(&root)?;
     let port = local_port()?;
@@ -723,6 +756,19 @@ async fn handle_connection(
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
+                    Some("list_device_claims") => {
+                        match crate::list_device_claims().await {
+                            Ok(claims)=>send_json(&mut socket,&json!({"type":"device_claims","claims":claims})).await?,
+                            Err(error)=>send_json(&mut socket,&json!({"type":"error","message":error.to_string()})).await?,
+                        }
+                    }
+                    Some("reject_claim") => {
+                        let id=frame["claim_id"].as_str().ok_or(LocalIpcError::Protocol)?.parse::<ClaimId>().map_err(|_|LocalIpcError::Protocol)?;
+                        match crate::reject_claim(id).await {
+                            Ok(())=>send_json(&mut socket,&json!({"type":"claim_rejected"})).await?,
+                            Err(error)=>send_json(&mut socket,&json!({"type":"error","message":error.to_string()})).await?,
+                        }
+                    }
                     Some("approve_claim") => {
                         let claim_id = frame["claim_id"]
                             .as_str()

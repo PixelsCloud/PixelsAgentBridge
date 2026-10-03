@@ -333,7 +333,7 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
         control
             .approve_device_claim(&device_endpoint, claim_id)
             .await
-            .is_err()
+            .is_ok()
     );
     assert!(
         control

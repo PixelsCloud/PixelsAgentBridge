@@ -203,7 +203,7 @@ pub async fn show_access() -> Result<(), BootstrapError> {
     Ok(())
 }
 
-pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
+async fn claim_connection() -> Result<(AuthenticatedControlConnection, DeviceId), BootstrapError> {
     let paths = DataPaths::for_scope(DataScope::Machine)?;
     let access = crate::device_access::load(&paths.executor_database()).await?;
     let deployment_id: DeploymentId = access
@@ -232,9 +232,28 @@ pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
         principal: EndpointProofPrincipal::Device { device_id },
         operation_timeout: Duration::from_secs(10),
     };
-    let mut connection =
+    let connection =
         AuthenticatedControlConnection::connect(&config, &secret, tls_connector(ca.as_deref())?)
             .await?;
+    Ok((connection, device_id))
+}
+
+pub async fn list_device_claims() -> Result<Vec<pab_protocol::DeviceClaimEntry>, BootstrapError> {
+    let (mut connection, _) = claim_connection().await?;
+    Ok(connection
+        .list_device_claims(Duration::from_secs(10))
+        .await?)
+}
+
+pub async fn reject_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
+    let (mut connection, _) = claim_connection().await?;
+    Ok(connection
+        .reject_device_claim(claim_id, Duration::from_secs(10))
+        .await?)
+}
+
+pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
+    let (mut connection, device_id) = claim_connection().await?;
     let (claimed_device, owner_tenant_id) = connection
         .approve_device_claim(claim_id, Duration::from_secs(10))
         .await?;

@@ -58,6 +58,10 @@ impl PostgresStore {
         claim_id: ClaimId,
     ) -> Result<(DeviceId, TenantId), StoreError> {
         let mut tx = self.pool.begin().await?;
+        if let Some(row) = sqlx::query("SELECT c.device_id,c.owner_tenant_id FROM device_claim_requests c JOIN devices d ON d.id=c.device_id AND d.owner_tenant_id=c.owner_tenant_id JOIN endpoints e ON e.device_id=d.id AND e.owner_kind='device' AND e.status='active' WHERE c.id=$1 AND c.resolution='approved' AND e.endpoint_key=$2")
+            .bind(claim_id.as_uuid()).bind(device_endpoint.endpoint_key.as_bytes().as_slice()).fetch_optional(&mut *tx).await? {
+            return Ok((DeviceId::from_uuid(row.try_get("device_id")?),TenantId::from_uuid(row.try_get("owner_tenant_id")?)));
+        }
         let row = sqlx::query(
             r#"
             SELECT request.device_id,
@@ -72,6 +76,7 @@ impl PostgresStore {
               ON member.tenant_id = request.owner_tenant_id
              AND member.user_id = request.requested_by_user_id
              AND member.status = 'active'
+            JOIN users applicant ON applicant.id=request.requested_by_user_id AND applicant.status='active'
             JOIN tenants owner_scope
               ON owner_scope.id = request.owner_tenant_id
              AND owner_scope.kind = 'personal'
@@ -81,11 +86,12 @@ impl PostgresStore {
               AND endpoint.owner_kind = 'device'
               AND endpoint.status = 'active'
               AND request.approved_at IS NULL
+              AND request.resolution = 'pending'
               AND request.expires_at > now()
               AND device.owner_tenant_id IS NULL
               AND device.status = 'active'
               AND member.role IN ('owner', 'admin')
-            FOR UPDATE OF device
+            FOR UPDATE OF device, request
             "#,
         )
         .bind(claim_id.as_uuid())
@@ -113,11 +119,15 @@ impl PostgresStore {
             return Err(StoreError::Conflict("device was already claimed"));
         }
 
-        sqlx::query("UPDATE device_claim_requests SET approved_at = now() WHERE id = $1")
+        sqlx::query("UPDATE device_claim_requests SET approved_at = now(), resolution='approved' WHERE id = $1")
             .bind(claim_id.as_uuid())
             .execute(&mut *tx)
             .await?;
+        sqlx::query("UPDATE device_claim_requests SET resolution='cancelled' WHERE device_id=$1 AND resolution='pending' AND id<>$2")
+            .bind(device_id.as_uuid()).bind(claim_id.as_uuid()).execute(&mut *tx).await?;
         support::bump_policy_revision(&mut tx).await?;
+        sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES (NULL,'device.claim_approved',$1)")
+            .bind(device_id.as_uuid()).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok((device_id, owner_tenant_id))
     }

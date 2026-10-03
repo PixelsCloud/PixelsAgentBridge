@@ -52,6 +52,21 @@ async fn approve_claim(claim_id: String) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+async fn pending_device_claims() -> Result<Vec<pab_protocol::DeviceClaimEntry>,String> {
+    let token_exists=pab_executor::local_ipc::user_token_path().ok().is_some_and(|path|path.is_file());
+    if token_exists {pab_executor::local_ipc::local_claim_request(None).await.map_err(|e|e.to_string())}
+    else {pab_executor::list_device_claims().await.map_err(|e|e.to_string())}
+}
+
+#[tauri::command]
+async fn reject_device_claim(claim_id:String)->Result<(),String>{
+    let id=claim_id.parse::<ClaimId>().map_err(|_|"invalid claim id".to_owned())?;
+    let token_exists=pab_executor::local_ipc::user_token_path().ok().is_some_and(|path|path.is_file());
+    if token_exists {pab_executor::local_ipc::local_claim_request(Some(id)).await.map(|_|()).map_err(|e|e.to_string())}
+    else {pab_executor::reject_claim(id).await.map_err(|e|e.to_string())}
+}
+
 async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
     loop {
         match pab_executor::local_ipc::connect_local().await {
@@ -262,6 +277,8 @@ pub fn run() {
             device_status,
             mcp_reporting::mcp_reporting_status,
             approve_claim,
+            pending_device_claims,
+            reject_device_claim,
             mcp_tool_settings::get_mcp_tool_settings,
             mcp_tool_settings::save_mcp_tool_settings,
             server_settings::get_operator_server_settings,

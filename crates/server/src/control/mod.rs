@@ -31,10 +31,11 @@ impl Default for ControlApiConfig {
 
 #[derive(Clone)]
 pub struct ControlApiState {
-    pub(super) control: Arc<ControlPlane>,
-    pub(super) deployment_id: DeploymentId,
-    pub(super) config: ControlApiConfig,
+    pub(crate) control: Arc<ControlPlane>,
+    pub(crate) deployment_id: DeploymentId,
+    pub(crate) config: ControlApiConfig,
     pub(super) relay_auth: RelayControlAuth,
+    pub(crate) server_instance: uuid::Uuid,
 }
 
 impl ControlApiState {
@@ -49,6 +50,7 @@ impl ControlApiState {
             deployment_id,
             config,
             relay_auth,
+            server_instance: uuid::Uuid::new_v4(),
         }
     }
 }

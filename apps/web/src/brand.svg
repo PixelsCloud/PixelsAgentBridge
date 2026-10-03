@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Pixels Agent Bridge">
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="#F8FBFB" stroke="#D7E7E8" stroke-width="8"/>
+  <path d="M256 118 118 357 394 357Z" fill="none" stroke="#007276" stroke-linejoin="round" stroke-width="28"/>
+  <circle cx="256" cy="118" r="49" fill="#007276"/>
+  <circle cx="118" cy="357" r="49" fill="#007276"/>
+  <circle cx="394" cy="357" r="49" fill="#007276"/>
+</svg>

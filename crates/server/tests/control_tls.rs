@@ -1691,6 +1691,26 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .expect("guest command did not reach a terminal snapshot");
     assert_eq!(guest_final.state, TaskState::Succeeded);
     assert!(String::from_utf8_lossy(&guest_stdout).contains("guest-command-ok"));
+    // Remote task payloads travel over the device session, never the central database.
+    let central_tables: Vec<String> = sqlx::query_scalar("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename<>'_sqlx_migrations'").fetch_all(&pool).await.unwrap();
+    for table in central_tables {
+        assert!(
+            table
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+        );
+        let found:bool = sqlx::query_scalar(&format!("SELECT EXISTS(SELECT 1 FROM \"{table}\" row WHERE position($1 in row_to_json(row)::text)>0)"))
+            .bind("guest-command-ok").fetch_one(&pool).await.unwrap();
+        assert!(
+            !found,
+            "remote command content was saved in central table {table}"
+        );
+    }
+    let relay_nodes:i64=sqlx::query_scalar("SELECT count(*) FROM relay_nodes WHERE node_id='primary' AND applied_policy_version IS NOT NULL").fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        relay_nodes, 1,
+        "real Relay policy polling must report its applied revision"
+    );
     guest_connection.close();
     tokio::time::timeout(Duration::from_secs(5), guest_server)
         .await

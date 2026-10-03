@@ -24,14 +24,10 @@ impl PostgresStore {
              AND member.status = 'active'
             JOIN devices device
               ON device.status = 'active'
-             AND (
-                 device.registered_by_user_id = requester.user_id
-                 OR EXISTS (
-                     SELECT 1 FROM device_claim_requests claim
-                     WHERE claim.device_id = device.id
-                       AND claim.requested_by_user_id = requester.user_id
-                       AND claim.approved_at IS NOT NULL
-                 )
+             AND EXISTS (
+                 SELECT 1 FROM personal_tenants owner
+                 WHERE owner.tenant_id = device.owner_tenant_id
+                   AND owner.user_id = requester.user_id
              )
             WHERE requester.endpoint_key = $1
               AND requester.tenant_id = $2

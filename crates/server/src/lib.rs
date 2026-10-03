@@ -7,6 +7,7 @@ pub mod domain;
 pub mod endpoint_proof;
 pub mod postgres;
 pub mod service;
+pub mod web;
 
 pub use auth::PasswordPolicy;
 pub use control::{

@@ -33,6 +33,60 @@ pub struct AuthenticatedControlConnection {
 }
 
 impl AuthenticatedControlConnection {
+    pub async fn list_device_claims(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<Vec<pab_protocol::DeviceClaimEntry>, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::ListDeviceClaims { request_id },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceClaims {
+                request_id: id,
+                claims,
+            } if id == request_id => Ok(claims),
+            ControlServerMessage::Error {
+                request_id: Some(id),
+                code,
+                message,
+            } if id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
+
+    pub async fn reject_device_claim(
+        &mut self,
+        claim_id: pab_protocol::ClaimId,
+        timeout: Duration,
+    ) -> Result<(), EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::RejectDeviceClaim {
+                request_id,
+                claim_id,
+            },
+            timeout,
+        )
+        .await?;
+        match receive(&mut self.socket, timeout).await? {
+            ControlServerMessage::DeviceClaimRejected {
+                request_id: id,
+                claim_id: claim,
+            } if id == request_id && claim == claim_id => Ok(()),
+            ControlServerMessage::Error {
+                request_id: Some(id),
+                code,
+                message,
+            } if id == request_id => Err(EndpointControlError::Server { code, message }),
+            _ => Err(EndpointControlError::MismatchedResponse),
+        }
+    }
+
     pub async fn approve_device_claim(
         &mut self,
         claim_id: pab_protocol::ClaimId,

@@ -1,3 +1,10 @@
+FROM node:22-bookworm-slim AS web-builder
+WORKDIR /web
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY apps/web/ ./
+RUN npm run build
+
 FROM rust:1.95-bookworm AS builder
 
 WORKDIR /src
@@ -23,6 +30,7 @@ RUN apt-get update \
 
 COPY --from=builder /out/pab-server /usr/local/bin/pab-server
 COPY --from=builder /out/pab-relay-server /usr/local/bin/pab-relay-server
+COPY --from=web-builder /web/dist /usr/local/bin/web
 
 USER pab:pab
 ENV PAB_LOG_DIR=/var/log/pab

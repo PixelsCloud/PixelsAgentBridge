@@ -1,0 +1,15 @@
+:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;background:#f3f6f8;color:#1d3546;font-synthesis:none}
+:root[data-theme=dark]{background:#181d23;color:#e4ebf1;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;min-width:360px}button svg{vertical-align:middle}h1,h2,h3,h4{margin-top:0!important}
+.full-center{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.auth-preferences{position:absolute;right:28px;top:24px}.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:100px;padding:90px 40px}
+.auth-intro{max-width:400px}.auth-intro h1{margin-top:28px!important;letter-spacing:-1px}.auth-card{width:440px;box-shadow:0 18px 70px #1339420d}
+.brand-mark{display:grid;place-items:center;width:72px;height:72px;border-radius:22px;background:#087f80;color:#fff;font-weight:800;font-size:36px}.brand-mark.small{width:36px;height:36px;border-radius:10px;font-size:20px;flex-shrink:0}
+.console-layout{min-height:100vh}.console-sidebar{border-right:1px solid #8697a321}.console-brand{height:86px;display:flex;align-items:center;gap:12px;padding:20px}.console-brand strong{display:block;font-size:20px;line-height:24px}.console-brand span{font-size:12px;opacity:.65}
+.console-sidebar .ant-menu{background:transparent!important;border-inline-end:none!important}.console-sidebar .ant-menu-item{height:44px;margin-block:8px}.console-header{height:72px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;background:transparent!important;border-bottom:1px solid #8697a321}
+.console-content{padding:28px;max-width:1800px;width:100%;margin:0 auto}.page-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.page-heading h2{margin-bottom:8px}.device-link{height:auto;padding:0;display:flex;align-items:center;gap:12px;text-align:left}.device-link strong{display:block;font-size:16px}.device-link span{display:block;font-size:13px;color:#758b97}
+.ant-layout-sider-collapsed .console-brand>div:last-child{display:none}.ant-layout-sider-collapsed .console-brand{padding:14px}
+.console-sidebar.ant-layout-sider{background:var(--ant-color-bg-container)}.console-brand{color:var(--ant-color-text)}.console-content{min-width:0}.console-content .ant-space-item{min-width:0;max-width:100%}.console-sidebar .ant-menu-dark{--ant-menu-dark-item-bg:transparent;--ant-menu-dark-sub-menu-item-bg:transparent}
+.console-content .ant-card-body>.ant-space{max-width:100%;width:100%}.console-content .ant-input-search{max-width:100%}
+@media(max-width:900px){.auth-wrap{gap:36px;flex-direction:column}.auth-intro{text-align:center}.auth-intro .brand-mark{margin:auto}.auth-intro h1{font-size:26px}.console-content{padding:16px}.console-header{padding:0 16px}.console-header>span{display:none}}
+@media(max-width:560px){.auth-wrap{padding:90px 16px 30px}.auth-card{width:100%}.console-content{padding:12px}.console-header .ant-tag{display:none}.page-heading{align-items:flex-start}.console-header{padding:0 12px}.auth-preferences{right:16px}}

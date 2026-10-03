@@ -56,6 +56,10 @@ impl RelayControlClient {
             request_id,
             deployment_id: self.deployment_id,
             known_policy_version: runtime.policy_version()?,
+            node_id: Some(
+                std::env::var("PAB_RELAY_NODE_ID").unwrap_or_else(|_| "primary".to_owned()),
+            ),
+            agent_version: Some(env!("CARGO_PKG_VERSION").to_owned()),
         };
         let encoded = serde_json::to_string(&request)?;
         tokio::time::timeout(

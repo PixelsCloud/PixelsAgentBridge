@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint, Team, TeamRole};
 
 mod accounts;
+mod claim_management;
 mod connection_intents;
 mod device_claim;
 mod device_discovery;
