@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use pab_protocol::{
     AuthorizedDevicePeer, DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION,
-    DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
     DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot,
     TenantId, UserId,
@@ -58,19 +58,13 @@ impl ControlPlane {
     pub async fn list_my_devices(
         &self,
         endpoint: &RegisteredEndpoint,
-        deployment_id: DeploymentId,
     ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, ServiceError> {
         let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
             return Err(ServiceError::UserEndpointRequired);
         };
         Ok(self
             .store
-            .list_my_devices(
-                endpoint.endpoint_key,
-                user_id,
-                endpoint.tenant_id,
-                deployment_id,
-            )
+            .list_my_devices(endpoint.endpoint_key, user_id, endpoint.tenant_id)
             .await?)
     }
 
@@ -93,15 +87,11 @@ impl ControlPlane {
         &self.store
     }
 
-    pub async fn initialize_deployment(
+    pub async fn initialize_settings(
         &self,
-        requested_id: DeploymentId,
         defaults: RelayLimitDefaults,
-    ) -> Result<DeploymentId, ServiceError> {
-        Ok(self
-            .store
-            .initialize_deployment(requested_id, defaults)
-            .await?)
+    ) -> Result<(), ServiceError> {
+        Ok(self.store.initialize_settings(defaults).await?)
     }
 
     pub async fn register_account(
@@ -480,23 +470,16 @@ impl ControlPlane {
         &self,
         endpoint: &RegisteredEndpoint,
         code: pab_protocol::DeviceCode,
-        deployment_id: pab_protocol::DeploymentId,
     ) -> Result<DeviceRef, ServiceError> {
         Ok(match endpoint.principal {
             EndpointProofPrincipal::User { user_id } => {
                 self.store
-                    .resolve_device_code(
-                        endpoint.endpoint_key,
-                        user_id,
-                        endpoint.tenant_id,
-                        deployment_id,
-                        code,
-                    )
+                    .resolve_device_code(endpoint.endpoint_key, user_id, endpoint.tenant_id, code)
                     .await?
             }
             EndpointProofPrincipal::Guest => {
                 self.store
-                    .guest_resolve_device_code(endpoint.endpoint_key, code, deployment_id)
+                    .guest_resolve_device_code(endpoint.endpoint_key, code)
                     .await?
             }
             EndpointProofPrincipal::Device { .. } => {

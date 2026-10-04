@@ -5,11 +5,11 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: pab
+      POSTGRES_DB: ${PAB_DB_NAME:-pab}
       POSTGRES_USER: pab
       POSTGRES_PASSWORD: ${PAB_DB_PASSWORD:?set PAB_DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pab -d pab"]
+      test: ["CMD-SHELL", "pg_isready -U pab -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -26,8 +26,7 @@ services:
     command: ["pab-server", "init"]
     restart: "no"
     environment:
-      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/pab
-      PAB_DEPLOYMENT_ID: ${PAB_DEPLOYMENT_ID:?set PAB_DEPLOYMENT_ID}
+      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/${PAB_DB_NAME:-pab}
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +39,7 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/pab
+      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/${PAB_DB_NAME:-pab}
       PAB_LISTEN_ADDR: 0.0.0.0:8443
       PAB_TLS_CERT: /run/pab-certs/backend-cert.pem
       PAB_TLS_KEY: /run/pab-certs/backend-key.pem
@@ -84,7 +83,6 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      PAB_DEPLOYMENT_ID: ${PAB_DEPLOYMENT_ID:?set PAB_DEPLOYMENT_ID}
       PAB_CONTROL_URL: wss://${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}:8443/relay-control
       PAB_CONTROL_CA_CERT: /run/pab-certs/backend-ca.pem
       PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret

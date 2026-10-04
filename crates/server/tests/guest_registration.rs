@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceId, DeviceNetworkUpdate, DeviceRef,
-    EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
-    EndpointProofResponse, EndpointSignature, RelayLimitDefaults, TenantId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeviceId, DeviceNetworkUpdate, DeviceRef, EndpointInstanceId,
+    EndpointKey, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
+    EndpointSignature, RelayLimitDefaults, TenantId,
 };
 use pab_server::{ControlPlane, EndpointProofSession, PasswordPolicy, PostgresStore};
 use sqlx::PgPool;
@@ -17,7 +17,7 @@ fn proof(
     purpose: EndpointProofPurpose,
 ) -> pab_server::VerifiedEndpointProof {
     let now = OffsetDateTime::now_utc();
-    let mut session = EndpointProofSession::new(DeploymentId::from_u128(1));
+    let mut session = EndpointProofSession::new();
     let challenge = session
         .issue(
             principal,
@@ -46,14 +46,11 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store.clone(), PasswordPolicy::default()).unwrap();
     control
-        .initialize_deployment(
-            DeploymentId::from_u128(1),
-            RelayLimitDefaults {
-                team_mbps: 20,
-                member_mbps: 4,
-                personal_mbps: 5,
-            },
-        )
+        .initialize_settings(RelayLimitDefaults {
+            team_mbps: 20,
+            member_mbps: 4,
+            personal_mbps: 5,
+        })
         .await
         .unwrap();
 
@@ -131,7 +128,7 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
 
     let guest_key = EndpointKey::new(*guest_secret.public().as_bytes());
     let device_ref = store
-        .guest_resolve_device_code(guest_key, first.code, DeploymentId::from_u128(1))
+        .guest_resolve_device_code(guest_key, first.code)
         .await
         .unwrap();
     assert_eq!(device_ref.device_id, first.id);
@@ -322,7 +319,6 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
             EndpointKey::new(*owner_key.public().as_bytes()),
             account.id,
             account.personal_tenant_id,
-            DeploymentId::from_u128(1),
             first.code,
         )
         .await
@@ -364,7 +360,7 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     );
 
     let revision_before: i64 =
-        sqlx::query_scalar("SELECT policy_revision FROM deployments WHERE singleton = true")
+        sqlx::query_scalar("SELECT policy_revision FROM server_settings WHERE singleton = true")
             .fetch_one(store.pool())
             .await
             .unwrap();
@@ -380,7 +376,7 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     assert_eq!(store.delete_expired_connection_intents().await.unwrap(), 1);
     assert_eq!(store.delete_expired_connection_intents().await.unwrap(), 0);
     let revision_after: i64 =
-        sqlx::query_scalar("SELECT policy_revision FROM deployments WHERE singleton = true")
+        sqlx::query_scalar("SELECT policy_revision FROM server_settings WHERE singleton = true")
             .fetch_one(store.pool())
             .await
             .unwrap();

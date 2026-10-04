@@ -55,8 +55,8 @@ pub use filesystem::{
     TextReadRange, cancellable_filesystem_kind, valid_file_hash,
 };
 pub use ids::{
-    ChallengeId, ClaimId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId,
-    TaskId, TenantId, UserId,
+    ChallengeId, ClaimId, ConnectionId, DeviceId, EndpointInstanceId, RequestId, TaskId, TenantId,
+    UserId,
 };
 pub use operator::OperatorRef;
 pub use peer::{

@@ -10,9 +10,8 @@ function sql(query: string) {
 }
 
 async function fixture(name: string) {
-  const deployment = sql('SELECT id FROM deployments');
   const executable = process.env.PAB_WEB_FIXTURE_BIN ?? resolve(root, `target/debug/examples/web-device-fixture${process.platform === 'win32' ? '.exe' : ''}`);
-  const child = spawn(executable, ['wss://localhost:38443/control', resolve(root, '.build/web-test/cert.pem'), deployment, name], { windowsHide: true });
+  const child = spawn(executable, ['wss://localhost:38443/control', resolve(root, '.build/web-test/cert.pem'), name], { windowsHide: true });
   const lines = createInterface({ input: child.stdout });
   const messages: Record<string, unknown>[] = []; let failure = '';
   lines.on('line', line => { try { messages.push(JSON.parse(line)); } catch { failure += line; } });

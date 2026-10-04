@@ -10,9 +10,6 @@ Unicode true
 !ifndef OUTPUT_FILE
     !error "OUTPUT_FILE is required"
 !endif
-!ifndef DEPLOYMENT_ID
-    !error "DEPLOYMENT_ID is required"
-!endif
 !ifndef CONTROL_URL
     !error "CONTROL_URL is required"
 !endif
@@ -97,7 +94,7 @@ Section "Install"
     File "${PAYLOAD_DIR}\uninstall.ps1"
     File "${PAYLOAD_DIR}\INSTALL-WINDOWS.txt"
 
-    nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" -DeploymentId "${DEPLOYMENT_ID}" -ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}" -InstallRoot "$INSTDIR"'
+    nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" -ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}" -InstallRoot "$INSTDIR"'
     Pop $0
     ${If} $0 != 0
         MessageBox MB_ICONSTOP "$(InstallFailed) $0"

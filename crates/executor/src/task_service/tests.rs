@@ -1,9 +1,7 @@
 use std::time::Duration;
 
 use pab_platform::detect_native_execution_context;
-use pab_protocol::{
-    DeploymentId, DeviceId, ExpectedEnvironment, RequestId, TaskState, TenantId, UserId,
-};
+use pab_protocol::{DeviceId, ExpectedEnvironment, RequestId, TaskState, TenantId, UserId};
 
 use super::*;
 
@@ -154,7 +152,6 @@ async fn executor_transfer_audit_survives_reopen_and_records_interruption() {
     let service = TaskService::open(
         &database,
         DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },
@@ -219,7 +216,6 @@ async fn executes_and_persists_a_command_with_live_output_ranges() {
     let directory = tempfile::tempdir().unwrap();
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
-        deployment_id: DeploymentId::from_u128(1),
         tenant_id: TenantId::from_u128(2),
         device_id: DeviceId::from_u128(3),
     };
@@ -296,7 +292,6 @@ async fn reopening_marks_an_accepted_task_interrupted() {
         .join("tasks.sqlite3");
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
-        deployment_id: DeploymentId::from_u128(11),
         tenant_id: TenantId::from_u128(12),
         device_id: DeviceId::from_u128(13),
     };
@@ -339,7 +334,6 @@ async fn active_task_limit_fails_new_work_but_preserves_request_deduplication() 
     let directory = tempfile::tempdir().unwrap();
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
-        deployment_id: DeploymentId::from_u128(21),
         tenant_id: TenantId::from_u128(22),
         device_id: DeviceId::from_u128(23),
     };
@@ -386,7 +380,6 @@ async fn guest_task_history_is_isolated_by_endpoint_identity() {
     let directory = tempfile::tempdir().unwrap();
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
-        deployment_id: DeploymentId::from_u128(31),
         tenant_id: TenantId::from_u128(32),
         device_id: DeviceId::from_u128(33),
     };
@@ -440,7 +433,6 @@ async fn one_accounts_endpoints_have_separate_task_history() {
     let directory = tempfile::tempdir().unwrap();
     let context = detect_native_execution_context().unwrap();
     let device_ref = DeviceRef {
-        deployment_id: DeploymentId::from_u128(41),
         tenant_id: TenantId::from_u128(42),
         device_id: DeviceId::from_u128(43),
     };
@@ -531,7 +523,6 @@ async fn output_reads_match_ranges_during_concurrent_append_and_trim() {
     let context = detect_native_execution_context().unwrap();
     let actor = account(9);
     let device = DeviceRef {
-        deployment_id: DeploymentId::new(),
         tenant_id: TenantId::new(),
         device_id: DeviceId::new(),
     };
@@ -639,7 +630,6 @@ async fn command_options_deliver_stdin_env_deduplicate_and_stop_at_deadline() {
     let svc = TaskService::open(
         &dir.path().join("tasks.db"),
         DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },

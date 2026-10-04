@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use iroh_base::{PublicKey, Signature};
 use pab_protocol::{
-    ChallengeId, ConnectionId, DeploymentId, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey,
-    EndpointProofChallenge, EndpointProofContractError, EndpointProofPrincipal,
-    EndpointProofPurpose, EndpointProofResponse, TenantId,
+    ChallengeId, ConnectionId, ENDPOINT_PROOF_SCHEMA_VERSION, EndpointKey, EndpointProofChallenge,
+    EndpointProofContractError, EndpointProofPrincipal, EndpointProofPurpose,
+    EndpointProofResponse, TenantId,
 };
 use rand_core::{OsRng, RngCore};
 use thiserror::Error;
@@ -14,15 +14,19 @@ const MAX_CHALLENGE_VALIDITY: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
 pub struct EndpointProofSession {
-    deployment_id: DeploymentId,
     connection_id: ConnectionId,
     pending: Option<EndpointProofChallenge>,
 }
 
+impl Default for EndpointProofSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EndpointProofSession {
-    pub fn new(deployment_id: DeploymentId) -> Self {
+    pub fn new() -> Self {
         Self {
-            deployment_id,
             connection_id: ConnectionId::new(),
             pending: None,
         }
@@ -57,7 +61,6 @@ impl EndpointProofSession {
         let challenge = EndpointProofChallenge {
             schema_version: ENDPOINT_PROOF_SCHEMA_VERSION,
             challenge_id: ChallengeId::new(),
-            deployment_id: self.deployment_id,
             connection_id: self.connection_id,
             principal,
             tenant_id,
@@ -168,7 +171,7 @@ mod tests {
     fn proves_possession_of_the_iroh_endpoint_key_once() {
         let secret = SecretKey::generate();
         let now = OffsetDateTime::now_utc();
-        let mut session = EndpointProofSession::new(DeploymentId::new());
+        let mut session = EndpointProofSession::new();
         let challenge = session
             .issue(
                 EndpointProofPrincipal::User {
@@ -194,7 +197,7 @@ mod tests {
         let claimed = SecretKey::generate();
         let attacker = SecretKey::generate();
         let now = OffsetDateTime::now_utc();
-        let mut session = EndpointProofSession::new(DeploymentId::new());
+        let mut session = EndpointProofSession::new();
         let challenge = session
             .issue(
                 EndpointProofPrincipal::User {
@@ -221,7 +224,7 @@ mod tests {
     fn rejects_an_expired_challenge() {
         let secret = SecretKey::generate();
         let now = OffsetDateTime::now_utc();
-        let mut session = EndpointProofSession::new(DeploymentId::new());
+        let mut session = EndpointProofSession::new();
         let challenge = session
             .issue(
                 EndpointProofPrincipal::Device {

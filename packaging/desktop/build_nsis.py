@@ -5,7 +5,6 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
-from uuid import UUID
 import json
 import subprocess
 import zipfile
@@ -45,13 +44,11 @@ def digest_file(path: Path) -> str:
 
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("--deployment-id", required=True)
     parser.add_argument("--control-url", default="wss://pab.rgaa.vip/control")
     parser.add_argument("--relay-url", default="https://pab-relay.rgaa.vip")
     parser.add_argument("--profile", choices=("debug", "release"), default="debug")
     args = parser.parse_args()
 
-    deployment_id = str(UUID(args.deployment_id))
     control_url = parse_url(args.control_url, "wss")
     relay_url = parse_url(args.relay_url, "https")
     profile = args.profile
@@ -86,7 +83,6 @@ def main() -> None:
             "UTF8",
             f"/DPAYLOAD_DIR={payload}",
             f"/DOUTPUT_FILE={output}",
-            f"/DDEPLOYMENT_ID={deployment_id}",
             f"/DCONTROL_URL={control_url}",
             f"/DRELAY_URL={relay_url}",
             f"/DAPP_ICON={icon}",

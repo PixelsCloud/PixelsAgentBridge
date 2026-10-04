@@ -17,8 +17,8 @@ PostgreSQL uses the named `postgres-data` volume, so replacing images or running
 use `docker compose down -v` for an ordinary uninstall or upgrade; removing that
 volume is an explicit data reset.
 
-Copy `example.env` to a private env file, generate a UUID for
-`PAB_DEPLOYMENT_ID`, and keep that UUID unchanged. Create a random Relay control
+Copy `example.env` to a private env file and configure
+the control and Relay URLs. Create a random Relay control
 secret containing at least 32 bytes at the path named by
 `PAB_RELAY_CONTROL_SECRET_PATH`.
 

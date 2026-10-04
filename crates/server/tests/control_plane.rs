@@ -2,24 +2,21 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceNetworkUpdate, DeviceRef,
-    EndpointInstanceId, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
-    EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RelayEndpointOwner,
-    RelayLimitDefaults, TenantId, TrafficScope, UserId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkUpdate, DeviceRef, EndpointInstanceId, EndpointKey,
+    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
+    EndpointSignature, RelayEndpointOwner, RelayLimitDefaults, TenantId, TrafficScope, UserId,
 };
 use pab_server::{ControlPlane, PasswordPolicy, PostgresStore, ServiceError, StoreError, TeamRole};
 use sqlx::PgPool;
 use time::OffsetDateTime;
 
 fn prove_endpoint(
-    deployment_id: DeploymentId,
     user_id: UserId,
     tenant_id: TenantId,
     purpose: EndpointProofPurpose,
     secret: &SecretKey,
 ) -> pab_server::VerifiedEndpointProof {
     prove_endpoint_principal(
-        deployment_id,
         EndpointProofPrincipal::User { user_id },
         tenant_id,
         purpose,
@@ -28,14 +25,13 @@ fn prove_endpoint(
 }
 
 fn prove_endpoint_principal(
-    deployment_id: DeploymentId,
     principal: EndpointProofPrincipal,
     tenant_id: TenantId,
     purpose: EndpointProofPurpose,
     secret: &SecretKey,
 ) -> pab_server::VerifiedEndpointProof {
     let now = OffsetDateTime::now_utc();
-    let mut session = pab_server::EndpointProofSession::new(deployment_id);
+    let mut session = pab_server::EndpointProofSession::new();
     let challenge = session
         .issue(
             principal,
@@ -67,15 +63,12 @@ fn signed_response(
 async fn team_limits_and_member_removal_are_audited_and_revoked(pool: PgPool) {
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
-    let deployment_id = control
-        .initialize_deployment(
-            DeploymentId::from_u128(90),
-            RelayLimitDefaults {
-                team_mbps: 20,
-                member_mbps: 4,
-                personal_mbps: 5,
-            },
-        )
+    control
+        .initialize_settings(RelayLimitDefaults {
+            team_mbps: 20,
+            member_mbps: 4,
+            personal_mbps: 5,
+        })
         .await
         .unwrap();
     let owner = control
@@ -103,7 +96,6 @@ async fn team_limits_and_member_removal_are_audited_and_revoked(pool: PgPool) {
     let endpoint_key = EndpointKey::new(*secret.public().as_bytes());
     control
         .register_user_endpoint(prove_endpoint(
-            deployment_id,
             member.id,
             team.tenant_id,
             EndpointProofPurpose::RegisterUserEndpoint,
@@ -261,15 +253,12 @@ async fn team_limits_and_member_removal_are_audited_and_revoked(pool: PgPool) {
 async fn account_team_device_and_policy_flow(pool: PgPool) {
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
-    let deployment_id = control
-        .initialize_deployment(
-            DeploymentId::from_u128(1),
-            RelayLimitDefaults {
-                team_mbps: 20,
-                member_mbps: 4,
-                personal_mbps: 5,
-            },
-        )
+    control
+        .initialize_settings(RelayLimitDefaults {
+            team_mbps: 20,
+            member_mbps: 4,
+            personal_mbps: 5,
+        })
         .await
         .unwrap();
 
@@ -344,7 +333,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     let unauthorized_device_key = SecretKey::generate();
     control
         .register_user_endpoint(prove_endpoint(
-            deployment_id,
             alice.id,
             team.tenant_id,
             EndpointProofPurpose::RegisterUserEndpoint,
@@ -354,7 +342,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .unwrap();
     control
         .register_user_endpoint(prove_endpoint(
-            deployment_id,
             bob.id,
             team.tenant_id,
             EndpointProofPurpose::RegisterUserEndpoint,
@@ -364,7 +351,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .unwrap();
     control
         .register_user_endpoint(prove_endpoint(
-            deployment_id,
             alice.id,
             alice.personal_tenant_id,
             EndpointProofPurpose::RegisterUserEndpoint,
@@ -375,7 +361,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     let device = control
         .register_device(
             prove_endpoint(
-                deployment_id,
                 alice.id,
                 alice.personal_tenant_id,
                 EndpointProofPurpose::RegisterDevice,
@@ -389,7 +374,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         control
             .register_device(
                 prove_endpoint(
-                    deployment_id,
                     bob.id,
                     team.tenant_id,
                     EndpointProofPurpose::RegisterDevice,
@@ -405,7 +389,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .relay_policy_snapshot(Duration::from_secs(60))
         .await
         .unwrap();
-    assert_eq!(snapshot.deployment_id, deployment_id);
     assert_eq!(snapshot.defaults.team_mbps, 20);
     assert_eq!(snapshot.team_limits.len(), 1);
     assert_eq!(snapshot.endpoints.len(), 4);
@@ -435,7 +418,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
 
     let authenticated_device = control
         .authenticate_registered_endpoint(prove_endpoint_principal(
-            deployment_id,
             EndpointProofPrincipal::Device {
                 device_id: device.id,
             },
@@ -454,7 +436,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     );
 
     let device_ref = DeviceRef {
-        deployment_id,
         tenant_id: alice.personal_tenant_id,
         device_id: device.id,
     };
@@ -476,7 +457,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .unwrap();
     let alice_endpoint = control
         .authenticate_registered_endpoint(prove_endpoint(
-            deployment_id,
             alice.id,
             team.tenant_id,
             EndpointProofPurpose::AuthenticateRegisteredEndpoint,
@@ -486,7 +466,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .unwrap();
     let bob_endpoint = control
         .authenticate_registered_endpoint(prove_endpoint(
-            deployment_id,
             bob.id,
             team.tenant_id,
             EndpointProofPurpose::AuthenticateRegisteredEndpoint,
@@ -494,15 +473,12 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         ))
         .await
         .unwrap();
-    let alice_devices = control
-        .list_my_devices(&alice_endpoint, deployment_id)
-        .await
-        .unwrap();
+    let alice_devices = control.list_my_devices(&alice_endpoint).await.unwrap();
     assert_eq!(alice_devices.len(), 1);
     assert_eq!(alice_devices[0].device_ref, device_ref);
     assert!(
         control
-            .list_my_devices(&bob_endpoint, deployment_id)
+            .list_my_devices(&bob_endpoint,)
             .await
             .unwrap()
             .is_empty()
@@ -510,7 +486,7 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     assert_eq!(device.code.to_string().len(), 9);
     assert_eq!(
         control
-            .resolve_device_code(&alice_endpoint, device.code, deployment_id)
+            .resolve_device_code(&alice_endpoint, device.code,)
             .await
             .unwrap(),
         device_ref
@@ -554,7 +530,7 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     );
     assert_eq!(
         control
-            .resolve_device_code(&bob_endpoint, device.code, deployment_id)
+            .resolve_device_code(&bob_endpoint, device.code,)
             .await
             .unwrap(),
         device_ref
@@ -613,7 +589,7 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
         .unwrap();
     assert_eq!(
         control
-            .resolve_device_code(&alice_endpoint, device.code, deployment_id)
+            .resolve_device_code(&alice_endpoint, device.code,)
             .await
             .unwrap(),
         device_ref
@@ -627,7 +603,6 @@ async fn account_team_device_and_policy_flow(pool: PgPool) {
     assert!(matches!(
         control
             .authenticate_registered_endpoint(prove_endpoint_principal(
-                deployment_id,
                 EndpointProofPrincipal::Device {
                     device_id: device.id,
                 },

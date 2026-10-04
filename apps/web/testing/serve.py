@@ -36,8 +36,8 @@ environment.update(PAB_DATABASE_URL='postgres://postgres@127.0.0.1:55435/pab_web
                    PAB_LOG_DIR=str(out/'logs'),
                    PAB_RELAY_CONTROL_SECRET='isolated-web-test-relay-secret-not-a-production-key',
                    PAB_REGISTRATION_ENABLED='true')
-# Never inherit a developer's production deployment identity or secret file.
-for setting in ['PAB_DEPLOYMENT_ID', 'PAB_RELAY_CONTROL_SECRET_FILE']:
+# Never inherit a developer's production Relay secret file.
+for setting in ['PAB_RELAY_CONTROL_SECRET_FILE']:
     environment.pop(setting, None)
 executable = 'pab-server.exe' if os.name == 'nt' else 'pab-server'
 server = out / executable

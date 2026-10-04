@@ -4,7 +4,7 @@ use std::{
 };
 
 use pab_protocol::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeploymentId, EndpointKey,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointKey,
     EndpointProofPrincipal, EndpointRegistration, EndpointRegistrationResult, RequestId, TenantId,
     TrafficScopeOptions, UserId,
 };
@@ -42,7 +42,6 @@ pub async fn login_traffic_scopes(
 
 pub async fn register_account_traffic_scope(
     control_url: &str,
-    deployment_id: DeploymentId,
     username: String,
     password: Zeroizing<String>,
     selected_tenant_id: TenantId,
@@ -72,7 +71,6 @@ pub async fn register_account_traffic_scope(
     let secret = load_or_create_endpoint_secret(&endpoint_secret_file)?;
     let endpoint_config = EndpointControlConfig {
         url: control_url.to_owned(),
-        deployment_id,
         tenant_id: selected_tenant_id,
         principal: EndpointProofPrincipal::User { user_id },
         operation_timeout: timeout,
@@ -85,7 +83,6 @@ pub async fn register_account_traffic_scope(
         }) => {
             let result = register_endpoint(
                 &mut socket,
-                deployment_id,
                 selected_tenant_id,
                 user_id,
                 &secret,

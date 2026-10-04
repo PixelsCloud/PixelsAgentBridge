@@ -178,7 +178,7 @@ fn valid_meta(meta: &ScreenshotMeta, id: RequestId, options: Option<&ScreenshotO
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pab_protocol::{DeploymentId, DeviceId, DeviceRef, EndpointKey, OperatorRef, TenantId};
+    use pab_protocol::{DeviceId, DeviceRef, EndpointKey, OperatorRef, TenantId};
     use pab_transport::{PabConnection, PabEndpoint, PabEndpointAddress, PabEndpointConfig};
     const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -236,7 +236,6 @@ mod tests {
         let authenticated = AuthenticatedDeviceConnection {
             connection: client,
             device_ref: DeviceRef {
-                deployment_id: DeploymentId::from_u128(1),
                 tenant_id: TenantId::from_u128(2),
                 device_id: DeviceId::from_u128(3),
             },

@@ -1,12 +1,9 @@
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use pab_protocol::DeploymentId;
-
 use super::config::{RelayServiceConfig, RelayServiceConfigError};
 
 fn config() -> RelayServiceConfig {
     RelayServiceConfig {
-        deployment_id: DeploymentId::new(),
         control_url: "wss://localhost/control".to_owned(),
         control_secret: "a test Relay control secret with 32 bytes".to_owned(),
         control_ca_cert: None,

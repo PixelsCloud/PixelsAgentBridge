@@ -10,7 +10,7 @@ use std::{
 use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent,
+    DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent,
     RelayControlClientMessage, RelayControlServerMessage, RelayEndpointOwner, RelayEndpointPolicy,
     RelayLimitDefaults, RelayPolicySnapshot, TenantId,
 };
@@ -74,7 +74,6 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         "wss://localhost:{}/relay-control",
         listener.local_addr().unwrap().port()
     );
-    let deployment_id = DeploymentId::new();
     let tenant_id = TenantId::new();
     let device_id = DeviceId::new();
     let operator = SecretKey::generate();
@@ -82,7 +81,6 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
     let new_operator = SecretKey::generate();
     let policy = Arc::new(Mutex::new(RelayPolicySnapshot {
         schema_version: RELAY_POLICY_SCHEMA_VERSION,
-        deployment_id,
         policy_version: 1,
         issued_at_unix_ms: now_ms() - 1,
         expires_at_unix_ms: now_ms() + 60_000,
@@ -131,7 +129,6 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
             let response = if known_policy_version == Some(policy_version) {
                 RelayControlServerMessage::PolicyUnchanged {
                     request_id,
-                    deployment_id,
                     policy_version,
                     expires_at_unix_ms: snapshot.expires_at_unix_ms,
                 }
@@ -151,7 +148,6 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         }
     });
     let relay = start_relay_service(RelayServiceConfig {
-        deployment_id,
         control_url,
         control_secret: CONTROL_SECRET.to_owned(),
         control_ca_cert: Some(cert_path.clone()),

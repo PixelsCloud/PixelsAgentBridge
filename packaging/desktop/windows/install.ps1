@@ -1,8 +1,5 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$DeploymentId,
-
-    [Parameter(Mandatory = $true)]
     [string]$ControlUrl,
 
     [Parameter(Mandatory = $true)]
@@ -116,7 +113,6 @@ foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1
 }
 
 @{
-    deployment_id = $DeploymentId
     control_url = $ControlUrl
     relay_urls = $RelayUrl
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8

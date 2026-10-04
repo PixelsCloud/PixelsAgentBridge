@@ -300,7 +300,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&database).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -355,7 +354,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&database).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -422,7 +420,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -486,7 +483,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -538,7 +534,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -603,7 +598,6 @@ mod tests {
         let store = RuntimeStore::open(&path).await.unwrap();
         store.start_session("other").await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -683,7 +677,6 @@ mod tests {
             .await
             .unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };

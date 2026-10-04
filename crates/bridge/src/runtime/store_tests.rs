@@ -1,5 +1,5 @@
 use pab_protocol::{
-    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeploymentId, DeviceCode, DeviceId, DeviceRef,
+    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeviceCode, DeviceId, DeviceRef,
     ExecutionContext, ExecutionScope, ExpectedEnvironment, OperatorRef, OsFamily,
     OutputAvailability, OutputChunk, OutputRange, OutputStream, PathStyle, RequestId,
     TASK_SCHEMA_VERSION, TaskCompletion, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
@@ -969,7 +969,6 @@ async fn advances_a_stale_cursor_to_the_remote_retention_boundary() {
 
 fn device_ref() -> DeviceRef {
     DeviceRef {
-        deployment_id: DeploymentId::from_u128(1),
         tenant_id: TenantId::from_u128(2),
         device_id: DeviceId::from_u128(3),
     }

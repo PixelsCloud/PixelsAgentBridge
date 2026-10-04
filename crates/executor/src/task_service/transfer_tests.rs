@@ -2,7 +2,7 @@
 //! files. Authentication is represented by a verified fixture actor; production
 //! endpoints, registrations and processes are never used or interrupted.
 use super::*;
-use pab_protocol::{DeploymentId, DeviceId, RequestId, TenantId, UserId};
+use pab_protocol::{DeviceId, RequestId, TenantId, UserId};
 use pab_transport::{PabConnection, PabEndpoint, PabEndpointAddress, PabEndpointConfig};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -68,7 +68,6 @@ pub(crate) async fn service(path: &Path) -> TaskService {
     TaskService::open(
         &path.join("executor.sqlite3"),
         DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },

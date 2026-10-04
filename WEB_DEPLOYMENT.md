@@ -24,10 +24,19 @@ Docker builds the same production Web sources in a Node 22 build stage and place
 
 ## Configure / 配置
 
-Keep the existing database, deployment UUID, TLS and Relay control secret configuration. `pab-server init` applies migrations and initializes an empty deployment. `pab-server serve` also applies outstanding migrations before serving.
+Configure the database, TLS and Relay control secret. `pab-server init` applies migrations and initializes the singleton server settings. `pab-server serve` also applies outstanding migrations before serving. Server URLs select the environment; no deployment UUID is configured or transmitted.
+
+### Current schema / 当前结构
+
+Development targets the new configuration and data structures only. The initial PostgreSQL schema creates `server_settings` directly, without a deployment UUID. Client databases and device references use the current fields; there is no conversion of old device-reference keys or credential columns.
+
+Use matching Server, Relay, Desktop, MCP and Executor builds. For this development baseline, initialize a fresh PostgreSQL database and fresh client data directories with the control/Relay URLs and existing TLS/authentication settings. Databases created by the previous baseline are not supported, including their migration checksums. Back up any data you need before replacing an environment; recreating it issues new device identities/codes and passwords. No compatibility or automatic data migration is provided.
+
+统一按新配置、新数据结构开发，不再兼容含 deployment ID 的旧结构。PostgreSQL 直接创建 `server_settings`；客户端不再转换旧设备引用或凭据表。部署时使用配套版本、新数据库和新客户端数据目录。需要的数据应提前备份；重新初始化会生成新的设备身份、设备码和密码。
 
 | Setting | Behavior |
 |---|---|
+| `PAB_DB_NAME` | Compose database name; defaults to `pab`. A distinct name allows a fresh baseline while retaining the previous database for rollback; create that database first if reusing an existing PostgreSQL volume. |
 | `PAB_WEB_DIR` | Optional absolute directory of built Web assets; defaults to `web` beside the executable |
 | `PAB_WEB_ORIGIN` | Optional **public HTTPS origin**, e.g. `https://bridge.example.com`; set explicitly behind a reverse proxy |
 | `PAB_REGISTRATION_ENABLED` | Existing registration switch; reflected by the Web login page |
@@ -51,8 +60,8 @@ For Compose, run this command in the backend container with its existing environ
 
 ## Upgrade and rollback / 升级与回滚
 
-1. Back up PostgreSQL with `pg_dump` and record the current binaries/image, configuration and deployment UUID. Check the backup can be restored into a separate database.
-2. Stop the old backend, deploy the new binary **together with its matching `web/`**, then run `pab-server migrate` (or normal `init`/`serve`). Migrations13–15 added management sessions/audit, historical claim resolution and Relay health. Migration16 retires pending claims without changing device identities or ownership. Published migrations1–15 are unchanged. Deploy the matching Desktop/Executor to remove old client prompts; the new server already rejects legacy claim operations.
+1. Back up PostgreSQL with `pg_dump` and record the current binaries/image, configuration. Check the backup can be restored into a separate database.
+2. Deploy the new binary **together with its matching `web/`**. When switching from the deployment-ID baseline, use a fresh database and run `pab-server init`, with new client data directories and matching client builds as described above. For subsequent versions sharing this baseline, normal `init`/`serve` applies pending migrations. Do not reuse the previous baseline's database or modify its migration checksums.
 3. Start Server and Relay. Verify `/health`, `/api/web/config`, login, device visibility, live device status and SPA deep links. Promote the initial administrator explicitly when needed.
 4. For rollback, stop the new backend and restore the pre-upgrade database backup plus matching old binaries/image. Do not edit `_sqlx_migrations`, remove Docker database volumes or pretend an older binary can safely downgrade the schema.
 
@@ -84,6 +93,6 @@ cd apps/web
 npm run test:e2e
 ```
 
-Build Web first using the earlier commands. Set `DATABASE_URL=postgres://postgres@127.0.0.1:55435/pab_web_test` for Rust tests; SQLx creates separate test databases. The launcher ignores production deployment IDs/secret-file settings and copies the executable to `.build/` so Windows rebuilds can continue. Stop the launcher with Ctrl+C. These fixed test container names and ports are deliberate safeguards; do not substitute a production instance.
+Build Web first using the earlier commands. Set `DATABASE_URL=postgres://postgres@127.0.0.1:55435/pab_web_test` for Rust tests; SQLx creates separate test databases. The launcher ignores production Relay secret-file settings and copies the executable to `.build/` so Windows rebuilds can continue. Stop the launcher with Ctrl+C. These fixed test container names and ports are deliberate safeguards; do not substitute a production instance.
 
 For Vite development use locally supplied `PAB_WEB_DEV_CERT`, `PAB_WEB_DEV_KEY`, optional `PAB_WEB_BACKEND` and matching backend `PAB_WEB_ORIGIN=https://localhost:1440`. Explicit `PAB_WEB_DEV_SELF_SIGNED=1` is allowed for isolated development only. Production TLS validation must remain enabled.

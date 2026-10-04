@@ -1,6 +1,5 @@
-CREATE TABLE deployments (
-    id uuid PRIMARY KEY,
-    singleton boolean NOT NULL DEFAULT true UNIQUE CHECK (singleton),
+CREATE TABLE server_settings (
+    singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
     default_team_mbps integer NOT NULL CHECK (default_team_mbps > 0),
     default_member_mbps integer NOT NULL CHECK (default_member_mbps > 0),
     default_personal_mbps integer NOT NULL CHECK (default_personal_mbps > 0),

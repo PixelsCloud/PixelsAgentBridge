@@ -51,18 +51,10 @@ async fn handle_message(
     match message {
         RelayControlClientMessage::GetPolicy {
             request_id,
-            deployment_id,
             known_policy_version,
             node_id,
             agent_version,
         } => {
-            if deployment_id != state.deployment_id {
-                return error(
-                    Some(request_id),
-                    RelayControlErrorCode::InvalidDeployment,
-                    "Relay belongs to a different deployment",
-                );
-            }
             let snapshot = match state
                 .control
                 .relay_policy_snapshot(state.config.relay_policy_validity)
@@ -117,7 +109,6 @@ async fn handle_message(
                 Some(version) if version == snapshot.policy_version => {
                     RelayControlServerMessage::PolicyUnchanged {
                         request_id,
-                        deployment_id: snapshot.deployment_id,
                         policy_version: snapshot.policy_version,
                         expires_at_unix_ms: snapshot.expires_at_unix_ms,
                     }

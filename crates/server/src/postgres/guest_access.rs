@@ -11,7 +11,6 @@ impl PostgresStore {
         &self,
         guest_key: EndpointKey,
         code: DeviceCode,
-        deployment_id: DeploymentId,
     ) -> Result<DeviceRef, StoreError> {
         let row = sqlx::query(
             r#"
@@ -37,7 +36,6 @@ impl PostgresStore {
         let device_id = DeviceId::from_uuid(row.try_get("id")?);
         let tenant_id = TenantId::from_uuid(row.try_get("tenant_id")?);
         Ok(DeviceRef {
-            deployment_id,
             tenant_id,
             device_id,
         })
@@ -75,9 +73,6 @@ impl PostgresStore {
              AND target.device_id = device.id
              AND target.owner_kind = 'device'
              AND target.status = 'active'
-            JOIN deployments deployment
-              ON deployment.singleton = true
-             AND deployment.id = $4
             WHERE guest.endpoint_key = $1
               AND guest.owner_kind = 'guest'
               AND guest.status = 'active'
@@ -87,7 +82,6 @@ impl PostgresStore {
         .bind(guest_key.as_bytes().as_slice())
         .bind(device_ref.device_id.as_uuid())
         .bind(device_ref.tenant_id.as_uuid())
-        .bind(device_ref.deployment_id.as_uuid())
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(StoreError::NotFound)?;
@@ -125,9 +119,9 @@ impl PostgresStore {
         device_id: DeviceId,
         guest_key: EndpointKey,
     ) -> Result<AuthorizedDevicePeer, StoreError> {
-        let deployment_id: uuid::Uuid = sqlx::query_scalar(
+        sqlx::query_scalar::<_, bool>(
             r#"
-            SELECT deployment.id
+            SELECT true
             FROM endpoints device_endpoint
             JOIN devices device
               ON device.tenant_id = device_endpoint.tenant_id
@@ -140,7 +134,6 @@ impl PostgresStore {
               ON guest.endpoint_key = intent.operator_endpoint_key
              AND guest.owner_kind = 'guest'
              AND guest.status = 'active'
-            JOIN deployments deployment ON deployment.singleton = true
             WHERE device_endpoint.endpoint_key = $1
               AND device_endpoint.device_id = $2
               AND device_endpoint.owner_kind = 'device'
@@ -156,7 +149,6 @@ impl PostgresStore {
         .ok_or(StoreError::NotFound)?;
         Ok(AuthorizedDevicePeer {
             device_ref: DeviceRef {
-                deployment_id: DeploymentId::from_uuid(deployment_id),
                 tenant_id: device_endpoint.tenant_id,
                 device_id,
             },

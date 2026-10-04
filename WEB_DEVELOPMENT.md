@@ -315,3 +315,19 @@ Desktop 本地状态订阅每1秒检查活动桌面，但服务每3秒推送状�
 本轮Web构建、13项PostgreSQL集成测试、6项Chrome E2E均通过。服务端和Web打包为 `pixels-agent-bridge:web-no-ownership-20261003`，镜像ID `sha256:46927066e6ee237b82ac04089278e6b52a30b3634228053b418700da5b4d963b`；没有数据库迁移或客户端二进制变更。上线前备份目录 `/opt/pixels-agent-bridge/backups/web-20261003T143454Z/`，独立恢复验证通过。
 
 已部署正式Server/Web/Relay。生产Chrome使用正常TLS校验通过：概览三项设备统计、列表无归属列/筛选、详情无归属/解绑、旧筛选URL自动清理、列表/详情/概览API无归属字段、旧解绑404及旧筛选参数400。概览检查时总数8、在线4、离线4；Server/Relay healthy，账号/Team/成员数及设备身份/底层权限摘要与升级前一致。历史记录与Team流量归集保留。证据 `.build/no-ownership-rollout/`。本轮未重制无需变更的客户端安装包，未安装客户端，未提交或push代码。
+
+### 不含 deployment ID 的新基线上线（2026-10-04）
+
+按用户要求，直接使用新配置与数据结构，不保留 deployment ID 兼容或本地数据转换逻辑。初始 PostgreSQL schema 直接创建 `server_settings`。Rust 全量测试356项通过、10项原有测试跳过。Compose 新增可选 `PAB_DB_NAME`，默认 `pab`，支持保留旧库并切换到独立的新库。
+
+部署镜像 `pixels-agent-bridge:no-deployment-20261004`，ID `sha256:6f2f295827bcfb283c182605b70fe6652c3a46be431023e5cf0e057804cb085a`。镜像本地构建、上传SHA-256及远端镜像ID验证通过。上线前备份目录 `/opt/pixels-agent-bridge/backups/web-20261004T025556Z/`，完成独立恢复验证；切换前另存停写备份。旧 `pab` 数据库保留，原3个账号、8台设备、Team及成员数据未迁入新库。
+
+正式 Web/Server/Relay 已切换到新库 `pab_no_id_20261004`，使用新基线的16个迁移文件初始化，确认不存在 `deployments` 表。重新注册并配置管理员 `Pixels`，登录密码沿用私有凭据文件中的密码。现网配置已移除 `PAB_DEPLOYMENT_ID`。新库当前为1个管理员、0台设备；`cn-primary` Relay 在线，已应用/已提供策略版本均为1。
+
+正式HTTPS Chrome验证通过：管理员登录、概览、设备列表、在线设备、账号、Team、管理变更、Relay、设置页面、暗色主题及WebSocket刷新。无浏览器脚本错误。Server、Relay、PostgreSQL均healthy。证据与截图保存于 `.build/no-id-rollout/`。本次部署范围为服务端；客户端需要使用新版本及新数据目录后连接，不沿用旧客户端安装包。未安装本机或90客户端，未提交或push代码。
+
+### 新基线客户端清理重装（2026-10-04）
+
+随后按用户要求重新构建 Executor、MCP 和包含生产前端资源的 Desktop，生成沿用原名的 `pixels-agent-bridge-windows-x86_64-debug-setup.exe`，SHA-256 为 `80095d68643fc3bdfbee352b00733ec9be851545cfae14832676e56e211e60e5`。本机与90均完成卸载、清理 Bridge 专用数据目录和 WebView 缓存、默认路径重新安装；安装后的三个二进制哈希均与构建产物一致。
+
+两台机器的 Executor 服务及会话监督任务正常运行，已使用新身份通过控制连接认证；服务器设备数为2。90重试原有凭据后连接成功，远程安装未自动打开的主界面已通过 Administrator 交互会话启动。两台 Desktop 的26035端口健康检查均通过。安装、清理目录及验证证据保存在 `.build/no-id-rollout/local-clean-install.json`、`90-clean-install.json` 和 `90-clean-verify.json`；私有凭据、临时脚本及安装包不纳入版本控制。

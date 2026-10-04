@@ -2,8 +2,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use pab_protocol::{
-    DeploymentId, RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
-    RequestId,
+    RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage, RequestId,
 };
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -17,14 +16,12 @@ use crate::{PolicyRuntimeError, RelayPolicyRuntime};
 const CONTROL_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct RelayControlClient {
-    deployment_id: DeploymentId,
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
 }
 
 impl RelayControlClient {
     pub async fn connect(
         url: &str,
-        deployment_id: DeploymentId,
         secret: &str,
         connector: Connector,
     ) -> Result<Self, RelayControlClientError> {
@@ -41,10 +38,7 @@ impl RelayControlClient {
         )
         .await
         .map_err(|_| RelayControlClientError::Timeout)??;
-        Ok(Self {
-            deployment_id,
-            socket,
-        })
+        Ok(Self { socket })
     }
 
     pub async fn sync_policy(
@@ -54,7 +48,6 @@ impl RelayControlClient {
         let request_id = RequestId::new();
         let request = RelayControlClientMessage::GetPolicy {
             request_id,
-            deployment_id: self.deployment_id,
             known_policy_version: runtime.policy_version()?,
             node_id: Some(
                 std::env::var("PAB_RELAY_NODE_ID").unwrap_or_else(|_| "primary".to_owned()),
@@ -90,11 +83,10 @@ impl RelayControlClient {
             }
             RelayControlServerMessage::PolicyUnchanged {
                 request_id: response_id,
-                deployment_id,
                 policy_version,
                 expires_at_unix_ms,
             } if response_id == request_id => {
-                runtime.refresh_expiry(deployment_id, policy_version, expires_at_unix_ms)?;
+                runtime.refresh_expiry(policy_version, expires_at_unix_ms)?;
                 Ok(PolicySync::Unchanged { policy_version })
             }
             RelayControlServerMessage::Error {

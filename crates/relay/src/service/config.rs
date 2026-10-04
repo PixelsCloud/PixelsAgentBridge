@@ -1,12 +1,9 @@
 use std::{env, fs, net::SocketAddr, path::PathBuf, str::FromStr, time::Duration};
-
-use pab_protocol::DeploymentId;
 use thiserror::Error;
 
 const MIN_CONTROL_SECRET_BYTES: usize = 32;
 
 pub struct RelayServiceConfig {
-    pub deployment_id: DeploymentId,
     pub control_url: String,
     pub control_secret: String,
     pub control_ca_cert: Option<PathBuf>,
@@ -23,9 +20,6 @@ pub struct RelayServiceConfig {
 impl RelayServiceConfig {
     pub fn from_env() -> Result<Self, RelayServiceConfigError> {
         let config = Self {
-            deployment_id: required("PAB_DEPLOYMENT_ID")?
-                .parse()
-                .map_err(|error| invalid("PAB_DEPLOYMENT_ID", error))?,
             control_url: required("PAB_CONTROL_URL")?,
             control_secret: required_secret("PAB_RELAY_CONTROL_SECRET")?,
             control_ca_cert: env::var_os("PAB_CONTROL_CA_CERT").map(PathBuf::from),

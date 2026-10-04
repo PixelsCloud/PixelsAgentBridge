@@ -2,12 +2,11 @@ use std::{env, ffi::OsString, path::PathBuf, time::Duration};
 
 use iroh_base::RelayUrl;
 use pab_agent_core::{DataPathError, DataPaths, DataScope};
-use pab_protocol::{DeploymentId, DeviceId, TenantId};
+use pab_protocol::{DeviceId, TenantId};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutorConfig {
-    pub deployment_id: DeploymentId,
     pub tenant_id: TenantId,
     pub device_id: DeviceId,
     pub control_url: String,
@@ -35,9 +34,6 @@ impl ExecutorConfig {
             None
         };
         let config = Self {
-            deployment_id: required_text(&mut lookup, "PAB_DEPLOYMENT_ID")?
-                .parse()
-                .map_err(|error| invalid("PAB_DEPLOYMENT_ID", error))?,
             tenant_id: required_text(&mut lookup, "PAB_TENANT_ID")?
                 .parse()
                 .map_err(|error| invalid("PAB_TENANT_ID", error))?,
@@ -146,10 +142,6 @@ mod tests {
     fn valid_values() -> HashMap<String, OsString> {
         HashMap::from([
             ("PAB_DATA_DIR".to_owned(), OsString::from("persistent-data")),
-            (
-                "PAB_DEPLOYMENT_ID".to_owned(),
-                OsString::from("00000000-0000-0000-0000-000000000001"),
-            ),
             (
                 "PAB_TENANT_ID".to_owned(),
                 OsString::from("00000000-0000-0000-0000-000000000002"),

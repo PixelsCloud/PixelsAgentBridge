@@ -1,8 +1,8 @@
 use pab_protocol::{
-    CapabilityRef, CpuArchitecture, DeploymentId, DeviceId, DeviceRef, ExecutionContext,
-    ExecutionScope, OsFamily, OutputStream, PathStyle, RequestId, TaskCompletion, TaskEventKind,
-    TaskId, TaskProgress, TaskRef, TaskState, TenantId, TransferDirection, TransferPhase,
-    TransferProgress, UserId,
+    CapabilityRef, CpuArchitecture, DeviceId, DeviceRef, ExecutionContext, ExecutionScope,
+    OsFamily, OutputStream, PathStyle, RequestId, TaskCompletion, TaskEventKind, TaskId,
+    TaskProgress, TaskRef, TaskState, TenantId, TransferDirection, TransferPhase, TransferProgress,
+    UserId,
 };
 use pab_task_runtime::{AcceptedTask, EventApply, TaskAggregate, TaskRuntimeError};
 
@@ -10,7 +10,6 @@ fn accepted(os_family: OsFamily, path_style: PathStyle) -> AcceptedTask {
     AcceptedTask {
         task_ref: TaskRef {
             device_ref: DeviceRef {
-                deployment_id: DeploymentId::from_u128(1),
                 tenant_id: TenantId::from_u128(2),
                 device_id: DeviceId::from_u128(3),
             },

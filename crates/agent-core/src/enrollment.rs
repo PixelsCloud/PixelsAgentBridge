@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeploymentId, ENDPOINT_PROOF_CLOCK_SKEW_MS,
-    EndpointKey, EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose,
-    EndpointProofResponse, EndpointRegistration, EndpointRegistrationResult, EndpointSignature,
-    RequestId, TenantId, UserId,
+    ControlClientMessage, ControlServerMessage, ENDPOINT_PROOF_CLOCK_SKEW_MS, EndpointKey,
+    EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
+    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, RequestId, TenantId,
+    UserId,
 };
 use thiserror::Error;
 use tokio_tungstenite::{
@@ -29,7 +29,6 @@ pub struct EndpointEnrollment {
 
 pub async fn enroll_account_with_device(
     control_url: &str,
-    deployment_id: DeploymentId,
     username: String,
     password: Zeroizing<String>,
     device_name: String,
@@ -73,7 +72,6 @@ pub async fn enroll_account_with_device(
     let user_endpoint_secret = SecretKey::generate();
     let user_result = register_endpoint(
         &mut socket,
-        deployment_id,
         tenant_id,
         user_id,
         &user_endpoint_secret,
@@ -93,7 +91,6 @@ pub async fn enroll_account_with_device(
     let device_endpoint_secret = SecretKey::generate();
     let device_result = register_endpoint(
         &mut socket,
-        deployment_id,
         tenant_id,
         user_id,
         &device_endpoint_secret,
@@ -128,7 +125,6 @@ pub(crate) async fn register_endpoint(
     socket: &mut tokio_tungstenite::WebSocketStream<
         tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
     >,
-    deployment_id: DeploymentId,
     tenant_id: TenantId,
     user_id: UserId,
     secret: &SecretKey,
@@ -159,14 +155,7 @@ pub(crate) async fn register_endpoint(
         } if request_id == begin_id => challenge,
         response => return Err(response_error(response, begin_id)),
     };
-    validate_challenge(
-        &challenge,
-        deployment_id,
-        tenant_id,
-        user_id,
-        endpoint_key,
-        purpose,
-    )?;
+    validate_challenge(&challenge, tenant_id, user_id, endpoint_key, purpose)?;
     let complete_id = RequestId::new();
     send(
         socket,
@@ -194,15 +183,11 @@ pub(crate) async fn register_endpoint(
 
 fn validate_challenge(
     challenge: &EndpointProofChallenge,
-    deployment_id: DeploymentId,
     tenant_id: TenantId,
     user_id: UserId,
     endpoint_key: EndpointKey,
     purpose: EndpointProofPurpose,
 ) -> Result<(), EnrollmentError> {
-    if challenge.deployment_id != deployment_id {
-        return Err(EnrollmentError::ChallengeMismatch("deployment"));
-    }
     if challenge.tenant_id != tenant_id {
         return Err(EnrollmentError::ChallengeMismatch("tenant"));
     }

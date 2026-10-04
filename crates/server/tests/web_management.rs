@@ -4,7 +4,7 @@ use axum::{
     http::{Request, StatusCode, header},
 };
 use http_body_util::BodyExt;
-use pab_protocol::{DeploymentId, RelayLimitDefaults};
+use pab_protocol::RelayLimitDefaults;
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth,
@@ -137,8 +137,7 @@ async fn legacy_control_claim_requests_are_rejected_without_disconnect(pool: PgP
     };
     let (_, control) = app(pool.clone(), true).await;
     unclaimed_fixture(&pool).await;
-    let mut session =
-        pab_server::ControlSession::new(control, DeploymentId::new(), ControlApiConfig::default());
+    let mut session = pab_server::ControlSession::new(control, ControlApiConfig::default());
     let request_id = RequestId::new();
     for request in [
         Client::BeginDeviceClaim {
@@ -276,20 +275,16 @@ async fn removed_unbind_preserves_existing_access(pool: PgPool) {
 async fn app(pool: PgPool, registration_enabled: bool) -> (Router, ControlPlane) {
     let control =
         ControlPlane::new(PostgresStore::from_pool(pool), PasswordPolicy::default()).unwrap();
-    let id = control
-        .initialize_deployment(
-            DeploymentId::new(),
-            RelayLimitDefaults {
-                team_mbps: 20,
-                member_mbps: 4,
-                personal_mbps: 5,
-            },
-        )
+    control
+        .initialize_settings(RelayLimitDefaults {
+            team_mbps: 20,
+            member_mbps: 4,
+            personal_mbps: 5,
+        })
         .await
         .unwrap();
     let state = ControlApiState::new(
         control.clone(),
-        id,
         ControlApiConfig {
             registration_enabled,
             ..Default::default()
@@ -951,8 +946,22 @@ async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) 
         .register_account("upgrade-user", "test password long enough")
         .await
         .unwrap();
-    let team = control
-        .admin_create_team(account.id, "Preserved Team", "upgrade-test")
+    let team_id = uuid::Uuid::new_v4();
+    sqlx::query("INSERT INTO tenants (id, kind, created_by_user_id) VALUES ($1, 'team', $2)")
+        .bind(team_id)
+        .bind(account.id.as_uuid())
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO teams (tenant_id, name) VALUES ($1, 'Preserved Team')")
+        .bind(team_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO memberships (tenant_id, user_id, role) VALUES ($1, $2, 'owner')")
+        .bind(team_id)
+        .bind(account.id.as_uuid())
+        .execute(&pool)
         .await
         .unwrap();
     let endpoint = unclaimed_fixture(&pool).await;
@@ -966,7 +975,7 @@ async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) 
     let count: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM teams WHERE tenant_id=$1 AND name='Preserved Team'",
     )
-    .bind(team.tenant_id.as_uuid())
+    .bind(team_id)
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -1001,7 +1010,6 @@ async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) 
 fn app_from_existing(control: ControlPlane) -> (Router, ControlPlane) {
     let state = ControlApiState::new(
         control.clone(),
-        DeploymentId::new(),
         ControlApiConfig::default(),
         RelayControlAuth::new("web-test-secret-with-at-least-32-characters").unwrap(),
     );

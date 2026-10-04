@@ -7,7 +7,7 @@ use iroh_base::EndpointId;
 use iroh_relay::server::{
     Access, AccessControl, ClientRequest, ForwardingControl, ForwardingDecision,
 };
-use pab_protocol::{DeploymentId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot};
+use pab_protocol::{EndpointKey, RelayEndpointOwner, RelayPolicySnapshot};
 use thiserror::Error;
 use tokio::sync::{Notify, watch};
 
@@ -45,17 +45,12 @@ impl RelayPolicyRuntime {
 
     pub fn refresh_expiry(
         &self,
-        deployment_id: DeploymentId,
         policy_version: u64,
         expires_at_unix_ms: i64,
     ) -> Result<(), PolicyRuntimeError> {
         let now_unix_ms = current_unix_millis()?;
-        self.lock()?.refresh_expiry(
-            deployment_id,
-            policy_version,
-            expires_at_unix_ms,
-            now_unix_ms,
-        )?;
+        self.lock()?
+            .refresh_expiry(policy_version, expires_at_unix_ms, now_unix_ms)?;
         self.refresh_completed
             .send_modify(|generation| *generation = generation.wrapping_add(1));
         Ok(())

@@ -8,8 +8,8 @@ use pab_agent_core::{
     register_account_traffic_scope, tls_connector,
 };
 use pab_bridge::{
-    BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig,
-    ConnectionPath, MemoryDevicePasswordProvider, RememberedDevice, SqliteDevicePasswordProvider,
+    BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, ConnectionPath,
+    MemoryDevicePasswordProvider, RememberedDevice, SqliteDevicePasswordProvider,
 };
 use pab_protocol::{DeviceCode, EndpointKey, OutputStream, RequestId, TaskId, TaskRef};
 use serde::Serialize;
@@ -150,11 +150,14 @@ pub async fn operator_connection_paths(
     let runtime = state.runtime().await?;
     let mut paths = Vec::with_capacity(remembered.len());
     for device in remembered {
-        let path = runtime.connection_path(device.device_ref).await.map(|path| match path {
-            ConnectionPath::Direct => "p2p",
-            ConnectionPath::Relay => "relay",
-            ConnectionPath::Unknown => "unknown",
-        });
+        let path = runtime
+            .connection_path(device.device_ref)
+            .await
+            .map(|path| match path {
+                ConnectionPath::Direct => "p2p",
+                ConnectionPath::Relay => "relay",
+                ConnectionPath::Unknown => "unknown",
+            });
         paths.push(DeviceConnectionPath {
             device_code: device.code.to_string(),
             path,
@@ -189,7 +192,10 @@ pub async fn operator_saved_device_presence(
             .and_then(Result::ok);
             SavedDevicePresence {
                 device_code: device.code.to_string(),
-                name: presence.as_ref().map(|value| value.name.clone()).unwrap_or_default(),
+                name: presence
+                    .as_ref()
+                    .map(|value| value.name.clone())
+                    .unwrap_or_default(),
                 online: presence.map(|value| value.online),
             }
         });
@@ -240,10 +246,6 @@ pub async fn operator_login_account(
     }
     let control_url = std::env::var("PAB_CONTROL_URL")
         .map_err(|_| "PAB_CONTROL_URL is not configured".to_owned())?;
-    let deployment_id = std::env::var("PAB_DEPLOYMENT_ID")
-        .map_err(|_| "PAB_DEPLOYMENT_ID is not configured".to_owned())?
-        .parse()
-        .map_err(|_| "invalid deployment ID".to_owned())?;
     let ca = std::env::var_os("PAB_CONTROL_CA_CERT")
         .map(std::fs::read)
         .transpose()
@@ -261,7 +263,6 @@ pub async fn operator_login_account(
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
     let registration = register_account_traffic_scope(
         &control_url,
-        deployment_id,
         username.trim().to_owned(),
         Zeroizing::new(password),
         options.default_tenant_id,
@@ -702,7 +703,13 @@ pub async fn operator_task(
             pab_protocol::OperatorRef::Account { endpoint_key, .. } => endpoint_key,
             pab_protocol::OperatorRef::Guest { guest_endpoint_key } => guest_endpoint_key,
         };
-        state.runtimes.lock().await.endpoints.get(endpoint_key).cloned()
+        state
+            .runtimes
+            .lock()
+            .await
+            .endpoints
+            .get(endpoint_key)
+            .cloned()
     };
     if let Some(runtime) = runtime {
         runtime

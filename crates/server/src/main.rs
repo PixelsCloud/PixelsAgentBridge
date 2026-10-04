@@ -1,6 +1,6 @@
 use std::{env, fs, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
 
-use pab_protocol::{DeploymentId, RelayLimitDefaults, TenantId, UserId};
+use pab_protocol::{RelayLimitDefaults, TenantId, UserId};
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth, TeamRole, serve_tls,
@@ -50,14 +50,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         "init" => {
             store.migrate().await?;
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
-            let requested_id = match env::var("PAB_DEPLOYMENT_ID") {
-                Ok(value) => value.parse::<DeploymentId>()?,
-                Err(env::VarError::NotPresent) => DeploymentId::default(),
-                Err(error) => return Err(error.into()),
-            };
-            let deployment_id = control_plane
-                .initialize_deployment(
-                    requested_id,
+            control_plane
+                .initialize_settings(
                     RelayLimitDefaults {
                         team_mbps: 20,
                         member_mbps: 4,
@@ -65,7 +59,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 )
                 .await?;
-            println!("PostgreSQL initialized for deployment {deployment_id}");
+            println!("PostgreSQL initialized");
         }
         "account-id" => {
             let [username] = arguments.as_slice() else {
@@ -181,7 +175,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         "serve" => {
             store.migrate().await?;
-            let deployment_id = store.deployment_id().await?;
+            let initialized: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM server_settings WHERE singleton)",
+            )
+            .fetch_one(store.pool())
+            .await?;
+            if !initialized {
+                return Err("server settings are not initialized; run pab-server init".into());
+            }
             let maintenance_store = store.clone();
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
             let address = env::var("PAB_LISTEN_ADDR")
@@ -197,7 +198,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let presence_control = control_plane.clone();
             let state = ControlApiState::new(
                 control_plane,
-                deployment_id,
                 ControlApiConfig {
                     registration_enabled,
                     ..ControlApiConfig::default()

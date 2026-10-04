@@ -11,7 +11,7 @@ the profiles so test and release packages cannot silently replace one another.
 The Windows ZIP includes `INSTALL-WINDOWS.txt` with the PowerShell installation
 steps. To make a single EXE installer for another Windows computer, copy NSIS
 3.12 into `tools/nsis` and run
-`python packaging/desktop/build_nsis.py --deployment-id <deployment-uuid>`
+`python packaging/desktop/build_nsis.py`
 after building the complete Windows Debug ZIP. The NSIS builder checks the ZIP
 checksum and every Debug binary before embedding them. The resulting
 `.build/packages/pixels-agent-bridge-windows-x86_64-debug-setup.exe` has the CN
@@ -54,7 +54,7 @@ Disabling removes only the Pixels MCP entry. Other Codex MCP entries are left
 untouched. On Linux and macOS, register the installed `run-mcp.sh` manually so
 the same deployment settings used by the desktop are loaded before MCP starts.
 
-Run `install.ps1` from an elevated PowerShell window with the deployment ID,
+Run `install.ps1` from an elevated PowerShell window with the
 WSS control URL, and HTTPS Relay URL. Installation starts the Executor as a
 LocalSystem Windows service and installs `run-app.ps1` as the single interface
 entry point. Windows policy `SoftwareSASGeneration` must allow services (value
@@ -93,7 +93,7 @@ On a Windows host with limited C: space, use
 downloads and compilation output in `.build` on the workspace drive and creates
 the Debug tarball. Pass `-Profile release` only for a release build.
 The archive includes the same Tauri app and background components.
-Run `install.sh` as root with the same three connection settings, then launch
+Run `install.sh` as root with the control URL and Relay URL, then launch
 `run-app.sh` as the interactive user. The old browser UI is absent from both
 platforms. On Linux, installation registers a hidden XDG autostart entry for
 the session helper. It captures the desktop in the logged-in graphical session;

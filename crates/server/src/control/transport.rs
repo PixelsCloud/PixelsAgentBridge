@@ -85,8 +85,7 @@ async fn relay_control_upgrade(
 
 async fn run_socket(socket: WebSocket, state: ControlApiState) {
     let (mut sender, mut receiver) = socket.split();
-    let mut session =
-        ControlSession::new((*state.control).clone(), state.deployment_id, state.config);
+    let mut session = ControlSession::new((*state.control).clone(), state.config);
 
     loop {
         let idle_timeout = if session.is_authenticated() {

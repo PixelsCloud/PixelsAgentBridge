@@ -4,7 +4,7 @@ use pab_agent_core::{
     register_open_endpoint, tls_connector,
 };
 use pab_protocol::{
-    DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello, DeviceRef, EndpointProofPrincipal,
+    DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceRef, EndpointProofPrincipal,
     EndpointRegistrationResult,
 };
 use serde_json::{Value, json};
@@ -19,20 +19,18 @@ fn emit(value: Value) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let [url, ca_path, deployment, name] = arguments.as_slice() else {
-        return Err("url ca deployment name required".into());
+    let [url, ca_path, name] = arguments.as_slice() else {
+        return Err("url ca name required".into());
     };
     let parsed = url::Url::parse(url)?;
     if parsed.scheme() != "wss" || !matches!(parsed.host_str(), Some("localhost" | "127.0.0.1")) {
         return Err("fixture requires loopback WSS".into());
     }
-    let deployment_id = deployment.parse::<DeploymentId>()?;
     let ca = std::fs::read(ca_path)?;
     let connector = tls_connector(Some(&ca))?;
     let secret = iroh_base::SecretKey::generate();
     let registered = register_open_endpoint(
         url,
-        deployment_id,
         &secret,
         OpenRegistrationKind::Device { name: name.clone() },
         connector.clone(),
@@ -50,7 +48,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let config = EndpointControlConfig {
         url: url.clone(),
-        deployment_id,
         tenant_id,
         principal: EndpointProofPrincipal::Device { device_id },
         operation_timeout: Duration::from_secs(10),
@@ -61,7 +58,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hello = DeviceHello {
         schema_version: DEVICE_SESSION_SCHEMA_VERSION,
         device_ref: DeviceRef {
-            deployment_id,
             tenant_id,
             device_id,
         },

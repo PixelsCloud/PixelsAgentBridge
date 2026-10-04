@@ -340,7 +340,7 @@ impl BridgeRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pab_protocol::{DeploymentId, DeviceId, FileSystemAction, TenantId, TextEncoding};
+    use pab_protocol::{DeviceId, FileSystemAction, TenantId, TextEncoding};
 
     #[tokio::test]
     async fn bulk_destination_partial_summary_and_owner_survive_history_projection() {
@@ -351,7 +351,6 @@ mod tests {
             .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -436,7 +435,6 @@ mod tests {
                 .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -531,7 +529,6 @@ mod tests {
             .unwrap();
         store.start_session("owner").await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -585,7 +582,6 @@ mod tests {
         store.start_session("first").await.unwrap();
         store.start_session("second").await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };
@@ -690,7 +686,6 @@ mod tests {
                 .unwrap();
         let store = RuntimeStore::open(&path).await.unwrap();
         let device = DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         };

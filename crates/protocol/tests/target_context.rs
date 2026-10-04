@@ -1,6 +1,6 @@
 use pab_protocol::{
-    ContextFreshness, CpuArchitecture, DeploymentId, DeviceId, DeviceRef, ExecutionContext,
-    ExecutionScope, ExpectedEnvironment, InterpreterContext, OsFamily, PathStyle, TargetContext,
+    ContextFreshness, CpuArchitecture, DeviceId, DeviceRef, ExecutionContext, ExecutionScope,
+    ExpectedEnvironment, InterpreterContext, OsFamily, PathStyle, TargetContext,
     TargetContextSource, TenantId,
 };
 
@@ -8,7 +8,6 @@ use pab_protocol::{
 fn compact_reminder_keeps_target_os_shell_and_revision_visible() {
     let context = TargetContext {
         device_ref: DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },
@@ -65,7 +64,6 @@ fn expected_environment_requires_both_os_and_revision() {
 
     let context = TargetContext {
         device_ref: DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },

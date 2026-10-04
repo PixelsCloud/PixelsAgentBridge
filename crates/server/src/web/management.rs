@@ -146,7 +146,7 @@ pub(crate) async fn update_account(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("UPDATE deployments SET policy_revision=policy_revision+1 WHERE singleton")
+    sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
         .execute(&mut *tx)
         .await?;
     sqlx::query(
@@ -169,7 +169,7 @@ pub(crate) async fn teams(
     let me = viewer(&state, &headers).await?;
     paged(&state,&me,query,r#"SELECT jsonb_build_object('id',t.tenant_id,'name',t.name,'total_mbps',COALESCE(t.relay_total_mbps,d.default_team_mbps),'member_mbps',COALESCE(t.relay_member_mbps,d.default_member_mbps),'role',m.role,'member_count',(SELECT count(*) FROM memberships x WHERE x.tenant_id=t.tenant_id AND x.status='active'))::text payload
       FROM teams t JOIN tenants scope ON scope.id=t.tenant_id AND scope.status='active'
-      CROSS JOIN deployments d LEFT JOIN memberships m ON m.tenant_id=t.tenant_id AND m.user_id=$2 AND m.status='active'
+      CROSS JOIN server_settings d LEFT JOIN memberships m ON m.tenant_id=t.tenant_id AND m.user_id=$2 AND m.status='active'
       WHERE ($1 OR m.user_id IS NOT NULL) AND position(lower($3) in lower(t.name))>0 ORDER BY lower(t.name),t.tenant_id"#).await
 }
 
@@ -319,7 +319,7 @@ pub(crate) async fn service_config(
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     administrator(&state, &headers).await?;
-    let row = sqlx::query("SELECT default_team_mbps,default_member_mbps,default_personal_mbps,policy_revision FROM deployments WHERE singleton").fetch_one(state.control.store().pool()).await?;
+    let row = sqlx::query("SELECT default_team_mbps,default_member_mbps,default_personal_mbps,policy_revision FROM server_settings WHERE singleton").fetch_one(state.control.store().pool()).await?;
     Ok(Json(
         json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"default_team_mbps":row.try_get::<i32,_>("default_team_mbps")?,"default_member_mbps":row.try_get::<i32,_>("default_member_mbps")?,"default_personal_mbps":row.try_get::<i32,_>("default_personal_mbps")?,"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_hours":12}),
     ))

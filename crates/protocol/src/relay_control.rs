@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{DeploymentId, RelayPolicySnapshot, RequestId};
+use crate::{RelayPolicySnapshot, RequestId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlClientMessage {
     GetPolicy {
         request_id: RequestId,
-        deployment_id: DeploymentId,
         known_policy_version: Option<u64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         node_id: Option<String>,
@@ -33,7 +32,6 @@ pub enum RelayControlServerMessage {
     },
     PolicyUnchanged {
         request_id: RequestId,
-        deployment_id: DeploymentId,
         policy_version: u64,
         expires_at_unix_ms: i64,
     },
@@ -48,7 +46,6 @@ pub enum RelayControlServerMessage {
 #[serde(rename_all = "snake_case")]
 pub enum RelayControlErrorCode {
     InvalidMessage,
-    InvalidDeployment,
     InvalidPolicyVersion,
     Internal,
 }

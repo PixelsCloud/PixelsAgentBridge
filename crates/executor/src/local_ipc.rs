@@ -1538,7 +1538,6 @@ mod tests {
         crate::device_access::save(
             &root.join("executor.sqlite3"),
             &crate::device_access::DeviceAccess {
-                deployment_id: "deployment".to_owned(),
                 tenant_id: "tenant".to_owned(),
                 device_id: "device-id".to_owned(),
                 device_code: "123456789".to_owned(),

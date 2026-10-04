@@ -342,7 +342,6 @@ impl BridgeRuntime {
         let inner = Arc::new(RuntimeInner {
             presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
                 session_id: session_id.clone(),
-                deployment_id: bridge_config.deployment_id.to_string(),
                 tenant_id: bridge_config.tenant_id.to_string(),
                 identity: initiated_by.clone(),
                 control_url: bridge_config.control_url.to_string(),

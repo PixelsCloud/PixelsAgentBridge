@@ -1,7 +1,7 @@
 //! Real stdio subprocess regression, using the MCP SDK and isolated storage.
 //! This is transport testing, not a replacement for installed-host acceptance.
 use pab_bridge::BridgeLocalStore;
-use pab_protocol::{DeploymentId, DeviceId, DeviceRef, RequestId, TenantId};
+use pab_protocol::{DeviceId, DeviceRef, RequestId, TenantId};
 use rmcp::{
     RoleClient, ServiceExt,
     model::{CallToolRequestParams, CallToolResult},
@@ -18,7 +18,6 @@ async fn start(root: &Path, database: &Path, port: u16) -> (Client, tokio::proce
         .env("PAB_BRIDGE_DATABASE", database)
         .env("PAB_MCP_GUEST", "1")
         .env("PAB_CONTROL_URL", format!("wss://127.0.0.1:{port}"))
-        .env("PAB_DEPLOYMENT_ID", DeploymentId::from_u128(1).to_string())
         .env("PAB_RELAY_URLS", "https://127.0.0.1:1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -75,7 +74,6 @@ async fn offline_submission_query_cancel_dedup_and_two_sessions_use_real_stdio()
     .await
     .unwrap();
     let device = DeviceRef {
-        deployment_id: DeploymentId::from_u128(1),
         tenant_id: TenantId::from_u128(2),
         device_id: DeviceId::from_u128(3),
     };

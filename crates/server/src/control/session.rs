@@ -1,9 +1,9 @@
 use std::{collections::HashSet, time::Duration};
 
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeploymentId, EndpointAuthenticationResult,
-    EndpointKey, EndpointProofPrincipal, EndpointProofPurpose, EndpointRegistration,
-    EndpointRegistrationResult, RequestId,
+    ControlClientMessage, ControlServerMessage, EndpointAuthenticationResult, EndpointKey,
+    EndpointProofPrincipal, EndpointProofPurpose, EndpointRegistration, EndpointRegistrationResult,
+    RequestId,
 };
 use time::OffsetDateTime;
 
@@ -34,7 +34,6 @@ enum PendingProof {
 
 pub struct ControlSession {
     control: ControlPlane,
-    deployment_id: DeploymentId,
     config: ControlApiConfig,
     proof_session: EndpointProofSession,
     account: Option<Account>,
@@ -46,16 +45,11 @@ pub struct ControlSession {
 }
 
 impl ControlSession {
-    pub fn new(
-        control: ControlPlane,
-        deployment_id: DeploymentId,
-        config: ControlApiConfig,
-    ) -> Self {
+    pub fn new(control: ControlPlane, config: ControlApiConfig) -> Self {
         Self {
             control,
-            deployment_id,
             config,
-            proof_session: EndpointProofSession::new(deployment_id),
+            proof_session: EndpointProofSession::new(),
             account: None,
             endpoint: None,
             pending_proof: None,
@@ -453,9 +447,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
-        if hello.device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         self.control
             .publish_device_hello(endpoint, hello)
             .await
@@ -470,9 +461,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
-        if update.device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         self.control
             .publish_device_network(endpoint, update)
             .await
@@ -487,9 +475,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
-        if device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         if !self.device_network_lookups.contains(&device_ref)
             && self.device_network_lookups.len() >= 20
         {
@@ -512,7 +497,7 @@ impl ControlSession {
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
         self.control
-            .resolve_device_code(endpoint, device_code, self.deployment_id)
+            .resolve_device_code(endpoint, device_code)
             .await
             .map_err(Into::into)
     }
@@ -551,7 +536,7 @@ impl ControlSession {
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
         self.control
-            .list_my_devices(endpoint, self.deployment_id)
+            .list_my_devices(endpoint)
             .await
             .map_err(Into::into)
     }
@@ -569,7 +554,6 @@ impl ControlSession {
             .await
             .map_err(Into::into)
     }
-
 }
 
 impl Drop for ControlSession {

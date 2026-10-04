@@ -4,8 +4,8 @@ use std::{
 };
 
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TenantId,
-    TrafficScope, mbps_to_bytes_per_second,
+    DeviceId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TenantId, TrafficScope,
+    mbps_to_bytes_per_second,
 };
 use thiserror::Error;
 
@@ -13,7 +13,6 @@ use crate::{Acquire, AggregateLimiter, LimitKey, Rate};
 
 #[derive(Debug)]
 pub struct RelayPolicyState {
-    deployment_id: DeploymentId,
     burst: Duration,
     policy_version: Option<u64>,
     expires_at_unix_ms: i64,
@@ -23,12 +22,11 @@ pub struct RelayPolicyState {
 }
 
 impl RelayPolicyState {
-    pub fn new(deployment_id: DeploymentId, burst: Duration) -> Result<Self, PolicyStateError> {
+    pub fn new(burst: Duration) -> Result<Self, PolicyStateError> {
         if burst.is_zero() {
             return Err(PolicyStateError::ZeroBurst);
         }
         Ok(Self {
-            deployment_id,
             burst,
             policy_version: None,
             expires_at_unix_ms: 0,
@@ -51,9 +49,6 @@ impl RelayPolicyState {
         snapshot
             .validate()
             .map_err(|error| PolicyStateError::InvalidSnapshot(error.to_string()))?;
-        if snapshot.deployment_id != self.deployment_id {
-            return Err(PolicyStateError::WrongDeployment);
-        }
         if snapshot.issued_at_unix_ms > now_unix_ms || snapshot.expires_at_unix_ms <= now_unix_ms {
             return Err(PolicyStateError::SnapshotNotCurrent);
         }
@@ -129,14 +124,10 @@ impl RelayPolicyState {
 
     pub fn refresh_expiry(
         &mut self,
-        deployment_id: DeploymentId,
         policy_version: u64,
         expires_at_unix_ms: i64,
         now_unix_ms: i64,
     ) -> Result<(), PolicyStateError> {
-        if deployment_id != self.deployment_id {
-            return Err(PolicyStateError::WrongDeployment);
-        }
         if self.policy_version != Some(policy_version) {
             return Err(PolicyStateError::UnexpectedPolicyVersion);
         }
@@ -221,8 +212,6 @@ pub enum PolicyStateError {
     ZeroBurst,
     #[error("Relay policy snapshot is invalid: {0}")]
     InvalidSnapshot(String),
-    #[error("Relay policy belongs to a different deployment")]
-    WrongDeployment,
     #[error("Relay policy is not valid at the current time")]
     SnapshotNotCurrent,
     #[error("Relay policy version is not newer than the applied version")]

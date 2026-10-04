@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-export type DeviceRef = { deployment_id: string; tenant_id: string; device_id: string };
+export type DeviceRef = { tenant_id: string; device_id: string };
 export type ToolCall = {
   id: string; tool: string; startedAtUnixMs: number; finishedAtUnixMs: number | null;
   deviceCode: string | null; deviceRef: DeviceRef | null; taskId: string | null; succeeded: boolean | null;

@@ -80,7 +80,6 @@ pub struct OperationReport {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeReport {
     pub session_id: String,
-    pub deployment_id: String,
     pub tenant_id: String,
     pub identity: String,
     pub control_url: String,

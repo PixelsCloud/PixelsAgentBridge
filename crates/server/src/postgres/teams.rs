@@ -7,9 +7,9 @@ impl PostgresStore {
         personal_tenant_id: TenantId,
     ) -> Result<pab_protocol::TrafficScopeOptions, StoreError> {
         let account_scope = sqlx::query(
-            "SELECT deployment.default_personal_mbps, account.default_traffic_team_id \
-             FROM deployments deployment CROSS JOIN users account \
-             WHERE deployment.singleton = true AND account.id = $1",
+            "SELECT settings.default_personal_mbps, account.default_traffic_team_id \
+             FROM server_settings settings CROSS JOIN users account \
+             WHERE settings.singleton = true AND account.id = $1",
         )
         .bind(user_id.as_uuid())
         .fetch_one(&self.pool)
@@ -19,13 +19,13 @@ impl PostgresStore {
         let rows = sqlx::query(
             r#"
             SELECT team.tenant_id, team.name,
-                   COALESCE(team.relay_total_mbps, deployment.default_team_mbps) AS total_mbps,
-                   COALESCE(team.relay_member_mbps, deployment.default_member_mbps) AS member_mbps
+                   COALESCE(team.relay_total_mbps, settings.default_team_mbps) AS total_mbps,
+                   COALESCE(team.relay_member_mbps, settings.default_member_mbps) AS member_mbps
             FROM memberships member
             JOIN teams team ON team.tenant_id = member.tenant_id
             JOIN tenants tenant ON tenant.id = team.tenant_id AND tenant.status = 'active'
             JOIN users account ON account.id = member.user_id AND account.status = 'active'
-            JOIN deployments deployment ON deployment.singleton = true
+            JOIN server_settings settings ON settings.singleton = true
             WHERE member.user_id = $1 AND member.status = 'active'
             ORDER BY team.name, team.tenant_id
             "#,
@@ -334,15 +334,15 @@ impl PostgresStore {
         let mut tx = self.pool.begin().await?;
         let row = sqlx::query(
             r#"
-            SELECT COALESCE(team.relay_total_mbps, deployment.default_team_mbps) AS total_mbps,
-                   COALESCE(team.relay_member_mbps, deployment.default_member_mbps) AS member_mbps,
+            SELECT COALESCE(team.relay_total_mbps, settings.default_team_mbps) AS total_mbps,
+                   COALESCE(team.relay_member_mbps, settings.default_member_mbps) AS member_mbps,
                    owner.user_id AS owner_user_id
             FROM teams team
             JOIN tenants tenant ON tenant.id = team.tenant_id AND tenant.status = 'active'
             JOIN memberships owner
               ON owner.tenant_id = team.tenant_id
              AND owner.role = 'owner' AND owner.status = 'active'
-            JOIN deployments deployment ON deployment.singleton = true
+            JOIN server_settings settings ON settings.singleton = true
             WHERE team.tenant_id = $1
             FOR UPDATE OF team
             "#,

@@ -3,9 +3,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{DeploymentId, DeviceId, EndpointKey, TenantId, UserId};
-
-pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 3;
+use crate::{DeviceId, EndpointKey, TenantId, UserId};
+pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -110,7 +109,6 @@ pub struct RelayEndpointPolicy {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RelayPolicySnapshot {
     pub schema_version: u16,
-    pub deployment_id: DeploymentId,
     pub policy_version: u64,
     pub issued_at_unix_ms: i64,
     pub expires_at_unix_ms: i64,
@@ -226,7 +224,6 @@ mod tests {
         };
         let snapshot = RelayPolicySnapshot {
             schema_version: RELAY_POLICY_SCHEMA_VERSION,
-            deployment_id: DeploymentId::new(),
             policy_version: 1,
             issued_at_unix_ms: 10,
             expires_at_unix_ms: 20,

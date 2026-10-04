@@ -61,7 +61,6 @@ impl BridgeClient {
         let control = EndpointControlSupervisor::new(
             EndpointControlConfig {
                 url: config.control_url.clone(),
-                deployment_id: config.deployment_id,
                 tenant_id: config.tenant_id,
                 principal: config.identity.principal(),
                 operation_timeout: config.operation_timeout,
@@ -135,9 +134,6 @@ impl BridgeConnector {
         code: pab_protocol::DeviceCode,
     ) -> Result<DeviceRef, BridgeError> {
         let device_ref = self.network_resolver.resolve_code(code).await?;
-        if device_ref.deployment_id != self.config.deployment_id {
-            return Err(BridgeError::DeviceIdentityMismatch);
-        }
         Ok(device_ref)
     }
 
@@ -146,9 +142,6 @@ impl BridgeConnector {
         device_ref: DeviceRef,
         password: Zeroizing<String>,
     ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
-        if device_ref.deployment_id != self.config.deployment_id {
-            return Err(BridgeError::DeviceIdentityMismatch);
-        }
         if password.is_empty() || password.len() > MAX_DEVICE_PASSWORD_BYTES {
             return Err(BridgeError::InvalidDevicePassword);
         }
@@ -616,8 +609,6 @@ pub enum BridgeError {
     Connection(#[from] PabConnectionError),
     #[error("the endpoint control supervisor task failed: {0}")]
     SupervisorTask(#[from] tokio::task::JoinError),
-    #[error("the requested device does not belong to this Bridge deployment and tenant")]
-    DeviceIdentityMismatch,
     #[error("the device password must contain between 1 and {MAX_DEVICE_PASSWORD_BYTES} bytes")]
     InvalidDevicePassword,
     #[error("the device rejected authentication")]
