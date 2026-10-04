@@ -48,6 +48,8 @@ pub(super) fn inspect(path: &Path, allow_missing: bool) -> Result<Option<Metadat
             Err(e) if allow_missing && e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(error("inspect_path", e)),
         };
+        #[cfg(target_os = "macos")]
+        let meta = base::macos_system_alias(&current, &meta).unwrap_or(meta);
         if base::is_link(&meta) {
             return Err(FileError::new(
                 "link_not_supported",

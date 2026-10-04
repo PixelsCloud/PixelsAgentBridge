@@ -8,7 +8,15 @@ mod native;
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 mod native;
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+#[path = "macos/mod.rs"]
+mod native;
+#[cfg(target_os = "macos")]
+pub use native::{
+    accessibility_allowed, active_console, apply_input, release_input, require_screen_capture,
+    screen_capture_allowed,
+};
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 #[path = "unsupported.rs"]
 mod native;
 
@@ -45,6 +53,8 @@ impl DesktopSession {
         options: &ScreenshotOptions,
     ) -> Result<pab_screenshot::EncodedScreenshot, String> {
         options.validate().map_err(str::to_owned)?;
+        #[cfg(target_os = "macos")]
+        native::require_screen_capture()?;
         check_session()?;
         let reference = options
             .window_ref
@@ -70,7 +80,7 @@ impl DesktopSession {
             return Err("invalid display scaling".into());
         }
         // xcap may allocate DPI-scaled pixels before returning; a conservative preflight.
-        let factor = if cfg!(windows) {
+        let factor = if cfg!(any(windows, target_os = "macos")) {
             f64::from(scale.max(1.0))
         } else {
             1.0
@@ -248,6 +258,8 @@ impl DesktopSession {
                 }
             }
             DesktopQuery::Windows {} => {
+                #[cfg(target_os = "macos")]
+                native::require_screen_capture()?;
                 self.prune();
                 let windows = xcap::Window::all().map_err(|e| e.to_string())?;
                 for w in windows {
@@ -395,6 +407,10 @@ fn short(value: &str, limit: usize) -> String {
     value[..end].to_owned()
 }
 fn check_session() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    if !native::active_console() {
+        return Err("macOS desktop requires the active console user".into());
+    }
     #[cfg(target_os = "linux")]
     if std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_none() {
         return Err("desktop operations require an X11 session; Wayland unsupported".into());

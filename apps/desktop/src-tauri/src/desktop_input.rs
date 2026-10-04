@@ -88,7 +88,21 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::apply;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+pub fn apply(event: DesktopInputEvent) -> Result<(), String> {
+    pab_desktop_control::apply_input(event)
+}
+
+#[cfg(target_os = "macos")]
+pub struct InputGuard;
+#[cfg(target_os = "macos")]
+impl Drop for InputGuard {
+    fn drop(&mut self) {
+        pab_desktop_control::release_input();
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub fn apply(_event: DesktopInputEvent) -> Result<(), String> {
     Err("desktop input is not supported on this platform".to_owned())
 }

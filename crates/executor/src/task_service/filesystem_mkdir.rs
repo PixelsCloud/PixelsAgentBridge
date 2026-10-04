@@ -25,6 +25,8 @@ impl TaskService {
         for part in &parts {
             match fs::symlink_metadata(part).await {
                 Ok(value) => {
+                    #[cfg(target_os = "macos")]
+                    let value = io::macos_system_alias(part, &value).unwrap_or(value);
                     io::no_links(part, false).await?;
                     if !value.is_dir() {
                         return Err(FileError::new(

@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+package_dir=$(cd "$(dirname "$0")" && pwd)
+# Revalidate immediately before mutation (the active user may have logged out).
+/bin/bash "$package_dir/preinstall" "$@"
+source "$package_dir/package.env"
+desktop_user=$(stat -f '%Su' /dev/console)
+# Installer runs as root and does not set SUDO_USER. The active console account,
+# not the account authorizing Installer, owns the per-user local access token.
+export SUDO_USER="$desktop_user"
+exec /bin/bash "$package_dir/payload/install.sh" \
+    "$PAB_DEPLOYMENT_ID" "$PAB_CONTROL_URL" "$PAB_RELAY_URL"

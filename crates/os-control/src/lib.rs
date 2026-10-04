@@ -5,6 +5,8 @@ use std::sync::{LazyLock, Mutex};
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
@@ -40,7 +42,11 @@ pub fn process_identity(pid: u32) -> Result<String, String> {
     {
         linux::identity(pid)
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        macos::identity(pid)
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         let _ = pid;
         Err("unsupported process identity backend".into())
@@ -87,7 +93,17 @@ pub async fn execute(query: &SystemQuery) -> Result<SystemQueryData, String> {
             linux::execute(query).await
         }
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        let query = query.clone();
+        tokio::task::spawn_blocking(move || {
+            let _guard = guard;
+            macos::execute(&query)
+        })
+        .await
+        .map_err(|e| format!("macOS control worker: {e}"))?
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         let _ = guard;
         Err("unsupported service/process control backend".into())

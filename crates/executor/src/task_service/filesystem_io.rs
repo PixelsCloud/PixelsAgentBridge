@@ -123,6 +123,10 @@ pub(super) async fn no_links(path: &Path, missing_final: bool) -> Result<(), Fil
             }
             Err(error) => return Err(io_error("inspect_path", error)),
         };
+        #[cfg(target_os = "macos")]
+        if macos_system_alias(&current, &value).is_some() {
+            continue;
+        }
         if is_link(&value) {
             return Err(FileError::new(
                 "link_not_supported",
@@ -132,6 +136,42 @@ pub(super) async fn no_links(path: &Path, missing_final: bool) -> Result<(), Fil
         }
     }
     Ok(())
+}
+
+// macOS ships these root-owned aliases on its protected system volume. Accept
+// only these exact links and destinations; all user-created links still fail.
+#[cfg(target_os = "macos")]
+pub(super) fn macos_system_alias(path: &Path, metadata: &Metadata) -> Option<Metadata> {
+    use std::os::unix::fs::MetadataExt;
+    let destination = match path.to_str()? {
+        "/var" => "private/var",
+        "/tmp" => "private/tmp",
+        "/etc" => "private/etc",
+        _ => return None,
+    };
+    if !metadata.file_type().is_symlink()
+        || metadata.uid() != 0
+        || std::fs::read_link(path).ok()? != Path::new(destination)
+    {
+        return None;
+    }
+    let target = std::fs::symlink_metadata(Path::new("/").join(destination)).ok()?;
+    (target.is_dir() && target.uid() == 0).then_some(target)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+    #[tokio::test]
+    async fn system_temp_alias_works_but_user_links_are_rejected() {
+        let dir = tempfile::tempdir_in("/tmp").unwrap();
+        let file = dir.path().join("text");
+        std::fs::write(&file, "data").unwrap();
+        no_links(&file, false).await.unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&file, &link).unwrap();
+        assert!(no_links(&link, false).await.is_err());
+    }
 }
 
 pub(super) async fn load(path: &Path) -> Result<(Vec<u8>, Metadata), FileError> {

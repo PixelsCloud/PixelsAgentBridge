@@ -188,6 +188,7 @@ pub struct ScreenshotInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window_ref: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Logical desktop bounds. Also present for scaled macOS monitor captures.
     pub desktop_rect: Option<ScreenshotDesktopRect>,
     pub captured_at_unix_ms: i64,
     pub mode: ScreenshotMode,
@@ -209,8 +210,9 @@ impl ScreenshotInfo {
             return Err("screenshot window identity mismatch");
         }
         match (&self.window_ref, &self.desktop_rect) {
-            (Some(_), Some(rect))
-                if rect.width > 0
+            (window, Some(rect))
+                if (window.is_some() || self.monitor_id.is_some())
+                    && rect.width > 0
                     && rect.height > 0
                     && rect.width <= 65535
                     && rect.height <= 65535

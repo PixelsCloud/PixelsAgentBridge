@@ -8,6 +8,8 @@ pub struct SessionBatch {
 }
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
@@ -24,12 +26,18 @@ pub async fn collect() -> Result<SessionBatch, String> {
             .await
             .map_err(|_| "logind collection timed out".to_string())?
     }
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(target_os = "macos")]
+    {
+        tokio::task::spawn_blocking(macos::collect)
+            .await
+            .map_err(|e| format!("macOS sessions: {e}"))?
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
     {
         Err("unsupported OS session backend".into())
     }
 }
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn bounded(s: &str) -> String {
     s.chars().take(256).collect()
 }

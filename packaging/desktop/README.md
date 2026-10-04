@@ -1,5 +1,59 @@
 # Desktop packages
 
+## macOS
+
+On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.9+, run
+`bash packaging/desktop/build-macos.sh release` from the repository root
+(`debug` is also supported). The native-architecture archive in `.build/packages`
+contains the ad-hoc signed `Pixels Agent Bridge.app`, MCP, Executor, dedicated
+macOS scripts and launchd plists. It is not Developer-ID signed or notarized.
+The adjacent SHA-256 manifest records the complete archive checksum.
+
+Unpack the complete archive and, from a desktop user account, run
+`sudo bash install.sh DEPLOYMENT_UUID WSS_CONTROL_URL HTTPS_RELAY_URL`.
+Open the app from Applications and grant Screen Recording and Accessibility as
+needed. Quit Desktop/MCP clients before upgrading with another complete archive.
+Uninstallation preserves machine and user data. See [MACOS.md](../../MACOS.md)
+for exact paths, permissions, account semantics and verification limitations.
+Windows/Linux use their existing scripts unchanged.
+
+### Double-click macOS installer
+
+`build-macos.sh release aarch64` and `build-macos.sh release x86_64` build
+architecture-specific archives on a Mac (install the corresponding Rust target
+first). To wrap either verified archive in a native Installer `.pkg`, use Python
+3.12+ and the **same deployment UUID used for the Windows installer**:
+
+```sh
+python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64 --deployment-id YOUR_DEPLOYMENT_UUID
+python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64 --deployment-id YOUR_DEPLOYMENT_UUID
+```
+
+The default control/relay addresses match `build_nsis.py`:
+`wss://pab.rgaa.vip/control` and `https://pab-relay.rgaa.vip`. The deployment UUID
+is deliberately required: the Windows builder also receives it externally; it
+is not recoverable from these URLs or stored in the repository.
+
+Each `*-setup.pkg` embeds all binaries and installation scripts, requires admin
+authorization, checks the native CPU architecture, installs only on the running
+system volume, and grants local access to the active desktop user. No Terminal
+commands or deployment inputs are needed on the target Mac. Quit Desktop/MCP
+clients first. Screen Recording and Accessibility still require manual consent.
+The package reuses `macos/install.sh` in a scripts-only component; its receipt is
+not a file inventory. Use the installed `uninstall.sh` to uninstall; existing
+data is retained. Installer failures do not provide automatic rollback.
+
+Pass `--sign 'Developer ID Installer: ...'` to sign the package if that identity
+is available. App signing and notarization are separate; an unsigned package
+is not a notarized public release. The per-architecture `SHA256-macos-*-setup-*.json`
+records the package hash and deployment settings. Building never installs PAB.
+
+Run `python3.13 packaging/desktop/test_macos_pkg.py` for validation tests; set
+`PAB_PKG_TEST_ARCHIVE` to an existing macOS archive to additionally build and
+expand a temporary fixture installer without running its installation scripts.
+
+## Windows and Linux
+
 During development, build Debug binaries and package them with
 `python packaging/desktop/build.py --platform windows --profile debug`.
 From `apps/desktop` on Windows, build the Debug desktop executable with

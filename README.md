@@ -294,9 +294,10 @@ caller caused it; external Docker clients can still change state concurrently.
 Local HTTP-fixture tests, QUIC, stdio and a real Windows named-pipe workflow on
 Docker Desktop's Linux Engine pass. The live test creates and removes its own
 isolated container and verifies Chinese stdout, stderr, start/restart/stop and
-inspection. Installed-host Pixels calls, Linux/macOS Executor runtime and Windows
-containers remain unverified. Upgrade both MCP and Executor and restart the AI
-client to use these source changes; this batch has not been packaged.
+inspection. macOS fixture/protocol tests also pass; a real macOS Docker Engine,
+installed-host Pixels calls, Linux runtime and Windows containers remain unverified.
+Upgrade both MCP and Executor and restart the AI client. For the macOS package,
+see [MACOS.md](MACOS.md).
 
 ### Git operations
 
@@ -351,10 +352,10 @@ published it. No automatic reset, force-push, identity creation or hook bypass i
 performed. Request identity hashes the commit message; Git results may still
 contain commit messages and are retained in task history.
 
-Windows temporary-repository, local bare-remote, cancellation, persistence,
-QUIC and stdio tests pass. Installed-host SSH authentication and Linux/macOS
+Windows and macOS temporary-repository, local bare-remote, cancellation,
+persistence, QUIC and stdio tests pass. Installed-host SSH authentication and Linux
 runtime acceptance remain pending. Rebuild both MCP and Executor and restart the
-AI client to use this batch; existing installers do not contain these changes.
+AI client; macOS package/verification details are in [MACOS.md](MACOS.md).
 
 ### System queries
 
@@ -456,8 +457,9 @@ uses logind on the system bus with a 5-second collection deadline; missing login
 access errors and unsupported platforms fail explicitly. Optional field failures
 are returned in each entry's `errors`. User and state filters match exactly.
 These three tools passed Windows local tests, deterministic local DNS fixtures and
-isolated QUIC; Linux collector cross-compilation passed. Linux/macOS runtime and
-installed-host acceptance remain pending.
+isolated QUIC; Linux collector cross-compilation passed. macOS native collection
+and automated tests also pass; Linux runtime and installed-host acceptance remain
+pending. macOS sessions use utmpx; see [MACOS.md](MACOS.md).
 
 Text tools require an updated target Executor. They support UTF-8 and UTF-16,
 detect BOMs, and reject binary data instead of replacing undecodable bytes.
@@ -497,7 +499,7 @@ For example, read the last 8 KiB and then wait for appended text:
 { "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "follow", "cursor": "previous result.log.cursor", "wait_ms": 5000 }
 ```
 
-Enhanced options require updated MCP and filesystem-v4 Executor installations; older peers reject them before execution rather than ignoring them. Basic requests retain their legacy wire format and deduplication fingerprints. Windows local automation and isolated QUIC tests passed; installed-host and native Linux/macOS acceptance remain pending.
+Enhanced options require updated MCP and filesystem-v4 Executor installations; older peers reject them before execution rather than ignoring them. Basic requests retain their legacy wire format and deduplication fingerprints. Windows/macOS local automation and isolated QUIC tests passed; installed-host and native Linux acceptance remain pending.
 
 `pab_file_hash` returns an `operation_ref` after remote acceptance and streams
 256 KiB chunks without loading the whole file. Query `pab_get_operation` for
@@ -559,8 +561,10 @@ use the Windows official bindings or [x11rb](https://github.com/psychon/x11rb)
 with standard EWMH messages. These tools require Executor system capability v4
 and an upgraded, active desktop helper. Windows and Linux/X11 adapters are
 implemented; Linux graphical runtime acceptance is pending. Wayland is rejected
-explicitly. macOS enumeration is available through xcap, but control/input are
-currently unsupported and unverified on a Mac.
+explicitly. macOS uses public Accessibility APIs for window control and Enigo
+for input; Screen Recording/Accessibility permission is required. Native builds
+and automated tests pass; actual graphical acceptance is pending permission.
+See [macOS implementation, installation and verification](MACOS.md).
 
 Call `pab_list_windows`, take the returned `window_ref`, then focus or control
 that reference. Call `pab_focus_window` before `pab_type_text`. Window lists contain
@@ -838,7 +842,7 @@ stdio stream. Automatic host recovery remains under investigation.
 | Windows screenshots and desktop input | Signed-in desktop verified; signed-out screenshots and secure attention also exercised |
 | Linux commands and files | Verified on real remote Linux machines |
 | Linux graphical desktop | Components implemented; graphical-machine validation remains; input requires X11 |
-| macOS | Installation templates and platform code exist; no complete real-machine validation yet |
+| macOS | Native app/launchd package and backends implemented; ARM automated tests and Intel compilation pass; graphical and deployed-host acceptance remain limited by permissions/environment. See [MACOS.md](MACOS.md) |
 | Codex | One-click registration and actual tool calls verified |
 | Other MCP hosts | Manual stdio entry point available; host-specific validation remains |
 

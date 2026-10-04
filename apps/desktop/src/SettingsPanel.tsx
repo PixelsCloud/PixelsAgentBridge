@@ -5,6 +5,7 @@ import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "luci
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
+import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 
 type ServerSettings = {
   deploymentId: string;
@@ -112,6 +113,7 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
             { value: "zh-TW", label: "繁體中文" },
             { value: "en", label: "English" },
           ]} />
+        <MacosPermissionsPanel language={language} />
       </div>}
 
       {section === "ai" && <div className="settings-ai">

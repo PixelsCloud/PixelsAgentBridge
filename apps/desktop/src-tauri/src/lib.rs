@@ -7,6 +7,17 @@ use tokio::sync::RwLock;
 
 mod agent_integrations;
 mod desktop_input;
+mod macos_permissions;
+#[cfg(target_os = "macos")]
+pub fn macos_diagnostics() -> serde_json::Value {
+    serde_json::json!({
+        "platform": "macos", "architecture": std::env::consts::ARCH,
+        "activeConsole": pab_desktop_control::active_console(),
+        "permissions": macos_permissions::macos_permissions(),
+        "monitors": xcap::Monitor::all().map(|v| v.len()).map_err(|e| e.to_string()),
+        "localAccessConfigured": pab_executor::local_ipc::user_token_path().is_ok_and(|p| p.is_file()),
+    })
+}
 mod mcp_reporting;
 mod mcp_tool_settings;
 mod operator;
@@ -56,7 +67,9 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
     loop {
         match pab_executor::local_ipc::connect_local().await {
             Ok(mut socket) => {
-                #[cfg(windows)]
+                #[cfg(target_os = "macos")]
+                let _input_guard = desktop_input::InputGuard;
+                #[cfg(any(windows, target_os = "macos"))]
                 if !session_helper::desktop_is_active(Some("Default")) {
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     continue;
@@ -69,7 +82,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                 }
                 let mut desktop_session = pab_desktop_control::DesktopSession::new();
                 loop {
-                    #[cfg(windows)]
+                    #[cfg(any(windows, target_os = "macos"))]
                     if !session_helper::desktop_is_active(Some("Default")) {
                         break;
                     }
@@ -89,7 +102,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             let _ = handle.emit("local-device-offline", ());
                         }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopQuery(id, query))) => {
-                            let mut reply = if !cfg!(windows)
+                            let mut reply = if !cfg!(any(windows, target_os = "macos"))
                                 || session_helper::desktop_is_active(Some("Default"))
                             {
                                 desktop_session.query(id, &query)
@@ -104,7 +117,8 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                                 reply.error = Some("interactive desktop changed".into());
                                 reply
                             };
-                            if cfg!(windows) && !session_helper::desktop_is_active(Some("Default"))
+                            if cfg!(any(windows, target_os = "macos"))
+                                && !session_helper::desktop_is_active(Some("Default"))
                             {
                                 reply.state = "unconfirmed".into();
                                 reply.error =
@@ -151,7 +165,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::CaptureScreenshotV2(
                             options,
                         ))) => {
-                            let result = if !cfg!(windows)
+                            let result = if !cfg!(any(windows, target_os = "macos"))
                                 || session_helper::desktop_is_active(Some("Default"))
                             {
                                 if options.window_ref.is_some() {
@@ -164,7 +178,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             };
                             let reply = match result {
                                 Ok(image)
-                                    if !cfg!(windows)
+                                    if !cfg!(any(windows, target_os = "macos"))
                                         || session_helper::desktop_is_active(Some("Default")) =>
                                 {
                                     pab_executor::local_ipc::reply_screenshot_v2(
@@ -194,7 +208,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             }
                         }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopInput(event))) => {
-                            let result = if cfg!(windows)
+                            let result = if cfg!(any(windows, target_os = "macos"))
                                 && !session_helper::desktop_is_active(Some("Default"))
                             {
                                 Err("interactive desktop changed".to_owned())
@@ -259,6 +273,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            macos_permissions::macos_permissions,
+            macos_permissions::open_macos_permission_settings,
             device_status,
             mcp_reporting::mcp_reporting_status,
             approve_claim,

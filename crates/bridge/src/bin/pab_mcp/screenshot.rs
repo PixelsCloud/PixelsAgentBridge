@@ -153,6 +153,42 @@ mod tests {
         assert!(meta.get("data").is_none());
     }
     #[test]
+    fn retina_monitor_mapping_keeps_pixels_and_logical_coordinates_distinct() {
+        use pab_protocol::*;
+        let mut image = fixture(500);
+        let info = ScreenshotInfo {
+            window_ref: None,
+            desktop_rect: Some(ScreenshotDesktopRect {
+                x: -1280,
+                y: 0,
+                width: 1280,
+                height: 800,
+            }),
+            captured_at_unix_ms: 1,
+            mode: ScreenshotMode::Jpeg,
+            format: ScreenshotFormat::Jpeg,
+            width: 2560,
+            height: 1600,
+            source_width: 2560,
+            source_height: 1600,
+            monitor_id: Some(2),
+            origin_x: -1280,
+            origin_y: 0,
+            quality: Some(85),
+            resized: false,
+        };
+        info.validate(&ScreenshotOptions::default()).unwrap();
+        image.meta.capture = Some(info.clone());
+        let (meta, _) = response(image, false);
+        assert_eq!(meta["preview_to_desktop"]["scale_x"], 0.5);
+        let mut invalid = info;
+        invalid.monitor_id = None;
+        assert!(invalid.validate(&ScreenshotOptions::default()).is_err());
+        invalid.monitor_id = Some(2);
+        invalid.origin_x = 0;
+        assert!(invalid.validate(&ScreenshotOptions::default()).is_err());
+    }
+    #[test]
     fn image_is_present_only_in_image_content_not_json_or_text() {
         let (meta, content) = response(fixture(500), true);
         assert_eq!(meta["image_included"], true);

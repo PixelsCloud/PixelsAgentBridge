@@ -35,6 +35,8 @@ impl TaskService {
                 }
                 let (shell, args): (&str, &[&str]) = if cfg!(target_os = "windows") {
                     ("powershell.exe", &["-NoLogo", "-NoProfile"])
+                } else if cfg!(target_os = "macos") {
+                    ("/bin/zsh", &["-l", "-i"])
                 } else {
                     ("/bin/sh", &["-i"])
                 };

@@ -13,3 +13,6 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus_systemd = { version = "=0.26100.0", default-features = false, features = ["login1", "zbus-async-tokio"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"

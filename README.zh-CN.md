@@ -227,7 +227,7 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 结果分别记录 `submission_started`（进入提交阶段，可能已发送动作）、`daemon_acknowledged` 和 `desired_state_observed`。取消只结束等待，不撤销Docker已接收的动作。超时、断线或重启可能留下 `unconfirmed`，相同ID不重执行；该Engine／容器上未确认的已提交控制会持续阻止另一PAB控制，包括Executor重启后。查询原请求，只读核对原Engine和完整容器ID；目标状态匹配不等于能确定是谁执行的。外部Docker客户端仍可能并发改变状态。
 
-HTTP替身、QUIC、stdio及Windows named pipe连接Docker Desktop Linux Engine的临时容器流程已通过，包含中文stdout、stderr、启动／重启／停止、详情；测试容器已清理。安装后的Pixels工具调用、Linux/macOS Executor运行时及Windows容器尚未验收。本批需更新MCP和Executor、重启AI客户端，尚未制作安装包。
+HTTP替身、QUIC、stdio及Windows named pipe连接Docker Desktop Linux Engine的临时容器流程已通过，包含中文stdout、stderr、启动／重启／停止、详情；测试容器已清理。macOS 替身及协议测试也已通过；真实 macOS Engine、安装后的 Pixels 调用、Linux 运行时及 Windows 容器尚未验收。需更新 MCP 和 Executor、重启 AI 客户端；macOS 安装包见 [MACOS.md](MACOS.md)。
 
 ### Git 操作
 
@@ -252,7 +252,7 @@ Commit 要求明确的相对文件路径和提交说明，支持已跟踪文件�
 
 Push 固定选定的提交 ID，默认 `force=false`；`force=true` 使用刚观测的远端引用作为明确 lease。推送回执丢失后，查询可核对原提交与远端引用，不会重推；引用匹配只证明目标状态已经存在，不归因于某个进程。不自动 reset、强推、创建提交身份或绕过 hooks。请求身份对提交说明做摘要，Git 输出与任务历史仍可能包含提交说明。
 
-Windows 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 测试已通过。安装后的宿主 SSH 认证及 Linux/macOS 运行时验收仍待完成。本批需要重新构建 MCP 与目标 Executor，并重启 AI 客户端；现有安装包不含这些改动。
+Windows/macOS 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 测试已通过。安装后的宿主 SSH 认证及 Linux 运行时验收仍待完成。需要重新构建 MCP 与目标 Executor，并重启 AI 客户端；macOS 安装包及验证范围见 [MACOS.md](MACOS.md)。
 
 ### 系统查询
 
@@ -278,7 +278,7 @@ Windows 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 
 
 DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退公共 DNS、不使用本地解析缓存。默认 A，另支持 AAAA/CNAME/MX/NS/PTR/SOA/SRV/TXT；PTR 可输入 IP 或反向域名，域名使用 ASCII/IDNA。返回名称、类型、TTL 和 DNS 展示文本，长值有 `value_truncated` 标记。查询超时默认 5000 ms，范围 100–10000；读取系统配置属于另行完成的原生 I/O。这是 DNS 查询，不等同于系统原生解析器：不读取 hosts，不处理 mDNS 或 Windows NRPT/VPN 分流策略，上游 DNS 仍可能有缓存。
 
-会话查询列出 OS 会话，不是账户、MCP 会话或 PAB 终端。Windows WTS 可以包含尚无登录用户的服务/监听会话。Linux 通过系统总线访问 logind，采集期限为 5 秒；logind 缺失、访问失败或不支持的平台明确失败，可选字段失败写入每项 `errors`。用户名和状态过滤均为精确匹配。这三个工具已通过 Windows 本地测试、本地 DNS 替身和隔离 QUIC；Linux 采集库交叉编译检查通过。Linux/macOS 运行时和安装后的宿主验收仍待完成。
+会话查询列出 OS 会话，不是账户、MCP 会话或 PAB 终端。Windows WTS 可以包含尚无登录用户的服务/监听会话。Linux 通过系统总线访问 logind，采集期限为 5 秒；logind 缺失、访问失败或不支持的平台明确失败，可选字段失败写入每项 `errors`。用户名和状态过滤均为精确匹配。这三个工具已通过 Windows 本地测试、本地 DNS 替身和隔离 QUIC；Linux 采集库交叉编译检查通过。macOS 原生采集和自动化也已通过，会话使用 utmpx，见 [MACOS.md](MACOS.md)。Linux 运行时和安装后的宿主验收仍待完成。
 
 文本工具要求目标 Executor 也升级。支持 UTF-8、UTF-16 和 BOM 检测，不静默替换
 无法解码的字节。普通按行/按字节读取及修改的文件上限 4 MiB，单次最多返回 16 KiB UTF-8 文本，写入及补丁
@@ -307,7 +307,7 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 { "device_code": "123456789", "path": "C:\\logs\\app.log", "mode": "follow", "cursor": "上次 result.log.cursor", "wait_ms": 5000 }
 ```
 
-这些增强需要新 MCP 和支持文件能力 v4 的 Executor；旧端会在执行前被拒绝，不会忽略新参数。基础参数仍保持旧版线格式及请求去重指纹。Windows 本机自动化和隔离 QUIC 已验证；安装版真实宿主及 Linux/macOS 原生验收仍待完成。
+这些增强需要新 MCP 和支持文件能力 v4 的 Executor；旧端会在执行前被拒绝，不会忽略新参数。基础参数仍保持旧版线格式及请求去重指纹。Windows/macOS 本机自动化和隔离 QUIC 已验证；安装版真实宿主及 Linux 原生验收仍待完成。
 
 `pab_file_hash` 在远端确认接收后返回 `operation_ref`，后台按 256 KiB 分块计算，不全量载入大文件。使用 `pab_get_operation` 查询 `progress.completed_bytes`、`progress.total_bytes` 和最终 `metadata.sha256`；使用 `pab_cancel_operation` 请求停止。只有 `cancelled` 才确认已停止。Executor 同时最多 4 个 Hash 作业，每个最多 30 分钟，单次读取超时为 30 秒。相同 `request_id` 返回原操作，文件后续变化也不会触发重算。观察到大小、修改时间或可用身份变化时明确失败，不宣称提供外部并发写入下的原子快照。MCP 会周期刷新活动记录；离线查询可能返回最后保存的状态，应结合进度时间判断新鲜度。
 
@@ -327,8 +327,9 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 [Enigo](https://github.com/enigo-rs/enigo)，外部窗口操作使用 Windows 官方绑定或
 [x11rb](https://github.com/psychon/x11rb) 的标准 EWMH 消息。这些工具要求 Executor
 系统能力 v4 和新版活动桌面 helper。Windows 与 Linux/X11 适配已实现；Linux 图形环境
-实机验收待补。Wayland 明确返回不支持。macOS 可以通过 xcap 枚举，暂不支持窗口控制和
-文字输入，也尚未在 Mac 上验证。
+实机验收待补。Wayland 明确返回不支持。macOS 已实现公共 Accessibility 窗口控制与
+Enigo 输入，需要屏幕录制/辅助功能授权；原生构建和自动化已通过，真实图形操作因权限
+跳过。完整安装、验证结果和限制见 [macOS 适配文档](MACOS.md)。
 
 先用 `pab_list_windows` 获取 `window_ref`，再对该引用执行操作。输入前先调用
 `pab_focus_window`。窗口列表最多 64 个，显示器最多 32 个，响应最多 32 KiB，超限明确
@@ -563,7 +564,7 @@ Desktop 的连接状态属于自己的 Runtime，可以在“设置 → AI Agent
 | Windows 截图和输入 | 已验证登录后桌面，也验证了未登录截图和安全注意序列 |
 | Linux 命令和文件 | 已完成真实远程 Linux 设备验证 |
 | Linux 图形桌面 | 已有实现组件，仍需图形真机验证；输入需要 X11 |
-| macOS | 已有安装模板及平台代码，尚未完成完整真机验证 |
+| macOS | 原生 app、launchd 安装包和后端已实现；ARM 自动化与 Intel 编译通过，图形及正式部署验收受权限/环境限制，见 [MACOS.md](MACOS.md) |
 | Codex | 已验证一键注册和真实工具调用 |
 | 其他 MCP 宿主 | 可手动接入 stdio，仍需逐宿主验证 |
 

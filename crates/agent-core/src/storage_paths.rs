@@ -126,7 +126,7 @@ fn persistent_data_dir_for_os(
                 })
                 .ok_or(DataPathError::MissingBase("HOME")),
             DataScope::Machine => Ok(PathBuf::from(
-                "/Library/Application Support/PixelsAgentBridge",
+                "/Library/Application Support/PixelsAgentBridgeData",
             )),
         },
         "linux" => match scope {
@@ -224,7 +224,7 @@ mod tests {
         );
         assert_eq!(
             persistent_data_dir_for_os("macos", DataScope::Machine, lookup).unwrap(),
-            PathBuf::from("/Library/Application Support/PixelsAgentBridge")
+            PathBuf::from("/Library/Application Support/PixelsAgentBridgeData")
         );
     }
 

@@ -1,4 +1,9 @@
-#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::{capture, capture_png};
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture_png() -> Result<Vec<u8>, String> {
     use pab_screenshot::image::DynamicImage;
     use xcap::Monitor;
@@ -28,7 +33,7 @@ pub fn capture_png() -> Result<Vec<u8>, String> {
     .map(|image| image.bytes)
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub fn capture(
     options: &pab_protocol::ScreenshotOptions,
 ) -> Result<pab_screenshot::EncodedScreenshot, String> {

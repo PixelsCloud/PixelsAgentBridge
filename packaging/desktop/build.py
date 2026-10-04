@@ -5,6 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import json
+import platform as host_platform
 import tarfile
 import zipfile
 
@@ -12,7 +13,7 @@ import zipfile
 root = Path(__file__).resolve().parents[2]
 scripts = Path(__file__).resolve().parent
 parser = ArgumentParser(description=__doc__)
-parser.add_argument("--platform", choices=("all", "windows", "linux"), default="all")
+parser.add_argument("--platform", choices=("all", "windows", "linux", "macos"), default="all")
 parser.add_argument("--profile", choices=("debug", "release"), default="release")
 parser.add_argument("--windows-bin-dir", type=Path)
 parser.add_argument(
@@ -21,6 +22,9 @@ parser.add_argument(
 )
 parser.add_argument("--linux-bin-dir", type=Path)
 parser.add_argument("--macos-bin-dir", type=Path)
+parser.add_argument("--macos-app", type=Path)
+parser.add_argument("--macos-arch", choices=("aarch64", "x86_64"),
+                    default="aarch64" if host_platform.machine() == "arm64" else "x86_64")
 parser.add_argument("--output-dir", type=Path, default=root / ".build" / "packages")
 args = parser.parse_args()
 args.windows_bin_dir = args.windows_bin_dir or root / "target" / args.profile
@@ -28,6 +32,9 @@ args.windows_desktop_bin = args.windows_desktop_bin or (
     root / "apps" / "desktop" / "src-tauri" / "target" / args.profile / "pab-desktop.exe"
 )
 args.linux_bin_dir = args.linux_bin_dir or root / ".build" / f"guest-desktop-linux-{args.profile}"
+args.macos_app = args.macos_app or (
+    root / "apps/desktop/src-tauri/target" / args.profile / "bundle/macos/Pixels Agent Bridge.app"
+)
 args.output_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -55,18 +62,29 @@ def package_windows():
 def package_unix(platform, architecture, binaries):
     archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-{args.profile}.tar.gz"
     files = [
-        *(binaries / name for name in ("pab-mcp", "pab-executor", "pab-desktop")),
-        *(scripts / "unix" / name for name in (
+        *(binaries / name for name in (
+            ("pab-mcp", "pab-executor") if platform == "macos"
+            else ("pab-mcp", "pab-executor", "pab-desktop")
+        )),
+        *(scripts / ("macos" if platform == "macos" else "unix") / name for name in (
             "install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh"
         )),
     ]
+    if platform == "macos":
+        files.extend(scripts / "macos" / name for name in (
+            "com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist",
+        ))
     for file in files:
         if not file.is_file():
             raise FileNotFoundError(file)
+    if platform == "macos" and not (args.macos_app / "Contents/MacOS/pab-desktop").is_file():
+        raise FileNotFoundError(args.macos_app)
     with tarfile.open(archive_path, "w:gz") as archive:
+        if platform == "macos":
+            archive.add(args.macos_app, arcname="Pixels Agent Bridge.app")
         for file in files:
             info = archive.gettarinfo(str(file), arcname=file.name)
-            info.mode = 0o755
+            info.mode = 0o644 if file.suffix == ".plist" else 0o755
             if file.suffix == ".sh":
                 content = file.read_bytes().replace(b"\r\n", b"\n")
                 info.size = len(content)
@@ -81,8 +99,8 @@ if args.platform in ("all", "windows"):
     package_windows()
 if args.platform in ("all", "linux"):
     package_unix("linux", "x86_64", args.linux_bin_dir)
-if args.platform == "all" and args.macos_bin_dir is not None:
-    package_unix("macos", "aarch64", args.macos_bin_dir)
+if args.platform == "macos" or (args.platform == "all" and args.macos_bin_dir is not None):
+    package_unix("macos", args.macos_arch, args.macos_bin_dir or root / "target" / args.profile)
 
 manifest = {}
 for archive in sorted(args.output_dir.iterdir()):

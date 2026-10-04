@@ -42,6 +42,12 @@ fn settings_path() -> Result<PathBuf, String> {
 
 fn read_saved() -> Result<Option<ServerSettings>, String> {
     let path = settings_path()?;
+    #[cfg(target_os = "macos")]
+    let path = if path.exists() {
+        path
+    } else {
+        PathBuf::from("/Library/Application Support/PixelsAgentBridge/operator-server.json")
+    };
     if !path.exists() {
         return Ok(None);
     }

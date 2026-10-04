@@ -32,6 +32,12 @@ fn mcp_binary() -> Result<PathBuf, String> {
     let binary = directory.join("pab-mcp.exe");
     #[cfg(not(windows))]
     let binary = directory.join("run-mcp.sh");
+    #[cfg(target_os = "macos")]
+    let binary = if !binary.is_file() && directory.ends_with("Contents/MacOS") {
+        PathBuf::from("/Library/Application Support/PixelsAgentBridge/run-mcp.sh")
+    } else {
+        binary
+    };
     Ok(binary)
 }
 
@@ -49,6 +55,14 @@ fn codex_binary() -> Option<PathBuf> {
                     return Some(path);
                 }
             }
+        }
+    }
+    // Finder and launchd do not inherit the interactive shell's Homebrew PATH.
+    #[cfg(target_os = "macos")]
+    for directory in ["/opt/homebrew/bin", "/usr/local/bin"] {
+        let path = PathBuf::from(directory).join("codex");
+        if path.is_file() {
+            return Some(path);
         }
     }
     #[cfg(windows)]

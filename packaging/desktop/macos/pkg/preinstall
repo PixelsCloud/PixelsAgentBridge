@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+package_dir=$(cd "$(dirname "$0")" && pwd)
+source "$package_dir/package.env"
+[[ ${3:-/} == / ]] || { echo 'Install on the running system volume only.' >&2; exit 1; }
+native_arch=x86_64
+if [[ $(sysctl -n hw.optional.arm64 2>/dev/null || true) == 1 ]]; then native_arch=arm64; fi
+[[ $native_arch == "$PAB_PKG_ARCH" ]] || { echo "Use the $native_arch installer for this Mac." >&2; exit 1; }
+desktop_user=$(stat -f '%Su' /dev/console)
+[[ $desktop_user != root && $desktop_user != loginwindow && $desktop_user != _mbsetupuser ]] || {
+    echo 'Sign in to a normal macOS desktop account before installing.' >&2; exit 1;
+}
+[[ $(id -u "$desktop_user") -ge 500 ]] || { echo 'A signed-in desktop user is required.' >&2; exit 1; }
+# Do not stop helpers here: a preflight failure must leave the installation running.
+while IFS= read -r command; do
+    case $command in
+        '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --session-helper') ;;
+        '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop'*|'/Library/Application Support/PixelsAgentBridge/pab-mcp'*)
+            echo 'Quit Pixels Agent Bridge and its MCP clients, then retry installation.' >&2; exit 1 ;;
+    esac
+done < <(ps -axo command=)

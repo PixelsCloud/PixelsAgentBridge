@@ -51,6 +51,8 @@ async fn serve_requests(
     socket: &mut LocalSocket,
     expected_desktop: Option<&str>,
 ) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let _input_guard = desktop_input::InputGuard;
     let mut desktop_session = pab_desktop_control::DesktopSession::new();
     loop {
         if !desktop_is_active(expected_desktop) {
@@ -190,7 +192,12 @@ pub(crate) fn desktop_is_active(expected: Option<&str>) -> bool {
     String::from_utf16_lossy(&name[..length]).eq_ignore_ascii_case(expected)
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub(crate) fn desktop_is_active(_expected: Option<&str>) -> bool {
+    pab_desktop_control::active_console()
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub(crate) fn desktop_is_active(_expected: Option<&str>) -> bool {
     true
 }

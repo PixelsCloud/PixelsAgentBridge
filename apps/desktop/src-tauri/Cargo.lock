@@ -4765,6 +4765,7 @@ name = "pab-desktop-control"
 version = "0.1.0"
 dependencies = [
  "enigo",
+ "pab-os-control",
  "pab-protocol",
  "pab-screenshot",
  "serde_json",
@@ -4823,7 +4824,9 @@ name = "pab-os-control"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "libc",
  "pab-protocol",
+ "plist",
  "rustix 1.1.4",
  "tokio",
  "windows-service",
@@ -4835,6 +4838,7 @@ dependencies = [
 name = "pab-os-sessions"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "pab-protocol",
  "tokio",
  "windows-sys 0.61.2",
