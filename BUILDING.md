@@ -54,3 +54,5 @@ python -m unittest discover -s scripts -p test_build_version.py -v
 覆盖首次编译、连续递增、两级进位、非法版本、清单/锁文件同步、第三方版本不变、失败重试、跨进程互斥、多目标只分配一次，以及打包版本和产物哈希匹配。测试在临时目录运行，不消耗正式版本号。
 
 2026-10-04 验证：9项自动化测试通过；`python scripts/build.py desktop server --package` 完成首次 `1.2.0` 实际构建，版本计数为1。Windows 客户端 ZIP/NSIS、Server/Relay/Web 归档均生成成功，Desktop 与安装器的 ProductVersion/FileVersion 均为 `1.2.0`。17个自有 Rust 包版本一致，两份 Cargo.lock 的第三方条目未变。构建日志 `.build/versioned-build.log`。本轮未执行 Linux/Docker 镜像实际构建。
+
+2026-10-04 合并后验证：快进同步远端 `1691883`，该提交已合并 macOS 原生支持、双架构安装工具与上述版本管理功能，无需再次处理文本冲突。在 Windows 上通过9项版本测试、1项包含 Windows/Linux/macOS 归档的测试、3项 macOS 安装器输入校验测试，以及 Desktop `tsc --noEmit` 和 `cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`。Rust 检查日志 `.build/merge-macos-windows-check.log`。未执行 macOS 原生编译、PKG 构建或安装；macOS 独立构建脚本尚未接入统一版本递增，归档沿用已编译 App 的版本。此次检查不消耗产品版本，仍为 `1.2.0`、计数1。
