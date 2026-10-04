@@ -1,5 +1,7 @@
 # macOS 完整适配与验收
 
+2026-10-04 构建更新：macOS 已接入统一版本递增。`bash packaging/desktop/build-macos.sh debug all` 在 Apple Silicon 实机完整生成 ARM/Intel 两套 `1.2.1` Debug tar.gz 和 PKG，同批只递增一次。每种架构的5项PKG测试（含实际重新打包和展开）全部通过，版本计数保持2；13项版本测试、三平台归档回归也通过。安装包仍为未签名、未公证的开发产物，本轮未执行安装或 Intel 实机运行。详情见 [BUILDING.md](BUILDING.md)。
+
 ## 目标与边界
 
 覆盖现有 60 个 MCP 工具、Desktop、Executor、后台运行和安装卸载。
@@ -113,20 +115,25 @@ app 签名完整性。Windows/Linux 安装脚本与 Windows NSIS 打包器均未
 
 ### 源码构建与 tar 安装
 
-需要 Xcode Command Line Tools、Rust stable、Node/npm、Python 3.9+；vendor 校验脚本
-另需 Python 3.11+。本次开发环境补齐了 Homebrew rustup、Node、Python 3.13 和
+需要 Xcode Command Line Tools、仓库固定版本的 Rust、Node/npm、Python 3.12+。
+本次开发环境补齐了 Homebrew rustup、Node、Python 3.13 和
 Rust Intel target；不由安装包自动安装这些开发工具。
 
 在 macOS 仓库根目录执行：
 
 ```sh
-bash packaging/desktop/build-macos.sh release
-# 开发包：bash packaging/desktop/build-macos.sh debug
+npm --prefix apps/desktop ci
+bash packaging/desktop/build-macos.sh debug all
+# 默认只编译当前架构的开发包：bash packaging/desktop/build-macos.sh
+# 正式双架构：bash packaging/desktop/build-macos.sh release all
 # Intel 交叉构建：bash packaging/desktop/build-macos.sh release x86_64
 # Apple Silicon：bash packaging/desktop/build-macos.sh release aarch64
 ```
 
-脚本构建 Executor、MCP、前端和原生 app，再打包到 `.build/packages/`。
+脚本调用统一构建入口，在编译前递增一次版本，构建 Executor、MCP、前端和原生 app，
+再打包 tar.gz 和 PKG 到 `.build/packages/`。`all` 的 ARM/Intel 共用该版本，打包不再次递增。
+直接入口为 `python3.13 scripts/build.py macos --macos-arch all --package`；使用便捷脚本
+可以自动选择 Python 3.12+ 和 Homebrew 工具路径。以仓库所属用户执行，不以 root 编译。
 ARM 包名为 `pixels-agent-bridge-macos-aarch64-release.tar.gz`；指定 `x86_64` 可在
 Mac 上交叉构建 Intel 包（需安装相应 Rust target）。相邻 `SHA256.json` 记录
 Release 校验和，Debug 使用独立清单。构建产物使用目标三元组子目录以隔离架构。

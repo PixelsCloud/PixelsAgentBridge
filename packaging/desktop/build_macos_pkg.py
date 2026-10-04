@@ -132,6 +132,9 @@ def main():
         verify_binaries(payload, arch)
         with (payload / APP / "Contents/Info.plist").open("rb") as source:
             version = plistlib.load(source)["CFBundleShortVersionString"]
+        archive_version = json.loads(manifest.read_text())[archive.name].get('version')
+        if archive_version != version:
+            raise ValueError('macOS archive version does not match its app')
         prepare_scripts(scripts, arch, control, relay)
         component = stage / "component.pkg"
         subprocess.run(["/usr/bin/pkgbuild", "--nopayload", "--scripts", str(scripts),
@@ -178,7 +181,7 @@ def main():
         command.append(str(stage / "installer.pkg"))
         subprocess.run(command, check=True)
         shutil.copyfile(stage / "installer.pkg", output)
-    metadata = {"file": output.name, "bytes": output.stat().st_size, "sha256": digest(output),
+    metadata = {"file": output.name, "version": version, "bytes": output.stat().st_size, "sha256": digest(output),
                 "architecture": arch, "control_url": control,
                 "relay_url": relay, "installer_signed": bool(args.sign), "notarized": False}
     (packages / f"SHA256-macos-{args.arch}-setup-{args.profile}.json").write_text(json.dumps(metadata, indent=2) + "\n")

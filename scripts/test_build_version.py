@@ -4,12 +4,14 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase, main
 from unittest.mock import patch
 import json
+import plistlib
 import subprocess
 import sys
 import tomllib
 
 from build_version import (build_lock, next_version, parse_version, read_state,
-                           record_artifacts, reserve_version, synchronize, verify_artifacts, write_json)
+                           record_artifacts, reserve_version, synchronize, verify_artifacts, write_json,
+                           macos_artifacts)
 
 
 def fixture(root):
@@ -114,6 +116,74 @@ class Versions(TestCase):
         self.assertEqual(read_state(self.root), {'version': '1.2.0', 'build_count': 1})
         self.assertEqual(len(commands), 2)
         self.assertTrue(all(cmd[-1] == 'build:assets' for cmd in commands))
+
+    def test_macos_both_architectures_share_one_reserved_version(self):
+        import build
+        cli = self.root / 'apps/desktop/node_modules/@tauri-apps/cli/tauri.js'
+        cli.parent.mkdir(parents=True)
+        cli.touch()
+        commands = []
+
+        def fake_run(command, cwd=None):
+            commands.append([str(x) for x in command])
+            if command[0] == 'cargo':
+                target = command[command.index('--target') + 1]
+                folder = self.root / 'target' / target / 'debug'
+                folder.mkdir(parents=True)
+                for name in ('pab-executor', 'pab-mcp'):
+                    (folder / name).write_bytes(b'fixture')
+            elif command[0] == 'node':
+                target = command[command.index('--target') + 1]
+                app = self.root / 'apps/desktop/src-tauri/target' / target / 'debug/bundle/macos/Pixels Agent Bridge.app'
+                executable = app / 'Contents/MacOS/pab-desktop'
+                executable.parent.mkdir(parents=True)
+                executable.write_bytes(b'fixture')
+                (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': read_state(self.root)['version']}))
+
+        with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\nx86_64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all', '--package']):
+            build.main()
+        self.assertEqual(read_state(self.root), {'version': '1.2.0', 'build_count': 1})
+        for architecture in ('aarch64', 'x86_64'):
+            record = json.loads((self.root / f'.build/builds/macos-{architecture}-debug.json').read_text())
+            self.assertEqual(record['version'], '1.2.0')
+            self.assertEqual(len(record['files']), 4)
+        self.assertEqual(sum(cmd[0] == 'cargo' for cmd in commands), 2)
+        self.assertEqual(sum('packaging/desktop/build_macos_pkg.py' in cmd for cmd in commands), 2)
+        self.assertTrue(all('--debug' in cmd for cmd in commands if cmd[0] == 'node'))
+
+    def test_missing_macos_target_does_not_consume_version(self):
+        import build
+        cli = self.root / 'apps/desktop/node_modules/@tauri-apps/cli/tauri.js'
+        cli.parent.mkdir(parents=True)
+        cli.touch()
+        with patch.object(build, 'ROOT', self.root), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all']), self.assertRaises(SystemExit):
+            build.main()
+        self.assertEqual(read_state(self.root)['build_count'], 0)
+
+    def test_macos_architecture_selection(self):
+        import build
+        with patch.object(build.platform, 'machine', return_value='arm64'):
+            self.assertEqual(build.macos_architectures('native'), ['aarch64'])
+        self.assertEqual(build.macos_architectures('all'), ['aarch64', 'x86_64'])
+        with self.assertRaises(ValueError):
+            build.macos_architectures('unknown')
+
+    def test_macos_record_detects_app_or_service_replacement(self):
+        app = self.root / 'App'
+        executable = app / 'Contents/MacOS/pab-desktop'
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b'app')
+        (app / 'Contents/Info.plist').write_bytes(b'plist fixture')
+        for name in ('pab-executor', 'pab-mcp'):
+            (self.root / name).write_bytes(b'service')
+        files = macos_artifacts(self.root, app)
+        record_artifacts(self.root, 'macos-aarch64', 'debug', '1.2.0', files)
+        for path in (executable, app / 'Contents/Info.plist', self.root / 'pab-mcp'):
+            before = path.read_bytes()
+            path.write_bytes(b'replaced')
+            with self.assertRaisesRegex(ValueError, 'changed since'):
+                verify_artifacts(self.root, 'macos-aarch64', 'debug', macos_artifacts(self.root, app))
+            path.write_bytes(before)
 
 
 if __name__ == '__main__':

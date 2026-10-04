@@ -73,7 +73,8 @@ class Installer(unittest.TestCase):
             root = Path(temporary)
             shutil.copyfile(archive, root / archive.name)
             manifest_name = "SHA256-debug.json" if profile == "debug" else "SHA256.json"
-            (root / manifest_name).write_text(json.dumps({archive.name: {"sha256": pkg.digest(archive), "bytes": archive.stat().st_size}}))
+            source_manifest = json.loads((archive.parent / manifest_name).read_text())
+            (root / manifest_name).write_text(json.dumps({archive.name: source_manifest[archive.name]}))
             subprocess.run([sys.executable, str(pkg.ROOT / "packaging/desktop/build_macos_pkg.py"),
                             "--arch", arch, "--profile", profile,
                             "--packages-dir", str(root)], check=True, capture_output=True)
@@ -96,6 +97,7 @@ class Installer(unittest.TestCase):
             self.assertEqual(package_info.attrib["version"], built_version)
             metadata = json.loads(next(root.glob("SHA256-macos-*-setup-*.json")).read_text())
             self.assertEqual(pkg.digest(installers[0]), metadata["sha256"])
+            self.assertEqual(metadata['version'], built_version)
             self.assertFalse(metadata["installer_signed"])
             self.assertNotIn("deployment_id", metadata)
 

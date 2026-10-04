@@ -2,30 +2,25 @@
 set -euo pipefail
 
 [[ $(uname -s) == Darwin ]] || { echo 'Build on macOS.' >&2; exit 2; }
-profile=${1:-release}
-architecture=${2:-$(uname -m)}
-case $architecture in
-    arm64|aarch64) architecture=aarch64 ;;
-    x86_64) ;;
-    *) echo 'Architecture must be aarch64 (arm64) or x86_64.' >&2; exit 2 ;;
-esac
+profile=${1:-debug}
+architecture=${2:-native}
 [[ $# -le 2 && ( $profile == debug || $profile == release ) ]] || {
-    echo 'usage: bash packaging/desktop/build-macos.sh [debug|release] [aarch64|x86_64]' >&2; exit 2;
+    echo 'usage: bash packaging/desktop/build-macos.sh [debug|release] [native|aarch64|x86_64|all]' >&2; exit 2;
 }
-target="$architecture-apple-darwin"
+case $architecture in native|arm64|aarch64|x86_64|all) ;; *) echo 'Invalid architecture.' >&2; exit 2 ;; esac
+
+# Non-interactive Executor sessions do not inherit the user's shell profile.
+for directory in /usr/local/opt/rustup/bin /opt/homebrew/opt/rustup/bin /usr/local/bin /opt/homebrew/bin; do
+    if [[ -d $directory ]]; then export PATH="$directory:$PATH"; fi
+done
+python=
+for candidate in python3.14 python3.13 python3.12 python3; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 12))'; then
+        python=$(command -v "$candidate")
+        break
+    fi
+done
+[[ -n $python ]] || { echo 'Python 3.12+ is required (system Python 3.9 is too old).' >&2; exit 2; }
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
-cargo_profile=dev
-if [[ $profile == release ]]; then cargo_profile=release; fi
-cargo build --locked --target "$target" --profile "$cargo_profile" -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp
-cd "$root/apps/desktop"
-npm ci
-if [[ $profile == release ]]; then
-    npm run tauri -- build --target "$target" --bundles app
-else
-    npm run tauri -- build --target "$target" --debug --bundles app
-fi
-cd "$root"
-python3 packaging/desktop/build.py --platform macos --profile "$profile" \
-    --macos-arch "$architecture" --macos-bin-dir "$root/target/$target/$profile" \
-    --macos-app "$root/apps/desktop/src-tauri/target/$target/$profile/bundle/macos/Pixels Agent Bridge.app"
+exec "$python" scripts/build.py macos --profile "$profile" --macos-arch "$architecture" --package

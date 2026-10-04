@@ -6,7 +6,6 @@ from io import BytesIO
 from pathlib import Path
 import json
 import platform as host_platform
-import plistlib
 import tarfile
 import zipfile
 import sys
@@ -87,10 +86,12 @@ def package_unix(platform, architecture, binaries):
     if platform == "macos" and not (args.macos_app / "Contents/MacOS/pab-desktop").is_file():
         raise FileNotFoundError(args.macos_app)
     if platform == "macos":
-        # The dedicated macOS builder is not a target of scripts/build.py yet.
-        # Record the built app's version, never the checkout's possibly newer one.
-        with (args.macos_app / "Contents/Info.plist").open("rb") as content:
-            versions[archive_path.name] = plistlib.load(content)["CFBundleShortVersionString"]
+        from build_version import verify_artifacts, macos_artifacts, macos_app_version
+
+        version = verify_artifacts(root, f'macos-{architecture}', args.profile, macos_artifacts(binaries, args.macos_app))
+        if macos_app_version(args.macos_app) != version:
+            raise ValueError('macOS app version does not match its build record')
+        versions[archive_path.name] = version
     else:
         from build_version import verify_artifacts
 

@@ -4,6 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 import json
 import os
+import plistlib
 import re
 import tomllib
 
@@ -142,6 +143,23 @@ def record_artifacts(root, target, profile, version, files):
         'version': version,
         'files': {name: digest(path) for name, path in files.items()},
     })
+
+
+def macos_artifacts(binaries, app):
+    """Bind both service binaries and the complete built app to one build record."""
+    if not (app / 'Contents/MacOS/pab-desktop').is_file():
+        raise ValueError(f'Missing built macOS app: {app}')
+    files = {name: binaries / name for name in ('pab-executor', 'pab-mcp')}
+    files.update({'Pixels Agent Bridge.app/' + path.relative_to(app).as_posix(): path
+                  for path in sorted(app.rglob('*')) if path.is_file()})
+    return files
+
+
+def macos_app_version(app):
+    with (app / 'Contents/Info.plist').open('rb') as source:
+        version = plistlib.load(source)['CFBundleShortVersionString']
+    parse_version(version)
+    return version
 
 
 def verify_artifacts(root, target, profile, files):

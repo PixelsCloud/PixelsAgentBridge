@@ -1,5 +1,11 @@
 # Desktop packages
 
+On macOS, run `bash packaging/desktop/build-macos.sh debug all` after installing
+frontend dependencies. This delegates to `scripts/build.py macos --macos-arch all
+--package`: both architectures share one version allocation, while tar/PKG creation
+does not allocate another version. The wrapper selects Python 3.12+ and Homebrew
+tools for non-interactive builds. See [MACOS.md](../../MACOS.md).
+
 ## macOS
 
 On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.9+, run

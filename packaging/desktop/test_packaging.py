@@ -14,7 +14,7 @@ import zipfile
 
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS.parents[1] / "scripts"))
-from build_version import record_artifacts
+from build_version import record_artifacts, macos_artifacts
 
 
 class Packages(unittest.TestCase):
@@ -47,6 +47,8 @@ class Packages(unittest.TestCase):
                         suffix = ".exe" if platform == "windows" else ""
                         files = {name + suffix: binaries / (name + suffix) for name in ("pab-executor", "pab-mcp", "pab-desktop")}
                         record_artifacts(root, "desktop" if platform == "windows" else platform, "debug", "1.2.0", files)
+                    else:
+                        record_artifacts(root, 'macos-aarch64', 'debug', '1.2.0', macos_artifacts(binaries, app))
                     subprocess.run([
                         sys.executable, str(package_scripts / "build.py"), "--platform", platform,
                         "--profile", "debug", "--output-dir", str(out),
