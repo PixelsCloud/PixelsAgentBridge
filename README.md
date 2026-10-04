@@ -29,6 +29,12 @@ status are described below.
 
 ## Features
 
+- **Server Web console:** React + Ant Design management for accounts, current device
+  device lists and live online status, Teams, Relay policy health and management
+  changes. English, Simplified/Traditional Chinese and light/dark themes are included.
+  Remote task records stay local. See the [deployment guide](WEB_DEPLOYMENT.md)
+  and [development/test plan](WEB_DEVELOPMENT.md).
+
 - **Agent-driven operations:** select devices and perform remote operations through
   a consistent set of `pab_*` MCP tools. Codex integration is implemented.
 - **Native commands:** execute a program with an explicit argument array, query its
@@ -102,8 +108,8 @@ Install the desktop package on the operator and target computers. The Windows
 package contains Desktop, Executor, MCP, and installation scripts. The EXE installer
 starts the background service and creates application shortcuts.
 
-Installation requires a deployment UUID, a WSS control URL, and an HTTPS Relay URL.
-Use the same deployment on computers that should communicate. For your own backend,
+Installation requires a WSS control URL and an HTTPS Relay URL.
+Use the same control service on computers that should communicate. For your own backend,
 follow [Self-hosting](#self-hosting) first. Packages can be generated with the
 [Windows build instructions](#build-a-windows-package).
 
@@ -894,7 +900,7 @@ Return to the repository root and generate the complete archive and installer:
 
 ```powershell
 python packaging/desktop/build.py --platform windows --profile debug
-python packaging/desktop/build_nsis.py --profile debug --deployment-id "YOUR_DEPLOYMENT_UUID" --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
+python packaging/desktop/build_nsis.py --profile debug --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
 ```
 
 Replace the deployment values before running. Output is under `.build/packages/`,
@@ -923,11 +929,10 @@ claim that all platforms or optional tests have passed.
 The supplied Compose stack runs PostgreSQL 17, the control backend, and Relay.
 
 1. Copy `packaging/docker/example.env` to `packaging/docker/private.env`.
-2. Set a deployment UUID and keep it unchanged for that deployment.
-3. Configure the database password, DNS names, certificate paths, and port mappings.
-4. Provision backend and Relay TLS certificates matching the DNS names, plus their
+2. Configure the database password, DNS names, certificate paths, and port mappings.
+3. Provision backend and Relay TLS certificates matching the DNS names, plus their
    CA files as required.
-5. Create the private Relay control secret file specified by the environment file.
+4. Create the private Relay control secret file specified by the environment file.
 
 Run from the repository root:
 

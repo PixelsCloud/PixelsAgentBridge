@@ -4,7 +4,7 @@ use futures_util::{SinkExt, StreamExt};
 use iroh_base::SecretKey;
 use pab_protocol::{
     AuthorizedDevicePeer, ControlClientMessage, ControlErrorCode, ControlServerMessage,
-    DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
     DeviceNetworkUpdate, DeviceRef, ENDPOINT_PROOF_CLOCK_SKEW_MS, ENDPOINT_PROOF_SCHEMA_VERSION,
     EndpointAuthenticationResult, EndpointKey, EndpointProofChallenge, EndpointProofPrincipal,
     EndpointProofPurpose, EndpointProofResponse, EndpointSignature, RequestId, TenantId,
@@ -21,7 +21,6 @@ const MAX_CONTROL_MESSAGE_BYTES: usize = 64 * 1024;
 #[derive(Debug, Clone)]
 pub struct EndpointControlConfig {
     pub url: String,
-    pub deployment_id: DeploymentId,
     pub tenant_id: TenantId,
     pub principal: EndpointProofPrincipal,
     pub operation_timeout: Duration,
@@ -33,38 +32,6 @@ pub struct AuthenticatedControlConnection {
 }
 
 impl AuthenticatedControlConnection {
-    pub async fn approve_device_claim(
-        &mut self,
-        claim_id: pab_protocol::ClaimId,
-        timeout: Duration,
-    ) -> Result<(pab_protocol::DeviceId, TenantId), EndpointControlError> {
-        let request_id = RequestId::new();
-        send(
-            &mut self.socket,
-            &ControlClientMessage::ApproveDeviceClaim {
-                request_id,
-                claim_id,
-            },
-            timeout,
-        )
-        .await?;
-        match receive(&mut self.socket, timeout).await? {
-            ControlServerMessage::DeviceClaimApproved {
-                request_id: result_id,
-                claim_id: result_claim,
-                device_id,
-                owner_tenant_id,
-            } if result_id == request_id && result_claim == claim_id => {
-                Ok((device_id, owner_tenant_id))
-            }
-            ControlServerMessage::Error {
-                request_id: Some(result_id),
-                code,
-                message,
-            } if result_id == request_id => Err(EndpointControlError::Server { code, message }),
-            _ => Err(EndpointControlError::MismatchedResponse),
-        }
-    }
     pub async fn connect(
         config: &EndpointControlConfig,
         secret: &SecretKey,
@@ -339,7 +306,6 @@ fn validate_challenge(
     challenge: &EndpointProofChallenge,
 ) -> Result<(), EndpointControlError> {
     if challenge.schema_version != ENDPOINT_PROOF_SCHEMA_VERSION
-        || challenge.deployment_id != config.deployment_id
         || challenge.tenant_id != config.tenant_id
         || challenge.principal != config.principal
         || challenge.endpoint_key != endpoint_key
@@ -437,7 +403,6 @@ mod tests {
     fn config(principal: EndpointProofPrincipal) -> EndpointControlConfig {
         EndpointControlConfig {
             url: "wss://localhost/control".to_owned(),
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             principal,
             operation_timeout: Duration::from_secs(1),
@@ -455,7 +420,6 @@ mod tests {
         let challenge = EndpointProofChallenge {
             schema_version: ENDPOINT_PROOF_SCHEMA_VERSION,
             challenge_id: ChallengeId::from_u128(4),
-            deployment_id: config.deployment_id,
             connection_id: ConnectionId::from_u128(5),
             principal,
             tenant_id: TenantId::from_u128(99),

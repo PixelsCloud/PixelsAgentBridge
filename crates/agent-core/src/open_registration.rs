@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use iroh_base::SecretKey;
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeploymentId, EndpointKey, EndpointProofPrincipal,
+    ControlClientMessage, ControlServerMessage, EndpointKey, EndpointProofPrincipal,
     EndpointProofPurpose, EndpointProofResponse, EndpointRegistrationResult, EndpointSignature,
     RequestId,
 };
@@ -20,7 +20,6 @@ pub enum OpenRegistrationKind {
 
 pub async fn register_open_endpoint(
     url: &str,
-    deployment_id: DeploymentId,
     secret: &SecretKey,
     kind: OpenRegistrationKind,
     connector: Connector,
@@ -79,8 +78,7 @@ pub async fn register_open_endpoint(
         )
     );
     let now = time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000;
-    if challenge.deployment_id != deployment_id
-        || challenge.endpoint_key != endpoint_key
+    if challenge.endpoint_key != endpoint_key
         || challenge.purpose != purpose
         || !principal_ok
         || challenge

@@ -5,14 +5,11 @@ use pab_agent_core::{
     DataPathError, DataPaths, DataScope, OpenRegistrationKind, load_or_create_endpoint_secret,
     register_open_endpoint, tls_connector,
 };
-use pab_protocol::{
-    DeploymentId, EndpointKey, EndpointProofPrincipal, OperatorRef, TenantId, UserId,
-};
+use pab_protocol::{EndpointKey, EndpointProofPrincipal, OperatorRef, TenantId, UserId};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BridgeConfig {
-    pub deployment_id: DeploymentId,
     pub tenant_id: TenantId,
     pub identity: BridgeIdentity,
     pub control_url: String,
@@ -60,10 +57,6 @@ impl BridgeConfig {
         let secret = load_or_create_endpoint_secret(&secret_path)?;
         let control_url = env::var("PAB_CONTROL_URL")
             .map_err(|_| GuestConfigError::Missing("PAB_CONTROL_URL"))?;
-        let deployment_id: DeploymentId = env::var("PAB_DEPLOYMENT_ID")
-            .map_err(|_| GuestConfigError::Missing("PAB_DEPLOYMENT_ID"))?
-            .parse()
-            .map_err(|_| GuestConfigError::InvalidDeployment)?;
         let ca = env::var_os("PAB_CONTROL_CA_CERT")
             .map(std::fs::read)
             .transpose()?;
@@ -71,7 +64,6 @@ impl BridgeConfig {
         let result = loop {
             match register_open_endpoint(
                 &control_url,
-                deployment_id,
                 &secret,
                 OpenRegistrationKind::Guest,
                 connector.clone(),
@@ -140,9 +132,6 @@ impl BridgeConfig {
             }
         };
         let config = Self {
-            deployment_id: required_text(&mut lookup, "PAB_DEPLOYMENT_ID")?
-                .parse()
-                .map_err(|error| invalid("PAB_DEPLOYMENT_ID", error))?,
             tenant_id: required_text(&mut lookup, "PAB_TENANT_ID")?
                 .parse()
                 .map_err(|error| invalid("PAB_TENANT_ID", error))?,
@@ -240,8 +229,6 @@ pub enum BridgeConfigError {
 pub enum GuestConfigError {
     #[error("{0} must be set")]
     Missing(&'static str),
-    #[error("PAB_DEPLOYMENT_ID is invalid")]
-    InvalidDeployment,
     #[error("guest registration returned an unexpected result")]
     InvalidResult,
     #[error(transparent)]
@@ -268,10 +255,6 @@ mod tests {
     fn default_endpoint_key_uses_persistent_user_data() {
         let values = HashMap::from([
             ("PAB_DATA_DIR", OsString::from("persistent-user-data")),
-            (
-                "PAB_DEPLOYMENT_ID",
-                OsString::from("00000000-0000-0000-0000-000000000001"),
-            ),
             (
                 "PAB_TENANT_ID",
                 OsString::from("00000000-0000-0000-0000-000000000002"),

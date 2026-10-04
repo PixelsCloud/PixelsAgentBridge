@@ -9,7 +9,6 @@ const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct PolicySyncSettings {
     pub control_url: String,
-    pub deployment_id: pab_protocol::DeploymentId,
     pub control_secret: String,
     pub refresh_interval: Duration,
     pub reconnect_interval: Duration,
@@ -20,13 +19,9 @@ pub async fn connect_and_sync(
     connector: Connector,
     runtime: &RelayPolicyRuntime,
 ) -> Result<RelayControlClient, RelayControlClientError> {
-    let mut client = RelayControlClient::connect(
-        &settings.control_url,
-        settings.deployment_id,
-        &settings.control_secret,
-        connector,
-    )
-    .await?;
+    let mut client =
+        RelayControlClient::connect(&settings.control_url, &settings.control_secret, connector)
+            .await?;
     client.sync_policy(runtime).await?;
     Ok(client)
 }

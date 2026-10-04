@@ -3,6 +3,12 @@
 This Compose stack runs PostgreSQL 17, the TLS control backend, and the TLS/QUIC
 iroh Relay. The image is compiled with Cargo's stripped Release profile.
 
+The backend also serves the built React/Ant Design Web console on the same HTTPS
+origin. Set `PAB_WEB_ORIGIN` to the public origin and configure the proxy for WebSocket
+upgrades. Provision an existing account with `pab-server web-admin <username>`.
+See [Web deployment and rollback](../../WEB_DEPLOYMENT.md). Task history stays local;
+Server/Web neither receive nor display it.
+
 `PAB_RELAY_IMAGE` may override just the Relay image for an independent update;
 otherwise it uses `PAB_SERVER_IMAGE` like the backend.
 
@@ -11,8 +17,8 @@ PostgreSQL uses the named `postgres-data` volume, so replacing images or running
 use `docker compose down -v` for an ordinary uninstall or upgrade; removing that
 volume is an explicit data reset.
 
-Copy `example.env` to a private env file, generate a UUID for
-`PAB_DEPLOYMENT_ID`, and keep that UUID unchanged. Create a random Relay control
+Copy `example.env` to a private env file and configure
+the control and Relay URLs. Create a random Relay control
 secret containing at least 32 bytes at the path named by
 `PAB_RELAY_CONTROL_SECRET_PATH`.
 

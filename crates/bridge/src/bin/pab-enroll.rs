@@ -2,7 +2,6 @@ use std::{env, fs, io::Write, path::PathBuf, process::ExitCode, time::Duration};
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use pab_agent_core::{DataPaths, DataScope, enroll_account_with_device, tls_connector};
-use pab_protocol::DeploymentId;
 use rand_core::OsRng;
 use thiserror::Error;
 use zeroize::Zeroizing;
@@ -45,10 +44,6 @@ async fn run() -> Result<(), EnrollCliError> {
     }
     let control_url =
         env::var("PAB_CONTROL_URL").map_err(|_| EnrollCliError::MissingEnv("PAB_CONTROL_URL"))?;
-    let deployment_id = env::var("PAB_DEPLOYMENT_ID")
-        .map_err(|_| EnrollCliError::MissingEnv("PAB_DEPLOYMENT_ID"))?
-        .parse::<DeploymentId>()
-        .map_err(|error| EnrollCliError::Deployment(error.to_string()))?;
     let relay_urls =
         env::var("PAB_RELAY_URLS").map_err(|_| EnrollCliError::MissingEnv("PAB_RELAY_URLS"))?;
     let extra_ca = env::var_os("PAB_CONTROL_CA_CERT")
@@ -66,7 +61,6 @@ async fn run() -> Result<(), EnrollCliError> {
         .to_string();
     let enrollment = enroll_account_with_device(
         &control_url,
-        deployment_id,
         username,
         account_password,
         device_name,
@@ -101,14 +95,13 @@ async fn run() -> Result<(), EnrollCliError> {
     pab_agent_core::restrict_private_file(&database)?;
     sqlx::query(
         "CREATE TABLE device_access (id INTEGER PRIMARY KEY CHECK (id = 1), \
-         deployment_id TEXT NOT NULL, tenant_id TEXT NOT NULL, device_id TEXT NOT NULL, \
+         tenant_id TEXT NOT NULL, device_id TEXT NOT NULL, \
          device_code TEXT NOT NULL, temporary_password TEXT NOT NULL, \
          password_version INTEGER NOT NULL, password_hash TEXT NOT NULL)",
     )
     .execute(&pool)
     .await?;
-    sqlx::query("INSERT INTO device_access VALUES (1, ?, ?, ?, ?, ?, 1, ?)")
-        .bind(deployment_id.to_string())
+    sqlx::query("INSERT INTO device_access VALUES (1, ?, ?, ?, ?, 1, ?)")
         .bind(enrollment.tenant_id.to_string())
         .bind(enrollment.device_id.to_string())
         .bind(enrollment.device_code.to_string())
@@ -198,8 +191,6 @@ enum EnrollCliError {
     Usage,
     #[error("{0} must be set")]
     MissingEnv(&'static str),
-    #[error("PAB_DEPLOYMENT_ID is invalid: {0}")]
-    Deployment(String),
     #[error("password file must contain UTF-8 text")]
     PasswordEncoding,
     #[error("password file is empty")]

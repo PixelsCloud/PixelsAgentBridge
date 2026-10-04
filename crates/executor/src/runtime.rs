@@ -45,7 +45,6 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let connector = tls_connector(extra_ca.as_deref())?;
     let execution_context = detect_native_execution_context()?;
     let device_ref = DeviceRef {
-        deployment_id: config.deployment_id,
         tenant_id: config.tenant_id,
         device_id: config.device_id,
     };
@@ -63,7 +62,6 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     };
     let control = EndpointControlConfig {
         url: config.control_url,
-        deployment_id: config.deployment_id,
         tenant_id: config.tenant_id,
         principal: EndpointProofPrincipal::Device {
             device_id: config.device_id,
@@ -246,7 +244,6 @@ mod tests {
         let hello = DeviceHello {
             schema_version: DEVICE_SESSION_SCHEMA_VERSION,
             device_ref: DeviceRef {
-                deployment_id: pab_protocol::DeploymentId::from_u128(1),
                 tenant_id: pab_protocol::TenantId::from_u128(2),
                 device_id: pab_protocol::DeviceId::from_u128(3),
             },

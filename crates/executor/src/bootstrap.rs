@@ -8,12 +8,10 @@ use std::{
 
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use pab_agent_core::{
-    AuthenticatedControlConnection, DataPaths, DataScope, EndpointControlConfig,
-    OpenRegistrationKind, load_or_create_endpoint_secret, register_open_endpoint, tls_connector,
+    DataPaths, DataScope, OpenRegistrationKind, load_or_create_endpoint_secret,
+    register_open_endpoint, tls_connector,
 };
-use pab_protocol::{
-    ClaimId, DeploymentId, DeviceId, EndpointProofPrincipal, EndpointRegistrationResult, TenantId,
-};
+use pab_protocol::EndpointRegistrationResult;
 use rand_core::{OsRng, RngCore};
 use thiserror::Error;
 
@@ -29,9 +27,6 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
         .unwrap_or_else(|| paths.executor_endpoint_secret());
     let secret = load_or_create_endpoint_secret(&secret_path)?;
     let control_url = required("PAB_CONTROL_URL")?;
-    let deployment_id = required("PAB_DEPLOYMENT_ID")?
-        .parse()
-        .map_err(|_| BootstrapError::InvalidDeployment)?;
     let name = env::var("PAB_DEVICE_NAME")
         .ok()
         .filter(|name| !name.trim().is_empty())
@@ -45,7 +40,6 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
     let result = loop {
         match register_open_endpoint(
             &control_url,
-            deployment_id,
             &secret,
             OpenRegistrationKind::Device { name: name.clone() },
             connector.clone(),
@@ -85,7 +79,6 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
     })?;
     ensure_device_access(
         &config.task_database_file,
-        deployment_id.to_string(),
         tenant_id.to_string(),
         device_id.to_string(),
         device_code.to_string(),
@@ -108,7 +101,6 @@ pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
 
 async fn ensure_device_access(
     path: &Path,
-    deployment_id: String,
     tenant_id: String,
     device_id: String,
     device_code: String,
@@ -122,7 +114,6 @@ async fn ensure_device_access(
     } else {
         new_device_access()
     };
-    access.deployment_id = deployment_id;
     access.tenant_id = tenant_id;
     access.device_id = device_id;
     access.device_code = device_code;
@@ -154,7 +145,6 @@ pub async fn rotate_temporary_password(path: &Path) -> Result<(), BootstrapError
 
 fn new_device_access() -> crate::device_access::DeviceAccess {
     crate::device_access::DeviceAccess {
-        deployment_id: String::new(),
         tenant_id: String::new(),
         device_id: String::new(),
         device_code: String::new(),
@@ -203,48 +193,6 @@ pub async fn show_access() -> Result<(), BootstrapError> {
     Ok(())
 }
 
-pub async fn approve_claim(claim_id: ClaimId) -> Result<(), BootstrapError> {
-    let paths = DataPaths::for_scope(DataScope::Machine)?;
-    let access = crate::device_access::load(&paths.executor_database()).await?;
-    let deployment_id: DeploymentId = access
-        .deployment_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let tenant_id: TenantId = access
-        .tenant_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let device_id: DeviceId = access
-        .device_id
-        .parse()
-        .map_err(|_| BootstrapError::InvalidResult)?;
-    let secret_path = env::var_os("PAB_ENDPOINT_SECRET_FILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| paths.executor_endpoint_secret());
-    let secret = pab_agent_core::read_endpoint_secret(&secret_path)?;
-    let ca = env::var_os("PAB_CONTROL_CA_CERT")
-        .map(fs::read)
-        .transpose()?;
-    let config = EndpointControlConfig {
-        url: required("PAB_CONTROL_URL")?,
-        deployment_id,
-        tenant_id,
-        principal: EndpointProofPrincipal::Device { device_id },
-        operation_timeout: Duration::from_secs(10),
-    };
-    let mut connection =
-        AuthenticatedControlConnection::connect(&config, &secret, tls_connector(ca.as_deref())?)
-            .await?;
-    let (claimed_device, owner_tenant_id) = connection
-        .approve_device_claim(claim_id, Duration::from_secs(10))
-        .await?;
-    if claimed_device != device_id {
-        return Err(BootstrapError::InvalidResult);
-    }
-    println!("Approved claim {claim_id} for device {device_id} into {owner_tenant_id}");
-    Ok(())
-}
-
 fn required(name: &'static str) -> Result<String, BootstrapError> {
     env::var(name).map_err(|_| BootstrapError::Missing(name))
 }
@@ -253,8 +201,6 @@ fn required(name: &'static str) -> Result<String, BootstrapError> {
 pub enum BootstrapError {
     #[error("{0} must be set")]
     Missing(&'static str),
-    #[error("PAB_DEPLOYMENT_ID is invalid")]
-    InvalidDeployment,
     #[error("device registration returned an unexpected result")]
     InvalidResult,
     #[error("system clock is invalid")]
@@ -305,15 +251,9 @@ mod tests {
     async fn rotated_password_matches_credential_and_invalidates_previous_password() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("executor.sqlite3");
-        ensure_device_access(
-            &path,
-            "deployment".into(),
-            "tenant".into(),
-            "device".into(),
-            "123456789".into(),
-        )
-        .await
-        .unwrap();
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
         let previous_password = device_access::load(&path).await.unwrap().temporary_password;
         rotate_temporary_password(&path).await.unwrap();
 
@@ -338,26 +278,14 @@ mod tests {
     async fn existing_password_survives_restart_until_explicit_rotation() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("executor.sqlite3");
-        ensure_device_access(
-            &path,
-            "deployment".into(),
-            "tenant".into(),
-            "device".into(),
-            "123456789".into(),
-        )
-        .await
-        .unwrap();
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
         let first = device_access::load(&path).await.unwrap();
 
-        ensure_device_access(
-            &path,
-            "deployment".into(),
-            "tenant".into(),
-            "device".into(),
-            "123456789".into(),
-        )
-        .await
-        .unwrap();
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
         let same = device_access::load(&path).await.unwrap();
         assert_eq!(same.temporary_password, first.temporary_password);
         assert_eq!(same.password_hash, first.password_hash);
@@ -365,15 +293,9 @@ mod tests {
         rotate_temporary_password(&path).await.unwrap();
         let rotated_password = device_access::load(&path).await.unwrap().temporary_password;
         assert_ne!(rotated_password, first.temporary_password);
-        ensure_device_access(
-            &path,
-            "deployment".into(),
-            "tenant".into(),
-            "device".into(),
-            "123456789".into(),
-        )
-        .await
-        .unwrap();
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
         assert_eq!(
             device_access::load(&path).await.unwrap().temporary_password,
             rotated_password
@@ -396,15 +318,9 @@ mod tests {
             .await
             .unwrap();
 
-        ensure_device_access(
-            &path,
-            "deployment".into(),
-            "tenant".into(),
-            "device".into(),
-            "123456789".into(),
-        )
-        .await
-        .unwrap();
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
         assert_eq!(
             device_access::load(&path).await.unwrap().device_code,
             "123456789"

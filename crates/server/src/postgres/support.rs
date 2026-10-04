@@ -45,7 +45,7 @@ pub(super) async fn bump_policy_revision(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<(), StoreError> {
     let result = sqlx::query(
-        "UPDATE deployments SET policy_revision = policy_revision + 1 WHERE singleton = true",
+        "UPDATE server_settings SET policy_revision = policy_revision + 1 WHERE singleton = true",
     )
     .execute(&mut **tx)
     .await?;
@@ -53,7 +53,7 @@ pub(super) async fn bump_policy_revision(
         Ok(())
     } else {
         Err(StoreError::InvalidState(
-            "deployment is not initialized".to_owned(),
+            "server settings are not initialized".to_owned(),
         ))
     }
 }

@@ -65,7 +65,7 @@ the profiles so test and release packages cannot silently replace one another.
 The Windows ZIP includes `INSTALL-WINDOWS.txt` with the PowerShell installation
 steps. To make a single EXE installer for another Windows computer, copy NSIS
 3.12 into `tools/nsis` and run
-`python packaging/desktop/build_nsis.py --deployment-id <deployment-uuid>`
+`python packaging/desktop/build_nsis.py`
 after building the complete Windows Debug ZIP. The NSIS builder checks the ZIP
 checksum and every Debug binary before embedding them. The resulting
 `.build/packages/pixels-agent-bridge-windows-x86_64-debug-setup.exe` has the CN
@@ -108,7 +108,7 @@ Disabling removes only the Pixels MCP entry. Other Codex MCP entries are left
 untouched. On Linux and macOS, register the installed `run-mcp.sh` manually so
 the same deployment settings used by the desktop are loaded before MCP starts.
 
-Run `install.ps1` from an elevated PowerShell window with the deployment ID,
+Run `install.ps1` from an elevated PowerShell window with the
 WSS control URL, and HTTPS Relay URL. Installation starts the Executor as a
 LocalSystem Windows service and installs `run-app.ps1` as the single interface
 entry point. Windows policy `SoftwareSASGeneration` must allow services (value
@@ -126,8 +126,9 @@ File transfer shows live progress, supports cancellation and retry from a partia
 file, and replaces an existing destination only when explicitly requested.
 The installer gives its current Windows user a private local WebSocket token.
 Other local users require a separate privileged `pab-executor issue-local-access
-<user-token-file>` operation before they can view this device's password or
-approve ownership from the desktop window.
+<user-token-file>` operation before they can view this device's password from
+the desktop window. Device claims and ownership approval have been removed;
+server administrators manage devices directly in the Web console.
 The eight-character device password remains valid across ordinary Executor
 restarts and package upgrades. Use the explicit `pab-executor rotate-password`
 command when rotation is needed; reconnecting operators then need the new
@@ -146,7 +147,7 @@ On a Windows host with limited C: space, use
 downloads and compilation output in `.build` on the workspace drive and creates
 the Debug tarball. Pass `-Profile release` only for a release build.
 The archive includes the same Tauri app and background components.
-Run `install.sh` as root with the same three connection settings, then launch
+Run `install.sh` as root with the control URL and Relay URL, then launch
 `run-app.sh` as the interactive user. The old browser UI is absent from both
 platforms. On Linux, installation registers a hidden XDG autostart entry for
 the session helper. It captures the desktop in the logged-in graphical session;

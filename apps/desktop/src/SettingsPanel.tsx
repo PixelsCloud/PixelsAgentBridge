@@ -8,7 +8,6 @@ import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 
 type ServerSettings = {
-  deploymentId: string;
   controlUrl: string;
   relayUrl: string;
 };
@@ -29,7 +28,7 @@ type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
 export function SettingsPanel({ language, onLanguageChange }: Props) {
   const t = messages[language];
   const [section, setSection] = useState<SettingsSection>("preferences");
-  const [settings, setSettings] = useState<ServerSettings>({ deploymentId: "", controlUrl: "", relayUrl: "" });
+  const [settings, setSettings] = useState<ServerSettings>({ controlUrl: "", relayUrl: "" });
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -138,7 +137,6 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
         <h2>{t.settingsServerTitle}</h2>
         <p>{t.settingsServerHint}</p>
         <div className="settings-fields">
-          <label><span className="field-label">{t.settingsDeployment}</span><Input value={settings.deploymentId} spellCheck={false} onChange={(event) => { setSettings({ ...settings, deploymentId: event.target.value }); setSaved(false); }} /></label>
           <label><span className="field-label">{t.settingsControl}</span><Input value={settings.controlUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, controlUrl: event.target.value }); setSaved(false); }} /></label>
           <label><span className="field-label">{t.settingsRelay}</span><Input value={settings.relayUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, relayUrl: event.target.value }); setSaved(false); }} /></label>
         </div>

@@ -1,9 +1,7 @@
 use std::{path::Path, process::ExitCode};
 
 use pab_agent_core::{DataPaths, DataScope};
-use pab_executor::{
-    approve_claim, bootstrapped_config, rotate_temporary_password, run_executor, show_access,
-};
+use pab_executor::{bootstrapped_config, rotate_temporary_password, run_executor, show_access};
 
 #[cfg(windows)]
 mod windows_service;
@@ -74,23 +72,9 @@ async fn main() -> ExitCode {
             }
         };
     }
-    if std::env::args().nth(1).as_deref() == Some("approve-claim") {
-        let Some(raw_id) = std::env::args().nth(2) else {
-            eprintln!("usage: pab-executor approve-claim <claim-id>");
-            return ExitCode::FAILURE;
-        };
-        let Ok(claim_id) = raw_id.parse() else {
-            eprintln!("invalid claim ID");
-            return ExitCode::FAILURE;
-        };
-        return match approve_claim(claim_id).await {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                tracing::error!(%error, "approve-claim failed");
-                eprintln!("pab-executor: {error}");
-                ExitCode::FAILURE
-            }
-        };
+    if std::env::args().nth(1).is_some() {
+        eprintln!("unknown executor command");
+        return ExitCode::FAILURE;
     }
     let local_service = pab_executor::local_ipc::spawn_local_service(log_root);
     let result = match bootstrapped_config().await {

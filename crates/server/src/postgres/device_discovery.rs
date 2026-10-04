@@ -1,5 +1,5 @@
 use pab_protocol::{
-    DEVICE_NETWORK_SCHEMA_VERSION, DeploymentId, DeviceCode, DeviceDirectoryEntry, DeviceId,
+    DEVICE_NETWORK_SCHEMA_VERSION, DeviceCode, DeviceDirectoryEntry, DeviceId,
     DeviceNetworkSnapshot, DeviceRef, EndpointKey, TenantId, UserId,
 };
 
@@ -11,7 +11,6 @@ impl PostgresStore {
         requester_key: EndpointKey,
         requester_user: UserId,
         requester_tenant: TenantId,
-        deployment_id: DeploymentId,
     ) -> Result<Vec<DeviceDirectoryEntry>, StoreError> {
         let rows = sqlx::query(
             r#"
@@ -24,14 +23,10 @@ impl PostgresStore {
              AND member.status = 'active'
             JOIN devices device
               ON device.status = 'active'
-             AND (
-                 device.registered_by_user_id = requester.user_id
-                 OR EXISTS (
-                     SELECT 1 FROM device_claim_requests claim
-                     WHERE claim.device_id = device.id
-                       AND claim.requested_by_user_id = requester.user_id
-                       AND claim.approved_at IS NOT NULL
-                 )
+             AND EXISTS (
+                 SELECT 1 FROM personal_tenants owner
+                 WHERE owner.tenant_id = device.owner_tenant_id
+                   AND owner.user_id = requester.user_id
              )
             WHERE requester.endpoint_key = $1
               AND requester.tenant_id = $2
@@ -50,7 +45,6 @@ impl PostgresStore {
             .map(|row| {
                 Ok(DeviceDirectoryEntry {
                     device_ref: DeviceRef {
-                        deployment_id,
                         tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
                         device_id: DeviceId::from_uuid(row.try_get("id")?),
                     },
@@ -68,7 +62,6 @@ impl PostgresStore {
         requester_key: EndpointKey,
         requester_user: UserId,
         tenant_id: TenantId,
-        deployment_id: DeploymentId,
         code: DeviceCode,
     ) -> Result<DeviceRef, StoreError> {
         let row = sqlx::query(
@@ -98,7 +91,6 @@ impl PostgresStore {
         .await?
         .ok_or(StoreError::NotFound)?;
         Ok(DeviceRef {
-            deployment_id,
             tenant_id: TenantId::from_uuid(row.try_get("device_tenant_id")?),
             device_id: DeviceId::from_uuid(row.try_get("id")?),
         })
@@ -129,12 +121,9 @@ impl PostgresStore {
             JOIN tenants tenant
               ON tenant.id = requester.tenant_id
              AND tenant.status = 'active'
-            JOIN deployments deployment
-              ON deployment.singleton = true
-             AND deployment.id = $5
             JOIN devices device
               ON device.id = $4
-             AND device.tenant_id = $6
+             AND device.tenant_id = $5
              AND device.status = 'active'
             JOIN device_network network
               ON network.tenant_id = device.tenant_id
@@ -156,7 +145,6 @@ impl PostgresStore {
         .bind(requester_tenant.as_uuid())
         .bind(requester_user.as_uuid())
         .bind(device_ref.device_id.as_uuid())
-        .bind(device_ref.deployment_id.as_uuid())
         .bind(device_ref.tenant_id.as_uuid())
         .fetch_optional(&mut *tx)
         .await?

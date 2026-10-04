@@ -1,9 +1,9 @@
 use std::{collections::HashSet, time::Duration};
 
 use pab_protocol::{
-    ControlClientMessage, ControlServerMessage, DeploymentId, EndpointAuthenticationResult,
-    EndpointKey, EndpointProofPrincipal, EndpointProofPurpose, EndpointRegistration,
-    EndpointRegistrationResult, RequestId,
+    ControlClientMessage, ControlServerMessage, EndpointAuthenticationResult, EndpointKey,
+    EndpointProofPrincipal, EndpointProofPurpose, EndpointRegistration, EndpointRegistrationResult,
+    RequestId,
 };
 use time::OffsetDateTime;
 
@@ -34,7 +34,6 @@ enum PendingProof {
 
 pub struct ControlSession {
     control: ControlPlane,
-    deployment_id: DeploymentId,
     config: ControlApiConfig,
     proof_session: EndpointProofSession,
     account: Option<Account>,
@@ -46,16 +45,11 @@ pub struct ControlSession {
 }
 
 impl ControlSession {
-    pub fn new(
-        control: ControlPlane,
-        deployment_id: DeploymentId,
-        config: ControlApiConfig,
-    ) -> Self {
+    pub fn new(control: ControlPlane, config: ControlApiConfig) -> Self {
         Self {
             control,
-            deployment_id,
             config,
-            proof_session: EndpointProofSession::new(deployment_id),
+            proof_session: EndpointProofSession::new(),
             account: None,
             endpoint: None,
             pending_proof: None,
@@ -72,6 +66,17 @@ impl ControlSession {
     pub async fn handle(&mut self, message: ControlClientMessage) -> ControlServerMessage {
         let request_id = message.request_id();
         let result = match message {
+            // Decode legacy requests, but never allow them to alter ownership.
+            ControlClientMessage::BeginDeviceClaim { .. }
+            | ControlClientMessage::ApproveDeviceClaim { .. }
+            | ControlClientMessage::ListDeviceClaims { .. }
+            | ControlClientMessage::RejectDeviceClaim { .. } => {
+                return ControlServerMessage::Error {
+                    request_id: Some(request_id),
+                    code: pab_protocol::ControlErrorCode::InvalidMessage,
+                    message: "device claims have been removed; use server administration".into(),
+                };
+            }
             ControlClientMessage::RegisterAccount {
                 username, password, ..
             } => {
@@ -172,28 +177,6 @@ impl ControlSession {
                 .authorize_device_peer(peer_endpoint_key)
                 .await
                 .map(|result| ControlServerMessage::DevicePeerAuthorized { request_id, result }),
-            ControlClientMessage::BeginDeviceClaim {
-                device_code,
-                owner_tenant_id,
-                ..
-            } => self
-                .begin_device_claim(device_code, owner_tenant_id)
-                .await
-                .map(|claim_id| ControlServerMessage::DeviceClaimPending {
-                    request_id,
-                    claim_id,
-                }),
-            ControlClientMessage::ApproveDeviceClaim { claim_id, .. } => self
-                .approve_device_claim(claim_id)
-                .await
-                .map(
-                    |(device_id, owner_tenant_id)| ControlServerMessage::DeviceClaimApproved {
-                        request_id,
-                        claim_id,
-                        device_id,
-                        owner_tenant_id,
-                    },
-                ),
         };
         match result {
             Ok(response) => response,
@@ -464,9 +447,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
-        if hello.device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         self.control
             .publish_device_hello(endpoint, hello)
             .await
@@ -481,9 +461,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
-        if update.device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         self.control
             .publish_device_network(endpoint, update)
             .await
@@ -498,9 +475,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
-        if device_ref.deployment_id != self.deployment_id {
-            return Err(ControlSessionError::DeviceIdentityMismatch);
-        }
         if !self.device_network_lookups.contains(&device_ref)
             && self.device_network_lookups.len() >= 20
         {
@@ -523,7 +497,7 @@ impl ControlSession {
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
         self.control
-            .resolve_device_code(endpoint, device_code, self.deployment_id)
+            .resolve_device_code(endpoint, device_code)
             .await
             .map_err(Into::into)
     }
@@ -562,7 +536,7 @@ impl ControlSession {
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
         self.control
-            .list_my_devices(endpoint, self.deployment_id)
+            .list_my_devices(endpoint)
             .await
             .map_err(Into::into)
     }
@@ -577,35 +551,6 @@ impl ControlSession {
             .ok_or(ControlSessionError::DeviceEndpointRequired)?;
         self.control
             .authorize_device_peer(endpoint, peer_endpoint_key)
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn begin_device_claim(
-        &self,
-        device_code: pab_protocol::DeviceCode,
-        owner_tenant_id: pab_protocol::TenantId,
-    ) -> Result<pab_protocol::ClaimId, ControlSessionError> {
-        let account = self
-            .account
-            .as_ref()
-            .ok_or(ControlSessionError::NotAuthenticated)?;
-        self.control
-            .begin_device_claim(account.id, device_code, owner_tenant_id)
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn approve_device_claim(
-        &self,
-        claim_id: pab_protocol::ClaimId,
-    ) -> Result<(pab_protocol::DeviceId, pab_protocol::TenantId), ControlSessionError> {
-        let endpoint = self
-            .endpoint
-            .as_ref()
-            .ok_or(ControlSessionError::DeviceEndpointRequired)?;
-        self.control
-            .approve_device_claim(endpoint, claim_id)
             .await
             .map_err(Into::into)
     }

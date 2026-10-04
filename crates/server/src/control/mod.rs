@@ -1,7 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use pab_protocol::DeploymentId;
-
 use crate::ControlPlane;
 
 mod relay_auth;
@@ -31,24 +29,23 @@ impl Default for ControlApiConfig {
 
 #[derive(Clone)]
 pub struct ControlApiState {
-    pub(super) control: Arc<ControlPlane>,
-    pub(super) deployment_id: DeploymentId,
-    pub(super) config: ControlApiConfig,
+    pub(crate) control: Arc<ControlPlane>,
+    pub(crate) config: ControlApiConfig,
     pub(super) relay_auth: RelayControlAuth,
+    pub(crate) server_instance: uuid::Uuid,
 }
 
 impl ControlApiState {
     pub fn new(
         control: ControlPlane,
-        deployment_id: DeploymentId,
         config: ControlApiConfig,
         relay_auth: RelayControlAuth,
     ) -> Self {
         Self {
             control: Arc::new(control),
-            deployment_id,
             config,
             relay_auth,
+            server_instance: uuid::Uuid::new_v4(),
         }
     }
 }

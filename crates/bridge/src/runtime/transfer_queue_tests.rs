@@ -1,11 +1,10 @@
 use super::*;
-use pab_protocol::{DeploymentId, DeviceId, EndpointKey, OperatorRef, TenantId, UserId};
+use pab_protocol::{DeviceId, EndpointKey, OperatorRef, TenantId, UserId};
 
 fn request() -> TransferRequest {
     TransferRequest {
         request_id: RequestId::new(),
         device_ref: DeviceRef {
-            deployment_id: DeploymentId::from_u128(1),
             tenant_id: TenantId::from_u128(2),
             device_id: DeviceId::from_u128(3),
         },

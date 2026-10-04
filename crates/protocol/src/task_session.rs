@@ -409,7 +409,7 @@ pub enum DeviceTaskResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::{DeploymentId, DeviceId, DeviceRef, TaskId, TenantId};
+    use crate::{DeviceId, DeviceRef, TaskId, TenantId};
 
     use super::*;
 
@@ -444,7 +444,6 @@ mod tests {
             schema_version: DEVICE_TASK_SCHEMA_VERSION,
             task_ref: TaskRef {
                 device_ref: DeviceRef {
-                    deployment_id: DeploymentId::from_u128(1),
                     tenant_id: TenantId::from_u128(2),
                     device_id: DeviceId::from_u128(3),
                 },

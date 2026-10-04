@@ -2,11 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{DeploymentId, DeviceId, TenantId};
+use crate::{DeviceId, TenantId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DeviceRef {
-    pub deployment_id: DeploymentId,
     pub tenant_id: TenantId,
     pub device_id: DeviceId,
 }
@@ -154,8 +153,7 @@ impl TargetContext {
             .unwrap_or_else(|| "none".to_owned());
         let revision = single_line(&self.execution.environment_revision, 80);
         format!(
-            "Target {}/{}/{} | {} {} | {} | {} | {} | cwd={} | env={}",
-            self.device_ref.deployment_id,
+            "Target {}/{} | {} {} | {} | {} | {} | cwd={} | env={}",
             self.device_ref.tenant_id,
             self.device_ref.device_id,
             self.execution.os_family,

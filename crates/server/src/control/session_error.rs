@@ -59,10 +59,6 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidState,
             "an authenticated user endpoint is required".to_owned(),
         ),
-        ControlSessionError::DeviceIdentityMismatch => (
-            ControlErrorCode::PermissionDenied,
-            "device identity does not match this connection".to_owned(),
-        ),
         ControlSessionError::EndpointProof(_) => (
             ControlErrorCode::InvalidCredentials,
             "endpoint proof was rejected".to_owned(),
@@ -168,8 +164,6 @@ pub(super) enum ControlSessionError {
     DeviceEndpointRequired,
     #[error("an authenticated user endpoint is required")]
     UserEndpointRequired,
-    #[error("device identity does not match this connection")]
-    DeviceIdentityMismatch,
     #[error(transparent)]
     EndpointProof(#[from] EndpointProofError),
     #[error(transparent)]

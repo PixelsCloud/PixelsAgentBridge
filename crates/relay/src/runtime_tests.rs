@@ -3,16 +3,15 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use iroh_base::SecretKey;
 use iroh_relay::server::{ForwardingControl, ForwardingDecision};
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent,
-    RelayEndpointOwner, RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot,
-    TeamRelayLimits, TenantId, TrafficScope, UserId,
+    DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
+    TrafficScope, UserId,
 };
 
 use crate::{RelayPolicyRuntime, RelayPolicyState};
 
 #[test]
 fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
-    let deployment_id = DeploymentId::new();
     let tenant_id = TenantId::new();
     let user_id = UserId::new();
     let user_key = SecretKey::generate();
@@ -28,7 +27,6 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
     .unwrap();
     let snapshot = RelayPolicySnapshot {
         schema_version: RELAY_POLICY_SCHEMA_VERSION,
-        deployment_id,
         policy_version: 1,
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
@@ -59,9 +57,8 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
             expires_at_unix_ms: now + 60_000,
         }],
     };
-    let runtime = RelayPolicyRuntime::new(
-        RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),
-    );
+    let runtime =
+        RelayPolicyRuntime::new(RelayPolicyState::new(Duration::from_millis(100)).unwrap());
     runtime.apply_snapshot(snapshot).unwrap();
 
     assert_eq!(
@@ -76,7 +73,6 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
 
 #[test]
 fn forwarding_hook_shares_team_budget_across_members() {
-    let deployment_id = DeploymentId::new();
     let tenant_id = TenantId::new();
     let device_id = DeviceId::new();
     let device_key = SecretKey::generate();
@@ -119,7 +115,6 @@ fn forwarding_hook_shares_team_budget_across_members() {
     }
     let snapshot = RelayPolicySnapshot {
         schema_version: RELAY_POLICY_SCHEMA_VERSION,
-        deployment_id,
         policy_version: 1,
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
@@ -136,9 +131,8 @@ fn forwarding_hook_shares_team_budget_across_members() {
         endpoints,
         connection_intents,
     };
-    let runtime = RelayPolicyRuntime::new(
-        RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),
-    );
+    let runtime =
+        RelayPolicyRuntime::new(RelayPolicyState::new(Duration::from_millis(100)).unwrap());
     runtime.apply_snapshot(snapshot).unwrap();
 
     assert_eq!(

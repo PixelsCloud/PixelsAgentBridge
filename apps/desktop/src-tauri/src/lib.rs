@@ -1,6 +1,5 @@
 use pab_agent_core::{DataPaths, DataScope};
 use pab_executor::{DeviceStatus, read_local_device_status};
-use pab_protocol::ClaimId;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
@@ -39,28 +38,6 @@ async fn device_status(state: tauri::State<'_, LocalStatus>) -> Result<DeviceSta
     read_local_device_status()
         .await
         .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-async fn approve_claim(claim_id: String) -> Result<(), String> {
-    let claim_id = claim_id
-        .parse::<ClaimId>()
-        .map_err(|_| "申请 ID 格式不正确".to_owned())?;
-    let token_exists = pab_executor::local_ipc::user_token_path()
-        .ok()
-        .is_some_and(|path| path.is_file());
-    if token_exists {
-        pab_executor::local_ipc::approve_local_claim(claim_id)
-            .await
-            .map_err(|error| error.to_string())
-    } else {
-        pab_executor::approve_claim(claim_id)
-            .await
-            .map_err(|error| {
-                tracing::warn!(%error, "device claim approval failed");
-                error.to_string()
-            })
-    }
 }
 
 async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
@@ -229,7 +206,10 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             tracing::debug!(%error, "local WebSocket disconnected");
                             break;
                         }
-                        Err(_) => break,
+                        // This one-second wake-up checks whether Windows changed
+                        // desktops. Status updates arrive every three seconds;
+                        // an idle tick is not a disconnected local service.
+                        Err(_) => continue,
                     }
                 }
             }
@@ -277,7 +257,6 @@ pub fn run() {
             macos_permissions::open_macos_permission_settings,
             device_status,
             mcp_reporting::mcp_reporting_status,
-            approve_claim,
             mcp_tool_settings::get_mcp_tool_settings,
             mcp_tool_settings::save_mcp_tool_settings,
             server_settings::get_operator_server_settings,
@@ -313,7 +292,6 @@ pub fn run() {
             operator::terminal::operator_terminal_close,
             operator::terminal::operator_terminal_history,
             operator::operator_task,
-            operator::operator_claim,
             operator::operator_current_traffic_scope,
             operator::operator_login_account,
             operator::operator_use_guest_scope,

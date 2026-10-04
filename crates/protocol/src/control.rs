@@ -77,12 +77,20 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         peer_endpoint_key: EndpointKey,
     },
+    // Legacy wire messages: retained for decoding only. The server rejects all claims.
     BeginDeviceClaim {
         request_id: RequestId,
         device_code: DeviceCode,
         owner_tenant_id: TenantId,
     },
     ApproveDeviceClaim {
+        request_id: RequestId,
+        claim_id: ClaimId,
+    },
+    ListDeviceClaims {
+        request_id: RequestId,
+    },
+    RejectDeviceClaim {
         request_id: RequestId,
         claim_id: ClaimId,
     },
@@ -108,6 +116,8 @@ impl ControlClientMessage {
             | Self::ListTrafficScopes { request_id }
             | Self::AuthorizeDevicePeer { request_id, .. } => *request_id,
             Self::BeginDeviceClaim { request_id, .. }
+            | Self::ListDeviceClaims { request_id }
+            | Self::RejectDeviceClaim { request_id, .. }
             | Self::ApproveDeviceClaim { request_id, .. } => *request_id,
         }
     }
@@ -183,11 +193,26 @@ pub enum ControlServerMessage {
         device_id: DeviceId,
         owner_tenant_id: TenantId,
     },
+    DeviceClaims {
+        request_id: RequestId,
+        claims: Vec<DeviceClaimEntry>,
+    },
+    DeviceClaimRejected {
+        request_id: RequestId,
+        claim_id: ClaimId,
+    },
     Error {
         request_id: Option<RequestId>,
         code: ControlErrorCode,
         message: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceClaimEntry {
+    pub claim_id: ClaimId,
+    pub username: String,
+    pub expires_at_unix_ms: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

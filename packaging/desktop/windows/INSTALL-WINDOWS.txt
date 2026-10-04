@@ -11,10 +11,10 @@ Pixels Agent Bridge - Windows Debug test package
    send Ctrl+Alt+Delete. The installer checks for value 1 or 3 before changing
    installed program files.
 
-4. Install the complete package, replacing the deployment ID and URLs with
+4. Install the complete package, replacing the URLs with
    values supplied by the deployment administrator:
 
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -DeploymentId '<deployment-uuid>' -ControlUrl 'wss://<server>/control' -RelayUrl 'https://<relay-server>'
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ControlUrl 'wss://<server>/control' -RelayUrl 'https://<relay-server>'
 
 5. Open the single desktop app:
 

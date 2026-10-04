@@ -1,0 +1,31 @@
+# Include inside nginx's http {} context; replace all domain/certificate paths.
+# Server environment: PAB_WEB_ORIGIN=https://bridge.example.com
+# Compose backend default loopback port: 31400. HTTPS remains enabled upstream.
+map $http_upgrade $pab_connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
+server {
+    listen 443 ssl;
+    server_name bridge.example.com;
+
+    ssl_certificate /etc/nginx/certs/bridge-fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/bridge-key.pem;
+
+    location / {
+        proxy_pass https://127.0.0.1:31400;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $pab_connection_upgrade;
+        proxy_ssl_server_name on;
+        # Must match a SAN on the backend certificate, not necessarily the Web domain.
+        proxy_ssl_name bridge.example.com;
+        proxy_ssl_verify on;
+        proxy_ssl_trusted_certificate /etc/nginx/certs/backend-ca.pem;
+        proxy_read_timeout 90s;
+        proxy_buffering off;
+        proxy_cache off;
+    }
+}

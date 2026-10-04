@@ -14,6 +14,8 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 
 ## 目录
 
+新增 **Server Web 管理端**：React + Ant Design，支持账号、设备列表与实时在线状态、Team、Relay 策略健康和管理变更记录；管理员直接管理全站设备，无需设备认领。提供简体中文、繁体中文、英文及亮暗主题。远程任务记录仅保存在本地。见[部署指南](WEB_DEPLOYMENT.md)和[完整开发与测试计划](WEB_DEVELOPMENT.md)。
+
 - [主要能力](#主要能力)
 - [工作流程与组件](#工作流程)
 - [快速开始](#快速开始)
@@ -87,8 +89,8 @@ Windows 安装还包含桌面会话辅助进程，提供需要交互桌面或安
 在操作端和目标计算机安装完整桌面包。Windows 包包含 Desktop、Executor、MCP
 和安装脚本，EXE 安装程序启动后台服务并创建快捷方式。
 
-安装需要部署 UUID、WSS 控制地址和 HTTPS Relay 地址，需要互相通信的计算机
-应使用同一部署。自部署先完成[服务端部署](#服务端部署)。
+安装需要 WSS 控制地址和 HTTPS Relay 地址，需要互相通信的计算机
+应连接同一控制服务。自部署先完成[服务端部署](#服务端部署)。
 安装包可按下文的[构建说明](#构建-windows-安装包)生成。
 
 Windows 无人值守访问由机器级服务承担，被操作端无需一直打开桌面主窗口。
@@ -614,7 +616,7 @@ npm ci
 
 ```powershell
 python packaging/desktop/build.py --platform windows --profile debug
-python packaging/desktop/build_nsis.py --profile debug --deployment-id "YOUR_DEPLOYMENT_UUID" --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
+python packaging/desktop/build_nsis.py --profile debug --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
 ```
 
 执行前替换部署信息。输出位于 `.build/packages/`，包含
@@ -641,10 +643,9 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 Compose 包含 PostgreSQL 17、控制后端和 Relay。启动前：
 
 1. 将 `packaging/docker/example.env` 复制为 `packaging/docker/private.env`。
-2. 设置部署 UUID，并在该部署生命周期内保持不变。
-3. 配置数据库密码、域名、证书路径和端口映射。
-4. 准备与域名匹配的后端、Relay TLS 证书，以及需要的 CA 文件。
-5. 创建环境配置指定的私有 Relay 控制密钥文件。
+2. 配置数据库密码、域名、证书路径和端口映射。
+3. 准备与域名匹配的后端、Relay TLS 证书，以及需要的 CA 文件。
+4. 创建环境配置指定的私有 Relay 控制密钥文件。
 
 在仓库根目录运行：
 

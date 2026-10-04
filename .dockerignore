@@ -8,6 +8,9 @@ references/
 target/
 **/target/
 **/node_modules/
+**/dist/
+**/test-results/
+**/playwright-report/
 packaging/docker/certs/
 packaging/docker/secrets/
 packaging/docker/private.env

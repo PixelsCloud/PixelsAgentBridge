@@ -1,7 +1,7 @@
 //! Opt-in remote regression for the built MCP executable, not installed-host acceptance.
 //! Set PAB_TEST_DEVICE_CODE, PAB_TEST_PATH (an existing target file), and
 //! PAB_DATA_DIR to the user's shared credential store,
-//! plus PAB_DEPLOYMENT_ID/PAB_CONTROL_URL/PAB_RELAY_URLS for the test deployment.
+//! plus PAB_CONTROL_URL/PAB_RELAY_URLS for the test server.
 use std::{process::Stdio, time::Duration};
 
 use rmcp::{RoleClient, ServiceExt, model::CallToolRequestParams, service::RunningService};

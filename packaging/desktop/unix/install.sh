@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo 'usage: install.sh DEPLOYMENT_ID WSS_CONTROL_URL HTTPS_RELAY_URL' >&2
+if [[ $# -ne 2 ]]; then
+    echo 'usage: install.sh WSS_CONTROL_URL HTTPS_RELAY_URL' >&2
     exit 2
 fi
 [[ $EUID -eq 0 ]] || { echo 'Installation requires root' >&2; exit 2; }
 
-deployment_id=$1
-control_url=$2
-relay_url=$3
+control_url=$1
+relay_url=$2
 source_dir=$(cd "$(dirname "$0")" && pwd)
 platform=$(uname -s)
 
@@ -63,7 +62,6 @@ for name in run-app.sh run-mcp.sh run-executor.sh uninstall.sh; do
 done
 
 {
-    printf 'export PAB_DEPLOYMENT_ID=%q\n' "$deployment_id"
     printf 'export PAB_CONTROL_URL=%q\n' "$control_url"
     printf 'export PAB_RELAY_URLS=%q\n' "$relay_url"
 } > "$install_dir/settings.env"

@@ -41,13 +41,9 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     config.validate()?;
     let server_tls = load_server_config(&config.tls_cert, &config.tls_key)?;
     let connector = control_connector(config.control_ca_cert.as_deref())?;
-    let runtime = RelayPolicyRuntime::new(RelayPolicyState::new(
-        config.deployment_id,
-        config.limiter_burst,
-    )?);
+    let runtime = RelayPolicyRuntime::new(RelayPolicyState::new(config.limiter_burst)?);
     let sync_settings = PolicySyncSettings {
         control_url: config.control_url,
-        deployment_id: config.deployment_id,
         control_secret: config.control_secret,
         refresh_interval: config.policy_refresh_interval,
         reconnect_interval: config.reconnect_interval,

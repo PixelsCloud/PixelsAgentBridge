@@ -6,14 +6,12 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OperatorSettings {
-    deployment_id: String,
     control_url: String,
     relay_url: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct InstalledSettings {
-    deployment_id: String,
     control_url: String,
     relay_urls: String,
 }
@@ -45,7 +43,6 @@ fn load(
         let bytes = fs::read(installed_path)?;
         let settings: InstalledSettings = serde_json::from_slice(without_utf8_bom(&bytes))?;
         values = vec![
-            ("PAB_DEPLOYMENT_ID", settings.deployment_id),
             ("PAB_CONTROL_URL", settings.control_url),
             ("PAB_RELAY_URLS", settings.relay_urls),
         ];
@@ -54,7 +51,6 @@ fn load(
         let bytes = fs::read(user_path)?;
         let settings: OperatorSettings = serde_json::from_slice(without_utf8_bom(&bytes))?;
         values = vec![
-            ("PAB_DEPLOYMENT_ID", settings.deployment_id),
             ("PAB_CONTROL_URL", settings.control_url),
             ("PAB_RELAY_URLS", settings.relay_url),
         ];
@@ -77,19 +73,18 @@ mod tests {
         let user = root.path().join("operator-server.json");
         fs::write(
             &installed,
-            b"\xef\xbb\xbf{\"deployment_id\":\"installed\",\"control_url\":\"wss://installed\",\"relay_urls\":\"https://installed\"}",
+            b"\xef\xbb\xbf{\"control_url\":\"wss://installed\",\"relay_urls\":\"https://installed\"}",
         )
         .unwrap();
         fs::write(
             &user,
-            r#"{"deploymentId":"user","controlUrl":"wss://user","relayUrl":"https://user"}"#,
+            r#"{"controlUrl":"wss://user","relayUrl":"https://user"}"#,
         )
         .unwrap();
 
         assert_eq!(
             load(&installed, &user).unwrap(),
             vec![
-                ("PAB_DEPLOYMENT_ID", "user".to_owned()),
                 ("PAB_CONTROL_URL", "wss://user".to_owned()),
                 ("PAB_RELAY_URLS", "https://user".to_owned()),
             ]

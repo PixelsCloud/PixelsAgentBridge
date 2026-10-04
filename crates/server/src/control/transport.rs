@@ -20,11 +20,15 @@ const LOGIN_MESSAGE_TIMEOUT: Duration = Duration::from_secs(20);
 const AUTHENTICATED_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub fn control_router(state: ControlApiState) -> Router {
+    let web = crate::web::router(state.clone());
     Router::new()
         .route("/health", get(health))
         .route("/control", get(control_upgrade))
         .route("/relay-control", get(relay_control_upgrade))
         .with_state(state)
+        .merge(web)
+        .fallback_service(crate::web::assets())
+        .layer(axum::middleware::from_fn(crate::web::response_headers))
 }
 
 pub async fn serve_tls(
@@ -81,8 +85,7 @@ async fn relay_control_upgrade(
 
 async fn run_socket(socket: WebSocket, state: ControlApiState) {
     let (mut sender, mut receiver) = socket.split();
-    let mut session =
-        ControlSession::new((*state.control).clone(), state.deployment_id, state.config);
+    let mut session = ControlSession::new((*state.control).clone(), state.config);
 
     loop {
         let idle_timeout = if session.is_authenticated() {

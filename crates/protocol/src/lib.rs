@@ -25,8 +25,9 @@ mod task_session;
 mod window;
 
 pub use control::{
-    ControlClientMessage, ControlErrorCode, ControlServerMessage, EndpointAuthenticationResult,
-    EndpointRegistration, EndpointRegistrationResult, TeamTrafficScope, TrafficScopeOptions,
+    ControlClientMessage, ControlErrorCode, ControlServerMessage, DeviceClaimEntry,
+    EndpointAuthenticationResult, EndpointRegistration, EndpointRegistrationResult,
+    TeamTrafficScope, TrafficScopeOptions,
 };
 pub use device::{
     DEVICE_SESSION_SCHEMA_VERSION, DeviceDirectoryEntry, DeviceHello, DeviceHelloResult,
@@ -54,8 +55,8 @@ pub use filesystem::{
     TextReadRange, cancellable_filesystem_kind, valid_file_hash,
 };
 pub use ids::{
-    ChallengeId, ClaimId, ConnectionId, DeploymentId, DeviceId, EndpointInstanceId, RequestId,
-    TaskId, TenantId, UserId,
+    ChallengeId, ClaimId, ConnectionId, DeviceId, EndpointInstanceId, RequestId, TaskId, TenantId,
+    UserId,
 };
 pub use operator::OperatorRef;
 pub use peer::{

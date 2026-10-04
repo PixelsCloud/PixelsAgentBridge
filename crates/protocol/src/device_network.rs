@@ -44,14 +44,13 @@ pub struct DeviceNetworkSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DeploymentId, DeviceId, TenantId};
+    use crate::{DeviceId, TenantId};
 
     #[test]
     fn network_update_round_trips_without_iroh_types() {
         let update = DeviceNetworkUpdate {
             schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
             device_ref: DeviceRef {
-                deployment_id: DeploymentId::from_u128(1),
                 tenant_id: TenantId::from_u128(2),
                 device_id: DeviceId::from_u128(3),
             },

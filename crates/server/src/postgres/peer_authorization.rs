@@ -12,7 +12,7 @@ impl PostgresStore {
     ) -> Result<AuthorizedDevicePeer, StoreError> {
         let row = sqlx::query(
             r#"
-            SELECT deployment.id AS deployment_id, peer.user_id
+            SELECT peer.user_id
             FROM endpoints device_endpoint
             JOIN devices device
               ON device.tenant_id = device_endpoint.tenant_id
@@ -21,7 +21,6 @@ impl PostgresStore {
             JOIN tenants tenant
               ON tenant.id = device.tenant_id
              AND tenant.status = 'active'
-            JOIN deployments deployment ON deployment.singleton = true
             JOIN device_connection_intents intent
               ON intent.device_id = device.id
              AND intent.operator_endpoint_key = $4
@@ -54,7 +53,6 @@ impl PostgresStore {
 
         Ok(AuthorizedDevicePeer {
             device_ref: pab_protocol::DeviceRef {
-                deployment_id: DeploymentId::from_uuid(row.try_get("deployment_id")?),
                 tenant_id: device_endpoint.tenant_id,
                 device_id,
             },

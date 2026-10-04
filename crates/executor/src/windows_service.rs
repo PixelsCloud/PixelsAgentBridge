@@ -23,7 +23,6 @@ const SERVICE_NAME: &str = "PixelsAgentBridgeExecutor";
 
 #[derive(Deserialize)]
 struct InstalledSettings {
-    deployment_id: String,
     control_url: String,
     relay_urls: String,
 }
@@ -47,7 +46,6 @@ fn load_installed_settings() -> Result<(), String> {
     // SAFETY: This runs before the service dispatcher starts any application threads.
     unsafe {
         std::env::set_var("PAB_DATA_DIR", data_root);
-        std::env::set_var("PAB_DEPLOYMENT_ID", settings.deployment_id);
         std::env::set_var("PAB_CONTROL_URL", settings.control_url);
         std::env::set_var("PAB_RELAY_URLS", settings.relay_urls);
     }
@@ -143,8 +141,8 @@ fn run_service() -> Result<(), String> {
 mod tests {
     #[test]
     fn accepts_settings_written_by_windows_powershell() {
-        let bytes = b"\xef\xbb\xbf{\"deployment_id\":\"id\",\"control_url\":\"wss://example.test\",\"relay_urls\":\"https://example.test\"}";
+        let bytes = b"\xef\xbb\xbf{\"control_url\":\"wss://example.test\",\"relay_urls\":\"https://example.test\"}";
         let settings = super::parse_installed_settings(bytes).unwrap();
-        assert_eq!(settings.deployment_id, "id");
+        assert_eq!(settings.control_url, "wss://example.test");
     }
 }

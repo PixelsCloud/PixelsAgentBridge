@@ -1,21 +1,16 @@
 use pab_agent_core::{DataPaths, DataScope, ensure_data_dir};
-use pab_protocol::DeploymentId;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerSettings {
-    deployment_id: String,
     control_url: String,
     relay_url: String,
 }
 
 impl ServerSettings {
     fn validate(&self) -> Result<(), String> {
-        self.deployment_id
-            .parse::<DeploymentId>()
-            .map_err(|_| "Invalid deployment ID".to_owned())?;
         validate_url(&self.control_url, "wss://")?;
         validate_url(&self.relay_url, "https://")?;
         Ok(())
@@ -65,7 +60,6 @@ pub fn apply_saved_at_start() -> Result<(), String> {
     // Called before Tauri or Tokio starts threads. The operator uses this
     // user-scoped override; the machine service retains its own configuration.
     unsafe {
-        std::env::set_var("PAB_DEPLOYMENT_ID", settings.deployment_id);
         std::env::set_var("PAB_CONTROL_URL", settings.control_url);
         std::env::set_var("PAB_RELAY_URLS", settings.relay_url);
     }
@@ -75,7 +69,6 @@ pub fn apply_saved_at_start() -> Result<(), String> {
 #[tauri::command]
 pub fn get_operator_server_settings() -> Result<ServerSettings, String> {
     Ok(ServerSettings {
-        deployment_id: std::env::var("PAB_DEPLOYMENT_ID").unwrap_or_default(),
         control_url: std::env::var("PAB_CONTROL_URL").unwrap_or_default(),
         relay_url: std::env::var("PAB_RELAY_URLS").unwrap_or_default(),
     })

@@ -17,12 +17,12 @@ use pab_executor::{DeviceSessionAcceptor, DeviceSessionError};
 use pab_platform::detect_native_execution_context;
 use pab_protocol::{
     CommandTaskSpec, ControlClientMessage, ControlErrorCode, ControlServerMessage, CpuArchitecture,
-    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeploymentId, DeviceHello,
-    DeviceNetworkUpdate, DeviceRef, DeviceTaskResponse, EndpointAuthenticationResult,
-    EndpointInstanceId, EndpointKey, EndpointProofPrincipal, EndpointProofResponse,
-    EndpointRegistration, EndpointRegistrationResult, EndpointSignature, ExecutionContext,
-    ExecutionScope, ExpectedEnvironment, InterpreterContext, OperatorRef, OsFamily, PathStyle,
-    RelayLimitDefaults, RequestId, TaskState,
+    DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION, DeviceHello, DeviceNetworkUpdate,
+    DeviceRef, DeviceTaskResponse, EndpointAuthenticationResult, EndpointInstanceId, EndpointKey,
+    EndpointProofPrincipal, EndpointProofResponse, EndpointRegistration,
+    EndpointRegistrationResult, EndpointSignature, ExecutionContext, ExecutionScope,
+    ExpectedEnvironment, InterpreterContext, OperatorRef, OsFamily, PathStyle, RelayLimitDefaults,
+    RequestId, TaskState,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -118,21 +118,17 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let store = PostgresStore::from_pool(pool.clone());
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
-    let deployment_id = control
-        .initialize_deployment(
-            DeploymentId::new(),
-            RelayLimitDefaults {
-                team_mbps: 20,
-                member_mbps: 4,
-                personal_mbps: 5,
-            },
-        )
+    control
+        .initialize_settings(RelayLimitDefaults {
+            team_mbps: 20,
+            member_mbps: 4,
+            personal_mbps: 5,
+        })
         .await
         .unwrap();
     let inspection_control = control.clone();
     let state = ControlApiState::new(
         control,
-        deployment_id,
         ControlApiConfig {
             registration_enabled: true,
             ..ControlApiConfig::default()
@@ -519,7 +515,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let connector = tls_connector(Some(&std::fs::read(&certificate_path).unwrap())).unwrap();
     let agent_config = EndpointControlConfig {
         url: format!("wss://localhost:{}/control", address.port()),
-        deployment_id,
         tenant_id: team_id,
         principal: EndpointProofPrincipal::User { user_id },
         operation_timeout: Duration::from_secs(5),
@@ -578,7 +573,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             .await
             .unwrap(),
         DeviceRef {
-            deployment_id,
             tenant_id: personal_tenant_id,
             device_id,
         }
@@ -590,13 +584,11 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     );
 
     let device_ref = DeviceRef {
-        deployment_id,
         tenant_id: personal_tenant_id,
         device_id,
     };
     let device_config = EndpointControlConfig {
         url: format!("wss://localhost:{}/control", address.port()),
-        deployment_id,
         tenant_id: personal_tenant_id,
         principal: EndpointProofPrincipal::Device { device_id },
         operation_timeout: Duration::from_secs(5),
@@ -891,7 +883,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let account_scope_directory = tempfile::tempdir().unwrap();
     let account_registration = register_account_traffic_scope(
         &account_control_url,
-        deployment_id,
         "alice".to_owned(),
         zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
         team_id,
@@ -906,7 +897,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let account_endpoint = AuthenticatedControlConnection::connect(
         &EndpointControlConfig {
             url: account_control_url.clone(),
-            deployment_id,
             tenant_id: team_id,
             principal: EndpointProofPrincipal::User { user_id },
             operation_timeout: Duration::from_secs(5),
@@ -919,7 +909,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     drop(account_endpoint);
     let reused_registration = register_account_traffic_scope(
         &account_control_url,
-        deployment_id,
         "alice".to_owned(),
         zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
         team_id,
@@ -936,7 +925,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert!(matches!(
         register_account_traffic_scope(
             &account_control_url,
-            deployment_id,
             "alice".to_owned(),
             zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
             pab_protocol::TenantId::new(),
@@ -960,17 +948,12 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         "Relay control must reject a connection without its internal secret"
     );
 
-    let mut relay_client = RelayControlClient::connect(
-        &relay_url,
-        deployment_id,
-        RELAY_CONTROL_SECRET,
-        connector.clone(),
-    )
-    .await
-    .unwrap();
-    let relay_policy = RelayPolicyRuntime::new(
-        RelayPolicyState::new(deployment_id, Duration::from_millis(100)).unwrap(),
-    );
+    let mut relay_client =
+        RelayControlClient::connect(&relay_url, RELAY_CONTROL_SECRET, connector.clone())
+            .await
+            .unwrap();
+    let relay_policy =
+        RelayPolicyRuntime::new(RelayPolicyState::new(Duration::from_millis(100)).unwrap());
     let first_sync = relay_client.sync_policy(&relay_policy).await.unwrap();
     let policy_version = match first_sync {
         PolicySync::Updated { policy_version } => policy_version,
@@ -995,7 +978,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let running_relay = tokio::time::timeout(
         Duration::from_secs(30),
         start_relay_service(RelayServiceConfig {
-            deployment_id,
             control_url: format!("wss://localhost:{}/relay-control", address.port()),
             control_secret: RELAY_CONTROL_SECRET.to_owned(),
             control_ca_cert: Some(certificate_path.clone()),
@@ -1046,7 +1028,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let bridge_secret_path = bridge_directory.path().join("bridge-endpoint.key");
     std::fs::write(&bridge_secret_path, endpoint_secret_text(&secret)).unwrap();
     let mut bridge = BridgeClient::connect(BridgeConfig {
-        deployment_id,
         tenant_id: team_id,
         identity: pab_bridge::BridgeIdentity::Account(user_id),
         control_url: format!("wss://localhost:{}/control", address.port()),
@@ -1065,7 +1046,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     )
     .unwrap();
     let second_bridge = BridgeClient::connect(BridgeConfig {
-        deployment_id,
         tenant_id: team_id,
         identity: pab_bridge::BridgeIdentity::Account(second_user_id),
         control_url: format!("wss://localhost:{}/control", address.port()),
@@ -1130,7 +1110,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await
     .unwrap();
     sqlx::query(
-        "CREATE TABLE device_access (id INTEGER PRIMARY KEY, deployment_id TEXT NOT NULL, \
+        "CREATE TABLE device_access (id INTEGER PRIMARY KEY, \
          tenant_id TEXT NOT NULL, device_id TEXT NOT NULL, device_code TEXT NOT NULL, \
          temporary_password TEXT NOT NULL, password_version INTEGER NOT NULL, \
          password_hash TEXT NOT NULL)",
@@ -1139,7 +1119,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await
     .unwrap();
     sqlx::query(
-        "INSERT INTO device_access VALUES (1, 'deployment', 'tenant', 'device', \
+        "INSERT INTO device_access VALUES (1, 'tenant', 'device', \
          '123456789', ?, 7, ?)",
     )
     .bind(device_password)
@@ -1382,7 +1362,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let guest_secret = SecretKey::generate();
     let guest_registration = register_open_endpoint(
         &format!("wss://localhost:{}/control", address.port()),
-        deployment_id,
         &guest_secret,
         OpenRegistrationKind::Guest,
         guest_connector,
@@ -1400,7 +1379,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let guest_secret_path = bridge_directory.path().join("guest-endpoint.key");
     std::fs::write(&guest_secret_path, endpoint_secret_text(&guest_secret)).unwrap();
     let mut guest = BridgeClient::connect(BridgeConfig {
-        deployment_id,
         tenant_id: guest_tenant_id,
         identity: pab_bridge::BridgeIdentity::Guest,
         control_url: format!("wss://localhost:{}/control", address.port()),
@@ -1691,6 +1669,26 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .expect("guest command did not reach a terminal snapshot");
     assert_eq!(guest_final.state, TaskState::Succeeded);
     assert!(String::from_utf8_lossy(&guest_stdout).contains("guest-command-ok"));
+    // Remote task payloads travel over the device session, never the central database.
+    let central_tables: Vec<String> = sqlx::query_scalar("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename<>'_sqlx_migrations'").fetch_all(&pool).await.unwrap();
+    for table in central_tables {
+        assert!(
+            table
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+        );
+        let found:bool = sqlx::query_scalar(&format!("SELECT EXISTS(SELECT 1 FROM \"{table}\" row WHERE position($1 in row_to_json(row)::text)>0)"))
+            .bind("guest-command-ok").fetch_one(&pool).await.unwrap();
+        assert!(
+            !found,
+            "remote command content was saved in central table {table}"
+        );
+    }
+    let relay_nodes:i64=sqlx::query_scalar("SELECT count(*) FROM relay_nodes WHERE node_id='primary' AND applied_policy_version IS NOT NULL").fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        relay_nodes, 1,
+        "real Relay policy polling must report its applied revision"
+    );
     guest_connection.close();
     tokio::time::timeout(Duration::from_secs(5), guest_server)
         .await

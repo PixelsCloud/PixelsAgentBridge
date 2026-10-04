@@ -45,7 +45,7 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
     const runtime = report.runtime;
     const deviceName = (ref: DeviceRef | null, code?: string | null) => {
       const device = runtime?.devices.find(device => code ? device.deviceCode === code
-        : device.deviceRef.device_id === ref?.device_id && device.deviceRef.deployment_id === ref?.deployment_id && device.deviceRef.tenant_id === ref?.tenant_id);
+        : device.deviceRef.device_id === ref?.device_id && device.deviceRef.tenant_id === ref?.tenant_id);
       const foundCode = code ?? device?.deviceCode;
       const name = device?.alias || device?.name;
       return foundCode ? `${formatDeviceCode(foundCode)}${name ? ` · ${name}` : ""}` : t.unknown;
@@ -80,7 +80,7 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
       ]} />
       {runtime?.lastError && <Alert type="error" showIcon title={runtime.lastError} />}
       <Tabs size="small" items={[
-        { key: "devices", label: `${t.mcpDevices} (${runtime?.devices.length ?? 0})`, children: runtime?.devices.length ? <div className="mcp-device-list">{runtime.devices.map(device => <div className="mcp-device-row" key={`${device.deviceRef.deployment_id}/${device.deviceRef.tenant_id}/${device.deviceRef.device_id}`}>
+        { key: "devices", label: `${t.mcpDevices} (${runtime?.devices.length ?? 0})`, children: runtime?.devices.length ? <div className="mcp-device-list">{runtime.devices.map(device => <div className="mcp-device-row" key={`${device.deviceRef.tenant_id}/${device.deviceRef.device_id}`}>
           <div><strong>{device.deviceCode ? formatDeviceCode(device.deviceCode) : device.deviceRef.device_id}</strong>
             {(device.alias || device.name) && <div>{device.alias || device.name}</div>}
             {device.environment && <Typography.Text type="secondary">{[device.environment.os_name, device.environment.os_version, device.environment.architecture].filter(Boolean).join(" · ")}</Typography.Text>}

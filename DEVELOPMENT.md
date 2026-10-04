@@ -1,5 +1,9 @@
 # Development
 
+The Server Web delivery and test contract is tracked in [WEB_DEVELOPMENT.md](WEB_DEVELOPMENT.md).
+Remote task history is local to Bridge/Executor only. The server and Web do not
+receive, retain, or display task history, command output, or task-derived statistics.
+
 Pixels Agent Bridge has a first remotely operable vertical slice: an enrolled Bridge
 can authenticate through the PostgreSQL control plane, reach an Executor through
 iroh, execute an explicit native program, and stream persistent task events and
@@ -75,7 +79,7 @@ connection close cannot overtake a completed authentication result.
 and Linux Bridge/Executor processes. Its endpoint control handshake accepts only
 `wss://`, uses normal certificate validation plus an optional private CA, caps control
 frames at 64 KiB, validates every challenge identity field before signing, and keeps
-the authenticated socket available for later task-sync protocols. Its supervisor
+the authenticated socket available for device control and ownership messages. Task history remains local and is never synchronized to Server. Its supervisor
 requires matching pong heartbeats, retries indefinitely at a fixed three-second
 interval after recoverable failures, increments a connection generation after every successful
 authentication, and publishes current connection state through a Tokio watch channel
@@ -149,7 +153,7 @@ building `pab-mcp`, with `PAB_MCP_SMOKE_EXE` pointing to the new executable:
 `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib real_mcp_stdio_processes_register_before_tools_and_clean_up_on_exit -- --ignored`.
 
 `pab-executor` is the first runnable, headless Executor entry point. It reads the
-deployment, tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
+tenant, device, WSS URL, explicit self-hosted Relay URLs, endpoint-key
 file, local device-credential file, and optional control/Relay private CAs from
 environment configuration; secrets are accepted only from files. It binds an iroh
 endpoint with the same registered key, detects the native environment, publishes
@@ -168,7 +172,6 @@ agree with the same persisted snapshot.
 Run the Debug Executor with a previously registered device endpoint:
 
 ```powershell
-$env:PAB_DEPLOYMENT_ID = "<deployment UUID>"
 $env:PAB_TENANT_ID = "<tenant UUID>"
 $env:PAB_DEVICE_ID = "<device UUID>"
 $env:PAB_CONTROL_URL = "wss://server.example/control"
@@ -229,7 +232,7 @@ same submission across process restarts. Reusing it with different command input
 rejected.
 
 For a fresh Debug deployment, prepare separate account and device password files, set
-`PAB_CONTROL_URL`, `PAB_DEPLOYMENT_ID`, and `PAB_RELAY_URLS`, then create the initial
+`PAB_CONTROL_URL` and `PAB_RELAY_URLS`, then create the initial
 account, user Endpoint, and device Endpoint:
 
 ```powershell
@@ -257,7 +260,7 @@ authentication response contains identity and password-version facts but no reus
 session credential.
 
 After a device endpoint authenticates, it publishes a versioned `DeviceHello` with
-its immutable deployment/tenant/device reference and current execution context.
+its immutable tenant/device reference and current execution context.
 The server validates the endpoint principal and platform contract again, rechecks
 that the device and endpoint are active, and stores the latest accepted environment
 in PostgreSQL migration `0002_device_runtime.sql`. The connection supervisor republishes
@@ -304,13 +307,13 @@ cargo run -p pab-server -- init
 ```
 
 `init` is idempotent: it applies versioned schema files and creates the single
-deployment record with the current 20/4/5 Mbps defaults if it is absent. PostgreSQL
+singleton server settings with the current 20/4/5 Mbps defaults if it is absent. PostgreSQL
 integration tests use `DATABASE_URL`; SQLx creates and removes isolated test databases.
 Use a disposable PostgreSQL instance with database-creation privileges for those tests.
 
 Endpoint registration and reconnect authentication use a one-time proof signed by
 the same Ed25519 secret key that produces the iroh Endpoint ID. Proof schema v2 binds
-the deployment, connection, typed user-or-device principal, tenant, purpose, nonce,
+the connection, typed user-or-device principal, tenant, purpose, nonce,
 and short validity window. A TLS-only WSS control service owns each proof session and
 supports account registration, login, endpoint registration, and password-free
 reconnects for active registered endpoints. It rechecks PostgreSQL after signature
@@ -322,7 +325,7 @@ TLS listener exposes the internal Relay policy WSS endpoint. Set a random
 same secret to each trusted Relay node; it is never sent outside TLS or logged.
 
 The production Relay entry point is `cargo run -p pab-relay --bin pab-relay-server`.
-It requires `PAB_DEPLOYMENT_ID`, `PAB_CONTROL_URL` (a `wss://` URL),
+It requires `PAB_CONTROL_URL` (a `wss://` URL),
 `PAB_RELAY_CONTROL_SECRET`, `PAB_RELAY_TLS_CERT`, and `PAB_RELAY_TLS_KEY`.
 `PAB_CONTROL_CA_CERT` adds trust for a self-signed control certificate. The Relay
 defaults to HTTPS on `127.0.0.1:31443`, QUIC on `0.0.0.0:7842`, and keeps iroh's

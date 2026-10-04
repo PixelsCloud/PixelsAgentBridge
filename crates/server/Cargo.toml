@@ -17,6 +17,7 @@ pab-task-runtime = { path = "../task-runtime" }
 rand_core = { version = "0.6", features = ["getrandom"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 serde_json.workspace = true
+serde.workspace = true
 sqlx = { version = "0.8", default-features = false, features = [
     "macros",
     "migrate",
@@ -33,8 +34,12 @@ tokio.workspace = true
 unicode-normalization = "0.1"
 uuid.workspace = true
 url = "2"
+tower-http = { version = "0.6", features = ["fs"] }
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["io-std"] }
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
 pab-agent-core = { path = "../agent-core" }
 pab-bridge = { path = "../bridge" }
 pab-executor = { path = "../executor" }

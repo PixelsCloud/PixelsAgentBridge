@@ -51,16 +51,10 @@ async fn handle_message(
     match message {
         RelayControlClientMessage::GetPolicy {
             request_id,
-            deployment_id,
             known_policy_version,
+            node_id,
+            agent_version,
         } => {
-            if deployment_id != state.deployment_id {
-                return error(
-                    Some(request_id),
-                    RelayControlErrorCode::InvalidDeployment,
-                    "Relay belongs to a different deployment",
-                );
-            }
             let snapshot = match state
                 .control
                 .relay_policy_snapshot(state.config.relay_policy_validity)
@@ -75,6 +69,37 @@ async fn handle_message(
                     );
                 }
             };
+            if let Some(node_id) = node_id {
+                if node_id.is_empty()
+                    || node_id.len() > 64
+                    || !node_id
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+                    || agent_version
+                        .as_ref()
+                        .is_some_and(|s| s.len() > 64 || s.chars().any(char::is_control))
+                {
+                    return error(
+                        Some(request_id),
+                        RelayControlErrorCode::InvalidMessage,
+                        "invalid Relay node metadata",
+                    );
+                }
+                if known_policy_version.is_none_or(|v| v <= snapshot.policy_version) {
+                    let applied = known_policy_version.and_then(|v| i64::try_from(v).ok());
+                    let Ok(offered) = i64::try_from(snapshot.policy_version) else {
+                        return error(
+                            Some(request_id),
+                            RelayControlErrorCode::Internal,
+                            "invalid policy version",
+                        );
+                    };
+                    if sqlx::query("INSERT INTO relay_nodes(node_id,agent_version,applied_policy_version,offered_policy_version,server_instance) VALUES($1,$2,$3,$4,$5) ON CONFLICT(node_id) DO UPDATE SET agent_version=excluded.agent_version,applied_policy_version=excluded.applied_policy_version,offered_policy_version=excluded.offered_policy_version,last_seen_at=clock_timestamp(),server_instance=excluded.server_instance")
+                        .bind(node_id).bind(agent_version).bind(applied).bind(offered).bind(state.server_instance).execute(state.control.store().pool()).await.is_err(){
+                        tracing::warn!("could not record Relay node status");
+                    }
+                }
+            }
             match known_policy_version {
                 Some(version) if version > snapshot.policy_version => error(
                     Some(request_id),
@@ -84,7 +109,6 @@ async fn handle_message(
                 Some(version) if version == snapshot.policy_version => {
                     RelayControlServerMessage::PolicyUnchanged {
                         request_id,
-                        deployment_id: snapshot.deployment_id,
                         policy_version: snapshot.policy_version,
                         expires_at_unix_ms: snapshot.expires_at_unix_ms,
                     }

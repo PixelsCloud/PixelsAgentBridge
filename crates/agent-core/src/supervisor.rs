@@ -58,8 +58,7 @@ impl EndpointControlSupervisor {
             return Err(DeviceNetworkConfigError::DevicePrincipalRequired);
         };
         let update = updates.borrow();
-        if update.device_ref.deployment_id != self.config.deployment_id
-            || update.device_ref.tenant_id != self.config.tenant_id
+        if update.device_ref.tenant_id != self.config.tenant_id
             || update.device_ref.device_id != device_id
         {
             return Err(DeviceNetworkConfigError::IdentityMismatch);
@@ -76,8 +75,7 @@ impl EndpointControlSupervisor {
         let EndpointProofPrincipal::Device { device_id } = self.config.principal else {
             return Err(DeviceHelloConfigError::DevicePrincipalRequired);
         };
-        if hello.device_ref.deployment_id != self.config.deployment_id
-            || hello.device_ref.tenant_id != self.config.tenant_id
+        if hello.device_ref.tenant_id != self.config.tenant_id
             || hello.device_ref.device_id != device_id
         {
             return Err(DeviceHelloConfigError::IdentityMismatch);
@@ -580,7 +578,7 @@ mod tests {
     use std::time::Duration;
 
     use iroh_base::SecretKey;
-    use pab_protocol::{DeploymentId, EndpointProofPrincipal, TenantId, UserId};
+    use pab_protocol::{EndpointProofPrincipal, TenantId, UserId};
 
     use super::*;
 
@@ -592,7 +590,6 @@ mod tests {
         let supervisor = EndpointControlSupervisor::new(
             EndpointControlConfig {
                 url: format!("wss://127.0.0.1:{port}/control"),
-                deployment_id: DeploymentId::from_u128(1),
                 tenant_id: TenantId::from_u128(2),
                 principal: EndpointProofPrincipal::User {
                     user_id: UserId::from_u128(3),

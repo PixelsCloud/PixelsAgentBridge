@@ -5,7 +5,6 @@ use thiserror::Error;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DeviceAccess {
-    pub deployment_id: String,
     pub tenant_id: String,
     pub device_id: String,
     pub device_code: String,
@@ -17,7 +16,7 @@ pub(crate) struct DeviceAccess {
 pub(crate) async fn load(path: &Path) -> Result<DeviceAccess, DeviceAccessError> {
     let pool = open(path, false).await?;
     let row = sqlx::query(
-        "SELECT deployment_id, tenant_id, device_id, device_code, temporary_password, \
+        "SELECT tenant_id, device_id, device_code, temporary_password, \
          password_version, password_hash FROM device_access WHERE id = 1",
     )
     .fetch_optional(&pool)
@@ -32,7 +31,6 @@ pub(crate) async fn load(path: &Path) -> Result<DeviceAccess, DeviceAccessError>
     })?
     .ok_or(DeviceAccessError::Missing)?;
     Ok(DeviceAccess {
-        deployment_id: row.try_get("deployment_id")?,
         tenant_id: row.try_get("tenant_id")?,
         device_id: row.try_get("device_id")?,
         device_code: row.try_get("device_code")?,
@@ -45,14 +43,13 @@ pub(crate) async fn load(path: &Path) -> Result<DeviceAccess, DeviceAccessError>
 pub(crate) async fn save(path: &Path, access: &DeviceAccess) -> Result<(), DeviceAccessError> {
     let pool = open(path, true).await?;
     sqlx::query(
-        "INSERT INTO device_access (id, deployment_id, tenant_id, device_id, device_code, \
-         temporary_password, password_version, password_hash) VALUES (1, ?, ?, ?, ?, ?, ?, ?) \
-         ON CONFLICT(id) DO UPDATE SET deployment_id = excluded.deployment_id, \
+        "INSERT INTO device_access (id,tenant_id, device_id, device_code, \
+         temporary_password, password_version, password_hash) VALUES (1, ?, ?, ?, ?, ?, ?) \
+         ON CONFLICT(id) DO UPDATE SET \
          tenant_id = excluded.tenant_id, device_id = excluded.device_id, \
          device_code = excluded.device_code, temporary_password = excluded.temporary_password, \
          password_version = excluded.password_version, password_hash = excluded.password_hash",
     )
-    .bind(&access.deployment_id)
     .bind(&access.tenant_id)
     .bind(&access.device_id)
     .bind(&access.device_code)
@@ -70,6 +67,7 @@ async fn open(path: &Path, create: bool) -> Result<SqlitePool, DeviceAccessError
     }
     let options = SqliteConnectOptions::new()
         .filename(path)
+        .busy_timeout(std::time::Duration::from_secs(10))
         .create_if_missing(create);
     let pool = SqlitePool::connect_with(options).await?;
     if create {
@@ -77,7 +75,7 @@ async fn open(path: &Path, create: bool) -> Result<SqlitePool, DeviceAccessError
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS device_access (\
                 id INTEGER PRIMARY KEY CHECK (id = 1), \
-                deployment_id TEXT NOT NULL, tenant_id TEXT NOT NULL, \
+                tenant_id TEXT NOT NULL, \
                 device_id TEXT NOT NULL, device_code TEXT NOT NULL, \
                 temporary_password TEXT NOT NULL, password_version INTEGER NOT NULL, \
                 password_hash TEXT NOT NULL)",

@@ -265,7 +265,7 @@ pub(super) async fn published_file_matches(path: &Path, size: u64, digest: &str)
 
 #[cfg(test)]
 mod tests {
-    use pab_protocol::{DeploymentId, DeviceId, DeviceRef, OperatorRef, TenantId, UserId};
+    use pab_protocol::{DeviceId, DeviceRef, OperatorRef, TenantId, UserId};
 
     use super::*;
 
@@ -290,7 +290,6 @@ mod tests {
         let record = OperationRecord {
             id: request_id.to_string(),
             device_ref: DeviceRef {
-                deployment_id: DeploymentId::from_u128(3),
                 tenant_id: TenantId::from_u128(4),
                 device_id: DeviceId::from_u128(5),
             },

@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use pab_protocol::{
     AuthorizedDevicePeer, DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION,
-    DeploymentId, DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
+    DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
     DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
     MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot,
     TenantId, UserId,
@@ -24,9 +24,27 @@ pub struct ControlPlane {
     passwords: PasswordEngine,
     dummy_password_hash: String,
     active_endpoints: Arc<ActiveEndpoints>,
+    web_revision: tokio::sync::watch::Sender<u64>,
 }
 
 impl ControlPlane {
+    pub(crate) fn web_changes(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.web_revision.subscribe()
+    }
+
+    pub(crate) fn web_changed(&self) {
+        self.web_revision
+            .send_modify(|revision| *revision = revision.wrapping_add(1));
+    }
+
+    pub async fn touch_online_devices(&self) -> Result<(), StoreError> {
+        sqlx::query("UPDATE devices d SET last_online_at=clock_timestamp() WHERE EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($1::bytea[]))")
+            .bind(self.online_endpoint_keys()).execute(self.store.pool()).await?;
+        Ok(())
+    }
+    pub(crate) fn online_endpoint_keys(&self) -> Vec<Vec<u8>> {
+        self.active_endpoints.keys()
+    }
     pub async fn list_traffic_scopes(
         &self,
         account: &Account,
@@ -40,44 +58,16 @@ impl ControlPlane {
     pub async fn list_my_devices(
         &self,
         endpoint: &RegisteredEndpoint,
-        deployment_id: DeploymentId,
     ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, ServiceError> {
         let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
             return Err(ServiceError::UserEndpointRequired);
         };
         Ok(self
             .store
-            .list_my_devices(
-                endpoint.endpoint_key,
-                user_id,
-                endpoint.tenant_id,
-                deployment_id,
-            )
+            .list_my_devices(endpoint.endpoint_key, user_id, endpoint.tenant_id)
             .await?)
     }
 
-    pub async fn begin_device_claim(
-        &self,
-        actor: pab_protocol::UserId,
-        code: pab_protocol::DeviceCode,
-        owner_tenant_id: pab_protocol::TenantId,
-    ) -> Result<pab_protocol::ClaimId, ServiceError> {
-        Ok(self
-            .store
-            .begin_device_claim(actor, code, owner_tenant_id)
-            .await?)
-    }
-
-    pub async fn approve_device_claim(
-        &self,
-        endpoint: &RegisteredEndpoint,
-        claim_id: pab_protocol::ClaimId,
-    ) -> Result<(pab_protocol::DeviceId, pab_protocol::TenantId), ServiceError> {
-        if !matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
-            return Err(ServiceError::DeviceEndpointRequired);
-        }
-        Ok(self.store.approve_device_claim(endpoint, claim_id).await?)
-    }
     pub fn new(
         store: PostgresStore,
         password_policy: PasswordPolicy,
@@ -89,6 +79,7 @@ impl ControlPlane {
             passwords,
             dummy_password_hash,
             active_endpoints: Arc::new(ActiveEndpoints::default()),
+            web_revision: tokio::sync::watch::channel(0).0,
         })
     }
 
@@ -96,15 +87,11 @@ impl ControlPlane {
         &self.store
     }
 
-    pub async fn initialize_deployment(
+    pub async fn initialize_settings(
         &self,
-        requested_id: DeploymentId,
         defaults: RelayLimitDefaults,
-    ) -> Result<DeploymentId, ServiceError> {
-        Ok(self
-            .store
-            .initialize_deployment(requested_id, defaults)
-            .await?)
+    ) -> Result<(), ServiceError> {
+        Ok(self.store.initialize_settings(defaults).await?)
     }
 
     pub async fn register_account(
@@ -307,11 +294,29 @@ impl ControlPlane {
     }
 
     pub(crate) fn endpoint_connected(&self, endpoint_key: EndpointKey) {
-        self.active_endpoints.connected(endpoint_key);
+        if self.active_endpoints.connected(endpoint_key) {
+            self.web_changed();
+            self.touch_device_endpoint(endpoint_key);
+        }
     }
 
     pub(crate) fn endpoint_disconnected(&self, endpoint_key: EndpointKey) {
-        self.active_endpoints.disconnected(endpoint_key);
+        if self.active_endpoints.disconnected(endpoint_key) {
+            self.web_changed();
+            self.touch_device_endpoint(endpoint_key);
+        }
+    }
+
+    fn touch_device_endpoint(&self, endpoint_key: EndpointKey) {
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            let pool = self.store.pool().clone();
+            runtime.spawn(async move {
+                if sqlx::query("UPDATE devices d SET last_online_at=clock_timestamp() WHERE EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.endpoint_key=$1)")
+                    .bind(endpoint_key.as_bytes().as_slice()).execute(&pool).await.is_err() {
+                    tracing::warn!("could not save device last-online time");
+                }
+            });
+        }
     }
 
     pub async fn authorize_device_peer(
@@ -465,23 +470,16 @@ impl ControlPlane {
         &self,
         endpoint: &RegisteredEndpoint,
         code: pab_protocol::DeviceCode,
-        deployment_id: pab_protocol::DeploymentId,
     ) -> Result<DeviceRef, ServiceError> {
         Ok(match endpoint.principal {
             EndpointProofPrincipal::User { user_id } => {
                 self.store
-                    .resolve_device_code(
-                        endpoint.endpoint_key,
-                        user_id,
-                        endpoint.tenant_id,
-                        deployment_id,
-                        code,
-                    )
+                    .resolve_device_code(endpoint.endpoint_key, user_id, endpoint.tenant_id, code)
                     .await?
             }
             EndpointProofPrincipal::Guest => {
                 self.store
-                    .guest_resolve_device_code(endpoint.endpoint_key, code, deployment_id)
+                    .guest_resolve_device_code(endpoint.endpoint_key, code)
                     .await?
             }
             EndpointProofPrincipal::Device { .. } => {

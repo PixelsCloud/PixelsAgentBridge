@@ -1,5 +1,5 @@
 use pab_protocol::{
-    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeploymentId, DeviceCode, DeviceId, DeviceRef,
+    CapabilityRef, CommandTaskSpec, CpuArchitecture, DeviceCode, DeviceId, DeviceRef,
     ExecutionContext, ExecutionScope, ExpectedEnvironment, OperatorRef, OsFamily,
     OutputAvailability, OutputChunk, OutputRange, OutputStream, PathStyle, RequestId,
     TASK_SCHEMA_VERSION, TaskCompletion, TaskEvent, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
@@ -792,6 +792,111 @@ async fn persists_submission_events_output_and_resume_cursor() {
 }
 
 #[tokio::test]
+async fn concurrent_command_writers_and_output_reader_share_one_database() {
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("concurrent-commands.db");
+    let first = RuntimeStore::open(&path).await.unwrap();
+    let second = RuntimeStore::open(&path).await.unwrap();
+    let reader = RuntimeStore::open(&path).await.unwrap();
+    let one = snapshot(device_ref(), RequestId::new());
+    let mut two = snapshot(device_ref(), RequestId::new());
+    two.task_ref.task_id = TaskId::new();
+    for (store, task) in [(&first, &one), (&second, &two)] {
+        store
+            .record_pending(task.task_ref.device_ref, task.request_id, &command())
+            .await
+            .unwrap();
+        store.bind_snapshot(task).await.unwrap();
+    }
+    async fn write(store: &RuntimeStore, task: &TaskSnapshot) {
+        store
+            .record_event(&TaskEvent {
+                schema_version: TASK_SCHEMA_VERSION,
+                task_ref: task.task_ref,
+                seq: 1,
+                occurred_at_unix_ms: 1_000,
+                kind: TaskEventKind::Accepted,
+            })
+            .await
+            .unwrap();
+        for offset in 0..100u64 {
+            let range = OutputRange {
+                retained_from: 0,
+                available_to: offset + 1,
+                complete: false,
+            };
+            let chunk = OutputChunk {
+                schema_version: TASK_SCHEMA_VERSION,
+                task_ref: task.task_ref,
+                stream: OutputStream::Stdout,
+                offset,
+                bytes: vec![(offset % 251) as u8],
+            };
+            store.append_output(&chunk, &range).await.unwrap();
+        }
+        let mut completed = task.clone();
+        completed.state = TaskState::Succeeded;
+        completed.latest_event_seq = 2;
+        completed.finished_at_unix_ms = Some(2_000);
+        completed.completion = Some(TaskCompletion {
+            summary: "done".into(),
+            exit_code: Some(0),
+        });
+        completed.output.stdout = OutputRange {
+            retained_from: 0,
+            available_to: 100,
+            complete: true,
+        };
+        completed.output.stderr.complete = true;
+        store
+            .record_event(&TaskEvent {
+                schema_version: TASK_SCHEMA_VERSION,
+                task_ref: task.task_ref,
+                seq: 2,
+                occurred_at_unix_ms: 2_000,
+                kind: TaskEventKind::Succeeded {
+                    completion: completed.completion.clone().unwrap(),
+                },
+            })
+            .await
+            .unwrap();
+        assert!(
+            store
+                .update_snapshot(&completed)
+                .await
+                .unwrap()
+                .is_complete()
+        );
+    }
+    let read = async {
+        for _ in 0..100 {
+            let (chunk, range) = reader
+                .read_output(one.task_ref, OutputStream::Stdout, 0, 1024)
+                .await
+                .unwrap();
+            assert_eq!(chunk.bytes.len() as u64, range.available_to);
+            assert!(
+                chunk
+                    .bytes
+                    .iter()
+                    .enumerate()
+                    .all(|(i, byte)| *byte == (i % 251) as u8)
+            );
+        }
+    };
+    tokio::join!(write(&first, &one), write(&second, &two), read);
+    for task in [&one, &two] {
+        assert!(
+            reader
+                .get_by_task(task.task_ref)
+                .await
+                .unwrap()
+                .is_complete()
+        );
+    }
+}
+
+#[tokio::test]
 async fn rejects_request_id_reuse_with_different_command() {
     let directory = tempdir().unwrap();
     let store = RuntimeStore::open(&directory.path().join("bridge.db"))
@@ -864,7 +969,6 @@ async fn advances_a_stale_cursor_to_the_remote_retention_boundary() {
 
 fn device_ref() -> DeviceRef {
     DeviceRef {
-        deployment_id: DeploymentId::from_u128(1),
         tenant_id: TenantId::from_u128(2),
         device_id: DeviceId::from_u128(3),
     }

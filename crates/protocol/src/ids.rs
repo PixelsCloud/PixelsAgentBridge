@@ -61,7 +61,6 @@ macro_rules! uuid_id {
     };
 }
 
-uuid_id!(DeploymentId);
 uuid_id!(UserId);
 uuid_id!(TenantId);
 uuid_id!(DeviceId);

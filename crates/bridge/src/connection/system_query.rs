@@ -179,7 +179,7 @@ mod tests {
     use super::*;
     #[test]
     fn capability_is_additive_and_reply_must_match_request_kind_identity_and_budget() {
-        let json = serde_json::json!({"type":"environment","filesystem_schema_version":3,"context":{"device_ref":{"deployment_id":DeploymentId::from_u128(1),"tenant_id":TenantId::from_u128(2),"device_id":DeviceId::from_u128(3)},"execution":{"os_family":"windows","os_name":"Windows","os_version":"fixture","architecture":"x86_64","execution_scope":"native","path_style":"windows","interpreter":null,"cwd":null,"environment_revision":"fixture"},"source":"executor_verified","observed_at_unix_ms":1,"freshness":"current"}});
+        let json = serde_json::json!({"type":"environment","filesystem_schema_version":3,"context":{"device_ref":{"tenant_id":TenantId::from_u128(2),"device_id":DeviceId::from_u128(3)},"execution":{"os_family":"windows","os_name":"Windows","os_version":"fixture","architecture":"x86_64","execution_scope":"native","path_style":"windows","interpreter":null,"cwd":null,"environment_revision":"fixture"},"source":"executor_verified","observed_at_unix_ms":1,"freshness":"current"}});
         let r: DeviceTaskResponse = serde_json::from_value(json).unwrap();
         assert!(matches!(
             r,

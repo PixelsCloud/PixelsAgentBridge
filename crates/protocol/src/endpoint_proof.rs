@@ -1,11 +1,10 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{ChallengeId, ConnectionId, DeploymentId, DeviceId, TenantId, UserId};
-
-pub const ENDPOINT_PROOF_SCHEMA_VERSION: u16 = 2;
+use crate::{ChallengeId, ConnectionId, DeviceId, TenantId, UserId};
+pub const ENDPOINT_PROOF_SCHEMA_VERSION: u16 = 3;
 pub const ENDPOINT_PROOF_CLOCK_SKEW_MS: i64 = 30_000;
-const ENDPOINT_PROOF_DOMAIN: &str = "pixels-agent-bridge endpoint proof v2";
+const ENDPOINT_PROOF_DOMAIN: &str = "pixels-agent-bridge endpoint proof v3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -95,7 +94,6 @@ impl EndpointProofPrincipal {
 pub struct EndpointProofChallenge {
     pub schema_version: u16,
     pub challenge_id: ChallengeId,
-    pub deployment_id: DeploymentId,
     pub connection_id: ConnectionId,
     pub principal: EndpointProofPrincipal,
     pub tenant_id: TenantId,
@@ -111,7 +109,6 @@ impl EndpointProofChallenge {
         let mut context = Vec::with_capacity(164);
         context.extend_from_slice(&self.schema_version.to_be_bytes());
         context.extend_from_slice(self.challenge_id.as_uuid().as_bytes());
-        context.extend_from_slice(self.deployment_id.as_uuid().as_bytes());
         context.extend_from_slice(self.connection_id.as_uuid().as_bytes());
         self.principal.encode(&mut context);
         context.extend_from_slice(self.tenant_id.as_uuid().as_bytes());
@@ -181,7 +178,6 @@ mod tests {
         EndpointProofChallenge {
             schema_version: ENDPOINT_PROOF_SCHEMA_VERSION,
             challenge_id: ChallengeId::from_u128(1),
-            deployment_id: DeploymentId::from_u128(2),
             connection_id: ConnectionId::from_u128(3),
             principal,
             tenant_id: TenantId::from_u128(4),
@@ -191,6 +187,16 @@ mod tests {
             expires_at_unix_ms: 2_000,
             nonce: [6; 32],
         }
+    }
+
+    #[test]
+    fn old_deployment_bound_schema_is_rejected() {
+        let mut challenge = challenge(EndpointProofPrincipal::Guest);
+        challenge.schema_version = 2;
+        assert_eq!(
+            challenge.validate_at(1500),
+            Err(EndpointProofContractError::UnsupportedSchemaVersion(2))
+        );
     }
 
     #[test]

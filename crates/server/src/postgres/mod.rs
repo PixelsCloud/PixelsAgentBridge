@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use pab_protocol::{
-    DeploymentId, DeviceId, EndpointKey, EndpointProofPrincipal, RELAY_POLICY_SCHEMA_VERSION,
-    RelayEndpointOwner, RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot,
-    TeamRelayLimits, TenantId, TrafficScope, UserId,
+    DeviceId, EndpointKey, EndpointProofPrincipal, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
+    TrafficScope, UserId,
 };
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 use thiserror::Error;
@@ -14,7 +14,6 @@ use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint, Team
 
 mod accounts;
 mod connection_intents;
-mod device_claim;
 mod device_discovery;
 mod device_network;
 mod device_presence;
@@ -53,39 +52,19 @@ impl PostgresStore {
         Ok(())
     }
 
-    pub async fn initialize_deployment(
+    pub async fn initialize_settings(
         &self,
-        requested_id: DeploymentId,
         defaults: RelayLimitDefaults,
-    ) -> Result<DeploymentId, StoreError> {
+    ) -> Result<(), StoreError> {
         defaults
             .validate()
             .map_err(|error| StoreError::InvalidInput(error.to_string()))?;
-        let row = sqlx::query(
-            r#"
-            INSERT INTO deployments (
-                id, default_team_mbps, default_member_mbps, default_personal_mbps
-            )
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (singleton) DO UPDATE SET singleton = deployments.singleton
-            RETURNING id
-            "#,
-        )
-        .bind(requested_id.as_uuid())
-        .bind(i32::try_from(defaults.team_mbps).map_err(support::invalid_number)?)
-        .bind(i32::try_from(defaults.member_mbps).map_err(support::invalid_number)?)
-        .bind(i32::try_from(defaults.personal_mbps).map_err(support::invalid_number)?)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(DeploymentId::from_uuid(row.try_get("id")?))
-    }
-
-    pub async fn deployment_id(&self) -> Result<DeploymentId, StoreError> {
-        let id = sqlx::query_scalar::<_, Uuid>("SELECT id FROM deployments WHERE singleton = true")
-            .fetch_optional(&self.pool)
-            .await?
-            .ok_or_else(|| StoreError::InvalidState("deployment is not initialized".to_owned()))?;
-        Ok(DeploymentId::from_uuid(id))
+        sqlx::query("INSERT INTO server_settings (default_team_mbps, default_member_mbps, default_personal_mbps) VALUES ($1, $2, $3) ON CONFLICT (singleton) DO NOTHING")
+            .bind(i32::try_from(defaults.team_mbps).map_err(support::invalid_number)?)
+            .bind(i32::try_from(defaults.member_mbps).map_err(support::invalid_number)?)
+            .bind(i32::try_from(defaults.personal_mbps).map_err(support::invalid_number)?)
+            .execute(&self.pool).await?;
+        Ok(())
     }
 }
 

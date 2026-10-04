@@ -1,6 +1,6 @@
 use std::{env, fs, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
 
-use pab_protocol::{DeploymentId, RelayLimitDefaults, TenantId, UserId};
+use pab_protocol::{RelayLimitDefaults, TenantId, UserId};
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth, TeamRole, serve_tls,
@@ -30,6 +30,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let store = PostgresStore::connect(&database_url, 5).await?;
 
     match command.as_str() {
+        "web-admin" => {
+            let [username] = arguments.as_slice() else {
+                return Err("usage: pab-server web-admin <existing-username>".into());
+            };
+            store.migrate().await?;
+            let control = ControlPlane::new(store, PasswordPolicy::default())?;
+            pab_server::web::bootstrap_admin(&control, username).await?;
+            println!("Server administrator enabled");
+        }
         "check" => {
             sqlx::query("SELECT 1").execute(store.pool()).await?;
             println!("PostgreSQL connection OK");
@@ -41,14 +50,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         "init" => {
             store.migrate().await?;
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
-            let requested_id = match env::var("PAB_DEPLOYMENT_ID") {
-                Ok(value) => value.parse::<DeploymentId>()?,
-                Err(env::VarError::NotPresent) => DeploymentId::default(),
-                Err(error) => return Err(error.into()),
-            };
-            let deployment_id = control_plane
-                .initialize_deployment(
-                    requested_id,
+            control_plane
+                .initialize_settings(
                     RelayLimitDefaults {
                         team_mbps: 20,
                         member_mbps: 4,
@@ -56,7 +59,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     },
                 )
                 .await?;
-            println!("PostgreSQL initialized for deployment {deployment_id}");
+            println!("PostgreSQL initialized");
         }
         "account-id" => {
             let [username] = arguments.as_slice() else {
@@ -172,7 +175,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         "serve" => {
             store.migrate().await?;
-            let deployment_id = store.deployment_id().await?;
+            let initialized: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM server_settings WHERE singleton)",
+            )
+            .fetch_one(store.pool())
+            .await?;
+            if !initialized {
+                return Err("server settings are not initialized; run pab-server init".into());
+            }
             let maintenance_store = store.clone();
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
             let address = env::var("PAB_LISTEN_ADDR")
@@ -185,9 +195,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or(true);
             let relay_control_secret = required_secret("PAB_RELAY_CONTROL_SECRET")?;
             let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
+            let presence_control = control_plane.clone();
             let state = ControlApiState::new(
                 control_plane,
-                deployment_id,
                 ControlApiConfig {
                     registration_enabled,
                     ..ControlApiConfig::default()
@@ -208,12 +218,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             });
+            let presence = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(30));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    interval.tick().await;
+                    if presence_control.touch_online_devices().await.is_err() {
+                        tracing::warn!("could not checkpoint online device timestamps");
+                    }
+                }
+            });
             let result = serve_tls(address, certificate_path, private_key_path, state).await;
             maintenance.abort();
+            presence.abort();
             result?;
         }
         _ => return Err(
-            "usage: pab-server [check|migrate|init|serve|account-id|team-create|team-add-member|team-remove-member|team-set-limits|account-set-default-team]"
+            "usage: pab-server [check|migrate|init|serve|web-admin|account-id|team-create|team-add-member|team-remove-member|team-set-limits|account-set-default-team]"
                 .into(),
         ),
     }

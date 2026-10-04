@@ -164,22 +164,24 @@ impl PostgresStore {
                 "relay policy validity must be greater than zero".to_owned(),
             ));
         }
-        let deployment = sqlx::query(
+        let settings = sqlx::query(
             r#"
-            SELECT id, default_team_mbps, default_member_mbps,
+            SELECT default_team_mbps, default_member_mbps,
                    default_personal_mbps, policy_revision
-            FROM deployments
+            FROM server_settings
             WHERE singleton = true
             "#,
         )
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StoreError::InvalidState("deployment is not initialized".to_owned()))?;
+        .ok_or_else(|| {
+            StoreError::InvalidState("server settings are not initialized".to_owned())
+        })?;
 
         let defaults = RelayLimitDefaults {
-            team_mbps: support::positive_u32(deployment.try_get("default_team_mbps")?)?,
-            member_mbps: support::positive_u32(deployment.try_get("default_member_mbps")?)?,
-            personal_mbps: support::positive_u32(deployment.try_get("default_personal_mbps")?)?,
+            team_mbps: support::positive_u32(settings.try_get("default_team_mbps")?)?,
+            member_mbps: support::positive_u32(settings.try_get("default_member_mbps")?)?,
+            personal_mbps: support::positive_u32(settings.try_get("default_personal_mbps")?)?,
         };
         let team_rows = sqlx::query(
             r#"
@@ -188,7 +190,7 @@ impl PostgresStore {
                    COALESCE(t.relay_member_mbps, d.default_member_mbps) AS member_mbps
             FROM teams t
             JOIN tenants tenant ON tenant.id = t.tenant_id
-            CROSS JOIN deployments d
+            CROSS JOIN server_settings d
             WHERE tenant.status = 'active' AND d.singleton = true
             ORDER BY t.tenant_id
             "#,
@@ -271,8 +273,7 @@ impl PostgresStore {
             .ok_or_else(|| StoreError::InvalidInput("relay validity is too large".to_owned()))?;
         let snapshot = RelayPolicySnapshot {
             schema_version: RELAY_POLICY_SCHEMA_VERSION,
-            deployment_id: DeploymentId::from_uuid(deployment.try_get("id")?),
-            policy_version: u64::try_from(deployment.try_get::<i64, _>("policy_revision")?)
+            policy_version: u64::try_from(settings.try_get::<i64, _>("policy_revision")?)
                 .map_err(support::invalid_number)?,
             issued_at_unix_ms: support::unix_millis(issued_at)?,
             expires_at_unix_ms: support::unix_millis(expires_at)?,
