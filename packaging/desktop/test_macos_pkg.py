@@ -38,7 +38,8 @@ class Installer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)
             value = "wss://example.test/control?a='x'&b=$(false)"
-            pkg.prepare_scripts(path, "arm64", "test-only", value, pkg.RELAY_URL)
+            pkg.prepare_scripts(path, "arm64", value, pkg.RELAY_URL)
+            self.assertNotIn("DEPLOYMENT", (path / "package.env").read_text())
             result = subprocess.check_output(["/bin/bash", "-c", 'source "$1"; printf "%s" "$PAB_CONTROL_URL"', "test", str(path / "package.env")], text=True)
             self.assertEqual(result, value)
 
@@ -66,15 +67,14 @@ class Installer(unittest.TestCase):
         archive = Path(os.environ["PAB_PKG_TEST_ARCHIVE"]).resolve()
         arch = "aarch64" if "aarch64" in archive.name else "x86_64"
         profile = "debug" if "debug" in archive.name else "release"
-        # Fixture deployment never leaves this temporary directory or gets installed.
-        deployment = "b9056d23-6dd8-4ea5-aad7-e843a4a4e111"
+        # Build/expand only; installation scripts are never executed.
         with tempfile.TemporaryDirectory(prefix="pab-pkg-test-", dir=pkg.ROOT / ".build") as temporary:
             root = Path(temporary)
             shutil.copyfile(archive, root / archive.name)
             manifest_name = "SHA256-debug.json" if profile == "debug" else "SHA256.json"
             (root / manifest_name).write_text(json.dumps({archive.name: {"sha256": pkg.digest(archive), "bytes": archive.stat().st_size}}))
             subprocess.run([sys.executable, str(pkg.ROOT / "packaging/desktop/build_macos_pkg.py"),
-                            "--arch", arch, "--profile", profile, "--deployment-id", deployment,
+                            "--arch", arch, "--profile", profile,
                             "--packages-dir", str(root)], check=True, capture_output=True)
             installers = list(root.glob("*-setup.pkg"))
             self.assertEqual(len(installers), 1)
@@ -85,13 +85,14 @@ class Installer(unittest.TestCase):
             self.assertEqual(distribution.find("options").attrib["require-scripts"], "true")
             configs = list(expanded.rglob("package.env"))
             self.assertEqual(len(configs), 1)
-            self.assertIn(deployment, configs[0].read_text())
+            self.assertNotIn("DEPLOYMENT", configs[0].read_text())
             self.assertIn(pkg.CONTROL_URL, configs[0].read_text())
             self.assertTrue((configs[0].parent / "payload" / pkg.APP / "Contents/MacOS/pab-desktop").is_file())
             pkg.verify_binaries(configs[0].parent / "payload", "arm64" if arch == "aarch64" else "x86_64")
             metadata = json.loads(next(root.glob("SHA256-macos-*-setup-*.json")).read_text())
             self.assertEqual(pkg.digest(installers[0]), metadata["sha256"])
             self.assertFalse(metadata["installer_signed"])
+            self.assertNotIn("deployment_id", metadata)
 
 
 if __name__ == "__main__":

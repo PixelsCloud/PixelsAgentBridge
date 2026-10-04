@@ -10,7 +10,7 @@ macOS scripts and launchd plists. It is not Developer-ID signed or notarized.
 The adjacent SHA-256 manifest records the complete archive checksum.
 
 Unpack the complete archive and, from a desktop user account, run
-`sudo bash install.sh DEPLOYMENT_UUID WSS_CONTROL_URL HTTPS_RELAY_URL`.
+`sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL`.
 Open the app from Applications and grant Screen Recording and Accessibility as
 needed. Quit Desktop/MCP clients before upgrading with another complete archive.
 Uninstallation preserves machine and user data. See [MACOS.md](../../MACOS.md)
@@ -22,17 +22,16 @@ Windows/Linux use their existing scripts unchanged.
 `build-macos.sh release aarch64` and `build-macos.sh release x86_64` build
 architecture-specific archives on a Mac (install the corresponding Rust target
 first). To wrap either verified archive in a native Installer `.pkg`, use Python
-3.12+ and the **same deployment UUID used for the Windows installer**:
+3.12+. The current protocol and installers no longer require a deployment UUID:
 
 ```sh
-python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64 --deployment-id YOUR_DEPLOYMENT_UUID
-python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64 --deployment-id YOUR_DEPLOYMENT_UUID
+python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64
+python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64
 ```
 
 The default control/relay addresses match `build_nsis.py`:
-`wss://pab.rgaa.vip/control` and `https://pab-relay.rgaa.vip`. The deployment UUID
-is deliberately required: the Windows builder also receives it externally; it
-is not recoverable from these URLs or stored in the repository.
+`wss://pab.rgaa.vip/control` and `https://pab-relay.rgaa.vip`. Override them with
+`--control-url` and `--relay-url` for another server. No UUID is embedded or requested.
 
 Each `*-setup.pkg` embeds all binaries and installation scripts, requires admin
 authorization, checks the native CPU architecture, installs only on the running

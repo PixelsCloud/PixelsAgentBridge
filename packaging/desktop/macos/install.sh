@@ -1,12 +1,10 @@
 #!/bin/bash
 set -euo pipefail
-[[ $(uname -s) == Darwin && $EUID -eq 0 && $# -eq 3 ]] || {
-    echo 'usage (macOS): sudo bash install.sh DEPLOYMENT_UUID WSS_CONTROL_URL HTTPS_RELAY_URL' >&2; exit 2;
+[[ $(uname -s) == Darwin && $EUID -eq 0 && $# -eq 2 ]] || {
+    echo 'usage (macOS): sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL' >&2; exit 2;
 }
-deployment_id=$1
-control_url=$2
-relay_url=$3
-[[ $deployment_id =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] || { echo 'Invalid deployment UUID' >&2; exit 2; }
+control_url=$1
+relay_url=$2
 [[ $control_url == wss://?* && $relay_url == https://?* && $control_url != *[$'\r\n\t ']* && $relay_url != *[$'\r\n\t ']* ]] || {
     echo 'Use wss:// control and https:// relay URLs without whitespace' >&2; exit 2;
 }
@@ -53,14 +51,12 @@ done
 ditto "$source_dir/Pixels Agent Bridge.app" "$app"
 chown -R root:wheel "$app"
 {
-    printf 'export PAB_DEPLOYMENT_ID=%q\n' "$deployment_id"
     printf 'export PAB_CONTROL_URL=%q\n' "$control_url"
     printf 'export PAB_RELAY_URLS=%q\n' "$relay_url"
 } > "$install_dir/settings.env"
 chmod 644 "$install_dir/settings.env"
 settings_file=$(mktemp "$install_dir/operator-server.XXXXXX")
 plutil -create xml1 "$settings_file"
-plutil -insert deploymentId -string "$deployment_id" "$settings_file"
 plutil -insert controlUrl -string "$control_url" "$settings_file"
 plutil -insert relayUrl -string "$relay_url" "$settings_file"
 plutil -convert json "$settings_file"

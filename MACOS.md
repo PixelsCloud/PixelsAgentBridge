@@ -73,7 +73,7 @@ macOS 上执行自动化测试，Intel 做编译检查和 Release 交叉打包�
 
 ## 构建与使用
 
-### 双击安装 `.pkg`（后续补充）
+### 双击安装 `.pkg`（2026-10-04 更新）
 
 已新增 `packaging/desktop/build_macos_pkg.py`，将校验过的 tar 包封装为原生 Installer
 安装器；默认地址与 Windows NSIS 完全一致：
@@ -81,14 +81,14 @@ macOS 上执行自动化测试，Intel 做编译检查和 Release 交叉打包�
 - Control：`wss://pab.rgaa.vip/control`
 - Relay：`https://pab-relay.rgaa.vip`
 
-Windows 的部署 UUID 由打包参数外部传入，仓库未保存。**当前仍待提供该 UUID，
-尚未输出可连接正式部署的 `.pkg`，不会用测试 UUID 代替。**
+已合并新版协议（`695aa1c`），部署 UUID 已完全移除。macOS 安装、PKG 打包参数、
+预置配置和测试均同步删除该字段，不再需要用户提供 UUID。旧版 tar 包不能混用。
 
-获得 UUID 后，在仓库根目录执行（此打包器需要 Python 3.12+）：
+构建新版两种架构的 tar 包后，在仓库根目录执行（此打包器需要 Python 3.12+）：
 
 ```sh
-python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64 --deployment-id YOUR_DEPLOYMENT_UUID
-python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64 --deployment-id YOUR_DEPLOYMENT_UUID
+python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64
+python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64
 ```
 
 生成 `pixels-agent-bridge-macos-{aarch64|x86_64}-release-setup.pkg` 和各自的 SHA-256
@@ -100,10 +100,16 @@ python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64 --deployment-id YO
 `uninstall.sh` 卸载；安装失败无自动回滚。`--sign` 支持 Developer ID Installer
 证书；当前没有该证书，不会把未签名、未公证的包描述为已公证发行版。
 
-验证覆盖参数、Windows 地址一致性、Shell 转义、归档路径和校验和，并使用临时
-测试 UUID 构建/展开真实 `.pkg` 检查内容；测试包不交付、不执行安装，结束后清理。
+验证覆盖参数、Windows 地址一致性、Shell 转义、归档路径和校验和，并构建/展开临时
+`.pkg` 检查内容和不含部署 UUID 的配置；测试包不执行安装，结束后清理。
 ARM 和 Intel 分别执行上述测试，均为 5 项通过；解包后再次核验全部二进制架构和
 app 签名完整性。Windows/Linux 安装脚本与 Windows NSIS 打包器均未改动。
+
+本次新版源码打包回归：`pab-bridge`、`pab-executor`、`pab-protocol` 共 256 项
+测试通过，2 项默认忽略；Desktop 使用新构建的 ARM Release MCP，8 项全部通过。
+日志为 `.build/macos-package-regression-current.log` 和
+`.build/macos-desktop-package-tests-current.log`。下文 2026-10-03 的全仓库记录保留作
+适配历史，本次没有重新执行需要 PostgreSQL 或桌面权限的环境验收。
 
 ### 源码构建与 tar 安装
 
@@ -126,10 +132,10 @@ Mac 上交叉构建 Intel 包（需安装相应 Rust target）。相邻 `SHA256.
 Release 校验和，Debug 使用独立清单。构建产物使用目标三元组子目录以隔离架构。
 配置的最低系统版本是 macOS 12，但旧系统运行兼容性尚未实测。
 
-解压完整包，以实际桌面用户执行（替换三个部署参数，不要直接以 root 登录安装）：
+解压完整包，以实际桌面用户执行（替换两个服务器地址，不要直接以 root 登录安装）：
 
 ```sh
-sudo bash install.sh DEPLOYMENT_UUID wss://CONTROL_ENDPOINT https://RELAY_ENDPOINT
+sudo bash install.sh wss://CONTROL_ENDPOINT https://RELAY_ENDPOINT
 ```
 
 安装前退出旧 Desktop 及使用 MCP 的客户端。升级使用新完整包重新执行同一命令；
@@ -219,22 +225,27 @@ cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --ta
   和 `src/server/testing.rs` 与记录清单不一致。已核对相关文件工作树与 Git HEAD
   一致，本次未改 vendor/补丁清单，避免把无关跨平台修复混入本任务。
 
-### 交付前检查
+### 最新交付（2026-10-04，无部署 UUID）
 
-已完成：
+产物位于 `.build/packages/`：
 
-- Release：`.build/packages/pixels-agent-bridge-macos-aarch64-release.tar.gz`，
-  28,743,510 字节（约 27.4 MiB）。
-- SHA-256：`fcebcfc6fb28c09ca84b9bbe5fa458d1e12124290f5e79b209588c75356c0b9e`，
-  与 `.build/packages/SHA256.json` 一致。
-- app、Executor、MCP 均为 ARM64 原生 Mach-O；构建目录和解压后 app 的
-  `codesign --verify --deep --strict` 均通过。
-- 后续新增 Intel Release：`.build/packages/pixels-agent-bridge-macos-x86_64-release.tar.gz`，
-  30,883,174 字节，SHA-256：
-  `d44ce08e78aefba8cbe97435daee8c0086844bc901528c3e90df26434a21e8a5`。
-  三个程序均核验为 x86_64 Mach-O；没有 Intel 实机运行验收。
-- 解压后全部 Shell 语法和两个 plist 校验通过；三平台打包回归通过；
-  `git diff --check` 通过；临时 launchd 测试作业未残留。
+| 平台 | 双击安装包 | 大小 |
+|---|---|---|
+| Apple Silicon | `pixels-agent-bridge-macos-aarch64-release-setup.pkg` | 28,672,232 字节 |
+| Intel | `pixels-agent-bridge-macos-x86_64-release-setup.pkg` | 30,873,068 字节 |
+
+- ARM PKG SHA-256：`1fbe26fab2e2d6c3ec734e052f6d8515c9c4246b6a3e275c512979909af4ce2a`。
+- Intel PKG SHA-256：`d14f9d6c3871e5051fb9b3fc14354b0edbfef5362b8eb664ade1cadec596113d`。
+- 分别与 `SHA256-macos-aarch64-setup-release.json`、
+  `SHA256-macos-x86_64-setup-release.json` 核对一致；清单包含实际内置服务器地址。
+- 两个同名架构的 Release `.tar.gz` 也已重新生成，校验和见 `SHA256.json`。
+  2026-10-03 的旧包已被新版替换，不能再使用旧哈希验收。
+- 两个架构的 app、Executor、MCP 均核验为对应 Mach-O；解包后 app 的
+  `codesign --verify --deep --strict` 通过。此处是 ad-hoc app 完整性校验，
+  **不是** Developer ID 签名或公证；`pkgutil` 确认两个 PKG 均未签名。
+- 每个架构均通过 5 项 PKG 测试（含实际构建/解包）；三平台打包回归、Shell 语法、
+  plist、`git diff --check` 通过。系统 Installer 能读取 ARM 包的安装选项。
+- 新版 ARM app 的只读诊断成功；没有实际安装/启动后台服务，没有 Intel 实机运行验收。
 - 安装包未公证，其他 Mac 的 Gatekeeper/企业安全策略仍可能阻止启动；正式公开
   分发应提供 Developer ID 签名和公证，不要关闭系统安全保护来解决。
 

@@ -10,4 +10,4 @@ desktop_user=$(stat -f '%Su' /dev/console)
 # not the account authorizing Installer, owns the per-user local access token.
 export SUDO_USER="$desktop_user"
 exec /bin/bash "$package_dir/payload/install.sh" \
-    "$PAB_DEPLOYMENT_ID" "$PAB_CONTROL_URL" "$PAB_RELAY_URL"
+    "$PAB_CONTROL_URL" "$PAB_RELAY_URL"

@@ -18,7 +18,6 @@ import sys
 import tarfile
 import tempfile
 from urllib.parse import urlsplit
-from uuid import UUID
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -95,12 +94,12 @@ def verify_binaries(payload, architecture):
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(payload / APP)], check=True)
 
 
-def prepare_scripts(destination, arch, deployment_id, control_url, relay_url):
+def prepare_scripts(destination, arch, control_url, relay_url):
     for name in ("preinstall", "postinstall"):
         shutil.copyfile(SCRIPTS / "pkg" / name, destination / name)
         (destination / name).chmod(0o755)
         subprocess.run(["/bin/bash", "-n", str(destination / name)], check=True)
-    values = {"PAB_PKG_ARCH": arch, "PAB_DEPLOYMENT_ID": deployment_id,
+    values = {"PAB_PKG_ARCH": arch,
               "PAB_CONTROL_URL": control_url, "PAB_RELAY_URL": relay_url}
     (destination / "package.env").write_text("".join(f"{k}={shlex.quote(v)}\n" for k, v in values.items()))
 
@@ -108,7 +107,6 @@ def prepare_scripts(destination, arch, deployment_id, control_url, relay_url):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arch", required=True, choices=("aarch64", "x86_64"))
-    parser.add_argument("--deployment-id", required=True)
     parser.add_argument("--control-url", default=CONTROL_URL)
     parser.add_argument("--relay-url", default=RELAY_URL)
     parser.add_argument("--profile", choices=("release", "debug"), default="release")
@@ -117,9 +115,6 @@ def main():
     args = parser.parse_args()
     if sys.platform != "darwin" or sys.version_info < (3, 12):
         parser.error("run on macOS using Python 3.12 or newer")
-    deployment_id = str(UUID(args.deployment_id))
-    if UUID(deployment_id).int == 0:
-        parser.error("a real deployment UUID is required, not the nil UUID")
     control = checked_url(args.control_url, "wss")
     relay = checked_url(args.relay_url, "https")
     arch = "arm64" if args.arch == "aarch64" else "x86_64"
@@ -136,7 +131,7 @@ def main():
         payload.mkdir(parents=True)
         extract_verified(archive, manifest, payload)
         verify_binaries(payload, arch)
-        prepare_scripts(scripts, arch, deployment_id, control, relay)
+        prepare_scripts(scripts, arch, control, relay)
         component = stage / "component.pkg"
         subprocess.run(["/usr/bin/pkgbuild", "--nopayload", "--scripts", str(scripts),
                         "--identifier", IDENTIFIER, "--version", version, str(component)], check=True)
@@ -183,7 +178,7 @@ def main():
         subprocess.run(command, check=True)
         shutil.copyfile(stage / "installer.pkg", output)
     metadata = {"file": output.name, "bytes": output.stat().st_size, "sha256": digest(output),
-                "architecture": arch, "deployment_id": deployment_id, "control_url": control,
+                "architecture": arch, "control_url": control,
                 "relay_url": relay, "installer_signed": bool(args.sign), "notarized": False}
     (packages / f"SHA256-macos-{args.arch}-setup-{args.profile}.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(json.dumps(metadata, indent=2))
