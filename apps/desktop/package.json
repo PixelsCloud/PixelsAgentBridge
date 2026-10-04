@@ -1,12 +1,14 @@
 {
   "name": "pab-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:desktop": "tauri dev --no-watch",
-    "build": "tsc && vite build",
+    "build": "python ../../scripts/build.py desktop-web",
+    "build:desktop": "python ../../scripts/build.py desktop",
+    "build:assets": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },

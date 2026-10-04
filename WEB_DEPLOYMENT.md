@@ -11,14 +11,14 @@ Web 与现有 `/control`、`/relay-control` 共用 HTTPS 端口，不新增公�
 ```sh
 cd apps/web
 npm ci
-npm run build
 cd ../..
-cargo build --locked --release -p pab-server --bin pab-server -p pab-relay --bin pab-relay-server
-python packaging/server/build.py --platform windows --profile release
-# Linux: use Linux-built binaries and --platform linux.
+python scripts/build.py server --profile release --package
+# Native Windows/Linux host: the archive format follows the host platform.
 ```
 
 The independent archive contains both binaries, `web/`, this guide and an adjacent SHA-256 manifest. It never includes `.env`, TLS keys, database credentials or test fixtures. Existing Desktop installer names are unchanged.
+
+The unified build allocates one product version for Server, Relay and Web; see [BUILDING.md](BUILDING.md). Repackaging existing verified artifacts keeps their original version.
 
 Docker builds the same production Web sources in a Node 22 build stage and places the assets beside the Server executable. See [Docker guide](packaging/docker/README.md). Configure a distinct stable `PAB_RELAY_NODE_ID` for each Relay; the default is `primary`. Legacy Relay versions that do not report a node ID do not appear in the node table.
 

@@ -1,11 +1,12 @@
 {
   "name": "pab-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "python ../../scripts/build.py web",
+    "build:assets": "tsc --noEmit && vite build",
     "test": "vitest run --exclude 'e2e/**'",
     "test:e2e": "playwright test"
   },

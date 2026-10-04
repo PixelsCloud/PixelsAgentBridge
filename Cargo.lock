@@ -4091,7 +4091,7 @@ dependencies = [
 
 [[package]]
 name = "pab-agent-core"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "futures-util",
  "iroh-base",
@@ -4110,7 +4110,7 @@ dependencies = [
 
 [[package]]
 name = "pab-bridge"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -4138,7 +4138,7 @@ dependencies = [
 
 [[package]]
 name = "pab-desktop-control"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "enigo",
  "pab-protocol",
@@ -4151,7 +4151,7 @@ dependencies = [
 
 [[package]]
 name = "pab-executor"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "argon2",
  "axum",
@@ -4189,7 +4189,7 @@ dependencies = [
 
 [[package]]
 name = "pab-logging"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "tempfile",
  "thiserror 2.0.20",
@@ -4199,7 +4199,7 @@ dependencies = [
 
 [[package]]
 name = "pab-os-control"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "futures-util",
  "pab-protocol",
@@ -4213,7 +4213,7 @@ dependencies = [
 
 [[package]]
 name = "pab-os-sessions"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "pab-protocol",
  "tokio",
@@ -4223,7 +4223,7 @@ dependencies = [
 
 [[package]]
 name = "pab-platform"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "blake3",
  "hickory-resolver",
@@ -4243,7 +4243,7 @@ dependencies = [
 
 [[package]]
 name = "pab-protocol"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "blake3",
  "serde",
@@ -4254,7 +4254,7 @@ dependencies = [
 
 [[package]]
 name = "pab-relay"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "futures-util",
  "hex",
@@ -4281,7 +4281,7 @@ dependencies = [
 
 [[package]]
 name = "pab-screenshot"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "image",
  "pab-protocol",
@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "pab-server"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "argon2",
  "axum",
@@ -4330,7 +4330,7 @@ dependencies = [
 
 [[package]]
 name = "pab-task-runtime"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "pab-protocol",
  "thiserror 2.0.20",
@@ -4338,7 +4338,7 @@ dependencies = [
 
 [[package]]
 name = "pab-terminal"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "portable-pty",
  "thiserror 2.0.20",
@@ -4346,7 +4346,7 @@ dependencies = [
 
 [[package]]
 name = "pab-transport"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "iroh",
  "iroh-relay",
@@ -4363,7 +4363,7 @@ dependencies = [
 
 [[package]]
 name = "pab-windows-sas"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "windows-sys 0.61.2",
 ]

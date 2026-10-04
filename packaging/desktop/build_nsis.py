@@ -8,9 +8,12 @@ from urllib.parse import urlsplit
 import json
 import subprocess
 import zipfile
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from build_version import parse_version, verify_artifacts
 PACKAGES = ROOT / ".build" / "packages"
 BINARIES = {
     "pab-desktop.exe": ROOT / "apps" / "desktop" / "src-tauri" / "target",
@@ -57,6 +60,12 @@ def main() -> None:
     expected_hash = json.loads(checksum_file.read_text(encoding="utf-8"))[archive.name]["sha256"]
     if digest_file(archive) != expected_hash:
         raise ValueError(f"Windows archive checksum does not match {checksum_file}")
+    version = verify_artifacts(ROOT, 'desktop', profile, {name: base / profile / name for name, base in BINARIES.items()})
+    archive_version = json.loads(checksum_file.read_text(encoding='utf-8'))[archive.name].get('version')
+    if archive_version != version:
+        raise ValueError('Windows archive version does not match its build record')
+    if parse_version(version)[0] > 65535:
+        raise ValueError('Windows version resources require major <= 65535')
 
     compiler = ROOT / "tools" / "nsis" / "makensis.exe"
     icon = ROOT / "apps" / "desktop" / "src-tauri" / "icons" / "icon.ico"
@@ -87,11 +96,12 @@ def main() -> None:
             f"/DRELAY_URL={relay_url}",
             f"/DAPP_ICON={icon}",
             f"/DBUILD_PROFILE={profile}",
+            f"/DAPP_VERSION={version}",
             str(script),
         ]
         subprocess.run(command, cwd=ROOT, check=True)
 
-    metadata = {"file": output.name, "bytes": output.stat().st_size, "sha256": digest_file(output)}
+    metadata = {"file": output.name, "version": version, "bytes": output.stat().st_size, "sha256": digest_file(output)}
     (PACKAGES / f"SHA256-windows-setup-{profile}.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
     )

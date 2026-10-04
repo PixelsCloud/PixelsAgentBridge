@@ -598,29 +598,26 @@ npm run dev:desktop
 
 ### 构建 Windows 安装包
 
-在仓库根目录编译核心 Debug 程序：
+在仓库根目录安装前端依赖，然后统一编译并打包：
 
 ```powershell
-cargo build --locked -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp
+npm --prefix apps/desktop ci
+python scripts/build.py desktop --package
 ```
 
-在 `apps/desktop` 编译 Desktop：
+需要更换控制端和中继地址时，对同一批产物重新生成安装包：
 
 ```powershell
-npm ci
-.\node_modules\.bin\tauri.cmd build --debug --no-bundle
-```
-
-返回仓库根目录生成完整归档和安装包：
-
-```powershell
-python packaging/desktop/build.py --platform windows --profile debug
 python packaging/desktop/build_nsis.py --profile debug --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
 ```
 
 执行前替换部署信息。输出位于 `.build/packages/`，包含
 `pixels-agent-bridge-windows-x86_64-debug-setup.exe` 和校验清单。
 安装、升级测试使用完整包；Release 打包需要对应程序和明确的 profile。
+
+每次整体编译自动分配一个统一版本，首次 `1.2.0`，之后每次 patch 加1；
+`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`。后续打包不再递增，也不改变安装包文件名。
+完整构建入口及规则见 [BUILDING.md](BUILDING.md)。
 
 ### 检查命令
 
@@ -633,7 +630,7 @@ cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-在 `apps/desktop` 执行 `npm run build` 检查前端。PostgreSQL 集成测试需要通过
+在 `apps/desktop` 执行 `npx tsc --noEmit` 检查前端类型，不消耗版本号。PostgreSQL 集成测试需要通过
 `DATABASE_URL` 配置可丢弃的测试数据库；依赖特定环境或标记 ignored 的测试需额外准备。
 这些是检查入口，不表示所有平台或可选测试均已通过。
 

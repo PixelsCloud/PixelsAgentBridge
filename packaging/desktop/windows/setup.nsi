@@ -22,6 +22,9 @@ Unicode true
 !ifndef BUILD_PROFILE
     !error "BUILD_PROFILE is required"
 !endif
+!ifndef APP_VERSION
+    !error "APP_VERSION is required"
+!endif
 
 Name "Pixels Agent Bridge"
 OutFile "${OUTPUT_FILE}"
@@ -33,11 +36,11 @@ ShowUninstDetails show
 SetCompressor /SOLID lzma
 Icon "${APP_ICON}"
 UninstallIcon "${APP_ICON}"
-VIProductVersion "0.1.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=1033 "ProductName" "Pixels Agent Bridge"
-VIAddVersionKey /LANG=1033 "ProductVersion" "0.1.0"
+VIAddVersionKey /LANG=1033 "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "Pixels"
-VIAddVersionKey /LANG=1033 "FileVersion" "0.1.0"
+VIAddVersionKey /LANG=1033 "FileVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1033 "FileDescription" "Pixels Agent Bridge ${BUILD_PROFILE} Installer"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright (C) 2026 Pixels"
 
@@ -109,7 +112,7 @@ Section "Install"
     CreateShortCut "$SMPROGRAMS\Pixels Agent Bridge\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "DisplayName" "Pixels Agent Bridge"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "DisplayVersion" "0.1.0 ${BUILD_PROFILE}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "DisplayVersion" "${APP_VERSION} ${BUILD_PROFILE}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "Publisher" "Pixels"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PixelsAgentBridge" "DisplayIcon" "$INSTDIR\pab-desktop.exe"

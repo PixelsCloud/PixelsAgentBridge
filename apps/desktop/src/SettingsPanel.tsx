@@ -5,6 +5,7 @@ import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "luci
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
+import { version } from "../package.json";
 
 type ServerSettings = {
   controlUrl: string;
@@ -149,7 +150,7 @@ export function SettingsPanel({ language, onLanguageChange }: Props) {
       {section === "about" && <div className="settings-about">
         <div className="surface-kicker"><Info size={15} /> {t.settingsAbout}</div>
         <h2>Pixels Agent Bridge</h2>
-        <p>v0.1.0</p>
+        <p>v{version}</p>
         <p>{t.iconAttribution}</p>
       </div>}
       </section>
