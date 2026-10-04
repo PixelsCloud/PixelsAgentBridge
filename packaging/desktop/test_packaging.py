@@ -2,6 +2,8 @@
 import hashlib
 import json
 from pathlib import Path
+import plistlib
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -11,12 +13,22 @@ import zipfile
 
 
 SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS.parents[1] / "scripts"))
+from build_version import record_artifacts
 
 
 class Packages(unittest.TestCase):
     def test_platform_archives_keep_their_own_scripts_and_components(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            # Keep synthetic provenance out of the checkout's real build records.
+            package_scripts = root / "packaging/desktop"
+            package_scripts.mkdir(parents=True)
+            shutil.copyfile(SCRIPTS / "build.py", package_scripts / "build.py")
+            for name in ("windows", "unix", "macos"):
+                shutil.copytree(SCRIPTS / name, package_scripts / name)
+            (root / "scripts").mkdir()
+            shutil.copyfile(SCRIPTS.parents[1] / "scripts/build_version.py", root / "scripts/build_version.py")
             binaries = root / "bin"
             binaries.mkdir()
             for name in ("pab-mcp", "pab-executor", "pab-desktop"):
@@ -27,11 +39,16 @@ class Packages(unittest.TestCase):
             executable.parent.mkdir(parents=True)
             executable.write_bytes(b"fixture")
             executable.chmod(0o755)
+            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleShortVersionString": "1.2.0"}))
             for platform in ("windows", "linux", "macos"):
                 with self.subTest(platform=platform):
                     out = root / platform
+                    if platform != "macos":
+                        suffix = ".exe" if platform == "windows" else ""
+                        files = {name + suffix: binaries / (name + suffix) for name in ("pab-executor", "pab-mcp", "pab-desktop")}
+                        record_artifacts(root, "desktop" if platform == "windows" else platform, "debug", "1.2.0", files)
                     subprocess.run([
-                        sys.executable, str(SCRIPTS / "build.py"), "--platform", platform,
+                        sys.executable, str(package_scripts / "build.py"), "--platform", platform,
                         "--profile", "debug", "--output-dir", str(out),
                         "--windows-bin-dir", str(binaries),
                         "--windows-desktop-bin", str(binaries / "pab-desktop.exe"),
@@ -41,6 +58,7 @@ class Packages(unittest.TestCase):
                     manifest = json.loads((out / "SHA256-debug.json").read_text())
                     self.assertEqual(len(manifest), 1)
                     name, info = next(iter(manifest.items()))
+                    self.assertEqual(info["version"], "1.2.0")
                     archive = out / name
                     self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), info["sha256"])
                     self.assertEqual(archive.stat().st_size, info["bytes"])

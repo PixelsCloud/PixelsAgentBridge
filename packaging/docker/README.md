@@ -35,10 +35,11 @@ certificate in each `*-ca.pem` file. Do not mark a server leaf certificate as a 
 Build and start the stack from the repository root:
 
 ```sh
+python scripts/build.py docker --profile release
+# Set PAB_SERVER_IMAGE (and any explicit PAB_RELAY_IMAGE) in the private env
+# file to pixels-agent-bridge:<version printed by the build>.
 docker compose --env-file packaging/docker/private.env \
-  -f packaging/docker/compose.yaml build
-docker compose --env-file packaging/docker/private.env \
-  -f packaging/docker/compose.yaml up -d
+  -f packaging/docker/compose.yaml up -d --no-build
 docker compose --env-file packaging/docker/private.env \
   -f packaging/docker/compose.yaml ps
 ```
@@ -47,6 +48,9 @@ The backend HTTPS and Relay HTTPS ports bind to host loopback by default for an
 existing reverse proxy. Relay QUIC publishes UDP 7842 directly. The upstream
 iroh captive-portal listener stays inside the Relay container on loopback and is
 never published by Compose.
+
+Use the unified entry point, not `docker compose build`, so each build allocates
+one product version before Docker copies the sources. See [BUILDING.md](../../BUILDING.md).
 
 The Relay control secret is mounted through a Compose secret file. PostgreSQL is
 reachable only on the private Compose network. No public HTTP listener is added.

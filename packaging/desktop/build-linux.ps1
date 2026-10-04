@@ -1,12 +1,16 @@
 param(
     [ValidateSet('debug', 'release')]
-    [string]$Profile = 'debug'
+    [string]$Profile = 'debug',
+    [switch]$ComponentsOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+if (-not $ComponentsOnly) {
+    & python (Join-Path $root 'scripts\build.py') linux --profile $Profile --package
+    exit $LASTEXITCODE
+}
 $dockerfile = Join-Path $PSScriptRoot 'Dockerfile.linux'
-$packageScript = Join-Path $PSScriptRoot 'build.py'
 $mount = "type=bind,source=$root,target=/src"
 $image = 'pab-linux-build-deps:bookworm'
 
@@ -33,9 +37,4 @@ $buildScript = $buildScript.Replace("`r`n", "`n")
     $image sh -c $buildScript
 if ($LASTEXITCODE -ne 0) {
     throw 'Linux program build failed'
-}
-
-& python $packageScript --platform linux --profile $Profile
-if ($LASTEXITCODE -ne 0) {
-    throw 'Linux archive creation failed'
 }

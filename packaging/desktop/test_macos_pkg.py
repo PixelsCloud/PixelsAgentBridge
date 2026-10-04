@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -89,6 +90,10 @@ class Installer(unittest.TestCase):
             self.assertIn(pkg.CONTROL_URL, configs[0].read_text())
             self.assertTrue((configs[0].parent / "payload" / pkg.APP / "Contents/MacOS/pab-desktop").is_file())
             pkg.verify_binaries(configs[0].parent / "payload", "arm64" if arch == "aarch64" else "x86_64")
+            with (configs[0].parent / "payload" / pkg.APP / "Contents/Info.plist").open("rb") as source:
+                built_version = plistlib.load(source)["CFBundleShortVersionString"]
+            package_info = ET.parse(next(expanded.rglob("PackageInfo"))).getroot()
+            self.assertEqual(package_info.attrib["version"], built_version)
             metadata = json.loads(next(root.glob("SHA256-macos-*-setup-*.json")).read_text())
             self.assertEqual(pkg.digest(installers[0]), metadata["sha256"])
             self.assertFalse(metadata["installer_signed"])

@@ -883,23 +883,16 @@ does not provide Tauri's native device APIs.
 
 ### Build a Windows package
 
-From the repository root, compile core Debug binaries:
+Install frontend dependencies once, then build and package from the repository root:
 
 ```powershell
-cargo build --locked -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp
+npm --prefix apps/desktop ci
+python scripts/build.py desktop --package
 ```
 
-From `apps/desktop`, compile Desktop:
+To repackage the same build with different control/Relay URLs:
 
 ```powershell
-npm ci
-.\node_modules\.bin\tauri.cmd build --debug --no-bundle
-```
-
-Return to the repository root and generate the complete archive and installer:
-
-```powershell
-python packaging/desktop/build.py --platform windows --profile debug
 python packaging/desktop/build_nsis.py --profile debug --control-url "wss://control.example.com/control" --relay-url "https://relay.example.com"
 ```
 
@@ -907,6 +900,10 @@ Replace the deployment values before running. Output is under `.build/packages/`
 including `pixels-agent-bridge-windows-x86_64-debug-setup.exe` and checksum manifests.
 Use complete packages for installation and upgrade testing. Release packaging needs
 the matching Release binaries and explicit profile selection.
+
+Each unified build allocates one shared version: first `1.2.0`, then one patch per
+build, with `1.2.99 → 1.3.0` and `1.99.99 → 2.0.0`. Packaging does not increment
+again or rename the installer. See [BUILDING.md](BUILDING.md) for all targets.
 
 ### Checks
 
@@ -919,7 +916,7 @@ cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-Run `npm run build` from `apps/desktop` for frontend validation. PostgreSQL integration
+Run `npx tsc --noEmit` from `apps/desktop` for frontend type validation without allocating a version. PostgreSQL integration
 tests need a disposable test database through `DATABASE_URL`. Environment-dependent
 and ignored tests require their documented setup. These are check commands, not a
 claim that all platforms or optional tests have passed.

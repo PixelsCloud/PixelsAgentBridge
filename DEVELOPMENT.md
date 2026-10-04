@@ -1,5 +1,10 @@
 # Development
 
+Product builds use `python scripts/build.py` to allocate one shared version per
+build, starting at 1.2.0 with base-100 minor/patch rollover. See [BUILDING.md](BUILDING.md)
+for targets, packaging, concurrency and failure behavior. Low-level checks/tests
+do not allocate versions; commit the version state and synchronized manifests together.
+
 The Server Web delivery and test contract is tracked in [WEB_DEVELOPMENT.md](WEB_DEVELOPMENT.md).
 Remote task history is local to Bridge/Executor only. The server and Web do not
 receive, retain, or display task history, command output, or task-derived statistics.

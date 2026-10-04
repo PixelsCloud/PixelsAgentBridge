@@ -5,8 +5,11 @@ from pathlib import Path
 import json
 import tarfile
 import zipfile
+import sys
 
 root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(root / 'scripts'))
+from build_version import verify_artifacts
 parser = ArgumentParser(description=__doc__)
 parser.add_argument('--platform', choices=['windows', 'linux'], required=True)
 parser.add_argument('--profile', choices=['debug', 'release'], default='release')
@@ -25,8 +28,10 @@ for path in sorted(web.rglob('*')):
         if path.is_symlink() or path.suffix not in allowed:
             raise SystemExit(f'Unexpected production Web asset: {path.name}')
         files.append((path, 'web/' + path.relative_to(web).as_posix()))
+version = verify_artifacts(root, 'server', args.profile, {member: path for path, member in files})
 files.append((root / 'WEB_DEPLOYMENT.md', 'WEB_DEPLOYMENT.md'))
 files.append((root / 'WEB_DEVELOPMENT.md', 'WEB_DEVELOPMENT.md'))
+files.append((root / 'BUILDING.md', 'BUILDING.md'))
 for path, _ in files:
     if not path.is_file():
         raise SystemExit(f'Missing required build artifact: {path}')
@@ -44,6 +49,6 @@ else:
                 info.mode = 0o755 if member in ['pab-server', 'pab-relay-server'] else 0o644
                 return info
             out.add(path, arcname=member, recursive=False, filter=permissions)
-manifest = {'archive': archive.name, 'sha256': sha256(archive.read_bytes()).hexdigest(), 'files': {member: sha256(path.read_bytes()).hexdigest() for path, member in files}}
+manifest = {'archive': archive.name, 'version': version, 'sha256': sha256(archive.read_bytes()).hexdigest(), 'files': {member: sha256(path.read_bytes()).hexdigest() for path, member in files}}
 archive.with_suffix(archive.suffix + '.manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf8')
 print(json.dumps({'archive': str(archive), 'files': len(files), 'sha256': manifest['sha256']}))

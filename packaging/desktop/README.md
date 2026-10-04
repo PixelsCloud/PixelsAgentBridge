@@ -8,6 +8,9 @@ On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.9+, run
 contains the ad-hoc signed `Pixels Agent Bridge.app`, MCP, Executor, dedicated
 macOS scripts and launchd plists. It is not Developer-ID signed or notarized.
 The adjacent SHA-256 manifest records the complete archive checksum.
+The dedicated macOS script uses the currently synchronized product version; it
+does not allocate a new version through the Windows/Linux unified build entry.
+macOS tar/PKG metadata uses the built app's version, not a newer checkout version.
 
 Unpack the complete archive and, from a desktop user account, run
 `sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL`.
@@ -53,13 +56,10 @@ expand a temporary fixture installer without running its installation scripts.
 
 ## Windows and Linux
 
-During development, build Debug binaries and package them with
-`python packaging/desktop/build.py --platform windows --profile debug`.
-From `apps/desktop` on Windows, build the Debug desktop executable with
-`.\node_modules\.bin\tauri.cmd build --debug --no-bundle`. The explicit CLI
-call matters: `npm run tauri build -- --debug --no-bundle` did not forward the
-flags in our PowerShell test and produced a Release executable.
-The default profile is Release. Archive names and checksum manifests distinguish
+During development, use `python scripts/build.py desktop --package` from the
+repository root after `npm ci` in `apps/desktop`. The unified entry point defaults
+to Debug, increments the product version once, and builds all three components
+before packaging. See [BUILDING.md](../../BUILDING.md). Archive names and checksum manifests distinguish
 the profiles so test and release packages cannot silently replace one another.
 The Windows ZIP includes `INSTALL-WINDOWS.txt` with the PowerShell installation
 steps. To make a single EXE installer for another Windows computer, copy NSIS
@@ -82,10 +82,8 @@ for debugging. A code change requires rebuilding and deploying a new complete
 Debug archive. Keep test data during installation unless a test explicitly
 requires resetting it.
 
-Build the Windows core binaries with
-`cargo build --locked --release -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp`. In
-`apps/desktop`, run `npm ci` and `.\node_modules\.bin\tauri.cmd build --no-bundle`, then run
-`python packaging/desktop/build.py --platform windows`. The resulting Windows archive contains
+For an explicitly requested Release build, use
+`python scripts/build.py desktop --profile release --package`. The resulting Windows archive contains
 one Tauri app, the background Executor, the MCP stdio tool, and installation
 scripts. The adjacent SHA-256 manifest verifies the archive. Release profiles
 strip symbols.
@@ -136,15 +134,11 @@ The machine's `executor.sqlite3` stores its device code, current temporary
 password, password hash, and task history together. A registered device can
 display its saved access information while the control server is unavailable.
 
-After building the frontend, build the Linux archive with
-`docker build -f packaging/desktop/Dockerfile.linux --output type=local,dest=.build/guest-desktop-linux-release .`.
-For a Debug package, add `--build-arg PAB_PROFILE=debug` and use a separate
-`guest-desktop-linux-debug` output directory, then run
-`python packaging/desktop/build.py --platform linux --profile debug`.
-On a Windows host with limited C: space, use
-`powershell -File packaging/desktop/build-linux.ps1` instead. It keeps Cargo
-downloads and compilation output in `.build` on the workspace drive and creates
-the Debug tarball. Pass `-Profile release` only for a release build.
+On a Windows host, build the Linux archive with
+`python scripts/build.py linux --package`. The existing
+`powershell -File packaging/desktop/build-linux.ps1` delegates to that entry point.
+It keeps Cargo downloads and compilation output in `.build` on the workspace drive
+and creates the Debug tarball. Use `--profile release` only for a release build.
 The archive includes the same Tauri app and background components.
 Run `install.sh` as root with the control URL and Relay URL, then launch
 `run-app.sh` as the interactive user. The old browser UI is absent from both

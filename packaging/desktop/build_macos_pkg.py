@@ -122,7 +122,6 @@ def main():
     stem = f"pixels-agent-bridge-macos-{args.arch}-{args.profile}"
     archive = packages / f"{stem}.tar.gz"
     manifest = packages / ("SHA256.json" if args.profile == "release" else "SHA256-debug.json")
-    version = json.loads((ROOT / "apps/desktop/src-tauri/tauri.conf.json").read_text())["version"]
     output = packages / f"{stem}-setup.pkg"
     with tempfile.TemporaryDirectory(prefix="pab-pkg-", dir=ROOT / ".build") as temporary:
         stage = Path(temporary)
@@ -131,6 +130,8 @@ def main():
         payload.mkdir(parents=True)
         extract_verified(archive, manifest, payload)
         verify_binaries(payload, arch)
+        with (payload / APP / "Contents/Info.plist").open("rb") as source:
+            version = plistlib.load(source)["CFBundleShortVersionString"]
         prepare_scripts(scripts, arch, control, relay)
         component = stage / "component.pkg"
         subprocess.run(["/usr/bin/pkgbuild", "--nopayload", "--scripts", str(scripts),
