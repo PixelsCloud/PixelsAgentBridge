@@ -10,6 +10,7 @@ import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { MacosPermissionsPanel, requestMacosPermissionsAtStartup } from "./MacosPermissionsPanel";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
@@ -47,6 +48,10 @@ function App() {
   const [copiedField, setCopiedField] = useState<"code" | "password" | null>(null);
   const t = messages[language];
   const appWindow = getCurrentWindow();
+
+  useEffect(() => {
+    void requestMacosPermissionsAtStartup().catch((cause) => setError(String(cause)));
+  }, []);
 
   useEffect(() => {
     const currentWindow = getCurrentWindow();
@@ -217,6 +222,7 @@ function App() {
         </aside>
 
         <main className="workspace">
+          <MacosPermissionsPanel language={language} persistent />
           {error && <div className="toast error" role="status">{error}</div>}
 
           <div className={`page-content page-${view}`}>

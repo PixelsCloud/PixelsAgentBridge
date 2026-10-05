@@ -26,6 +26,8 @@ struct Size {
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
     fn AXIsProcessTrusted() -> bool;
+    fn AXIsProcessTrustedWithOptions(options: Ref) -> bool;
+    static kAXTrustedCheckOptionPrompt: Ref;
     fn getuid() -> u32;
     fn AXUIElementCreateApplication(pid: i32) -> Ref;
     fn AXUIElementCreateSystemWide() -> Ref;
@@ -42,6 +44,7 @@ unsafe extern "C" {
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
 }
 #[link(name = "CoreFoundation", kind = "framework")]
 unsafe extern "C" {
@@ -61,6 +64,14 @@ unsafe extern "C" {
     fn CFArrayGetTypeID() -> usize;
     fn CFArrayGetCount(array: Ref) -> isize;
     fn CFArrayGetValueAtIndex(array: Ref, index: isize) -> Ref;
+    fn CFDictionaryCreate(
+        allocator: Ref,
+        keys: *const Ref,
+        values: *const Ref,
+        count: isize,
+        key_callbacks: Ref,
+        value_callbacks: Ref,
+    ) -> Ref;
     static kCFBooleanTrue: Ref;
     static kCFBooleanFalse: Ref;
 }
@@ -156,6 +167,28 @@ pub fn active_console() -> bool {
 }
 pub fn screen_capture_allowed() -> bool {
     unsafe { CGPreflightScreenCaptureAccess() }
+}
+/// Called by the foreground application's main thread, never by the daemon.
+pub fn request_screen_capture() -> bool {
+    screen_capture_allowed() || unsafe { CGRequestScreenCaptureAccess() }
+}
+/// macOS shows the native prompt asynchronously; false does not mean rejection.
+pub fn request_accessibility() -> Result<bool, String> {
+    if accessibility_allowed() {
+        return Ok(true);
+    }
+    // Static CF keys/values outlive this dictionary, so no retain callbacks are needed.
+    let options = Owned::new(unsafe {
+        CFDictionaryCreate(
+            std::ptr::null(),
+            &kAXTrustedCheckOptionPrompt,
+            &kCFBooleanTrue,
+            1,
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    })?;
+    Ok(unsafe { AXIsProcessTrustedWithOptions(options.0) })
 }
 pub fn require_screen_capture() -> Result<(), String> {
     if screen_capture_allowed() {

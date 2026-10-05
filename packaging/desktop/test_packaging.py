@@ -38,8 +38,10 @@ class Packages(unittest.TestCase):
             executable = app / "Contents/MacOS/pab-desktop"
             executable.parent.mkdir(parents=True)
             executable.write_bytes(b"fixture")
-            executable.chmod(0o755)
+            executable.chmod(0o700)
             (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleShortVersionString": "1.2.0"}))
+            (app / "Contents/Info.plist").chmod(0o600)
+            executable.parent.chmod(0o700)
             for platform in ("windows", "linux", "macos"):
                 with self.subTest(platform=platform):
                     out = root / platform
@@ -76,6 +78,9 @@ class Packages(unittest.TestCase):
                             self.assertEqual(package.getmember("install.sh").mode, 0o755)
                             if platform == "macos":
                                 self.assertIn("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop", package.getnames())
+                                self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop").mode, 0o755)
+                                self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS").mode, 0o755)
+                                self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/Info.plist").mode, 0o644)
                                 self.assertNotIn("pab-desktop", package.getnames())
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.executor.plist").mode, 0o644)
                             else:

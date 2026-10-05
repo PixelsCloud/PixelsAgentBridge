@@ -13,8 +13,8 @@ mod native;
 mod native;
 #[cfg(target_os = "macos")]
 pub use native::{
-    accessibility_allowed, active_console, apply_input, release_input, require_screen_capture,
-    screen_capture_allowed,
+    accessibility_allowed, active_console, apply_input, release_input, request_accessibility,
+    request_screen_capture, require_screen_capture, screen_capture_allowed,
 };
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 #[path = "unsupported.rs"]

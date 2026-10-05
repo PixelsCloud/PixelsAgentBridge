@@ -254,6 +254,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             macos_permissions::macos_permissions,
+            macos_permissions::request_macos_permission,
             macos_permissions::open_macos_permission_settings,
             device_status,
             mcp_reporting::mcp_reporting_status,

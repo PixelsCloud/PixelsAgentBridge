@@ -98,7 +98,13 @@ def package_unix(platform, architecture, binaries):
         versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:3]})
     with tarfile.open(archive_path, "w:gz") as archive:
         if platform == "macos":
-            archive.add(args.macos_app, arcname="Pixels Agent Bridge.app")
+            def app_permissions(info):
+                # A launchd build may inherit umask 077. Installed apps are root-owned
+                # but must remain readable/executable by the signed-in user.
+                executable = info.name == "Pixels Agent Bridge.app/Contents/MacOS/pab-desktop"
+                info.mode = 0o755 if info.isdir() or executable or info.mode & 0o111 else 0o644
+                return info
+            archive.add(args.macos_app, arcname="Pixels Agent Bridge.app", filter=app_permissions)
         for file in files:
             info = archive.gettarinfo(str(file), arcname=file.name)
             info.mode = 0o644 if file.suffix == ".plist" else 0o755

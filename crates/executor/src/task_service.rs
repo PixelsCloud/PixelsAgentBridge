@@ -514,7 +514,11 @@ impl TaskService {
             DeviceTaskRequest::DesktopInput {
                 request_id, event, ..
             } => {
-                if !cfg!(windows) {
+                // macOS has a native helper backend, including standalone key-up
+                // events needed to recover a modifier left down after a crash.
+                if !cfg!(any(windows, target_os = "macos"))
+                    || (!cfg!(windows) && matches!(event, DesktopInputEvent::SecureAttention))
+                {
                     return Err(TaskServiceError::Unsupported);
                 }
                 let kind = match event {
@@ -750,6 +754,28 @@ fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
 }
 
 fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
+    // Permission failures are actionable. Do not hide them behind "unsupported",
+    // and do not expose arbitrary helper errors (which may contain local paths).
+    if let TaskServiceError::WindowHelper(crate::local_ipc::LocalIpcError::Remote(message)) = error
+    {
+        let permission = if message.starts_with("screen_recording_permission_required:") {
+            Some(
+                "screen_recording_permission_required: open Pixels Agent Bridge on the Mac to request Screen Recording access",
+            )
+        } else if message.starts_with("accessibility_permission_required:") {
+            Some(
+                "accessibility_permission_required: open Pixels Agent Bridge on the Mac to request Accessibility access",
+            )
+        } else {
+            None
+        };
+        if let Some(message) = permission {
+            return DeviceTaskResponse::Error {
+                code: DeviceTaskErrorCode::AccessDenied,
+                message: message.into(),
+            };
+        }
+    }
     let code = match error {
         TaskServiceError::InvalidRequest(_) => DeviceTaskErrorCode::InvalidRequest,
         TaskServiceError::DirectoryRead(error) if error.kind() == std::io::ErrorKind::NotFound => {

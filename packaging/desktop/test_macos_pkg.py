@@ -91,6 +91,9 @@ class Installer(unittest.TestCase):
             self.assertIn(pkg.CONTROL_URL, configs[0].read_text())
             self.assertTrue((configs[0].parent / "payload" / pkg.APP / "Contents/MacOS/pab-desktop").is_file())
             pkg.verify_binaries(configs[0].parent / "payload", "arm64" if arch == "aarch64" else "x86_64")
+            app_payload = configs[0].parent / "payload" / pkg.APP
+            self.assertEqual((app_payload / "Contents/MacOS/pab-desktop").stat().st_mode & 0o777, 0o755)
+            self.assertEqual((app_payload / "Contents/Info.plist").stat().st_mode & 0o777, 0o644)
             with (configs[0].parent / "payload" / pkg.APP / "Contents/Info.plist").open("rb") as source:
                 built_version = plistlib.load(source)["CFBundleShortVersionString"]
             package_info = ET.parse(next(expanded.rglob("PackageInfo"))).getroot()

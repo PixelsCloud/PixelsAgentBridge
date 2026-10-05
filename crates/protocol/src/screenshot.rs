@@ -312,6 +312,35 @@ pub struct ScreenshotMeta {
 mod tests {
     use super::*;
     #[test]
+    fn macos_monitor_logical_bounds_accept_native_and_retina_jpeg() {
+        let mut info: ScreenshotInfo = serde_json::from_value(serde_json::json!({
+            "captured_at_unix_ms": 1, "mode": "jpeg", "format": "jpeg",
+            "width": 1920, "height": 1080, "source_width": 1920, "source_height": 1080,
+            "monitor_id": 1, "origin_x": -1920, "origin_y": 0,
+            "quality": 85, "resized": false,
+            "desktop_rect": {"x": -1920, "y": 0, "width": 1920, "height": 1080}
+        }))
+        .unwrap();
+        let options = ScreenshotOptions::default();
+        assert_eq!(info.validate(&options), Ok(()));
+        info.width = 3840;
+        info.source_width = 3840;
+        info.height = 2160;
+        info.source_height = 2160;
+        assert_eq!(info.validate(&options), Ok(()));
+        let selected = ScreenshotOptions {
+            monitor_id: Some(2),
+            ..options.clone()
+        };
+        assert!(info.validate(&selected).is_err());
+        info.desktop_rect.as_mut().unwrap().x = 0;
+        assert!(info.validate(&options).is_err());
+        info.desktop_rect.as_mut().unwrap().x = -1920;
+        info.monitor_id = None;
+        assert!(info.validate(&options).is_err());
+    }
+
+    #[test]
     fn native_jpeg_selection_requires_v3_and_does_not_accept_other_sources() {
         let r = RequestId::new().to_string();
         let good = ScreenshotOptions {

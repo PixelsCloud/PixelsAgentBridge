@@ -5,6 +5,81 @@ use pab_protocol::{DeviceId, ExpectedEnvironment, RequestId, TaskState, TenantId
 
 use super::*;
 
+#[cfg(target_os = "macos")]
+#[tokio::test]
+#[ignore = "run alone: verifies dispatch with no in-process desktop helper registered"]
+async fn macos_key_release_reaches_helper_but_secure_attention_is_rejected() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = TaskService::open(
+        &directory.path().join("tasks.sqlite3"),
+        DeviceRef {
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        },
+        detect_native_execution_context().unwrap(),
+    )
+    .await
+    .unwrap();
+    let release = service
+        .handle_request(
+            account(9),
+            DeviceTaskRequest::DesktopInput {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id: RequestId::new(),
+                event: DesktopInputEvent::Key {
+                    virtual_key: 91,
+                    down: false,
+                },
+            },
+        )
+        .await;
+    // The installed GUI is never contacted: helper registration is process-local.
+    assert!(matches!(
+        release,
+        Err(TaskServiceError::WindowHelper(
+            crate::local_ipc::LocalIpcError::WindowHelperUnavailable
+        ))
+    ));
+    let secure = service
+        .handle_request(
+            account(9),
+            DeviceTaskRequest::DesktopInput {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request_id: RequestId::new(),
+                event: DesktopInputEvent::SecureAttention,
+            },
+        )
+        .await;
+    assert!(matches!(secure, Err(TaskServiceError::Unsupported)));
+}
+
+#[test]
+fn desktop_permission_errors_are_actionable_without_exposing_helper_details() {
+    for permission in [
+        "screen_recording_permission_required",
+        "accessibility_permission_required",
+    ] {
+        let response = error_response(&TaskServiceError::WindowHelper(
+            crate::local_ipc::LocalIpcError::Remote(format!(
+                "{permission}: private diagnostic details"
+            )),
+        ));
+        let DeviceTaskResponse::Error { code, message } = response else {
+            panic!("expected error");
+        };
+        assert_eq!(code, DeviceTaskErrorCode::AccessDenied);
+        assert!(message.starts_with(permission));
+        assert!(!message.contains("private diagnostic"));
+    }
+    let response = error_response(&TaskServiceError::WindowHelper(
+        crate::local_ipc::LocalIpcError::Remote("/private/secret".into()),
+    ));
+    let DeviceTaskResponse::Error { message, .. } = response else {
+        panic!("expected error");
+    };
+    assert!(!message.contains("/private/secret"));
+}
+
 fn account(id: u128) -> OperatorRef {
     OperatorRef::account(
         UserId::from_u128(id),

@@ -50,6 +50,7 @@ for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall
 done
 ditto "$source_dir/Pixels Agent Bridge.app" "$app"
 chown -R root:wheel "$app"
+chmod -R u=rwX,go=rX "$app"
 {
     printf 'export PAB_CONTROL_URL=%q\n' "$control_url"
     printf 'export PAB_RELAY_URLS=%q\n' "$relay_url"
