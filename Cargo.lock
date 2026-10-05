@@ -1447,8 +1447,6 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 [[package]]
 name = "enigo"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71744ff36f35a4276e8827add8102d0e792378c574fd93cb4e1c8e0505f96b7c"
 dependencies = [
  "core-foundation 0.10.1",
  "core-graphics",
@@ -4091,7 +4089,7 @@ dependencies = [
 
 [[package]]
 name = "pab-agent-core"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "futures-util",
  "iroh-base",
@@ -4110,7 +4108,7 @@ dependencies = [
 
 [[package]]
 name = "pab-bridge"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -4138,7 +4136,7 @@ dependencies = [
 
 [[package]]
 name = "pab-desktop-control"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "dispatch2",
  "enigo",
@@ -4154,7 +4152,7 @@ dependencies = [
 
 [[package]]
 name = "pab-executor"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "argon2",
  "axum",
@@ -4192,7 +4190,7 @@ dependencies = [
 
 [[package]]
 name = "pab-logging"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "tempfile",
  "thiserror 2.0.20",
@@ -4202,7 +4200,7 @@ dependencies = [
 
 [[package]]
 name = "pab-os-control"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "futures-util",
  "libc",
@@ -4218,7 +4216,7 @@ dependencies = [
 
 [[package]]
 name = "pab-os-sessions"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "libc",
  "pab-protocol",
@@ -4229,7 +4227,7 @@ dependencies = [
 
 [[package]]
 name = "pab-platform"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "blake3",
  "hickory-resolver",
@@ -4249,7 +4247,7 @@ dependencies = [
 
 [[package]]
 name = "pab-protocol"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "blake3",
  "serde",
@@ -4260,7 +4258,7 @@ dependencies = [
 
 [[package]]
 name = "pab-relay"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "futures-util",
  "hex",
@@ -4287,7 +4285,7 @@ dependencies = [
 
 [[package]]
 name = "pab-screenshot"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "image",
  "pab-protocol",
@@ -4295,7 +4293,7 @@ dependencies = [
 
 [[package]]
 name = "pab-server"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "argon2",
  "axum",
@@ -4336,7 +4334,7 @@ dependencies = [
 
 [[package]]
 name = "pab-task-runtime"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "pab-protocol",
  "thiserror 2.0.20",
@@ -4344,7 +4342,7 @@ dependencies = [
 
 [[package]]
 name = "pab-terminal"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "portable-pty",
  "thiserror 2.0.20",
@@ -4352,7 +4350,7 @@ dependencies = [
 
 [[package]]
 name = "pab-transport"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "iroh",
  "iroh-relay",
@@ -4369,7 +4367,7 @@ dependencies = [
 
 [[package]]
 name = "pab-windows-sas"
-version = "1.2.9"
+version = "1.2.13"
 dependencies = [
  "windows-sys 0.61.2",
 ]

@@ -1,6 +1,6 @@
 [package]
 name = "pab-desktop"
-version = "1.2.9"
+version = "1.2.13"
 description = "Pixels Agent Bridge desktop application"
 authors = ["Pixels"]
 edition = "2024"
@@ -57,3 +57,6 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[patch.crates-io]
+enigo = { path = "../../../vendor/enigo" }

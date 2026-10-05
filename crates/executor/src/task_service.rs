@@ -775,6 +775,26 @@ fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
                 message: message.into(),
             };
         }
+        // Keep a small allowlist of actionable backend failures. Never expose
+        // arbitrary helper diagnostics, paths, or input content to the caller.
+        let reason = match message.as_str() {
+            "no connection could be established: (failed creating event source)" => Some(
+                "desktop_input_source_unavailable: macOS could not create an input event source in the current login session",
+            ),
+            "primary monitor unavailable" | "selected monitor is unavailable" => Some(
+                "desktop_monitor_unavailable: the display changed or is unavailable; list monitors again",
+            ),
+            "interactive desktop changed" => Some(
+                "desktop_session_changed: the active desktop changed; inspect the current session before sending input",
+            ),
+            _ => None,
+        };
+        if let Some(message) = reason {
+            return DeviceTaskResponse::Error {
+                code: DeviceTaskErrorCode::Unsupported,
+                message: message.into(),
+            };
+        }
     }
     let code = match error {
         TaskServiceError::InvalidRequest(_) => DeviceTaskErrorCode::InvalidRequest,

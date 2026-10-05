@@ -80,6 +80,37 @@ fn desktop_permission_errors_are_actionable_without_exposing_helper_details() {
     assert!(!message.contains("/private/secret"));
 }
 
+#[test]
+fn desktop_backend_failures_preserve_known_reasons_without_leaking_details() {
+    for (backend, public) in [
+        (
+            "no connection could be established: (failed creating event source)",
+            "desktop_input_source_unavailable:",
+        ),
+        (
+            "primary monitor unavailable",
+            "desktop_monitor_unavailable:",
+        ),
+        (
+            "selected monitor is unavailable",
+            "desktop_monitor_unavailable:",
+        ),
+        ("interactive desktop changed", "desktop_session_changed:"),
+    ] {
+        for suffix in ["", ": /private/secret"] {
+            let response = error_response(&TaskServiceError::WindowHelper(
+                crate::local_ipc::LocalIpcError::Remote(format!("{backend}{suffix}")),
+            ));
+            let DeviceTaskResponse::Error { code, message } = response else {
+                panic!("expected error");
+            };
+            assert_eq!(code, DeviceTaskErrorCode::Unsupported);
+            assert_eq!(message.starts_with(public), suffix.is_empty());
+            assert!(!message.contains("/private/secret"));
+        }
+    }
+}
+
 fn account(id: u128) -> OperatorRef {
     OperatorRef::account(
         UserId::from_u128(id),

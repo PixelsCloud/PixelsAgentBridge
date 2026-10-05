@@ -83,8 +83,9 @@ unsafe extern "C" {
 }
 
 struct Owned(Ref);
-// SAFETY: these are retained CF/AX references. Access is serialized by WINDOWS;
-// AX remote messaging and CoreFoundation retain/release do not require the main thread.
+// SAFETY: these are retained CF/AX references stored behind WINDOWS. Registry
+// access is dispatched to the main thread before locking, including removal.
+// AX calls into our own process can enter AppKit and must stay on that thread.
 unsafe impl Send for Owned {}
 impl Drop for Owned {
     fn drop(&mut self) {
@@ -288,6 +289,9 @@ fn present(w: &Window) -> Result<(), String> {
     }
 }
 pub fn mark(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
+    crate::on_input_thread(|| mark_on_main(id, pid, key, marker))
+}
+fn mark_on_main(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
     let process_identity = pab_os_control::process_identity(pid)?;
     let app = application(pid)?;
     let window = xcap::Window::all()
@@ -344,6 +348,9 @@ pub fn mark(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
     Ok(())
 }
 pub fn verify(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
+    crate::on_input_thread(|| verify_on_main(id, pid, key, marker))
+}
+fn verify_on_main(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
     let mut windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
     let w = windows
         .get(&(key.into(), marker))
@@ -356,9 +363,11 @@ pub fn verify(id: u32, pid: u32, key: &str, marker: u32) -> Result<(), String> {
     result
 }
 pub fn unmark(_: u32, _: u32, key: &str, marker: u32) {
-    if let Ok(mut windows) = WINDOWS.lock() {
-        windows.remove(&(key.into(), marker));
-    }
+    crate::on_input_thread(|| {
+        if let Ok(mut windows) = WINDOWS.lock() {
+            windows.remove(&(key.into(), marker));
+        }
+    });
 }
 fn is_focused(w: &Window) -> Result<bool, String> {
     present(w)?;
@@ -368,6 +377,9 @@ fn is_focused(w: &Window) -> Result<bool, String> {
     Ok(unsafe { CFEqual(focused.0, w.element.0) })
 }
 pub fn focused(id: u32) -> Result<bool, String> {
+    crate::on_input_thread(|| focused_on_main(id))
+}
+fn focused_on_main(id: u32) -> Result<bool, String> {
     let windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
     is_focused(
         windows
@@ -409,85 +421,103 @@ pub fn act(
     marker: u32,
     action: Option<WindowControlAction>,
 ) -> Result<(), String> {
-    verify(id, pid, key, marker)?;
-    let mut windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
-    let w = windows
-        .get_mut(&(key.into(), marker))
-        .ok_or("stale window reference")?;
-    let mut expected_rect = None;
-    match action {
-        None => {
-            application(pid)?.set("AXFrontmost", unsafe { kCFBooleanTrue })?;
-            w.element.action("AXRaise")?;
-        }
-        Some(WindowControlAction::Minimize) => {
-            w.element.set("AXMinimized", unsafe { kCFBooleanTrue })?
-        }
-        Some(WindowControlAction::Close) => {
-            w.element.attribute("AXCloseButton")?.action("AXPress")?
-        }
-        Some(WindowControlAction::Maximize) => {
-            let window = xcap::Window::all()
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .find(|v| v.id().ok() == Some(id))
-                .ok_or("window unavailable")?;
-            let monitor = window.current_monitor().map_err(|e| e.to_string())?;
-            let rect = (
-                Point {
-                    x: monitor.x().map_err(|e| e.to_string())? as f64,
-                    y: monitor.y().map_err(|e| e.to_string())? as f64,
-                },
-                Size {
-                    width: monitor.width().map_err(|e| e.to_string())? as f64,
-                    height: monitor.height().map_err(|e| e.to_string())? as f64,
-                },
-            );
-            if w.restore.is_none() {
-                w.restore = Some(geometry(&w.element)?);
+    // AX calls targeting this very process enter AppKit synchronously. They
+    // must run on its main thread, including reads and releases of AX objects.
+    // Acquire WINDOWS inside dispatch, never while waiting for the main queue.
+    let expected_rect = crate::on_input_thread(|| -> Result<_, String> {
+        verify_on_main(id, pid, key, marker)?;
+        let mut windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
+        let w = windows
+            .get_mut(&(key.into(), marker))
+            .ok_or("stale window reference")?;
+        let mut expected_rect = None;
+        match action {
+            None => {
+                application(pid)?.set("AXFrontmost", unsafe { kCFBooleanTrue })?;
+                w.element.action("AXRaise")?;
             }
-            set_geometry(&w.element, rect.0, rect.1)?;
-            expected_rect = Some(rect);
-        }
-        Some(WindowControlAction::Restore) => {
-            w.element.set("AXMinimized", unsafe { kCFBooleanFalse })?;
-            if let Some(rect) = w.restore {
+            Some(WindowControlAction::Minimize) => {
+                w.element.set("AXMinimized", unsafe { kCFBooleanTrue })?
+            }
+            Some(WindowControlAction::Close) => {
+                w.element.attribute("AXCloseButton")?.action("AXPress")?
+            }
+            Some(WindowControlAction::Maximize) => {
+                let window = xcap::Window::all()
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .find(|v| v.id().ok() == Some(id))
+                    .ok_or("window unavailable")?;
+                let monitor = window.current_monitor().map_err(|e| e.to_string())?;
+                let rect = (
+                    Point {
+                        x: monitor.x().map_err(|e| e.to_string())? as f64,
+                        y: monitor.y().map_err(|e| e.to_string())? as f64,
+                    },
+                    Size {
+                        width: monitor.width().map_err(|e| e.to_string())? as f64,
+                        height: monitor.height().map_err(|e| e.to_string())? as f64,
+                    },
+                );
+                if w.restore.is_none() {
+                    w.restore = Some(geometry(&w.element)?);
+                }
                 set_geometry(&w.element, rect.0, rect.1)?;
                 expected_rect = Some(rect);
             }
+            Some(WindowControlAction::Restore) => {
+                w.element.set("AXMinimized", unsafe { kCFBooleanFalse })?;
+                if let Some(rect) = w.restore {
+                    set_geometry(&w.element, rect.0, rect.1)?;
+                    expected_rect = Some(rect);
+                }
+            }
         }
-    }
+        Ok(expected_rect)
+    })?;
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
-        // A failed AX read alone does not prove a close succeeded.
-        let app_windows = application(pid)?.attribute("AXWindows")?.elements()?;
-        let exists = app_windows
-            .iter()
-            .any(|e| unsafe { CFEqual(e.0, w.element.0) });
-        let observed = match action {
-            Some(WindowControlAction::Close) => !exists,
-            _ if !exists => return Err("window disappeared during control".into()),
-            None => is_focused(w)?,
-            Some(WindowControlAction::Minimize) => unsafe {
-                CFEqual(w.element.attribute("AXMinimized")?.0, kCFBooleanTrue)
-            },
-            Some(WindowControlAction::Maximize | WindowControlAction::Restore) => {
-                let restored =
-                    unsafe { CFEqual(w.element.attribute("AXMinimized")?.0, kCFBooleanFalse) };
-                restored
-                    && expected_rect
-                        .is_none_or(|r| geometry(&w.element).is_ok_and(|g| matches_geometry(g, r)))
+        let observed = crate::on_input_thread(|| -> Result<bool, String> {
+            let mut windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
+            let w = windows
+                .get_mut(&(key.into(), marker))
+                .ok_or("stale window reference")?;
+            // A failed AX read alone does not prove a close succeeded.
+            let app_windows = application(pid)?.attribute("AXWindows")?.elements()?;
+            let exists = app_windows
+                .iter()
+                .any(|e| unsafe { CFEqual(e.0, w.element.0) });
+            let observed = match action {
+                Some(WindowControlAction::Close) => !exists,
+                _ if !exists => return Err("window disappeared during control".into()),
+                None => is_focused(w)?,
+                Some(WindowControlAction::Minimize) => unsafe {
+                    CFEqual(w.element.attribute("AXMinimized")?.0, kCFBooleanTrue)
+                },
+                Some(WindowControlAction::Maximize | WindowControlAction::Restore) => {
+                    let restored =
+                        unsafe { CFEqual(w.element.attribute("AXMinimized")?.0, kCFBooleanFalse) };
+                    restored
+                        && expected_rect.is_none_or(|r| {
+                            geometry(&w.element).is_ok_and(|g| matches_geometry(g, r))
+                        })
+                }
+            };
+            if observed {
+                if action == Some(WindowControlAction::Restore) {
+                    w.restore = None;
+                }
             }
-        };
+            Ok(observed)
+        })?;
         if observed {
-            if action == Some(WindowControlAction::Restore) {
-                w.restore = None;
-            }
             return Ok(());
         }
         if Instant::now() >= deadline {
             return Err("window action accepted; requested state not observed (application may constrain geometry)".into());
         }
+        // Observation waits stay on the caller's worker thread so AppKit can
+        // process animations and deferred close/minimize events between checks.
         std::thread::sleep(Duration::from_millis(50));
     }
 }

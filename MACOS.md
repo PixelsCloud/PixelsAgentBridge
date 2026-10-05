@@ -1,5 +1,88 @@
 # macOS 完整适配与验收
 
+## 自身窗口崩溃与锁屏／注销验收（2026-10-06，1.2.10–1.2.13）
+
+### 已修复和验证
+
+- 1.2.9 GUI 在聚焦自己的窗口时崩溃。系统报告
+  `pab-desktop-2026-10-06-005038.ips` 明确记录 `Must only be used from the main thread`，
+  调用链为 `AXUIElementPerformAction → accessibilityPerformRaise → makeKeyAndOrderFront`。
+  当时批量操作停在 focus，锁屏快捷键尚未执行。
+- 将 AX 窗口标记、验证、聚焦查询、控制和释放调度到主线程；注册表锁在调度后获取。
+  状态轮询的等待仍在工作线程，避免阻塞 AppKit 的最小化、恢复动画。
+- 1.2.10 完整 PKG 安装后，暂时停止 Aqua helper，让 GUI 单独处理请求。
+  聚焦自身、最小化、恢复均观察到目标状态，GUI PID11831 保持存活，没有新的崩溃报告。
+  操作 ID 分别为 `e23d4545-d1e6-4094-8ddd-979a7d052338`、
+  `6308fd92-cf7b-4676-b0ab-436d890b34a9`、`69158070-0d33-4cc3-9fa5-dfc8f7dab3fb`。
+- 恢复 Aqua helper 后，旧引用在任何动作执行前被拒绝。重新枚举窗口后，
+  Control-Command-Q 实际锁屏；JPEG 截图确认密码界面。通过正式 MCP 输入工具输入
+  用户提供的登录凭据后成功解锁，截图确认返回桌面。凭据未写入测试文件或文档。
+  锁屏操作 ID 为 `361df588-716d-4a67-bb8f-1eccd808c6f2`。
+- 用户确认保存工作后，Shift-Command-Q 打开正常退出登录对话框，确认后完成注销。
+  焦点转入系统对话框导致快捷键批次末尾验证为 unconfirmed，未重放；依据截图确认下一步。
+  `/dev/console` 变为 root，LoginWindow LaunchAgent 自动启动，能够截取登录界面。
+
+### 登录前输入问题与修复
+
+- 1.2.10 在 LoginWindow 首次输入失败，Executor 原始记录为
+  `no connection could be established: (failed creating event source)`；不是辅助功能未授权。
+  失败请求 `27bac914-cc08-491f-9b0b-0ef6763434b1` 尚未发送按键。
+- Enigo 0.5.0 默认使用 private event-state table。只创建／释放事件源、不发送事件的
+  诊断显示该环境 private 创建失败，combined 和 HID 创建成功。1.2.11 仅对活动的
+  LoginWindow 使用 Enigo 的 combined-session 设置，Aqua 保持 private 设置。
+  依据：[Apple CGEventSourceStateID](https://developer.apple.com/documentation/coregraphics/cgeventsourcestateid)、
+  [Enigo](https://github.com/enigo-rs/enigo)。
+- Executor 对事件源不可用、显示器不可用、桌面已切换返回固定的具体原因；保留任意
+  helper 诊断不外泄的规则，新增测试验证已知原因和带私有路径的变体。
+- Mac desktop-control 20项、Executor desktop 相关6项测试通过；Windows desktop-control
+  16项通过、4项图形环境测试忽略。引入 Enigo 补丁后 Mac Tauri cargo check 通过。
+  1.2.10–1.2.13 均完成正式签名构建。
+  因当前已注销，使用校验 SHA-256 后的完整 TGZ 和随包 install.sh，以已确认的 huayang
+  账号更新应用、Executor、MCP及服务，再启动 LoginWindow helper；没有仅替换单个二进制。
+  GUI PKG 安装器仍要求已登录普通用户，此次没有宣称完成登录界面的 PKG 安装验收。
+- 1.2.11 消除了事件源错误，但接口接受并不意味着登录框收到输入。用户确认系统屏幕
+  访问提示后仍无效果；TCC 日志明确显示实际 LoginWindow helper 的 ScreenCapture
+  和 PostEvent/Accessibility 已允许，不能继续归因于用户未授权。
+- 1.2.12 为 Enigo 0.5.0 增加仅 LoginWindow 使用的 Session event tap 设置，保留其
+  按键映射、事件生成与释放逻辑。源码和 MIT 许可置于 `vendor/enigo`，两个 Cargo
+  workspace 均使用可复现的本地 patch；普通 Aqua 桌面保持上游 HID 行为。
+  参考 [RustDesk 输入实现](https://github.com/rustdesk/rustdesk/blob/master/src/server/input_service.rs)。
+  此项单独安装后仍未观察到输入生效，不能将其宣称为单独解决原因。
+- 1.2.13 为 macOS 的 pab-desktop 可执行文件增加预登录图形程序声明
+  `__CGPreLoginApp,__cgpreloginapp`，`otool -l` 确认产物包含该 section。
+  参考 [RustDesk 构建参数](https://github.com/rustdesk/rustdesk/blob/master/.cargo/config.toml)
+  和 [Chromium Remote Desktop](https://chromium.googlesource.com/chromium/src/+/refs/tags/113.0.5649.2/remoting/host/remoting_me2me_host.cc)。
+  完整安装且签名校验通过后，同样的鼠标及按键操作首次在登录框实际出现密码圆点。
+  此次没有重置 TCC、关闭 SIP 或授予私有 entitlement。
+
+### 1.2.13 注销后登录验收通过
+
+- 通过正式 `pixels.pab_desktop_input` 输入已授权的登录凭据并确认，截图观察到用户桌面。
+  `/dev/console` 从 root 恢复为 huayang/501；LoginWindow helper 退出，用户 GUI
+  PID15831 和 Aqua helper PID16299 运行。凭据未写入源文件或测试文档。
+- 新窗口枚举返回新 helper `da4e529b-2a22-4b32-b5c8-a2d707715170`。
+  旧引用请求 `9670e04b-40ec-4370-8cdc-cde99a3f2d0e` 在动作执行前被拒绝。
+- 用户所有、可写的 TextEdit 验收文件中输入 `LoginRecovered-中文` 并 Command-S；
+  文件读取实际确认内容已保存。批次 `23e36dab-a741-4447-a9b8-f09122e0f024`
+  三步完成，之后正常关闭测试窗口，没有修改用户其他文档。
+- HID/combined 状态中的左右 Command、Shift、Option、Control 均已释放，全部输入
+  恢复账本 held 槽为零；本轮没有新增 pab-desktop 崩溃报告。
+
+### 待继续与产物
+
+1. 锁屏时曾分别出现 `primary monitor unavailable` 和 `selected monitor is unavailable`；
+   明确指定重新枚举得到的 monitor 2 可以截图。默认显示器选择的切换边界仍需进一步定位。
+2. 本轮未测试重启、FileVault 预启动登录、多用户快速切换；当前设备 FileVault 关闭。
+
+最终 Mac ARM64 debug PKG：`.build/packages/pixels-agent-bridge-macos-aarch64-debug-setup.pkg`，
+版本1.2.13，71,990,447字节，SHA-256
+`625ffb1f1eb6356556501d75be0cb56c0e9fd2597489e148329ef1db2c6f2cdc`。
+完整 TGZ SHA-256 `5845981e68355ac66722fd340526eba1cb33fd4ec926053a3201b720797e774f`。
+继续沿用固定自签名证书；PKG 未做 Apple 签名／公证。Windows 源码同步版本1.2.13／计数14，
+仅运行测试，未构建或安装 Windows 产品。日志位于 Mac `.build/ax-main-*`、
+`.build/login-source-*`、`.build/login-tap-*`、`.build/prelogin-marker-*` 和对应
+`install-*.log`；四个临时安装 launchd job 均已移除。
+
 ## 输入进程异常退出恢复（2026-10-06，1.2.9）
 
 已将 1.2.9 完整 PKG 覆盖安装到设备603527578，沿用固定自签名证书，未重置 TCC。

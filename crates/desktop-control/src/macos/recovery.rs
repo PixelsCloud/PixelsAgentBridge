@@ -56,6 +56,11 @@ fn new_engine() -> Result<Enigo, String> {
         open_prompt_to_get_permissions: false,
         // This wrapper owns cleanup and keeps failed releases in the journal.
         release_keys_when_dropped: false,
+        // LoginWindow has no private event-state table (CGEventSourceCreate(-1)
+        // returns null). Use Enigo's public combined-session source there;
+        // keep ordinary user input isolated in its private state table.
+        independent_of_keyboard_state: !super::login_window_active(),
+        macos_use_session_event_tap: super::login_window_active(),
         ..Settings::default()
     })
     .map_err(|e| e.to_string())

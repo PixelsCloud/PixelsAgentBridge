@@ -1,0 +1,112 @@
+[package]
+name = "enigo"
+version = "0.5.0"
+authors = [
+    "pentamassiv <pentamassiv@posteo.de>",
+    "Dustin Bensing <dustin.bensing@googlemail.com>",
+]
+edition = "2024"
+rust-version = "1.85"
+description = "Cross-platform (Linux, Windows, macOS & BSD) library to simulate keyboard and mouse events"
+documentation = "https://docs.rs/enigo/"
+homepage = "https://github.com/enigo-rs/enigo"
+repository = "https://github.com/enigo-rs/enigo"
+readme = "README.md"
+keywords = ["simulate", "input", "mouse", "keyboard", "automation"]
+categories = [
+    "development-tools::testing",
+    "api-bindings",
+    "hardware-support",
+    "os",
+    "simulation",
+]
+license = "MIT"
+exclude = [".github", "examples", ".gitignore", "rustfmt.toml"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["x11rb"]
+libei = ["dep:reis", "dep:ashpd", "dep:tokio", "dep:nom"]
+serde = ["dep:serde"]
+wayland = [
+    "dep:wayland-client",
+    "dep:wayland-protocols-misc",
+    "dep:wayland-protocols-wlr",
+    "dep:tempfile",
+    "dep:nom",
+]
+xdo = []
+x11rb = ["dep:x11rb", "dep:nom"]
+
+[dependencies]
+log = "0.4"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_TextServices",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_HiDpi",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+core-graphics = { version = "0.25", features = ["highsierra"] }
+objc2 = { version = "0.6", features = ["relax-void-encoding"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSEvent",
+    "NSGraphicsContext",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "objc2-core-foundation",
+    "NSGeometry",
+] }
+foreign-types-shared = "0.3"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+libc = "0.2"
+reis = { version = "0.5", optional = true }
+ashpd = { version = "0.11", optional = true }
+tokio = { version = "1.23.1", features = [
+    "rt",
+    "rt-multi-thread",
+], optional = true }
+wayland-protocols-misc = { version = "0.3", features = [
+    "client",
+], optional = true }
+wayland-protocols-wlr = { version = "0.3", features = [
+    "client",
+], optional = true }
+wayland-client = { version = "0.31", optional = true }
+x11rb = { version = "0.13", features = [
+    "randr",
+    "xinput",
+    "xtest",
+], optional = true }
+xkbcommon = "0.8"
+xkeysym = "0.2"
+tempfile = { version = "3", optional = true }
+nom = { version = "8.0", optional = true }
+
+[dev-dependencies]
+env_logger = "0.11"
+serde = { version = "1", features = ["derive"] }
+tungstenite = "0.26"
+url = "2"
+webbrowser = "1.0"
+ron = "0.10"
+strum = "0.27"
+strum_macros = "0.27"
+rdev = "0.5"                                     # Test the main_display() function
+mouse_position = "0.1"                           # Test the location() function
+
+[[example]]
+name = "serde"
+path = "examples/serde.rs"
+required-features = ["serde"]
