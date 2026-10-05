@@ -59,6 +59,8 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                 }
                 let mut desktop_session = pab_desktop_control::DesktopSession::new();
                 loop {
+                    #[cfg(target_os = "macos")]
+                    pab_desktop_control::release_idle_input();
                     #[cfg(any(windows, target_os = "macos"))]
                     if !session_helper::desktop_is_active(Some("Default")) {
                         break;
@@ -256,6 +258,7 @@ pub fn run() {
             macos_permissions::macos_permissions,
             macos_permissions::request_macos_permission,
             macos_permissions::open_macos_permission_settings,
+            macos_permissions::restart_macos_permission_processes,
             device_status,
             mcp_reporting::mcp_reporting_status,
             mcp_tool_settings::get_mcp_tool_settings,

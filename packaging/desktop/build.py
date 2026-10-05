@@ -79,6 +79,7 @@ def package_unix(platform, architecture, binaries):
     if platform == "macos":
         files.extend(scripts / "macos" / name for name in (
             "com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist",
+            "com.pixelsagentbridge.login-helper.plist",
         ))
     for file in files:
         if not file.is_file():

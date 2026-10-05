@@ -7,9 +7,14 @@ use std::{
     time::{Duration, Instant},
 };
 mod input;
-pub use input::{apply_input, release_input};
+pub use input::{apply_input, release_idle_input, release_input};
 pub const BACKEND: &str = "xcap/macos_accessibility/enigo";
 type Ref = *const c_void;
+
+#[link(name = "Security", kind = "framework")]
+unsafe extern "C" {
+    fn SessionGetInfo(session: u32, actual: *mut u32, attributes: *mut u32) -> i32;
+}
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug)]
 struct Point {
@@ -163,7 +168,22 @@ pub fn accessibility_allowed() -> bool {
 }
 pub fn active_console() -> bool {
     use std::os::unix::fs::MetadataExt;
-    std::fs::metadata("/dev/console").is_ok_and(|m| m.uid() == unsafe { getuid() })
+    let Ok(console) = std::fs::metadata("/dev/console") else {
+        return false;
+    };
+    let mut session = 0;
+    let mut attributes = 0;
+    // callerSecuritySession; sessionHasGraphicAccess | sessionOnConsole.
+    let status = unsafe { SessionGetInfo(u32::MAX, &mut session, &mut attributes) };
+    interactive_console_matches(unsafe { getuid() }, console.uid(), status, attributes)
+}
+
+fn interactive_console_matches(uid: u32, console_uid: u32, status: i32, attributes: u32) -> bool {
+    status == 0 && uid == console_uid && attributes & 0x30 == 0x30
+}
+
+pub fn login_window_active() -> bool {
+    (unsafe { getuid() == 0 }) && active_console()
 }
 pub fn screen_capture_allowed() -> bool {
     unsafe { CGPreflightScreenCaptureAccess() }
@@ -356,6 +376,10 @@ pub fn focused(id: u32) -> Result<bool, String> {
     )
 }
 pub fn pointer_targets_window(id: u32) -> Result<bool, String> {
+    crate::on_input_thread(|| pointer_targets_window_on_main(id))
+}
+
+fn pointer_targets_window_on_main(id: u32) -> Result<bool, String> {
     require_accessibility()?;
     use enigo::Mouse;
     let engine = enigo::Enigo::new(&enigo::Settings {
@@ -470,6 +494,17 @@ pub fn act(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn console_access_requires_matching_identity_and_active_graphical_session() {
+        assert!(interactive_console_matches(501, 501, 0, 0x6030));
+        assert!(interactive_console_matches(0, 0, 0, 0x30));
+        assert!(!interactive_console_matches(0, 0, 0, 0));
+        assert!(!interactive_console_matches(0, 501, 0, 0x30));
+        assert!(!interactive_console_matches(501, 0, 0, 0x30));
+        assert!(!interactive_console_matches(501, 501, -1, 0x30));
+        assert!(!interactive_console_matches(501, 501, 0, 0x10));
+        assert!(!interactive_console_matches(501, 501, 0, 0x20));
+    }
     #[test]
     fn geometry_rejects_nan_and_large_changes() {
         let g = (

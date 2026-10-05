@@ -1,14 +1,23 @@
 use enigo::{Axis, Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use pab_protocol::{DesktopInputEvent, DesktopMouseButton};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+const INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 // Preserve modifiers and held keys between individual browser events.
 struct State {
     engine: Enigo,
     buttons: Vec<Button>,
+    keys: Vec<Key>,
+    last_input: Instant,
 }
 static ENGINE: Mutex<Option<State>> = Mutex::new(None);
 pub fn apply_input(event: DesktopInputEvent) -> Result<(), String> {
+    crate::on_input_thread(|| apply_input_on_main(event))
+}
+
+fn apply_input_on_main(event: DesktopInputEvent) -> Result<(), String> {
     super::require_accessibility()?;
     if !super::active_console() {
         return Err("macOS input requires the active console user".into());
@@ -25,9 +34,17 @@ pub fn apply_input(event: DesktopInputEvent) -> Result<(), String> {
             })
             .map_err(|e| e.to_string())?,
             buttons: Vec::new(),
+            keys: Vec::new(),
+            last_input: Instant::now(),
         });
     }
-    let State { engine, buttons } = slot.as_mut().unwrap();
+    let State {
+        engine,
+        buttons,
+        keys,
+        last_input,
+    } = slot.as_mut().unwrap();
+    *last_input = Instant::now();
     match event {
         DesktopInputEvent::MouseMove { x, y } => {
             let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
@@ -77,15 +94,55 @@ pub fn apply_input(event: DesktopInputEvent) -> Result<(), String> {
         DesktopInputEvent::Key { virtual_key, down } => {
             let key = map_virtual_key(virtual_key)
                 .ok_or_else(|| format!("unsupported browser virtual key: {virtual_key}"))?;
-            engine.key(key, direction(down)).map_err(|e| e.to_string())
+            // A failed OS call may still have posted a press. Record it before
+            // calling Enigo, whose own ledger records only successful calls.
+            if down && !keys.contains(&key) {
+                keys.push(key);
+            }
+            engine
+                .key(key, direction(down))
+                .map_err(|e| e.to_string())?;
+            if !down {
+                keys.retain(|held| *held != key);
+            }
+            Ok(())
         }
         DesktopInputEvent::SecureAttention => unreachable!(),
     }
 }
 pub fn release_input() {
+    crate::on_input_thread(release_input_on_main);
+}
+
+/// A caller can disappear without a key-up while the helper socket stays alive.
+/// Poll even when other (non-input) requests continue arriving.
+pub fn release_idle_input() {
+    crate::on_input_thread(|| {
+        let expired = ENGINE.lock().is_ok_and(|slot| {
+            slot.as_ref().is_some_and(|s| {
+                idle_expired(
+                    s.last_input.elapsed(),
+                    !s.keys.is_empty() || !s.buttons.is_empty(),
+                )
+            })
+        });
+        if expired {
+            release_input_on_main();
+        }
+    });
+}
+
+fn idle_expired(idle: Duration, held: bool) -> bool {
+    held && idle >= INPUT_IDLE_TIMEOUT
+}
+
+fn release_input_on_main() {
     if let Ok(mut slot) = ENGINE.lock()
         && let Some(mut state) = slot.take()
     {
+        for key in state.keys.into_iter().rev() {
+            let _ = state.engine.key(key, Direction::Release);
+        }
         for button in state.buttons {
             let _ = state.engine.button(button, Direction::Release);
         }
@@ -179,6 +236,13 @@ fn map_virtual_key(value: u16) -> Option<Key> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn abandoned_input_expires_but_active_or_empty_state_does_not() {
+        assert!(!idle_expired(Duration::from_secs(9), true));
+        assert!(idle_expired(Duration::from_secs(10), true));
+        assert!(idle_expired(Duration::from_secs(60), true));
+        assert!(!idle_expired(Duration::from_secs(60), false));
+    }
     #[test]
     fn maps_mac_modifiers_and_rejects_unknown() {
         assert_eq!(map_virtual_key(91), Some(Key::Meta));

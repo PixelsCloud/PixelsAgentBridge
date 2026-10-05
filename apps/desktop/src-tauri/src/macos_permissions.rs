@@ -65,7 +65,10 @@ pub async fn request_macos_permission(
 }
 
 #[tauri::command]
-pub fn open_macos_permission_settings(permission: String) -> Result<(), String> {
+pub async fn open_macos_permission_settings(
+    app: tauri::AppHandle,
+    permission: String,
+) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let pane = match permission.as_str() {
@@ -73,21 +76,60 @@ pub fn open_macos_permission_settings(permission: String) -> Result<(), String> 
             "accessibility" => "Privacy_Accessibility",
             _ => return Err("unknown permission".into()),
         };
-        let status = std::process::Command::new("/usr/bin/open")
-            .arg(format!(
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            use objc2_app_kit::NSWorkspace;
+            use objc2_foundation::{NSString, NSURL};
+            let url = NSURL::URLWithString(&NSString::from_str(&format!(
                 "x-apple.systempreferences:com.apple.preference.security?{pane}"
-            ))
-            .status()
-            .map_err(|e| e.to_string())?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err("could not open System Settings".into())
-        }
+            )));
+            let opened = url.is_some_and(|url| NSWorkspace::sharedWorkspace().openURL(&url));
+            let _ = sender.send(if opened {
+                Ok(())
+            } else {
+                Err("could not open System Settings".to_owned())
+            });
+        })
+        .map_err(|e| e.to_string())?;
+        receiver
+            .await
+            .map_err(|_| "opening System Settings interrupted".to_owned())?
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = permission;
+        let _ = (app, permission);
         Err("macOS settings are unavailable on this platform".into())
+    }
+}
+
+/// Explicit user action only: apply newly granted permissions to both processes.
+#[tauri::command]
+pub async fn restart_macos_permission_processes(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn getuid() -> u32;
+        }
+        let service = format!("gui/{}/com.pixelsagentbridge.session-helper", unsafe {
+            getuid()
+        });
+        let result = tokio::process::Command::new("/bin/launchctl")
+            .args(["kill", "SIGTERM", &service])
+            .output()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !result.status.success() {
+            return Err(
+                "Could not restart the desktop helper; check that Pixels Agent Bridge is installed"
+                    .into(),
+            );
+        }
+        pab_desktop_control::release_input();
+        app.restart();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("macOS permissions are unavailable on this platform".into())
     }
 }

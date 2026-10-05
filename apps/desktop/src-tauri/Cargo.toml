@@ -1,6 +1,6 @@
 [package]
 name = "pab-desktop"
-version = "1.2.5"
+version = "1.2.8"
 description = "Pixels Agent Bridge desktop application"
 authors = ["Pixels"]
 edition = "2024"
@@ -27,7 +27,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml_edit = "0.25"
 tracing = "0.1"
-tokio = { version = "1", features = ["io-util", "net", "process", "sync", "time"] }
+tokio = { version = "1", features = ["io-util", "net", "process", "signal", "sync", "time"] }
 zeroize = "1"
 base64 = "0.22"
 url = "2"
@@ -43,6 +43,11 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 
 [target.'cfg(target_os = "linux")'.dependencies]
 enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.4"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWorkspace"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 xcap = "=0.8.2"

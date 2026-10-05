@@ -31,6 +31,7 @@ REQUIRED = {
     "pab-executor", "pab-mcp", "install.sh", "uninstall.sh", "run-app.sh",
     "run-mcp.sh", "run-executor.sh", "com.pixelsagentbridge.executor.plist",
     "com.pixelsagentbridge.session-helper.plist",
+    "com.pixelsagentbridge.login-helper.plist",
 }
 
 
@@ -92,6 +93,12 @@ def verify_binaries(payload, architecture):
         if not path.stat().st_mode & 0o111:
             raise ValueError(f"non-executable binary: {relative}")
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(payload / APP)], check=True)
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    from macos_signing import load_identity, verify, IDENTIFIERS
+    fingerprint = load_identity()
+    verify(payload / APP, IDENTIFIERS['desktop'], fingerprint)
+    for name in ('executor', 'mcp'):
+        verify(payload / f'pab-{name}', IDENTIFIERS[name], fingerprint)
 
 
 def prepare_scripts(destination, arch, control_url, relay_url):

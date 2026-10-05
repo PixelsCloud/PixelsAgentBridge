@@ -18,7 +18,7 @@ install_dir='/Library/Application Support/PixelsAgentBridge'
 app='/Applications/Pixels Agent Bridge.app'
 data_dir='/Library/Application Support/PixelsAgentBridgeData'
 user_data="$user_home/Library/Application Support/PixelsAgentBridge"
-for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh com.pixelsagentbridge.executor.plist com.pixelsagentbridge.session-helper.plist; do
+for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh com.pixelsagentbridge.executor.plist com.pixelsagentbridge.session-helper.plist com.pixelsagentbridge.login-helper.plist; do
     [[ -f $source_dir/$name ]] || { echo "Missing package file: $name" >&2; exit 2; }
 done
 [[ -f "$source_dir/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop" ]] || { echo 'Missing application bundle' >&2; exit 2; }
@@ -30,6 +30,9 @@ if [[ -e $app ]]; then
     [[ $installed_id == vip.rgaa.pab.desktop ]] || { echo 'Refusing to replace an unrelated application' >&2; exit 2; }
 fi
 # Every currently logged-in helper must stop before replacing the shared app.
+if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&1; then
+    launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
+fi
 while read -r uid; do
     if launchctl print "gui/$uid/com.pixelsagentbridge.session-helper" >/dev/null 2>&1; then
         launchctl bootout "gui/$uid/com.pixelsagentbridge.session-helper"
@@ -68,6 +71,7 @@ chown "$desktop_user" "$user_data/local-access.key"
 install -d -m 755 /Library/LaunchAgents /Library/LaunchDaemons
 install -m 644 "$source_dir/com.pixelsagentbridge.executor.plist" /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist
 install -m 644 "$source_dir/com.pixelsagentbridge.session-helper.plist" /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
+install -m 644 "$source_dir/com.pixelsagentbridge.login-helper.plist" /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
 launchctl bootstrap system /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist
 if launchctl print "gui/$desktop_uid" >/dev/null 2>&1; then
     launchctl bootstrap "gui/$desktop_uid" /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist

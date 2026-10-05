@@ -22,13 +22,14 @@ type CodexIntegration = {
 type Props = {
   language: Language;
   onLanguageChange: (value: Language) => void;
+  section: SettingsSection;
+  onSectionChange: (value: SettingsSection) => void;
 };
 
-type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
+export type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
 
-export function SettingsPanel({ language, onLanguageChange }: Props) {
+export function SettingsPanel({ language, onLanguageChange, section, onSectionChange: setSection }: Props) {
   const t = messages[language];
-  const [section, setSection] = useState<SettingsSection>("preferences");
   const [settings, setSettings] = useState<ServerSettings>({ controlUrl: "", relayUrl: "" });
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);

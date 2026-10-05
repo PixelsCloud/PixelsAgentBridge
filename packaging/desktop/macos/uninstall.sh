@@ -7,6 +7,9 @@ if [[ -e $app ]]; then
     bundle_id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")
     [[ $bundle_id == vip.rgaa.pab.desktop ]] || { echo 'Refusing to remove an unrelated application' >&2; exit 2; }
 fi
+if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&1; then
+    launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
+fi
 while read -r uid; do
     if launchctl print "gui/$uid/com.pixelsagentbridge.session-helper" >/dev/null 2>&1; then
         launchctl bootout "gui/$uid/com.pixelsagentbridge.session-helper"
@@ -20,6 +23,7 @@ if launchctl print system/com.pixelsagentbridge.executor >/dev/null 2>&1; then
     launchctl bootout system/com.pixelsagentbridge.executor
 fi
 rm -f -- /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
+rm -f -- /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
 rm -rf -- '/Applications/Pixels Agent Bridge.app'
 for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh settings.env operator-server.json; do
     rm -f -- "$install_dir/$name"

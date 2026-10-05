@@ -50,6 +50,23 @@ macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_
 
 ## 打包与版本校验
 
+macOS 免费签名：首次以构建用户运行 `python3.13 scripts/macos_signing.py init`，
+在 `~/Library/Application Support/PixelsAgentBridgeBuildSigning` 创建固定自签名证书和
+独立钥匙串。私钥、钥匙串密码只留在该用户的受限目录，不纳入 Git、不随安装包分发。
+不要删除该目录来解决构建问题，应安全备份；更换证书会改变应用授权身份。
+脚本不添加系统信任根、不修改 TCC/Gatekeeper。此签名不代表 Apple 公证，其他 Mac
+的首次运行仍可能被 Gatekeeper 或管理策略阻止。
+
+统一构建入口在分配版本之前检查签名材料，缺失/损坏时直接失败，不自动生成新证书。
+Tauri 的临时 App 随后使用固定证书重签；App、Executor、MCP 的 designated requirement
+分别绑定固定程序 ID 和证书指纹，不绑定每次变化的二进制哈希。签名完成后才记录
+产物哈希及归档。PKG 构建再次核验三者的签名身份，拒绝临时签名或另一张证书的产物。
+安装器 PKG 本身保持未签名，App 的固定自签名身份与 PKG 签名是两件事。
+
+`PAB_TEST_LOCAL_SIGNING=1 python3.13 scripts/test_macos_signing.py` 在 Mac 上使用临时
+程序验证两次不同编译仍匹配同一要求、错误证书和文件篡改被拒绝，不更改隐私权限。
+这只能验证代码身份；真实权限保持必须在用户授权后，覆盖升级并实际截图/输入验收。
+
 `.build/builds/` 记录成功构建的版本与产物 SHA-256。现有 `packaging/*/build*.py` 仍可单独重打包已构建产物，保持该产物的版本；无构建记录、组件被替换或混入另一批前端时拒绝打包，不给旧二进制贴新版本。
 
 Mac 使用每个架构独立的 `macos-aarch64-<profile>.json` / `macos-x86_64-<profile>.json` 记录，覆盖 Executor、MCP 和完整 App 文件。归档与 PKG 的版本必须与 App 一致；旧的无构建记录产物需要重新构建。

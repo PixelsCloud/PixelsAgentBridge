@@ -13,9 +13,43 @@ pub fn run() -> Result<(), String> {
     let log_role = match expected_desktop.as_deref() {
         Some("Default") => "session-helper-default",
         Some("Winlogon") => "session-helper-winlogon",
+        Some("LoginWindow") => "session-helper-loginwindow",
         _ => "session-helper",
     };
     pab_logging::init(log_role, paths.root()).map_err(|error| error.to_string())?;
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::MainThreadMarker;
+        use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+        let main = MainThreadMarker::new().ok_or("session helper must start on the main thread")?;
+        let app = NSApplication::sharedApplication(main);
+        // A helper must service AppKit/AX and the main dispatch queue without
+        // becoming the foreground app and taking focus away from its target.
+        if !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited) {
+            return Err("unable to configure background session helper".into());
+        }
+        let task = tauri::async_runtime::spawn(async move {
+            use tokio::signal::unix::{SignalKind, signal};
+            let Ok(mut termination) = signal(SignalKind::terminate()) else {
+                tracing::error!("unable to install helper termination handler");
+                std::process::exit(1);
+            };
+            tokio::select! {
+                result = run_forever(expected_desktop) => {
+                    if let Err(error) = result { tracing::error!(%error, "session helper stopped"); }
+                }
+                _ = termination.recv() => {}
+            }
+            // The request loop has been dropped. Release on the still-running
+            // AppKit thread before launchd starts the replacement helper.
+            pab_desktop_control::release_input();
+            std::process::exit(0);
+        });
+        app.run();
+        task.abort();
+        return Ok(());
+    }
+    #[cfg(not(target_os = "macos"))]
     tauri::async_runtime::block_on(run_forever(expected_desktop))
 }
 
@@ -55,6 +89,8 @@ async fn serve_requests(
     let _input_guard = desktop_input::InputGuard;
     let mut desktop_session = pab_desktop_control::DesktopSession::new();
     loop {
+        #[cfg(target_os = "macos")]
+        pab_desktop_control::release_idle_input();
         if !desktop_is_active(expected_desktop) {
             tracing::info!("session helper paused for desktop switch");
             return Ok(());
@@ -193,8 +229,12 @@ pub(crate) fn desktop_is_active(expected: Option<&str>) -> bool {
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn desktop_is_active(_expected: Option<&str>) -> bool {
-    pab_desktop_control::active_console()
+pub(crate) fn desktop_is_active(expected: Option<&str>) -> bool {
+    if expected == Some("LoginWindow") {
+        pab_desktop_control::login_window_active()
+    } else {
+        pab_desktop_control::active_console() && !pab_desktop_control::login_window_active()
+    }
 }
 
 #[cfg(not(any(windows, target_os = "macos")))]

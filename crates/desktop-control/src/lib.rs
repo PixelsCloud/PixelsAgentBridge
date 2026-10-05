@@ -2,6 +2,16 @@
 use pab_protocol::*;
 use std::collections::HashMap;
 mod batch;
+/// Keep the entire Enigo lifetime (including key release on drop) on the macOS
+/// main thread. Both the GUI and standalone helper service an AppKit event loop;
+/// IPC stays on the runtime worker so it cannot block that event loop.
+/// Never hold a native input/registry lock while dispatching here.
+fn on_input_thread<R: Send>(action: impl FnOnce() -> R + Send) -> R {
+    #[cfg(target_os = "macos")]
+    return dispatch2::run_on_main(|_| action());
+    #[cfg(not(target_os = "macos"))]
+    action()
+}
 #[cfg(windows)]
 #[path = "windows.rs"]
 mod native;
@@ -13,8 +23,9 @@ mod native;
 mod native;
 #[cfg(target_os = "macos")]
 pub use native::{
-    accessibility_allowed, active_console, apply_input, release_input, request_accessibility,
-    request_screen_capture, require_screen_capture, screen_capture_allowed,
+    accessibility_allowed, active_console, apply_input, login_window_active, release_idle_input,
+    release_input, request_accessibility, request_screen_capture, require_screen_capture,
+    screen_capture_allowed,
 };
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 #[path = "unsupported.rs"]
@@ -316,7 +327,8 @@ impl DesktopSession {
                 snapshot.window_ref = Some(window_ref.clone());
                 snapshot.action_started = true;
                 match query {
-                    DesktopQuery::TypeText { text, .. } => {
+                    DesktopQuery::TypeText { text, .. } => on_input_thread(|| {
+                        snapshot.action_started = false;
                         // Do not implicitly steal focus: the caller must focus this reference first.
                         if !native::focused(e.id)? {
                             snapshot.action_started = false;
@@ -325,13 +337,17 @@ impl DesktopSession {
                             );
                         }
                         use enigo::{Enigo, Keyboard, Settings};
-                        let mut engine =
-                            Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+                        let mut engine = Enigo::new(&Settings {
+                            open_prompt_to_get_permissions: false,
+                            ..Settings::default()
+                        })
+                        .map_err(|e| e.to_string())?;
                         native::verify(e.id, e.pid, &self.key, e.marker)?;
                         if !native::focused(e.id)? {
                             snapshot.action_started = false;
                             return Err("foreground changed before text input".into());
                         }
+                        snapshot.action_started = true;
                         engine.text(text).map_err(|e| e.to_string())?;
                         native::verify(e.id, e.pid, &self.key, e.marker)?;
                         if !native::focused(e.id)? {
@@ -341,7 +357,8 @@ impl DesktopSession {
                         }
                         snapshot.verification =
                             Some("input_api_accepted; application text is not verified".into());
-                    }
+                        Ok::<_, String>(())
+                    })?,
                     DesktopQuery::Focus { .. } => {
                         native::act(e.id, e.pid, &self.key, e.marker, None)?;
                         snapshot.verification = Some("foreground_observed".into());

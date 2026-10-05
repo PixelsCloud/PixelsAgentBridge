@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Alert, Button, Space, Tag } from "antd";
+import { Button, Space, Tag, Tooltip, theme } from "antd";
 import type { Language } from "./i18n";
 
 type Permissions = { screenRecording: boolean; accessibility: boolean };
@@ -15,21 +15,19 @@ export function requestMacosPermissionsAtStartup(): Promise<void> {
   })();
 }
 const copy = {
-  "zh-CN": { title: "macOS 权限", screen: "屏幕录制", input: "辅助功能", allowed: "已授权", missing: "未授权", request: "申请授权", open: "打开设置", refresh: "重新检查", hint: "应用会主动申请截图和桌面控制权限，请在系统提示中允许。若此前拒绝，请打开设置启用；授权后如仍不可用，请重新启动应用和后台辅助进程（或重新登录）。" },
-  "zh-TW": { title: "macOS 權限", screen: "螢幕錄製", input: "輔助使用", allowed: "已授權", missing: "未授權", request: "申請授權", open: "開啟設定", refresh: "重新檢查", hint: "應用程式會主動申請擷取畫面及桌面控制權限，請在系統提示中允許。若先前拒絕，請開啟設定啟用；授權後若仍無法使用，請重新啟動應用程式及背景輔助程序（或重新登入）。" },
-  en: { title: "macOS permissions", screen: "Screen Recording", input: "Accessibility", allowed: "Allowed", missing: "Not allowed", request: "Request access", open: "Open Settings", refresh: "Check again", hint: "The app requests capture and desktop control access. Allow it in the system prompt. If previously denied, enable it in Settings. If access is still unavailable, restart the app and background helper (or log out and back in)." },
+  "zh-CN": { title: "macOS 权限", screen: "屏幕录制", input: "辅助功能", allowed: "可用", missing: "当前不可用", request: "申请授权", open: "打开设置", refresh: "重新检查", restart: "重启应用和辅助进程", hint: "未授权时，请在系统设置中开启权限。已经开启但仍不可用时，可重启应用和辅助进程使授权生效；重启会中断当前桌面控制。升级更换签名后，可能需要在设置中移除旧条目，再为当前应用授权。" },
+  "zh-TW": { title: "macOS 權限", screen: "螢幕錄製", input: "輔助使用", allowed: "可用", missing: "目前無法使用", request: "申請授權", open: "開啟設定", refresh: "重新檢查", restart: "重新啟動應用程式及輔助程序", hint: "尚未授權時，請在系統設定中開啟權限。已開啟但仍無法使用時，可重新啟動應用程式及輔助程序使授權生效；重新啟動會中斷目前的桌面控制。更新更換簽章後，可能需要在設定中移除舊項目，再為目前應用程式授權。" },
+  en: { title: "macOS permissions", screen: "Screen Recording", input: "Accessibility", allowed: "Available", missing: "Currently unavailable", request: "Request access", open: "Open Settings", refresh: "Check again", restart: "Restart app and helper", hint: "Enable missing permissions in System Settings. If already enabled, restart the app and helper to apply access; this interrupts desktop control. If an update changed the signing identity, you may need to remove the old entry in Settings and authorize the current app." },
 };
 const missingCopy = {
-  "zh-CN": { title: "请开启所需权限", screen: "屏幕录制未授权，无法截图。", input: "辅助功能未授权，无法控制桌面。" },
-  "zh-TW": { title: "請開啟所需權限", screen: "螢幕錄製未授權，無法擷取畫面。", input: "輔助使用未授權，無法控制桌面。" },
-  en: { title: "Permissions required", screen: "Screen Recording is required for screenshots.", input: "Accessibility is required for desktop control." },
+  "zh-CN": { title: "权限待开启", screen: "屏幕录制当前不可用，无法截图。", input: "辅助功能当前不可用，无法控制桌面。" },
+  "zh-TW": { title: "權限待開啟", screen: "螢幕錄製目前無法使用，無法擷取畫面。", input: "輔助使用目前無法使用，無法控制桌面。" },
+  en: { title: "Permissions needed", screen: "Screen Recording is unavailable; screenshots cannot be taken.", input: "Accessibility is unavailable; desktop control cannot be used." },
 };
-export function MacosPermissionsPanel({ language, persistent = false }: { language: Language; persistent?: boolean }) {
+function useMacosPermissions() {
   const [permissions, setPermissions] = useState<Permissions | null>(null);
   const [error, setError] = useState("");
-  const [requesting, setRequesting] = useState<string | null>(null);
-  const text = copy[language];
-  const refresh = useCallback(() => invoke<Permissions | null>("macos_permissions").then(setPermissions).catch((e) => setError(String(e))), []);
+  const refresh = useCallback(() => invoke<Permissions | null>("macos_permissions").then((value) => { setPermissions(value); setError(""); }).catch((e) => setError(String(e))), []);
   useEffect(() => {
     void refresh();
     const onFocus = () => void refresh();
@@ -38,6 +36,27 @@ export function MacosPermissionsPanel({ language, persistent = false }: { langua
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 2000);
     return () => { window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); window.clearInterval(timer); };
   }, [refresh]);
+  return { permissions, setPermissions, error, setError, refresh };
+}
+
+export function MacosPermissionStatus({ language, onOpenSettings }: { language: Language; onOpenSettings: () => void }) {
+  const { permissions } = useMacosPermissions();
+  const { token } = theme.useToken();
+  if (!permissions || (permissions.screenRecording && permissions.accessibility)) return null;
+  const text = missingCopy[language];
+  const detail = [!permissions.screenRecording && text.screen, !permissions.accessibility && text.input].filter(Boolean).join(" ");
+  return <Tooltip title={detail}>
+    <button type="button" className="sidebar-status sidebar-permission-status" style={{ color: token.colorWarningText }} onClick={onOpenSettings}>
+      <span className="status-dot" aria-hidden="true" />
+      <span>{text.title}</span>
+    </button>
+  </Tooltip>;
+}
+
+export function MacosPermissionsPanel({ language }: { language: Language }) {
+  const { permissions, setPermissions, error, setError, refresh } = useMacosPermissions();
+  const [requesting, setRequesting] = useState<string | null>(null);
+  const text = copy[language];
   if (!permissions) return null;
   async function open(permission: string) {
     setError("");
@@ -51,27 +70,20 @@ export function MacosPermissionsPanel({ language, persistent = false }: { langua
     catch (e) { setError(String(e)); }
     finally { setRequesting(null); }
   }
-  if (persistent) {
-    if (permissions.screenRecording && permissions.accessibility) return null;
-    const notice = missingCopy[language];
-    return <Alert className="macos-permission-notice" type="warning" showIcon
-      title={notice.title}
-      description={<Space orientation="vertical" size={4}>
-        {([ ["screen", permissions.screenRecording, notice.screen], ["accessibility", permissions.accessibility, notice.input] ] as const)
-          .filter(([, allowed]) => !allowed).map(([permission, , hint]) => <Space key={permission} wrap size={8}>
-            <span>{hint}</span>
-            <Button size="small" loading={requesting === permission} disabled={requesting !== null} onClick={() => void request(permission)}>{text.request}</Button>
-            <Button size="small" type="link" onClick={() => void open(permission)}>{text.open}</Button>
-          </Space>)}
-        {error && <span role="alert">{error}</span>}
-      </Space>} />;
+  async function restart() {
+    setRequesting("restart");
+    setError("");
+    try { await invoke("restart_macos_permission_processes"); }
+    catch (e) { setError(String(e)); }
+    finally { setRequesting(null); }
   }
   return <div style={{ marginTop: 24 }}>
     <h2>{text.title}</h2><p>{text.hint}</p>
-    <Space direction="vertical" style={{ marginTop: 12 }}>
+    <Space orientation="vertical" style={{ marginTop: 12 }}>
       <Space wrap><span>{text.screen}</span><Tag color={permissions.screenRecording ? "green" : "orange"}>{permissions.screenRecording ? text.allowed : text.missing}</Tag>{!permissions.screenRecording && <Button type="primary" loading={requesting === "screen"} disabled={requesting !== null} onClick={() => void request("screen")}>{text.request}</Button>}<Button onClick={() => void open("screen")}>{text.open}</Button></Space>
       <Space wrap><span>{text.input}</span><Tag color={permissions.accessibility ? "green" : "orange"}>{permissions.accessibility ? text.allowed : text.missing}</Tag>{!permissions.accessibility && <Button type="primary" loading={requesting === "accessibility"} disabled={requesting !== null} onClick={() => void request("accessibility")}>{text.request}</Button>}<Button onClick={() => void open("accessibility")}>{text.open}</Button></Space>
       <Button onClick={() => void refresh()}>{text.refresh}</Button>
+      <Button loading={requesting === "restart"} disabled={requesting !== null} onClick={() => void restart()}>{text.restart}</Button>
     </Space>
     {error && <p role="alert">{error}</p>}
   </div>;

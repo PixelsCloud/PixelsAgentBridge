@@ -141,7 +141,9 @@ class Versions(TestCase):
                 (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': read_state(self.root)['version']}))
 
         with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\nx86_64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all', '--package']):
-            build.main()
+            with patch('macos_signing.load_identity', return_value='A' * 40), patch('macos_signing.sign') as signing:
+                build.main()
+                self.assertEqual(signing.call_count, 6)
         self.assertEqual(read_state(self.root), {'version': '1.2.0', 'build_count': 1})
         for architecture in ('aarch64', 'x86_64'):
             record = json.loads((self.root / f'.build/builds/macos-{architecture}-debug.json').read_text())
@@ -157,7 +159,18 @@ class Versions(TestCase):
         cli.parent.mkdir(parents=True)
         cli.touch()
         with patch.object(build, 'ROOT', self.root), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all']), self.assertRaises(SystemExit):
-            build.main()
+            with patch('macos_signing.load_identity', return_value='A' * 40):
+                build.main()
+        self.assertEqual(read_state(self.root)['build_count'], 0)
+
+    def test_missing_signing_identity_does_not_consume_version(self):
+        import build
+        cli = self.root / 'apps/desktop/node_modules/@tauri-apps/cli/tauri.js'
+        cli.parent.mkdir(parents=True)
+        cli.touch()
+        with patch.object(build, 'ROOT', self.root), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'aarch64']), patch('macos_signing.load_identity', side_effect=RuntimeError('identity missing')):
+            with self.assertRaisesRegex(RuntimeError, 'identity missing'):
+                build.main()
         self.assertEqual(read_state(self.root)['build_count'], 0)
 
     def test_macos_architecture_selection(self):

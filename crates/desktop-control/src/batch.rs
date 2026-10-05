@@ -122,118 +122,124 @@ impl DesktopSession {
             Ok(())
         };
         verify()?;
-        use enigo::{Axis, Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
-        let mut engine = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-        verify()?;
-        match action {
-            DesktopAction::KeyChord { modifiers, key } => {
-                let key = keyboard_key(key)?;
-                let mut keys: Vec<_> = modifiers
-                    .iter()
-                    .map(|modifier| match modifier {
-                        DesktopModifier::Control => enigo::Key::Control,
-                        DesktopModifier::Alt => enigo::Key::Alt,
-                        DesktopModifier::Shift => enigo::Key::Shift,
-                        DesktopModifier::Meta => enigo::Key::Meta,
-                    })
-                    .collect();
-                keys.push(key);
-                press_and_release(
-                    &keys,
-                    verify,
-                    |key, down| {
-                        engine
-                            .key(
-                                key,
-                                if down {
-                                    Direction::Press
-                                } else {
-                                    Direction::Release
-                                },
-                            )
-                            .map_err(|e| e.to_string())
-                    },
-                    &mut snapshot.action_started,
-                )?;
-            }
-            DesktopAction::Click { x, y, button } => {
-                let window = xcap::Window::all()
-                    .map_err(|e| e.to_string())?
-                    .into_iter()
-                    .find(|w| w.id().ok() == Some(e.id) && w.pid().ok() == Some(e.pid))
-                    .ok_or("window is unavailable for click coordinates")?;
-                if window.is_minimized().map_err(|e| e.to_string())? {
-                    return Err("window is minimized".into());
-                }
-                let rect = window_rect(&window)?;
-                if u32::from(*x) >= rect.width || u32::from(*y) >= rect.height {
-                    return Err("click is outside the window rectangle".into());
-                }
-                snapshot.action_started = true;
-                engine
-                    .move_mouse(
-                        rect.x
-                            .checked_add(i32::from(*x))
-                            .ok_or("click x overflow")?,
-                        rect.y
-                            .checked_add(i32::from(*y))
-                            .ok_or("click y overflow")?,
-                        Coordinate::Abs,
-                    )
-                    .map_err(|e| e.to_string())?;
-                verify()?;
-                if window_rect(&window)? != rect {
-                    return Err("window moved before click; batch stopped".into());
-                }
-                if !native::pointer_targets_window(e.id)? {
-                    return Err("pointer targets another window; click stopped".into());
-                }
-                let button = match button {
-                    DesktopMouseButton::Left => Button::Left,
-                    DesktopMouseButton::Right => Button::Right,
-                    DesktopMouseButton::Middle => Button::Middle,
-                };
-                press_and_release(
-                    &[button],
-                    verify,
-                    |button, down| {
-                        engine
-                            .button(
-                                button,
-                                if down {
-                                    Direction::Press
-                                } else {
-                                    Direction::Release
-                                },
-                            )
-                            .map_err(|e| e.to_string())
-                    },
-                    &mut snapshot.action_started,
-                )?;
-            }
-            DesktopAction::Scroll { axis, amount } => {
-                if !native::pointer_targets_window(e.id)? {
-                    return Err(
-                        "pointer must be over the referenced window before scrolling".into(),
-                    );
-                }
-                snapshot.action_started = true;
-                engine
-                    .scroll(
-                        i32::from(*amount),
-                        match axis {
-                            DesktopScrollAxis::Horizontal => Axis::Horizontal,
-                            DesktopScrollAxis::Vertical => Axis::Vertical,
+        super::on_input_thread(|| {
+            use enigo::{Axis, Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
+            let mut engine = Enigo::new(&Settings {
+                open_prompt_to_get_permissions: false,
+                ..Settings::default()
+            })
+            .map_err(|e| e.to_string())?;
+            verify()?;
+            match action {
+                DesktopAction::KeyChord { modifiers, key } => {
+                    let key = keyboard_key(key)?;
+                    let mut keys: Vec<_> = modifiers
+                        .iter()
+                        .map(|modifier| match modifier {
+                            DesktopModifier::Control => enigo::Key::Control,
+                            DesktopModifier::Alt => enigo::Key::Alt,
+                            DesktopModifier::Shift => enigo::Key::Shift,
+                            DesktopModifier::Meta => enigo::Key::Meta,
+                        })
+                        .collect();
+                    keys.push(key);
+                    press_and_release(
+                        &keys,
+                        verify,
+                        |key, down| {
+                            engine
+                                .key(
+                                    key,
+                                    if down {
+                                        Direction::Press
+                                    } else {
+                                        Direction::Release
+                                    },
+                                )
+                                .map_err(|e| e.to_string())
                         },
-                    )
-                    .map_err(|e| e.to_string())?;
+                        &mut snapshot.action_started,
+                    )?;
+                }
+                DesktopAction::Click { x, y, button } => {
+                    let window = xcap::Window::all()
+                        .map_err(|e| e.to_string())?
+                        .into_iter()
+                        .find(|w| w.id().ok() == Some(e.id) && w.pid().ok() == Some(e.pid))
+                        .ok_or("window is unavailable for click coordinates")?;
+                    if window.is_minimized().map_err(|e| e.to_string())? {
+                        return Err("window is minimized".into());
+                    }
+                    let rect = window_rect(&window)?;
+                    if u32::from(*x) >= rect.width || u32::from(*y) >= rect.height {
+                        return Err("click is outside the window rectangle".into());
+                    }
+                    snapshot.action_started = true;
+                    engine
+                        .move_mouse(
+                            rect.x
+                                .checked_add(i32::from(*x))
+                                .ok_or("click x overflow")?,
+                            rect.y
+                                .checked_add(i32::from(*y))
+                                .ok_or("click y overflow")?,
+                            Coordinate::Abs,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    verify()?;
+                    if window_rect(&window)? != rect {
+                        return Err("window moved before click; batch stopped".into());
+                    }
+                    if !native::pointer_targets_window(e.id)? {
+                        return Err("pointer targets another window; click stopped".into());
+                    }
+                    let button = match button {
+                        DesktopMouseButton::Left => Button::Left,
+                        DesktopMouseButton::Right => Button::Right,
+                        DesktopMouseButton::Middle => Button::Middle,
+                    };
+                    press_and_release(
+                        &[button],
+                        verify,
+                        |button, down| {
+                            engine
+                                .button(
+                                    button,
+                                    if down {
+                                        Direction::Press
+                                    } else {
+                                        Direction::Release
+                                    },
+                                )
+                                .map_err(|e| e.to_string())
+                        },
+                        &mut snapshot.action_started,
+                    )?;
+                }
+                DesktopAction::Scroll { axis, amount } => {
+                    if !native::pointer_targets_window(e.id)? {
+                        return Err(
+                            "pointer must be over the referenced window before scrolling".into(),
+                        );
+                    }
+                    snapshot.action_started = true;
+                    engine
+                        .scroll(
+                            i32::from(*amount),
+                            match axis {
+                                DesktopScrollAxis::Horizontal => Axis::Horizontal,
+                                DesktopScrollAxis::Vertical => Axis::Vertical,
+                            },
+                        )
+                        .map_err(|e| e.to_string())?;
+                }
+                _ => return Err("unsupported batch input action".into()),
             }
-            _ => return Err("unsupported batch input action".into()),
-        }
-        verify()?;
-        snapshot.verification =
-            Some("input_api_accepted; application effect is not verified".into());
-        Ok(())
+            verify()?;
+            snapshot.verification =
+                Some("input_api_accepted; application effect is not verified".into());
+            Ok(())
+        })
     }
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     pub(super) fn batch_action(

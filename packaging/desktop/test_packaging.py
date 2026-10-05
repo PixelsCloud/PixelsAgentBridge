@@ -83,6 +83,7 @@ class Packages(unittest.TestCase):
                                 self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/Info.plist").mode, 0o644)
                                 self.assertNotIn("pab-desktop", package.getnames())
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.executor.plist").mode, 0o644)
+                                self.assertEqual(package.getmember("com.pixelsagentbridge.login-helper.plist").mode, 0o644)
                             else:
                                 self.assertIn("pab-desktop", package.getnames())
                                 self.assertNotIn("com.pixelsagentbridge.executor.plist", package.getnames())

@@ -36,6 +36,7 @@ def macos_architectures(selection):
 
 
 def build_macos(version, profile, architectures, package):
+    from macos_signing import sign, IDENTIFIERS
     for architecture in architectures:
         target = f'{architecture}-apple-darwin'
         flags = ['--release'] if profile == 'release' else []
@@ -47,6 +48,9 @@ def build_macos(version, profile, architectures, package):
         app = ROOT / 'apps/desktop/src-tauri/target' / target / profile / 'bundle/macos/Pixels Agent Bridge.app'
         if macos_app_version(app) != version:
             raise ValueError(f'Built macOS app version does not match {version}')
+        for name in ('executor', 'mcp'):
+            sign(binaries / f'pab-{name}', IDENTIFIERS[name])
+        sign(app, IDENTIFIERS['desktop'])
         record_artifacts(ROOT, f'macos-{architecture}', profile, version, macos_artifacts(binaries, app))
         if package:
             run([sys.executable, 'packaging/desktop/build.py', '--platform', 'macos', '--profile', profile,
@@ -90,6 +94,8 @@ def main():
     if any(t in targets for t in ['desktop', 'macos']) and not (ROOT / 'apps/desktop/node_modules/@tauri-apps/cli/tauri.js').is_file():
         parser.error('Run npm ci in apps/desktop first')
     if architectures:
+        from macos_signing import load_identity
+        load_identity()  # Fail before allocating a version; never silently regenerate keys.
         installed = subprocess.check_output(['rustup', 'target', 'list', '--installed'], cwd=ROOT, text=True).splitlines()
         missing = [f'{arch}-apple-darwin' for arch in architectures if f'{arch}-apple-darwin' not in installed]
         if missing:

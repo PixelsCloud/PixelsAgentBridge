@@ -9,8 +9,8 @@ import zhTW from "antd/locale/zh_TW";
 import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon, Settings2, Sun, UserRound, X } from "lucide-react";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
-import { SettingsPanel } from "./SettingsPanel";
-import { MacosPermissionsPanel, requestMacosPermissionsAtStartup } from "./MacosPermissionsPanel";
+import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
+import { MacosPermissionStatus, requestMacosPermissionsAtStartup } from "./MacosPermissionsPanel";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
@@ -41,6 +41,7 @@ function App() {
     () => window.localStorage.getItem("pab.theme") === "dark" ? "dark" : "light",
   );
   const [view, setView] = useState<View>("home");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("preferences");
   const [device, setDevice] = useState<DeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,7 +51,7 @@ function App() {
   const appWindow = getCurrentWindow();
 
   useEffect(() => {
-    void requestMacosPermissionsAtStartup().catch((cause) => setError(String(cause)));
+    void requestMacosPermissionsAtStartup().catch((cause) => console.error("Could not request macOS permissions", cause));
   }, []);
 
   useEffect(() => {
@@ -210,6 +211,7 @@ function App() {
           </nav>
           <div className="sidebar-spacer" />
           <div className="sidebar-status-group">
+            <MacosPermissionStatus language={language} onOpenSettings={() => { setSettingsSection("preferences"); setView("settings"); setError(""); }} />
             <div className="sidebar-status">
               <span className={`status-dot ${device?.executor_running ? "online" : ""}`} />
               <span>{loading ? t.localServiceLoading : !device ? t.localServiceUnknown : device.executor_running ? t.running : t.stopped}</span>
@@ -222,7 +224,6 @@ function App() {
         </aside>
 
         <main className="workspace">
-          <MacosPermissionsPanel language={language} persistent />
           {error && <div className="toast error" role="status">{error}</div>}
 
           <div className={`page-content page-${view}`}>
@@ -256,7 +257,7 @@ function App() {
               </section>
             )}
 
-            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
+            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} section={settingsSection} onSectionChange={setSettingsSection} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
       </div>

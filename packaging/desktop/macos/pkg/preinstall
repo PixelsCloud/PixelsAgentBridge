@@ -16,6 +16,7 @@ desktop_user=$(stat -f '%Su' /dev/console)
 while IFS= read -r command; do
     case $command in
         '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --session-helper') ;;
+        '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --session-helper --desktop=LoginWindow') ;;
         '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop'*|'/Library/Application Support/PixelsAgentBridge/pab-mcp'*)
             echo 'Quit Pixels Agent Bridge and its MCP clients, then retry installation.' >&2; exit 1 ;;
     esac

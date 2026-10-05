@@ -1,5 +1,131 @@
 # macOS 完整适配与验收
 
+## 权限提示位置调整（2026-10-06）
+
+移除主内容区的权限横幅。权限不可用时，仅在左侧“本机服务运行中”上方显示
+“权限待开启”（繁体“權限待開啟”、英文“Permissions needed”）；悬停显示缺失
+权限的用途，点击切换到设置的应用偏好页，保留详细状态、申请授权、系统设置和
+重启入口。设置子页由 App 管理，已经停在其他设置子页时也能正确跳转。
+权限全部可用或非 macOS 时不显示此行。查询仍定时刷新，不因轮询重复申请。
+启动申请异常只记日志，不再把权限错误作为主页 toast 展示。
+
+验证：前端 TypeScript 检查通过；浏览器模拟验证了侧栏位置、点击回调、权限生效
+后隐藏及撤销后恢复、三语言、亮暗色、设置操作及轮询不申请权限。此次未编译
+原生程序、未打包安装；Mac 实机仍使用 1.2.8 的旧界面。
+
+继续检查输入恢复代码：现有保护包含断开 helper IPC 后松键、10 秒空闲松键、
+SIGTERM 退出前松键。进程强制结束、崩溃或主线程卡死后的恢复仍待实现和实测，
+不视为上述正常退出路径已经覆盖；本次未对真实 Mac 注入故障或遗留按键。
+
+## 固定自签名与权限迁移（2026-10-05 晚）
+
+按用户不付费的要求，使用构建机生成并持久保存的自签名代码证书；不使用 Apple
+付费证书，不公证，不安装系统信任根，也不关闭 Gatekeeper。实现与备份要求见
+[BUILDING.md](BUILDING.md)。私钥只在 huayang 的独立构建钥匙串中，不上传仓库。
+本次证书 SHA-1：`BD9EAA0BA8136249F6FA2D8AB7154512E73AB275`（公开指纹）。
+
+统一构建签名 App、Executor 和 MCP，绑定各自固定 ID 与该证书；构建前检查材料，
+签名后记录产物哈希，PKG 再校验三者身份。未发现材料时不会静默退回临时签名。
+1.2.7 已通过完整 PKG 安装到603527578，不是局部替换；系统 Installer 成功，
+App 版本、安装后的 designated requirement 与 HTTP 26035 健康检查均核验通过。
+1.2.8 已使用同一证书完整构建并覆盖安装，源码版本计数9同步 Windows。
+实机比较1.2.7/1.2.8 designated requirement 完全一致；覆盖升级没有重置 TCC，
+升级后2560×1080 JPEG 截图成功，屏幕录制授权保留。用户随后确认已完成重新授权，
+1.2.8 正式 helper 的辅助功能也生效，窗口引用、焦点和文字输入均可用。
+
+权限界面使用“当前不可用”描述系统 API 的观测结果，避免把签名不匹配、重启待生效
+误判为用户未授权；新增手动重启 App/helper 入口。设置入口改用主线程 NSWorkspace。
+helper 在收到 SIGTERM 时停止请求循环并尝试松键，然后退出，供 launchd 重启。
+重启入口不清理授权；正常安装升级也不自动重置授权。
+
+迁移中发现系统仍保留旧 `82b6315d…` 临时签名的授权记录，用户打开开关后仍然
+返回签名不匹配。已告知用户并用官方 tccutil 针对 `vip.rgaa.pab.desktop` 单独重置
+ScreenCapture/Accessibility，随后重新启动正式 App 申请；未直接修改 TCC 数据库。
+这次重置是旧签名迁移的故障处理，不放进每次安装或启动流程。
+重置后正式 helper 成功枚举14个窗口并截图2560×1080 JPEG，签名不匹配日志消失；
+当时辅助功能仍返回不可用；随后已恢复。退出 GUI、仅保留 standalone helper 的
+实测中，可写 TextEdit 文件成功输入 `PAB-中文-1.2.8`，窗口截图确认实际内容；
+窗口绑定批次 focus + Command-S 完成，直接读取保存文件确认文字一致。
+前后 CombinedSession/HIDSystem 的左右 Command/Shift/Option/Control 均为 false。
+旧测试文件此前由 root 创建，TextEdit 弹出无写入权限对话框导致焦点变化，操作
+明确返回未确认而未重放；已修正该测试文件归属，新的夹具由 huayang 所有。
+辅助功能授权的准确完成时刻与升级重叠，没有足够证据单独断言其跨版本保持已经
+完整验收；屏幕录制保持已实测。登录前控制、异常崩溃松键仍不标记完成。
+
+验证：Mac 两项签名测试通过（两份不同程序的要求一致、错误证书/篡改拒绝）；
+Mac/Windows 14项版本测试通过（含缺失签名不消耗版本）；Mac/Windows Desktop
+cargo check 和前端类型检查通过；1.2.7 的六项 PKG 测试含实际构建/展开通过。
+浏览器模拟验证了权限持续提示、查询不反复申请、设置目标、重启失败显示、授权/
+撤销刷新、三语言及非 Mac 隐藏。NSWorkspace 设置入口仍需正式 App 实机点击验收。
+
+产物均位于 Mac `.build/packages/pixels-agent-bridge-macos-aarch64-debug-setup.pkg`，
+新构建覆盖同名文件：1.2.7 SHA-256 为
+`dfc98a7e214a079efc2160faf7bb5dbb4205226ab87cbddb5c65b331cac08d56`；
+当前1.2.8为 `cf7dea6da7e7ed6f25a09651a42e24918a3fd1833b39fc7b3ac67ff30e1a2cee`。
+日志为 Mac `.build/self-signing-tests.log`、`self-signed-{build,upgrade-build,pkg-tests,version-tests}.log`，
+以及 `install-self-signed-1.2.7.log`。
+
+## 输入与登录会话修复进展（2026-10-05 晚，1.2.6）
+
+已在设备 `603527578` 编译并完整安装 ARM Debug `1.2.6`，版本计数7；Windows
+源码同步该版本记录，本轮没有构建 Windows 安装包。以下为当前状态，后文记录保留
+各次验收时的版本和边界，不能将历史通过项视为本轮输入修复已经通过。
+
+### 已观察到的问题与改动
+
+- 重启后只读查询未发现 Command/Shift/Option/Control 残留；本次卡死前缺少直接
+  输入故障证据，不能认定与此前 Command 残留是同一个原因。
+- 在独立 TextEdit 测试文件上，旧 standalone helper 的 focus 返回已观察到焦点，
+  随后的纯文本输入报 AX `-25204`，截图未见文字插入。停止该 helper、让已运行的
+  GUI 接管后，同一测试窗口实际插入了 `PAB-GUI-中文`。这证明两种宿主的行为存在
+  差异；`-25204` 本身不能直接解释为用户未授予辅助功能。
+- standalone helper 增加 AppKit 主线程事件循环，使用 Prohibited 激活策略避免
+  抢占前台；IPC 保留在异步工作线程。Enigo 的创建、输入和释放统一调度到主线程。
+- legacy 输入记录尝试按下的键和鼠标按钮，即使原生调用部分失败也进入释放清单；
+  helper 周期检查连续10秒未收到输入的按住状态并尝试释放，覆盖调用端消失但
+  helper 仍存活的情况。此机制不能保证 SIGKILL、进程崩溃或事件循环卡死后的清理。
+- 添加独立 LoginWindow LaunchAgent，与现有 Aqua helper 分开；安装、升级和卸载
+  脚本包含其生命周期。会话检查同时使用控制台 UID 与 Security Session 的图形/
+  活动控制台属性，防止普通 root 后台进程被误判为可输入的登录窗口。
+- 后台输入不主动申请 TCC 权限；前台应用仍通过系统接口申请并持续展示缺失权限。
+  文字输入只有真正准备发送事件时才标记 action_started，避免预检失败误报已发送。
+
+### 验证与产物
+
+| 检查 | 结果 |
+|---|---|
+| Mac desktop-control 单元测试 | 11项通过 |
+| Mac、Windows Desktop cargo check --locked | 通过 |
+| Windows desktop-control | 7项通过，4项图形环境测试默认忽略 |
+| Mac PKG 测试 | 6项通过，包含实际构建和展开临时安装包 |
+| 三平台归档测试、Shell 语法、plist 与 diff 检查 | 通过 |
+| 实机升级 | Installer 成功；Aqua helper running，LoginWindow plist 校验通过，HTTP 26035 /health 正常 |
+| 新版 helper 的真实输入与登录前控制 | 尚未验收，不能标记完成 |
+
+Mac 安装包：`.build/packages/pixels-agent-bridge-macos-aarch64-debug-setup.pkg`。
+SHA-256：`17586d6a94e77f3c2cb4f55f1b20c5326c3467e2e416d5067e3a8169da8a4e1c`。
+日志：`.build/input-loop-build.log`、`.build/install-input-fix-1.2.6.log`、
+`.build/input-fix-real-pkg-tests.log`。安装包仍为 ad-hoc 应用、未签名 PKG，未公证。
+
+升级后正式 helper 返回 `screen_recording_permission_required`。22:14 的系统 TCC
+日志进一步确认具体原因：`Failed to match existing code requirement for subject
+vip.rgaa.pab.desktop and service kTCCServiceScreenCapture`。已保存授权的 cdhash 为
+`82b6315d530a99a5dac246d77eb80ccd17a796bf`，当前应用为
+`687164300992d034d5d37823b163ffe9d9e19ab2`。这是 ad-hoc 构建更新后的签名要求
+不匹配，不能据此指责用户未开启权限。单独重启 helper 后错误仍在，停用 helper
+改由 GUI 处理也失败；诊断结束已恢复 Aqua helper。系统日志还发现通过 `/usr/bin/open`
+打开设置时触发 AppleEvents entitlement 缺失，设置入口需单独修正并实测。
+
+后续应给构建配置稳定的代码签名身份：开发使用 Apple Development，分发使用
+Developer ID Application，并验证跨版本升级仍能匹配授权。当前机器没有可用签名
+证书，不能把临时签名包描述为已解决授权持久化。依据见
+[Apple DTS 对 ad-hoc 构建身份变化的确认](https://developer.apple.com/forums/thread/819406)。
+只读查询系统 TCC 数据库被拒绝后没有重试绕过；未修改 TCC 数据库、清空权限或绕过
+系统授权。下一轮先在独立测试窗口验证纯文本实际效果，再验证快捷键/释放和本机
+键盘可用性；最后在用户结束当前工作后安排登录窗口、锁屏和会话切换验收。
+测试文件 `.build/PAB-input-recovery-20261005.txt` 的 TextEdit 窗口仍保留，待授权后
+仅关闭该测试窗口，不终止用户其他文档。未进行新的注销、重启或密码输入。
+
 ## 本次提交范围（2026-10-05）
 
 提交已验证的权限申请与持续提示、安装文件权限修复、截图元数据回归测试、
@@ -47,10 +173,10 @@ flags 为 `0x20000000`；验收结束再次查询仍一致。仅查询按键状�
 - 文字、快捷键、鼠标点击、输入批次及登录前输入本轮没有验收，之前的事件投递
   和修饰键残留问题仍需修复。未重测 Git 远端推送、服务启停、Intel 实机。
 
-## 登录前控制开发任务（2026-10-05，待实现）
+## 登录前控制开发任务（2026-10-05，部分实现、待实机验收）
 
 用户已明确要求实现 Mac 开机登录界面的截图和输入密码进入桌面；当前先完成上述
-其他功能验收。本节是开发要求，**不是已实现或已验收的能力**。不在文档、日志或
+其他功能验收。本节是完整开发要求；当前进展见文首，**不能视为已验收的能力**。不在文档、日志或
 测试夹具中保存用户提供的登录密码。
 
 依据：Apple 的 [PreLoginAgents 示例](https://developer.apple.com/library/archive/samplecode/PreLoginAgents/Introduction/Intro.html)

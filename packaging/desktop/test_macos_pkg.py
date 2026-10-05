@@ -17,6 +17,21 @@ import build_macos_pkg as pkg
 
 
 class Installer(unittest.TestCase):
+    def test_login_helper_is_separate_and_uses_machine_local_access(self):
+        with (pkg.SCRIPTS / "com.pixelsagentbridge.login-helper.plist").open('rb') as source:
+            login = plistlib.load(source)
+        with (pkg.SCRIPTS / "com.pixelsagentbridge.session-helper.plist").open('rb') as source:
+            user = plistlib.load(source)
+        self.assertEqual(login['LimitLoadToSessionType'], 'LoginWindow')
+        self.assertEqual(user['LimitLoadToSessionType'], 'Aqua')
+        self.assertNotEqual(login['Label'], user['Label'])
+        self.assertEqual(login['ProgramArguments'][1:], ['--session-helper', '--desktop=LoginWindow'])
+        self.assertEqual(login['EnvironmentVariables'], {
+            'PAB_DATA_DIR': '/Library/Application Support/PixelsAgentBridgeData',
+        })
+        self.assertNotIn('EnvironmentVariables', user)
+        self.assertIn('com.pixelsagentbridge.login-helper.plist', pkg.REQUIRED)
+
     def test_defaults_match_windows_builder(self):
         tree = ast.parse((pkg.ROOT / "packaging/desktop/build_nsis.py").read_text())
         defaults = {}
