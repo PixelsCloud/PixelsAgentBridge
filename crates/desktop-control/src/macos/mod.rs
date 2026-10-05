@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 mod input;
+pub(crate) mod recovery;
 pub use input::{apply_input, release_idle_input, release_input};
 pub const BACKEND: &str = "xcap/macos_accessibility/enigo";
 type Ref = *const c_void;

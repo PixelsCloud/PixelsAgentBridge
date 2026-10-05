@@ -41,6 +41,8 @@ async fn device_status(state: tauri::State<'_, LocalStatus>) -> Result<DeviceSta
 }
 
 async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
+    #[cfg(target_os = "macos")]
+    let _recovery = desktop_input::start_recovery_monitor();
     loop {
         match pab_executor::local_ipc::connect_local().await {
             Ok(mut socket) => {

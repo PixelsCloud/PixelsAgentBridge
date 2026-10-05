@@ -54,6 +54,8 @@ pub fn run() -> Result<(), String> {
 }
 
 async fn run_forever(expected_desktop: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let _recovery = crate::desktop_input::start_recovery_monitor();
     loop {
         if !desktop_is_active(expected_desktop.as_deref()) {
             tokio::time::sleep(Duration::from_secs(1)).await;

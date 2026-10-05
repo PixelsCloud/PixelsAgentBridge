@@ -2,6 +2,8 @@
 use pab_protocol::*;
 use std::collections::HashMap;
 mod batch;
+#[cfg(any(target_os = "macos", test))]
+mod input_recovery;
 /// Keep the entire Enigo lifetime (including key release on drop) on the macOS
 /// main thread. Both the GUI and standalone helper service an AppKit event loop;
 /// IPC stays on the runtime worker so it cannot block that event loop.
@@ -27,6 +29,10 @@ pub use native::{
     release_input, request_accessibility, request_screen_capture, require_screen_capture,
     screen_capture_allowed,
 };
+#[cfg(target_os = "macos")]
+pub fn recover_abandoned_input() -> Result<(), String> {
+    on_input_thread(native::recovery::recover_abandoned)
+}
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 #[path = "unsupported.rs"]
 mod native;
@@ -336,7 +342,11 @@ impl DesktopSession {
                                 "target is not foreground; call pab_focus_window first".into()
                             );
                         }
+                        #[cfg(not(target_os = "macos"))]
                         use enigo::{Enigo, Keyboard, Settings};
+                        #[cfg(target_os = "macos")]
+                        let mut engine = native::recovery::RecoveryInput::new()?;
+                        #[cfg(not(target_os = "macos"))]
                         let mut engine = Enigo::new(&Settings {
                             open_prompt_to_get_permissions: false,
                             ..Settings::default()

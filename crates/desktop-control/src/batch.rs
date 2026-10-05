@@ -123,7 +123,12 @@ impl DesktopSession {
         };
         verify()?;
         super::on_input_thread(|| {
-            use enigo::{Axis, Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
+            use enigo::{Axis, Button, Coordinate, Direction};
+            #[cfg(not(target_os = "macos"))]
+            use enigo::{Enigo, Keyboard, Mouse, Settings};
+            #[cfg(target_os = "macos")]
+            let mut engine = native::recovery::RecoveryInput::new()?;
+            #[cfg(not(target_os = "macos"))]
             let mut engine = Enigo::new(&Settings {
                 open_prompt_to_get_permissions: false,
                 ..Settings::default()

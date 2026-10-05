@@ -1,4 +1,5 @@
-use enigo::{Axis, Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
+use super::recovery::RecoveryInput;
+use enigo::{Axis, Button, Coordinate, Direction, Key};
 use pab_protocol::{DesktopInputEvent, DesktopMouseButton};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -7,7 +8,7 @@ const INPUT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 // Preserve modifiers and held keys between individual browser events.
 struct State {
-    engine: Enigo,
+    engine: RecoveryInput,
     buttons: Vec<Button>,
     keys: Vec<Key>,
     last_input: Instant,
@@ -28,11 +29,7 @@ fn apply_input_on_main(event: DesktopInputEvent) -> Result<(), String> {
     let mut slot = ENGINE.lock().map_err(|_| "input engine unavailable")?;
     if slot.is_none() {
         *slot = Some(State {
-            engine: Enigo::new(&Settings {
-                open_prompt_to_get_permissions: false,
-                ..Default::default()
-            })
-            .map_err(|e| e.to_string())?,
+            engine: RecoveryInput::new()?,
             buttons: Vec::new(),
             keys: Vec::new(),
             last_input: Instant::now(),
@@ -146,7 +143,7 @@ fn release_input_on_main() {
         for button in state.buttons {
             let _ = state.engine.button(button, Direction::Release);
         }
-        // Enigo's Drop releases all keys tracked by this engine.
+        // RecoveryInput retries failed releases; unresolved entries survive exit.
     }
 }
 fn direction(down: bool) -> Direction {

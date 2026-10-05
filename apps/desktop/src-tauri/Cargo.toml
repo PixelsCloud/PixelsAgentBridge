@@ -1,6 +1,6 @@
 [package]
 name = "pab-desktop"
-version = "1.2.8"
+version = "1.2.9"
 description = "Pixels Agent Bridge desktop application"
 authors = ["Pixels"]
 edition = "2024"

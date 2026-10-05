@@ -95,6 +95,32 @@ pub fn apply(event: DesktopInputEvent) -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 pub struct InputGuard;
+/// Independent of the Executor connection: a disconnected service must not stop
+/// recovery of input left behind by a crashed GUI/helper in the same session.
+#[cfg(target_os = "macos")]
+pub struct RecoveryMonitor(tauri::async_runtime::JoinHandle<()>);
+#[cfg(target_os = "macos")]
+impl Drop for RecoveryMonitor {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+#[cfg(target_os = "macos")]
+pub fn start_recovery_monitor() -> RecoveryMonitor {
+    RecoveryMonitor(tauri::async_runtime::spawn(async {
+        let mut previous_error = None;
+        loop {
+            let error = pab_desktop_control::recover_abandoned_input().err();
+            if error != previous_error {
+                if let Some(error) = &error {
+                    tracing::warn!(%error, "input recovery pending");
+                }
+                previous_error = error;
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+    }))
+}
 #[cfg(target_os = "macos")]
 impl Drop for InputGuard {
     fn drop(&mut self) {
