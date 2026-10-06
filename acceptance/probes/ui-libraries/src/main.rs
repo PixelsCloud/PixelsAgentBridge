@@ -57,9 +57,10 @@ fn mac_probe() -> Result<(), Box<dyn std::error::Error>> {
     let app = AXUIElement::application(args[1].parse()?);
     app.set_messaging_timeout(0.5)?;
     app.role()?; // Permission/provider failures must not look like an empty successful tree.
-    let mut stack = vec![app];
-    let mut entries = Vec::new();
+    let mut stack: Vec<AXUIElement> = app.windows()?.iter().map(|e| (*e).clone()).collect();
+    let mut entries: Vec<AXUIElement> = Vec::new();
     while let Some(element) = stack.pop() {
+        if entries.contains(&element) { continue; }
         if entries.len() >= 100 { return Err("fixture unexpectedly large".into()); }
         element.set_messaging_timeout(0.5)?;
         if let Ok(children) = element.children() {
@@ -68,7 +69,8 @@ fn mac_probe() -> Result<(), Box<dyn std::error::Error>> {
         }
         entries.push(element);
     }
-    let title = |e: &AXUIElement| e.title().or_else(|_|e.description()).map(|s|s.to_string()).unwrap_or_default();
+    let title = |e: &AXUIElement| e.title().ok().map(|s|s.to_string()).filter(|s|!s.is_empty())
+        .or_else(||e.description().ok().map(|s|s.to_string())).unwrap_or_default();
     if args.get(2).is_some_and(|mode| mode == "inspect") {
         for element in &entries { println!("{} {:?}",title(element),element.role().map(|s|s.to_string())); }
     }
