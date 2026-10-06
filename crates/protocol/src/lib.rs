@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+mod app_management;
+pub use app_management::*;
 mod container;
 pub use container::*;
 mod desktop_query;

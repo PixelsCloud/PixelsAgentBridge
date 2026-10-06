@@ -1,6 +1,7 @@
 //! Product policy around xcap/enigo and native foreign-window operations.
 use pab_protocol::*;
 use std::collections::HashMap;
+pub mod apps;
 mod batch;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;

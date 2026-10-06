@@ -169,15 +169,19 @@ pub fn accessibility_allowed() -> bool {
     unsafe { AXIsProcessTrusted() }
 }
 pub fn active_console() -> bool {
+    active_console_session().is_some()
+}
+pub(crate) fn active_console_session() -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
     let Ok(console) = std::fs::metadata("/dev/console") else {
-        return false;
+        return None;
     };
     let mut session = 0;
     let mut attributes = 0;
     // callerSecuritySession; sessionHasGraphicAccess | sessionOnConsole.
     let status = unsafe { SessionGetInfo(u32::MAX, &mut session, &mut attributes) };
     interactive_console_matches(unsafe { getuid() }, console.uid(), status, attributes)
+        .then_some(session)
 }
 
 fn interactive_console_matches(uid: u32, console_uid: u32, status: i32, attributes: u32) -> bool {

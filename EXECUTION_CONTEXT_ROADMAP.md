@@ -307,7 +307,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 |---|---|
 | 本规划 | 已完成 |
 | Finder修复 | 1.2.26已安装验证，已提交push：dfe7221 |
-| E0用户执行原型 | Windows两个WTS用户、Mac UID 501、Linux无GUI账户均已实测，见 acceptance/execution-e0-2026-10-06.md；应用入口原型尚待完成 |
+| E0用户执行原型 | Windows两个WTS用户、Mac UID 501、Linux无GUI账户均已实测，见 acceptance/execution-e0-2026-10-06.md；应用发现原型已实测，启动/打开原型待完成 |
 | E1身份协议基础 | 实际身份观察、连接绑定注册表以及命令/终端/Git/文件/目录/传输的选择、去重及记录已接入源码；完整生命周期矩阵及正式安装验收待完成 |
 | E1账户发现 | 已实现 pab_list_execution_contexts，三平台相关测试通过；旧设备拒绝新查询，尚未安装到正式宿主 |
 | E2本地通道/生命周期 | 内核核对PID的通道、内部user-worker命令路由、Windows Job/Unix进程组回收已实现；三平台原生测试通过，完整异常矩阵仍待完成 |
@@ -321,7 +321,8 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E3传输协议与Executor | transfer v2、接受事务、完整参数和身份冻结、重复请求查原记录、显式续传约束、原用户只读发布核对已完成；三平台原生QUIC及回归通过，见 acceptance/execution-e3-transfer-executor-2026-10-07.md |
 | E3传输Bridge/MCP | execution/resume_from、能力检查、二进制前身份回执、队列指纹及实际身份、查询/后台恢复核对已接入；分层源码证据见 acceptance/execution-e3-transfer-bridge-2026-10-07.md；正式安装宿主验收待完成 |
 | E2用户环境首批 | 用户 PATH、Mac Homebrew/系统 paths、选中用户 SSH agent 查询及身份环境覆盖校验已实现；Mac/Linux 原生切换实测通过，见 acceptance/execution-e2-environment-2026-10-07.md；真实认证等仍待验收 |
+| E4应用发现后端 | Windows AppsFolder/可见应用进程、Mac 标准应用目录/NSWorkspace、搜索与有界响应已实测，Linux明确不支持；见 acceptance/execution-e4-app-discovery-2026-10-07.md。尚未接入公开工具，启动/打开/桌面身份路由待实现 |
 | E2–E8剩余增量 | 用户环境/真实凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 继续用户自装工具/真实 Git 凭据验证与终端启动模式；推进应用、UI、完整异常矩阵和打包安装验收 |
+| 下一动作 | 推进应用启动/打开文件原型与桌面身份/helper路由，接入正式工具及UI；继续用户自装工具/真实Git凭据、终端启动模式、完整异常矩阵和打包安装验收 |
