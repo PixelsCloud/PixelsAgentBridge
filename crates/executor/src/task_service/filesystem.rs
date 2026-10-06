@@ -161,6 +161,7 @@ impl TaskService {
                 .execution_context
                 .as_ref()
                 .and_then(|c| c.identity.clone())
+                .filter(|identity| identity.mode != pab_protocol::ExecutionMode::Service)
             {
                 // Observe with the frozen native identity, not a fresh connection
                 // reference and never the service account after a user failure.

@@ -79,7 +79,35 @@ fn worker(root: &Path, payload: &OsString) -> Result<(), Box<dyn std::error::Err
     if !pty.contains(&marker) {
         return Err(format!("PTY account mismatch: {pty}").into());
     }
-    let report = json!({"identity":actual,"cwd":std::env::current_dir()?,"home":home,"file_owner":owner,"pty":pty,"payload":payload.to_string_lossy(),"service_environment_removed":true});
+    let search_path = std::env::var_os("PATH").ok_or("missing PATH")?;
+    #[cfg(unix)]
+    {
+        let paths: Vec<_> = std::env::split_paths(&search_path).collect();
+        if !paths.contains(&home.join(".local/bin")) || !paths.contains(&home.join(".cargo/bin")) {
+            return Err("missing native user executable paths".into());
+        }
+        #[cfg(target_os = "macos")]
+        if !paths.contains(&PathBuf::from("/opt/homebrew/bin")) {
+            return Err("missing Apple Silicon Homebrew path".into());
+        }
+        let output = std::process::Command::new("id").arg("-u").output()?;
+        if !output.status.success()
+            || String::from_utf8(output.stdout)?.trim()
+                != actual.account_id.strip_prefix("uid:").unwrap()
+        {
+            return Err("native PATH lookup failed".into());
+        }
+    }
+    let agent_socket_present = std::env::var_os("SSH_AUTH_SOCK").is_some();
+    #[cfg(unix)]
+    if let Some(socket) = std::env::var_os("SSH_AUTH_SOCK") {
+        use std::os::unix::fs::{FileTypeExt, MetadataExt};
+        let meta = std::fs::symlink_metadata(socket)?;
+        if !meta.file_type().is_socket() || format!("uid:{}", meta.uid()) != actual.account_id {
+            return Err("SSH agent belongs to another account".into());
+        }
+    }
+    let report = json!({"identity":actual,"cwd":std::env::current_dir()?,"home":home,"file_owner":owner,"pty":pty,"payload":payload.to_string_lossy(),"service_environment_removed":true,"search_path":search_path.to_string_lossy(),"agent_socket_present":agent_socket_present});
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)

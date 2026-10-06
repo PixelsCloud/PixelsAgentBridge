@@ -449,42 +449,85 @@ async fn shared_upload_lock_blocks_text_mutation_and_other_paths_remain_availabl
 
 #[tokio::test]
 async fn publication_intent_recovers_after_restart_without_reexecution() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("recover.txt");
-    let first = service(dir.path()).await;
-    let request = request(
-        &path,
-        FileSystemAction::Write {
-            encoding: TextEncoding::Utf8,
-            overwrite: false,
-            expected_hash: None,
-        },
-        b"published",
-    );
-    let fingerprint = digest(&serde_json::to_vec(&request).unwrap());
-    first
-        .store
-        .accept_filesystem(actor(), &request, &fingerprint)
-        .await
-        .unwrap();
-    let mut intent = FileSystemReply::pending(&request);
-    let bytes = b"published";
-    fs::write(&path, bytes).await.unwrap();
-    let mut meta = metadata(&fs::metadata(&path).await.unwrap());
-    meta.sha256 = Some(digest(bytes));
-    intent.metadata = Some(meta);
-    first.store.begin_file_publication(&intent).await.unwrap();
-    drop(first);
-    let reopened = service(dir.path()).await;
-    assert_eq!(
-        reopened
-            .lookup_filesystem(actor(), request.request_id)
+    for mode in [
+        None,
+        Some(pab_protocol::ExecutionMode::Service),
+        Some(pab_protocol::ExecutionMode::User),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("recover.txt");
+        let first = service(dir.path()).await;
+        let mut request = request(
+            &path,
+            FileSystemAction::Write {
+                encoding: TextEncoding::Utf8,
+                overwrite: false,
+                expected_hash: None,
+            },
+            b"published",
+        );
+        let mut context = mode.map(|_| first.execution_context.clone());
+        if let Some(mode) = mode {
+            let identity = context.as_mut().unwrap().identity.as_mut().unwrap();
+            assert_eq!(identity.mode, pab_protocol::ExecutionMode::Service);
+            if mode == pab_protocol::ExecutionMode::User {
+                identity.mode = mode;
+                identity.environment_source =
+                    pab_protocol::ExecutionEnvironmentSource::NativeAccount;
+                identity.account_name = "pab-unavailable-fixture".into();
+                #[cfg(unix)]
+                {
+                    identity.account_id = "uid:4294967295".into();
+                }
+                #[cfg(windows)]
+                {
+                    identity.session_id = Some(u32::MAX.to_string());
+                }
+                request.execution = pab_protocol::ExecutionSelection::User {
+                    context_ref: pab_protocol::ExecutionContextRef::new(),
+                };
+            }
+        }
+        let fingerprint = digest(&serde_json::to_vec(&request).unwrap());
+        first
+            .store
+            .accept_filesystem_with_context(actor(), &request, &fingerprint, context.as_ref())
             .await
-            .unwrap()
-            .state,
-        "completed"
-    );
-    assert_eq!(fs::read(&path).await.unwrap(), bytes);
+            .unwrap();
+        let mut intent = FileSystemReply::pending(&request);
+        intent.execution_context = context.clone();
+        let bytes = b"published";
+        fs::write(&path, bytes).await.unwrap();
+        let mut meta = metadata(&fs::metadata(&path).await.unwrap());
+        meta.sha256 = Some(digest(bytes));
+        intent.metadata = Some(meta);
+        first.store.begin_file_publication(&intent).await.unwrap();
+        drop(first);
+        let reopened = service(dir.path()).await;
+        assert_eq!(
+            reopened
+                .lookup_filesystem(actor(), request.request_id)
+                .await
+                .unwrap()
+                .state,
+            if mode == Some(pab_protocol::ExecutionMode::User) {
+                "unconfirmed"
+            } else {
+                "completed"
+            },
+            "mode: {mode:?}"
+        );
+        assert_eq!(
+            reopened
+                .store
+                .get_filesystem(actor(), request.request_id)
+                .await
+                .unwrap()
+                .execution_context,
+            context
+        );
+        assert_eq!(fs::read(&path).await.unwrap(), bytes);
+    }
 }
 
 #[tokio::test]

@@ -1,4 +1,6 @@
 use super::*;
+#[path = "unix_environment.rs"]
+mod environment;
 use std::{
     ffi::{CStr, CString, OsStr},
     os::unix::{ffi::OsStrExt, process::CommandExt},
@@ -149,7 +151,10 @@ impl PreparedUser {
             .env("USER", &self.account.identity.account_name)
             .env("LOGNAME", &self.account.identity.account_name)
             .env("SHELL", &self.account.shell)
-            .env("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+            .env(
+                "PATH",
+                environment::search_path(&self.account.identity.home)?,
+            )
             .env("TMPDIR", "/tmp")
             .env(
                 "LANG",
@@ -162,6 +167,9 @@ impl PreparedUser {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
+        if let Some(socket) = environment::ssh_agent(self.account.uid) {
+            command.env("SSH_AUTH_SOCK", socket);
+        }
         // SAFETY: pure identity read; permissions are still enforced by the kernel.
         let privileged = unsafe { libc::geteuid() } == 0;
         if !privileged

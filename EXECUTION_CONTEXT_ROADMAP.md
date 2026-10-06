@@ -315,12 +315,13 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E3指定用户终端 | 复用portable-pty接入user-worker；身份冻结、连接隔离、重复打开/关闭、中文及断线清理三平台源码集成通过，见 acceptance/execution-e3-terminal-2026-10-07.md；正式宿主与完整异常矩阵待验收 |
 | E3指定用户Git | 八工具v11接入user-worker，父进程共享仓库锁与持久化，原身份push核对；三平台源码集成通过，见 acceptance/execution-e3-git-2026-10-07.md；真实凭据和完整异常矩阵待验收 |
 | E3指定用户文件后端 | 复用文件引擎接入原生user-worker，二进制帧、父端路径锁和持久化确认；Windows两用户/Mac/Linux实测与文件回归通过，见 acceptance/execution-e3-filesystem-worker-2026-10-07.md；公开工具接入进展见下一行 |
-| E3文件公开工具接入 | 12工具filesystem v5、原子身份记录、重连查重、原用户发布核对及异步配额/取消已接入；三平台源码集成和读写QUIC通过，见 acceptance/execution-e3-filesystem-2026-10-07.md；最新复核发现文本发布恢复的service身份分流需修正，完整异常矩阵待完成 |
+| E3文件公开工具接入 | 12工具filesystem v5、原子身份记录、重连查重、原用户发布核对及异步配额/取消已接入；三平台源码集成和读写QUIC通过，见 acceptance/execution-e3-filesystem-2026-10-07.md；Service 发布恢复分流已修复并通过三平台回归，完整异常矩阵待完成 |
 | E3目录列表用户接入 | filesystem v6复用文件流程，分页保留实际身份，默认service沿用原入口；三平台原生用户和QUIC验证见 acceptance/execution-e3-directory-2026-10-07.md；正式安装验收待完成 |
 | E3传输用户后端 | 已抽出复用传输引擎并接入原生user-worker，二进制IPC、父端记录确认及共享路径锁、按身份区分续传临时文件；三平台普通回归及原生用户测试通过，见 acceptance/execution-e3-transfer-worker-2026-10-07.md |
 | E3传输协议与Executor | transfer v2、接受事务、完整参数和身份冻结、重复请求查原记录、显式续传约束、原用户只读发布核对已完成；三平台原生QUIC及回归通过，见 acceptance/execution-e3-transfer-executor-2026-10-07.md |
 | E3传输Bridge/MCP | execution/resume_from、能力检查、二进制前身份回执、队列指纹及实际身份、查询/后台恢复核对已接入；分层源码证据见 acceptance/execution-e3-transfer-bridge-2026-10-07.md；正式安装宿主验收待完成 |
-| E2–E8剩余增量 | 默认service文本发布恢复修正、用户环境/凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
+| E2用户环境首批 | 用户 PATH、Mac Homebrew/系统 paths、选中用户 SSH agent 查询及身份环境覆盖校验已实现；Mac/Linux 原生切换实测通过，见 acceptance/execution-e2-environment-2026-10-07.md；真实认证等仍待验收 |
+| E2–E8剩余增量 | 用户环境/真实凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 先修正默认service文本发布恢复的身份分流并补实测；继续用户环境/凭据、应用、UI、完整异常矩阵和打包安装验收 |
+| 下一动作 | 继续用户自装工具/真实 Git 凭据验证与终端启动模式；推进应用、UI、完整异常矩阵和打包安装验收 |

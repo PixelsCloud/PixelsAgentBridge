@@ -94,6 +94,28 @@ impl CommandOptions {
         {
             return Err("invalid command environment");
         }
+        if !self.execution.is_service()
+            && self.env.keys().any(|key| {
+                [
+                    "HOME",
+                    "USER",
+                    "LOGNAME",
+                    "USERNAME",
+                    "USERDOMAIN",
+                    "USERPROFILE",
+                    "HOMEDRIVE",
+                    "HOMEPATH",
+                    "APPDATA",
+                    "LOCALAPPDATA",
+                    "UID",
+                    "EUID",
+                ]
+                .iter()
+                .any(|reserved| key.eq_ignore_ascii_case(reserved))
+            })
+        {
+            return Err("user execution cannot override native account environment");
+        }
         if self
             .env
             .iter()
@@ -467,6 +489,42 @@ mod tests {
         ] {
             assert!(serde_json::from_value::<CommandOptions>(serde_json::json!({"execution":invalid,"env":{},"stdin_text":null,"timeout_ms":null})).is_err());
         }
+    }
+
+    #[test]
+    fn selected_account_environment_cannot_be_replaced_by_caller() {
+        let mut options = CommandOptions {
+            execution: crate::ExecutionSelection::User {
+                context_ref: crate::ExecutionContextRef::new(),
+            },
+            ..Default::default()
+        };
+        for key in [
+            "HOME",
+            "user",
+            "UserProfile",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "USERDOMAIN",
+            "HOMEDRIVE",
+            "HOMEPATH",
+            "LOGNAME",
+            "USERNAME",
+            "UID",
+            "EUID",
+        ] {
+            options.env.clear();
+            options.env.insert(key.into(), "other-account".into());
+            assert!(options.validate().is_err(), "{key}");
+        }
+        options.env.clear();
+        options
+            .env
+            .insert("PATH".into(), "/custom/bin:/usr/bin".into());
+        assert!(options.validate().is_ok());
+        options.execution = crate::ExecutionSelection::Service {};
+        options.env.insert("HOME".into(), "/legacy".into());
+        assert!(options.validate().is_ok());
     }
 
     #[test]
