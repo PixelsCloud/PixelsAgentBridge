@@ -60,7 +60,7 @@ def run_suite(suite, timeout):
     env["PAB_TEST_CATALOG_PATH"] = str(directory / "catalog.json")
     if suite == "isolated":
         commands = [
-            ["cargo", "test", "-p", "pab-protocol", "-p", "pab-desktop-control", "--lib"],
+            ["cargo", "test", "-p", "pab-protocol", "-p", "pab-desktop-control", "-p", "pab-terminal", "--lib"],
             ["cargo", "test", "-p", "pab-bridge", "--bin", "pab-mcp"],
             ["cargo", "test", "-p", "pab-bridge", "--test", "mcp_operations"],
             ["cargo", "test", "-p", "pab-executor", "--lib"],

@@ -62,7 +62,7 @@ impl OutputBuffer {
 
 pub struct TerminalSession {
     // Drop the input pipe before the ConPTY handle so Windows can finish closing it.
-    writer: Mutex<Box<dyn Write + Send>>,
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
     master: Mutex<Box<dyn MasterPty + Send>>,
     child: Mutex<Box<dyn portable_pty::Child + Send>>,
     output: Arc<Mutex<OutputBuffer>>,
@@ -103,15 +103,54 @@ impl TerminalSession {
         };
         let output = Arc::new(Mutex::new(OutputBuffer::default()));
         let reader_output = Arc::clone(&output);
+        let writer = Arc::new(Mutex::new(writer));
+        #[cfg(windows)]
+        let reader_writer = Arc::downgrade(&writer);
+        #[cfg(windows)]
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
         if let Err(error) = std::thread::Builder::new()
             .name("pab-terminal-reader".to_owned())
             .spawn(move || {
                 let mut buffer = [0_u8; 8 * 1024];
+                #[cfg(windows)]
+                let mut startup = StartupCursor::default();
                 loop {
                     match reader.read(&mut buffer) {
                         Ok(0) | Err(_) => break,
-                        Ok(count) => reader_output.lock().unwrap().append(&buffer[..count]),
+                        Ok(count) => {
+                            #[cfg(windows)]
+                            if !startup.finished {
+                                let (reply, bytes) = startup.feed(&buffer[..count]);
+                                if reply {
+                                    // portable-pty 0.9 creates ConPTY with INHERIT_CURSOR.
+                                    // Each PAB session starts a fresh virtual screen at 1,1;
+                                    // an MCP client has no terminal emulator to answer DSR.
+                                    // Consume only this initial query, leaving later VT to clients.
+                                    let Some(writer) = reader_writer.upgrade() else {
+                                        break;
+                                    };
+                                    let mut writer = writer.lock().unwrap();
+                                    if writer
+                                        .write_all(b"\x1b[1;1R")
+                                        .and_then(|_| writer.flush())
+                                        .is_err()
+                                    {
+                                        break;
+                                    }
+                                }
+                                if startup.finished {
+                                    let _ = ready_tx.try_send(());
+                                }
+                                reader_output.lock().unwrap().append(&bytes);
+                                continue;
+                            }
+                            reader_output.lock().unwrap().append(&buffer[..count]);
+                        }
                     }
+                }
+                #[cfg(windows)]
+                if !startup.pending.is_empty() {
+                    reader_output.lock().unwrap().append(&startup.pending);
                 }
                 reader_output.lock().unwrap().ended = true;
             })
@@ -119,8 +158,15 @@ impl TerminalSession {
             let _ = child.kill();
             return Err(TerminalError::Thread(error));
         }
+        #[cfg(windows)]
+        if ready_rx.recv_timeout(Duration::from_secs(3)).is_err() {
+            let _ = child.kill();
+            return Err(TerminalError::Pty(
+                "ConPTY startup did not finish its cursor handshake".into(),
+            ));
+        }
         Ok(Self {
-            writer: Mutex::new(writer),
+            writer,
             master: Mutex::new(pair.master),
             child: Mutex::new(child),
             output,
@@ -187,6 +233,33 @@ impl TerminalSession {
     }
 }
 
+#[cfg(any(windows, test))]
+#[derive(Default)]
+struct StartupCursor {
+    pending: Vec<u8>,
+    finished: bool,
+}
+#[cfg(any(windows, test))]
+impl StartupCursor {
+    fn feed(&mut self, bytes: &[u8]) -> (bool, Vec<u8>) {
+        if self.finished {
+            return (false, bytes.to_vec());
+        }
+        self.pending.extend_from_slice(bytes);
+        const QUERY: &[u8] = b"\x1b[6n";
+        if self.pending.len() < QUERY.len() && QUERY.starts_with(&self.pending) {
+            return (false, Vec::new());
+        }
+        self.finished = true;
+        let reply = self.pending.starts_with(QUERY);
+        let mut output = std::mem::take(&mut self.pending);
+        if reply {
+            output.drain(..QUERY.len());
+        }
+        (reply, output)
+    }
+}
+
 impl Drop for TerminalSession {
     fn drop(&mut self) {
         if let Ok(child) = self.child.get_mut() {
@@ -219,6 +292,26 @@ pub enum TerminalError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_cursor_handles_chunk_boundaries_once_and_preserves_other_output() {
+        for split in 0..=4 {
+            let mut parser = StartupCursor::default();
+            let query = b"\x1b[6n";
+            let (first, a) = parser.feed(&query[..split]);
+            let (second, b) = parser.feed(&query[split..]);
+            assert_eq!(u8::from(first) + u8::from(second), 1);
+            assert!(a.is_empty() && b.is_empty());
+            assert_eq!(
+                parser.feed(b"after\x1b[6n"),
+                (false, b"after\x1b[6n".to_vec())
+            );
+        }
+        let mut parser = StartupCursor::default();
+        assert_eq!(parser.feed(b"\x1b[6nhello"), (true, b"hello".to_vec()));
+        let mut parser = StartupCursor::default();
+        assert_eq!(parser.feed(b"\x1b["), (false, vec![]));
+        assert_eq!(parser.feed(b"2J"), (false, b"\x1b[2J".to_vec()));
+    }
 
     #[test]
     fn output_buffer_reports_evicted_bytes() {
@@ -258,8 +351,6 @@ mod tests {
         let (shell, args): (&str, &[&str]) = ("/bin/sh", &["-c", "echo PAB_TERMINAL_SMOKE"]);
 
         let session = TerminalSession::start(shell, args, 80, 24).unwrap();
-        #[cfg(windows)]
-        session.input(b"\x1b[1;1R").unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut output = Vec::new();
         loop {
@@ -280,11 +371,37 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn powershell_accepts_immediate_input_without_client_cursor_response() {
+        let session =
+            TerminalSession::start("powershell.exe", &["-NoLogo", "-NoProfile"], 100, 30).unwrap();
+        session
+            .input(b"Write-Output ('PAB_RESULT_' + (6*7)); exit\r\n")
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(8);
+        let mut output = Vec::new();
+        while Instant::now() < deadline {
+            let next = session.read(output.len() as u64, MAX_READ_BYTES);
+            output.extend_from_slice(&next.bytes);
+            if next.ended {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            String::from_utf8_lossy(&output).contains("PAB_RESULT_42"),
+            "shell never computed the result"
+        );
+        assert!(
+            !output.windows(4).any(|w| w == b"\x1b[6n"),
+            "initial ConPTY query leaked to client"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn two_interactive_sessions_close_independently() {
         let first = TerminalSession::start("cmd.exe", &["/K"], 80, 24).unwrap();
         let second = TerminalSession::start("cmd.exe", &["/K"], 80, 24).unwrap();
-        first.input(b"\x1b[1;1R").unwrap();
-        second.input(b"\x1b[1;1R").unwrap();
         std::thread::sleep(Duration::from_millis(100));
         first.input(b"echo PAB_FIRST_SESSION\r\n").unwrap();
         second.input(b"echo PAB_SECOND_SESSION\r\n").unwrap();
