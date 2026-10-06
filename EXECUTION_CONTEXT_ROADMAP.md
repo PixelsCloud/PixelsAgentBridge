@@ -332,4 +332,5 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E2–E8剩余增量 | 用户环境/真实凭据边界、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面交付入口 | 已移除Linux包的Desktop/前端依赖，Executor+MCP在精简镜像编译、手动安装/强制回收与真实systemd安装生命周期通过，见 acceptance/execution-linux-headless-package-2026-10-07.md；正式版本包、真实设备身份保留及宿主验收仍待E7/E8完成 |
+| E7首批产物与安装 | Windows/Linux 1.2.27、Mac ARM/Intel 1.2.28完整产物已生成；本机/90/Mac ARM/Linux测试端已安装，哈希/身份/服务通过，远端原生连接首轮通过，见 acceptance/execution-e7-packages-2026-10-07.md；当前AI会话须重启加载新MCP，完整E8仍待完成 |
 | 下一动作 | 最小UI、终端启动信息及Linux无界面安装源码已接入；继续Windows helper实机生命周期、Mac锁屏边界与测试文档清理、Windows真实Git凭据、完整异常矩阵和打包安装后的UI及正式宿主验收 |
