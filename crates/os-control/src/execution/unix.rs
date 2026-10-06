@@ -257,28 +257,29 @@ impl UserProcess {
         self.child.id()
     }
     pub fn try_wait(&mut self) -> io::Result<Option<i32>> {
-        if !self.exited {
-            // Observe without reaping first. While this child remains ours its
-            // PID cannot be reused by an unrelated process group.
-            let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
-            if unsafe {
-                libc::waitid(
-                    libc::P_PID,
-                    self.child.id() as _,
-                    &mut info,
-                    libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-                )
-            } != 0
-            {
-                return Err(io::Error::last_os_error());
-            }
-            if info.si_signo != 0 {
-                self.stop_group(true)?;
-            }
+        if !self.exited && self.exit_observed()? {
+            self.stop_group(true)?;
         }
         let status = self.child.try_wait()?;
         self.exited |= status.is_some();
         Ok(status.map(|v| v.code().unwrap_or(-1)))
+    }
+    fn exit_observed(&self) -> io::Result<bool> {
+        // Observe without reaping. This reserves the PID while checking/killing
+        // the group, including a child that exits during an explicit terminate.
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        if unsafe {
+            libc::waitid(
+                libc::P_PID,
+                self.child.id() as _,
+                &mut info,
+                libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+            )
+        } != 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(info.si_signo != 0)
     }
     pub fn terminate(&mut self) -> io::Result<()> {
         if !self.exited {
@@ -306,14 +307,30 @@ impl UserProcess {
             let error = io::Error::last_os_error();
             if error.raw_os_error() != Some(libc::ESRCH) {
                 #[cfg(target_os = "macos")]
-                if child_exited
-                    && error.raw_os_error() == Some(libc::EPERM)
-                    && !mac_group_has_live_members(self.child.id())?
-                {
-                    self.group_stopped = true;
-                    return Ok(());
+                if error.raw_os_error() == Some(libc::EPERM) {
+                    // Darwin can stop considering an exiting leader signalable
+                    // just before waitid reports its exit. Keep its PID reserved
+                    // and briefly wait for that proof; never waive EPERM for a
+                    // still-running leader or any remaining live descendant.
+                    let deadline =
+                        std::time::Instant::now() + std::time::Duration::from_millis(100);
+                    let mut exited = child_exited;
+                    while !exited {
+                        exited = self.exit_observed()?;
+                        if exited || std::time::Instant::now() >= deadline {
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
+                    if exited && !mac_group_has_live_members(self.child.id())? {
+                        self.group_stopped = true;
+                        return Ok(());
+                    }
                 }
-                return Err(error);
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!("worker process-group termination failed: {error}"),
+                ));
             }
         }
         let _ = child_exited;
@@ -355,7 +372,10 @@ fn mac_group_has_live_members(group: u32) -> io::Result<bool> {
             if error.raw_os_error() == Some(libc::ESRCH) {
                 continue;
             }
-            return Err(error);
+            return Err(io::Error::new(
+                error.kind(),
+                format!("cannot inspect remaining worker group member {pid}: {error}"),
+            ));
         }
         if info.pbi_pgid == group && info.pbi_status != libc::SZOMB {
             return Ok(true);
@@ -392,5 +412,28 @@ mod tests {
                 .spawn(Path::new("/bin/true"), &[], Path::new("/"))
                 .is_err()
         );
+    }
+    #[test]
+    fn explicit_terminate_reaps_an_already_exited_group_leader() {
+        let child = Command::new("/bin/sh")
+            .args(["-c", "exit 0"])
+            .process_group(0)
+            .spawn()
+            .unwrap();
+        let mut process = UserProcess {
+            child,
+            exited: false,
+            group_stopped: false,
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while !process.exit_observed().unwrap() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        // Do not call try_wait first: it already handles zombie-only groups.
+        // Explicit termination must independently handle the exit/kill race.
+        process.terminate().unwrap();
+        assert!(process.exited && process.group_stopped);
+        process.terminate().unwrap();
     }
 }

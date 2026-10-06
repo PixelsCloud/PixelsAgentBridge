@@ -442,6 +442,28 @@ async fn native_user_git_acceptance() {
     svc.store.finish_system_query(&lost).await.unwrap();
     let mut reconnected = base.for_ui_connection();
     reconnected.worker_executable = svc.worker_executable.clone();
+    // Exercise the worker result directly as well as the public observation;
+    // public reconciliation deliberately retains uncertainty on backend errors.
+    #[cfg(windows)]
+    let original_user = PreparedUser::for_session(user).unwrap();
+    #[cfg(unix)]
+    let original_user = PreparedUser::for_uid(user).unwrap();
+    let SystemQuery::Git {
+        query: reconcile_query,
+    } = &push_query
+    else {
+        unreachable!()
+    };
+    let observed = crate::user_worker::git::reconcile(
+        svc.worker_executable.as_ref().unwrap(),
+        original_user,
+        reconcile_query.clone(),
+        lost.clone(),
+    )
+    .await
+    .expect("native reconciliation cleanup must succeed")
+    .expect("remote reference must be observable");
+    assert_eq!(observed.state, "completed", "{observed:?}");
     let reconciled = reconnected
         .get_system_query(actor(), reconcile_id)
         .await

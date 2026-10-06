@@ -203,7 +203,9 @@ async fn operate(
     }
     drop(child);
     drop(repository);
-    cleanup?;
+    cleanup.map_err(|error| {
+        io::Error::new(error.kind(), format!("Git worker cleanup failed: {error}"))
+    })?;
     result.map_err(Into::into)
 }
 fn validate_reply(
