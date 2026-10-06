@@ -38,7 +38,7 @@ fn main() {
         Some("--macos-check") => {
             println!("{}", pab_desktop_lib::macos_diagnostics());
         }
-        Some("--session-helper") => {
+        Some("--session-helper" | "--application-helper") => {
             if let Err(error) = pab_desktop_lib::run_session_helper() {
                 eprintln!("pab-session-helper: {error}");
                 std::process::exit(1);

@@ -46,12 +46,13 @@ impl Drop for OwnedHandle {
 enum DesktopKind {
     Default,
     Winlogon,
+    Applications,
 }
 
 impl DesktopKind {
     fn name(self) -> &'static str {
         match self {
-            Self::Default => "WinSta0\\Default",
+            Self::Default | Self::Applications => "WinSta0\\Default",
             Self::Winlogon => "WinSta0\\Winlogon",
         }
     }
@@ -90,7 +91,36 @@ pub fn run() -> Result<(), String> {
 
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut workers = Vec::<Worker>::new();
+    let mut application_workers = Vec::<Worker>::new();
     loop {
+        // Application sessions are independent of the single desktop selected
+        // for legacy window/input control. Never redirect an explicit user.
+        match application_targets() {
+            Ok(targets) => {
+                application_workers
+                    .retain(|worker| targets.contains(&worker.target) && worker.is_running());
+                for target in targets {
+                    if application_workers
+                        .iter()
+                        .any(|worker| worker.target == target)
+                    {
+                        continue;
+                    }
+                    match launch_helper(&executable, target) {
+                        Ok(worker) => application_workers.push(worker),
+                        Err(error) => {
+                            tracing::warn!(session_id = target.session_id, %error, "could not launch application helper")
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                // A failed enumeration cannot establish that any session is
+                // still eligible. Retire only our helpers, never their apps.
+                application_workers.clear();
+                tracing::warn!(%error, "could not inspect application sessions");
+            }
+        }
         match active_target() {
             Ok(Some(target)) => {
                 let desktops: &[DesktopKind] = if target.desktop == DesktopKind::Default {
@@ -137,8 +167,7 @@ pub fn run() -> Result<(), String> {
     }
 }
 
-fn active_target() -> io::Result<Option<Target>> {
-    let console = unsafe { WTSGetActiveConsoleSessionId() };
+fn active_sessions() -> io::Result<Vec<u32>> {
     let mut sessions: *mut WTS_SESSION_INFOW = ptr::null_mut();
     let mut count = 0;
     // SAFETY: WTS writes a process-owned array; it is freed below.
@@ -161,6 +190,54 @@ fn active_target() -> io::Result<Option<Target>> {
     if !sessions.is_null() {
         unsafe { WTSFreeMemory(sessions.cast()) };
     }
+    Ok(active)
+}
+
+pub(crate) fn current_application_session_is_active() -> bool {
+    let mut session = 0;
+    // SAFETY: output points to a valid u32; only the current process is queried.
+    if unsafe {
+        windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId(
+            std::process::id(),
+            &mut session,
+        )
+    } == 0
+        || session == 0
+    {
+        return false;
+    }
+    active_sessions().is_ok_and(|sessions| sessions.contains(&session))
+}
+
+fn application_targets() -> io::Result<Vec<Target>> {
+    let mut targets = Vec::new();
+    for session_id in active_sessions()?.into_iter().filter(|id| *id != 0) {
+        let target = (|| -> io::Result<Option<Target>> {
+            if !session_has_user(session_id)? {
+                return Ok(None);
+            }
+            let Some(winlogon_pid) = winlogon_process(session_id)? else {
+                return Ok(None);
+            };
+            Ok(Some(Target {
+                session_id,
+                desktop: DesktopKind::Applications,
+                winlogon_pid,
+                user_logon_id: Some(logon_id(&user_token(session_id)?)?),
+            }))
+        })();
+        match target {
+            Ok(Some(target)) => targets.push(target),
+            Ok(None) => {}
+            Err(error) => tracing::warn!(session_id, %error, "application session unavailable"),
+        }
+    }
+    Ok(targets)
+}
+
+fn active_target() -> io::Result<Option<Target>> {
+    let console = unsafe { WTSGetActiveConsoleSessionId() };
+    let active = active_sessions()?;
     let session_id = active
         .iter()
         .copied()
@@ -341,12 +418,21 @@ fn logon_id(token: &OwnedHandle) -> io::Result<(u32, i32)> {
 }
 
 fn interactive_token(target: Target) -> io::Result<OwnedHandle> {
+    let token = application_token(target)?;
+    elevated_window_token(token)
+}
+
+fn application_token(target: Target) -> io::Result<OwnedHandle> {
     let token = user_token(target.session_id)?;
     if Some(logon_id(&token)?) != target.user_logon_id {
         return Err(io::Error::other(
             "interactive user changed before helper launch",
         ));
     }
+    Ok(token)
+}
+
+fn elevated_window_token(token: OwnedHandle) -> io::Result<OwnedHandle> {
     let mut elevation = 0i32;
     let mut needed = 0;
     // SAFETY: TokenElevationType returns a TOKEN_ELEVATION_TYPE (i32).
@@ -441,8 +527,9 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
     let primary = match target.desktop {
         DesktopKind::Default => interactive_token(target)?,
         DesktopKind::Winlogon => winlogon_token(target)?,
+        DesktopKind::Applications => application_token(target)?,
     };
-    let environment = if target.desktop == DesktopKind::Default {
+    let environment = if target.desktop != DesktopKind::Winlogon {
         let environment = UserEnvironment::new(&primary)?;
         pab_executor::local_ipc::issue_local_access(
             &environment.local_data()?.join("local-access.key"),
@@ -455,8 +542,13 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
 
     let executable_wide = wide(executable.as_os_str());
     let mut command = wide(OsStr::new(&format!(
-        "\"{}\" --session-helper --desktop={}",
+        "\"{}\" {} --desktop={}",
         executable.display(),
+        if target.desktop == DesktopKind::Applications {
+            "--application-helper"
+        } else {
+            "--session-helper"
+        },
         if target.desktop == DesktopKind::Winlogon {
             "Winlogon"
         } else {

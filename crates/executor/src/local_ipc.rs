@@ -57,6 +57,7 @@ struct WindowProvider {
     desktop_schema_version: Option<u16>,
     identity: Option<helper_identity::VerifiedHelper>,
     application_schema_version: Option<u16>,
+    applications_only: bool,
 }
 
 enum HelperRequest {
@@ -114,7 +115,9 @@ pub(crate) async fn request_window_list() -> Result<Vec<WindowEntry>, LocalIpcEr
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
-        .last()
+        .iter()
+        .rev()
+        .find(|provider| !provider.applications_only)
         .map(|provider| provider.sender.clone());
     let Some(sender) = sender else {
         tracing::warn!("window listing requested without a registered interactive helper");
@@ -135,7 +138,9 @@ pub(crate) async fn request_screenshot() -> Result<Vec<u8>, LocalIpcError> {
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
-        .last()
+        .iter()
+        .rev()
+        .find(|provider| !provider.applications_only)
         .map(|provider| provider.sender.clone());
     let Some(sender) = sender else {
         return Err(LocalIpcError::WindowHelperUnavailable);
@@ -160,7 +165,9 @@ pub(crate) async fn request_screenshot_v2(
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
-        .last()
+        .iter()
+        .rev()
+        .find(|provider| !provider.applications_only)
         .filter(|provider| {
             provider
                 .screenshot_schema_version
@@ -216,7 +223,9 @@ pub(crate) async fn request_desktop_input(event: DesktopInputEvent) -> Result<()
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
-        .last()
+        .iter()
+        .rev()
+        .find(|provider| !provider.applications_only)
         .map(|provider| provider.sender.clone())
         .ok_or(LocalIpcError::WindowHelperUnavailable)?;
     let (reply, receiver) = oneshot::channel();
@@ -252,19 +261,24 @@ pub enum LocalEvent {
 }
 
 pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
-    register_helper(socket, false).await
+    register_helper(socket, false, false).await
 }
 
 pub async fn register_application_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
-    register_helper(socket, true).await
+    register_helper(socket, true, false).await
+}
+
+pub async fn register_application_only_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
+    register_helper(socket, true, true).await
 }
 
 async fn register_helper(
     socket: &mut LocalSocket,
     applications: bool,
+    applications_only: bool,
 ) -> Result<(), LocalIpcError> {
     let pid = cfg!(any(windows, target_os = "macos")).then(std::process::id);
-    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(1),"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
+    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(1),"applications_only":applications_only,"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
@@ -351,7 +365,7 @@ pub(crate) async fn release_ui_connection(connection_id: pab_protocol::RequestId
         .lock()
         .map(|ps| {
             ps.iter()
-                .filter(|p| p.desktop_schema_version.is_some_and(|v| v >= 4))
+                .filter(|p| !p.applications_only && p.desktop_schema_version.is_some_and(|v| v >= 4))
                 .map(|p| p.sender.clone())
                 .collect()
         })
@@ -374,7 +388,9 @@ pub(crate) async fn request_desktop_query_with_context(
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
-        .last()
+        .iter()
+        .rev()
+        .find(|provider| !provider.applications_only)
         .filter(|p| {
             p.desktop_schema_version
                 .is_some_and(|v| v >= query.required_helper_version())
@@ -784,8 +800,12 @@ async fn handle_connection(
                 match frame["type"].as_str() {
                     Some("register_window_helper") if registration.0.is_none() => {
                         let identity=helper_identity::verify(&mut socket,&frame).await?;
+                        let applications_only = frame["applications_only"].as_bool().unwrap_or(false);
+                        if applications_only && (identity.is_none() || frame["application_schema_version"].as_u64().is_none_or(|v| v < 1)) {
+                            break Err(LocalIpcError::Protocol);
+                        }
                         let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
-                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), application_schema_version:frame["application_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), identity });
+                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), application_schema_version:frame["application_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), identity, applications_only });
                         registration.0 = Some(id);
                         tracing::info!(helper_id = id, "interactive window helper registered");
                         send_json(&mut socket, &json!({"type":"window_helper_registered"})).await?;

@@ -55,7 +55,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                 }
                 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
                 if let Err(error) =
-                    pab_executor::local_ipc::register_application_helper(&mut socket).await
+                    session_helper::register_desktop_helper(&mut socket).await
                 {
                     tracing::debug!(%error, "window helper registration failed");
                 }

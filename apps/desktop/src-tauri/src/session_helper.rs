@@ -10,11 +10,19 @@ pub fn run() -> Result<(), String> {
     let expected_desktop = std::env::args()
         .nth(2)
         .and_then(|argument| argument.strip_prefix("--desktop=").map(str::to_owned));
-    let log_role = match expected_desktop.as_deref() {
-        Some("Default") => "session-helper-default",
-        Some("Winlogon") => "session-helper-winlogon",
-        Some("LoginWindow") => "session-helper-loginwindow",
-        _ => "session-helper",
+    let applications_only = std::env::args().nth(1).as_deref() == Some("--application-helper");
+    if applications_only && (!cfg!(windows) || expected_desktop.as_deref() != Some("Default")) {
+        return Err("application helper requires the Windows Default desktop".into());
+    }
+    let log_role = if applications_only {
+        "application-helper"
+    } else {
+        match expected_desktop.as_deref() {
+            Some("Default") => "session-helper-default",
+            Some("Winlogon") => "session-helper-winlogon",
+            Some("LoginWindow") => "session-helper-loginwindow",
+            _ => "session-helper",
+        }
     };
     pab_logging::init(log_role, paths.root()).map_err(|error| error.to_string())?;
     #[cfg(target_os = "macos")]
@@ -35,7 +43,7 @@ pub fn run() -> Result<(), String> {
                 std::process::exit(1);
             };
             tokio::select! {
-                result = run_forever(expected_desktop) => {
+                result = run_forever(expected_desktop, applications_only) => {
                     if let Err(error) = result { tracing::error!(%error, "session helper stopped"); }
                 }
                 _ = termination.recv() => {}
@@ -50,29 +58,54 @@ pub fn run() -> Result<(), String> {
         return Ok(());
     }
     #[cfg(not(target_os = "macos"))]
-    tauri::async_runtime::block_on(run_forever(expected_desktop))
+    tauri::async_runtime::block_on(run_forever(expected_desktop, applications_only))
 }
 
-async fn run_forever(expected_desktop: Option<String>) -> Result<(), String> {
+pub(crate) async fn register_desktop_helper(
+    socket: &mut LocalSocket,
+) -> Result<(), local_ipc::LocalIpcError> {
+    if cfg!(target_os = "macos") {
+        local_ipc::register_application_helper(socket).await
+    } else {
+        local_ipc::register_window_helper(socket).await
+    }
+}
+
+async fn run_forever(
+    expected_desktop: Option<String>,
+    applications_only: bool,
+) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     let _recovery = crate::desktop_input::start_recovery_monitor();
     loop {
-        if !desktop_is_active(expected_desktop.as_deref()) {
+        if !(if applications_only {
+            application_desktop_is_active()
+        } else {
+            desktop_is_active(expected_desktop.as_deref())
+        }) {
             tokio::time::sleep(Duration::from_secs(1)).await;
             continue;
         }
         match local_ipc::connect_local().await {
             Ok(mut socket) => {
-                if let Err(error) = local_ipc::register_application_helper(&mut socket).await {
+                let registration = if applications_only {
+                    local_ipc::register_application_only_helper(&mut socket).await
+                } else {
+                    register_desktop_helper(&mut socket).await
+                };
+                if let Err(error) = registration {
                     tracing::warn!(%error, "session helper registration failed");
                 } else {
                     tracing::info!(
                         desktop = expected_desktop.as_deref().unwrap_or("unspecified"),
                         "session helper registered"
                     );
-                    if let Err(error) =
+                    let result = if applications_only {
+                        serve_application_requests(&mut socket).await
+                    } else {
                         serve_requests(&mut socket, expected_desktop.as_deref()).await
-                    {
+                    };
+                    if let Err(error) = result {
                         tracing::debug!(%error, "session helper disconnected");
                     }
                 }
@@ -80,6 +113,58 @@ async fn run_forever(expected_desktop: Option<String>) -> Result<(), String> {
             Err(error) => tracing::debug!(%error, "local Executor is unavailable"),
         }
         tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+}
+
+async fn serve_application_requests(socket: &mut LocalSocket) -> Result<(), String> {
+    // This helper never acquires input state or initializes UI automation.
+    while application_desktop_is_active() {
+        let event =
+            match tokio::time::timeout(Duration::from_secs(1), local_ipc::next_local_event(socket))
+                .await
+            {
+                Ok(result) => result.map_err(|e| e.to_string())?,
+                Err(_) => continue,
+            };
+        match event {
+            LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+            LocalEvent::ApplicationQuery(id, query, identity) => {
+                // Shell extensions can block inside a native call indefinitely.
+                // This dedicated process owns no input state and its children
+                // are not in a kill-on-close job. Retire just this helper on a
+                // deadline; the parent records an unconfirmed result, without
+                // replaying the request or terminating a launched application.
+                let operation = tokio::task::spawn_blocking(move || {
+                    pab_desktop_control::apps::query_guarded(id, &query, &identity, || {
+                        application_desktop_is_active()
+                    })
+                });
+                let reply = match tokio::time::timeout(Duration::from_secs(20), operation).await {
+                    Ok(result) => result.map_err(|e| e.to_string())?,
+                    Err(_) => {
+                        tracing::error!(%id, "application call exceeded deadline; retiring helper without replay");
+                        std::process::exit(1);
+                    }
+                };
+                local_ipc::reply_desktop_query(socket, &reply)
+                    .await
+                    .map_err(|e| e.to_string())?;
+            }
+            _ => return Err("non-application request sent to application helper".into()),
+        }
+    }
+    Ok(())
+}
+
+fn application_desktop_is_active() -> bool {
+    #[cfg(windows)]
+    {
+        crate::windows_session_supervisor::current_application_session_is_active()
+            && desktop_is_active(Some("Default"))
+    }
+    #[cfg(not(windows))]
+    {
+        false
     }
 }
 

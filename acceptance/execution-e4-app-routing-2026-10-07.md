@@ -33,7 +33,7 @@
 ## 仍需完成
 
 - 三个正式 MCP 入口、工具发现与能力检查、Bridge 历史集成验证、最小 UI。
-- Windows 在主程序未运行时的普通用户 helper 供给；现有 SYSTEM Default/Winlogon helper 不能执行用户应用。
+- Windows 后台应用 helper 供给仍待补足。更正：现有 Default helper 已以登录用户运行，管理员使用 linked elevated token 以控制高权限窗口；只有 Winlogon helper 使用 SYSTEM。应用启动应使用原始 WTS 用户 token，并与窗口控制通道分离。
 - 阻塞原生调用的生命周期边界；当前有父端等待预算和 unconfirmed，不宣称可以硬中断 Shell/NSWorkspace 调用，也不把超时当作取消成功。
 - Windows 90 多用户及两 MCP 场景、真实 helper 派发到原生后端的端到端操作、Mac 锁屏/注销工作流、未保存文档的正常关闭阻塞。
 - 前一报告记录的 Mac TextEdit 文档仍待解锁后单独关闭和清理；本轮未操纵登录界面、未发送键鼠、未重置 TCC。

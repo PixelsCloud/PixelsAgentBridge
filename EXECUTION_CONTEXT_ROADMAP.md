@@ -325,7 +325,8 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E4启动/打开后端 | Windows Shell、Mac NSWorkspace 的 ID/路径启动及指定/默认应用打开文件已实现并实测首批流程，见 acceptance/execution-e4-app-actions-2026-10-07.md；桌面身份路由/记录/正式工具已继续接入，见后续两行。Mac锁屏下保留一份测试文档待解锁后清理 |
 | E4应用身份路由/记录 | system-query v12、内核核验helper进程身份、连接绑定desktop_user上下文、接受前冻结通道/身份及原记录去重已接入；双桌面编译/IPC与Linux拒绝边界通过，见 acceptance/execution-e4-app-routing-2026-10-07.md；正式入口见下一行；完整生命周期仍待完成 |
 | E4应用MCP/Bridge入口 | 三个正式工具、严格解析/v12协商、原身份结果验证/历史去重及活动操作计数已接入；三平台各67项Bridge、38项MCP、7项stdio测试通过，见 acceptance/execution-e4-app-mcp-2026-10-07.md；安装宿主验收仍待完成 |
+| E4 Windows应用helper | 已增加各活动WTS用户的原始令牌应用helper、旧桌面路由隔离和原生调用阻塞退出；Windows/Mac各22项IPC与Linux18项回归通过，见 acceptance/execution-e4-application-helper-2026-10-07.md；安装后多会话与故障注入仍待验收 |
 | E2–E8剩余增量 | 用户环境/真实凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 补足Windows后台用户应用helper与阻塞调用生命周期，接入最小UI及实际身份历史；处理锁屏边界与Mac测试文档清理，继续真实Git凭据、终端启动模式、完整异常矩阵和打包安装验收 |
+| 下一动作 | 接入最小UI及实际身份历史；处理锁屏边界与Mac测试文档清理，继续Windows helper实机生命周期、真实Git凭据、终端启动模式、完整异常矩阵和打包安装验收 |

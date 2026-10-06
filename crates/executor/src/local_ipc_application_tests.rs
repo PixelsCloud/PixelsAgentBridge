@@ -1,17 +1,71 @@
 async fn application_helper() -> (tempfile::TempDir, LocalSocket, tokio::task::JoinHandle<Result<(), LocalIpcError>>, u64, pab_protocol::ExecutionIdentity) {
+    application_helper_mode(false).await
+}
+async fn application_helper_mode(only: bool) -> (tempfile::TempDir, LocalSocket, tokio::task::JoinHandle<Result<(), LocalIpcError>>, u64, pab_protocol::ExecutionIdentity) {
     let directory = tempfile::tempdir().unwrap();
     let token = ensure_machine_token(directory.path()).unwrap();
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
     let mut socket = connect_with_token(port, &token).await.unwrap();
-    register_application_helper(&mut socket).await.unwrap();
+    if only {
+        register_application_only_helper(&mut socket).await.unwrap();
+    } else {
+        register_application_helper(&mut socket).await.unwrap();
+    }
     let (id, identity) = {
         let providers = window_providers().lock().unwrap();
         let provider = providers.last().unwrap();
         (provider.id, provider.identity.as_ref().expect("run this test in a native desktop user session").identity.clone())
     };
     (directory, socket, server, id, identity)
+}
+
+#[tokio::test]
+async fn application_only_registration_preserves_window_route_and_release_broadcast() {
+    let _guard = TEST_HELPER_LOCK.lock().await;
+    let (_win_dir, mut windows, window_server, window_id) = screenshot_helper().await;
+    let (_app_dir, mut apps, app_server, app_id, identity) = application_helper_mode(true).await;
+    assert!(applications::ApplicationRoute::select(&identity).is_ok());
+    let request = tokio::spawn(request_window_list());
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            match next_local_event(&mut windows).await.unwrap() {
+                LocalEvent::ListWindows => break,
+                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {},
+                other => panic!("unexpected window event {other:?}"),
+            }
+        }
+    }).await.unwrap();
+    reply_window_list(&mut windows, &[]).await.unwrap();
+    assert!(request.await.unwrap().unwrap().is_empty());
+    let connection = pab_protocol::RequestId::new();
+    release_ui_connection(connection).await;
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let LocalEvent::ReleaseUiConnection(id) = next_local_event(&mut windows).await.unwrap() {
+                assert_eq!(id, connection); break;
+            }
+        }
+    }).await.unwrap();
+    windows.close(None).await.unwrap(); wait_helper_removed(window_id).await; window_server.abort();
+    // With only the app channel remaining, all legacy requests fail before
+    // dispatch instead of using the wrong session/helper.
+    assert!(matches!(request_window_list().await, Err(LocalIpcError::WindowHelperUnavailable)));
+    assert!(matches!(request_screenshot().await, Err(LocalIpcError::WindowHelperUnavailable)));
+    assert!(matches!(request_screenshot_v2(pab_protocol::ScreenshotOptions::default()).await, Err(LocalIpcError::WindowHelperUnavailable)));
+    assert!(matches!(request_desktop_input(DesktopInputEvent::Key { virtual_key: 0x41, down: false }).await, Err(LocalIpcError::WindowHelperUnavailable)));
+    assert!(matches!(request_desktop_query(pab_protocol::RequestId::new(), pab_protocol::DesktopQuery::Windows {}).await, Err(LocalIpcError::WindowHelperUnavailable)));
+    let unexpected = tokio::time::timeout(Duration::from_millis(150), async {
+        loop {
+            match next_local_event(&mut apps).await.unwrap() {
+                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {},
+                other => return other,
+            }
+        }
+    }).await;
+    assert!(unexpected.is_err(), "app-only helper received a window/input request");
+    apps.close(None).await.unwrap(); wait_helper_removed(app_id).await; app_server.abort();
 }
 async fn next_application(socket: &mut LocalSocket) -> (pab_protocol::RequestId, pab_protocol::AppQuery, pab_protocol::ExecutionIdentity) {
     tokio::time::timeout(Duration::from_secs(8), async {
