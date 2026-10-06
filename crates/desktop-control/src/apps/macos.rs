@@ -1,4 +1,7 @@
 use super::*;
+#[path = "macos_action.rs"]
+mod action;
+pub(super) use action::act;
 use pab_os_control::execution::UserIdentity;
 use std::{
     io::Read,
