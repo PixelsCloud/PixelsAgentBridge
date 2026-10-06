@@ -41,10 +41,7 @@ impl AuthenticatedDeviceConnection {
                 filesystem_schema_version,
                 ..
             } if context.device_ref == self.device_ref => {
-                if !supports(
-                    filesystem_schema_version,
-                    request.operation.schema_version(),
-                ) {
+                if !supports(filesystem_schema_version, request.schema_version()) {
                     return Err(BridgeError::UnsupportedFileSystem);
                 }
             }
@@ -74,6 +71,15 @@ impl AuthenticatedDeviceConnection {
             || reply.kind != request.operation.kind()
             || reply.destination.as_deref() != request.operation.destination()
             || (reply.data_size > 0 && reply.kind != "file_read")
+            || (!request.execution.is_service()
+                && reply.state != "failed"
+                && reply
+                    .execution_context
+                    .as_ref()
+                    .and_then(|c| c.identity.as_ref())
+                    .is_none_or(|id| {
+                        id.mode != pab_protocol::ExecutionMode::User || id.validate().is_err()
+                    }))
         {
             return Err(BridgeError::UnexpectedTaskResponse(
                 "filesystem reply does not match request".to_owned(),
@@ -234,6 +240,7 @@ mod tests {
             assert!(supports(Some(2), action.schema_version()));
         }
         let request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/hash.bin".to_owned(),
             operation: FileSystemAction::Hash,

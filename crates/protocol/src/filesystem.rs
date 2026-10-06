@@ -195,6 +195,8 @@ impl FileSystemAction {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileSystemRequest {
+    #[serde(default, skip_serializing_if = "crate::ExecutionSelection::is_service")]
+    pub execution: crate::ExecutionSelection,
     pub request_id: RequestId,
     pub path: String,
     pub operation: FileSystemAction,
@@ -203,7 +205,22 @@ pub struct FileSystemRequest {
 }
 
 impl FileSystemRequest {
+    pub fn schema_version(&self) -> u16 {
+        if self.execution.is_service() {
+            self.operation.schema_version()
+        } else {
+            5
+        }
+    }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if matches!(
+            self.execution,
+            crate::ExecutionSelection::DesktopUser { .. }
+        ) {
+            return Err(
+                "filesystem execution supports service or user; desktop_user is not supported",
+            );
+        }
         if self.path.is_empty() || self.path.len() > 4096 || self.path.contains('\0') {
             return Err("path must contain 1..4096 bytes without NUL");
         }
@@ -405,6 +422,8 @@ pub struct FileSystemError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSystemReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<crate::ExecutionContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log: Option<LogReadState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub patch_preview: Option<PatchPreview>,
@@ -432,6 +451,7 @@ pub struct FileSystemReply {
 impl FileSystemReply {
     pub fn pending(request: &FileSystemRequest) -> Self {
         Self {
+            execution_context: None,
             log: None,
             patch_preview: None,
             request_id: request.request_id,
@@ -512,6 +532,24 @@ pub struct FileHashProgress {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn file_execution_versions_keep_service_fingerprint_and_reject_desktop() {
+        let legacy = serde_json::json!({"request_id":crate::RequestId::new(),"path":"/tmp/file","operation":{"action":"hash"},"payload_size":0,"payload_sha256":null});
+        let mut request: super::FileSystemRequest = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(request.execution.is_service());
+        assert_eq!(serde_json::to_value(&request).unwrap(), legacy);
+        assert_eq!(request.schema_version(), 2);
+        request.execution = crate::ExecutionSelection::User {
+            context_ref: crate::ExecutionContextRef::new(),
+        };
+        assert_eq!(request.schema_version(), 5);
+        assert!(request.validate().is_ok());
+        request.execution = crate::ExecutionSelection::DesktopUser {
+            context_ref: crate::ExecutionContextRef::new(),
+        };
+        assert!(request.validate().is_err());
+    }
+
     use super::*;
     #[test]
     fn legacy_requests_keep_their_fingerprint_and_enhancements_require_v4() {
@@ -544,6 +582,7 @@ mod tests {
         };
         assert_eq!(action.schema_version(), 4);
         let mut request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/log".into(),
             operation: action,
@@ -564,6 +603,7 @@ mod tests {
     #[test]
     fn search_uses_byte_limits_and_non_payload_mutations_are_explicit() {
         let mut request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/root".to_owned(),
             operation: FileSystemAction::Search {

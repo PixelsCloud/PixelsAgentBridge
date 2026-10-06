@@ -6,6 +6,7 @@ use pab_protocol::{
 
 fn request(path: &Path, operation: FileSystemAction, payload: &[u8]) -> FileSystemRequest {
     FileSystemRequest {
+        execution: Default::default(),
         request_id: RequestId::new(),
         path: path.to_string_lossy().into_owned(),
         payload_size: payload.len() as u32,
@@ -697,7 +698,7 @@ async fn overload_rejects_before_acceptance_and_old_environment_payload_still_de
     assert!(matches!(
         &response,
         DeviceTaskResponse::Environment {
-            filesystem_schema_version: Some(4),
+            filesystem_schema_version: Some(5),
             ..
         }
     ));

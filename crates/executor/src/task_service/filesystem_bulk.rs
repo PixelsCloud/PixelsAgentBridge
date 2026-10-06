@@ -15,7 +15,8 @@ use tokio::task::JoinHandle;
 
 pub(super) struct BulkJob {
     pub cancel: Arc<AtomicBool>,
-    _task: JoinHandle<()>,
+    pub(super) user_cancel: Option<tokio::sync::watch::Sender<bool>>,
+    pub(super) _task: JoinHandle<()>,
 }
 #[cfg(test)]
 pub(super) struct BulkTestGate {
@@ -38,8 +39,10 @@ impl TaskService {
     pub(super) async fn start_bulk(
         &self,
         request: &FileSystemRequest,
+        context: pab_protocol::ExecutionContext,
     ) -> Result<FileSystemReply, TaskServiceError> {
         let mut reply = FileSystemReply::pending(request);
+        reply.execution_context = Some(context);
         reply.mutation = Some(FileMutationSummary {
             phase: "planning".to_owned(),
             ..Default::default()
@@ -93,6 +96,7 @@ impl TaskService {
             id,
             BulkJob {
                 cancel,
+                user_cancel: None,
                 _task: task,
             },
         );
@@ -117,6 +121,9 @@ impl TaskService {
         reply.state = "cancel_requested".to_owned();
         self.store.request_filesystem_cancel(&reply).await?;
         job.cancel.store(true, Ordering::Release);
+        if let Some(cancel) = &job.user_cancel {
+            let _ = cancel.send(true);
+        }
         self.store
             .get_filesystem(actor, id)
             .await

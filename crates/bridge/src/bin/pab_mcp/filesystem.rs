@@ -135,6 +135,13 @@ pub(super) fn tools() -> Vec<Value> {
         }
     }
     tools.extend(super::mcp_filesystem_bulk::tools());
+    for tool in &mut tools {
+        tool["inputSchema"]["properties"]["execution"] = json!({"oneOf":[{"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},{"type":"object","properties":{"mode":{"const":"user"},"context_ref":{"type":"string","format":"uuid"}},"required":["mode","context_ref"],"additionalProperties":false}]});
+        let description = tool["description"].as_str().unwrap();
+        tool["description"] = json!(format!(
+            "{description} Defaults to service account. execution=user uses a context_ref from pab_list_execution_contexts on this connection and requires filesystem v5. Access and ownership follow that account; no service fallback. History preserves the original execution identity."
+        ));
+    }
     tools
 }
 
@@ -336,6 +343,12 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(FileSystemRequest, Vec<
         return Err("UTF-8 payload exceeds 128 KiB; use file transfer".to_owned());
     }
     let request = FileSystemRequest {
+        execution: args
+            .get("execution")
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+            .map_err(|error| error.to_string())?
+            .unwrap_or_default(),
         request_id: args
             .get("request_id")
             .and_then(Value::as_str)
@@ -385,6 +398,42 @@ pub(super) async fn call(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn every_file_tool_exposes_strict_user_selection_and_v5() {
+        use pab_protocol::{ExecutionContextRef, ExecutionSelection};
+        let entries = super::tools();
+        assert_eq!(entries.len(), 12);
+        for entry in entries {
+            assert!(
+                entry["inputSchema"]["properties"]["execution"].is_object(),
+                "{entry}"
+            );
+        }
+        let reference = ExecutionContextRef::new();
+        let args = serde_json::json!({"device_code":"123456789","path":"/tmp/file","execution":{"mode":"user","context_ref":reference}});
+        super::super::mcp_catalog::validate_arguments("pab_file_stat", &args).unwrap();
+        let (request, _) = super::parse("pab_file_stat", &args).unwrap();
+        assert_eq!(
+            request.execution,
+            ExecutionSelection::User {
+                context_ref: reference
+            }
+        );
+        assert_eq!(request.schema_version(), 5);
+        for execution in [
+            serde_json::json!({"mode":"user","username":"root"}),
+            serde_json::json!({"mode":"service","password":"bad"}),
+            serde_json::json!({"mode":"desktop_user","context_ref":reference}),
+        ] {
+            let mut invalid = args.clone();
+            invalid["execution"] = execution;
+            assert!(
+                super::super::mcp_catalog::validate_arguments("pab_file_stat", &invalid).is_err()
+            );
+            assert!(super::parse("pab_file_stat", &invalid).is_err());
+        }
+    }
+
     use super::*;
     #[test]
     fn enhanced_modes_have_strict_selectors_and_preserve_cursor_and_preview() {

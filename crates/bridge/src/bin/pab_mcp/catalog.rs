@@ -408,7 +408,10 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
             .map_err(|e| e.to_string())?;
         }
     }
-    if matches!(name, "pab_file_read" | "pab_file_search" | "pab_file_patch") {
+    if super::mcp_filesystem::tools()
+        .iter()
+        .any(|entry| entry["name"] == name)
+    {
         super::mcp_filesystem::parse(name, args)?;
     }
     if matches!(name, "pab_run_command" | "pab_open_terminal") {

@@ -1,4 +1,4 @@
-//! Native worker tests; these do not claim public MCP schema/host acceptance.
+//! Native executor integration; installed MCP host acceptance remains separate.
 use super::transfer_tests::{actor, service};
 use super::*;
 use pab_os_control::execution::PreparedUser;
@@ -43,7 +43,8 @@ async fn run(
     payload: Vec<u8>,
     cancel: bool,
 ) -> (FileSystemReply, Vec<u8>) {
-    let request = FileSystemRequest {
+    let mut request = FileSystemRequest {
+        execution: Default::default(),
         request_id: RequestId::new(),
         path: path.to_str().unwrap().into(),
         payload_size: payload.len() as u32,
@@ -52,6 +53,71 @@ async fn run(
             .then(|| filesystem_io::digest(&payload)),
         operation: action,
     };
+    if !cancel {
+        let identity = prepared(user)
+            .identity()
+            .observation(
+                ExecutionMode::User,
+                ExecutionEnvironmentSource::NativeAccount,
+            )
+            .unwrap();
+        let context_ref = svc
+            .ui_connection
+            .execution_contexts
+            .lock()
+            .await
+            .register(
+                pab_task_runtime::ExecutionCaller {
+                    device: svc.device_ref,
+                    actor: actor(),
+                    connection: svc.ui_connection.id,
+                },
+                identity.clone(),
+            )
+            .unwrap();
+        request.execution = ExecutionSelection::User { context_ref };
+        let mut result = dispatch(svc, &request, &payload).await;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        while matches!(result.0.state.as_str(), "running" | "cancel_requested") {
+            assert!(tokio::time::Instant::now() < deadline, "{:?}", result.0);
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            result.0 = svc
+                .lookup_filesystem(actor(), request.request_id)
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            result
+                .0
+                .execution_context
+                .as_ref()
+                .unwrap()
+                .identity
+                .as_ref(),
+            Some(&identity)
+        );
+        // A new connection cannot use this selection, but can observe/replay an
+        // already accepted request without changing its original user identity.
+        let fresh = svc.for_ui_connection();
+        let historical = fresh
+            .execute_filesystem(actor(), &request, &payload)
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(historical.execution_context, result.0.execution_context);
+        if result.0.kind == "file_read" && result.0.state == "completed" {
+            assert_eq!(historical.error.unwrap().code, "read_request_consumed");
+        } else {
+            assert_eq!(historical.state, result.0.state);
+        }
+        let mut changed = request.clone();
+        changed.execution = Default::default();
+        assert!(matches!(
+            svc.execute_filesystem(actor(), &changed, &payload).await,
+            Err(TaskServiceError::Store(TaskStoreError::RequestConflict))
+        ));
+        return result;
+    }
     svc.store
         .accept_filesystem(
             actor(),
@@ -61,11 +127,22 @@ async fn run(
         .await
         .unwrap();
     let (send, receive) = watch::channel(cancel);
+    let mut context = svc.execution_context.clone();
+    context.identity = Some(
+        prepared(user)
+            .identity()
+            .observation(
+                ExecutionMode::User,
+                ExecutionEnvironmentSource::NativeAccount,
+            )
+            .unwrap(),
+    );
     let result = crate::user_worker::filesystem::execute(
         &PathBuf::from(std::env::var_os("PAB_EXECUTION_TEST_WORKER").unwrap()),
         prepared(user),
         request.clone(),
         payload,
+        context,
         svc.file_coordinator(),
         receive,
     )
@@ -80,6 +157,63 @@ async fn run(
         .unwrap();
     assert_eq!(saved.state, result.0.state);
     result
+}
+
+async fn dispatch(
+    svc: &TaskService,
+    request: &FileSystemRequest,
+    payload: &[u8],
+) -> (FileSystemReply, Vec<u8>) {
+    if !matches!(
+        request.operation,
+        FileSystemAction::Write { .. } | FileSystemAction::Read { .. }
+    ) {
+        return svc
+            .execute_filesystem(actor(), request, payload)
+            .await
+            .unwrap();
+    }
+    let timeout = Duration::from_secs(15);
+    let (a, b, client, server) = super::transfer_tests::pair().await;
+    let worker = svc.clone();
+    let task = tokio::spawn(async move {
+        worker
+            .handle_stream(actor(), server.accept_bi(timeout).await.unwrap(), timeout)
+            .await
+            .unwrap();
+    });
+    let mut stream = client.open_bi(timeout).await.unwrap();
+    stream
+        .send_frame_json(
+            &DeviceTaskRequest::FileSystem {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request: request.clone(),
+            },
+            timeout,
+        )
+        .await
+        .unwrap();
+    for bytes in payload.chunks(64 * 1024) {
+        stream.send_binary_frame(bytes, timeout).await.unwrap();
+    }
+    stream.finish_send(timeout).await.unwrap();
+    let response: DeviceTaskResponse = stream.receive_json(timeout).await.unwrap();
+    let DeviceTaskResponse::FileSystem { reply } = response else {
+        panic!("{response:?}")
+    };
+    let mut bytes = Vec::new();
+    while bytes.len() < reply.data_size as usize {
+        bytes.extend(stream.receive_binary_frame(timeout).await.unwrap());
+    }
+    stream.expect_receive_end(timeout).await.unwrap();
+    assert_eq!(bytes.len(), reply.data_size as usize);
+    if let Some(hash) = &reply.data_sha256 {
+        assert_eq!(*hash, filesystem_io::digest(&bytes));
+    }
+    task.await.unwrap();
+    a.close().await;
+    b.close().await;
+    (*reply, bytes)
 }
 async fn success(
     svc: &TaskService,
@@ -101,6 +235,74 @@ fn write(overwrite: bool, hash: Option<String>) -> FileSystemAction {
 }
 
 #[tokio::test]
+async fn invalid_user_file_context_is_rejected_before_acceptance() {
+    let directory = tempfile::tempdir().unwrap();
+    let svc = service(directory.path()).await;
+    let request = FileSystemRequest {
+        execution: ExecutionSelection::User {
+            context_ref: ExecutionContextRef::new(),
+        },
+        request_id: RequestId::new(),
+        path: directory
+            .path()
+            .join("untouched.txt")
+            .to_str()
+            .unwrap()
+            .into(),
+        operation: write(false, None),
+        payload_size: 1,
+        payload_sha256: Some(filesystem_io::digest(b"x")),
+    };
+    assert!(matches!(
+        svc.execute_filesystem(actor(), &request, b"x").await,
+        Err(TaskServiceError::ExecutionContext(_))
+    ));
+    assert!(
+        svc.store
+            .get_filesystem(actor(), request.request_id)
+            .await
+            .is_err()
+    );
+    assert!(!Path::new(&request.path).exists());
+    let timeout = Duration::from_secs(5);
+    let (a, b, client, server) = super::transfer_tests::pair().await;
+    let worker = svc.clone();
+    let task = tokio::spawn(async move {
+        worker
+            .handle_stream(actor(), server.accept_bi(timeout).await.unwrap(), timeout)
+            .await
+            .unwrap();
+    });
+    let mut stream = client.open_bi(timeout).await.unwrap();
+    stream
+        .send_frame_json(
+            &DeviceTaskRequest::FileSystem {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request: request.clone(),
+            },
+            timeout,
+        )
+        .await
+        .unwrap();
+    stream.send_binary_frame(b"x", timeout).await.unwrap();
+    stream.finish_send(timeout).await.unwrap();
+    let response: DeviceTaskResponse = stream.receive_json(timeout).await.unwrap();
+    assert!(
+        matches!(response, DeviceTaskResponse::Error { .. }),
+        "{response:?}"
+    );
+    task.await.unwrap();
+    assert!(
+        svc.store
+            .get_filesystem(actor(), request.request_id)
+            .await
+            .is_err()
+    );
+    a.close().await;
+    b.close().await;
+}
+
+#[tokio::test]
 #[ignore = "requires native user and PAB_EXECUTION_TEST_WORKER; owns only a generated home fixture"]
 async fn native_user_filesystem_worker_acceptance() {
     let user: u32 = std::env::var("PAB_EXECUTION_TEST_USER")
@@ -109,7 +311,12 @@ async fn native_user_filesystem_worker_acceptance() {
         .unwrap();
     let identity = prepared(user).identity().clone();
     let database = tempfile::tempdir().unwrap();
-    let svc = service(database.path()).await;
+    let mut svc = service(database.path()).await.for_ui_connection();
+    svc.worker_executable = Some(
+        std::env::var_os("PAB_EXECUTION_TEST_WORKER")
+            .unwrap()
+            .into(),
+    );
     let root = Workspace {
         path: identity
             .home
@@ -201,6 +408,36 @@ async fn native_user_filesystem_worker_acceptance() {
         hash.metadata.unwrap().sha256,
         written.metadata.as_ref().unwrap().sha256
     );
+    let mut original = written.clone();
+    original.request_id = RequestId::new();
+    original.state = "running".into();
+    let req = FileSystemRequest {
+        execution: ExecutionSelection::User {
+            context_ref: ExecutionContextRef::new(),
+        },
+        request_id: original.request_id,
+        path: original.path.clone(),
+        operation: write(false, None),
+        payload_size: text.len() as u32,
+        payload_sha256: Some(filesystem_io::digest(text.as_bytes())),
+    };
+    svc.store
+        .accept_filesystem_with_context(
+            actor(),
+            &req,
+            "reconcile-fixture",
+            original.execution_context.as_ref(),
+        )
+        .await
+        .unwrap();
+    svc.store.begin_file_publication(&original).await.unwrap();
+    let observed = svc
+        .for_ui_connection()
+        .lookup_filesystem(actor(), original.request_id)
+        .await
+        .unwrap();
+    assert_eq!(observed.state, "completed", "{observed:?}");
+    assert_eq!(observed.execution_context, original.execution_context);
     let changed = run(
         &svc,
         user,
@@ -361,6 +598,8 @@ async fn native_user_filesystem_worker_acceptance() {
     // A service-owned, private directory must remain inaccessible to this user.
     let private = database.path().join("private");
     std::fs::create_dir(&private).unwrap();
+    let hidden = private.join("existing.txt");
+    std::fs::write(&hidden, b"service-only").unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -393,6 +632,42 @@ async fn native_user_filesystem_worker_acceptance() {
     .0;
     assert_eq!(denied.state, "failed", "{denied:?}");
     assert!(!private.join("must-not-exist.txt").exists());
+    let mut unconfirmed = original.clone();
+    unconfirmed.request_id = RequestId::new();
+    unconfirmed.path = hidden.to_str().unwrap().into();
+    let meta = unconfirmed.metadata.as_mut().unwrap();
+    meta.size = 12;
+    meta.sha256 = Some(filesystem_io::digest(b"service-only"));
+    let req = FileSystemRequest {
+        execution: ExecutionSelection::User {
+            context_ref: ExecutionContextRef::new(),
+        },
+        request_id: unconfirmed.request_id,
+        path: unconfirmed.path.clone(),
+        operation: write(false, None),
+        payload_size: 12,
+        payload_sha256: meta.sha256.clone(),
+    };
+    svc.store
+        .accept_filesystem_with_context(
+            actor(),
+            &req,
+            "private-reconcile-fixture",
+            unconfirmed.execution_context.as_ref(),
+        )
+        .await
+        .unwrap();
+    svc.store
+        .begin_file_publication(&unconfirmed)
+        .await
+        .unwrap();
+    assert_eq!(
+        svc.lookup_filesystem(actor(), unconfirmed.request_id)
+            .await
+            .unwrap()
+            .state,
+        "unconfirmed"
+    );
     assert!(svc.upload_locks.try_acquire(&file).await.unwrap().is_some());
     assert!(
         !std::fs::read_dir(&root.path)

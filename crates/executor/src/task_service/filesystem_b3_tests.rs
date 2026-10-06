@@ -12,6 +12,7 @@ use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 fn request(path: &Path, operation: FileSystemAction) -> FileSystemRequest {
     FileSystemRequest {
+        execution: Default::default(),
         request_id: RequestId::new(),
         path: path.to_str().unwrap().to_owned(),
         operation,

@@ -42,16 +42,32 @@ pub(crate) struct FileEngine {
     >,
 }
 impl FileEngine {
+    pub(crate) async fn reconcile(&self, mut reply: FileSystemReply) -> FileSystemReply {
+        use super::filesystem_io::{digest, load};
+        if let Some(meta) = &reply.metadata
+            && let Some(expected) = &meta.sha256
+            && let Ok(Some(_guard)) = self.upload_locks.try_acquire(Path::new(&reply.path)).await
+            && let Ok((bytes, _)) = load(Path::new(&reply.path)).await
+            && bytes.len() as u64 == meta.size
+            && &digest(&bytes) == expected
+        {
+            reply.state = "completed".into();
+            reply.error = None;
+        }
+        reply
+    }
     /// Execute mechanics only. Acceptance, quotas, history and the final record
     /// belong to the parent. Cancellation must settle before it releases locks.
     pub(crate) async fn execute(
         self,
         request: FileSystemRequest,
         payload: Vec<u8>,
+        context: Option<pab_protocol::ExecutionContext>,
         mut cancel: watch::Receiver<bool>,
     ) -> (FileSystemReply, Vec<u8>) {
         use super::filesystem::FileError;
         let mut reply = FileSystemReply::pending(&request);
+        reply.execution_context = context;
         if request.operation.is_bulk() {
             use std::sync::{
                 Arc,
@@ -334,6 +350,7 @@ mod tests {
                 .unwrap();
             let payload = b"updated";
             let request = FileSystemRequest {
+                execution: Default::default(),
                 request_id: RequestId::new(),
                 path: destination.to_str().unwrap().into(),
                 operation: FileSystemAction::Write {

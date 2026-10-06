@@ -13,16 +13,18 @@ pub(super) struct HashTestGate {
 }
 
 pub(super) struct HashJob {
-    cancel: watch::Sender<bool>,
-    _task: JoinHandle<()>,
+    pub(super) cancel: watch::Sender<bool>,
+    pub(super) _task: JoinHandle<()>,
 }
 
 impl TaskService {
     pub(super) async fn start_hash(
         &self,
         request: &FileSystemRequest,
+        context: pab_protocol::ExecutionContext,
     ) -> Result<FileSystemReply, TaskServiceError> {
         let mut reply = FileSystemReply::pending(request);
+        reply.execution_context = Some(context.clone());
         reply.progress = Some(FileHashProgress {
             completed_bytes: 0,
             total_bytes: 0,
@@ -84,6 +86,7 @@ impl TaskService {
         );
         // This acknowledges acceptance, never waits for hashing the file.
         let mut accepted = FileSystemReply::pending(request);
+        accepted.execution_context = Some(context);
         accepted.progress = Some(FileHashProgress {
             completed_bytes: 0,
             total_bytes: 0,

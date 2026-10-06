@@ -7,6 +7,7 @@ use pab_protocol::{
 use tokio::io::AsyncWriteExt;
 fn request(path: &Path, operation: FileSystemAction, payload: &[u8]) -> FileSystemRequest {
     FileSystemRequest {
+        execution: Default::default(),
         request_id: RequestId::new(),
         path: path.to_string_lossy().into_owned(),
         payload_size: payload.len() as u32,

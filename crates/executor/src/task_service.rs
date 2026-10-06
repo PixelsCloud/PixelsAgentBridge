@@ -35,6 +35,7 @@ mod filesystem_mkdir;
 mod filesystem_publish;
 mod filesystem_search;
 mod filesystem_text;
+mod filesystem_user;
 #[cfg(test)]
 mod filesystem_user_tests;
 pub(crate) mod git;
@@ -474,7 +475,7 @@ impl TaskService {
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
-                filesystem_schema_version: Some(4),
+                filesystem_schema_version: Some(5),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {

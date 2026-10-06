@@ -23,11 +23,46 @@ impl TaskStore {
         Ok(())
     }
 
+    #[cfg(test)]
     pub async fn accept_filesystem(
         &self,
         actor: OperatorRef,
         request: &FileSystemRequest,
         fingerprint: &str,
+    ) -> Result<Option<FileSystemReply>, TaskStoreError> {
+        self.accept_filesystem_with_context(actor, request, fingerprint, None)
+            .await
+    }
+
+    pub async fn existing_filesystem(
+        &self,
+        actor: OperatorRef,
+        request: &FileSystemRequest,
+        fingerprint: &str,
+    ) -> Result<Option<FileSystemReply>, TaskStoreError> {
+        let existing = sqlx::query("SELECT o.initiated_by_json, f.fingerprint FROM read_operations o LEFT JOIN filesystem_results f ON f.request_id = o.request_id WHERE o.request_id = ?")
+            .bind(request.request_id.to_string()).fetch_optional(&self.pool).await?;
+        if let Some(row) = existing {
+            if serde_json::from_str::<OperatorRef>(row.try_get("initiated_by_json")?)? != actor {
+                return Err(TaskStoreError::NotFound);
+            }
+            if row.try_get::<Option<String>, _>("fingerprint")?.as_deref() != Some(fingerprint) {
+                return Err(TaskStoreError::RequestConflict);
+            }
+            return self
+                .get_filesystem(actor, request.request_id)
+                .await
+                .map(Some);
+        }
+        Ok(None)
+    }
+
+    pub async fn accept_filesystem_with_context(
+        &self,
+        actor: OperatorRef,
+        request: &FileSystemRequest,
+        fingerprint: &str,
+        context: Option<&pab_protocol::ExecutionContext>,
     ) -> Result<Option<FileSystemReply>, TaskStoreError> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let existing = sqlx::query("SELECT o.initiated_by_json, o.state, f.fingerprint, f.reply_json FROM read_operations o LEFT JOIN filesystem_results f ON f.request_id = o.request_id WHERE o.request_id = ?")
@@ -58,11 +93,16 @@ impl TaskStore {
         }
         sqlx::query("INSERT INTO read_operations (request_id, initiated_by_json, kind, path, state, started_at_unix_ms) VALUES (?, ?, ?, ?, 'running', ?)")
             .bind(request.request_id.to_string()).bind(serde_json::to_string(&actor)?).bind(request.operation.kind()).bind(&request.path).bind(super::operation::now_unix_ms()).execute(&mut *tx).await?;
-        sqlx::query("INSERT INTO filesystem_results (request_id, fingerprint) VALUES (?, ?)")
-            .bind(request.request_id.to_string())
-            .bind(fingerprint)
-            .execute(&mut *tx)
-            .await?;
+        let mut pending = FileSystemReply::pending(request);
+        pending.execution_context = context.cloned();
+        sqlx::query(
+            "INSERT INTO filesystem_results (request_id, fingerprint, reply_json) VALUES (?, ?, ?)",
+        )
+        .bind(request.request_id.to_string())
+        .bind(fingerprint)
+        .bind(serde_json::to_string(&pending)?)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         Ok(None)
     }
@@ -81,6 +121,7 @@ impl TaskStore {
             serde_json::from_str::<FileSystemReply>(&json)?
         } else {
             FileSystemReply {
+                execution_context: None,
                 log: None,
                 patch_preview: None,
                 request_id: id,

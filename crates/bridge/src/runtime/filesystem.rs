@@ -121,6 +121,11 @@ impl RuntimeStore {
                 summary.state = "cancel_requested".to_owned();
             }
             let stored: FileSystemReply = serde_json::from_str(row.try_get("reply_json")?)?;
+            if stored.execution_context.is_some()
+                && summary.execution_context != stored.execution_context
+            {
+                return Err(RuntimeStoreError::SnapshotIdentityMismatch);
+            }
             match (&mut summary.progress, stored.progress) {
                 (Some(current), Some(old)) => {
                     current.completed_bytes = current.completed_bytes.max(old.completed_bytes);
@@ -217,9 +222,17 @@ impl BridgeRuntime {
                 // The remote may have published a mutation before the response
                 // was lost. Preserve its original ID and never replay it here.
                 let mut reply = FileSystemReply::pending(request);
+                let rejected_context = matches!(
+                    &error,
+                    crate::BridgeError::RemoteTask {
+                        code: pab_protocol::DeviceTaskErrorCode::EnvironmentChanged,
+                        ..
+                    }
+                );
                 reply.state = if (request.operation.mutates()
                     || matches!(request.operation, pab_protocol::FileSystemAction::Hash))
                     && !matches!(error, crate::BridgeError::UnsupportedFileSystem)
+                    && !rejected_context
                 {
                     "unconfirmed"
                 } else {
@@ -227,13 +240,20 @@ impl BridgeRuntime {
                 }
                 .to_owned();
                 reply.error = Some(pab_protocol::FileSystemError {
-                    code: if matches!(error, crate::BridgeError::UnsupportedFileSystem) {
+                    code: if rejected_context {
+                        "execution_context_unavailable"
+                    } else if matches!(error, crate::BridgeError::UnsupportedFileSystem) {
                         "unsupported"
                     } else {
                         "response_unavailable"
                     }
                     .to_owned(),
-                    phase: "receive".to_owned(),
+                    phase: if rejected_context {
+                        "accept"
+                    } else {
+                        "receive"
+                    }
+                    .to_owned(),
                     message: error.to_string(),
                 });
                 self.inner.store.save_filesystem_reply(&reply).await?;
@@ -356,6 +376,7 @@ mod tests {
         };
         let code = "123456789".parse().unwrap();
         let request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/source".into(),
             operation: FileSystemAction::Move {
@@ -440,6 +461,7 @@ mod tests {
         };
         let code = "123456789".parse().unwrap();
         let request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/hash.bin".to_owned(),
             operation: FileSystemAction::Hash,
@@ -451,12 +473,37 @@ mod tests {
             .await
             .unwrap();
         let mut reply = FileSystemReply::pending(&request);
+        reply.execution_context = Some(serde_json::from_value(serde_json::json!({
+            "os_family":"linux","os_name":"Linux","os_version":"test","architecture":"x86_64","execution_scope":"native","path_style":"posix","interpreter":null,"cwd":"/home/fixture","environment_revision":"user-v1:test",
+            "identity":{"mode":"user","account_id":"uid:23001","account_name":"fixture","home":"/home/fixture","primary_group":23001,"session_id":null,"logon_id":null,"environment_source":"native_account"}
+        })).unwrap());
+
         reply.progress = Some(pab_protocol::FileHashProgress {
             completed_bytes: 256,
             total_bytes: 1024,
             updated_at_unix_ms: 200,
         });
         store.save_filesystem_reply(&reply).await.unwrap();
+        for erased in [false, true] {
+            let mut altered = reply.clone();
+            if erased {
+                altered.execution_context = None;
+            } else {
+                altered
+                    .execution_context
+                    .as_mut()
+                    .unwrap()
+                    .identity
+                    .as_mut()
+                    .unwrap()
+                    .account_id = "uid:23002".into();
+            }
+            assert!(matches!(
+                store.save_filesystem_reply(&altered).await,
+                Err(RuntimeStoreError::SnapshotIdentityMismatch)
+            ));
+        }
+
         reply.state = "cancel_requested".to_owned();
         store.save_filesystem_reply(&reply).await.unwrap();
         reply.state = "running".to_owned();
@@ -472,6 +519,7 @@ mod tests {
             .unwrap()
             .1;
         assert_eq!(cached.state, "cancel_requested");
+        assert_eq!(cached.execution_context, reply.execution_context);
         assert_eq!(cached.progress.unwrap().completed_bytes, 256);
         let page = queue
             .operation_page(Some(code), None, None, 20)
@@ -533,6 +581,7 @@ mod tests {
             device_id: DeviceId::from_u128(3),
         };
         let mut request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/hash.bin".to_owned(),
             operation: FileSystemAction::Hash,
@@ -587,6 +636,7 @@ mod tests {
         };
         let code = "123456789".parse().unwrap();
         let request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/data.txt".to_owned(),
             operation: FileSystemAction::Write {
@@ -691,6 +741,7 @@ mod tests {
         };
         let code = "123456789".parse().unwrap();
         let request = FileSystemRequest {
+            execution: Default::default(),
             request_id: RequestId::new(),
             path: "/tmp/read.txt".to_owned(),
             operation: FileSystemAction::Stat {

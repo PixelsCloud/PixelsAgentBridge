@@ -101,7 +101,15 @@ impl TaskService {
                 "text payload hash mismatch",
             ));
         }
-        let (reply, bytes) = self.execute_filesystem(actor, &request, &payload).await?;
+        let (reply, bytes) = match self.execute_filesystem(actor, &request, &payload).await {
+            Ok(result) => result,
+            Err(error) => {
+                stream
+                    .send_json(&super::error_response(&error), timeout)
+                    .await?;
+                return Ok(());
+            }
+        };
         stream
             .send_frame_json(
                 &DeviceTaskResponse::FileSystem {
@@ -149,6 +157,34 @@ impl TaskService {
             && let Some(meta) = &reply.metadata
             && let Some(hash) = meta.sha256.as_deref()
         {
+            if let Some(identity) = reply
+                .execution_context
+                .as_ref()
+                .and_then(|c| c.identity.clone())
+            {
+                // Observe with the frozen native identity, not a fresh connection
+                // reference and never the service account after a user failure.
+                let prepared = tokio::task::spawn_blocking(move || {
+                    pab_os_control::execution::PreparedUser::from_observation(&identity)
+                })
+                .await;
+                if let Ok(Ok(prepared)) = prepared {
+                    if let Ok(observed) = crate::user_worker::filesystem::reconcile(
+                        &self.user_worker_executable()?,
+                        prepared,
+                        reply.clone(),
+                        self.file_coordinator(),
+                    )
+                    .await
+                    {
+                        reply = observed;
+                        if reply.state == "completed" {
+                            self.store.finish_filesystem(&reply).await?;
+                        }
+                    }
+                }
+                return Ok(reply);
+            }
             let lock = self.upload_locks.try_acquire(Path::new(&reply.path)).await;
             if let Ok(Some(_guard)) = lock
                 && let Ok((bytes, _)) = load(Path::new(&reply.path)).await
@@ -171,36 +207,66 @@ impl TaskService {
     ) -> Result<(FileSystemReply, Vec<u8>), TaskServiceError> {
         let fingerprint =
             digest(&serde_json::to_vec(request).map_err(crate::task_store::TaskStoreError::from)?);
-        if let Some(mut existing) = self
+        request
+            .validate()
+            .map_err(TaskServiceError::InvalidRequest)?;
+        if let Some(existing) = self
             .store
-            .accept_filesystem(actor, request, &fingerprint)
+            .existing_filesystem(actor, request, &fingerprint)
             .await?
         {
-            if existing.kind == "file_read" && existing.state == "completed" {
-                existing.state = "failed".to_owned();
-                existing.error = Some(
-                    FileError::new(
-                        "read_request_consumed",
-                        "read",
-                        "use a new read request and expected_hash for another range",
-                    )
-                    .0,
-                );
-            } else if existing.state == "unconfirmed"
-                || (pab_protocol::cancellable_filesystem_kind(&existing.kind)
-                    && matches!(existing.state.as_str(), "running" | "cancel_requested"))
-            {
-                existing = self.lookup_filesystem(actor, request.request_id).await?;
+            return self.filesystem_history(actor, existing).await;
+        }
+        let user = self.prepare_user(actor, request.execution).await?;
+        let mut context = self.execution_context.clone();
+        if let Some((_, identity)) = &user {
+            context.cwd = Some(identity.home.clone());
+            context.environment_revision = format!(
+                "user-v1:{}",
+                digest(
+                    &serde_json::to_vec(identity)
+                        .map_err(crate::task_store::TaskStoreError::from)?
+                )
+            );
+            context.identity = Some(identity.clone());
+        }
+        if let Some(existing) = self
+            .store
+            .accept_filesystem_with_context(actor, request, &fingerprint, Some(&context))
+            .await?
+        {
+            return self.filesystem_history(actor, existing).await;
+        }
+        if let Some((prepared, _)) = user {
+            if pab_protocol::cancellable_filesystem_kind(request.operation.kind()) {
+                return Ok((
+                    self.start_user_filesystem(actor, request.clone(), prepared, context)
+                        .await?,
+                    Vec::new(),
+                ));
             }
-            return Ok((existing, Vec::new()));
+            let (_cancel, receive) = tokio::sync::watch::channel(false);
+            let result = self
+                .run_user_filesystem(
+                    actor,
+                    request.clone(),
+                    payload.to_vec(),
+                    prepared,
+                    context,
+                    receive,
+                )
+                .await?;
+            self.store.finish_filesystem(&result.0).await?;
+            return Ok(result);
         }
         if matches!(request.operation, FileSystemAction::Hash) {
-            return Ok((self.start_hash(request).await?, Vec::new()));
+            return Ok((self.start_hash(request, context).await?, Vec::new()));
         }
         if request.operation.is_bulk() {
-            return Ok((self.start_bulk(request).await?, Vec::new()));
+            return Ok((self.start_bulk(request, context).await?, Vec::new()));
         }
         let mut reply = FileSystemReply::pending(request);
+        reply.execution_context = Some(context);
         let result = self
             .file_engine()
             .prepare_filesystem(request, payload, &mut reply)
@@ -218,6 +284,29 @@ impl TaskService {
         };
         self.store.finish_filesystem(&reply).await?;
         Ok((reply, bytes))
+    }
+    async fn filesystem_history(
+        &self,
+        actor: OperatorRef,
+        mut existing: FileSystemReply,
+    ) -> Result<(FileSystemReply, Vec<u8>), TaskServiceError> {
+        if existing.kind == "file_read" && existing.state == "completed" {
+            existing.state = "failed".into();
+            existing.error = Some(
+                FileError::new(
+                    "read_request_consumed",
+                    "read",
+                    "use a new read request and expected_hash for another range",
+                )
+                .0,
+            );
+        } else if existing.state == "unconfirmed"
+            || (pab_protocol::cancellable_filesystem_kind(&existing.kind)
+                && matches!(existing.state.as_str(), "running" | "cancel_requested"))
+        {
+            existing = self.lookup_filesystem(actor, existing.request_id).await?;
+        }
+        Ok((existing, Vec::new()))
     }
 }
 

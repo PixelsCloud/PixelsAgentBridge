@@ -12,9 +12,58 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Request {
-    operation: FileSystemRequest,
+    operation: Operation,
     identity: ExecutionIdentity,
+    context: pab_protocol::ExecutionContext,
     initial_cancel: bool,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
+enum Operation {
+    Execute { request: FileSystemRequest },
+    Reconcile { original: FileSystemReply },
+}
+impl Operation {
+    fn validate(&self) -> io::Result<()> {
+        match self {
+            Self::Execute { request } => request.validate().map_err(io::Error::other),
+            Self::Reconcile { original }
+                if original.state == "unconfirmed"
+                    && matches!(original.kind.as_str(), "file_write" | "file_patch") =>
+            {
+                Ok(())
+            }
+            _ => Err(io::Error::other("invalid file reconciliation")),
+        }
+    }
+    fn payload_size(&self) -> usize {
+        match self {
+            Self::Execute { request } => request.payload_size as usize,
+            _ => 0,
+        }
+    }
+    fn validate_payload(&self, bytes: &[u8]) -> io::Result<()> {
+        self.validate()?;
+        match self {
+            Self::Execute { request } => validate_payload(request, bytes),
+            Self::Reconcile { .. } if bytes.is_empty() => Ok(()),
+            _ => Err(io::Error::other("unexpected reconcile payload")),
+        }
+    }
+    fn validate_reply(&self, reply: &FileSystemReply) -> io::Result<()> {
+        let expected = match self {
+            Self::Execute { request } => FileSystemReply::pending(request),
+            Self::Reconcile { original } => original.clone(),
+        };
+        if reply.request_id != expected.request_id
+            || reply.path != expected.path
+            || reply.kind != expected.kind
+            || reply.destination != expected.destination
+        {
+            return Err(io::Error::other("file result request mismatch"));
+        }
+        Ok(())
+    }
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -51,21 +100,22 @@ fn validate_payload(request: &FileSystemRequest, payload: &[u8]) -> io::Result<(
     Ok(())
 }
 pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
-    request.operation.validate().map_err(io::Error::other)?;
+    request.operation.validate()?;
     if current_identity()?.observation(
         ExecutionMode::User,
         ExecutionEnvironmentSource::NativeAccount,
     )? != request.identity
+        || request.context.identity.as_ref() != Some(&request.identity)
     {
         return Err(io::Error::other("file execution identity mismatch"));
     }
     let payload = tokio::time::timeout(Duration::from_secs(30), async {
-        let mut payload = Vec::with_capacity(request.operation.payload_size as usize);
-        while payload.len() < request.operation.payload_size as usize {
+        let mut payload = Vec::with_capacity(request.operation.payload_size());
+        while payload.len() < request.operation.payload_size() {
             let frame = peer.receive().await?;
             if frame.tag != 5
                 || frame.bytes.is_empty()
-                || payload.len() + frame.bytes.len() > request.operation.payload_size as usize
+                || payload.len() + frame.bytes.len() > request.operation.payload_size()
             {
                 return Err(io::Error::other("invalid file input frame"));
             }
@@ -74,7 +124,7 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
         if !matches!(decode(peer.receive().await?)?, Control::FileSystemEnd) {
             return Err(io::Error::other("unexpected trailing file input"));
         }
-        validate_payload(&request.operation, &payload)?;
+        request.operation.validate_payload(&payload)?;
         Ok(payload)
     })
     .await
@@ -82,11 +132,16 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
     let (send, mut events) = mpsc::channel(8);
     let engine = FileEngine::worker(send);
     let (cancel, receive) = watch::channel(request.initial_cancel);
-    let mut work = AbortOnDrop(tokio::spawn(engine.execute(
-        request.operation,
-        payload,
-        receive,
-    )));
+    let mut work = AbortOnDrop(tokio::spawn(async move {
+        match request.operation {
+            Operation::Execute { request: operation } => {
+                engine
+                    .execute(operation, payload, Some(request.context), receive)
+                    .await
+            }
+            Operation::Reconcile { original } => (engine.reconcile(original).await, Vec::new()),
+        }
+    }));
     let result = async {
         loop {
             tokio::select! {
@@ -166,19 +221,68 @@ pub(crate) async fn execute(
     prepared: PreparedUser,
     request: FileSystemRequest,
     payload: Vec<u8>,
+    context: pab_protocol::ExecutionContext,
+    coordinator: FileCoordinator,
+    cancel: watch::Receiver<bool>,
+) -> io::Result<(FileSystemReply, Vec<u8>)> {
+    operate(
+        executable,
+        prepared,
+        Operation::Execute { request },
+        payload,
+        context,
+        coordinator,
+        cancel,
+    )
+    .await
+}
+pub(crate) async fn reconcile(
+    executable: &Path,
+    prepared: PreparedUser,
+    original: FileSystemReply,
+    coordinator: FileCoordinator,
+) -> io::Result<FileSystemReply> {
+    let context = original
+        .execution_context
+        .clone()
+        .ok_or_else(|| io::Error::other("missing original file identity"))?;
+    let (_send, cancel) = watch::channel(false);
+    operate(
+        executable,
+        prepared,
+        Operation::Reconcile { original },
+        Vec::new(),
+        context,
+        coordinator,
+        cancel,
+    )
+    .await
+    .map(|(reply, _)| reply)
+}
+async fn operate(
+    executable: &Path,
+    prepared: PreparedUser,
+    request: Operation,
+    payload: Vec<u8>,
+    context: pab_protocol::ExecutionContext,
     coordinator: FileCoordinator,
     mut cancel: watch::Receiver<bool>,
 ) -> io::Result<(FileSystemReply, Vec<u8>)> {
-    validate_payload(&request, &payload)?;
+    request.validate_payload(&payload)?;
     let identity = prepared.identity().observation(
         ExecutionMode::User,
         ExecutionEnvironmentSource::NativeAccount,
     )?;
     let (mut peer, child) = launch(executable, prepared).await?;
     let mut owned = OwnedWorker { child, coordinator };
-    let result = tokio::time::timeout(Duration::from_secs(30 * 60 + 30), async {
+    let timeout = if matches!(request, Operation::Reconcile { .. }) {
+        Duration::from_secs(15)
+    } else {
+        Duration::from_secs(30 * 60 + 30)
+    };
+    let result = tokio::time::timeout(timeout, async {
         let initial_cancel = *cancel.borrow();
-        peer.control(Control::FileSystem { request: Request { operation: request.clone(), identity, initial_cancel } }).await?;
+        peer.control(Control::FileSystem { request: Request { operation: request.clone(), identity, context: context.clone(), initial_cancel } }).await?;
         for chunk in payload.chunks(64 * 1024) { peer.send(5, chunk).await?; }
         peer.control(Control::FileSystemEnd).await?;
         let mut cancel_at = None;
@@ -209,13 +313,16 @@ pub(crate) async fn execute(
                 },
                 Reply::Unlock { id } => owned.coordinator.unlock(id)?,
                 Reply::Record { publication, snapshot } => {
-                    validate_reply(&snapshot, &request)?;
+                    if matches!(request, Operation::Reconcile { .. }) { return Err(io::Error::other("unexpected reconcile write record")); }
+                    request.validate_reply(&snapshot)?;
+                    if snapshot.execution_context.as_ref() != Some(&context) { return Err(io::Error::other("file progress execution identity mismatch")); }
                     if snapshot.state != "running" { return Err(io::Error::other("invalid file progress state")); }
                     owned.coordinator.record(publication, &snapshot).await?;
                     peer.control(Control::FileSystemAck { accepted: true, error: None }).await?;
                 },
                 Reply::Finished { snapshot } => {
-                    validate_reply(&snapshot, &request)?;
+                    request.validate_reply(&snapshot)?;
+                    if snapshot.execution_context.as_ref() != Some(&context) { return Err(io::Error::other("file result execution identity mismatch")); }
                     if !["completed", "failed", "cancelled", "unconfirmed"].contains(&snapshot.state.as_str()) || snapshot.data_size as usize > pab_protocol::MAX_TEXT_READ_BYTES {
                         return Err(io::Error::other("invalid file terminal result"));
                     }
@@ -260,14 +367,4 @@ pub(crate) async fn execute(
     drop(owned);
     cleanup?;
     result
-}
-fn validate_reply(reply: &FileSystemReply, request: &FileSystemRequest) -> io::Result<()> {
-    if reply.request_id != request.request_id
-        || reply.path != request.path
-        || reply.kind != request.operation.kind()
-        || reply.destination.as_deref() != request.operation.destination()
-    {
-        return Err(io::Error::other("file worker result identity mismatch"));
-    }
-    Ok(())
 }
