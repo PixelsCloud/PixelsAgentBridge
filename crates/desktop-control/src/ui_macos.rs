@@ -13,6 +13,42 @@ use pab_protocol::*;
 use std::collections::BTreeMap;
 
 pub struct MacUi;
+
+enum WindowMatch {
+    NotWindow,
+    OtherWindow,
+    Target,
+}
+
+fn select_window<T>(
+    windows: impl IntoIterator<Item = T>,
+    mut classify: impl FnMut(&T) -> Result<WindowMatch, &'static str>,
+) -> Result<T, &'static str> {
+    let mut target = None;
+    let mut saw_window = false;
+    for window in windows {
+        match classify(&window)? {
+            // Finder also exposes its desktop scroll area through AXWindows.
+            // It is neither a target window nor evidence that other windows
+            // are unavailable. Never traverse it as the requested root.
+            WindowMatch::NotWindow => continue,
+            WindowMatch::OtherWindow => saw_window = true,
+            WindowMatch::Target => {
+                saw_window = true;
+                if target.is_some() {
+                    return Err("ambiguous_window");
+                }
+                target = Some(window);
+            }
+        }
+    }
+    target.ok_or(if saw_window {
+        "ambiguous_window"
+    } else {
+        "interactive_window_unavailable"
+    })
+}
+
 fn error(code: i32) -> &'static str {
     match code {
         -25211 => "accessibility_permission_required",
@@ -257,13 +293,12 @@ impl UiBackend for MacUi {
         if truncated {
             return Err("window_budget");
         }
-        let mut candidates = vec![];
-        for window in windows {
+        let target = select_window(windows, |window| {
             if text(&window, "AXRole")? != "AXWindow" {
-                return Err("interactive_window_unavailable");
+                return Ok(WindowMatch::NotWindow);
             }
             if text(&window, "AXTitle").ok().as_deref() != Some(&title) {
-                continue;
+                return Ok(WindowMatch::OtherWindow);
             }
             if let Ok(r) = rect(&window) {
                 if (r.x as i64 - expected.x as i64).abs() < 2
@@ -271,15 +306,13 @@ impl UiBackend for MacUi {
                     && r.width.abs_diff(expected.width) < 2
                     && r.height.abs_diff(expected.height) < 2
                 {
-                    candidates.push(window);
+                    return Ok(WindowMatch::Target);
                 }
             }
-        }
-        if candidates.len() != 1 {
-            return Err("ambiguous_window");
-        }
+            Ok(WindowMatch::OtherWindow)
+        })?;
         verify_process(ticket)?;
-        Ok(candidates.remove(0))
+        Ok(target)
     }
     fn same(&self, a: &AXUIElement, b: &AXUIElement) -> bool {
         a == b
@@ -448,5 +481,53 @@ impl UiBackend for MacUi {
             UiAction::Collapse => set(node, "AXExpanded", CFBoolean::false_value().as_CFType()),
             UiAction::Focus => set(node, "AXFocused", CFBoolean::true_value().as_CFType()),
         }
+    }
+}
+
+#[cfg(test)]
+mod window_selection_tests {
+    use super::*;
+
+    fn classify(item: &&str) -> Result<WindowMatch, &'static str> {
+        match *item {
+            "target" => Ok(WindowMatch::Target),
+            "other" => Ok(WindowMatch::OtherWindow),
+            "scroll_area" | "application" => Ok(WindowMatch::NotWindow),
+            _ => Err("provider_unresponsive"),
+        }
+    }
+
+    #[test]
+    fn finder_non_window_entries_do_not_invalidate_the_unique_target() {
+        for items in [
+            ["scroll_area", "target", "other"],
+            ["target", "other", "scroll_area"],
+        ] {
+            assert_eq!(select_window(items, classify), Ok("target"));
+        }
+    }
+
+    #[test]
+    fn non_windows_cannot_become_roots_or_hide_ambiguity() {
+        assert_eq!(
+            select_window(["scroll_area", "application"], classify),
+            Err("interactive_window_unavailable")
+        );
+        assert_eq!(
+            select_window(["scroll_area", "other"], classify),
+            Err("ambiguous_window")
+        );
+        assert_eq!(
+            select_window(["target", "scroll_area", "target"], classify),
+            Err("ambiguous_window")
+        );
+    }
+
+    #[test]
+    fn provider_error_does_not_turn_a_partial_scan_into_a_unique_match() {
+        assert_eq!(
+            select_window(["target", "error"], classify),
+            Err("provider_unresponsive")
+        );
     }
 }

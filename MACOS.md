@@ -2,6 +2,11 @@
 
 ## 当前执行状态（2026-10-06）
 
+Finder窗口查询问题已修复并实机验收：AXWindows混入的AXScrollArea不再导致整个
+查询失败，仍严格要求目标AXWindow唯一且符合进程/标题/几何信息。Mac已安装1.2.26，
+原签名和授权保留，Finder/Terminal查询及21项正式控件回归通过；ARM/Intel完整包已生成。
+见[修复报告](acceptance/finder-window-fix-2026-10-06.md)。下方1.2.25记录为修复前交付。
+
 最新控件自动化已实现：`pab_ui_query/get/action/wait`，使用 AX 开源绑定和 helper 所属的
 隔离 worker。Mac ARM/Intel 1.2.25 完整包已生成；ARM 已安装，固定签名、设备身份和
 已有权限保留，安装后的控件闭环两轮及原生27项基础回归通过。Intel仅构建/签名检查。

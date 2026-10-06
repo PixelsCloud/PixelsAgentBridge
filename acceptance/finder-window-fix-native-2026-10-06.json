@@ -1,0 +1,155 @@
+{
+  "version": "1.2.26",
+  "queries": [
+    {
+      "app": "Finder",
+      "operation_id": "0c7a3160-50d2-4dcb-83ee-9a5e155c6a57",
+      "state": "completed",
+      "error": null,
+      "returned": 50,
+      "visited": 50,
+      "truncated": true,
+      "stop_reason": "result_budget",
+      "values_omitted": true
+    },
+    {
+      "app": "Terminal",
+      "operation_id": "ffbf1a14-36f0-4600-a8db-8520b6c6c428",
+      "state": "completed",
+      "error": null,
+      "returned": 12,
+      "visited": 12,
+      "truncated": false,
+      "stop_reason": null,
+      "values_omitted": true
+    }
+  ],
+  "fixture": {
+    "source": "native_pixels_host",
+    "device_code": "603527578",
+    "round": 1,
+    "cases": [
+      {
+        "tool": "pab_list_windows",
+        "operation_id": "ade3f3e4-0def-4545-bba2-a5271f3c79f6",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_query",
+        "operation_id": "9ef296de-b0a8-4575-8cb1-486cb70d6b36",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_get",
+        "operation_id": "26b46cf6-5100-4f2f-9798-eaf3a43ae1a3",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "f9118389-5881-4ebe-96a0-eb24611afa2c",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "df035556-ce7d-4502-b15e-3e7af6eb2c74",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "3db4d3a9-ccd9-4669-a82f-0aa7e345518e",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "af1138ab-b92a-4fda-8bb4-3f42b57e2d2d",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "9d8d5af1-0e7b-410c-8ffb-a7abe4fa91d3",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "3b755374-902d-4311-b227-01c61e46ce28",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "b16d561d-ccf6-4771-9860-599510d97ef2",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "7194cf9e-a72e-4f30-9474-d384721455bc",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "67483240-a2e7-4ff5-991a-2a55cd41c184",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_get",
+        "operation_id": "b952e4bd-33d5-4777-a22c-c51d5de07181",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_get",
+        "operation_id": "56b604b8-48a8-4779-8357-b022d3785f65",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "a4c0f578-f184-47e8-8d74-922e22bb02b1",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_wait",
+        "operation_id": "cc45f962-8d7c-4f4f-89be-ea3f73d1b2e4",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_wait",
+        "operation_id": "814d3449-3830-46c1-ab2c-ffb7191a513c",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_wait",
+        "operation_id": "06abe22e-ef61-481c-b17a-668d1707f855",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "2e7a7211-1997-4f84-b6ff-262626262626",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_action",
+        "operation_id": "2e7a7211-1997-4f84-b6ff-262626262626",
+        "status": "pass"
+      },
+      {
+        "tool": "pab_ui_get",
+        "operation_id": "850fe4f3-b8b4-4208-af78-ec39906d668b",
+        "status": "pass"
+      }
+    ],
+    "started_at": "2026-10-06T08:31:45.234Z",
+    "fixture_window": "2f762431-1819-4fba-b2b6-091b1409ed60",
+    "fixture_input": "8ffdf49e-41c1-4fe8-bdf1-b596f21f5d7a",
+    "actual_application_verified": true,
+    "status": "pass",
+    "finished_at": "2026-10-06T08:31:48.212Z"
+  },
+  "packages": {
+    "aarch64": {
+      "bytes": 73381000,
+      "sha256": "34b4e7e9c3140662288c6c67c19f84f122ae60e802e36650f23bcf9c546edbd6"
+    },
+    "x86_64": {
+      "bytes": 74287886,
+      "sha256": "11a57fe64382f11668e8efd054abb39afc20cc9e1df0dd7630e8982af33e9cb7"
+    }
+  }
+}
