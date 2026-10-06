@@ -192,21 +192,12 @@ async fn operate(
         }
     }).await.map_err(io::Error::other).and_then(|v|v);
     drop(peer);
-    // Keep the parent repository lock through cleanup, even on an IPC error.
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-    let cleanup = async {
-        while child.try_wait()?.is_none() {
-            if tokio::time::Instant::now() >= deadline {
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Git worker exit not confirmed",
-                ));
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-        child.terminate()
-    }
-    .await;
+    // Finished is the worker's final response; no further Git work is allowed.
+    // Kill its owned tree before releasing the repository lock. On Windows,
+    // inherited pipe reads can keep the worker runtime alive while a credential
+    // helper continues running, so waiting for a graceful exit first is unsafe.
+    // The same cleanup is required when the IPC exchange fails or times out.
+    let cleanup = child.terminate();
     if cleanup.is_err() {
         let _ = child.terminate();
     }

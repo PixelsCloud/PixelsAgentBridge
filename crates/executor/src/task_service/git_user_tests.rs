@@ -475,3 +475,227 @@ async fn native_user_git_acceptance() {
         assert_ne!(owners[1], "S-1-5-18");
     }
 }
+
+#[tokio::test]
+#[ignore = "requires native user worker and Git; owns a generated user-home repository and loopback HTTP listener"]
+async fn native_user_git_slow_credential_cleanup() {
+    use pab_os_control::execution::PreparedUser;
+    let user: u32 = std::env::var("PAB_EXECUTION_TEST_USER")
+        .unwrap()
+        .parse()
+        .unwrap();
+    #[cfg(windows)]
+    let prepared = PreparedUser::for_session(user).unwrap();
+    #[cfg(unix)]
+    let prepared = PreparedUser::for_uid(user).unwrap();
+    let expected = prepared.identity().clone();
+    let dir = tempfile::tempdir().unwrap();
+    let mut svc = service(dir.path()).await.for_ui_connection();
+    svc.worker_executable = Some(
+        std::env::var_os("PAB_EXECUTION_TEST_WORKER")
+            .unwrap()
+            .into(),
+    );
+    let inventory = result(
+        &svc,
+        RequestId::new(),
+        SystemQuery::ExecutionContexts {
+            user: Some(expected.account_name.clone()),
+            include_system: true,
+            limit: 100,
+        },
+    )
+    .await;
+    let Some(SystemQueryData::ExecutionContexts { entries, .. }) = inventory.data else {
+        panic!("no accounts")
+    };
+    let selected = entries
+        .iter()
+        .find(|e| {
+            e.mode == ExecutionMode::User
+                && e.account_id.as_ref() == Some(&expected.account_id)
+                && e.session_id == expected.session_id.map(|n| n.to_string())
+        })
+        .unwrap()
+        .selection
+        .unwrap();
+    let root = Workspace {
+        path: expected
+            .home
+            .join(format!("pab-git-acceptance-{}", RequestId::new())),
+        home: expected.home.clone(),
+    };
+    let repo = root.path.join("repo");
+    command(
+        &svc,
+        selected,
+        "git",
+        vec!["init".into(), repo.to_str().unwrap().into()],
+        None,
+    )
+    .await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        let app = axum::Router::new().fallback(|| async {
+            (
+                axum::http::StatusCode::UNAUTHORIZED,
+                [(
+                    axum::http::header::WWW_AUTHENTICATE,
+                    "Basic realm=\"PAB fixture\"",
+                )],
+                "",
+            )
+        });
+        axum::serve(listener, app).await.unwrap();
+    });
+    command(
+        &svc,
+        selected,
+        "git",
+        vec![
+            "remote".into(),
+            "add".into(),
+            "slow".into(),
+            format!("http://127.0.0.1:{port}/fixture.git"),
+        ],
+        Some(&repo),
+    )
+    .await;
+    // Empty helper resets inherited helpers. Only the generated repository is
+    // configured; no real user's credential store or global config is touched.
+    command(
+        &svc,
+        selected,
+        "git",
+        vec!["config".into(), "credential.helper".into(), "".into()],
+        Some(&repo),
+    )
+    .await;
+    for mode in ["cancel", "deadline"] {
+        let started = repo.join(format!(".git/helper-{mode}-started"));
+        let leaked = repo.join(format!(".git/helper-{mode}-leaked"));
+        let helper = format!(
+            "!f() {{ printf x >> .git/helper-{mode}-started; sleep 4; printf leaked > .git/helper-{mode}-leaked; }}; f"
+        );
+        // Replace this fixture's prior helper, retaining the explicit reset.
+        command(
+            &svc,
+            selected,
+            "git",
+            vec![
+                "config".into(),
+                "--replace-all".into(),
+                "credential.helper".into(),
+                "".into(),
+            ],
+            Some(&repo),
+        )
+        .await;
+        command(
+            &svc,
+            selected,
+            "git",
+            vec![
+                "config".into(),
+                "--add".into(),
+                "credential.helper".into(),
+                helper,
+            ],
+            Some(&repo),
+        )
+        .await;
+        let id = RequestId::new();
+        let mut q = query(
+            &repo,
+            selected,
+            GitAction::Fetch {
+                remote: "slow".into(),
+                branch: None,
+            },
+        );
+        if let SystemQuery::Git { query } = &mut q {
+            query.timeout_ms = if mode == "deadline" { 2000 } else { 15000 };
+        }
+        assert_eq!(
+            svc.system_query(actor(), id, q.clone())
+                .await
+                .unwrap()
+                .state,
+            "running"
+        );
+        let ready_by = tokio::time::Instant::now() + Duration::from_secs(10);
+        while !started.exists() {
+            let current = svc.get_system_query(actor(), id).await.unwrap();
+            assert_eq!(current.state, "running", "helper never ran: {current:?}");
+            assert!(
+                tokio::time::Instant::now() < ready_by,
+                "credential helper readiness deadline"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            assert_eq!(std::fs::metadata(&started).unwrap().uid(), user);
+        }
+        if mode == "cancel" {
+            assert_eq!(
+                svc.cancel_system_query(actor(), id).await.unwrap().state,
+                "cancel_requested"
+            );
+        }
+        let finish_by = tokio::time::Instant::now() + Duration::from_secs(7);
+        let finished = loop {
+            let current = svc.get_system_query(actor(), id).await.unwrap();
+            if current.state != "running" {
+                break current;
+            }
+            assert!(
+                tokio::time::Instant::now() < finish_by,
+                "credential operation did not finish: {current:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        };
+        assert_eq!(finished.state, "unconfirmed", "{finished:?}");
+        assert_eq!(
+            finished
+                .execution_context
+                .as_ref()
+                .unwrap()
+                .identity
+                .as_ref()
+                .unwrap()
+                .account_id,
+            expected.account_id
+        );
+        // Observe beyond the helper's delayed write. Returning a bounded error
+        // while leaving its descendant alive must fail this test.
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert!(
+            !leaked.exists(),
+            "{mode}: credential helper survived worker cleanup"
+        );
+        assert_eq!(std::fs::read(&started).unwrap(), b"x");
+        let duplicate = svc.system_query(actor(), id, q).await.unwrap();
+        assert_eq!(
+            duplicate.state, "unconfirmed",
+            "original uncertain fetch must not replay"
+        );
+        assert_eq!(std::fs::read(&started).unwrap(), b"x");
+        let status = result(
+            &svc,
+            RequestId::new(),
+            query(&repo, selected, GitAction::Status { limit: 10 }),
+        )
+        .await;
+        assert_eq!(
+            status.state, "completed",
+            "repository lock leaked: {status:?}"
+        );
+        println!(
+            "SLOW_CREDENTIAL {mode}=pass user_identity=pass descendants=clean duplicate=no_replay repo_lock=released"
+        );
+    }
+    server.abort();
+}
