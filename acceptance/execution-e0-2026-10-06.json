@@ -1,0 +1,200 @@
+{
+  "date": "2026-10-06",
+  "stage": "E0 native identity / PTY prototype (not final MCP API acceptance)",
+  "windows": {
+    "task_id": "87a03132-7498-476b-b693-35afd3632925",
+    "artifact_directory": "C:\\Users\\Administrator\\.pab-execution-probe-1791295230545-37248",
+    "child_pid": 35824,
+    "negative_checks": [
+      "relative_worker_rejected",
+      "missing_worker_rejected",
+      "unknown_session_rejected",
+      "worker_termination_confirmed_and_repeatable"
+    ],
+    "result": {
+      "cwd": "C:\\Users\\Administrator",
+      "file_owner": {
+        "validation": "inspect file ACL with native security API after worker completion"
+      },
+      "home": "C:\\Users\\Administrator",
+      "identity": {
+        "account_id": "S-1-5-21-651462275-30253513-3142702281-500",
+        "account_name": "WIN-RASS8RC6V3H\\Administrator",
+        "home": "C:\\Users\\Administrator",
+        "logon_id": "00000000:00103b90",
+        "primary_group": null,
+        "session_id": 1
+      },
+      "payload": "用户 空格 \\\" 引号\\",
+      "pty": "\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[H\u001b]0;C:\\Windows\\System32\\whoami.exe\u0007\u001b[?25h\u001b[?25l\r\n用户信息\r\n----------------\u001b[5;1H用户名                        SID\u001b[39X\r\n============================= ==========================================\r\nwin-rass8rc6v3h\\administrator S-1-5-21-651462275-30253513-3142702281-500\r\n\u001b[?25h",
+      "service_environment_removed": true
+    },
+    "service": {
+      "account_id": "S-1-5-18",
+      "account_name": "NT AUTHORITY\\SYSTEM",
+      "home": "C:\\Windows\\system32\\config\\systemprofile",
+      "logon_id": "00000000:000003e7",
+      "primary_group": null,
+      "session_id": 0
+    },
+    "status": "passed",
+    "target": {
+      "account_id": "S-1-5-21-651462275-30253513-3142702281-500",
+      "account_name": "WIN-RASS8RC6V3H\\Administrator",
+      "home": "C:\\Users\\Administrator",
+      "logon_id": "00000000:00103b90",
+      "primary_group": null,
+      "session_id": 1
+    }
+  },
+  "windows_second_session": {
+    "task_id": "8467ef60-6d12-4b67-95e5-e2e80e62795e",
+    "artifact_directory": "C:\\Users\\pxrdp_2c3153bd5fff41.WIN-RASS8RC6V3H\\.pab-execution-probe-1791294807798-39416",
+    "child_pid": 38848,
+    "result": {
+      "cwd": "C:\\Users\\pxrdp_2c3153bd5fff41.WIN-RASS8RC6V3H",
+      "file_owner": {
+        "validation": "inspect file ACL with native security API after worker completion"
+      },
+      "home": "C:\\Users\\pxrdp_2c3153bd5fff41.WIN-RASS8RC6V3H",
+      "identity": {
+        "account_id": "S-1-5-21-651462275-30253513-3142702281-1099",
+        "account_name": "WIN-RASS8RC6V3H\\pxrdp_2c3153bd5fff41",
+        "home": "C:\\Users\\pxrdp_2c3153bd5fff41.WIN-RASS8RC6V3H",
+        "logon_id": "00000000:01a168f4",
+        "primary_group": null,
+        "session_id": 2
+      },
+      "payload": {
+        "Windows": [
+          29992,
+          25143,
+          32,
+          31354,
+          26684,
+          32,
+          92,
+          34,
+          32,
+          24341,
+          21495,
+          92
+        ]
+      },
+      "pty": "\u001b[m\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\r\n\u001b[K\u001b[H\u001b]0;C:\\Windows\\System32\\whoami.exe\u0007\u001b[?25h\u001b[?25l\r\n用户信息\r\n----------------\u001b[5;1H用户名                               SID\u001b[40X\r\n==================================== ===========================================\r\nwin-rass8rc6v3h\\pxrdp_2c3153bd5fff41 S-1-5-21-651462275-30253513-3142702281-1099\r\n\u001b[?25h",
+      "service_environment_removed": true
+    },
+    "service": {
+      "account_id": "S-1-5-18",
+      "account_name": "NT AUTHORITY\\SYSTEM",
+      "home": "C:\\Windows\\system32\\config\\systemprofile",
+      "logon_id": "00000000:000003e7",
+      "primary_group": null,
+      "session_id": 0
+    },
+    "status": "passed",
+    "target": {
+      "account_id": "S-1-5-21-651462275-30253513-3142702281-1099",
+      "account_name": "WIN-RASS8RC6V3H\\pxrdp_2c3153bd5fff41",
+      "home": "C:\\Users\\pxrdp_2c3153bd5fff41.WIN-RASS8RC6V3H",
+      "logon_id": "00000000:01a168f4",
+      "primary_group": null,
+      "session_id": 2
+    }
+  },
+  "macos": {
+    "task_id": "72b6079f-26c9-42a3-b58d-c0e46631af9f",
+    "artifact_directory": "/Users/huayang/.pab-execution-probe-1791295230110-12618",
+    "child_pid": 12624,
+    "negative_checks": [
+      "relative_worker_rejected",
+      "missing_worker_rejected",
+      "unknown_account_rejected",
+      "service_only_cwd_rejected_after_switch",
+      "worker_termination_confirmed_and_repeatable"
+    ],
+    "result": {
+      "cwd": "/Users/huayang",
+      "file_owner": {
+        "gid": 20,
+        "uid": 501
+      },
+      "home": "/Users/huayang",
+      "identity": {
+        "account_id": "uid:501",
+        "account_name": "huayang",
+        "home": "/Users/huayang",
+        "logon_id": null,
+        "primary_group": 20,
+        "session_id": null
+      },
+      "payload": "用户 空格 \\\" 引号\\",
+      "pty": "uid=501(huayang) gid=20(staff) groups=20(staff),12(everyone),61(localaccounts),79(_appserverusr),80(admin),81(_appserveradm),33(_appstore),98(_lpadmin),100(_lpoperator),204(_developer),250(_analyticsusers),395(com.apple.access_ftp),398(com.apple.access_screensharing),399(com.apple.access_ssh),400(com.apple.access_remote_ae),701(com.apple.sharepoint.group.1)\r\n",
+      "service_environment_removed": true
+    },
+    "service": {
+      "account_id": "uid:0",
+      "account_name": "root",
+      "home": "/var/root",
+      "logon_id": null,
+      "primary_group": 0,
+      "session_id": null
+    },
+    "status": "passed",
+    "target": {
+      "account_id": "uid:501",
+      "account_name": "huayang",
+      "home": "/Users/huayang",
+      "logon_id": null,
+      "primary_group": 20,
+      "session_id": null
+    }
+  },
+  "linux_headless_no_logind": {
+    "artifact_directory": "/home/pabprobe/.pab-execution-probe-1791295204706-393",
+    "child_pid": 397,
+    "negative_checks": [
+      "relative_worker_rejected",
+      "missing_worker_rejected",
+      "unknown_account_rejected",
+      "service_only_cwd_rejected_after_switch",
+      "worker_termination_confirmed_and_repeatable"
+    ],
+    "result": {
+      "cwd": "/home/pabprobe",
+      "file_owner": {
+        "gid": 23001,
+        "uid": 23001
+      },
+      "home": "/home/pabprobe",
+      "identity": {
+        "account_id": "uid:23001",
+        "account_name": "pabprobe",
+        "home": "/home/pabprobe",
+        "logon_id": null,
+        "primary_group": 23001,
+        "session_id": null
+      },
+      "payload": "用户 空格 \\\" 引号\\",
+      "pty": "uid=23001(pabprobe) gid=23001(pabprobe) groups=23001(pabprobe),23002(pabextra)\r\n",
+      "service_environment_removed": true
+    },
+    "service": {
+      "account_id": "uid:0",
+      "account_name": "root",
+      "home": "/root",
+      "logon_id": null,
+      "primary_group": 0,
+      "session_id": null
+    },
+    "status": "passed",
+    "target": {
+      "account_id": "uid:23001",
+      "account_name": "pabprobe",
+      "home": "/home/pabprobe",
+      "logon_id": null,
+      "primary_group": 23001,
+      "session_id": null
+    }
+  }
+}

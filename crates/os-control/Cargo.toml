@@ -7,10 +7,11 @@ rust-version.workspace = true
 [dependencies]
 pab-protocol = { path = "../protocol" }
 tokio.workspace = true
+serde.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "=0.8.1"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Services", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Services", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_Security", "Win32_Security_Authorization", "Win32_System_RemoteDesktop", "Win32_System_Environment"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 futures-util = "0.3"
@@ -19,7 +20,11 @@ zbus_systemd = { version = "=0.26100.0", default-features = false, features = ["
 
 [dev-dependencies]
 tempfile = "3"
+serde_json.workspace = true
+pab-terminal = { path = "../terminal" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-libc = "0.2"
 plist = "1"

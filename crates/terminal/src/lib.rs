@@ -229,7 +229,17 @@ impl TerminalSession {
     }
 
     pub fn close(&self) -> Result<(), TerminalError> {
-        self.child.lock().unwrap().kill().map_err(TerminalError::Io)
+        let mut child = self.child.lock().unwrap();
+        if child.try_wait().map_err(TerminalError::Io)?.is_some() {
+            return Ok(());
+        }
+        match child.kill() {
+            Ok(()) => Ok(()),
+            // The child may exit between try_wait and kill. Recheck the actual
+            // child instead of treating ESRCH as a failed terminal close.
+            Err(_) if child.try_wait().ok().flatten().is_some() => Ok(()),
+            Err(error) => Err(TerminalError::Io(error)),
+        }
     }
 }
 
@@ -367,6 +377,10 @@ mod tests {
             String::from_utf8_lossy(&output)
         );
         assert!(session.read(output.len() as u64, MAX_READ_BYTES).ended);
+        // A naturally exited/reaped child is already closed. In particular,
+        // Unix kill must not turn this successful session into an ESRCH error.
+        session.close().unwrap();
+        session.close().unwrap();
     }
 
     #[cfg(windows)]
