@@ -1,6 +1,6 @@
 [package]
 name = "pab-desktop-control"
-version = "1.2.20"
+version = "1.2.22"
 edition.workspace = true
 rust-version.workspace = true
 [dependencies]
