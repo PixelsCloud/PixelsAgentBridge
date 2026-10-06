@@ -1,6 +1,6 @@
 [package]
 name = "pab-agent-core"
-version = "1.2.23"
+version = "1.2.24"
 edition.workspace = true
 rust-version.workspace = true
 
