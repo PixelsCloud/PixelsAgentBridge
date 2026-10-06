@@ -3,6 +3,7 @@ use pab_protocol::*;
 use std::collections::HashMap;
 mod batch;
 pub mod ui_worker;
+pub mod ui_registry;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;
 mod monitor_input;
