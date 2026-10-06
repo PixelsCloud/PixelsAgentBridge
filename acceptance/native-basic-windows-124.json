@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "run_id": "a2689ed8-2e26-4b6e-a953-080000000002",
+  "suite": "live-basic",
+  "source": "native_pixels_host",
+  "device_code": "211399447",
+  "os": "windows",
+  "started_at": "2026-10-06T06:54:26.537Z",
+  "cases": [
+    {
+      "case": "create isolated fixture",
+      "tool": "pab_mkdir",
+      "started_at": "2026-10-06T06:54:26.537Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000001"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:26.609Z"
+    },
+    {
+      "case": "Unicode path and UTF-8 write",
+      "tool": "pab_file_write",
+      "started_at": "2026-10-06T06:54:26.609Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000002"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:26.700Z"
+    },
+    {
+      "case": "read exact Unicode content",
+      "tool": "pab_file_read",
+      "started_at": "2026-10-06T06:54:26.700Z",
+      "status": "pass",
+      "operation_ids": [
+        "901f4dab-bd19-46a8-b767-1612cf5ef1c7"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:26.788Z"
+    },
+    {
+      "case": "reject overwrite conflict",
+      "tool": "pab_file_write",
+      "started_at": "2026-10-06T06:54:26.788Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000003"
+      ],
+      "evidence": "Expected rejection observed",
+      "finished_at": "2026-10-06T06:54:26.881Z"
+    },
+    {
+      "case": "reject stale hash",
+      "tool": "pab_file_patch",
+      "started_at": "2026-10-06T06:54:26.881Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000004"
+      ],
+      "evidence": "Expected rejection observed",
+      "finished_at": "2026-10-06T06:54:26.973Z"
+    },
+    {
+      "case": "dry-run patch",
+      "tool": "pab_file_patch",
+      "started_at": "2026-10-06T06:54:26.973Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000005"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.064Z"
+    },
+    {
+      "case": "dry-run preserves file",
+      "tool": "pab_file_read",
+      "started_at": "2026-10-06T06:54:27.064Z",
+      "status": "pass",
+      "operation_ids": [
+        "66486a16-66c5-48bb-8493-e1038f345fa4"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.154Z"
+    },
+    {
+      "case": "apply hash guarded patch",
+      "tool": "pab_file_patch",
+      "started_at": "2026-10-06T06:54:27.154Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000006"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.207Z"
+    },
+    {
+      "case": "read tail after patch",
+      "tool": "pab_file_read",
+      "started_at": "2026-10-06T06:54:27.207Z",
+      "status": "pass",
+      "operation_ids": [
+        "b8c5978d-0b29-43c2-84bc-ecb096c6925b"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.314Z"
+    },
+    {
+      "case": "hash modified file",
+      "tool": "pab_file_hash",
+      "started_at": "2026-10-06T06:54:27.314Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000007"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.458Z"
+    },
+    {
+      "case": "regex content search",
+      "tool": "pab_file_search",
+      "started_at": "2026-10-06T06:54:27.458Z",
+      "status": "pass",
+      "operation_ids": [
+        "eb9d0411-d44d-4b68-8f11-508616a6dabc"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.547Z"
+    },
+    {
+      "case": "copy file",
+      "tool": "pab_file_copy",
+      "started_at": "2026-10-06T06:54:27.547Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000008"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.709Z"
+    },
+    {
+      "case": "copied hash",
+      "tool": "pab_file_hash",
+      "started_at": "2026-10-06T06:54:27.709Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000009"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.836Z"
+    },
+    {
+      "case": "move file",
+      "tool": "pab_file_move",
+      "started_at": "2026-10-06T06:54:27.836Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000010"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:27.991Z"
+    },
+    {
+      "case": "moved content",
+      "tool": "pab_file_read",
+      "started_at": "2026-10-06T06:54:27.991Z",
+      "status": "pass",
+      "operation_ids": [
+        "67c8a35c-b50f-45ea-9613-b02bb953116d"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.055Z"
+    },
+    {
+      "case": "old move path absent",
+      "tool": "pab_file_stat",
+      "started_at": "2026-10-06T06:54:28.055Z",
+      "status": "pass",
+      "operation_ids": [
+        "6b588c6a-65c3-417b-b57d-959d80659623"
+      ],
+      "evidence": "Expected rejection observed",
+      "finished_at": "2026-10-06T06:54:28.155Z"
+    },
+    {
+      "case": "archive create",
+      "tool": "pab_archive_create",
+      "started_at": "2026-10-06T06:54:28.155Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000011"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.313Z"
+    },
+    {
+      "case": "archive extract",
+      "tool": "pab_archive_extract",
+      "started_at": "2026-10-06T06:54:28.313Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000012"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.460Z"
+    },
+    {
+      "case": "archive content verified",
+      "tool": "pab_file_read",
+      "started_at": "2026-10-06T06:54:28.460Z",
+      "status": "pass",
+      "operation_ids": [
+        "7b76d6b8-8faa-4350-91a8-f98111dbb4b4"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.541Z"
+    },
+    {
+      "case": "empty file round trip",
+      "tool": "pab_file_write",
+      "started_at": "2026-10-06T06:54:28.541Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000013"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.632Z"
+    },
+    {
+      "case": "pab_system_info",
+      "tool": "pab_system_info",
+      "started_at": "2026-10-06T06:54:28.632Z",
+      "status": "pass",
+      "operation_ids": [
+        "5b5b9030-f282-4b75-b3c1-fbb53f4524e4"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.733Z"
+    },
+    {
+      "case": "pab_list_disks",
+      "tool": "pab_list_disks",
+      "started_at": "2026-10-06T06:54:28.733Z",
+      "status": "pass",
+      "operation_ids": [
+        "d912f585-d73c-43fd-9546-afaa8d0d322a"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.787Z"
+    },
+    {
+      "case": "pab_list_processes",
+      "tool": "pab_list_processes",
+      "started_at": "2026-10-06T06:54:28.787Z",
+      "status": "pass",
+      "operation_ids": [
+        "3286edf0-93e0-41fd-ad8b-11d2dcbd9516"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:28.914Z"
+    },
+    {
+      "case": "pab_list_network_interfaces",
+      "tool": "pab_list_network_interfaces",
+      "started_at": "2026-10-06T06:54:28.914Z",
+      "status": "pass",
+      "operation_ids": [
+        "61ad1757-6d8b-4fe3-9a34-7c81760e9fff"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:29.006Z"
+    },
+    {
+      "case": "pab_list_sessions",
+      "tool": "pab_list_sessions",
+      "started_at": "2026-10-06T06:54:29.006Z",
+      "status": "pass",
+      "operation_ids": [
+        "78159ee4-7f18-426a-8d5d-fb86543e5d8e"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:29.063Z"
+    },
+    {
+      "case": "pab_list_services",
+      "tool": "pab_list_services",
+      "started_at": "2026-10-06T06:54:29.063Z",
+      "status": "pass",
+      "operation_ids": [
+        "09117de3-a058-4cfe-a335-f0ca2b92d89d"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:29.123Z"
+    },
+    {
+      "case": "cleanup owned fixture",
+      "tool": "pab_file_delete",
+      "started_at": "2026-10-06T06:54:29.123Z",
+      "status": "pass",
+      "operation_ids": [
+        "a2689ed8-2e26-4b6e-a953-000000000014"
+      ],
+      "evidence": "Terminal result and case assertion verified",
+      "finished_at": "2026-10-06T06:54:29.245Z"
+    }
+  ],
+  "uncleaned_resources": [],
+  "finished_at": "2026-10-06T06:54:29.245Z"
+}

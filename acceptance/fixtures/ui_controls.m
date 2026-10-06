@@ -39,6 +39,13 @@ int main(int argc,char **argv) {
     if(argc<2 || argc>3)return 2;
     @autoreleasepool {
         NSString *directory=[NSString stringWithUTF8String:argv[1]];
+        BOOL isDirectory=NO;
+        NSFileManager *files=[NSFileManager defaultManager];
+        if(![files fileExistsAtPath:directory isDirectory:&isDirectory] || !isDirectory ||
+           ![files isWritableFileAtPath:directory]) {
+            fprintf(stderr,"Create a fresh writable fixture directory first\n");
+            return 5;
+        }
         NSString *ready=[directory stringByAppendingPathComponent:@"ready.json"];
         if([[NSFileManager defaultManager] fileExistsAtPath:ready])return 3;
         NSApplication *app=[NSApplication sharedApplication];
