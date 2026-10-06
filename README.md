@@ -163,12 +163,16 @@ Replace the device code and paths with your own information.
 
 ## MCP tool reference
 
-The current source exposes **60 tools**. Hosts may display them with a namespace,
+The current source exposes **68 tools**. Hosts may display them with a namespace,
 for example `pixels.pab_connect`.
 
 | Tool | Purpose |
 |---|---|
 | `pab_list_devices` | List locally remembered devices, including while the control server is offline |
+| `pab_list_execution_contexts` | Discover native service/user identities and available verified desktop-user sessions |
+| `pab_list_apps` | Discover installed or running applications in an explicitly selected Windows/macOS user session |
+| `pab_launch_app` | Launch or activate an application by native ID or absolute application path |
+| `pab_open_file` | Open a target-local file with a selected or default application |
 | `pab_connect` | Authenticate a device and return verified OS and execution context |
 | `pab_run_command` | Start a native executable with an explicit argument array |
 | `pab_get_task` | Query state, progress, completion, and output ranges |
@@ -242,11 +246,45 @@ come from the local Bridge database and are not tool arguments.
 
 ### Tool group settings
 
-Open **Settings → MCP tools** to choose six static groups. All 60 tools are enabled by default, preserving existing use. Connections/tasks (14) are required; files (15), system (12), desktop (7), Git (8), and Docker (4) can be disabled individually. Save, then restart the MCP process through your AI client to load the selection. Restarting only Desktop does not reload an already running MCP process.
+Open **Settings → MCP tools** to choose six static groups. All 68 tools are enabled by default, preserving existing use. Connections/tasks (15) are required; files (15), system (12), desktop (14), Git (8), and Docker (4) can be disabled individually. Save, then restart the MCP process through your AI client to load the selection. Restarting only Desktop does not reload an already running MCP process.
 
 Preferences are stored per user in `mcp-tools.json` under the PAB data directory (`PAB_DATA_DIR` when set). Each MCP reads a fixed startup snapshot; existing processes and accepted operations retain their behavior. Required operation query/cancel tools remain available when optional groups are disabled. Tool listing and dispatch use the same selection, so explicitly calling an omitted tool fails before runtime initialization. Groups control discovery and dispatch, not device permissions or approval policy; calls retain the configured automatic execution behavior.
 
 Configuration has version 1 and a required `enabledGroups` array of `core`, `file`, `system`, `desktop`, `git`, `container`; `core` must be present. Unknown fields/groups, duplicate groups, unsupported versions and malformed files fail MCP startup with an error rather than silently enabling everything. The settings editor displays the error and allows an explicit replacement by saving a valid selection. Saves use tempfile atomic replacement, so startup never sees partially written JSON.
+
+### Execution users and application tools
+
+These additions are in source development; the installed-host acceptance and package
+rollout are tracked in [the execution roadmap](EXECUTION_CONTEXT_ROADMAP.md).
+An older MCP/Executor installation does not gain them by updating these docs.
+
+Call `pab_list_execution_contexts` on the same device connection and use the returned
+`selection` object unchanged. `service` is the existing default for commands/files;
+`user` selects a native account for commands, terminals, Git, files and transfers;
+`desktop_user` selects a verified Windows/macOS interactive helper for applications.
+User command/terminal/Git/filesystem/directory/transfer options require capabilities
+v3/v2/v11/v5/v6/v2 respectively. Explicit user execution never falls back to the service.
+References are bound to the device, caller and connection; rediscover after reconnect
+or login changes. Linux headless supports native user execution without a desktop or
+logind, but application tools explicitly return unsupported.
+
+Application tools require system-query **v12** and an available user helper. Use
+`pab_list_apps` with `scope="installed"` (default) or `"running"`, optional literal
+`search`, and `limit=1..200` (default 100). This is a bounded snapshot, not live paging.
+Pass either `{"kind":"id","id":"<returned OS ID>"}` or
+`{"kind":"path","path":"<absolute executable or .app path>"}` as `application`
+to `pab_launch_app`. `pab_open_file` takes an existing absolute target-local `path`;
+omit `application` to use that user's default. No URL schemes or arbitrary arguments.
+All three require the `desktop_user` selection in `execution`.
+
+The result reports native execution identity and an observed instance when available.
+OS acceptance does not prove a new process, a ready window or changed document content.
+Use the existing window/UI tools to observe, focus, interact and request normal close;
+an unsaved-document prompt is not bypassed. A missing, locked or changed desktop does
+not select another account. Preserve `request_id` and query `pab_get_operation` on
+running/unconfirmed results; never automatically repeat a launch after a lost reply.
+These actions cannot be cancelled or rolled back, and native OS calls have no guaranteed
+hard interruption. Operation data stays in the local SQLite history.
 
 ### Docker container operations
 

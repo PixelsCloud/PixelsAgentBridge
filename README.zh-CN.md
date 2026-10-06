@@ -138,11 +138,15 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ## MCP 工具
 
-当前源码提供 **60 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
+当前源码提供 **68 个工具**。宿主可能显示命名空间，例如 `pixels.pab_connect`。
 
 | 工具 | 用途 |
 |---|---|
 | `pab_list_devices` | 列出本机保存的设备，控制服务离线时也可读取 |
+| `pab_list_execution_contexts` | 查询原生服务/用户身份及可用的已验证桌面用户会话 |
+| `pab_list_apps` | 查询指定 Windows/macOS 用户会话中的已安装或运行中应用 |
+| `pab_launch_app` | 按系统标识或绝对应用路径启动/激活应用 |
+| `pab_open_file` | 用指定或默认应用打开目标机器上的本地文件 |
 | `pab_connect` | 认证目标设备，返回经过验证的操作系统和执行环境 |
 | `pab_run_command` | 按程序和参数数组启动原生程序 |
 | `pab_get_task` | 查询状态、进度、完成信息和输出范围 |
@@ -216,11 +220,37 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 
 ### 工具分组设置
 
-在 **设置 → MCP 工具** 中选择六组工具。默认启用全部60个工具，延续现有使用方式。连接与任务（14）必选；文件（15）、系统（12）、桌面（7）、Git（8）、Docker（4）可以分别关闭。保存后通过AI客户端重启MCP进程生效；只重启Desktop不会重新加载已运行的MCP。
+在 **设置 → MCP 工具** 中选择六组工具。默认启用全部68个工具，延续现有使用方式。连接与任务（15）必选；文件（15）、系统（12）、桌面（14）、Git（8）、Docker（4）可以分别关闭。保存后通过AI客户端重启MCP进程生效；只重启Desktop不会重新加载已运行的MCP。
 
 当前用户的配置保存在PAB数据目录（设置了 `PAB_DATA_DIR` 时使用该目录）下的 `mcp-tools.json`。每个MCP只在启动时读取一次，运行中的进程和已接受的操作继续使用原有行为。关闭可选分组后，已有操作的查询和取消仍可用。工具目录与调用入口使用同一选择，手动调用已关闭工具会在初始化Runtime前失败。分组控制工具发现与调用范围，不改变设备权限或工具自动执行配置。
 
 配置使用版本1和必需的 `enabledGroups` 数组，支持 `core`、`file`、`system`、`desktop`、`git`、`container`，其中 `core` 必须保留。未知字段/分组、重复分组、未知版本或损坏配置会明确阻止MCP启动，不静默启用全部。设置页显示读取错误，允许用户重新选择并保存修复。保存复用tempfile的原子替换，避免MCP启动读到半个JSON。
+
+### 执行用户与应用工具
+
+这些增量已接入源码，安装包及正式宿主验收进度见[执行上下文规划](EXECUTION_CONTEXT_ROADMAP.md)。
+旧版 MCP/Executor 不会因为文档更新而自动获得新能力。
+
+先在同一设备连接中调用 `pab_list_execution_contexts`，原样使用返回的 `selection`。
+`service` 是命令/文件原有默认账户；`user` 用于指定原生账户执行命令、终端、Git、文件和传输；
+`desktop_user` 用于指定已核验的 Windows/macOS 交互 helper 执行应用操作。
+指定用户的命令/终端/Git/文件/目录/传输分别要求 v3/v2/v11/v5/v6/v2 能力。
+显式用户不可用时不会回退到服务账户。引用绑定设备、调用者和连接，重连或登录变化后重新查询。
+Linux 无界面端支持原生用户执行，不依赖桌面或 logind；应用工具明确返回不支持。
+
+应用工具要求 system-query **v12** 和可用的用户 helper。
+`pab_list_apps` 的 `scope` 为 `installed`（默认）或 `running`，可选字面搜索 `search`，
+`limit` 为 1–200（默认 100）；返回有界快照，不做实时分页。
+`pab_launch_app` 的 `application` 使用 `{"kind":"id","id":"<返回的系统标识>"}`，
+或 `{"kind":"path","path":"<绝对可执行文件或 .app 路径>"}`。
+`pab_open_file` 的 `path` 是目标机器上已有文件的绝对路径，省略 `application` 时使用该用户的默认应用。
+不支持 URL scheme 或任意启动参数。三个工具都必须在 `execution` 中传入 `desktop_user` 选择。
+
+结果包含实际执行身份及可核实的进程实例。系统接受请求不等于创建了新进程、窗口已就绪或文档内容已改变。
+继续使用已有窗口/控件工具观察、聚焦、输入及请求正常关闭；不会跳过未保存提示。
+缺少桌面、锁屏或会话变化不会自动选择其他账户。
+遇到 running/unconfirmed 时保留 `request_id`，用 `pab_get_operation` 查询原记录，不自动重新启动。
+应用动作不支持取消或回滚，底层系统调用也不承诺硬中断。操作数据只保存在本机 SQLite 记录中。
 
 ### Docker 容器操作
 

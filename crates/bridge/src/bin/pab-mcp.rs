@@ -1,3 +1,5 @@
+#[path = "pab_mcp/applications.rs"]
+mod mcp_applications;
 #[path = "pab_mcp/container.rs"]
 mod mcp_container;
 #[path = "pab_mcp/git.rs"]
@@ -255,6 +257,9 @@ impl ServerHandler for McpServer {
                     | "pab_resolve_dns"
                     | "pab_list_sessions"
                     | "pab_list_execution_contexts"
+                    | "pab_list_apps"
+                    | "pab_launch_app"
+                    | "pab_open_file"
                     | "pab_terminate_process"
                     | "pab_list_services"
                     | "pab_get_service"
@@ -388,7 +393,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 65);
+        assert_eq!(catalog.tools.len(), 68);
         let names = catalog
             .tools
             .iter()

@@ -12,11 +12,29 @@ async fn applications_are_explicitly_unsupported_on_headless_without_gui_probe()
     use pab_protocol::*;
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path()).await;
-    let result = svc.system_query(actor(), RequestId::new(), SystemQuery::Applications {
-        execution: ExecutionSelection::DesktopUser { context_ref: ExecutionContextRef::new() },
-        query: AppQuery::List { request: AppListRequest { scope: AppListScope::Installed, search: String::new(), limit: 10 } },
-    }).await;
-    assert!(result.unwrap_err().to_string().contains("unsupported_platform"));
+    let result = svc
+        .system_query(
+            actor(),
+            RequestId::new(),
+            SystemQuery::Applications {
+                execution: ExecutionSelection::DesktopUser {
+                    context_ref: ExecutionContextRef::new(),
+                },
+                query: AppQuery::List {
+                    request: AppListRequest {
+                        scope: AppListScope::Installed,
+                        search: String::new(),
+                        limit: 10,
+                    },
+                },
+            },
+        )
+        .await;
+    let error = result.unwrap_err();
+    assert!(error.to_string().contains("unsupported_platform"));
+    assert!(
+        matches!(crate::task_service::error_response(&error), DeviceTaskResponse::Error { code: DeviceTaskErrorCode::Unsupported, message } if message.contains("unsupported_platform"))
+    );
 }
 
 #[cfg(unix)]

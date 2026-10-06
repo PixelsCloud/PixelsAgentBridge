@@ -251,6 +251,7 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_container::tools());
     tools.extend(super::mcp_desktop::tools());
     tools.extend(super::mcp_ui::tools());
+    tools.extend(super::mcp_applications::tools());
     super::mcp_desktop::enhance_input_tool(
         tools
             .iter_mut()
@@ -401,6 +402,9 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
         .find(|tool| tool["name"] == name)
         .ok_or_else(|| format!("unknown tool: {name}"))?;
     validate_value(args, &definition["inputSchema"], "arguments")?;
+    if super::mcp_applications::handles(name) {
+        super::mcp_applications::parse(name, args)?;
+    }
     if super::mcp_ui::handles(name) {
         super::mcp_ui::parse(name, args)?;
     }
@@ -632,7 +636,7 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 65);
+        assert_eq!(all.len(), 68);
         assert_eq!(enabled_tools(&McpToolSettings::default()), all);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {

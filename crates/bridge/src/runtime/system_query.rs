@@ -216,10 +216,7 @@ impl BridgeRuntime {
             Ok(r) => r,
             Err(e) => {
                 let mut r = SystemQueryReply::pending(id, &query);
-                r.state = if matches!(
-                    e,
-                    RuntimeError::Bridge(crate::BridgeError::UnsupportedSystemQuery)
-                ) {
+                r.state = if submission_rejected(&query, &e) {
                     "failed"
                 } else {
                     "unconfirmed"
@@ -277,6 +274,24 @@ impl BridgeRuntime {
             .1)
     }
 }
+fn submission_rejected(query: &SystemQuery, error: &RuntimeError) -> bool {
+    matches!(
+        error,
+        RuntimeError::Bridge(crate::BridgeError::UnsupportedSystemQuery)
+    ) || (matches!(query, SystemQuery::Applications { .. })
+        && matches!(
+            error,
+            RuntimeError::Bridge(crate::BridgeError::RemoteTask {
+                code: DeviceTaskErrorCode::EnvironmentChanged
+                    | DeviceTaskErrorCode::InvalidRequest
+                    | DeviceTaskErrorCode::Unsupported
+                    | DeviceTaskErrorCode::AccessDenied
+                    | DeviceTaskErrorCode::RequestConflict,
+                ..
+            })
+        ))
+}
+
 impl TransferQueue {
     pub async fn system_record(
         &self,
@@ -292,6 +307,143 @@ impl TransferQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn application_rejection_is_distinct_from_unknown_storage_or_transport_outcome() {
+        let query = SystemQuery::Applications {
+            execution: ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            },
+            query: AppQuery::Execute {
+                request: AppActionRequest::Launch {
+                    application: AppTarget::Id {
+                        id: "fixture.app".into(),
+                    },
+                },
+            },
+        };
+        for (code, rejected) in [
+            (DeviceTaskErrorCode::EnvironmentChanged, true),
+            (DeviceTaskErrorCode::InvalidRequest, true),
+            (DeviceTaskErrorCode::Unsupported, true),
+            (DeviceTaskErrorCode::AccessDenied, true),
+            (DeviceTaskErrorCode::RequestConflict, true),
+            (DeviceTaskErrorCode::StorageUnavailable, false),
+            (DeviceTaskErrorCode::Internal, false),
+        ] {
+            let error = RuntimeError::Bridge(crate::BridgeError::RemoteTask {
+                code,
+                message: "fixture".into(),
+            });
+            assert_eq!(submission_rejected(&query, &error), rejected);
+            assert!(!submission_rejected(
+                &SystemQuery::Disks { limit: 10 },
+                &error
+            ));
+        }
+        assert!(!submission_rejected(
+            &query,
+            &RuntimeError::Bridge(crate::BridgeError::UnexpectedTaskResponse(
+                "malformed after dispatch".into()
+            ))
+        ));
+    }
+    #[tokio::test]
+    async fn application_history_preserves_identity_and_unconfirmed_operations_without_replay() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bridge.sqlite3");
+        let queue = TransferQueue::open(&path, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&path).await.unwrap();
+        let device = DeviceRef {
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let code = "123456789".parse().unwrap();
+        let context: ExecutionContext = serde_json::from_value(serde_json::json!({"os_family":"macos","os_name":"Mac OS","os_version":"fixture","architecture":"aarch64","execution_scope":"native","path_style":"posix","interpreter":null,"cwd":null,"environment_revision":"interactive-session-v1","identity":{"mode":"desktop_user","account_id":"uid:501","account_name":"fixture","home":"/Users/fixture","primary_group":20,"session_id":"100002","logon_id":null,"environment_source":"interactive_session"}})).unwrap();
+        let id = RequestId::new();
+        let query = SystemQuery::Applications {
+            execution: ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            },
+            query: AppQuery::Execute {
+                request: AppActionRequest::OpenFile {
+                    path: "/Users/fixture/中文 文件.txt".into(),
+                    application: None,
+                },
+            },
+        };
+        assert!(
+            store
+                .accept_system_query(id, &query, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(store.operations().await.unwrap()[0].direction, "control");
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let mut reply = SystemQueryReply::pending(id, &query);
+        reply.execution_context = Some(context.clone());
+        reply.state = "unconfirmed".into();
+        reply.error = Some("helper disconnected after dispatch".into());
+        store.save_system_reply(&reply).await.unwrap();
+        let reopened = RuntimeStore::open(&path).await.unwrap();
+        assert_eq!(
+            reopened
+                .system_record(id, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+                .1,
+            reply
+        );
+        assert!(
+            !reopened
+                .accept_system_query(id, &query, device, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+        );
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let mut other_identity = query.clone();
+        if let SystemQuery::Applications { execution, .. } = &mut other_identity {
+            *execution = ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            };
+        }
+        assert!(
+            reopened
+                .accept_system_query(id, &other_identity, device, Some(code), "guest", "owner")
+                .await
+                .is_err()
+        );
+        assert!(
+            reopened
+                .accept_system_query(id, &query, device, Some(code), "guest", "another-mcp")
+                .await
+                .is_err()
+        );
+        reply.state = "completed".into();
+        reply.error = None;
+        reply.returned_count = 1;
+        reply.data = Some(SystemQueryData::Applications {
+            snapshot: AppSnapshot::Action {
+                result: AppActionResult {
+                    request_accepted: true,
+                    instance: None,
+                    reused_instance: None,
+                    execution_identity: context.identity.unwrap(),
+                    window_ready: None,
+                    notes: vec![],
+                },
+            },
+        });
+        reopened.save_system_reply(&reply).await.unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 0);
+        assert_eq!(queue.system_record(id, code).await.unwrap().1, reply);
+        let mut late = reply.clone();
+        late.state = "unconfirmed".into();
+        late.execution_context = None;
+        reopened.save_system_reply(&late).await.unwrap();
+        assert_eq!(queue.system_record(id, code).await.unwrap().1, reply);
+    }
     #[tokio::test]
     async fn ui_history_presents_metadata_without_names_or_input_values() {
         let dir = tempfile::tempdir().unwrap();

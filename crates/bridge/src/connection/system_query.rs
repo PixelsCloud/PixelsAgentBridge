@@ -84,6 +84,11 @@ fn require_capability(version: Option<u16>, query: &SystemQuery) -> Result<(), B
     Ok(())
 }
 fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
+    if ["app_list", "app_launch", "app_open_file"].contains(&r.kind.as_str())
+        && !valid_application(r)
+    {
+        return false;
+    }
     if let Some(SystemQueryData::ExecutionContexts { entries, .. }) = &r.data {
         if entries.iter().any(|row| row.validate().is_err())
             || r.returned_count as usize != entries.len()
@@ -147,6 +152,9 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "dns"
                 | "os_sessions"
                 | "execution_contexts"
+                | "app_list"
+                | "app_launch"
+                | "app_open_file"
                 | "process_terminate"
                 | "services"
                 | "service"
@@ -159,6 +167,9 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
                 (
+                    "app_list" | "app_launch" | "app_open_file",
+                    Some(SystemQueryData::Applications { .. })
+                ) | (
                     "containers" | "container" | "container_logs" | "container_control",
                     Some(SystemQueryData::Container { .. })
                 ) | (
@@ -211,9 +222,137 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             ))
 }
 
+fn valid_application(reply: &SystemQueryReply) -> bool {
+    let Some(data) = &reply.data else {
+        return reply.state != "completed";
+    };
+    let (identity, instances, count) = match (reply.kind.as_str(), data) {
+        (
+            "app_list",
+            SystemQueryData::Applications {
+                snapshot: AppSnapshot::List { snapshot },
+            },
+        ) => {
+            if snapshot.apps.len() > 200 {
+                return false;
+            }
+            (
+                &snapshot.execution_identity,
+                snapshot
+                    .apps
+                    .iter()
+                    .filter_map(|app| app.instance.as_ref())
+                    .collect::<Vec<_>>(),
+                snapshot.apps.len() as u32,
+            )
+        }
+        (
+            "app_launch" | "app_open_file",
+            SystemQueryData::Applications {
+                snapshot: AppSnapshot::Action { result },
+            },
+        ) if result.request_accepted => (
+            &result.execution_identity,
+            result.instance.iter().collect(),
+            1,
+        ),
+        _ => return false,
+    };
+    identity.mode == ExecutionMode::DesktopUser
+        && identity.validate().is_ok()
+        && reply
+            .execution_context
+            .as_ref()
+            .and_then(|context| context.identity.as_ref())
+            == Some(identity)
+        && reply.returned_count == count
+        && instances.into_iter().all(|instance| {
+            instance.process_id > 0
+                && !instance.process_identity.is_empty()
+                && instance
+                    .account_id
+                    .as_ref()
+                    .is_none_or(|id| id == &identity.account_id)
+                && instance
+                    .session_id
+                    .as_ref()
+                    .is_none_or(|id| Some(id) == identity.session_id.as_ref())
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn applications_require_v12_and_reply_identity_matches_persisted_context() {
+        let query = SystemQuery::Applications {
+            execution: ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            },
+            query: AppQuery::Execute {
+                request: AppActionRequest::Launch {
+                    application: AppTarget::Id {
+                        id: "fixture.app".into(),
+                    },
+                },
+            },
+        };
+        for version in [None, Some(1), Some(11)] {
+            assert!(require_capability(version, &query).is_err());
+        }
+        assert!(require_capability(Some(12), &query).is_ok());
+        let context: ExecutionContext = serde_json::from_value(serde_json::json!({"os_family":"macos","os_name":"Mac OS","os_version":"fixture","architecture":"aarch64","execution_scope":"native","path_style":"posix","interpreter":null,"cwd":null,"environment_revision":"interactive-session-v1","identity":{"mode":"desktop_user","account_id":"uid:501","account_name":"fixture","home":"/Users/fixture","primary_group":20,"session_id":"100002","logon_id":null,"environment_source":"interactive_session"}})).unwrap();
+        let identity = context.identity.clone().unwrap();
+        let mut reply = SystemQueryReply::pending(RequestId::new(), &query);
+        assert!(valid(&reply, reply.request_id));
+        reply.state = "completed".into();
+        reply.returned_count = 1;
+        reply.execution_context = Some(context.clone());
+        reply.data = Some(SystemQueryData::Applications {
+            snapshot: AppSnapshot::Action {
+                result: AppActionResult {
+                    request_accepted: true,
+                    instance: Some(AppInstance {
+                        process_id: 42,
+                        process_identity: "fixture:42".into(),
+                        account_id: Some(identity.account_id.clone()),
+                        session_id: identity.session_id.clone(),
+                    }),
+                    reused_instance: None,
+                    execution_identity: identity.clone(),
+                    window_ready: None,
+                    notes: vec![],
+                },
+            },
+        });
+        assert!(valid(&reply, reply.request_id));
+        reply.kind = "app_list".into();
+        assert!(!valid(&reply, reply.request_id));
+        reply.kind = "app_launch".into();
+        reply.returned_count = 0;
+        assert!(!valid(&reply, reply.request_id));
+        reply.returned_count = 1;
+        reply
+            .execution_context
+            .as_mut()
+            .unwrap()
+            .identity
+            .as_mut()
+            .unwrap()
+            .account_id = "uid:502".into();
+        assert!(!valid(&reply, reply.request_id));
+        reply.execution_context = Some(context);
+        if let Some(SystemQueryData::Applications {
+            snapshot: AppSnapshot::Action { result },
+        }) = &mut reply.data
+        {
+            result.instance.as_mut().unwrap().account_id = Some("uid:502".into());
+        }
+        assert!(!valid(&reply, reply.request_id));
+        reply.state = "unconfirmed".into();
+        reply.data = None;
+        assert!(valid(&reply, reply.request_id));
+    }
     #[test]
     fn execution_context_discovery_rejects_old_peers_without_blocking_existing_queries() {
         let query = SystemQuery::ExecutionContexts {

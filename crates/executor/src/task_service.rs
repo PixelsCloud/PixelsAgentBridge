@@ -857,6 +857,16 @@ pub(crate) fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServ
 }
 
 fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
+    if let TaskServiceError::InvalidRequest(
+        message
+        @ "unsupported_platform: application management is unavailable on the headless product",
+    ) = error
+    {
+        return DeviceTaskResponse::Error {
+            code: DeviceTaskErrorCode::Unsupported,
+            message: (*message).into(),
+        };
+    }
     if let TaskServiceError::ExecutionContext(message) = error {
         return DeviceTaskResponse::Error {
             code: DeviceTaskErrorCode::EnvironmentChanged,

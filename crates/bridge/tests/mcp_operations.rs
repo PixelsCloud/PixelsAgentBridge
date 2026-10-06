@@ -68,6 +68,42 @@ fn result(response: CallToolResult) -> Value {
 }
 
 #[tokio::test]
+async fn application_tools_export_strict_schemas_and_reject_missing_desktop_context_over_stdio() {
+    let dir = tempfile::tempdir().unwrap();
+    let (client, child) = start(dir.path(), &dir.path().join("apps.sqlite3"), 1).await;
+    let catalog = client.list_all_tools().await.unwrap();
+    for name in ["pab_list_apps", "pab_launch_app", "pab_open_file"] {
+        let tool = catalog
+            .iter()
+            .find(|tool| tool.name == name)
+            .expect("application tool exported");
+        let schema = serde_json::to_value(&tool.input_schema).unwrap();
+        assert!(
+            schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("execution"))
+        );
+        assert_eq!(
+            schema["properties"]["execution"]["properties"]["mode"]["enum"],
+            json!(["desktop_user"])
+        );
+        let mut args = json!({"device_code":"123456789"});
+        if name == "pab_launch_app" {
+            args["application"] = json!({"kind":"id","id":"fixture.app"});
+        }
+        if name == "pab_open_file" {
+            args["path"] = json!("/tmp/fixture.txt");
+        }
+        let error = call(&client, name, args.clone()).await;
+        assert_eq!(error.is_error, Some(true));
+        args["execution"] = json!({"mode":"service"});
+        assert_eq!(call(&client, name, args).await.is_error, Some(true));
+    }
+    stop(client, child).await;
+}
+
+#[tokio::test]
 async fn offline_submission_query_cancel_dedup_and_two_sessions_use_real_stdio() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("bridge.sqlite3");
@@ -98,7 +134,7 @@ async fn offline_submission_query_cancel_dedup_and_two_sessions_use_real_stdio()
     });
     let (first, first_child) = start(&directory.path().join("first"), &database, port).await;
     let (second, second_child) = start(&directory.path().join("second"), &database, port).await;
-    assert_eq!(first.list_all_tools().await.unwrap().len(), 64);
+    assert_eq!(first.list_all_tools().await.unwrap().len(), 68);
     let request_id = RequestId::new().to_string();
     let args = json!({"device_code":"123456789","source":source,"destination":if cfg!(windows){"C:\\fixture\\remote.bin"}else{"/tmp/fixture-remote.bin"},"request_id":request_id});
     let submitted = result(call(&first, "pab_upload_file", args.clone()).await);
@@ -232,9 +268,12 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
         "disabled calls must not initialize the runtime/store"
     );
     McpToolSettings::default().save(&path).unwrap();
-    assert_eq!(first.list_all_tools().await.unwrap().len(), 14);
+    assert_eq!(
+        first.list_all_tools().await.unwrap().len(),
+        ToolGroup::Core.tools().len()
+    );
     let (second, second_child) = start(root, &database, 1).await;
-    assert_eq!(second.list_all_tools().await.unwrap().len(), 64);
+    assert_eq!(second.list_all_tools().await.unwrap().len(), 68);
     stop(second, second_child).await;
     stop(first, first_child).await;
 }

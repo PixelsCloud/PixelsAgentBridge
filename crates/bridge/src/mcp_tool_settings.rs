@@ -77,6 +77,9 @@ impl ToolGroup {
                 "pab_terminate_process",
             ],
             Self::Desktop => &[
+                "pab_list_apps",
+                "pab_launch_app",
+                "pab_open_file",
                 "pab_capture_screenshot",
                 "pab_desktop_input",
                 "pab_focus_window",
@@ -238,8 +241,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 65);
-        assert_eq!(unique.len(), 65);
+        assert_eq!(names.len(), 68);
+        assert_eq!(unique.len(), 68);
         for name in [
             "pab_connect",
             "pab_disconnect",
