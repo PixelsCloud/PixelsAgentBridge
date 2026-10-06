@@ -26,12 +26,20 @@ pub(crate) enum Operation {
     Download {
         path: String,
         offset: u64,
+        expected_sha256: Option<String>,
+    },
+    Reconcile {
+        path: String,
+        size: u64,
+        sha256: String,
     },
 }
 impl Operation {
     fn validate(&self) -> io::Result<()> {
         let path = match self {
-            Self::Upload { path, .. } | Self::Download { path, .. } => path,
+            Self::Upload { path, .. }
+            | Self::Download { path, .. }
+            | Self::Reconcile { path, .. } => path,
         };
         if path.is_empty()
             || path.len() > 4096
@@ -41,7 +49,7 @@ impl Operation {
             return Err(io::Error::other("invalid transfer path"));
         }
         match self {
-            Self::Upload { size, sha256, .. }
+            Self::Upload { size, sha256, .. } | Self::Reconcile { size, sha256, .. }
                 if *size > i64::MAX as u64
                     || sha256.len() != 64
                     || !sha256
@@ -204,8 +212,35 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
                     .upload(&mut stream, timeout, &path, size, &sha256, overwrite)
                     .await
             }
-            Operation::Download { path, offset } => {
-                engine.download(&mut stream, timeout, &path, offset).await
+            Operation::Download {
+                path,
+                offset,
+                expected_sha256,
+            } => {
+                engine
+                    .download(
+                        &mut stream,
+                        timeout,
+                        &path,
+                        offset,
+                        expected_sha256.as_deref(),
+                    )
+                    .await
+            }
+            Operation::Reconcile { path, size, sha256 } => {
+                if !engine.verify_publication(&path, size, &sha256).await? {
+                    return Err(io::Error::other(
+                        "original user could not confirm transfer publication",
+                    )
+                    .into());
+                }
+                stream
+                    .response(
+                        &DeviceTaskResponse::FileComplete { size, sha256 },
+                        true,
+                        timeout,
+                    )
+                    .await
             }
         }
     }));
@@ -300,6 +335,7 @@ pub(crate) async fn execute(
                     },
                     Reply::Unlock { id } => owned.coordinator.unlock(id)?,
                     Reply::Record { event } => {
+                        if matches!(operation, Operation::Reconcile { .. }) { return Err(io::Error::other("reconciliation cannot write records")); }
                         records.record(event).await?;
                         peer.control(Control::TransferAck { accepted: true }).await?;
                     },

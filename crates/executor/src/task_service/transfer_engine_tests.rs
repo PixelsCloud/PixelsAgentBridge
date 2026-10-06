@@ -192,6 +192,7 @@ async fn transfer_engine_streams_resumed_download_and_records_the_whole_hash() {
             Duration::from_secs(5),
             path.to_str().unwrap(),
             65536,
+            None,
         )
         .await
         .unwrap();

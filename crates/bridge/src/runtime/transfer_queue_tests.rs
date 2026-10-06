@@ -24,6 +24,7 @@ async fn queue(path: &Path, session: &str) -> TransferQueue {
 
 fn remote(spec: &TransferRequest, state: &str, published: Option<bool>) -> TransferSnapshot {
     TransferSnapshot {
+        execution_context: None,
         request_id: spec.request_id,
         initiated_by: OperatorRef::account(UserId::from_u128(7), EndpointKey::new([7; 32])),
         direction: "receive".into(),

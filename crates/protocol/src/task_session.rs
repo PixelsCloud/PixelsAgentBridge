@@ -118,6 +118,8 @@ impl CommandOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<crate::ExecutionContext>,
     pub request_id: RequestId,
     pub initiated_by: OperatorRef,
     pub direction: String,
@@ -136,6 +138,10 @@ pub struct TransferSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskRequest {
+    TransferFile {
+        schema_version: u16,
+        request: crate::FileTransferRequest,
+    },
     SystemQuery {
         schema_version: u16,
         request_id: RequestId,
@@ -280,7 +286,8 @@ pub enum DeviceTaskRequest {
 impl DeviceTaskRequest {
     pub const fn schema_version(&self) -> u16 {
         match self {
-            Self::SystemQuery { schema_version, .. }
+            Self::TransferFile { schema_version, .. }
+            | Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
             | Self::CancelSystemQuery { schema_version, .. }
             | Self::FileSystem { schema_version, .. }
@@ -341,6 +348,8 @@ pub enum DeviceTaskResponse {
         terminal_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transfer_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         system_query_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -514,6 +523,7 @@ mod tests {
         );
         let response = DeviceTaskResponse::Transfer {
             snapshot: TransferSnapshot {
+                execution_context: None,
                 request_id,
                 initiated_by: crate::OperatorRef::account(
                     crate::UserId::from_u128(9),

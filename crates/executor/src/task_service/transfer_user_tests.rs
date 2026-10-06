@@ -42,6 +42,7 @@ struct TestStream {
     input: VecDeque<Vec<u8>>,
     output: Vec<u8>,
     responses: Vec<DeviceTaskResponse>,
+    resume_from: Option<RequestId>,
 }
 impl TransferStream for TestStream {
     async fn response(
@@ -71,7 +72,16 @@ impl TransferStream for TestStream {
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
-async fn execute(
+fn execute<'a>(
+    svc: &'a TaskService,
+    user: u32,
+    operation: Operation,
+    stream: &'a mut TestStream,
+    cancelled: bool,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = (RequestId, io::Result<()>)> + 'a>> {
+    Box::pin(execute_inner(svc, user, operation, stream, cancelled))
+}
+async fn execute_inner(
     svc: &TaskService,
     user: u32,
     operation: Operation,
@@ -79,6 +89,83 @@ async fn execute(
     cancelled: bool,
 ) -> (RequestId, io::Result<()>) {
     let id = RequestId::new();
+    if !cancelled {
+        let identity = prepared(user)
+            .identity()
+            .observation(
+                ExecutionMode::User,
+                ExecutionEnvironmentSource::NativeAccount,
+            )
+            .unwrap();
+        let context_ref = svc
+            .ui_connection
+            .execution_contexts
+            .lock()
+            .await
+            .register(
+                pab_task_runtime::ExecutionCaller {
+                    device: svc.device_ref,
+                    actor: actor(),
+                    connection: svc.ui_connection.id,
+                },
+                identity.clone(),
+            )
+            .unwrap();
+        let request = FileTransferRequest {
+            request_id: id,
+            execution: ExecutionSelection::User { context_ref },
+            resume_from: stream.resume_from,
+            operation: match operation {
+                Operation::Upload {
+                    path,
+                    size,
+                    sha256,
+                    overwrite,
+                } => FileTransferOperation::Upload {
+                    path,
+                    size,
+                    sha256,
+                    overwrite,
+                },
+                Operation::Download {
+                    path,
+                    offset,
+                    expected_sha256,
+                } => FileTransferOperation::Download {
+                    path,
+                    offset,
+                    expected_sha256,
+                },
+                Operation::Reconcile { .. } => panic!("separate reconciliation"),
+            },
+        };
+        let result = dispatch(svc, &request, stream).await;
+        if let Ok(snapshot) = svc.store.get_transfer(actor(), id).await {
+            assert_eq!(
+                snapshot
+                    .execution_context
+                    .as_ref()
+                    .unwrap()
+                    .identity
+                    .as_ref(),
+                Some(&identity)
+            );
+            let fresh = svc.for_ui_connection();
+            let mut repeated = TestStream::default();
+            dispatch(&fresh, &request, &mut repeated).await.unwrap();
+            assert!(
+                matches!(repeated.responses.first(),Some(DeviceTaskResponse::Transfer { snapshot: observed }) if observed.execution_context==snapshot.execution_context)
+            );
+            let mut changed = request.clone();
+            changed.execution = Default::default();
+            assert!(
+                dispatch(svc, &changed, &mut TestStream::default())
+                    .await
+                    .is_err()
+            );
+        }
+        return (id, result);
+    }
     match &operation {
         Operation::Upload {
             path, size, sha256, ..
@@ -92,6 +179,7 @@ async fn execute(
             .start_transfer(id, actor(), "send", path, 0, None)
             .await
             .unwrap(),
+        Operation::Reconcile { .. } => panic!("use the read-only reconciliation entry"),
     }
     let (_cancel, receive) = watch::channel(cancelled);
     let result = crate::user_worker::transfer::execute(
@@ -115,6 +203,98 @@ async fn execute(
     }
     (id, result)
 }
+async fn dispatch(
+    svc: &TaskService,
+    request: &FileTransferRequest,
+    fixture: &mut TestStream,
+) -> io::Result<()> {
+    let (a, b, client, server) = super::transfer_tests::pair().await;
+    let service = svc.clone();
+    let timeout = Duration::from_secs(15);
+    let work = tokio::spawn(async move {
+        service
+            .handle_stream(actor(), server.accept_bi(timeout).await.unwrap(), timeout)
+            .await
+    });
+    let mut stream = client.open_bi(timeout).await.unwrap();
+    stream
+        .send_frame_json(
+            &DeviceTaskRequest::TransferFile {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                request: request.clone(),
+            },
+            timeout,
+        )
+        .await
+        .unwrap();
+    let result = async {
+        loop {
+            let response: DeviceTaskResponse = stream
+                .receive_json(timeout)
+                .await
+                .map_err(io::Error::other)?;
+            fixture.responses.push(response.clone());
+            match response {
+                DeviceTaskResponse::Transfer { .. } | DeviceTaskResponse::FileComplete { .. } => {
+                    return Ok(());
+                }
+                DeviceTaskResponse::Error { message, .. } => return Err(io::Error::other(message)),
+                DeviceTaskResponse::FileReady { size, offset, .. }
+                    if matches!(request.operation, FileTransferOperation::Download { .. }) =>
+                {
+                    let mut received = offset;
+                    while received < size {
+                        let bytes = stream
+                            .receive_binary_frame(timeout)
+                            .await
+                            .map_err(io::Error::other)?;
+                        received += bytes.len() as u64;
+                        assert!(received <= size);
+                        fixture.output.extend(bytes);
+                    }
+                }
+                DeviceTaskResponse::FileReady { size, offset, .. } => {
+                    if offset < size {
+                        let bytes = fixture
+                            .input
+                            .pop_front()
+                            .ok_or_else(|| io::Error::other("fixture disconnect"))?;
+                        stream
+                            .send_binary_frame(&bytes, timeout)
+                            .await
+                            .map_err(io::Error::other)?;
+                    }
+                }
+                DeviceTaskResponse::FileProgress { offset } => {
+                    let FileTransferOperation::Upload { size, .. } = &request.operation else {
+                        panic!("download progress frame")
+                    };
+                    if offset < *size {
+                        let bytes = fixture
+                            .input
+                            .pop_front()
+                            .ok_or_else(|| io::Error::other("fixture disconnect"))?;
+                        stream
+                            .send_binary_frame(&bytes, timeout)
+                            .await
+                            .map_err(io::Error::other)?;
+                    }
+                }
+                _ => panic!("unexpected transfer response"),
+            }
+        }
+    }
+    .await;
+    drop(stream);
+    let _ = tokio::time::timeout(Duration::from_secs(20), work)
+        .await
+        .unwrap()
+        .unwrap();
+    a.close().await;
+    b.close().await;
+    result
+}
+
 fn upload(path: &Path, bytes: &[u8], overwrite: bool) -> Operation {
     Operation::Upload {
         path: path.to_str().unwrap().into(),
@@ -139,7 +319,12 @@ async fn native_user_transfer_worker_acceptance() {
         .unwrap();
     let identity = prepared(user).identity().clone();
     let database = tempfile::tempdir().unwrap();
-    let svc = service(database.path()).await;
+    let mut svc = service(database.path()).await;
+    svc.worker_executable = Some(
+        std::env::var_os("PAB_EXECUTION_TEST_WORKER")
+            .unwrap()
+            .into(),
+    );
     let root = Workspace {
         path: identity
             .home
@@ -200,7 +385,39 @@ async fn native_user_transfer_worker_acceptance() {
         65536
     );
     // New attempt resumes only matching hash bytes, in the same native account.
+    let mut changed_user = svc.store.transfer_request(actor(), id).await.unwrap();
+    changed_user.request_id = RequestId::new();
+    changed_user.resume_from = Some(id);
+    changed_user.execution = Default::default();
+    assert!(
+        dispatch(&svc, &changed_user, &mut input(&bytes))
+            .await
+            .is_err()
+    );
+    assert!(matches!(
+        svc.store
+            .get_transfer(actor(), changed_user.request_id)
+            .await,
+        Err(TaskStoreError::NotFound)
+    ));
+    let mut changed_content = input(b"different");
+    changed_content.resume_from = Some(id);
+    let (rejected_id, result) = execute(
+        &svc,
+        user,
+        upload(&path, b"different", false),
+        &mut changed_content,
+        false,
+    )
+    .await;
+    assert!(result.is_err());
+    assert!(matches!(
+        svc.store.get_transfer(actor(), rejected_id).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    assert!(!path.exists());
     let mut resumed = input(&bytes[65536..]);
+    resumed.resume_from = Some(id);
     let (id, result) = execute(
         &svc,
         user,
@@ -210,6 +427,13 @@ async fn native_user_transfer_worker_acceptance() {
     )
     .await;
     result.unwrap();
+    let transfer_context = svc
+        .store
+        .get_transfer(actor(), id)
+        .await
+        .unwrap()
+        .execution_context
+        .unwrap();
     assert!(matches!(
         resumed.responses.first(),
         Some(DeviceTaskResponse::FileReady { offset: 65536, .. })
@@ -242,6 +466,7 @@ async fn native_user_transfer_worker_acceptance() {
         Operation::Download {
             path: path.to_str().unwrap().into(),
             offset: 65536,
+            expected_sha256: None,
         },
         &mut downloaded,
         false,
@@ -253,6 +478,43 @@ async fn native_user_transfer_worker_acceptance() {
         svc.store.get_transfer(actor(), id).await.unwrap().sha256,
         Some(digest(&bytes))
     );
+    let mut resumed_download = TestStream {
+        resume_from: Some(id),
+        ..Default::default()
+    };
+    execute(
+        &svc,
+        user,
+        Operation::Download {
+            path: path.to_str().unwrap().into(),
+            offset: 131072,
+            expected_sha256: Some(digest(&bytes)),
+        },
+        &mut resumed_download,
+        false,
+    )
+    .await
+    .1
+    .unwrap();
+    assert_eq!(resumed_download.output, bytes[131072..]);
+    let mut changed_download = TestStream::default();
+    assert!(
+        execute(
+            &svc,
+            user,
+            Operation::Download {
+                path: path.to_str().unwrap().into(),
+                offset: 65536,
+                expected_sha256: Some(digest(b"old content")),
+            },
+            &mut changed_download,
+            false
+        )
+        .await
+        .1
+        .is_err()
+    );
+    assert!(changed_download.output.is_empty());
     let held = svc.upload_locks.try_acquire(&path).await.unwrap().unwrap();
     assert!(
         execute(
@@ -343,7 +605,8 @@ async fn native_user_transfer_worker_acceptance() {
             user,
             Operation::Download {
                 path: private.join("secret.bin").to_str().unwrap().into(),
-                offset: 0
+                offset: 0,
+                expected_sha256: None
             },
             &mut denied,
             false
@@ -354,5 +617,81 @@ async fn native_user_transfer_worker_acceptance() {
     );
     assert!(denied.output.is_empty());
     assert!(!private.join("denied.bin").exists());
+    // Simulate publication before its durable completion receipt. Observation
+    // must use the frozen native account, even after the connection changes.
+    for (target, content, expected_state) in [
+        (&path, bytes.as_slice(), "completed"),
+        (
+            &private.join("secret.bin"),
+            b"private".as_slice(),
+            "committing",
+        ),
+    ] {
+        let req = FileTransferRequest {
+            request_id: RequestId::new(),
+            execution: ExecutionSelection::User {
+                context_ref: ExecutionContextRef::new(),
+            },
+            resume_from: None,
+            operation: FileTransferOperation::Upload {
+                path: target.to_str().unwrap().into(),
+                size: content.len() as u64,
+                sha256: digest(content),
+                overwrite: true,
+            },
+        };
+        svc.store
+            .accept_transfer(actor(), &req, &transfer_context)
+            .await
+            .unwrap();
+        svc.store
+            .transfer_progress(req.request_id, content.len() as u64, content.len() as u64)
+            .await
+            .unwrap();
+        svc.store
+            .begin_transfer_publication(req.request_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            svc.store
+                .get_transfer(actor(), req.request_id)
+                .await
+                .unwrap()
+                .state,
+            "committing"
+        );
+        let observed = svc
+            .for_ui_connection()
+            .lookup_transfer(actor(), req.request_id)
+            .await
+            .unwrap();
+        assert_eq!(observed.state, expected_state, "{observed:?}");
+        assert_eq!(observed.execution_context, Some(transfer_context.clone()));
+    }
     assert!(svc.upload_locks.try_acquire(&path).await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn invalid_transfer_identity_rejects_before_acceptance() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let request = FileTransferRequest {
+        request_id: RequestId::new(),
+        execution: ExecutionSelection::User {
+            context_ref: ExecutionContextRef::new(),
+        },
+        resume_from: None,
+        operation: FileTransferOperation::Upload {
+            path: dir.path().join("never.bin").to_str().unwrap().into(),
+            size: 1,
+            sha256: digest(b"x"),
+            overwrite: false,
+        },
+    };
+    assert!(dispatch(&svc, &request, &mut input(b"x")).await.is_err());
+    assert!(matches!(
+        svc.store.get_transfer(actor(), request.request_id).await,
+        Err(TaskStoreError::NotFound)
+    ));
+    assert!(!dir.path().join("never.bin").exists());
 }

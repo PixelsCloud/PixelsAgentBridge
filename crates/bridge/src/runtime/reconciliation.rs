@@ -312,6 +312,7 @@ mod tests {
             filesystem_mutation: None,
         };
         let mut snapshot = TransferSnapshot {
+            execution_context: None,
             request_id,
             initiated_by: actor,
             direction: "send".to_owned(),

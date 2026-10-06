@@ -272,12 +272,36 @@ impl<R: TransferRecorder> TransferEngine<R> {
         Ok(())
     }
 
+    /// Read-only evidence check, performed with this engine's actual OS identity.
+    pub(crate) async fn verify_publication(
+        &self,
+        path: &str,
+        size: u64,
+        sha256: &str,
+    ) -> Result<bool, TaskServiceError> {
+        let Some(path) = valid_path(path) else {
+            return Ok(false);
+        };
+        if !valid_sha256(sha256) {
+            return Ok(false);
+        }
+        let Some(_guard) = self.locks.try_acquire(&path).await? else {
+            return Ok(false);
+        };
+        let meta = fs::symlink_metadata(&path).await?;
+        if !meta.is_file() || meta.file_type().is_symlink() || meta.len() != size {
+            return Ok(false);
+        }
+        Ok(hash_file(&path).await? == sha256)
+    }
+
     pub(crate) async fn download(
         &self,
         stream: &mut impl TransferStream,
         timeout: Duration,
         path: &str,
         offset: u64,
+        expected_sha256: Option<&str>,
     ) -> Result<(), TaskServiceError> {
         let Some(source) = valid_path(path) else {
             return reject(stream, timeout, "invalid source path").await;
@@ -303,6 +327,14 @@ impl<R: TransferRecorder> TransferEngine<R> {
             .record(TransferRecord::Progress { offset, size })
             .await?;
         let sha256 = hash_file(&source).await?;
+        if expected_sha256.is_some_and(|expected| expected != sha256) {
+            return reject(
+                stream,
+                timeout,
+                "source hash changed since the original transfer",
+            )
+            .await;
+        }
         self.records
             .record(TransferRecord::Hash {
                 sha256: sha256.clone(),

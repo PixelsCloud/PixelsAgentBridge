@@ -317,8 +317,9 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E3指定用户文件后端 | 复用文件引擎接入原生user-worker，二进制帧、父端路径锁和持久化确认；Windows两用户/Mac/Linux实测与文件回归通过，见 acceptance/execution-e3-filesystem-worker-2026-10-07.md；公开工具接入进展见下一行 |
 | E3文件公开工具接入 | 12工具filesystem v5、原子身份记录、重连查重、原用户发布核对及异步配额/取消已接入；三平台源码集成和读写QUIC通过，见 acceptance/execution-e3-filesystem-2026-10-07.md；传输及完整异常矩阵待完成 |
 | E3目录列表用户接入 | filesystem v6复用文件流程，分页保留实际身份，默认service沿用原入口；三平台原生用户和QUIC验证见 acceptance/execution-e3-directory-2026-10-07.md；正式安装验收待完成 |
-| E3传输用户后端 | 已抽出复用传输引擎并接入原生user-worker，二进制IPC、父端记录确认及共享路径锁、按身份区分续传临时文件；三平台普通回归及原生用户测试通过，见 acceptance/execution-e3-transfer-worker-2026-10-07.md；公开参数、身份记录和原身份恢复尚未接入 |
+| E3传输用户后端 | 已抽出复用传输引擎并接入原生user-worker，二进制IPC、父端记录确认及共享路径锁、按身份区分续传临时文件；三平台普通回归及原生用户测试通过，见 acceptance/execution-e3-transfer-worker-2026-10-07.md |
+| E3传输协议与Executor | transfer v2、接受事务、完整参数和身份冻结、重复请求查原记录、显式续传约束、原用户只读发布核对已完成；三平台原生QUIC及回归通过，见 acceptance/execution-e3-transfer-executor-2026-10-07.md；Bridge/MCP公开接入待完成 |
 | E2–E8剩余增量 | 传输用户执行、用户环境/凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 将传输用户后端接入公开协议/接受事务/Bridge异步队列与MCP参数，并实现原身份结果核对及恢复；继续用户环境/凭据、应用、UI、完整异常矩阵和打包安装验收 |
+| 下一动作 | 将transfer v2接入Bridge异步队列与MCP参数，保存实际身份并校验恢复；继续用户环境/凭据、应用、UI、完整异常矩阵和打包安装验收 |

@@ -43,6 +43,7 @@ mod subscription;
 mod system_query;
 mod terminal;
 pub(crate) mod transfer_engine;
+mod transfer_user;
 #[cfg(test)]
 mod transfer_user_tests;
 mod ui;
@@ -204,6 +205,20 @@ impl TaskService {
                 "unsupported device task schema version",
             )
             .await;
+        }
+        if let DeviceTaskRequest::TransferFile { request, .. } = request {
+            let result = self
+                .transfer_stream(
+                    initiated_by,
+                    &request,
+                    &mut stream,
+                    timeout.max(Duration::from_secs(60)),
+                )
+                .await;
+            if let Err(error) = &result {
+                let _ = stream.send_json(&error_response(error), timeout).await;
+            }
+            return result;
         }
         if let DeviceTaskRequest::FileSystem { request, .. } = request {
             return self
@@ -479,6 +494,7 @@ impl TaskService {
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
                 filesystem_schema_version: Some(6),
+                transfer_schema_version: Some(pab_protocol::FILE_TRANSFER_SCHEMA_VERSION),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
@@ -512,7 +528,7 @@ impl TaskService {
                 })
             }
             DeviceTaskRequest::GetTransfer { request_id, .. } => {
-                let snapshot = self.store.get_transfer(initiated_by, request_id).await?;
+                let snapshot = self.lookup_transfer(initiated_by, request_id).await?;
                 Ok(DeviceTaskResponse::Transfer { snapshot })
             }
             DeviceTaskRequest::ListDirectory {
@@ -638,6 +654,7 @@ impl TaskService {
                 })
             }
             DeviceTaskRequest::Subscribe { .. }
+            | DeviceTaskRequest::TransferFile { .. }
             | DeviceTaskRequest::UploadFile { .. }
             | DeviceTaskRequest::DownloadFile { .. } => unreachable!("handled before dispatch"),
         }

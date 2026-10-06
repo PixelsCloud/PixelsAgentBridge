@@ -23,11 +23,13 @@ mod operator;
 mod peer;
 mod platform;
 pub use execution_identity::*;
+mod file_transfer;
 mod relay_control;
 mod relay_policy;
 mod screenshot;
 mod task;
 mod task_session;
+pub use file_transfer::*;
 mod window;
 
 pub use control::{

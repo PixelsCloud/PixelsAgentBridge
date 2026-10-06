@@ -30,6 +30,6 @@ pub(super) async fn download(
     offset: u64,
 ) -> Result<(), TaskServiceError> {
     TransferEngine::local(store, request_id, &UploadPathLocks::default())
-        .download(stream, timeout, path, offset)
+        .download(stream, timeout, path, offset, None)
         .await
 }

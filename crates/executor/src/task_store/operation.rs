@@ -12,7 +12,7 @@ impl TaskStore {
         request_id: RequestId,
     ) -> Result<TransferSnapshot, TaskStoreError> {
         let row = sqlx::query(
-            "SELECT initiated_by_json, direction, path, state, offset, size, sha256, finished_at_unix_ms, message FROM transfer_operations WHERE request_id = ?",
+            "SELECT o.initiated_by_json, o.direction, o.path, o.state, o.offset, o.size, o.sha256, o.finished_at_unix_ms, o.message, e.context_json FROM transfer_operations o LEFT JOIN transfer_execution e ON e.request_id=o.request_id WHERE o.request_id = ?",
         )
         .bind(request_id.to_string())
         .fetch_optional(&self.pool)
@@ -23,6 +23,10 @@ impl TaskStore {
             return Err(TaskStoreError::NotFound);
         }
         let mut snapshot = TransferSnapshot {
+            execution_context: row
+                .try_get::<Option<String>, _>("context_json")?
+                .map(|value| serde_json::from_str(&value))
+                .transpose()?,
             request_id,
             initiated_by: stored_actor,
             direction: row.try_get("direction")?,
@@ -48,6 +52,10 @@ impl TaskStore {
         // completion. Resolve that window using file evidence, never by replay.
         if snapshot.direction == "receive"
             && snapshot.state == "committing"
+            && snapshot
+                .execution_context
+                .as_ref()
+                .is_none_or(|context| context.identity.is_none())
             && publication_matches(&snapshot).await
         {
             self.finish_transfer(request_id, "completed", None).await?;
