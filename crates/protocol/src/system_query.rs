@@ -2,11 +2,15 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 11;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SystemQuery {
+    Applications {
+        execution: crate::ExecutionSelection,
+        query: crate::AppQuery,
+    },
     ExecutionContexts {
         user: Option<String>,
         include_system: bool,
@@ -81,6 +85,7 @@ pub enum SystemQuery {
 impl SystemQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Applications { query, .. } => query.kind(),
             Self::ExecutionContexts { .. } => "execution_contexts",
             Self::Container { query } => query.kind(),
             Self::Git { query } => query.kind(),
@@ -100,6 +105,9 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::Applications { .. }) {
+            return 12;
+        }
         if matches!(self, Self::Git { query } if !query.execution.is_service()) {
             return 11;
         }
@@ -158,6 +166,9 @@ impl SystemQuery {
         }
     }
     pub fn is_mutation(&self) -> bool {
+        if let Self::Applications { query, .. } = self {
+            return query.is_mutation();
+        }
         if let Self::Container { query } = self {
             return query.is_mutation();
         }
@@ -213,6 +224,12 @@ impl SystemQuery {
         value
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Applications { execution, query } = self {
+            if !matches!(execution, crate::ExecutionSelection::DesktopUser { .. }) {
+                return Err("applications require an explicit desktop_user execution context");
+            }
+            return query.validate();
+        }
         if let Self::Container { query } = self {
             return query.validate();
         }
@@ -332,10 +349,13 @@ pub struct SystemQueryReply {
 }
 impl SystemQueryReply {
     pub fn pending(id: RequestId, query: &SystemQuery) -> Self {
+        Self::pending_kind(id, query.kind())
+    }
+    pub fn pending_kind(id: RequestId, kind: &str) -> Self {
         Self {
             execution_context: None,
             request_id: id,
-            kind: query.kind().into(),
+            kind: kind.into(),
             state: "running".into(),
             sampled_from_unix_ms: None,
             sampled_at_unix_ms: None,
@@ -353,6 +373,9 @@ impl SystemQueryReply {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SystemQueryData {
+    Applications {
+        snapshot: crate::AppSnapshot,
+    },
     ExecutionContexts {
         backend: String,
         entries: Vec<crate::ExecutionContextEntry>,

@@ -93,7 +93,7 @@ impl SystemCollector {
             reply.cpu_sample_ms = Some(sample.elapsed().as_millis() as u64);
         }
         reply.data = match query {
-            SystemQuery::Desktop { .. } => {
+            SystemQuery::Applications { .. } | SystemQuery::Desktop { .. } => {
                 reply.state = "failed".into();
                 reply.error = Some("desktop query requires the interactive helper".into());
                 return reply;
@@ -459,6 +459,9 @@ pub fn bound_reply(reply: &mut SystemQueryReply) {
     reply.warnings.truncate(8);
     loop {
         reply.returned_count = match &reply.data {
+            Some(SystemQueryData::Applications {
+                snapshot: AppSnapshot::List { snapshot },
+            }) => snapshot.apps.len() as u32,
             Some(SystemQueryData::ExecutionContexts { entries, .. }) => entries.len() as u32,
             Some(SystemQueryData::Services { entries, .. }) => entries.len() as u32,
             Some(SystemQueryData::Connections { entries, .. }) => entries.len() as u32,
@@ -476,6 +479,12 @@ pub fn bound_reply(reply: &mut SystemQueryReply) {
         reply.truncated = true;
         reply.stop_reason = Some("output_bytes_limit".into());
         let removed = match &mut reply.data {
+            Some(SystemQueryData::Applications {
+                snapshot: AppSnapshot::List { snapshot },
+            }) => {
+                snapshot.truncated = true;
+                snapshot.apps.pop().is_some()
+            }
             Some(SystemQueryData::ExecutionContexts { entries, .. }) => entries.pop().is_some(),
             Some(SystemQueryData::Services { entries, .. }) => entries.pop().is_some(),
             Some(SystemQueryData::Connections { entries, .. }) => entries.pop().is_some(),
@@ -491,8 +500,19 @@ pub fn bound_reply(reply: &mut SystemQueryReply) {
             _ => false,
         };
         if !removed {
+            let application_effect = matches!(
+                &reply.data,
+                Some(SystemQueryData::Applications {
+                    snapshot: AppSnapshot::Action { .. }
+                })
+            );
             reply.data = None;
-            reply.state = "failed".into();
+            reply.state = if application_effect {
+                "unconfirmed"
+            } else {
+                "failed"
+            }
+            .into();
             reply.error = Some("result exceeds output budget".into());
             break;
         }

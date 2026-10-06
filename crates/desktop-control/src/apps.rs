@@ -1,6 +1,94 @@
 //! Runs inside the selected desktop helper, never in a root/SYSTEM service as a
 //! substitute for the requested session. Public transport routing is separate.
 use pab_protocol::*;
+
+/// Called only in the helper selected by the service. Recheck native identity
+/// and the active desktop immediately before dispatch and after the native call.
+pub fn query_guarded(
+    id: RequestId,
+    query: &AppQuery,
+    expected: &ExecutionIdentity,
+    active: impl Fn() -> bool,
+) -> SystemQueryReply {
+    let mut reply = SystemQueryReply::pending_kind(id, query.kind());
+    let now = || {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64
+    };
+    reply.sampled_from_unix_ms = Some(now());
+    let verify = || -> Result<(), String> {
+        query.validate().map_err(str::to_owned)?;
+        expected.validate().map_err(str::to_owned)?;
+        if !active() {
+            return Err("desktop_session_unavailable: selected desktop is not active".into());
+        }
+        #[cfg(any(windows, target_os = "macos"))]
+        {
+            let observed = session_identity()?
+                .observation(
+                    ExecutionMode::DesktopUser,
+                    ExecutionEnvironmentSource::InteractiveSession,
+                )
+                .map_err(|e| e.to_string())?;
+            if &observed != expected {
+                return Err("desktop_identity_changed: query execution contexts again".into());
+            }
+            Ok(())
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
+        Err(
+            "unsupported_platform: application management is unavailable on the headless product"
+                .into(),
+        )
+    };
+    let result = verify()
+        .map_err(|e| AppActionError::new(false, e))
+        .and_then(|()| match query {
+            AppQuery::List { request } => list(request)
+                .map(|snapshot| AppSnapshot::List { snapshot })
+                .map_err(|e| AppActionError::new(false, e)),
+            AppQuery::Execute { request } => {
+                act(request).map(|result| AppSnapshot::Action { result })
+            }
+        });
+    match result {
+        Ok(snapshot) => {
+            if let AppSnapshot::List { snapshot } = &snapshot {
+                reply.returned_count = snapshot.apps.len() as u32;
+                reply.truncated = snapshot.truncated;
+                if reply.truncated {
+                    reply.stop_reason = Some("application_snapshot_limit".into());
+                }
+            } else {
+                reply.returned_count = 1;
+            }
+            reply.data = Some(SystemQueryData::Applications { snapshot });
+            reply.state = "completed".into();
+            if let Err(error) = verify() {
+                reply.state = if query.is_mutation() {
+                    "unconfirmed"
+                } else {
+                    "failed"
+                }
+                .into();
+                reply.error = Some(error);
+            }
+        }
+        Err(error) => {
+            reply.state = if error.action_started {
+                "unconfirmed"
+            } else {
+                "failed"
+            }
+            .into();
+            reply.error = Some(error.message);
+        }
+    }
+    reply.sampled_at_unix_ms = Some(now());
+    reply
+}
 #[cfg(windows)]
 #[path = "apps/windows.rs"]
 mod native;
@@ -135,6 +223,32 @@ fn finish(request: &AppListRequest, snapshot: &mut AppListSnapshot) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn application_guard_rejects_inactive_or_mismatched_session_before_native_action() {
+        let mut identity = pab_os_control::execution::current_identity()
+            .unwrap()
+            .observation(
+                ExecutionMode::User,
+                ExecutionEnvironmentSource::NativeAccount,
+            )
+            .unwrap();
+        identity.mode = ExecutionMode::DesktopUser;
+        identity.environment_source = ExecutionEnvironmentSource::InteractiveSession;
+        identity.session_id = Some("invalid-session".into());
+        let query = AppQuery::Execute {
+            request: AppActionRequest::Launch {
+                application: AppTarget::Id {
+                    id: "fixture.never-launched".into(),
+                },
+            },
+        };
+        for active in [false, true] {
+            let reply = query_guarded(RequestId::new(), &query, &identity, || active);
+            assert_eq!(reply.state, "failed");
+            assert!(reply.data.is_none());
+            assert!(reply.error.is_some());
+        }
+    }
     #[test]
     fn discovery_filters_before_limiting_and_bounds_escaped_wire_bytes() {
         let identity = pab_os_control::execution::current_identity()

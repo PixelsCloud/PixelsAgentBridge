@@ -35,6 +35,10 @@ const DEFAULT_PORT: u16 = 7843;
 const AUTH_TIMEOUT: Duration = Duration::from_secs(5);
 type HmacSha256 = Hmac<Sha256>;
 pub type LocalSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
+#[path = "local_ipc_applications.rs"]
+pub(crate) mod applications;
+#[path = "local_ipc_helper_identity.rs"]
+mod helper_identity;
 
 struct HelperRegistration(Option<u64>);
 impl Drop for HelperRegistration {
@@ -51,9 +55,17 @@ struct WindowProvider {
     sender: mpsc::Sender<HelperRequest>,
     screenshot_schema_version: Option<u16>,
     desktop_schema_version: Option<u16>,
+    identity: Option<helper_identity::VerifiedHelper>,
+    application_schema_version: Option<u16>,
 }
 
 enum HelperRequest {
+    ApplicationQuery(
+        pab_protocol::RequestId,
+        pab_protocol::AppQuery,
+        pab_protocol::ExecutionIdentity,
+        oneshot::Sender<Result<pab_protocol::SystemQueryReply, LocalIpcError>>,
+    ),
     ReleaseUiConnection(pab_protocol::RequestId),
     DesktopQuery(
         pab_protocol::RequestId,
@@ -220,6 +232,11 @@ pub(crate) async fn request_desktop_input(event: DesktopInputEvent) -> Result<()
 
 #[derive(Debug)]
 pub enum LocalEvent {
+    ApplicationQuery(
+        pab_protocol::RequestId,
+        pab_protocol::AppQuery,
+        pab_protocol::ExecutionIdentity,
+    ),
     Status(crate::DeviceStatus),
     StatusUnavailable(String),
     ListWindows,
@@ -235,12 +252,28 @@ pub enum LocalEvent {
 }
 
 pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
-    send_json(socket, &json!({"type":"register_window_helper","screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
+    register_helper(socket, false).await
+}
+
+pub async fn register_application_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
+    register_helper(socket, true).await
+}
+
+async fn register_helper(
+    socket: &mut LocalSocket,
+    applications: bool,
+) -> Result<(), LocalIpcError> {
+    let pid = cfg!(any(windows, target_os = "macos")).then(std::process::id);
+    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(1),"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
             if frame["type"] == "window_helper_registered" {
                 return Ok(());
+            }
+            if frame["type"] == "verify_helper_identity" {
+                helper_identity::answer(&frame).await?;
+                continue;
             }
             if frame["type"] != "status" && frame["type"] != "error" {
                 return Err(LocalIpcError::Protocol);
@@ -254,6 +287,18 @@ pub async fn register_window_helper(socket: &mut LocalSocket) -> Result<(), Loca
 pub async fn next_local_event(socket: &mut LocalSocket) -> Result<LocalEvent, LocalIpcError> {
     let frame = receive_json(socket).await?;
     match frame["type"].as_str() {
+        Some("application_query") => {
+            let id = serde_json::from_value(frame["request_id"].clone())?;
+            let query: pab_protocol::AppQuery = serde_json::from_value(frame["query"].clone())?;
+            let identity: pab_protocol::ExecutionIdentity =
+                serde_json::from_value(frame["identity"].clone())?;
+            query.validate().map_err(|_| LocalIpcError::Protocol)?;
+            identity.validate().map_err(|_| LocalIpcError::Protocol)?;
+            if identity.mode != pab_protocol::ExecutionMode::DesktopUser {
+                return Err(LocalIpcError::Protocol);
+            }
+            Ok(LocalEvent::ApplicationQuery(id, query, identity))
+        }
         Some("status") => Ok(LocalEvent::Status(serde_json::from_value(
             frame["status"].clone(),
         )?)),
@@ -738,8 +783,9 @@ async fn handle_connection(
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
                     Some("register_window_helper") if registration.0.is_none() => {
+                        let identity=helper_identity::verify(&mut socket,&frame).await?;
                         let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
-                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()) });
+                        window_providers().lock().map_err(|_| LocalIpcError::Protocol)?.push(WindowProvider { id, sender: requests.clone(), screenshot_schema_version:frame["screenshot_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()),desktop_schema_version:frame["desktop_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), application_schema_version:frame["application_schema_version"].as_u64().and_then(|v|u16::try_from(v).ok()), identity });
                         registration.0 = Some(id);
                         tracing::info!(helper_id = id, "interactive window helper registered");
                         send_json(&mut socket, &json!({"type":"window_helper_registered"})).await?;
@@ -805,6 +851,12 @@ async fn handle_connection(
                     match request {
                         HelperRequest::ReleaseUiConnection(connection_id)=>{
                             send_json(&mut socket,&json!({"type":"release_ui_connection","connection_id":connection_id})).await?;
+                        },
+                        HelperRequest::ApplicationQuery(id,query,identity,reply)=>{
+                            if reply.is_closed(){continue;}
+                            send_json(&mut socket,&json!({"type":"application_query","request_id":id,"query":query,"identity":identity})).await?;
+                            screenshot_deadline=Some(tokio::time::Instant::now()+Duration::from_secs(30));
+                            pending=Some(PendingRequest::DesktopQuery{id,kind:query.kind().into(),reply});
                         },
                         HelperRequest::DesktopQuery(id,query,context,reply)=>{
                             if reply.is_closed(){continue;}
@@ -875,6 +927,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static TEST_HELPER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    #[cfg(any(windows, target_os = "macos"))]
+    include!("local_ipc_application_tests.rs");
 
     async fn screenshot_helper() -> (
         tempfile::TempDir,
@@ -1660,7 +1714,9 @@ mod tests {
                     }
                     Ok(LocalEvent::DesktopInput(_)) => panic!("unexpected desktop input"),
                     Ok(LocalEvent::ReleaseUiConnection(_)) => {}
-                    Ok(LocalEvent::DesktopQuery(..)) => panic!("unexpected desktop query"),
+                    Ok(LocalEvent::DesktopQuery(..) | LocalEvent::ApplicationQuery(..)) => {
+                        panic!("unexpected desktop query")
+                    }
                     Err(error) => panic!("helper connection failed: {error}"),
                 }
             }
@@ -1709,7 +1765,9 @@ mod tests {
                         panic!("unexpected screenshot request")
                     }
                     LocalEvent::DesktopInput(_) => panic!("unexpected desktop input"),
-                    LocalEvent::DesktopQuery(..) => panic!("unexpected desktop query"),
+                    LocalEvent::DesktopQuery(..) | LocalEvent::ApplicationQuery(..) => {
+                        panic!("unexpected desktop query")
+                    }
                 }
             }
         });

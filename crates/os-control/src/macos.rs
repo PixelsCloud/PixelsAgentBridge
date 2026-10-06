@@ -12,7 +12,7 @@ unsafe extern "C" {
     fn proc_signal_with_audittoken(token: *const [u32; 8], signal: i32) -> i32;
 }
 
-fn audit_token(pid: u32) -> Result<[u32; 8], String> {
+pub(crate) fn audit_token(pid: u32) -> Result<[u32; 8], String> {
     let pid = i32::try_from(pid).map_err(|_| "invalid PID")?;
     let mut port = 0;
     let mut token = [0; 8];

@@ -145,6 +145,13 @@ fn running(identity: &UserIdentity, snapshot: &mut AppListSnapshot) -> Result<()
             skipped += 1;
             continue;
         };
+        let Ok(owner) = pab_os_control::execution::process_user_identity(pid) else {
+            skipped += 1;
+            continue;
+        };
+        if owner.account_id != identity.account_id || owner.session_id != identity.session_id {
+            continue;
+        }
         let path = unsafe {
             let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
                 skipped += 1;
@@ -183,7 +190,7 @@ fn running(identity: &UserIdentity, snapshot: &mut AppListSnapshot) -> Result<()
             instance: Some(AppInstance {
                 process_id: pid,
                 process_identity: marker,
-                account_id: None,
+                account_id: Some(owner.account_id),
                 session_id: Some(session.to_string()),
             }),
         });

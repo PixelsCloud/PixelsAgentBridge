@@ -165,18 +165,23 @@ pub(crate) fn act(
         pid
     };
     let instance = pid.and_then(|pid| {
+        let marker = pab_os_control::process_identity(pid).ok()?;
+        let owner = pab_os_control::execution::process_user_identity(pid).ok()?;
         let mut session = 0;
         if unsafe {
             windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId(pid, &mut session)
         } == 0
             || Some(session) != identity.session_id
+            || owner.account_id != identity.account_id
+            || owner.session_id != identity.session_id
+            || pab_os_control::process_identity(pid).ok().as_ref() != Some(&marker)
         {
             return None;
         }
         Some(AppInstance {
             process_id: pid,
-            process_identity: pab_os_control::process_identity(pid).ok()?,
-            account_id: None,
+            process_identity: marker,
+            account_id: Some(owner.account_id),
             session_id: Some(session.to_string()),
         })
     });

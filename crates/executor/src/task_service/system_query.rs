@@ -15,8 +15,49 @@ impl TaskService {
             drop(jobs);
             return self.get_system_query(actor, id).await;
         }
-        let mut git_context = None;
+        let mut operation_context = None;
         let mut git_user = None;
+        let mut application_route = None;
+        if let SystemQuery::Applications { execution, .. } = &query {
+            if !cfg!(any(windows, target_os = "macos")) {
+                return Err(TaskServiceError::InvalidRequest(
+                    "unsupported_platform: application management is unavailable on the headless product",
+                ));
+            }
+            let caller = pab_task_runtime::ExecutionCaller {
+                device: self.device_ref,
+                actor,
+                connection: self.ui_connection.id,
+            };
+            let identity = self
+                .ui_connection
+                .execution_contexts
+                .lock()
+                .await
+                .identity(caller, *execution)
+                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?
+                .clone();
+            let selected = identity.clone();
+            application_route = Some(
+                tokio::task::spawn_blocking(move || {
+                    crate::local_ipc::applications::ApplicationRoute::select(&selected)
+                })
+                .await?
+                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?,
+            );
+            self.ui_connection
+                .execution_contexts
+                .lock()
+                .await
+                .resolve(caller, *execution, &identity)
+                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?;
+            let mut context = self.execution_context.clone();
+            context.cwd = None;
+            context.interpreter = None;
+            context.environment_revision = "interactive-session-v1".into();
+            context.identity = Some(identity);
+            operation_context = Some(context);
+        }
         if let SystemQuery::Git { query: git } = &query {
             let mut context = self.execution_context.clone();
             context.cwd = Some(git.repo.clone());
@@ -31,11 +72,11 @@ impl TaskService {
                 context.identity = Some(identity);
                 git_user = Some(prepared);
             }
-            git_context = Some(context);
+            operation_context = Some(context);
         }
         if !self
             .store
-            .accept_system_query_with_context(actor, id, &query, git_context.as_ref())
+            .accept_system_query_with_context(actor, id, &query, operation_context.as_ref())
             .await?
         {
             drop(jobs);
@@ -45,7 +86,7 @@ impl TaskService {
             Ok(p) => p,
             Err(_) => {
                 let mut r = SystemQueryReply::pending(id, &query);
-                r.execution_context = git_context.clone();
+                r.execution_context = operation_context.clone();
                 r.state = "failed".into();
                 r.error =
                     Some("executor_busy: system query queue is full (16 accepted queries)".into());
@@ -97,7 +138,7 @@ impl TaskService {
                 Some(Ok(Ok(p))) if !*cancelled.borrow() => p,
                 _ => {
                     let mut r = SystemQueryReply::pending(id, &query);
-                    r.execution_context = git_context.clone();
+                    r.execution_context = operation_context.clone();
                     if *cancelled.borrow() {
                         r.state = "cancelled".into();
                         r.error = Some("cancelled before execution".into());
@@ -140,6 +181,39 @@ impl TaskService {
                 if let Some(pab_protocol::SystemQueryData::ExecutionContexts { entries, .. }) =
                     &mut reply.data
                 {
+                    if let SystemQuery::ExecutionContexts { user, limit, .. } = &query {
+                        let identities = tokio::task::spawn_blocking(
+                            crate::local_ipc::applications::desktop_identities,
+                        )
+                        .await
+                        .unwrap_or_default();
+                        for identity in identities {
+                            if user.as_ref().is_some_and(|u| {
+                                !identity.account_name.eq_ignore_ascii_case(u)
+                                    && !identity
+                                        .account_name
+                                        .rsplit('\\')
+                                        .next()
+                                        .is_some_and(|n| n.eq_ignore_ascii_case(u))
+                            }) {
+                                continue;
+                            }
+                            if entries.len() >= *limit as usize {
+                                reply.truncated = true;
+                                reply.stop_reason = Some("entry_limit".into());
+                                break;
+                            }
+                            entries.push(pab_protocol::ExecutionContextEntry {
+                                mode: identity.mode,
+                                account_name: identity.account_name.clone(),
+                                account_id: Some(identity.account_id.clone()),
+                                session_id: identity.session_id.clone(),
+                                identity: Some(identity),
+                                selection: None,
+                                unavailable_reason: None,
+                            });
+                        }
+                    }
                     let caller = pab_task_runtime::ExecutionCaller {
                         device: service.device_ref,
                         actor,
@@ -155,14 +229,48 @@ impl TaskService {
                         } else {
                             match registry.register(caller, identity.clone()) {
                                 Ok(context_ref) => {
-                                    entry.selection =
-                                        Some(pab_protocol::ExecutionSelection::User { context_ref })
+                                    entry.selection = Some(
+                                        if identity.mode == pab_protocol::ExecutionMode::DesktopUser
+                                        {
+                                            pab_protocol::ExecutionSelection::DesktopUser {
+                                                context_ref,
+                                            }
+                                        } else {
+                                            pab_protocol::ExecutionSelection::User { context_ref }
+                                        },
+                                    )
                                 }
                                 Err(error) => entry.unavailable_reason = Some(error.to_string()),
                             }
                         }
                     }
                 }
+                pab_platform::bound_system_reply(&mut reply);
+                reply
+            } else if let SystemQuery::Applications { query: app, .. } = &query {
+                let mut reply = match application_route
+                    .expect("application route frozen")
+                    .execute(id, app.clone())
+                    .await
+                {
+                    Ok(reply) => reply,
+                    Err(error) => {
+                        let mut reply = SystemQueryReply::pending(id, &query);
+                        reply.state = if query.is_mutation()
+                            && !matches!(
+                                error,
+                                crate::local_ipc::LocalIpcError::WindowHelperUnavailable
+                            ) {
+                            "unconfirmed"
+                        } else {
+                            "failed"
+                        }
+                        .into();
+                        reply.error = Some(error.to_string());
+                        reply
+                    }
+                };
+                reply.execution_context = operation_context.clone();
                 pab_platform::bound_system_reply(&mut reply);
                 reply
             } else if let SystemQuery::Desktop {
@@ -204,7 +312,7 @@ impl TaskService {
                             prepared,
                             id,
                             git.clone(),
-                            git_context.clone().expect("Git context frozen"),
+                            operation_context.clone().expect("Git context frozen"),
                             service.store.clone(),
                             cancelled,
                         )
@@ -219,7 +327,7 @@ impl TaskService {
                                 .get_system_query(actor, id)
                                 .await
                                 .unwrap_or_else(|_| SystemQueryReply::pending(id, &query));
-                            reply.execution_context = git_context.clone();
+                            reply.execution_context = operation_context.clone();
                             reply.state = "unconfirmed".into();
                             reply.error=Some("user Git worker result unconfirmed; inspect the original operation, do not replay".into());
                             reply
@@ -231,7 +339,7 @@ impl TaskService {
                         git,
                         cancelled,
                         super::git::GitSink::Store(Some(service.store.clone())),
-                        git_context.clone(),
+                        operation_context.clone(),
                     )
                     .await
                 }

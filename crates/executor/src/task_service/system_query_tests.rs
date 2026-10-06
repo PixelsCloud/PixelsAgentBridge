@@ -6,6 +6,19 @@ use pab_protocol::{
 };
 use std::time::Duration;
 
+#[cfg(not(any(windows, target_os = "macos")))]
+#[tokio::test]
+async fn applications_are_explicitly_unsupported_on_headless_without_gui_probe() {
+    use pab_protocol::*;
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let result = svc.system_query(actor(), RequestId::new(), SystemQuery::Applications {
+        execution: ExecutionSelection::DesktopUser { context_ref: ExecutionContextRef::new() },
+        query: AppQuery::List { request: AppListRequest { scope: AppListScope::Installed, search: String::new(), limit: 10 } },
+    }).await;
+    assert!(result.unwrap_err().to_string().contains("unsupported_platform"));
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn execution_context_query_binds_native_user_references_to_each_mcp_connection() {

@@ -229,6 +229,24 @@ pub(super) fn current_identity() -> io::Result<UserIdentity> {
     identity.primary_group = Some(unsafe { libc::getegid() });
     Ok(identity)
 }
+pub(super) fn process_user_identity(pid: u32) -> io::Result<UserIdentity> {
+    #[cfg(target_os = "macos")]
+    {
+        let token = crate::macos::audit_token(pid).map_err(io::Error::other)?;
+        let mut identity = lookup(token[1])?.identity;
+        identity.primary_group = Some(token[2]);
+        identity.session_id = Some(token[6]);
+        Ok(identity)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = pid;
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "desktop helper observation is unavailable on the headless product",
+        ))
+    }
+}
 pub(super) struct UserProcess {
     child: Child,
     exited: bool,

@@ -63,7 +63,7 @@ async fn run_forever(expected_desktop: Option<String>) -> Result<(), String> {
         }
         match local_ipc::connect_local().await {
             Ok(mut socket) => {
-                if let Err(error) = local_ipc::register_window_helper(&mut socket).await {
+                if let Err(error) = local_ipc::register_application_helper(&mut socket).await {
                     tracing::warn!(%error, "session helper registration failed");
                 } else {
                     tracing::info!(
@@ -108,6 +108,14 @@ async fn serve_requests(
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
             LocalEvent::ReleaseUiConnection(connection) => {
                 desktop_session.release_ui_connection(connection)
+            }
+            LocalEvent::ApplicationQuery(id, query, identity) => {
+                let reply = pab_desktop_control::apps::query_guarded(id, &query, &identity, || {
+                    desktop_is_active(expected_desktop)
+                });
+                local_ipc::reply_desktop_query(socket, &reply)
+                    .await
+                    .map_err(|e| e.to_string())?;
             }
             LocalEvent::DesktopQuery(id, query, context) => {
                 let mut reply = if desktop_is_active(expected_desktop) {

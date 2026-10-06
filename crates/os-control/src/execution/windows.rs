@@ -352,6 +352,19 @@ pub(super) fn current_identity() -> io::Result<UserIdentity> {
     }
     identity(&Handle(raw))
 }
+pub(super) fn process_user_identity(pid: u32) -> io::Result<UserIdentity> {
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if process.is_null() {
+        return Err(io::Error::last_os_error());
+    }
+    let process = Handle(process);
+    let mut raw = ptr::null_mut();
+    if unsafe { OpenProcessToken(process.0, TOKEN_QUERY, &mut raw) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    identity(&Handle(raw))
+}
 pub(super) struct UserProcess {
     process: Handle,
     job: Handle,

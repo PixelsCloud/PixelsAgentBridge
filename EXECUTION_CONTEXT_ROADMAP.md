@@ -323,7 +323,8 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E2用户环境首批 | 用户 PATH、Mac Homebrew/系统 paths、选中用户 SSH agent 查询及身份环境覆盖校验已实现；Mac/Linux 原生切换实测通过，见 acceptance/execution-e2-environment-2026-10-07.md；真实认证等仍待验收 |
 | E4应用发现后端 | Windows AppsFolder/可见应用进程、Mac 标准应用目录/NSWorkspace、搜索与有界响应已实测，Linux明确不支持；见 acceptance/execution-e4-app-discovery-2026-10-07.md。公开工具与桌面身份路由待实现，启动/打开后端进度见下一行 |
 | E4启动/打开后端 | Windows Shell、Mac NSWorkspace 的 ID/路径启动及指定/默认应用打开文件已实现并实测首批流程，见 acceptance/execution-e4-app-actions-2026-10-07.md；仍需桌面身份路由/持久化/公开工具接入。Mac锁屏下保留一份测试文档待解锁后清理 |
+| E4应用身份路由/记录 | system-query v12、内核核验helper进程身份、连接绑定desktop_user上下文、接受前冻结通道/身份及原记录去重已接入；双桌面编译/IPC与Linux拒绝边界通过，见 acceptance/execution-e4-app-routing-2026-10-07.md；正式入口与完整生命周期仍待完成 |
 | E2–E8剩余增量 | 用户环境/真实凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 实现应用操作的桌面身份/helper路由与持久化、正式工具及UI，处理锁屏边界和Mac测试文档清理；继续真实Git凭据、终端启动模式、完整异常矩阵和打包安装验收 |
+| 下一动作 | 接入三个正式MCP应用工具及UI；补足用户helper供给和阻塞调用生命周期，处理锁屏边界及Mac测试文档清理；继续真实Git凭据、终端启动模式、完整异常矩阵和打包安装验收 |

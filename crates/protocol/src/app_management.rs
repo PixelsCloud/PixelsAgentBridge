@@ -1,5 +1,37 @@
 //! Application discovery is a bounded snapshot, not a paginated process list.
 use serde::{Deserialize, Serialize};
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum AppQuery {
+    List { request: AppListRequest },
+    Execute { request: AppActionRequest },
+}
+impl AppQuery {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        match self {
+            Self::List { request } => request.validate(),
+            Self::Execute { request } => request.validate(),
+        }
+    }
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::List { .. } => "app_list",
+            Self::Execute {
+                request: AppActionRequest::Launch { .. },
+            } => "app_launch",
+            Self::Execute { .. } => "app_open_file",
+        }
+    }
+    pub fn is_mutation(&self) -> bool {
+        matches!(self, Self::Execute { .. })
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AppSnapshot {
+    List { snapshot: AppListSnapshot },
+    Action { result: AppActionResult },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -140,6 +172,45 @@ pub struct AppListSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn application_query_requires_explicit_desktop_selection_and_version_12() {
+        use crate::{ExecutionContextRef, ExecutionSelection, SystemQuery};
+        let app = AppQuery::Execute {
+            request: AppActionRequest::OpenFile {
+                path: "/tmp/example.txt".into(),
+                application: None,
+            },
+        };
+        for execution in [
+            ExecutionSelection::Service {},
+            ExecutionSelection::User {
+                context_ref: ExecutionContextRef::new(),
+            },
+        ] {
+            assert!(
+                SystemQuery::Applications {
+                    execution,
+                    query: app.clone()
+                }
+                .validate()
+                .is_err()
+            );
+        }
+        let query = SystemQuery::Applications {
+            execution: ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            },
+            query: app,
+        };
+        assert!(query.validate().is_ok());
+        assert_eq!(query.required_version(), 12);
+        assert!(query.is_mutation());
+        assert_eq!(query.kind(), "app_open_file");
+        assert_eq!(
+            serde_json::from_value::<SystemQuery>(serde_json::to_value(&query).unwrap()).unwrap(),
+            query
+        );
+    }
     #[test]
     fn application_actions_reject_extra_arguments_and_malformed_targets() {
         for value in [

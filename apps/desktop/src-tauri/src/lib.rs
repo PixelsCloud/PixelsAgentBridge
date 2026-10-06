@@ -55,7 +55,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                 }
                 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
                 if let Err(error) =
-                    pab_executor::local_ipc::register_window_helper(&mut socket).await
+                    pab_executor::local_ipc::register_application_helper(&mut socket).await
                 {
                     tracing::debug!(%error, "window helper registration failed");
                 }
@@ -86,6 +86,25 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             connection,
                         ))) => {
                             desktop_session.release_ui_connection(connection);
+                        }
+                        Ok(Ok(pab_executor::local_ipc::LocalEvent::ApplicationQuery(
+                            id,
+                            query,
+                            identity,
+                        ))) => {
+                            let reply = pab_desktop_control::apps::query_guarded(
+                                id,
+                                &query,
+                                &identity,
+                                || session_helper::desktop_is_active(Some("Default")),
+                            );
+                            if let Err(error) =
+                                pab_executor::local_ipc::reply_desktop_query(&mut socket, &reply)
+                                    .await
+                            {
+                                tracing::debug!(%error, "application query response failed");
+                                break;
+                            }
                         }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopQuery(
                             id,

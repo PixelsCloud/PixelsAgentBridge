@@ -32,6 +32,19 @@ pub struct UserIdentity {
     pub logon_id: Option<String>,
 }
 
+/// Observe a live desktop helper through native process credentials, not fields
+/// supplied by its registration message. The caller must also prove IPC peer PID.
+pub fn process_user_identity(pid: u32) -> io::Result<UserIdentity> {
+    let before = crate::process_identity(pid).map_err(io::Error::other)?;
+    let identity = native::process_user_identity(pid)?;
+    if crate::process_identity(pid).map_err(io::Error::other)? != before {
+        return Err(io::Error::other(
+            "process identity changed during observation",
+        ));
+    }
+    Ok(identity)
+}
+
 impl UserIdentity {
     pub fn observation(
         &self,
