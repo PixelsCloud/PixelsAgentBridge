@@ -36,6 +36,7 @@ pub trait UiBackend {
         &mut self,
         node: &Self::Element,
         max: usize,
+        deadline: Instant,
     ) -> Result<(Vec<Self::Element>, bool), &'static str>;
     fn read(
         &mut self,
@@ -142,6 +143,17 @@ impl<B: UiBackend> UiEngine<B> {
         selector: &UiSelector,
         condition: &UiCondition,
     ) -> UiSnapshot {
+        self.sample_with_budget(owner, ticket, scope, selector, condition, 3000)
+    }
+    pub fn sample_with_budget(
+        &mut self,
+        owner: &UiOwner,
+        ticket: Option<&UiWindow>,
+        scope: &UiScope,
+        selector: &UiSelector,
+        condition: &UiCondition,
+        timeout_ms: u32,
+    ) -> UiSnapshot {
         let request = match scope {
             UiScope::Element { element_ref } => UiRequest::Get {
                 element_ref: element_ref.clone(),
@@ -150,7 +162,10 @@ impl<B: UiBackend> UiEngine<B> {
             UiScope::Window { .. } => UiRequest::Query {
                 scope: scope.clone(),
                 selector: selector.clone(),
-                limits: UiQueryLimits::default(),
+                limits: UiQueryLimits {
+                    timeout_ms,
+                    ..Default::default()
+                },
             },
         };
         let mut result = self.run(owner, ticket, &request);
@@ -286,7 +301,14 @@ impl<B: UiBackend> UiEngine<B> {
             }
             let remaining =
                 ((limits.max_visited - result.visited_count) as usize).saturating_sub(stack.len());
-            let (children, omitted) = self.backend.children(&target.node, remaining.min(2000))?;
+            let deadline = start + Duration::from_millis(limits.timeout_ms.into());
+            let (children, omitted) =
+                self.backend
+                    .children(&target.node, remaining.min(2000), deadline)?;
+            if Instant::now() >= deadline {
+                truncate(result, "time_budget");
+                break;
+            }
             if omitted {
                 truncate(result, "visit_budget");
             }

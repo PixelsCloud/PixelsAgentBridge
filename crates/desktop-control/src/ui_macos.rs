@@ -318,6 +318,7 @@ impl UiBackend for MacUi {
         &mut self,
         node: &AXUIElement,
         max: usize,
+        _deadline: std::time::Instant,
     ) -> Result<(Vec<AXUIElement>, bool), &'static str> {
         list(node, "AXChildren", max)
     }

@@ -69,12 +69,14 @@ impl DesktopSession {
                     scope,
                     selector,
                     condition,
+                    timeout_ms,
                     ..
                 } if context.sample => WorkerCommand::Sample {
                     ticket,
                     scope: scope.clone(),
                     selector: selector.clone(),
                     condition: condition.clone(),
+                    timeout_ms: (*timeout_ms).min(3000),
                 },
                 UiRequest::Wait { .. } => return Err("wait_requires_executor_sampling".into()),
                 _ if context.sample => return Err("invalid UI sample context".into()),
@@ -103,7 +105,14 @@ impl DesktopSession {
                 .ui_worker
                 .as_mut()
                 .unwrap()
-                .exchange(&value, Duration::from_millis(timeout as u64));
+                // Give bounded queries a small envelope to serialize their
+                // time-budget result. A genuinely blocked provider is still killed.
+                .exchange(
+                    &value,
+                    Duration::from_millis(
+                        timeout as u64 + if query.is_mutation() { 0 } else { 250 },
+                    ),
+                );
             let value = match response {
                 Ok(value) => value,
                 Err(error) => {

@@ -26,6 +26,7 @@ pub enum WorkerCommand {
         scope: UiScope,
         selector: UiSelector,
         condition: UiCondition,
+        timeout_ms: u32,
     },
     ReleaseOwner,
     ReleaseWindow {
@@ -55,22 +56,24 @@ pub fn serve<B: UiBackend>(backend: B) -> Result<(), WorkerFailure> {
                 scope,
                 selector,
                 condition,
+                timeout_ms,
             } => {
                 UiRequest::Wait {
                     scope: scope.clone(),
                     selector: selector.clone(),
                     condition: condition.clone(),
-                    timeout_ms: 5000,
-                    poll_ms: 250,
+                    timeout_ms,
+                    poll_ms: 100,
                 }
                 .validate()
                 .map_err(|_| WorkerFailure::InvalidFrame)?;
-                Some(engine.sample(
+                Some(engine.sample_with_budget(
                     &message.owner,
                     ticket.as_ref(),
                     &scope,
                     &selector,
                     &condition,
+                    timeout_ms,
                 ))
             }
             WorkerCommand::ReleaseOwner => {

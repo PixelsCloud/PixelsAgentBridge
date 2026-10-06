@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use uiautomation::{
     UIAutomation, UIElement,
     patterns::*,
-    types::{ControlType, ExpandCollapseState, ToggleState},
+    types::{ControlType, ExpandCollapseState, ToggleState, TreeScope, UIProperty},
 };
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
 
@@ -28,6 +28,7 @@ impl Drop for UiApartment {
 }
 pub struct WindowsUi {
     automation: UIAutomation,
+    read_cache: uiautomation::core::UICacheRequest,
 }
 /// Cache UIA's opaque identity while retaining the native element. Comparing
 /// every pair through COM makes wide trees unnecessarily expensive.
@@ -50,8 +51,39 @@ impl std::ops::Deref for WindowsElement {
 }
 impl WindowsUi {
     pub fn new(_: &UiApartment) -> Result<Self, &'static str> {
+        let automation = UIAutomation::new_direct().map_err(|_| "uia_unavailable")?;
+        let read_cache = automation.create_cache_request().map_err(err)?;
+        read_cache.set_tree_scope(TreeScope::Element).map_err(err)?;
+        // Refresh one element, never the full tree or protected text values.
+        for property in [
+            UIProperty::ControlType,
+            UIProperty::Name,
+            UIProperty::AutomationId,
+            UIProperty::IsPassword,
+            UIProperty::IsEnabled,
+            UIProperty::IsOffscreen,
+            UIProperty::HasKeyboardFocus,
+            UIProperty::IsKeyboardFocusable,
+            UIProperty::BoundingRectangle,
+            UIProperty::ValueIsReadOnly,
+            UIProperty::ToggleToggleState,
+            UIProperty::SelectionItemIsSelected,
+            UIProperty::ExpandCollapseExpandCollapseState,
+        ] {
+            read_cache.add_property(property).map_err(err)?;
+        }
+        for pattern in [
+            UIPatternType::Invoke,
+            UIPatternType::Value,
+            UIPatternType::Toggle,
+            UIPatternType::SelectionItem,
+            UIPatternType::ExpandCollapse,
+        ] {
+            read_cache.add_pattern(pattern).map_err(err)?;
+        }
         Ok(Self {
-            automation: UIAutomation::new_direct().map_err(|_| "uia_unavailable")?,
+            automation,
+            read_cache,
         })
     }
     fn verify_window(&self, window: &UiWindow) -> Result<(), &'static str> {
@@ -65,8 +97,17 @@ impl WindowsUi {
         Ok(())
     }
 }
-fn err(_: uiautomation::Error) -> &'static str {
-    "provider_failed"
+fn native_error(code: i32) -> &'static str {
+    use windows::Win32::UI::Accessibility::{UIA_E_ELEMENTNOTAVAILABLE, UIA_E_TIMEOUT};
+    match code as u32 {
+        UIA_E_ELEMENTNOTAVAILABLE => "stale_element",
+        UIA_E_TIMEOUT => "provider_unresponsive",
+        0x80070005 => "accessibility_permission_required",
+        _ => "provider_failed",
+    }
+}
+fn err(error: uiautomation::Error) -> &'static str {
+    native_error(error.code())
 }
 fn optional<T>(
     v: uiautomation::Result<T>,
@@ -160,6 +201,7 @@ impl UiBackend for WindowsUi {
         &mut self,
         node: &WindowsElement,
         max: usize,
+        deadline: std::time::Instant,
     ) -> Result<(Vec<WindowsElement>, bool), &'static str> {
         let walker = self.automation.get_control_view_walker().map_err(err)?;
         let mut next = walk_child(&walker, node, false)?;
@@ -169,7 +211,7 @@ impl UiBackend for WindowsUi {
                 return Ok((children, false));
             };
             let child = WindowsElement::new(child);
-            if children.len() >= max {
+            if children.len() >= max || std::time::Instant::now() >= deadline {
                 return Ok((children, true));
             }
             if children.iter().any(|old| self.same(old, &child)) {
@@ -185,17 +227,19 @@ impl UiBackend for WindowsUi {
         node: &WindowsElement,
         include_value: bool,
     ) -> Result<UiElement, &'static str> {
-        let t = node.get_control_type().map_err(err)?;
+        let node = node.build_updated_cache(&self.read_cache).map_err(err)?;
+        let t = node.get_cached_control_type().map_err(err)?;
         let mut errors = BTreeMap::new();
-        let protected = optional(node.is_password(), "protected", &mut errors).unwrap_or(true);
+        let protected =
+            optional(node.is_cached_password(), "protected", &mut errors).unwrap_or(true);
         let mut actions = vec![];
-        if node.get_pattern::<UIInvokePattern>().is_ok() {
+        if node.get_cached_pattern::<UIInvokePattern>().is_ok() {
             actions.push(UiActionKind::Invoke);
         }
-        let value_pattern = node.get_pattern::<UIValuePattern>().ok();
+        let value_pattern = node.get_cached_pattern::<UIValuePattern>().ok();
         let read_only = value_pattern
             .as_ref()
-            .and_then(|p| optional(p.is_readonly(), "read_only", &mut errors));
+            .and_then(|p| optional(p.cached_is_readonly(), "read_only", &mut errors));
         if value_pattern.is_some() && read_only == Some(false) && !protected {
             actions.push(UiActionKind::SetValue);
         }
@@ -206,25 +250,25 @@ impl UiBackend for WindowsUi {
         } else {
             None
         };
-        let toggle = node.get_pattern::<UITogglePattern>().ok();
+        let toggle = node.get_cached_pattern::<UITogglePattern>().ok();
         let checked = toggle
             .as_ref()
-            .and_then(|p| optional(p.get_toggle_state(), "checked", &mut errors))
+            .and_then(|p| optional(p.get_cached_toggle_state(), "checked", &mut errors))
             .map(checked);
         if toggle.is_some() {
             actions.push(UiActionKind::SetChecked);
         }
-        let selection = node.get_pattern::<UISelectionItemPattern>().ok();
+        let selection = node.get_cached_pattern::<UISelectionItemPattern>().ok();
         let selected = selection
             .as_ref()
-            .and_then(|p| optional(p.is_selected(), "selected", &mut errors));
+            .and_then(|p| optional(p.is_cached_selected(), "selected", &mut errors));
         if selection.is_some() {
             actions.push(UiActionKind::Select);
         }
-        let expansion = node.get_pattern::<UIExpandCollapsePattern>().ok();
+        let expansion = node.get_cached_pattern::<UIExpandCollapsePattern>().ok();
         let expanded = expansion
             .as_ref()
-            .and_then(|p| optional(p.get_state(), "expanded", &mut errors))
+            .and_then(|p| optional(p.get_cached_state(), "expanded", &mut errors))
             .and_then(|v| match v {
                 ExpandCollapseState::Expanded => Some(true),
                 ExpandCollapseState::Collapsed => Some(false),
@@ -233,29 +277,33 @@ impl UiBackend for WindowsUi {
         if expanded.is_some() {
             actions.extend([UiActionKind::Expand, UiActionKind::Collapse]);
         }
-        if node.is_keyboard_focusable().unwrap_or(false) {
+        if node.is_cached_keyboard_focusable().unwrap_or(false) {
             actions.push(UiActionKind::Focus);
         }
-        let rect =
-            optional(node.get_bounding_rectangle(), "bounding_rect", &mut errors).map(|r| UiRect {
-                x: r.get_left(),
-                y: r.get_top(),
-                width: r.get_right().saturating_sub(r.get_left()).max(0) as u32,
-                height: r.get_bottom().saturating_sub(r.get_top()).max(0) as u32,
-            });
+        let rect = optional(
+            node.get_cached_bounding_rectangle(),
+            "bounding_rect",
+            &mut errors,
+        )
+        .map(|r| UiRect {
+            x: r.get_left(),
+            y: r.get_top(),
+            width: r.get_right().saturating_sub(r.get_left()).max(0) as u32,
+            height: r.get_bottom().saturating_sub(r.get_top()).max(0) as u32,
+        });
         Ok(UiElement {
             element_ref: String::new(),
             parent_ref: None,
             role: role(t),
             native_role: format!("{t:?}"),
-            name: optional(node.get_name(), "name", &mut errors),
-            identifier: optional(node.get_automation_id(), "identifier", &mut errors),
+            name: optional(node.get_cached_name(), "name", &mut errors),
+            identifier: optional(node.get_cached_automation_id(), "identifier", &mut errors),
             value,
             protected,
-            enabled: optional(node.is_enabled(), "enabled", &mut errors),
+            enabled: optional(node.is_cached_enabled(), "enabled", &mut errors),
             visible: None,
-            offscreen: optional(node.is_offscreen(), "offscreen", &mut errors),
-            focused: optional(node.has_keyboard_focus(), "focused", &mut errors),
+            offscreen: optional(node.is_cached_offscreen(), "offscreen", &mut errors),
+            focused: optional(node.has_cached_keyboard_focus(), "focused", &mut errors),
             read_only,
             checked,
             selected,
@@ -358,6 +406,6 @@ fn walk_child(
     } else {
         Some(unsafe { IUIAutomationElement::from_raw(output) })
     };
-    status.ok().map_err(|_| "provider_failed")?;
+    status.ok().map_err(|error| native_error(error.code().0))?;
     Ok(result.map(UIElement::from))
 }

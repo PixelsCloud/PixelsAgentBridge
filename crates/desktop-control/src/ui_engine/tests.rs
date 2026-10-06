@@ -38,7 +38,12 @@ impl UiBackend for Fake {
             Ok(())
         }
     }
-    fn children(&mut self, node: &u32, max: usize) -> Result<(Vec<u32>, bool), &'static str> {
+    fn children(
+        &mut self,
+        node: &u32,
+        max: usize,
+        _deadline: Instant,
+    ) -> Result<(Vec<u32>, bool), &'static str> {
         let state = self.state.lock().unwrap();
         let children = if *node == 0 {
             (1..=state.node_count.unwrap_or(2)).collect::<Vec<_>>()

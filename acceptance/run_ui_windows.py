@@ -88,6 +88,8 @@ def main():
                     start=time.monotonic(); sample=query(scan,ticket,timeout=12)
                     assert not sample["error_code"] and (not sample["truncated"] or sample["stop_reason"]=="time_budget"), sample
                     rounds.append({"ms":round((time.monotonic()-start)*1000),"visited":sample["visited_count"],"handles":handles(),"truncated":sample["truncated"]})
+                    if len(rounds)%10==0:
+                        print(json.dumps({"round":len(rounds),**rounds[-1]}),flush=True)
                 end=handles()
                 assert end<=baseline+8, (baseline,end)
                 report={"rounds":50,"baseline_handles":baseline,"final_handles":end,"max_ms":max(r["ms"] for r in rounds),"min_visited":min(r["visited"] for r in rounds),"bounded_query_ms":first_ms,"stop_reason":large["stop_reason"],"returned":len(large["elements"]),"response_bytes":reply_bytes}
