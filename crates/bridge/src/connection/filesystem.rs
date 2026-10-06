@@ -86,6 +86,22 @@ impl AuthenticatedDeviceConnection {
             ));
         }
         let mut data = Vec::with_capacity(reply.data_size as usize);
+        if let pab_protocol::FileSystemAction::ListDirectory { after, limit } = &request.operation
+            && reply.state == "completed"
+            && reply.directory.as_ref().is_none_or(|page| {
+                !super::directory::valid_directory_page(
+                    page,
+                    request.request_id,
+                    &request.path,
+                    after.as_deref(),
+                    *limit,
+                ) || page.execution_context != reply.execution_context
+            })
+        {
+            return Err(BridgeError::UnexpectedTaskResponse(
+                "directory page does not match selected execution request".into(),
+            ));
+        }
         while data.len() < reply.data_size as usize {
             let bytes = stream.receive_binary_frame(timeout).await?;
             if bytes.is_empty() || data.len() + bytes.len() > reply.data_size as usize {

@@ -56,6 +56,10 @@ impl FileSearchOptions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FileSystemAction {
+    ListDirectory {
+        after: Option<String>,
+        limit: u16,
+    },
     Copy {
         destination: String,
         recursive: bool,
@@ -123,6 +127,7 @@ pub enum FileSystemAction {
 impl FileSystemAction {
     pub const fn kind(&self) -> &'static str {
         match self {
+            Self::ListDirectory { .. } => "directory",
             Self::Copy { .. } => "file_copy",
             Self::Move { .. } => "file_move",
             Self::Delete { .. } => "file_delete",
@@ -167,6 +172,7 @@ impl FileSystemAction {
 
     pub fn schema_version(&self) -> u16 {
         match self {
+            Self::ListDirectory { .. } => 6,
             Self::Read {
                 range: TextReadRange::Stream { .. },
                 ..
@@ -209,7 +215,7 @@ impl FileSystemRequest {
         if self.execution.is_service() {
             self.operation.schema_version()
         } else {
-            5
+            self.operation.schema_version().max(5)
         }
     }
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -242,6 +248,17 @@ impl FileSystemRequest {
             return Err("destination requires 1..4096 bytes without NUL");
         }
         match &self.operation {
+            FileSystemAction::ListDirectory { after, limit }
+                if *limit == 0
+                    || *limit > crate::MAX_DIRECTORY_PAGE_ENTRIES
+                    || after.as_ref().is_some_and(|value| {
+                        value.is_empty()
+                            || value.len() > crate::MAX_DIRECTORY_NAME_BYTES
+                            || value.contains('\0')
+                    }) =>
+            {
+                return Err("directory page requires limit 1..64 and a valid name cursor");
+            }
             FileSystemAction::Search { options, .. }
                 if options.exclude.len() > 32
                     || options
@@ -422,6 +439,8 @@ pub struct FileSystemError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSystemReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub directory: Option<crate::DirectoryPage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_context: Option<crate::ExecutionContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub log: Option<LogReadState>,
@@ -451,6 +470,7 @@ pub struct FileSystemReply {
 impl FileSystemReply {
     pub fn pending(request: &FileSystemRequest) -> Self {
         Self {
+            directory: None,
             execution_context: None,
             log: None,
             patch_preview: None,
@@ -544,6 +564,17 @@ mod tests {
         };
         assert_eq!(request.schema_version(), 5);
         assert!(request.validate().is_ok());
+        request.operation = super::FileSystemAction::ListDirectory {
+            after: None,
+            limit: 64,
+        };
+        assert_eq!(request.schema_version(), 6);
+        assert!(request.validate().is_ok());
+        request.operation = super::FileSystemAction::ListDirectory {
+            after: None,
+            limit: 0,
+        };
+        assert!(request.validate().is_err());
         request.execution = crate::ExecutionSelection::DesktopUser {
             context_ref: crate::ExecutionContextRef::new(),
         };

@@ -35,7 +35,19 @@ impl Drop for Workspace {
         }
     }
 }
-async fn run(
+fn run<'a>(
+    svc: &'a TaskService,
+    user: u32,
+    path: &'a Path,
+    action: FileSystemAction,
+    payload: Vec<u8>,
+    cancel: bool,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = (FileSystemReply, Vec<u8>)> + 'a>> {
+    // Keep each native operation out of the large workflow future's stack frame.
+    Box::pin(run_inner(svc, user, path, action, payload, cancel))
+}
+
+async fn run_inner(
     svc: &TaskService,
     user: u32,
     path: &Path,
@@ -166,7 +178,9 @@ async fn dispatch(
 ) -> (FileSystemReply, Vec<u8>) {
     if !matches!(
         request.operation,
-        FileSystemAction::Write { .. } | FileSystemAction::Read { .. }
+        FileSystemAction::Write { .. }
+            | FileSystemAction::Read { .. }
+            | FileSystemAction::ListDirectory { .. }
     ) {
         return svc
             .execute_filesystem(actor(), request, payload)
@@ -520,6 +534,36 @@ async fn native_user_filesystem_worker_acceptance() {
     )
     .await;
     assert_eq!(std::fs::read(&copy).unwrap(), std::fs::read(&file).unwrap());
+    let first = success(
+        &svc,
+        user,
+        &root.path,
+        FileSystemAction::ListDirectory {
+            after: None,
+            limit: 1,
+        },
+        vec![],
+    )
+    .await
+    .0;
+    let page = first.directory.as_ref().unwrap();
+    assert_eq!(page.execution_context, first.execution_context);
+    assert_eq!(page.entries[0].name, "copy.txt");
+    let second = success(
+        &svc,
+        user,
+        &root.path,
+        FileSystemAction::ListDirectory {
+            after: page.next_after.clone(),
+            limit: 1,
+        },
+        vec![],
+    )
+    .await
+    .0;
+    let page = second.directory.unwrap();
+    assert_eq!(page.entries[0].name, "中文 data.txt");
+    assert!(page.next_after.is_none());
     let moved = root.path.join("moved.txt");
     success(
         &svc,
@@ -631,6 +675,21 @@ async fn native_user_filesystem_worker_acceptance() {
     .await
     .0;
     assert_eq!(denied.state, "failed", "{denied:?}");
+    let denied_listing = run(
+        &svc,
+        user,
+        &private,
+        FileSystemAction::ListDirectory {
+            after: None,
+            limit: 1,
+        },
+        vec![],
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(denied_listing.state, "failed", "{denied_listing:?}");
+    assert!(denied_listing.directory.is_none());
     assert!(!private.join("must-not-exist.txt").exists());
     let mut unconfirmed = original.clone();
     unconfirmed.request_id = RequestId::new();

@@ -319,6 +319,34 @@ impl super::filesystem_engine::FileEngine {
     ) -> Result<Vec<u8>, FileError> {
         let path = Path::new(&request.path);
         match &request.operation {
+            FileSystemAction::ListDirectory { after, limit } => {
+                let mut page = super::directory::list(
+                    request.request_id,
+                    request.path.clone(),
+                    after.clone(),
+                    *limit,
+                )
+                .await
+                .map_err(|error| match error {
+                    TaskServiceError::DirectoryRead(error) => io_error("list_directory", error),
+                    error => {
+                        FileError::new("directory_read_failed", "list_directory", error.to_string())
+                    }
+                })?;
+                page.execution_context = reply.execution_context.clone();
+                reply.directory = Some(page);
+                // Escaped filenames and repeated identity/path fields can exceed
+                // the normal file reply budget even with at most 64 entries.
+                if serde_json::to_vec(reply).map_or(true, |bytes| bytes.len() > 31 * 1024) {
+                    reply.directory = None;
+                    return Err(FileError::new(
+                        "directory_page_too_large",
+                        "list_directory",
+                        "encoded directory page is too large; retry with a smaller limit",
+                    ));
+                }
+                Ok(Vec::new())
+            }
             FileSystemAction::Copy { .. }
             | FileSystemAction::Move { .. }
             | FileSystemAction::Delete { .. }

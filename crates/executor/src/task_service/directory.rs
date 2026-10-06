@@ -98,6 +98,7 @@ pub(super) async fn list(
     }
     let next_after = has_more.then(|| entries.last().unwrap().name.clone());
     Ok(DirectoryPage {
+        execution_context: None,
         request_id,
         path,
         entries,

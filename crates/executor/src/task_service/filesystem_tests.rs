@@ -28,6 +28,46 @@ async fn execute(
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn directory_escaped_names_return_bounded_error_and_smaller_pages_work() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = service(dir.path()).await;
+    let files = dir.path().join("escaped");
+    tokio::fs::create_dir(&files).await.unwrap();
+    for index in 0..64 {
+        tokio::fs::write(
+            files.join(format!("{index:02}{}", "\u{1}".repeat(200))),
+            b"",
+        )
+        .await
+        .unwrap();
+    }
+    let make = |limit| {
+        request(
+            &files,
+            FileSystemAction::ListDirectory { after: None, limit },
+            &[],
+        )
+    };
+    let large = execute(&service, &make(64), &[]).await;
+    assert_eq!(large.state, "failed");
+    assert_eq!(
+        large.error.as_ref().unwrap().code,
+        "directory_page_too_large"
+    );
+    assert!(large.directory.is_none());
+    assert!(serde_json::to_vec(&large).unwrap().len() < 32 * 1024);
+    let small = execute(&service, &make(1), &[]).await;
+    assert_eq!(small.state, "completed");
+    let page = small.directory.unwrap();
+    assert_eq!(page.entries.len(), 1);
+    assert_eq!(
+        page.next_after.as_deref(),
+        Some(page.entries[0].name.as_str())
+    );
+}
+
+#[tokio::test]
 async fn write_read_patch_preserves_bom_newlines_and_permissions_for_all_encodings() {
     let dir = tempfile::tempdir().unwrap();
     let service = service(dir.path()).await;
@@ -698,7 +738,7 @@ async fn overload_rejects_before_acceptance_and_old_environment_payload_still_de
     assert!(matches!(
         &response,
         DeviceTaskResponse::Environment {
-            filesystem_schema_version: Some(5),
+            filesystem_schema_version: Some(6),
             ..
         }
     ));

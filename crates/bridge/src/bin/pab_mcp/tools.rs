@@ -168,6 +168,13 @@ pub(super) async fn call_tool(
         "pab_read_output" => read_output(runtime, arguments).await,
 
         "pab_list_directory" => {
+            let execution = serde_json::from_value(
+                arguments
+                    .get("execution")
+                    .cloned()
+                    .unwrap_or(json!({"mode":"service"})),
+            )
+            .map_err(|error| error.to_string())?;
             let device_ref = resolve_target(runtime, arguments).await?;
             let path = required_text(arguments, "path")?;
             let after = arguments.get("after").and_then(Value::as_str);
@@ -178,7 +185,7 @@ pub(super) async fn call_tool(
                 .await
                 .map_err(|error| error.to_string())?;
             let page = runtime
-                .list_directory(device_ref, path, after, limit)
+                .list_directory_as(device_ref, path, after, limit, execution)
                 .await
                 .map_err(|error| error.to_string())?;
             Ok(json!({ "page": page, "os_reminder": target.compact_reminder() }))

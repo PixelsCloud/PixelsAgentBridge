@@ -280,7 +280,10 @@ pub(super) fn tools() -> Vec<Value> {
                 json!({"type":"string","enum":["change","complete"],"default":"change"}),
             );
         }
-        if matches!(name.as_str(), "pab_run_command" | "pab_open_terminal") {
+        if matches!(
+            name.as_str(),
+            "pab_run_command" | "pab_open_terminal" | "pab_list_directory"
+        ) {
             properties.insert("execution".into(),json!({"oneOf":[
                 {"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},
                 {"type":"object","properties":{"mode":{"const":"user"},"context_ref":{"type":"string","format":"uuid"}},"required":["mode","context_ref"],"additionalProperties":false}
@@ -316,6 +319,9 @@ pub(super) fn tools() -> Vec<Value> {
             );
         }
         let extra = match name.as_str() {
+            "pab_list_directory" => {
+                " Defaults to service. User execution requires filesystem v6 and a current connection context_ref from pab_list_execution_contexts. Use the same selection for subsequent name-cursor pages. No service fallback; pages report actual execution identity. Directory contents may change between pages."
+            }
             "pab_run_command" => {
                 " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Output ranges are returned; use pab_read_output for bytes."
             }
@@ -414,7 +420,10 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     {
         super::mcp_filesystem::parse(name, args)?;
     }
-    if matches!(name, "pab_run_command" | "pab_open_terminal") {
+    if matches!(
+        name,
+        "pab_run_command" | "pab_open_terminal" | "pab_list_directory"
+    ) {
         let options = pab_protocol::CommandOptions {
             execution: serde_json::from_value(
                 args.get("execution")
@@ -547,6 +556,19 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn directory_user_selection_rejects_claimed_accounts_and_desktop() {
+        let mut args = serde_json::json!({"device_code":"123456789","path":"/home/fixture","execution":{"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()}});
+        super::validate_arguments("pab_list_directory", &args).unwrap();
+        for execution in [
+            serde_json::json!({"mode":"user","username":"root"}),
+            serde_json::json!({"mode":"service","context_ref":pab_protocol::ExecutionContextRef::new()}),
+            serde_json::json!({"mode":"desktop_user","context_ref":pab_protocol::ExecutionContextRef::new()}),
+        ] {
+            args["execution"] = execution;
+            assert!(super::validate_arguments("pab_list_directory", &args).is_err());
+        }
+    }
     #[test]
     fn terminal_user_selection_rejects_claimed_identity_and_desktop_mode() {
         let valid = serde_json::json!({"device_code":"123456789","execution":{"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()}});

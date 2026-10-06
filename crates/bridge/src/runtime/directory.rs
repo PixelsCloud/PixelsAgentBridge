@@ -3,6 +3,43 @@ use pab_protocol::{DeviceRef, DirectoryPage, RequestId};
 use super::{BridgeRuntime, RuntimeError};
 
 impl BridgeRuntime {
+    pub async fn list_directory_as(
+        &self,
+        device_ref: DeviceRef,
+        path: &str,
+        after: Option<&str>,
+        limit: u16,
+        execution: pab_protocol::ExecutionSelection,
+    ) -> Result<DirectoryPage, RuntimeError> {
+        if execution.is_service() {
+            return self.list_directory(device_ref, path, after, limit).await;
+        }
+        let request = pab_protocol::FileSystemRequest {
+            execution,
+            request_id: RequestId::new(),
+            path: path.to_owned(),
+            operation: pab_protocol::FileSystemAction::ListDirectory {
+                after: after.map(str::to_owned),
+                limit,
+            },
+            payload_size: 0,
+            payload_sha256: None,
+        };
+        let result = self.filesystem(device_ref, &request, &[]).await?;
+        if result.reply.state == "completed" {
+            if let Some(page) = result.reply.directory {
+                return Ok(page);
+            }
+        }
+        Err(
+            crate::BridgeError::UnexpectedTaskResponse(result.reply.error.map_or_else(
+                || "directory result was not confirmed".into(),
+                |error| format!("{}: {}", error.code, error.message),
+            ))
+            .into(),
+        )
+    }
+
     pub async fn list_directory(
         &self,
         device_ref: DeviceRef,

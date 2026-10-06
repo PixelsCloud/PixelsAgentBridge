@@ -475,7 +475,7 @@ impl TaskService {
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
-                filesystem_schema_version: Some(5),
+                filesystem_schema_version: Some(6),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {

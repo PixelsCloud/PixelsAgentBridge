@@ -24,6 +24,8 @@ pub struct DirectoryEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DirectoryPage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<crate::ExecutionContext>,
     pub request_id: RequestId,
     pub path: String,
     pub entries: Vec<DirectoryEntry>,

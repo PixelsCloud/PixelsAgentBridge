@@ -121,6 +121,7 @@ impl TaskStore {
             serde_json::from_str::<FileSystemReply>(&json)?
         } else {
             FileSystemReply {
+                directory: None,
                 execution_context: None,
                 log: None,
                 patch_preview: None,
@@ -172,7 +173,7 @@ impl TaskStore {
     pub async fn finish_filesystem(&self, reply: &FileSystemReply) -> Result<(), TaskStoreError> {
         let mut tx = self.pool.begin().await?;
         let changed = sqlx::query("UPDATE read_operations SET state = ?, finished_at_unix_ms = ?, message = ?, result_count = ? WHERE request_id = ? AND state IN ('running', 'committing', 'unconfirmed', 'cancel_requested')")
-            .bind(&reply.state).bind(super::operation::now_unix_ms()).bind(reply.error.as_ref().map(|error| error.message.as_str())).bind(reply.metadata.as_ref().map_or(0, |meta| meta.size.min(i64::MAX as u64) as i64)).bind(reply.request_id.to_string()).execute(&mut *tx).await?;
+            .bind(&reply.state).bind(super::operation::now_unix_ms()).bind(reply.error.as_ref().map(|error| error.message.as_str())).bind(reply.metadata.as_ref().map_or_else(|| reply.directory.as_ref().map_or(0, |page| page.entries.len() as i64), |meta| meta.size.min(i64::MAX as u64) as i64)).bind(reply.request_id.to_string()).execute(&mut *tx).await?;
         if changed.rows_affected() == 1 {
             let mut summary = reply.clone();
             summary.data_size = 0;

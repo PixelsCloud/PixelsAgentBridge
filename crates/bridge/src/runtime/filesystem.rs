@@ -137,8 +137,12 @@ impl RuntimeStore {
                 _ => {}
             }
         }
+        let count = reply
+            .directory
+            .as_ref()
+            .map(|page| page.entries.len() as i64);
         let changed = sqlx::query("UPDATE runtime_operations SET state = ?, finished_at_unix_ms = ?, message = ?, size = ?, offset = ? WHERE id = ? AND state IN ('running', 'cancel_requested')")
-            .bind(if terminal { reply.state.as_str() } else if summary.state == "cancel_requested" { "cancel_requested" } else { "running" }).bind(terminal.then(now_unix_ms)).bind(reply.error.as_ref().map(|error| format!("{} ({}): {}", error.code, error.phase, error.message))).bind(summary.progress.as_ref().map_or_else(|| reply.metadata.as_ref().map_or(0, |meta| meta.size.min(i64::MAX as u64) as i64), |progress| progress.total_bytes.min(i64::MAX as u64) as i64)).bind(summary.progress.as_ref().map_or(reply.data_size as i64, |progress| progress.completed_bytes.min(i64::MAX as u64) as i64)).bind(reply.request_id.to_string()).execute(&mut *tx).await?;
+            .bind(if terminal { reply.state.as_str() } else if summary.state == "cancel_requested" { "cancel_requested" } else { "running" }).bind(terminal.then(now_unix_ms)).bind(reply.error.as_ref().map(|error| format!("{} ({}): {}", error.code, error.phase, error.message))).bind(summary.progress.as_ref().map_or_else(|| count.unwrap_or_else(|| reply.metadata.as_ref().map_or(0, |meta| meta.size.min(i64::MAX as u64) as i64)), |progress| progress.total_bytes.min(i64::MAX as u64) as i64)).bind(summary.progress.as_ref().map_or(count.unwrap_or(reply.data_size as i64), |progress| progress.completed_bytes.min(i64::MAX as u64) as i64)).bind(reply.request_id.to_string()).execute(&mut *tx).await?;
         if changed.rows_affected() == 1 {
             sqlx::query("UPDATE runtime_filesystem_results SET reply_json = ? WHERE id = ?")
                 .bind(serde_json::to_string(&summary)?)
@@ -724,6 +728,68 @@ mod tests {
                 .state,
             "completed"
         );
+    }
+
+    #[tokio::test]
+    async fn directory_history_retains_page_and_counts_active_work() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bridge.sqlite3");
+        let queue = super::super::TransferQueue::open(&path, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&path).await.unwrap();
+        let device = DeviceRef {
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let code = "123456789".parse().unwrap();
+        let request = FileSystemRequest {
+            execution: pab_protocol::ExecutionSelection::User {
+                context_ref: pab_protocol::ExecutionContextRef::new(),
+            },
+            request_id: RequestId::new(),
+            path: "/tmp".into(),
+            operation: FileSystemAction::ListDirectory {
+                after: None,
+                limit: 1,
+            },
+            payload_size: 0,
+            payload_sha256: None,
+        };
+        store
+            .accept_filesystem(&request, device, Some(code), "guest", "owner")
+            .await
+            .unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 1);
+        let mut reply = FileSystemReply::pending(&request);
+        reply.state = "completed".into();
+        reply.directory = Some(pab_protocol::DirectoryPage {
+            request_id: request.request_id,
+            path: request.path.clone(),
+            execution_context: None,
+            entries: vec![pab_protocol::DirectoryEntry {
+                name: "a.txt".into(),
+                kind: pab_protocol::DirectoryEntryKind::File,
+                size: Some(3),
+            }],
+            next_after: Some("a.txt".into()),
+        });
+        store.save_filesystem_reply(&reply).await.unwrap();
+        assert_eq!(queue.active_for_device(code).await.unwrap(), 0);
+        drop(store);
+        let reopened = RuntimeStore::open(&path).await.unwrap();
+        assert_eq!(
+            reopened
+                .filesystem_record(request.request_id, Some(code), "guest", "owner")
+                .await
+                .unwrap()
+                .1
+                .directory,
+            reply.directory
+        );
+        let records = reopened.operations().await.unwrap();
+        assert_eq!(records[0].kind, "directory");
+        assert_eq!((records[0].offset, records[0].size), (1, 1));
     }
 
     #[tokio::test]

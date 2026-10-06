@@ -33,7 +33,7 @@ impl AuthenticatedDeviceConnection {
     }
 }
 
-fn valid_directory_page(
+pub(super) fn valid_directory_page(
     page: &DirectoryPage,
     request_id: RequestId,
     path: &str,
@@ -76,6 +76,7 @@ mod tests {
     fn directory_response_must_match_request_and_sorted_page() {
         let id = RequestId::from_u128(1);
         let mut page = DirectoryPage {
+            execution_context: None,
             request_id: id,
             path: "/tmp".to_owned(),
             entries: vec![DirectoryEntry {
