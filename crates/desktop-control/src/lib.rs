@@ -3,6 +3,10 @@ use pab_protocol::*;
 use std::collections::HashMap;
 mod batch;
 #[cfg(any(target_os = "macos", test))]
+mod macos_display;
+#[cfg(target_os = "macos")]
+pub use macos_display::select_monitor as select_macos_monitor;
+#[cfg(any(target_os = "macos", test))]
 mod input_recovery;
 /// Keep the entire Enigo lifetime (including key release on drop) on the macOS
 /// main thread. Both the GUI and standalone helper service an AppKit event loop;
@@ -244,9 +248,12 @@ impl DesktopSession {
         match query {
             DesktopQuery::Batch { .. } => unreachable!("batches are dispatched by query_guarded"),
             DesktopQuery::Monitors {} => {
+                #[cfg(target_os = "macos")]
+                let monitors = macos_display::active_monitors()?;
+                #[cfg(not(target_os = "macos"))]
                 let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
                 let overflow = monitors.len() > 32;
-                for m in monitors.into_iter().take(32) {
+                for (_index, m) in monitors.into_iter().take(32).enumerate() {
                     snapshot.monitors.push(MonitorInfo {
                         id: m.id().map_err(|e| e.to_string())?,
                         name: short(&m.name().map_err(|e| e.to_string())?, 256),
@@ -254,7 +261,16 @@ impl DesktopSession {
                         y: m.y().map_err(|e| e.to_string())?,
                         width: m.width().map_err(|e| e.to_string())?,
                         height: m.height().map_err(|e| e.to_string())?,
-                        primary: m.is_primary().map_err(|e| e.to_string())?,
+                        primary: {
+                            #[cfg(target_os = "macos")]
+                            {
+                                _index == 0
+                            }
+                            #[cfg(not(target_os = "macos"))]
+                            {
+                                m.is_primary().map_err(|e| e.to_string())?
+                            }
+                        },
                         scale_percent: m
                             .scale_factor()
                             .ok()

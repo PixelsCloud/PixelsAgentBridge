@@ -14,23 +14,15 @@ pub fn capture(options: &ScreenshotOptions) -> Result<EncodedScreenshot, String>
     if options.window_ref.is_some() {
         return Err("window capture requires its referenced desktop session".into());
     }
-    let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
-    let monitor = monitors
-        .iter()
-        .find(|m| match options.monitor_id {
-            Some(id) => m.id().ok() == Some(id),
-            None => m.is_primary().unwrap_or(false),
-        })
-        .ok_or("selected monitor is unavailable")?;
-    let id = monitor.id().map_err(|e| e.to_string())?;
-    let scale = monitor.scale_factor().map_err(|e| e.to_string())?;
-    if !scale.is_finite() || !(1.0..=8.0).contains(&scale) {
-        return Err("invalid monitor scale".into());
-    }
-    let w = monitor.width().map_err(|e| e.to_string())?;
-    let h = monitor.height().map_err(|e| e.to_string())?;
-    let x = monitor.x().map_err(|e| e.to_string())?;
-    let y = monitor.y().map_err(|e| e.to_string())?;
+    let (monitor, geometry) = pab_desktop_control::select_macos_monitor(options.monitor_id)?;
+    let (id, scale, w, h, x, y) = (
+        geometry.id,
+        geometry.scale,
+        geometry.width,
+        geometry.height,
+        geometry.x,
+        geometry.y,
+    );
     if w == 0
         || h == 0
         || (options.mode != ScreenshotMode::Jpeg
@@ -40,11 +32,14 @@ pub fn capture(options: &ScreenshotOptions) -> Result<EncodedScreenshot, String>
         return Err("monitor exceeds capture pixel budget".into());
     }
     let mut image = monitor.capture_image().map_err(|e| e.to_string())?;
-    if monitor.width().ok() != Some(w)
-        || monitor.height().ok() != Some(h)
-        || monitor.scale_factor().ok() != Some(scale)
-    {
+    // Re-enumerate: check removal, main-display changes, origin and scale too.
+    // Do not return an image whose coordinate mapping belongs to another layout.
+    let (_, current) = pab_desktop_control::select_macos_monitor(options.monitor_id)?;
+    if current != geometry {
         return Err("monitor geometry changed during capture; retry".into());
+    }
+    if !pab_desktop_control::active_console() {
+        return Err("interactive desktop changed".into());
     }
     let mut origin = (x, y);
     let mut desktop_size = (w, h);

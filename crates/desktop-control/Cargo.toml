@@ -1,6 +1,6 @@
 [package]
 name = "pab-desktop-control"
-version = "1.2.13"
+version = "1.2.15"
 edition.workspace = true
 rust-version.workspace = true
 [dependencies]
@@ -19,3 +19,5 @@ x11rb = "=0.13.2"
 pab-os-control = { path = "../os-control" }
 dispatch2 = "=0.3.1"
 libc = "0.2"
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFString"] }
+objc2-io-kit = { version = "=0.3.2", default-features = false, features = ["std", "pwr_mgt"] }

@@ -15,10 +15,21 @@ struct State {
 }
 static ENGINE: Mutex<Option<State>> = Mutex::new(None);
 pub fn apply_input(event: DesktopInputEvent) -> Result<(), String> {
-    crate::on_input_thread(|| apply_input_on_main(event))
+    // Display wake may take up to two seconds. Keep that wait off AppKit's
+    // main thread, where event injection and key cleanup must remain runnable.
+    let geometry = if matches!(event, DesktopInputEvent::MouseMove { .. }) {
+        super::require_accessibility()?;
+        Some(crate::select_macos_monitor(None)?.1)
+    } else {
+        None
+    };
+    crate::on_input_thread(|| apply_input_on_main(event, geometry))
 }
 
-fn apply_input_on_main(event: DesktopInputEvent) -> Result<(), String> {
+fn apply_input_on_main(
+    event: DesktopInputEvent,
+    geometry: Option<crate::macos_display::DisplayGeometry>,
+) -> Result<(), String> {
     super::require_accessibility()?;
     if !super::active_console() {
         return Err("macOS input requires the active console user".into());
@@ -44,23 +55,14 @@ fn apply_input_on_main(event: DesktopInputEvent) -> Result<(), String> {
     *last_input = Instant::now();
     match event {
         DesktopInputEvent::MouseMove { x, y } => {
-            let monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
-            let monitor = monitors
-                .iter()
-                .find(|m| m.is_primary().unwrap_or(false))
-                .ok_or("primary monitor unavailable")?;
-            let width = monitor.width().map_err(|e| e.to_string())?;
-            let height = monitor.height().map_err(|e| e.to_string())?;
-            if width == 0 || height == 0 {
-                return Err("empty display geometry".into());
-            }
+            let display = geometry.ok_or("selected monitor is unavailable")?;
             // xcap/CGDisplayBounds and CGEvent both use logical display points on macOS.
-            let px = i64::from(monitor.x().map_err(|e| e.to_string())?)
-                + i64::from(x) * i64::from(width - 1) / 65535;
-            let py = i64::from(monitor.y().map_err(|e| e.to_string())?)
-                + i64::from(y) * i64::from(height - 1) / 65535;
+            let px = i64::from(display.x) + i64::from(x) * i64::from(display.width - 1) / 65535;
+            let py = i64::from(display.y) + i64::from(y) * i64::from(display.height - 1) / 65535;
+            let px = i32::try_from(px).map_err(|_| "coordinate overflow")?;
+            let py = i32::try_from(py).map_err(|_| "coordinate overflow")?;
             engine
-                .move_mouse(px as i32, py as i32, Coordinate::Abs)
+                .move_mouse(px, py, Coordinate::Abs)
                 .map_err(|e| e.to_string())
         }
         DesktopInputEvent::MouseButton { button, down } => {
