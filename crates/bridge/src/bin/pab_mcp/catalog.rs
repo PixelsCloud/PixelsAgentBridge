@@ -281,6 +281,10 @@ pub(super) fn tools() -> Vec<Value> {
             );
         }
         if name == "pab_run_command" {
+            properties.insert("execution".into(),json!({"oneOf":[
+                {"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},
+                {"type":"object","properties":{"mode":{"const":"user"},"context_ref":{"type":"string","format":"uuid"}},"required":["mode","context_ref"],"additionalProperties":false}
+            ]}));
             properties.insert(
                 "request_id".into(),
                 json!({"type":"string","format":"uuid"}),
@@ -311,7 +315,7 @@ pub(super) fn tools() -> Vec<Value> {
         }
         let extra = match name.as_str() {
             "pab_run_command" => {
-                " Reuse request_id to deduplicate. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Output ranges are returned; use pab_read_output for bytes."
+                " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Output ranges are returned; use pab_read_output for bytes."
             }
             "pab_get_task" | "pab_get_operation" => {
                 " wait_ms optionally waits up to 30s for change or completion. Reuse after_revision to avoid missing updates. Expiry returns observed facts, not a task failure."
@@ -407,6 +411,12 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     }
     if name == "pab_run_command" {
         let options = pab_protocol::CommandOptions {
+            execution: serde_json::from_value(
+                args.get("execution")
+                    .cloned()
+                    .unwrap_or(json!({"mode":"service"})),
+            )
+            .map_err(|e| e.to_string())?,
             env: args
                 .get("env")
                 .map(|v| serde_json::from_value(v.clone()))
@@ -533,6 +543,22 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn command_user_selection_accepts_only_discovered_reference_shape() {
+        let mut args = json!({"device_code":"123456789","program":"whoami","args":[]});
+        args["execution"] =
+            json!({"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()});
+        assert!(validate_arguments("pab_run_command", &args).is_ok());
+        for value in [
+            json!({"mode":"user","username":"alice"}),
+            json!({"mode":"service","context_ref":pab_protocol::ExecutionContextRef::new()}),
+            json!({"mode":"desktop_user","context_ref":pab_protocol::ExecutionContextRef::new()}),
+            json!(null),
+        ] {
+            args["execution"] = value;
+            assert!(validate_arguments("pab_run_command", &args).is_err());
+        }
+    }
     #[test]
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};

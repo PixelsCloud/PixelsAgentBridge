@@ -18,6 +18,7 @@ iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }
 pab-logging = { path = "../logging" }
 pab-platform = { path = "../platform" }
+pab-os-control = { path = "../os-control" }
 pab-protocol = { path = "../protocol" }
 pab-screenshot = { path = "../screenshot" }
 pab-task-runtime = { path = "../task-runtime" }

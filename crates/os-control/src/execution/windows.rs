@@ -12,11 +12,16 @@ use windows_sys::Win32::{
     },
     System::{
         Environment::{CreateEnvironmentBlock, DestroyEnvironmentBlock},
+        JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+            SetInformationJobObject, TerminateJobObject,
+        },
         RemoteDesktop::WTSQueryUserToken,
         Threading::{
-            CREATE_NO_WINDOW, CREATE_UNICODE_ENVIRONMENT, CreateProcessAsUserW, GetCurrentProcess,
-            GetExitCodeProcess, OpenProcessToken, PROCESS_INFORMATION, STARTUPINFOW,
-            TerminateProcess, WaitForSingleObject,
+            CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessAsUserW,
+            GetCurrentProcess, GetExitCodeProcess, OpenProcessToken, PROCESS_INFORMATION,
+            ResumeThread, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
         },
     },
     UI::Shell::GetUserProfileDirectoryW,
@@ -235,6 +240,26 @@ impl PreparedUser {
         let mut startup: STARTUPINFOW = unsafe { std::mem::zeroed() };
         startup.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
         let mut created: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+        // The job handle is never inherited. Closing it also stops descendants
+        // if the parent crashes, even when the worker itself has already exited.
+        let raw_job = unsafe { CreateJobObjectW(ptr::null(), ptr::null()) };
+        if raw_job.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let job = Handle(raw_job);
+        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if unsafe {
+            SetInformationJobObject(
+                job.0,
+                JobObjectExtendedLimitInformation,
+                (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                std::mem::size_of_val(&limits) as u32,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
         // SAFETY: all pointers live for the synchronous call, mutable command line,
         // validated primary token. No parent handles inherited, no implicit shell,
         // and no request for the linked elevated token of an administrator.
@@ -246,7 +271,7 @@ impl PreparedUser {
                 ptr::null(),
                 ptr::null(),
                 0,
-                CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW,
+                CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | CREATE_SUSPENDED,
                 env.0.cast_const(),
                 cwd.as_ptr(),
                 &startup,
@@ -257,9 +282,23 @@ impl PreparedUser {
             return Err(io::Error::last_os_error());
         }
         let process = Handle(created.hProcess);
-        drop(Handle(created.hThread));
+        let thread = Handle(created.hThread);
+        // No user code runs before containment succeeds. On failure there is no
+        // uncontained fallback, and the still-suspended process is terminated.
+        if unsafe { AssignProcessToJobObject(job.0, process.0) } == 0 {
+            let error = io::Error::last_os_error();
+            unsafe {
+                TerminateProcess(process.0, 1);
+                WaitForSingleObject(process.0, 5000);
+            }
+            return Err(error);
+        }
+        if unsafe { ResumeThread(thread.0) } == u32::MAX {
+            return Err(io::Error::last_os_error());
+        }
         Ok(UserProcess {
             process,
+            job,
             pid: created.dwProcessId,
             exited: false,
         })
@@ -315,6 +354,7 @@ pub(super) fn current_identity() -> io::Result<UserIdentity> {
 }
 pub(super) struct UserProcess {
     process: Handle,
+    job: Handle,
     pid: u32,
     exited: bool,
 }
@@ -337,10 +377,10 @@ impl UserProcess {
         }
     }
     pub fn terminate(&mut self) -> io::Result<()> {
+        if unsafe { TerminateJobObject(self.job.0, 1) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
         if self.try_wait()?.is_none() {
-            if unsafe { TerminateProcess(self.process.0, 1) } == 0 {
-                return Err(io::Error::last_os_error());
-            }
             if unsafe { WaitForSingleObject(self.process.0, 5000) } != WAIT_OBJECT_0 {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,

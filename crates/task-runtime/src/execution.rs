@@ -105,6 +105,29 @@ impl ExecutionContextRegistry {
         })
     }
 
+    /// Retrieve native discovery facts only after checking the reference owner.
+    /// Callers must refresh those facts and call resolve before accepting work.
+    pub fn identity(
+        &self,
+        caller: ExecutionCaller,
+        selection: ExecutionSelection,
+    ) -> Result<&ExecutionIdentity, ExecutionResolveError> {
+        let id = selection
+            .context_ref()
+            .ok_or(ExecutionResolveError::ServiceNeedsNoReference)?;
+        let entry = self
+            .entries
+            .get(&id)
+            .ok_or(ExecutionResolveError::UnknownReference)?;
+        if entry.caller != caller {
+            return Err(ExecutionResolveError::WrongOwner);
+        }
+        if entry.identity.mode != selection.mode() {
+            return Err(ExecutionResolveError::ModeMismatch);
+        }
+        Ok(&entry.identity)
+    }
+
     /// Explicit disconnect/resource cleanup; does not alter already accepted work.
     pub fn release_connection(&mut self, caller: ExecutionCaller) {
         self.entries.retain(|_, v| v.caller != caller);

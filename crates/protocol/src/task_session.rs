@@ -57,6 +57,8 @@ pub struct CommandTaskSpec {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommandOptions {
+    #[serde(default, skip_serializing_if = "crate::ExecutionSelection::is_service")]
+    pub execution: crate::ExecutionSelection,
     #[serde(default)]
     pub env: std::collections::BTreeMap<String, String>,
     pub stdin_text: Option<String>,
@@ -64,10 +66,27 @@ pub struct CommandOptions {
 }
 
 impl CommandOptions {
+    pub fn required_version(&self) -> u16 {
+        if !self.execution.is_service() {
+            3
+        } else if self.is_default() {
+            1
+        } else {
+            2
+        }
+    }
     pub fn is_default(&self) -> bool {
         self == &Self::default()
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if matches!(
+            self.execution,
+            crate::ExecutionSelection::DesktopUser { .. }
+        ) {
+            return Err(
+                "command requires service or user execution; desktop_user is for desktop operations",
+            );
+        }
         if self.env.len() > 64
             || self.env.iter().any(|(k, v)| {
                 k.is_empty() || k.len() > 256 || k.contains(['=', '\0']) || v.contains('\0')
@@ -412,6 +431,25 @@ mod tests {
     use crate::{DeviceId, DeviceRef, TaskId, TenantId};
 
     use super::*;
+
+    #[test]
+    fn user_execution_is_explicit_strict_and_requires_command_v3() {
+        let legacy: CommandOptions = serde_json::from_value(
+            serde_json::json!({"env":{},"stdin_text":null,"timeout_ms":null}),
+        )
+        .unwrap();
+        assert!(legacy.execution.is_service());
+        assert_eq!(legacy.required_version(), 1);
+        let selected:CommandOptions=serde_json::from_value(serde_json::json!({"execution":{"mode":"user","context_ref":crate::ExecutionContextRef::new()},"env":{},"stdin_text":null,"timeout_ms":null})).unwrap();
+        assert_eq!(selected.required_version(), 3);
+        assert!(selected.validate().is_ok());
+        for invalid in [
+            serde_json::json!({"mode":"service","context_ref":crate::ExecutionContextRef::new()}),
+            serde_json::json!({"mode":"user","username":"fake"}),
+        ] {
+            assert!(serde_json::from_value::<CommandOptions>(serde_json::json!({"execution":invalid,"env":{},"stdin_text":null,"timeout_ms":null})).is_err());
+        }
+    }
 
     #[test]
     fn legacy_commands_default_options_and_enhanced_options_are_byte_bounded() {

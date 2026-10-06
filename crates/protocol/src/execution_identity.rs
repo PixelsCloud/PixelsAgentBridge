@@ -25,6 +25,9 @@ impl Default for ExecutionSelection {
     }
 }
 impl ExecutionSelection {
+    pub fn is_service(&self) -> bool {
+        matches!(self, Self::Service {})
+    }
     pub fn mode(self) -> ExecutionMode {
         match self {
             Self::Service {} => ExecutionMode::Service,

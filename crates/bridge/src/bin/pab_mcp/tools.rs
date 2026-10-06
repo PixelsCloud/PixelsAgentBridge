@@ -86,6 +86,13 @@ pub(super) async fn call_tool(
                 .await
                 .map_err(|error| error.to_string())?;
             let options = pab_protocol::CommandOptions {
+                execution: serde_json::from_value(
+                    arguments
+                        .get("execution")
+                        .cloned()
+                        .unwrap_or(json!({"mode":"service"})),
+                )
+                .map_err(|e| e.to_string())?,
                 env: serde_json::from_value(arguments.get("env").cloned().unwrap_or(json!({})))
                     .map_err(|e| e.to_string())?,
                 stdin_text: arguments["stdin_text"].as_str().map(str::to_owned),

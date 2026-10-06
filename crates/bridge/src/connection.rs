@@ -292,7 +292,8 @@ impl AuthenticatedDeviceConnection {
                     context,
                     command_schema_version: Some(v),
                     ..
-                } if context.device_ref == self.device_ref && v >= 2 => {}
+                } if context.device_ref == self.device_ref
+                    && v >= command.options.required_version() => {}
                 _ => return Err(BridgeError::UnsupportedCommandOptions),
             }
         }
@@ -584,7 +585,7 @@ fn read_file(path: &std::path::Path, kind: &'static str) -> Result<Vec<u8>, Brid
 #[derive(Debug, Error)]
 pub enum BridgeError {
     #[error(
-        "target Executor does not support command options v2; upgrade it before using env, stdin_text or timeout_ms"
+        "target Executor does not support the requested command options; env/stdin/timeout require v2 and user execution requires v3; upgrade the target"
     )]
     UnsupportedCommandOptions,
     #[error(transparent)]

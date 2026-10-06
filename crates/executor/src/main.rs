@@ -8,6 +8,23 @@ mod windows_service;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if std::env::args().nth(1).as_deref() == Some("--user-worker") {
+        let args = std::env::args().skip(2).collect::<Vec<_>>();
+        if args.len() != 2 {
+            return ExitCode::FAILURE;
+        }
+        let Ok(parent) = args[1].parse() else {
+            return ExitCode::FAILURE;
+        };
+        return match pab_executor::user_worker::run(&args[0], parent).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                let _ = pab_os_control::execution::stop_disconnected_worker_group();
+                eprintln!("user worker: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let log_root = match DataPaths::for_scope(DataScope::Machine) {
         Ok(paths) => paths.root().to_path_buf(),
         Err(error) => {

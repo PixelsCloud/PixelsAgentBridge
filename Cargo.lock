@@ -4263,6 +4263,7 @@ dependencies = [
  "iroh-base",
  "pab-agent-core",
  "pab-logging",
+ "pab-os-control",
  "pab-platform",
  "pab-protocol",
  "pab-screenshot",

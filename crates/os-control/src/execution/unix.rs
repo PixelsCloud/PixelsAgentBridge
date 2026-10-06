@@ -142,6 +142,7 @@ impl PreparedUser {
         let mut command = Command::new(executable);
         command
             .args(args)
+            .process_group(0)
             .current_dir("/")
             .env_clear()
             .env("HOME", &self.account.identity.home)
@@ -209,6 +210,7 @@ impl PreparedUser {
         command.spawn().map(|child| UserProcess {
             child,
             exited: false,
+            group_stopped: false,
         })
     }
 }
@@ -222,24 +224,118 @@ pub(super) fn current_identity() -> io::Result<UserIdentity> {
 pub(super) struct UserProcess {
     child: Child,
     exited: bool,
+    group_stopped: bool,
 }
 impl UserProcess {
     pub fn id(&self) -> u32 {
         self.child.id()
     }
     pub fn try_wait(&mut self) -> io::Result<Option<i32>> {
+        if !self.exited {
+            // Observe without reaping first. While this child remains ours its
+            // PID cannot be reused by an unrelated process group.
+            let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+            if unsafe {
+                libc::waitid(
+                    libc::P_PID,
+                    self.child.id() as _,
+                    &mut info,
+                    libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+                )
+            } != 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            if info.si_signo != 0 {
+                self.stop_group(true)?;
+            }
+        }
         let status = self.child.try_wait()?;
         self.exited |= status.is_some();
         Ok(status.map(|v| v.code().unwrap_or(-1)))
     }
     pub fn terminate(&mut self) -> io::Result<()> {
-        if self.try_wait()?.is_none() {
-            self.child.kill()?;
-            self.child.wait()?;
-            self.exited = true;
+        if !self.exited {
+            self.stop_group(false)?;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while self.try_wait()?.is_none() {
+                if std::time::Instant::now() >= deadline {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "worker termination not confirmed",
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
         }
         Ok(())
     }
+    fn stop_group(&mut self, child_exited: bool) -> io::Result<()> {
+        if self.group_stopped {
+            return Ok(());
+        }
+        // The worker started a dedicated process group before dropping identity.
+        // Descendants that start another session need explicit worker cleanup.
+        if unsafe { libc::killpg(self.child.id() as _, libc::SIGKILL) } != 0 {
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() != Some(libc::ESRCH) {
+                #[cfg(target_os = "macos")]
+                if child_exited
+                    && error.raw_os_error() == Some(libc::EPERM)
+                    && !mac_group_has_live_members(self.child.id())?
+                {
+                    self.group_stopped = true;
+                    return Ok(());
+                }
+                return Err(error);
+            }
+        }
+        let _ = child_exited;
+        self.group_stopped = true;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn mac_group_has_live_members(group: u32) -> io::Result<bool> {
+    // Darwin killpg skips zombies and returns EPERM for a zombie-only group.
+    // Verify the condition; never reinterpret a real permission denial as success.
+    const PROC_PGRP_ONLY: u32 = 2;
+    let mut pids = vec![0i32; 4096];
+    let capacity = (pids.len() * std::mem::size_of::<i32>()) as i32;
+    let bytes =
+        unsafe { libc::proc_listpids(PROC_PGRP_ONLY, group, pids.as_mut_ptr().cast(), capacity) };
+    if bytes < 0 || bytes >= capacity {
+        return Err(io::Error::other("cannot verify worker process group"));
+    }
+    for pid in pids
+        .into_iter()
+        .take(bytes as usize / std::mem::size_of::<i32>())
+        .filter(|v| *v > 0 && *v as u32 != group)
+    {
+        let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
+        let size = std::mem::size_of_val(&info) as i32;
+        let n = unsafe {
+            libc::proc_pidinfo(
+                pid,
+                libc::PROC_PIDTBSDINFO,
+                0,
+                (&mut info as *mut libc::proc_bsdinfo).cast(),
+                size,
+            )
+        };
+        if n != size {
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() == Some(libc::ESRCH) {
+                continue;
+            }
+            return Err(error);
+        }
+        if info.pbi_pgid == group && info.pbi_status != libc::SZOMB {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 impl Drop for UserProcess {
     fn drop(&mut self) {

@@ -215,6 +215,13 @@ fn apply(
             snapshot.state = TaskState::Running;
             snapshot.started_at_unix_ms = Some(occurred_at_unix_ms);
         }
+        TaskEventKind::Running
+            if from == TaskState::CancelRequested && snapshot.started_at_unix_ms.is_none() =>
+        {
+            // Start notification can race an accepted cancellation. Preserve
+            // cancellation intent while recording that execution did start.
+            snapshot.started_at_unix_ms = Some(occurred_at_unix_ms);
+        }
         TaskEventKind::CancelRequested
             if matches!(from, TaskState::Accepted | TaskState::Running) =>
         {

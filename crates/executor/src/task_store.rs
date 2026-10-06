@@ -196,7 +196,7 @@ impl TaskStore {
             initiated_by,
             capability: CapabilityRef {
                 name: "process.exec".to_owned(),
-                version: 1,
+                version: u32::from(command.options.required_version()),
             },
             display_summary: command.display_summary.clone(),
             execution_context,
@@ -225,6 +225,24 @@ impl TaskStore {
         tx.commit().await?;
         self.publish(task_ref, TaskChangeKind::Event);
         Ok(AcceptTaskOutcome::Created(snapshot))
+    }
+
+    pub async fn existing_command(
+        &self,
+        actor: OperatorRef,
+        id: RequestId,
+        command: &CommandTaskSpec,
+    ) -> Result<Option<TaskSnapshot>, TaskStoreError> {
+        let row=sqlx::query("SELECT snapshot_json, command_json FROM task_records WHERE initiated_by = ? AND request_id = ?")
+            .bind(actor.storage_key()).bind(id.to_string()).fetch_optional(&self.pool).await?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let stored: CommandTaskSpec = serde_json::from_str(row.get("command_json"))?;
+        if &stored != command {
+            return Err(TaskStoreError::RequestConflict);
+        }
+        decode_snapshot(row.get("snapshot_json")).map(Some)
     }
 
     pub async fn get_task(

@@ -57,6 +57,24 @@ fn progress(phase: TransferPhase, confirmed_bytes: u64) -> TaskEventKind {
 }
 
 #[test]
+fn start_racing_accepted_cancellation_preserves_intent_and_can_finish_cancelled() {
+    let (mut task, _) = TaskAggregate::accept(accepted(OsFamily::Linux, PathStyle::Posix)).unwrap();
+    task.record(TaskEventKind::CancelRequested, 1100).unwrap();
+    task.record(TaskEventKind::Running, 1200).unwrap();
+    assert_eq!(task.snapshot().state, TaskState::CancelRequested);
+    assert_eq!(task.snapshot().started_at_unix_ms, Some(1200));
+    assert!(task.record(TaskEventKind::Running, 1250).is_err());
+    task.record(
+        TaskEventKind::Cancelled {
+            reason: "stopped".into(),
+        },
+        1300,
+    )
+    .unwrap();
+    assert_eq!(task.snapshot().state, TaskState::Cancelled);
+}
+
+#[test]
 fn projects_a_monotonic_task_timeline() {
     let (mut task, accepted) =
         TaskAggregate::accept(accepted(OsFamily::Windows, PathStyle::Windows)).unwrap();

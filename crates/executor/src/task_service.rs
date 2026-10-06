@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::sync::{Mutex, watch};
 
-mod command;
+pub(crate) mod command;
 mod container;
 mod directory;
 mod file_transfer;
@@ -51,6 +51,8 @@ const MAX_ACTIVE_TERMINALS: usize = 8;
 
 #[derive(Clone)]
 pub(crate) struct TaskService {
+    #[cfg(test)]
+    worker_executable: Option<std::path::PathBuf>,
     ui_connection: Arc<UiConnection>,
     #[cfg(test)]
     container_client: Option<(bollard::Docker, String)>,
@@ -140,6 +142,8 @@ impl TaskService {
                 .await?;
         }
         Ok(Self {
+            #[cfg(test)]
+            worker_executable: None,
             ui_connection: Arc::new(UiConnection::new()),
             #[cfg(test)]
             container_client: None,
@@ -462,7 +466,7 @@ impl TaskService {
                 "filesystem requests require their binary stream handler",
             )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
-                command_schema_version: Some(2),
+                command_schema_version: Some(3),
                 filesystem_schema_version: Some(4),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
@@ -635,6 +639,15 @@ impl TaskService {
         command: CommandTaskSpec,
     ) -> Result<TaskSnapshot, TaskServiceError> {
         validate_command(&command)?;
+        // Replay the accepted request before consulting a new login or registry.
+        // The original selection and actual identity remain frozen in storage.
+        if let Some(snapshot) = self
+            .store
+            .existing_command(initiated_by, request_id, &command)
+            .await?
+        {
+            return Ok(snapshot);
+        }
         if !self
             .execution_context
             .matches_expected(&command.expected_environment)
@@ -643,6 +656,42 @@ impl TaskService {
         }
         let mut execution_context = self.execution_context.clone();
         execution_context.cwd.clone_from(&command.cwd);
+        let prepared = if command.options.execution.is_service() {
+            None
+        } else {
+            let caller = pab_task_runtime::ExecutionCaller {
+                device: self.device_ref,
+                actor: initiated_by,
+                connection: self.ui_connection.id,
+            };
+            let selection = command.options.execution;
+            let expected = self
+                .ui_connection
+                .execution_contexts
+                .lock()
+                .await
+                .identity(caller, selection)
+                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?
+                .clone();
+            let selected = expected.clone();
+            let prepared=tokio::task::spawn_blocking(move ||pab_os_control::execution::PreparedUser::from_observation(&selected)).await?
+                .map_err(|_|TaskServiceError::ExecutionContext("execution account/session unavailable or changed; query execution contexts again".into()))?;
+            self.ui_connection
+                .execution_contexts
+                .lock()
+                .await
+                .resolve(caller, selection, &expected)
+                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?;
+            execution_context.cwd = command.cwd.clone().or_else(|| Some(expected.home.clone()));
+            execution_context.environment_revision = format!(
+                "user-v1:{:x}",
+                Sha256::digest(serde_json::to_vec(&expected).map_err(|_| {
+                    TaskServiceError::InvalidRequest("invalid execution identity")
+                })?)
+            );
+            execution_context.identity = Some(expected);
+            Some(prepared)
+        };
         let outcome = self
             .store
             .accept_command(
@@ -683,9 +732,18 @@ impl TaskService {
                 drop(active);
                 let service = self.clone();
                 tokio::spawn(async move {
-                    if let Err(error) = service.run_command(task_ref, command, receiver).await {
+                    let user_execution = prepared.is_some();
+                    if let Err(error) = service
+                        .run_command(task_ref, command, prepared, receiver)
+                        .await
+                    {
                         tracing::error!(task_id = %task_ref.task_id, %error, "task failed");
-                        if let Err(finalize_error) = service.finalize_worker_error(task_ref).await {
+                        let finalized = if user_execution {
+                            service.finalize_user_worker_error(task_ref).await
+                        } else {
+                            service.finalize_worker_error(task_ref).await
+                        };
+                        if let Err(finalize_error) = finalized {
                             tracing::error!(
                                 task_id = %task_ref.task_id,
                                 %finalize_error,
@@ -742,7 +800,7 @@ impl TaskService {
     }
 }
 
-fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
+pub(crate) fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
     command
         .options
         .validate()
@@ -791,6 +849,12 @@ fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServiceError> {
 }
 
 fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
+    if let TaskServiceError::ExecutionContext(message) = error {
+        return DeviceTaskResponse::Error {
+            code: DeviceTaskErrorCode::EnvironmentChanged,
+            message: message.clone(),
+        };
+    }
     // Permission failures are actionable. Do not hide them behind "unsupported",
     // and do not expose arbitrary helper errors (which may contain local paths).
     if let TaskServiceError::WindowHelper(crate::local_ipc::LocalIpcError::Remote(message)) = error
@@ -914,6 +978,8 @@ fn unix_millis() -> Result<i64, TaskServiceError> {
 
 #[derive(Debug, Error)]
 pub(crate) enum TaskServiceError {
+    #[error("{0}")]
+    ExecutionContext(String),
     #[error("invalid task request: {0}")]
     InvalidRequest(&'static str),
     #[error("the target execution environment changed before the task was accepted")]
@@ -952,6 +1018,8 @@ impl TaskServiceError {
     }
 }
 
+#[cfg(test)]
+mod execution_tests;
 #[cfg(test)]
 mod tests;
 

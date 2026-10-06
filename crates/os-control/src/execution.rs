@@ -64,6 +64,42 @@ impl UserIdentity {
 pub struct PreparedUser(native::PreparedUser);
 
 impl PreparedUser {
+    /// Refresh native facts rather than trusting a persisted account name or UID.
+    pub fn from_observation(expected: &pab_protocol::ExecutionIdentity) -> io::Result<Self> {
+        expected.validate().map_err(io::Error::other)?;
+        if expected.mode != pab_protocol::ExecutionMode::User {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "expected native user execution",
+            ));
+        }
+        #[cfg(unix)]
+        let value = Self::for_uid(
+            expected
+                .account_id
+                .strip_prefix("uid:")
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| io::Error::other("invalid execution UID"))?,
+        )?;
+        #[cfg(windows)]
+        let value = Self::for_session(
+            expected
+                .session_id
+                .as_ref()
+                .and_then(|v| v.parse().ok())
+                .ok_or_else(|| io::Error::other("missing execution session"))?,
+        )?;
+        let observed = value.identity().observation(
+            pab_protocol::ExecutionMode::User,
+            pab_protocol::ExecutionEnvironmentSource::NativeAccount,
+        )?;
+        if &observed != expected {
+            return Err(io::Error::other(
+                "execution account/session changed; query contexts again",
+            ));
+        }
+        Ok(value)
+    }
     #[cfg(unix)]
     pub fn for_uid(uid: u32) -> io::Result<Self> {
         native::PreparedUser::for_uid(uid).map(Self)
@@ -99,8 +135,9 @@ impl PreparedUser {
 }
 
 /// Owned worker, killed and reaped when dropped while still running.
-/// Descendant/PTY cleanup is the worker protocol's responsibility; this handle
-/// alone does not promise process-tree cancellation.
+/// Windows owns a kill-on-close Job Object. Unix owns a dedicated process group;
+/// descendants starting another session (such as a PTY) additionally require
+/// explicit worker cleanup. Parent loss on Unix is detected by the IPC worker.
 pub struct UserProcess(native::UserProcess);
 impl UserProcess {
     pub fn id(&self) -> u32 {
@@ -116,4 +153,25 @@ impl UserProcess {
 
 pub fn current_identity() -> io::Result<UserIdentity> {
     native::current_identity()
+}
+
+/// Last-resort cleanup when the internal worker loses its parent channel. This
+/// must only run inside a disposable worker in its own dedicated process group.
+/// Windows is contained by the parent's kill-on-close job even on parent crash.
+pub fn stop_disconnected_worker_group() -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        // SAFETY: kernel facts guard against ever signalling a caller's group.
+        let pid = unsafe { libc::getpid() };
+        if unsafe { libc::getpgrp() } != pid {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "not an isolated worker process group",
+            ));
+        }
+        if unsafe { libc::killpg(pid, libc::SIGKILL) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    Ok(())
 }
