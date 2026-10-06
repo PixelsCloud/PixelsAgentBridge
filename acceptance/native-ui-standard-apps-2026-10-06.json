@@ -1,0 +1,48 @@
+{
+  "source": "native_pixels_host",
+  "observations": [
+    {
+      "device_code": "211399447",
+      "application": "Everything",
+      "operation_id": "95d95003-b909-4c90-8b60-0bb5b0ba2415",
+      "state": "completed",
+      "error": null,
+      "returned": 6,
+      "visited": 6,
+      "truncated": false,
+      "stop_reason": null,
+      "values_omitted": true,
+      "read_only": true
+    },
+    {
+      "device_code": "603527578",
+      "application": "Finder",
+      "operation_id": "6a7a8f5b-9868-45d6-bab8-c87e3c8f32f9",
+      "state": "failed",
+      "error": "interactive_window_unavailable",
+      "returned": 0,
+      "visited": 0,
+      "truncated": false,
+      "stop_reason": null,
+      "values_omitted": true,
+      "read_only": true
+    },
+    {
+      "device_code": "603527578",
+      "application": "Terminal",
+      "operation_id": "8d977eb1-3405-4244-a4c9-f0fa459634fc",
+      "state": "completed",
+      "error": null,
+      "returned": 12,
+      "visited": 12,
+      "truncated": false,
+      "values_omitted": true,
+      "read_only": true
+    }
+  ],
+  "cleanup": {
+    "windows_fixture_jobs_removed": true,
+    "windows_fixture_processes_exited": true,
+    "mac_fixture_processes_exited": true
+  }
+}

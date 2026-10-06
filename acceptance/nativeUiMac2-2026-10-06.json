@@ -1,0 +1,118 @@
+{
+  "source": "native_pixels_host",
+  "device_code": "603527578",
+  "round": 2,
+  "cases": [
+    {
+      "tool": "pab_list_windows",
+      "operation_id": "87348da8-2d5e-4c9f-b511-e87a070b4d58",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_query",
+      "operation_id": "8c5b50e7-b7b1-4463-b7af-127b56c39826",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_get",
+      "operation_id": "9ec2cd99-2f83-4b29-8fc6-06f43963dec3",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "449ba79c-b83b-44fa-b201-93eb087679fb",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "3296f256-f838-472e-b609-491ff4fc8352",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "5ff43118-eeef-49e7-9d23-a41e954555c0",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "1051b0ef-e663-4951-840c-35c2299a335a",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "e3c511b0-014a-4361-874c-74012b15d0a8",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "e824af7b-52ec-49ee-9c81-1212d94deabc",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "2ede3eef-1a76-4545-a903-9fcba48d893c",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "cc61566d-4f49-43bb-a3c4-b05329ffa755",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "ee35daac-8898-4b26-b46a-dc719c48c119",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_get",
+      "operation_id": "863d1f16-d1c6-4233-ad4b-72db6033c8f3",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_get",
+      "operation_id": "253c3246-5abf-42f5-8a6a-6465cb092fe1",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "951540b6-a33c-4239-a2b3-d96fcbbbce9a",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_wait",
+      "operation_id": "209e1953-549a-4f49-8a03-8088d9fc3f2e",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_wait",
+      "operation_id": "50d06c82-613f-42ab-9cac-d0124933e21f",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_wait",
+      "operation_id": "23feeb02-1f7f-492d-9ba3-b17fac6f1715",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "bb821902-7500-44e3-8bc5-622222222222",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_action",
+      "operation_id": "bb821902-7500-44e3-8bc5-622222222222",
+      "status": "pass"
+    },
+    {
+      "tool": "pab_ui_get",
+      "operation_id": "74143bf1-a4aa-4e26-b784-493fae43db23",
+      "status": "pass"
+    }
+  ],
+  "started_at": "2026-10-06T08:03:47.030Z",
+  "fixture_window": "851b1655-c144-4b47-b19c-846f7ec998f1",
+  "fixture_input": "ff4e3997-8adf-4fea-b14b-e2a74e0a6060",
+  "actual_application_verified": true,
+  "status": "pass",
+  "finished_at": "2026-10-06T08:03:50.425Z"
+}

@@ -6,29 +6,29 @@
       "group": "desktop-ui",
       "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
       "live_suite": "ui-controls",
-      "live_status": "not_run",
-      "scope": "Installed Windows 1.2.24 and Mac ARM 1.2.25 passed two UI rounds via independent stdio clients; native AI-host reload remains pending. See acceptance/ui-u0-2026-10-06.md."
+      "live_status": "pass",
+      "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_get": {
       "group": "desktop-ui",
       "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
       "live_suite": "ui-controls",
-      "live_status": "not_run",
-      "scope": "Installed Windows 1.2.24 and Mac ARM 1.2.25 passed two UI rounds via independent stdio clients; native AI-host reload remains pending. See acceptance/ui-u0-2026-10-06.md."
+      "live_status": "pass",
+      "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_action": {
       "group": "desktop-ui",
       "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
       "live_suite": "ui-controls",
-      "live_status": "not_run",
-      "scope": "Installed Windows 1.2.24 and Mac ARM 1.2.25 passed two UI rounds via independent stdio clients; native AI-host reload remains pending. See acceptance/ui-u0-2026-10-06.md."
+      "live_status": "pass",
+      "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_wait": {
       "group": "desktop-ui",
       "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
       "live_suite": "ui-controls",
-      "live_status": "not_run",
-      "scope": "Installed Windows 1.2.24 and Mac ARM 1.2.25 passed two UI rounds via independent stdio clients; native AI-host reload remains pending. See acceptance/ui-u0-2026-10-06.md."
+      "live_status": "pass",
+      "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_connect": {
       "group": "connection",
