@@ -42,6 +42,9 @@ pub(crate) mod git;
 mod subscription;
 mod system_query;
 mod terminal;
+pub(crate) mod transfer_engine;
+#[cfg(test)]
+mod transfer_user_tests;
 mod ui;
 mod upload_lock;
 

@@ -18,9 +18,19 @@ const BINARY_LIMIT: usize = 256 * 1024;
 pub(crate) mod filesystem;
 pub(crate) mod git;
 pub(crate) mod terminal;
+pub(crate) mod transfer;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum Control {
+    Transfer {
+        request: transfer::Request,
+    },
+    TransferReply {
+        reply: transfer::Reply,
+    },
+    TransferAck {
+        accepted: bool,
+    },
     FileSystem {
         request: filesystem::Request,
     },
@@ -132,7 +142,7 @@ async fn read_frame(reader: &mut (impl AsyncRead + Unpin)) -> io::Result<Frame> 
     let len = reader.read_u32().await? as usize;
     let limit = match tag {
         0 => CONTROL_LIMIT,
-        1..=6 => BINARY_LIMIT,
+        1..=8 => BINARY_LIMIT,
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -157,7 +167,7 @@ async fn write_frame(
 ) -> io::Result<()> {
     let limit = match tag {
         0 => CONTROL_LIMIT,
-        1..=6 => BINARY_LIMIT,
+        1..=8 => BINARY_LIMIT,
         _ => 0,
     };
     if limit == 0 || bytes.len() > limit {
@@ -190,6 +200,7 @@ pub async fn run(address: &str, parent_pid: u32) -> io::Result<()> {
         .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "worker request timed out"))??;
     let command = match decode(request)? {
         Control::FileSystem { request } => return filesystem::serve(peer, request).await,
+        Control::Transfer { request } => return transfer::serve(peer, request).await,
         Control::Git { request } => return git::serve(peer, request).await,
         Control::Command { command } => command,
         Control::Terminal {
