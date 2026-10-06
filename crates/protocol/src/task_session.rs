@@ -210,6 +210,8 @@ pub enum DeviceTaskRequest {
         request_id: RequestId,
         cols: u16,
         rows: u16,
+        #[serde(default, skip_serializing_if = "crate::ExecutionSelection::is_service")]
+        execution: crate::ExecutionSelection,
     },
     TerminalInput {
         schema_version: u16,
@@ -336,6 +338,8 @@ pub enum DeviceTaskResponse {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         command_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        terminal_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         system_query_schema_version: Option<u16>,
@@ -371,6 +375,8 @@ pub enum DeviceTaskResponse {
         shell: String,
         cols: u16,
         rows: u16,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        identity: Option<crate::ExecutionIdentity>,
     },
     TerminalAcknowledged {
         session_id: RequestId,

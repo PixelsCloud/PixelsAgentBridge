@@ -273,7 +273,11 @@ impl StartupCursor {
 impl Drop for TerminalSession {
     fn drop(&mut self) {
         if let Ok(child) = self.child.get_mut() {
-            let _ = child.kill();
+            // portable-pty's Unix kill begins with a PID signal. Once try_wait
+            // has reaped this shell, that PID may belong to another process.
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill();
+            }
         }
     }
 }

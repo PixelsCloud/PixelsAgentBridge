@@ -10,6 +10,7 @@ pub struct TerminalOpened {
     pub shell: String,
     pub cols: u16,
     pub rows: u16,
+    pub identity: Option<pab_protocol::ExecutionIdentity>,
 }
 
 pub struct TerminalOutput {
@@ -27,12 +28,43 @@ impl AuthenticatedDeviceConnection {
         cols: u16,
         rows: u16,
     ) -> Result<TerminalOpened, BridgeError> {
+        self.open_terminal_as(session_id, cols, rows, Default::default())
+            .await
+    }
+
+    pub async fn open_terminal_as(
+        &self,
+        session_id: RequestId,
+        cols: u16,
+        rows: u16,
+        execution: pab_protocol::ExecutionSelection,
+    ) -> Result<TerminalOpened, BridgeError> {
+        if !execution.is_service() {
+            match self
+                .task_request(DeviceTaskRequest::GetEnvironment {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                })
+                .await?
+            {
+                DeviceTaskResponse::Environment {
+                    context,
+                    terminal_schema_version: Some(v),
+                    ..
+                } if context.device_ref == self.device_ref && v >= 2 => {}
+                _ => {
+                    return Err(BridgeError::Terminal(
+                        "selected user requires terminal protocol v2".into(),
+                    ));
+                }
+            }
+        }
         let response = self
             .task_request(DeviceTaskRequest::OpenTerminal {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
                 request_id: session_id,
                 cols,
                 rows,
+                execution,
             })
             .await?;
         match response {
@@ -41,12 +73,23 @@ impl AuthenticatedDeviceConnection {
                 shell,
                 cols: returned_cols,
                 rows: returned_rows,
+                identity,
             } if returned == session_id && returned_cols == cols && returned_rows == rows => {
+                if identity
+                    .as_ref()
+                    .is_some_and(|v| v.validate().is_err() || v.mode != execution.mode())
+                    || (!execution.is_service() && identity.is_none())
+                {
+                    return Err(BridgeError::Terminal(
+                        "terminal returned a missing or different execution identity".into(),
+                    ));
+                }
                 Ok(TerminalOpened {
                     session_id,
                     shell,
                     cols,
                     rows,
+                    identity,
                 })
             }
             response => Err(unexpected_task_response(response)),

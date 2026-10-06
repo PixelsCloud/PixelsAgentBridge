@@ -230,6 +230,7 @@ async fn authenticate(
         .await?;
     if let Some(tasks) = tasks {
         let tasks = tasks.for_ui_connection();
+        let _terminals = tasks.terminal_connection_guard();
         let mut recheck = tokio::time::interval(AUTHORIZATION_RECHECK_INTERVAL);
         recheck.set_missed_tick_behavior(MissedTickBehavior::Delay);
         recheck.tick().await;

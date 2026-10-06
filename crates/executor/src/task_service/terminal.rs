@@ -6,14 +6,263 @@ use pab_transport::PabBiStream;
 use tokio::sync::Mutex;
 
 use super::{MAX_ACTIVE_TERMINALS, TaskService, TaskServiceError};
+#[cfg(test)]
+mod tests;
+
+enum Session {
+    Service(Arc<TerminalSession>),
+    User(crate::user_worker::terminal::UserTerminal),
+}
+impl Session {
+    async fn input(&self, bytes: &[u8]) -> Result<(), TaskServiceError> {
+        match self {
+            Self::Service(session) => {
+                let session = session.clone();
+                let bytes = bytes.to_vec();
+                tokio::task::spawn_blocking(move || session.input(&bytes)).await??;
+            }
+            Self::User(session) => session.input(bytes).await?,
+        };
+        Ok(())
+    }
+    async fn read(
+        &self,
+        offset: u64,
+        limit: usize,
+    ) -> Result<pab_terminal::TerminalOutput, TaskServiceError> {
+        Ok(match self {
+            Self::Service(session) => session.read(offset, limit),
+            Self::User(session) => session.read(offset, limit).await?,
+        })
+    }
+    async fn resize(&self, cols: u16, rows: u16) -> Result<(), TaskServiceError> {
+        match self {
+            Self::Service(session) => {
+                let session = session.clone();
+                tokio::task::spawn_blocking(move || session.resize(cols, rows)).await??;
+            }
+            Self::User(session) => session.resize(cols, rows).await?,
+        };
+        Ok(())
+    }
+    async fn close(&self) -> Result<(), TaskServiceError> {
+        match self {
+            Self::Service(session) => {
+                let session = session.clone();
+                tokio::task::spawn_blocking(move || session.close()).await??;
+            }
+            Self::User(session) => session.close().await?,
+        };
+        Ok(())
+    }
+}
+
+// Separate from task clones: dropping a network session closes its terminals
+// even if accepted commands still keep a TaskService clone alive.
+pub(crate) struct TerminalConnectionGuard(TaskService);
+impl Drop for TerminalConnectionGuard {
+    fn drop(&mut self) {
+        self.0
+            .ui_connection
+            .closed
+            .store(true, std::sync::atomic::Ordering::Release);
+        let service = self.0.clone();
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                service.close_connection_terminals().await;
+            });
+        }
+    }
+}
 
 pub(super) struct ActiveTerminal {
     owner: OperatorRef,
-    session: Arc<TerminalSession>,
+    connection: RequestId,
+    selection: pab_protocol::ExecutionSelection,
+    identity: Option<pab_protocol::ExecutionIdentity>,
+    cols: u16,
+    rows: u16,
+    session: Arc<Session>,
     next_sequence: Mutex<u64>,
 }
 
 impl TaskService {
+    async fn finish_terminal_action(
+        &self,
+        id: RequestId,
+        sequence: u64,
+        result: Result<(), TaskServiceError>,
+    ) -> Result<(), TaskServiceError> {
+        self.store
+            .finish_terminal_event(
+                id,
+                sequence,
+                if result.is_ok() {
+                    "completed"
+                } else {
+                    "unconfirmed"
+                },
+            )
+            .await?;
+        if result.is_err() {
+            self.store
+                .finish_terminal(
+                    id,
+                    "interrupted",
+                    Some("terminal operation result unconfirmed; input is not replayed"),
+                )
+                .await?;
+            self.terminals.lock().await.remove(&id);
+        }
+        result
+    }
+    pub(crate) fn terminal_connection_guard(&self) -> TerminalConnectionGuard {
+        TerminalConnectionGuard(self.clone())
+    }
+
+    async fn close_connection_terminals(&self) {
+        let entries = {
+            let mut sessions = self.terminals.lock().await;
+            let ids = sessions
+                .iter()
+                .filter(|(_, entry)| entry.connection == self.ui_connection.id)
+                .map(|(id, _)| *id)
+                .collect::<Vec<_>>();
+            ids.into_iter()
+                .filter_map(|id| sessions.remove(&id).map(|entry| (id, entry)))
+                .collect::<Vec<_>>()
+        };
+        for (id, entry) in entries {
+            let result = entry.session.close().await;
+            let _ = self
+                .store
+                .finish_terminal(
+                    id,
+                    "interrupted",
+                    Some(if result.is_ok() {
+                        "connection ended; terminal closed"
+                    } else {
+                        "connection ended; terminal cleanup unconfirmed"
+                    }),
+                )
+                .await;
+        }
+    }
+
+    pub(super) async fn open_terminal_session(
+        &self,
+        owner: OperatorRef,
+        id: RequestId,
+        cols: u16,
+        rows: u16,
+        selection: pab_protocol::ExecutionSelection,
+    ) -> Result<Arc<ActiveTerminal>, TaskServiceError> {
+        if !(20..=500).contains(&cols) || !(5..=200).contains(&rows) {
+            return Err(TaskServiceError::InvalidRequest(
+                "invalid terminal dimensions",
+            ));
+        }
+        let mut sessions = self.terminals.lock().await;
+        if self
+            .ui_connection
+            .closed
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return Err(TaskServiceError::InvalidRequest("connection ended"));
+        }
+        if let Some(entry) = sessions.get(&id) {
+            if entry.owner != owner || entry.connection != self.ui_connection.id {
+                return Err(TaskServiceError::AccessDenied);
+            }
+            if entry.selection != selection || entry.cols != cols || entry.rows != rows {
+                return Err(TaskServiceError::Store(
+                    crate::task_store::TaskStoreError::RequestConflict,
+                ));
+            }
+            return Ok(entry.clone());
+        }
+        if sessions.len() >= MAX_ACTIVE_TERMINALS {
+            return Err(TaskServiceError::InvalidRequest(
+                "too many terminal sessions",
+            ));
+        }
+        let prepared = self.prepare_user(owner, selection).await?;
+        let identity = prepared
+            .as_ref()
+            .map(|(_, identity)| identity.clone())
+            .or_else(|| self.execution_context.identity.clone());
+        let (shell, args) = crate::user_worker::terminal::shell();
+        self.store
+            .start_terminal(
+                id,
+                owner,
+                shell,
+                self.ui_connection.id,
+                selection,
+                identity.as_ref(),
+                cols,
+                rows,
+            )
+            .await?;
+        let started: Result<Session, TaskServiceError> = async {
+            Ok(if let Some((prepared, _)) = prepared {
+                Session::User(
+                    crate::user_worker::terminal::UserTerminal::start(
+                        &self.user_worker_executable()?,
+                        prepared,
+                        cols,
+                        rows,
+                    )
+                    .await?,
+                )
+            } else {
+                Session::Service(Arc::new(
+                    tokio::task::spawn_blocking(move || {
+                        TerminalSession::start(shell, args, cols, rows)
+                    })
+                    .await??,
+                ))
+            })
+        }
+        .await;
+        let session = match started {
+            Ok(session) => session,
+            Err(error) => {
+                self.store
+                    .finish_terminal(id, "failed", Some("terminal start failed"))
+                    .await?;
+                return Err(error);
+            }
+        };
+        if self
+            .ui_connection
+            .closed
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            let _ = session.close().await;
+            self.store
+                .finish_terminal(
+                    id,
+                    "interrupted",
+                    Some("connection ended during terminal start"),
+                )
+                .await?;
+            return Err(TaskServiceError::InvalidRequest("connection ended"));
+        }
+        let entry = Arc::new(ActiveTerminal {
+            owner,
+            connection: self.ui_connection.id,
+            selection,
+            identity,
+            cols,
+            rows,
+            session: Arc::new(session),
+            next_sequence: Mutex::new(1),
+        });
+        sessions.insert(id, entry.clone());
+        Ok(entry)
+    }
+
     pub(super) async fn handle_terminal(
         &self,
         initiated_by: OperatorRef,
@@ -26,44 +275,13 @@ impl TaskService {
                 request_id,
                 cols,
                 rows,
+                execution,
                 ..
             } => {
-                if self.terminals.lock().await.len() >= MAX_ACTIVE_TERMINALS {
-                    return Err(TaskServiceError::InvalidRequest(
-                        "too many terminal sessions",
-                    ));
-                }
-                let (shell, args): (&str, &[&str]) = if cfg!(target_os = "windows") {
-                    ("powershell.exe", &["-NoLogo", "-NoProfile"])
-                } else if cfg!(target_os = "macos") {
-                    ("/bin/zsh", &["-l", "-i"])
-                } else {
-                    ("/bin/sh", &["-i"])
-                };
-                self.store
-                    .start_terminal(request_id, initiated_by, shell)
+                let entry = self
+                    .open_terminal_session(initiated_by, request_id, cols, rows, execution)
                     .await?;
-                let started = tokio::task::spawn_blocking(move || {
-                    TerminalSession::start(shell, args, cols, rows)
-                })
-                .await?;
-                let session = match started {
-                    Ok(session) => Arc::new(session),
-                    Err(error) => {
-                        self.store
-                            .finish_terminal(request_id, "failed", Some(&error.to_string()))
-                            .await?;
-                        return Err(error.into());
-                    }
-                };
-                self.terminals.lock().await.insert(
-                    request_id,
-                    Arc::new(ActiveTerminal {
-                        owner: initiated_by,
-                        session,
-                        next_sequence: Mutex::new(1),
-                    }),
-                );
+                let (shell, _) = crate::user_worker::terminal::shell();
                 stream
                     .send_json(
                         &DeviceTaskResponse::TerminalOpened {
@@ -71,6 +289,7 @@ impl TaskService {
                             shell: shell.to_owned(),
                             cols,
                             rows,
+                            identity: entry.identity.clone(),
                         },
                         timeout,
                     )
@@ -105,19 +324,9 @@ impl TaskService {
                     .await?;
                 *next += 1;
                 let session = Arc::clone(&entry.session);
-                let result = tokio::task::spawn_blocking(move || session.input(&bytes)).await?;
-                self.store
-                    .finish_terminal_event(
-                        session_id,
-                        sequence,
-                        if result.is_ok() {
-                            "completed"
-                        } else {
-                            "failed"
-                        },
-                    )
+                let result = session.input(&bytes).await;
+                self.finish_terminal_action(session_id, sequence, result)
                     .await?;
-                result?;
                 stream
                     .send_json(
                         &DeviceTaskResponse::TerminalAcknowledged {
@@ -140,7 +349,20 @@ impl TaskService {
                     ));
                 }
                 let entry = self.terminal_entry(session_id, initiated_by).await?;
-                let output = entry.session.read(offset, limit as usize);
+                let output = match entry.session.read(offset, limit as usize).await {
+                    Ok(output) => output,
+                    Err(error) => {
+                        self.store
+                            .finish_terminal(
+                                session_id,
+                                "interrupted",
+                                Some("terminal output unavailable; session is not reopened"),
+                            )
+                            .await?;
+                        self.terminals.lock().await.remove(&session_id);
+                        return Err(error);
+                    }
+                };
                 let size = output.bytes.len() as u16;
                 let response = DeviceTaskResponse::TerminalOutput {
                     session_id,
@@ -158,6 +380,7 @@ impl TaskService {
                     stream.finish_send(timeout).await?;
                 }
                 if output.ended {
+                    entry.session.close().await?;
                     self.store
                         .finish_terminal(session_id, "closed", None)
                         .await?;
@@ -184,20 +407,9 @@ impl TaskService {
                     .await?;
                 *next += 1;
                 let session = Arc::clone(&entry.session);
-                let result =
-                    tokio::task::spawn_blocking(move || session.resize(cols, rows)).await?;
-                self.store
-                    .finish_terminal_event(
-                        session_id,
-                        sequence,
-                        if result.is_ok() {
-                            "completed"
-                        } else {
-                            "failed"
-                        },
-                    )
+                let result = session.resize(cols, rows).await;
+                self.finish_terminal_action(session_id, sequence, result)
                     .await?;
-                result?;
                 stream
                     .send_json(
                         &DeviceTaskResponse::TerminalAcknowledged {
@@ -225,22 +437,13 @@ impl TaskService {
                     .await?;
                 *next += 1;
                 let session = Arc::clone(&entry.session);
-                let result = tokio::task::spawn_blocking(move || session.close()).await?;
-                self.store
-                    .finish_terminal_event(
-                        session_id,
-                        sequence,
-                        if result.is_ok() {
-                            "completed"
-                        } else {
-                            "failed"
-                        },
-                    )
+                let result = session.close().await;
+                self.finish_terminal_action(session_id, sequence, result)
                     .await?;
-                result?;
                 self.store
                     .finish_terminal(session_id, "closed", None)
                     .await?;
+                self.terminals.lock().await.remove(&session_id);
                 stream
                     .send_json(&DeviceTaskResponse::TerminalClosed { session_id }, timeout)
                     .await?;
@@ -262,7 +465,7 @@ impl TaskService {
             .get(&id)
             .cloned()
             .ok_or(TaskServiceError::NotFound)?;
-        if entry.owner != initiated_by {
+        if entry.owner != initiated_by || entry.connection != self.ui_connection.id {
             return Err(TaskServiceError::AccessDenied);
         }
         Ok(entry)

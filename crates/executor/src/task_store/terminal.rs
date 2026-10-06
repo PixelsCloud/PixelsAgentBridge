@@ -28,7 +28,13 @@ impl TaskStore {
         id: RequestId,
         initiated_by: OperatorRef,
         shell: &str,
+        connection: RequestId,
+        selection: pab_protocol::ExecutionSelection,
+        identity: Option<&pab_protocol::ExecutionIdentity>,
+        cols: u16,
+        rows: u16,
     ) -> Result<(), TaskStoreError> {
+        let mut tx = self.pool.begin().await?;
         sqlx::query(
             r#"
             INSERT INTO terminal_sessions (id, initiated_by_json, shell, state, started_at_unix_ms)
@@ -39,8 +45,11 @@ impl TaskStore {
         .bind(serde_json::to_string(&initiated_by)?)
         .bind(shell)
         .bind(now_unix_ms())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        sqlx::query("INSERT INTO terminal_execution (session_id, connection_id, selection_json, identity_json, cols, rows) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(id.to_string()).bind(connection.to_string()).bind(serde_json::to_string(&selection)?).bind(identity.map(serde_json::to_string).transpose()?).bind(i64::from(cols)).bind(i64::from(rows)).execute(&mut *tx).await?;
+        tx.commit().await?;
         Ok(())
     }
 

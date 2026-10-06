@@ -21,6 +21,7 @@ use tokio::sync::{Mutex, watch};
 pub(crate) mod command;
 mod container;
 mod directory;
+mod execution;
 mod file_transfer;
 mod filesystem;
 mod filesystem_archive;
@@ -81,6 +82,7 @@ pub(crate) struct TaskService {
 }
 
 struct UiConnection {
+    closed: std::sync::atomic::AtomicBool,
     id: pab_protocol::RequestId,
     used: std::sync::atomic::AtomicBool,
     execution_contexts: Mutex<pab_task_runtime::ExecutionContextRegistry>,
@@ -88,6 +90,7 @@ struct UiConnection {
 impl UiConnection {
     fn new() -> Self {
         Self {
+            closed: std::sync::atomic::AtomicBool::new(false),
             id: pab_protocol::RequestId::new(),
             used: std::sync::atomic::AtomicBool::new(false),
             execution_contexts: Mutex::new(pab_task_runtime::ExecutionContextRegistry::default()),
@@ -467,6 +470,7 @@ impl TaskService {
             )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 command_schema_version: Some(3),
+                terminal_schema_version: Some(2),
                 filesystem_schema_version: Some(4),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
@@ -656,32 +660,10 @@ impl TaskService {
         }
         let mut execution_context = self.execution_context.clone();
         execution_context.cwd.clone_from(&command.cwd);
-        let prepared = if command.options.execution.is_service() {
-            None
-        } else {
-            let caller = pab_task_runtime::ExecutionCaller {
-                device: self.device_ref,
-                actor: initiated_by,
-                connection: self.ui_connection.id,
-            };
-            let selection = command.options.execution;
-            let expected = self
-                .ui_connection
-                .execution_contexts
-                .lock()
-                .await
-                .identity(caller, selection)
-                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?
-                .clone();
-            let selected = expected.clone();
-            let prepared=tokio::task::spawn_blocking(move ||pab_os_control::execution::PreparedUser::from_observation(&selected)).await?
-                .map_err(|_|TaskServiceError::ExecutionContext("execution account/session unavailable or changed; query execution contexts again".into()))?;
-            self.ui_connection
-                .execution_contexts
-                .lock()
-                .await
-                .resolve(caller, selection, &expected)
-                .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?;
+        let prepared = if let Some((prepared, expected)) = self
+            .prepare_user(initiated_by, command.options.execution)
+            .await?
+        {
             execution_context.cwd = command.cwd.clone().or_else(|| Some(expected.home.clone()));
             execution_context.environment_revision = format!(
                 "user-v1:{:x}",
@@ -691,6 +673,8 @@ impl TaskService {
             );
             execution_context.identity = Some(expected);
             Some(prepared)
+        } else {
+            None
         };
         let outcome = self
             .store

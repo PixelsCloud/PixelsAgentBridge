@@ -70,6 +70,17 @@ impl BridgeRuntime {
         cols: u16,
         rows: u16,
     ) -> Result<TerminalOpened, RuntimeError> {
+        self.open_terminal_as(device_ref, cols, rows, Default::default())
+            .await
+    }
+
+    pub async fn open_terminal_as(
+        &self,
+        device_ref: DeviceRef,
+        cols: u16,
+        rows: u16,
+        execution: pab_protocol::ExecutionSelection,
+    ) -> Result<TerminalOpened, RuntimeError> {
         validate_terminal_size(cols, rows)?;
         // A read-only probe refreshes a cached device connection before a non-idempotent open.
         self.current_environment(device_ref).await?;
@@ -111,7 +122,7 @@ impl BridgeRuntime {
         }
         let device = self.inner.device(device_ref).await;
         let result = match device.connection().await {
-            Ok(connection) => match connection.open_terminal(id, cols, rows).await {
+            Ok(connection) => match connection.open_terminal_as(id, cols, rows, execution).await {
                 Ok(opened) => Ok(opened),
                 Err(error) => {
                     if error.is_recoverable_connection() {

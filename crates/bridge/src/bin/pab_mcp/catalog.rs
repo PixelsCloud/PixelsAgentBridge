@@ -155,7 +155,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_open_terminal",
-            "Open an interactive shell on a selected device and return its verified OS context. Subsequent calls use session_id; do not assume commands from another OS work here.",
+            "Open an interactive shell. Default execution is service; user requires a context_ref discovered on this connection. Identity is fixed for this session and never falls back. Subsequent calls use session_id. Disconnect closes the session; no automatic reopen or replay of input.",
             json!({
                 "type": "object",
                 "properties": {
@@ -280,11 +280,13 @@ pub(super) fn tools() -> Vec<Value> {
                 json!({"type":"string","enum":["change","complete"],"default":"change"}),
             );
         }
-        if name == "pab_run_command" {
+        if matches!(name.as_str(), "pab_run_command" | "pab_open_terminal") {
             properties.insert("execution".into(),json!({"oneOf":[
                 {"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},
                 {"type":"object","properties":{"mode":{"const":"user"},"context_ref":{"type":"string","format":"uuid"}},"required":["mode","context_ref"],"additionalProperties":false}
             ]}));
+        }
+        if name == "pab_run_command" {
             properties.insert(
                 "request_id".into(),
                 json!({"type":"string","format":"uuid"}),
@@ -409,7 +411,7 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     if matches!(name, "pab_file_read" | "pab_file_search" | "pab_file_patch") {
         super::mcp_filesystem::parse(name, args)?;
     }
-    if name == "pab_run_command" {
+    if matches!(name, "pab_run_command" | "pab_open_terminal") {
         let options = pab_protocol::CommandOptions {
             execution: serde_json::from_value(
                 args.get("execution")
@@ -542,6 +544,20 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn terminal_user_selection_rejects_claimed_identity_and_desktop_mode() {
+        let valid = serde_json::json!({"device_code":"123456789","execution":{"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()}});
+        super::validate_arguments("pab_open_terminal", &valid).unwrap();
+        for execution in [
+            serde_json::json!({"mode":"user","username":"fixture"}),
+            serde_json::json!({"mode":"service","context_ref":pab_protocol::ExecutionContextRef::new()}),
+            serde_json::json!({"mode":"desktop_user","context_ref":pab_protocol::ExecutionContextRef::new()}),
+        ] {
+            let mut args = valid.clone();
+            args["execution"] = execution;
+            assert!(super::validate_arguments("pab_open_terminal", &args).is_err());
+        }
+    }
     use super::*;
     #[test]
     fn command_user_selection_accepts_only_discovered_reference_shape() {

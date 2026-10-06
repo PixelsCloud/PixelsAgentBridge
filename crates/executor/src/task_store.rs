@@ -136,6 +136,7 @@ impl TaskStore {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS filesystem_results (request_id TEXT PRIMARY KEY REFERENCES read_operations(request_id), fingerprint TEXT NOT NULL, reply_json TEXT)").execute(&mut *tx).await?;
+        sqlx::query("CREATE TABLE IF NOT EXISTS terminal_execution (session_id TEXT PRIMARY KEY REFERENCES terminal_sessions(id), connection_id TEXT NOT NULL, selection_json TEXT NOT NULL, identity_json TEXT, cols INTEGER NOT NULL, rows INTEGER NOT NULL)").execute(&mut *tx).await?;
         tx.commit().await?;
         let (changes, _) = broadcast::channel(CHANGE_BUFFER);
         Ok(Self { pool, changes })

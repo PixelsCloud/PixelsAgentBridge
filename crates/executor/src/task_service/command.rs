@@ -35,9 +35,7 @@ impl TaskService {
             task_ref,
         };
         if let Some(prepared) = prepared {
-            let executable = std::env::current_exe()?;
-            #[cfg(test)]
-            let executable = self.worker_executable.clone().unwrap_or(executable);
+            let executable = self.user_worker_executable()?;
             crate::user_worker::execute(&executable, prepared, command, sink, cancel).await
         } else {
             execute(sink, command, cancel).await

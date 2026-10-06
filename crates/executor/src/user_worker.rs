@@ -15,6 +15,7 @@ use tokio::{
 const HANDSHAKE: Duration = Duration::from_secs(15);
 const CONTROL_LIMIT: usize = 64 * 1024;
 const BINARY_LIMIT: usize = 256 * 1024;
+pub(crate) mod terminal;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum Control {
@@ -24,6 +25,12 @@ enum Control {
     },
     Command {
         command: CommandTaskSpec,
+    },
+    Terminal {
+        request: terminal::Request,
+    },
+    TerminalReply {
+        reply: terminal::Reply,
     },
     Event {
         event: TaskEventKind,
@@ -103,7 +110,7 @@ async fn read_frame(reader: &mut (impl AsyncRead + Unpin)) -> io::Result<Frame> 
     let len = reader.read_u32().await? as usize;
     let limit = match tag {
         0 => CONTROL_LIMIT,
-        1 | 2 => BINARY_LIMIT,
+        1..=4 => BINARY_LIMIT,
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -128,7 +135,7 @@ async fn write_frame(
 ) -> io::Result<()> {
     let limit = match tag {
         0 => CONTROL_LIMIT,
-        1 | 2 => BINARY_LIMIT,
+        1..=4 => BINARY_LIMIT,
         _ => 0,
     };
     if limit == 0 || bytes.len() > limit {
@@ -159,8 +166,14 @@ pub async fn run(address: &str, parent_pid: u32) -> io::Result<()> {
     let request = tokio::time::timeout(HANDSHAKE, peer.receive())
         .await
         .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "worker request timed out"))??;
-    let Control::Command { command } = decode(request)? else {
-        return Err(io::Error::other("expected worker command"));
+    let command = match decode(request)? {
+        Control::Command { command } => command,
+        Control::Terminal {
+            request: terminal::Request::Open { cols, rows },
+        } => {
+            return terminal::serve(peer, cols, rows).await;
+        }
+        _ => return Err(io::Error::other("expected worker operation")),
     };
     crate::task_service::validate_command(&command).map_err(io::Error::other)?;
     let (cancel, receiver) = watch::channel(None);
@@ -197,8 +210,17 @@ pub(crate) async fn execute(
     prepared: PreparedUser,
     command: CommandTaskSpec,
     sink: CommandSink,
-    mut cancel: watch::Receiver<Option<String>>,
+    cancel: watch::Receiver<Option<String>>,
 ) -> Result<(), TaskServiceError> {
+    let (mut peer, mut child) = launch(executable, prepared).await?;
+    peer.control(Control::Command { command }).await?;
+    execute_started(&mut peer, &mut child, sink, cancel).await
+}
+
+async fn launch(
+    executable: &Path,
+    prepared: PreparedUser,
+) -> io::Result<(Peer, pab_os_control::execution::UserProcess)> {
     let expected = prepared.identity().clone();
     let mut listener = channel::WorkerListener::bind(&expected)?;
     let args = vec![
@@ -208,7 +230,7 @@ pub(crate) async fn execute(
     ];
     let executable = executable.to_owned();
     let cwd = expected.home.clone();
-    let mut child =
+    let child =
         tokio::task::spawn_blocking(move || prepared.spawn(&executable, &args, &cwd)).await??;
     let mut peer = Peer::new(listener.accept(child.id(), HANDSHAKE).await?);
     let hello = tokio::time::timeout(HANDSHAKE, peer.receive())
@@ -223,11 +245,18 @@ pub(crate) async fn execute(
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 "native worker identity mismatch",
-            )
-            .into());
+            ));
         }
     }
-    peer.control(Control::Command { command }).await?;
+    Ok((peer, child))
+}
+
+async fn execute_started(
+    peer: &mut Peer,
+    child: &mut pab_os_control::execution::UserProcess,
+    sink: CommandSink,
+    mut cancel: watch::Receiver<Option<String>>,
+) -> Result<(), TaskServiceError> {
     let initial = cancel.borrow().clone();
     let mut cancel_deadline = None;
     if let Some(reason) = initial {
@@ -296,7 +325,6 @@ pub(crate) async fn execute(
             },
         }
     }
-    drop(peer);
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         if let Some(code) = child.try_wait()? {
@@ -310,7 +338,7 @@ pub(crate) async fn execute(
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    drop(child); // Close the Windows job before recording success/cancellation.
+    child.terminate()?; // Terminate any remaining Windows job members before terminal result.
     sink.event(terminal.ok_or_else(|| io::Error::other("worker omitted terminal result"))?)
         .await
 }

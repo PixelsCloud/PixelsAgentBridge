@@ -225,12 +225,19 @@ pub(super) async fn call_tool(
             let device_ref = resolve_target(runtime, arguments).await?;
             let cols = terminal_size(arguments, "cols", 80)?;
             let rows = terminal_size(arguments, "rows", 24)?;
+            let execution = serde_json::from_value(
+                arguments
+                    .get("execution")
+                    .cloned()
+                    .unwrap_or(json!({"mode":"service"})),
+            )
+            .map_err(|e| e.to_string())?;
             let target = runtime
                 .current_environment(device_ref)
                 .await
                 .map_err(|error| error.to_string())?;
             let opened = runtime
-                .open_terminal(device_ref, cols, rows)
+                .open_terminal_as(device_ref, cols, rows, execution)
                 .await
                 .map_err(|error| error.to_string())?;
             Ok(json!({
@@ -238,6 +245,7 @@ pub(super) async fn call_tool(
                 "shell": opened.shell,
                 "cols": opened.cols,
                 "rows": opened.rows,
+                "execution_identity": opened.identity,
                 "os_reminder": target.compact_reminder()
             }))
         }
