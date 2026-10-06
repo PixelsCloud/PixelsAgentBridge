@@ -6,6 +6,8 @@ pub mod ui_worker;
 pub mod ui_worker_entry;
 pub mod ui_registry;
 pub mod ui_engine;
+#[cfg(target_os = "macos")]
+pub mod ui_macos;
 #[cfg(windows)]
 pub mod ui_windows;
 #[cfg(any(target_os = "macos", test))]

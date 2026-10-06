@@ -20,6 +20,9 @@ windows-sys = {version="0.61",features=["Win32_Foundation","Win32_UI_WindowsAndM
 x11rb = "=0.13.2"
 
 [target.'cfg(target_os="macos")'.dependencies]
+accessibility = "=0.2.0"
+accessibility-sys = "=0.2.0"
+core-foundation = "=0.10.1"
 dispatch2 = "=0.3.1"
 libc = "0.2"
 objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFString"] }

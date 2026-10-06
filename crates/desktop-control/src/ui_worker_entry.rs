@@ -102,6 +102,10 @@ pub fn run() -> Result<(), WorkerFailure> {
             .map_err(|_| WorkerFailure::Unavailable)?;
         serve(backend)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        serve(crate::ui_macos::MacUi)
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     Err(WorkerFailure::Unavailable)
 }
