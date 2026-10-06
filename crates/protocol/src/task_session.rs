@@ -334,6 +334,9 @@ pub enum DeviceTaskErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
+    TransferAccepted {
+        snapshot: TransferSnapshot,
+    },
     SystemQuery {
         reply: Box<crate::SystemQueryReply>,
     },

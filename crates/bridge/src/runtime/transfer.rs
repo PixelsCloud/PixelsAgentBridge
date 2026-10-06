@@ -28,24 +28,47 @@ impl BridgeRuntime {
             .await
             .connection()
             .await?;
+        let expected_hash = if let Some(original) = spec.options.resume_from {
+            let (_, context) = self.inner.store.transfer_context(original).await?;
+            control
+                .expect_context(context.ok_or(super::RuntimeStoreError::SnapshotIdentityMismatch)?);
+            let hash: Option<String> =
+                sqlx::query_scalar("SELECT sha256 FROM runtime_async_transfers WHERE id=?")
+                    .bind(original.to_string())
+                    .fetch_optional(&self.inner.store.pool)
+                    .await
+                    .map_err(super::RuntimeStoreError::from)?
+                    .flatten();
+            if spec.direction == "download" && hash.is_none() {
+                return Err(RuntimeError::TaskOperation(
+                    "original download hash is unavailable".into(),
+                ));
+            }
+            hash
+        } else {
+            None
+        };
         if spec.direction == "upload" {
             connection
-                .upload_file_controlled(
+                .upload_file_with_options(
                     spec.request_id,
                     std::path::Path::new(&spec.source),
                     &spec.destination,
                     spec.overwrite,
+                    &spec.options,
                     control,
                     progress,
                 )
                 .await?;
         } else {
             connection
-                .download_file_controlled(
+                .download_file_with_options(
                     spec.request_id,
                     &spec.source,
                     std::path::Path::new(&spec.destination),
                     spec.overwrite,
+                    &spec.options,
+                    expected_hash.as_deref(),
                     control,
                     progress,
                 )

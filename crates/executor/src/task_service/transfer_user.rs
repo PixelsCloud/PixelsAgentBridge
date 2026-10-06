@@ -118,70 +118,84 @@ impl TaskService {
                 .await?;
             return Ok(());
         }
-        let result = if let Some((prepared, _)) = user {
-            let operation = match &request.operation {
-                FileTransferOperation::Upload {
-                    path,
-                    size,
-                    sha256,
-                    overwrite,
-                } => Operation::Upload {
-                    path: path.clone(),
-                    size: *size,
-                    sha256: sha256.clone(),
-                    overwrite: *overwrite,
-                },
-                FileTransferOperation::Download {
-                    path,
-                    offset,
-                    expected_sha256,
-                } => Operation::Download {
-                    path: path.clone(),
-                    offset: *offset,
-                    expected_sha256: expected_sha256.clone(),
-                },
-            };
-            let (_send, cancel) = watch::channel(false);
-            crate::user_worker::transfer::execute(
-                worker
-                    .as_ref()
-                    .expect("user worker resolved before acceptance"),
-                prepared,
-                operation,
-                LocalRecorder {
-                    store: self.store.clone(),
-                    request_id: request.request_id,
-                },
-                self.file_coordinator(),
-                stream,
-                cancel,
-            )
-            .await
-            .map_err(TaskServiceError::from)
-        } else {
-            let engine = TransferEngine::local(&self.store, request.request_id, &self.upload_locks);
-            match &request.operation {
-                FileTransferOperation::Upload {
-                    path,
-                    size,
-                    sha256,
-                    overwrite,
-                } => {
-                    engine
-                        .upload(stream, timeout, path, *size, sha256, *overwrite)
-                        .await
-                }
-                FileTransferOperation::Download {
-                    path,
-                    offset,
-                    expected_sha256,
-                } => {
-                    engine
-                        .download(stream, timeout, path, *offset, expected_sha256.as_deref())
-                        .await
+        // Publish the frozen identity before the first binary frame. Failure to
+        // deliver this receipt is settled by the same durable transfer record.
+        let result = async {
+            stream
+                .send_frame_json(
+                    &DeviceTaskResponse::TransferAccepted {
+                        snapshot: self.store.get_transfer(actor, request.request_id).await?,
+                    },
+                    timeout,
+                )
+                .await?;
+            if let Some((prepared, _)) = user {
+                let operation = match &request.operation {
+                    FileTransferOperation::Upload {
+                        path,
+                        size,
+                        sha256,
+                        overwrite,
+                    } => Operation::Upload {
+                        path: path.clone(),
+                        size: *size,
+                        sha256: sha256.clone(),
+                        overwrite: *overwrite,
+                    },
+                    FileTransferOperation::Download {
+                        path,
+                        offset,
+                        expected_sha256,
+                    } => Operation::Download {
+                        path: path.clone(),
+                        offset: *offset,
+                        expected_sha256: expected_sha256.clone(),
+                    },
+                };
+                let (_send, cancel) = watch::channel(false);
+                crate::user_worker::transfer::execute(
+                    worker
+                        .as_ref()
+                        .expect("user worker resolved before acceptance"),
+                    prepared,
+                    operation,
+                    LocalRecorder {
+                        store: self.store.clone(),
+                        request_id: request.request_id,
+                    },
+                    self.file_coordinator(),
+                    stream,
+                    cancel,
+                )
+                .await
+                .map_err(TaskServiceError::from)
+            } else {
+                let engine =
+                    TransferEngine::local(&self.store, request.request_id, &self.upload_locks);
+                match &request.operation {
+                    FileTransferOperation::Upload {
+                        path,
+                        size,
+                        sha256,
+                        overwrite,
+                    } => {
+                        engine
+                            .upload(stream, timeout, path, *size, sha256, *overwrite)
+                            .await
+                    }
+                    FileTransferOperation::Download {
+                        path,
+                        offset,
+                        expected_sha256,
+                    } => {
+                        engine
+                            .download(stream, timeout, path, *offset, expected_sha256.as_deref())
+                            .await
+                    }
                 }
             }
-        };
+        }
+        .await;
         self.finish_transfer(request.request_id, &result).await?;
         result
     }
@@ -203,6 +217,9 @@ impl TaskService {
         else {
             return Ok(snapshot);
         };
+        if identity.mode == pab_protocol::ExecutionMode::Service {
+            return Ok(snapshot);
+        }
         let Some(hash) = snapshot.sha256.clone() else {
             return Ok(snapshot);
         };

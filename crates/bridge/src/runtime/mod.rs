@@ -16,6 +16,7 @@ mod system_query;
 mod terminal;
 mod terminal_store;
 mod transfer;
+mod transfer_identity;
 mod transfer_queue;
 mod windows;
 mod worker;

@@ -67,7 +67,12 @@ impl TaskStore {
             return Err(TaskStoreError::RequestConflict);
         }
         let identity_matches = match request.execution {
-            pab_protocol::ExecutionSelection::Service {} => context.identity.is_none(),
+            pab_protocol::ExecutionSelection::Service {} => {
+                context.identity.as_ref().is_none_or(|identity| {
+                    identity.mode == pab_protocol::ExecutionMode::Service
+                        && identity.validate().is_ok()
+                })
+            }
             pab_protocol::ExecutionSelection::User { .. } => context
                 .identity
                 .as_ref()

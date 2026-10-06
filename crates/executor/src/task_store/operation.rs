@@ -44,7 +44,7 @@ impl TaskStore {
                 row.try_get::<String, _>("state")?.as_str(),
             ) {
                 ("receive", "completed") => Some(true),
-                ("receive", "failed") => Some(false),
+                ("receive", "failed" | "interrupted" | "cancelled") => Some(false),
                 _ => None,
             },
         };
@@ -52,10 +52,12 @@ impl TaskStore {
         // completion. Resolve that window using file evidence, never by replay.
         if snapshot.direction == "receive"
             && snapshot.state == "committing"
-            && snapshot
-                .execution_context
-                .as_ref()
-                .is_none_or(|context| context.identity.is_none())
+            && snapshot.execution_context.as_ref().is_none_or(|context| {
+                context
+                    .identity
+                    .as_ref()
+                    .is_none_or(|identity| identity.mode == pab_protocol::ExecutionMode::Service)
+            })
             && publication_matches(&snapshot).await
         {
             self.finish_transfer(request_id, "completed", None).await?;

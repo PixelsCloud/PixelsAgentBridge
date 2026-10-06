@@ -235,6 +235,9 @@ async fn dispatch(
                 .map_err(io::Error::other)?;
             fixture.responses.push(response.clone());
             match response {
+                DeviceTaskResponse::TransferAccepted { .. } => {
+                    fixture.responses.pop();
+                }
                 DeviceTaskResponse::Transfer { .. } | DeviceTaskResponse::FileComplete { .. } => {
                     return Ok(());
                 }
@@ -694,4 +697,57 @@ async fn invalid_transfer_identity_rejects_before_acceptance() {
         Err(TaskStoreError::NotFound)
     ));
     assert!(!dir.path().join("never.bin").exists());
+}
+
+#[tokio::test]
+async fn service_transfer_retains_observed_native_identity_and_reconciles_locally() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let path = dir.path().join("service.bin");
+    assert_eq!(
+        svc.execution_context.identity.as_ref().unwrap().mode,
+        ExecutionMode::Service
+    );
+    let request = FileTransferRequest {
+        request_id: RequestId::new(),
+        execution: Default::default(),
+        resume_from: None,
+        operation: FileTransferOperation::Upload {
+            path: path.to_str().unwrap().into(),
+            size: 4,
+            sha256: digest(b"data"),
+            overwrite: false,
+        },
+    };
+    dispatch(&svc, &request, &mut input(b"data")).await.unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"data");
+    let snapshot = svc
+        .lookup_transfer(actor(), request.request_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        snapshot.execution_context,
+        Some(svc.execution_context.clone())
+    );
+    let mut lost = request;
+    lost.request_id = RequestId::new();
+    svc.store
+        .accept_transfer(actor(), &lost, &svc.execution_context)
+        .await
+        .unwrap();
+    svc.store
+        .transfer_progress(lost.request_id, 4, 4)
+        .await
+        .unwrap();
+    svc.store
+        .begin_transfer_publication(lost.request_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        svc.lookup_transfer(actor(), lost.request_id)
+            .await
+            .unwrap()
+            .state,
+        "completed"
+    );
 }

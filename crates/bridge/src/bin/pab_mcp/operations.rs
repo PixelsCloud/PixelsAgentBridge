@@ -66,6 +66,9 @@ pub(super) fn handles(name: &str) -> bool {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileArgs {
+    #[serde(default)]
+    execution: pab_protocol::ExecutionSelection,
+    resume_from: Option<RequestId>,
     device_code: DeviceCode,
     source: String,
     destination: String,
@@ -351,6 +354,10 @@ impl OperationManager {
             return Err("source and destination must be absolute file paths for their respective operating systems".to_owned());
         }
         let spec = TransferRequest {
+            options: pab_protocol::FileTransferOptions {
+                execution: args.execution,
+                resume_from: args.resume_from,
+            },
             request_id: args.request_id.unwrap_or_default(),
             device_ref: device.device_ref,
             device_code: args.device_code,
@@ -461,6 +468,11 @@ impl OperationManager {
                     break Err("transfer cancellation requested".to_owned());
                 },
                 _ = timer.tick() => {
+                    if let Some(snapshot) = control.accepted() {
+                        if let Err(e) = self.queue.observe_acceptance(id, spec.device_code, &snapshot).await {
+                            break Err(e.to_string());
+                        }
+                    }
                     let progress = (offset.load(Ordering::Acquire), size.load(Ordering::Acquire));
                     if progress != last {
                         if let Err(e) = self.queue.progress(id, progress.0, progress.1).await { tracing::warn!(%e, "cannot persist transfer progress"); }
@@ -473,6 +485,18 @@ impl OperationManager {
         };
         // Drop the stream before trying to reconcile cancellation with the Executor.
         drop(operation);
+        let result = if let Some(snapshot) = control.accepted() {
+            match self
+                .queue
+                .observe_acceptance(id, spec.device_code, &snapshot)
+                .await
+            {
+                Ok(()) => result,
+                Err(error) => Err(error.to_string()),
+            }
+        } else {
+            result
+        };
         let _ = self
             .queue
             .progress(

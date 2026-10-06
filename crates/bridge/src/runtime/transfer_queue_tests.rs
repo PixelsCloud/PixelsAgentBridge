@@ -3,6 +3,7 @@ use pab_protocol::{DeviceId, EndpointKey, OperatorRef, TenantId, UserId};
 
 fn request() -> TransferRequest {
     TransferRequest {
+        options: Default::default(),
         request_id: RequestId::new(),
         device_ref: DeviceRef {
             tenant_id: TenantId::from_u128(2),
@@ -37,6 +38,105 @@ fn remote(spec: &TransferRequest, state: &str, published: Option<bool>) -> Trans
         message: None,
         published,
     }
+}
+
+fn user_context() -> pab_protocol::ExecutionContext {
+    serde_json::from_value(serde_json::json!({
+        "os_family":"linux","os_name":"Linux","os_version":"test","architecture":"x86_64","execution_scope":"native","path_style":"posix","interpreter":null,"cwd":"/home/fixture","environment_revision":"user-v1:test",
+        "identity":{"mode":"user","account_id":"uid:23001","account_name":"fixture","home":"/home/fixture","primary_group":23001,"session_id":null,"logon_id":null,"environment_source":"native_account"}
+    })).unwrap()
+}
+
+#[tokio::test]
+async fn transfer_identity_and_resume_are_durable_and_cannot_be_replaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let q = queue(&path, "first").await;
+    let mut spec = request();
+    spec.options.execution = pab_protocol::ExecutionSelection::User {
+        context_ref: pab_protocol::ExecutionContextRef::new(),
+    };
+    q.submit(&spec).await.unwrap();
+    let mut changed = spec.clone();
+    changed.options.execution = Default::default();
+    assert!(q.submit(&changed).await.is_err());
+    let mut reply = remote(&spec, "running", None);
+    assert!(
+        q.observe_acceptance(spec.request_id, spec.device_code, &reply)
+            .await
+            .is_err()
+    );
+    reply.execution_context = Some(user_context());
+    q.observe_acceptance(spec.request_id, spec.device_code, &reply)
+        .await
+        .unwrap();
+    let mut other = reply.clone();
+    other
+        .execution_context
+        .as_mut()
+        .unwrap()
+        .identity
+        .as_mut()
+        .unwrap()
+        .account_id = "uid:23002".into();
+    assert!(
+        q.observe_acceptance(spec.request_id, spec.device_code, &other)
+            .await
+            .is_err()
+    );
+    let mut resume = spec.clone();
+    resume.request_id = RequestId::new();
+    resume.options.resume_from = Some(spec.request_id);
+    assert!(q.submit(&resume).await.is_err()); // Original still live.
+    reply.state = "interrupted".into();
+    reply.published = Some(false);
+    q.reconcile(
+        &q.get(spec.request_id, spec.device_code).await.unwrap(),
+        &reply,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        q.get(spec.request_id, spec.device_code)
+            .await
+            .unwrap()
+            .operation
+            .state,
+        "failed"
+    );
+    changed = resume.clone();
+    changed.destination = "/tmp/different.bin".into();
+    assert!(q.submit(&changed).await.is_err());
+    q.close().await.unwrap();
+    let q = queue(&path, "second").await;
+    assert!(!q.submit(&spec).await.unwrap().1);
+    assert_eq!(
+        q.get(spec.request_id, spec.device_code)
+            .await
+            .unwrap()
+            .execution_context,
+        Some(user_context())
+    );
+    resume.options.execution = pab_protocol::ExecutionSelection::User {
+        context_ref: pab_protocol::ExecutionContextRef::new(),
+    };
+    assert!(q.submit(&resume).await.unwrap().1);
+    reply = remote(&resume, "running", None);
+    reply.execution_context = other.execution_context;
+    assert!(
+        q.observe_acceptance(resume.request_id, resume.device_code, &reply)
+            .await
+            .is_err()
+    );
+    reply.execution_context = Some(user_context());
+    q.observe_acceptance(resume.request_id, resume.device_code, &reply)
+        .await
+        .unwrap();
+    let page = q.operation_page(None, None, None, 10).await.unwrap();
+    assert_eq!(
+        page[0]["execution_context"]["identity"]["account_id"],
+        "uid:23001"
+    );
 }
 
 #[tokio::test]

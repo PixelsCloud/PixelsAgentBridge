@@ -119,6 +119,14 @@ pub(super) async fn run_reconciliation(
                     continue;
                 }
             };
+            if inner
+                .store
+                .observe_transfer_context(&record, &snapshot)
+                .await
+                .is_err()
+            {
+                continue;
+            }
             if record.direction == "upload"
                 && remote_target_matches(&record, &snapshot)
                 && let Err(error) = inner
@@ -226,7 +234,10 @@ fn remote_completion_matches(record: &OperationRecord, snapshot: &TransferSnapsh
 fn remote_incomplete_upload_failed(record: &OperationRecord, snapshot: &TransferSnapshot) -> bool {
     record.direction == "upload"
         && remote_target_matches(record, snapshot)
-        && snapshot.state == "failed"
+        && matches!(
+            snapshot.state.as_str(),
+            "failed" | "interrupted" | "cancelled"
+        )
         && (snapshot.offset < snapshot.size || snapshot.published == Some(false))
         && snapshot.finished_at_unix_ms.is_some()
 }

@@ -11,6 +11,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct TransferRequest {
+    pub options: pab_protocol::FileTransferOptions,
     pub request_id: RequestId,
     pub device_ref: DeviceRef,
     pub device_code: DeviceCode,
@@ -22,6 +23,9 @@ pub struct TransferRequest {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct QueuedTransfer {
+    #[serde(flatten)]
+    pub options: pab_protocol::FileTransferOptions,
+    pub execution_context: Option<pab_protocol::ExecutionContext>,
     #[serde(flatten)]
     pub operation: OperationRecord,
     pub phase: String,
@@ -73,6 +77,9 @@ impl TransferQueue {
             return Err(RuntimeStoreError::RequestConflict);
         }
         let id = remote.request_id;
+        self.store
+            .observe_transfer_context(operation, remote)
+            .await?;
         if remote.state == "completed"
             && remote.offset == remote.size
             && remote.finished_at_unix_ms.is_some()
@@ -101,7 +108,10 @@ impl TransferQueue {
             self.phase(id, "completed", Some(digest)).await?;
             self.finish(id, "completed", None).await?;
         } else if operation.direction == "upload"
-            && remote.state == "failed"
+            && matches!(
+                remote.state.as_str(),
+                "failed" | "interrupted" | "cancelled"
+            )
             && (remote.published == Some(false) || remote.offset < remote.size)
         {
             self.finish(
@@ -166,12 +176,33 @@ impl TransferQueue {
         if !matches!(spec.direction.as_str(), "upload" | "download") {
             return Err(RuntimeStoreError::RequestConflict);
         }
+        if !matches!(
+            spec.options.execution,
+            pab_protocol::ExecutionSelection::Service {}
+                | pab_protocol::ExecutionSelection::User { .. }
+        ) || spec.options.resume_from == Some(spec.request_id)
+        {
+            return Err(RuntimeStoreError::RequestConflict);
+        }
+        let options = serde_json::to_string(&spec.options)?;
         let mut tx = self.store.pool.begin_with("BEGIN IMMEDIATE").await?;
         let previous = sqlx::query("SELECT * FROM runtime_operations WHERE id = ?")
             .bind(spec.request_id.to_string())
             .fetch_optional(&mut *tx)
             .await?;
         if let Some(row) = previous {
+            let prior: Option<String> =
+                sqlx::query_scalar("SELECT options_json FROM runtime_transfer_context WHERE id=?")
+                    .bind(spec.request_id.to_string())
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            let same_options = match prior {
+                Some(json) => {
+                    serde_json::from_str::<pab_protocol::FileTransferOptions>(&json)?
+                        == spec.options
+                }
+                None => spec.options == pab_protocol::FileTransferOptions::default(),
+            };
             let matches = row.try_get::<String, _>("device_ref_json")?
                 == serde_json::to_string(&spec.device_ref)?
                 && row.try_get::<Option<String>, _>("device_code")?.as_deref()
@@ -181,7 +212,8 @@ impl TransferQueue {
                 && row.try_get::<String, _>("direction")? == spec.direction
                 && row.try_get::<String, _>("source")? == spec.source
                 && row.try_get::<String, _>("destination")? == spec.destination
-                && row.try_get::<bool, _>("overwrite")? == spec.overwrite;
+                && row.try_get::<bool, _>("overwrite")? == spec.overwrite
+                && same_options;
             if !matches {
                 return Err(RuntimeStoreError::RequestConflict);
             }
@@ -196,6 +228,41 @@ impl TransferQueue {
         if existing_task != 0 {
             return Err(RuntimeStoreError::RequestConflict);
         }
+        if let Some(original) = spec.options.resume_from {
+            let row = sqlx::query("SELECT o.*, c.context_json, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_sessions s ON s.id=o.owner_session_id WHERE o.id=?")
+                .bind(original.to_string()).fetch_optional(&mut *tx).await?.ok_or(RuntimeStoreError::NotFound)?;
+            if row
+                .try_get::<Option<String>, _>("owner_session_id")?
+                .as_deref()
+                != Some(&self.session_id)
+                && row
+                    .try_get::<Option<i64>, _>("stopped_at_unix_ms")?
+                    .is_none()
+                && row
+                    .try_get::<Option<i64>, _>("heartbeat_at_unix_ms")?
+                    .is_some_and(|v| v >= now_unix_ms() - 15_000)
+            {
+                return Err(RuntimeStoreError::NotFound);
+            }
+            if row.try_get::<String, _>("device_ref_json")?
+                != serde_json::to_string(&spec.device_ref)?
+                || row.try_get::<String, _>("initiated_by")? != self.initiated_by
+                || row.try_get::<String, _>("direction")? != spec.direction
+                || row.try_get::<String, _>("source")? != spec.source
+                || row.try_get::<String, _>("destination")? != spec.destination
+                || row.try_get::<bool, _>("overwrite")? != spec.overwrite
+                || !matches!(
+                    row.try_get::<String, _>("state")?.as_str(),
+                    "failed" | "cancelled"
+                )
+                || row
+                    .try_get::<Option<i64>, _>("finished_at_unix_ms")?
+                    .is_none()
+                || row.try_get::<Option<String>, _>("context_json")?.is_none()
+            {
+                return Err(RuntimeStoreError::RequestConflict);
+            }
+        }
         sqlx::query("INSERT INTO runtime_operations (id, device_ref_json, device_code, initiated_by, kind, direction, source, destination, overwrite, state, started_at_unix_ms, owner_session_id) VALUES (?, ?, ?, ?, 'file_transfer', ?, ?, ?, ?, 'running', ?, ?)")
             .bind(spec.request_id.to_string()).bind(serde_json::to_string(&spec.device_ref)?)
             .bind(spec.device_code.to_string()).bind(&self.initiated_by).bind(&spec.direction)
@@ -203,6 +270,11 @@ impl TransferQueue {
             .bind(now_unix_ms()).bind(&self.session_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO runtime_async_transfers (id, phase, updated_at_unix_ms) VALUES (?, 'queued', ?)")
             .bind(spec.request_id.to_string()).bind(now_unix_ms()).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO runtime_transfer_context (id, options_json) VALUES (?, ?)")
+            .bind(spec.request_id.to_string())
+            .bind(options)
+            .execute(&mut *tx)
+            .await?;
         if spec.direction == "download" {
             let destination = Path::new(&spec.destination);
             let parent = tokio::fs::canonicalize(
@@ -258,7 +330,10 @@ impl TransferQueue {
         let updated_at_unix_ms = row.try_get("updated_at_unix_ms")?;
         let sha256 = row.try_get("sha256")?;
         let operation = super::operation::decode_operation(row, now_unix_ms() - 15_000)?;
+        let (options, execution_context) = self.store.transfer_context(id).await?;
         Ok(QueuedTransfer {
+            options,
+            execution_context,
             operation,
             phase,
             updated_at_unix_ms,
@@ -442,7 +517,7 @@ impl TransferQueue {
                 own.created_at_unix_ms, json_extract(t.snapshot_json, '$.finished_at_unix_ms'), 0, 0,
                 COALESCE(json_extract(t.snapshot_json, '$.state'), 'queued'), NULL, NULL, NULL, NULL, NULL
             FROM runtime_tasks t JOIN runtime_task_owners own ON own.request_id = t.request_id LEFT JOIN remembered_devices d ON d.device_ref_json = t.device_ref_json WHERE own.owner_session_id = ?
-        ) SELECT * FROM entries WHERE (? IS NULL OR device_code = ?) AND (? IS NULL OR state = ?) AND (? IS NULL OR (started, id) < (?, ?)) ORDER BY started DESC, id DESC LIMIT ?")
+        ) SELECT *, (SELECT c.context_json FROM runtime_transfer_context c WHERE c.id=entries.id) AS transfer_context FROM entries WHERE (? IS NULL OR device_code = ?) AND (? IS NULL OR state = ?) AND (? IS NULL OR (started, id) < (?, ?)) ORDER BY started DESC, id DESC LIMIT ?")
             .bind(&self.session_id).bind(&self.session_id).bind(&self.session_id).bind(&self.session_id).bind(code.map(|c| c.to_string())).bind(code.map(|c| c.to_string()))
             .bind(state).bind(state).bind(before.map(|c| c.0)).bind(before.map(|c| c.0)).bind(before.map(|c| c.1))
             .bind(i64::from(limit.min(101))).fetch_all(&self.store.pool).await?;
@@ -454,7 +529,8 @@ impl TransferQueue {
             "phase": row.try_get::<String, _>("phase")?, "updated_at_unix_ms": row.try_get::<Option<i64>, _>("updated")?,
             "message": row.try_get::<Option<String>, _>("message")?,
             "source": row.try_get::<Option<String>, _>("source")?, "destination": row.try_get::<Option<String>, _>("destination")?,
-            "partial": row.try_get::<Option<i64>, _>("partial")?.map(|v| v != 0)
+            "partial": row.try_get::<Option<i64>, _>("partial")?.map(|v| v != 0),
+            "execution_context": row.try_get::<Option<String>,_>("transfer_context")?.map(|v| serde_json::from_str::<serde_json::Value>(&v)).transpose()?
         }))).collect()
     }
 }

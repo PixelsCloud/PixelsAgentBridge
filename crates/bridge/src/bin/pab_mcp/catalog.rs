@@ -282,7 +282,11 @@ pub(super) fn tools() -> Vec<Value> {
         }
         if matches!(
             name.as_str(),
-            "pab_run_command" | "pab_open_terminal" | "pab_list_directory"
+            "pab_run_command"
+                | "pab_open_terminal"
+                | "pab_list_directory"
+                | "pab_upload_file"
+                | "pab_download_file"
         ) {
             properties.insert("execution".into(),json!({"oneOf":[
                 {"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},
@@ -319,6 +323,9 @@ pub(super) fn tools() -> Vec<Value> {
             );
         }
         let extra = match name.as_str() {
+            "pab_upload_file" | "pab_download_file" => {
+                " Defaults to service. User execution requires transfer v2 and a context_ref from pab_list_execution_contexts on this connection; no service fallback. Status reports actual execution_context. To resume a confirmed failed/cancelled attempt, use a new request_id and resume_from with identical paths/overwrite and the same native user (a fresh connection reference is allowed). Upload content must be unchanged; downloads are checked against the original hash. Unconfirmed attempts must be queried first."
+            }
             "pab_list_directory" => {
                 " Defaults to service. User execution requires filesystem v6 and a current connection context_ref from pab_list_execution_contexts. Use the same selection for subsequent name-cursor pages. No service fallback; pages report actual execution identity. Directory contents may change between pages."
             }
@@ -372,6 +379,7 @@ fn file_tool_schema() -> Value {
             "source": { "type": "string", "minLength": 1, "maxLength": 4096 },
             "destination": { "type": "string", "minLength": 1, "maxLength": 4096 },
             "overwrite": { "type": "boolean", "default": false },
+            "resume_from": { "type": "string", "format": "uuid" },
             "request_id": { "type": "string", "format": "uuid" },
             "wait_ms": { "type": "integer", "minimum": 0, "maximum": 5000, "default": 0 }
         },
@@ -422,7 +430,11 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     }
     if matches!(
         name,
-        "pab_run_command" | "pab_open_terminal" | "pab_list_directory"
+        "pab_run_command"
+            | "pab_open_terminal"
+            | "pab_list_directory"
+            | "pab_upload_file"
+            | "pab_download_file"
     ) {
         let options = pab_protocol::CommandOptions {
             execution: serde_json::from_value(
@@ -556,6 +568,22 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn transfer_user_selection_and_resume_are_strict() {
+        for name in ["pab_upload_file", "pab_download_file"] {
+            let args = serde_json::json!({"device_code":"123456789","source":"/tmp/a","destination":"/tmp/b","resume_from":pab_protocol::RequestId::new(),"execution":{"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()}});
+            super::validate_arguments(name, &args).unwrap();
+            for execution in [
+                serde_json::json!({"mode":"desktop_user","context_ref":pab_protocol::ExecutionContextRef::new()}),
+                serde_json::json!({"mode":"user","username":"root"}),
+                serde_json::json!({"mode":"service","password":"secret"}),
+            ] {
+                let mut invalid = args.clone();
+                invalid["execution"] = execution;
+                assert!(super::validate_arguments(name, &invalid).is_err());
+            }
+        }
+    }
     #[test]
     fn directory_user_selection_rejects_claimed_accounts_and_desktop() {
         let mut args = serde_json::json!({"device_code":"123456789","path":"/home/fixture","execution":{"mode":"user","context_ref":pab_protocol::ExecutionContextRef::new()}});

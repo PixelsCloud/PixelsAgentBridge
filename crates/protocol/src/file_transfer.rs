@@ -2,6 +2,14 @@ use crate::{ExecutionSelection, RequestId, valid_file_hash};
 use serde::{Deserialize, Serialize};
 
 pub const FILE_TRANSFER_SCHEMA_VERSION: u16 = 2;
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileTransferOptions {
+    #[serde(default)]
+    pub execution: ExecutionSelection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_from: Option<RequestId>,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileTransferRequest {

@@ -15,9 +15,41 @@ const REQUESTED: u8 = 4;
 pub struct TransferControl {
     state: Arc<AtomicU8>,
     digest: Arc<Mutex<Option<String>>>,
+    accepted: Arc<Mutex<Option<pab_protocol::TransferSnapshot>>>,
+    expected_context: Arc<Mutex<Option<pab_protocol::ExecutionContext>>>,
 }
 
 impl TransferControl {
+    pub fn expect_context(&self, context: pab_protocol::ExecutionContext) {
+        *self
+            .expected_context
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(context);
+    }
+    pub(super) fn accept(
+        &self,
+        snapshot: pab_protocol::TransferSnapshot,
+    ) -> Result<(), BridgeError> {
+        if self
+            .expected_context
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .is_some_and(|expected| snapshot.execution_context.as_ref() != Some(expected))
+        {
+            return Err(BridgeError::FileTransfer(
+                "transfer execution identity changed".into(),
+            ));
+        }
+        *self.accepted.lock().unwrap_or_else(|e| e.into_inner()) = Some(snapshot);
+        Ok(())
+    }
+    pub fn accepted(&self) -> Option<pab_protocol::TransferSnapshot> {
+        self.accepted
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
     pub fn cancel(&self) {
         self.state.fetch_or(CANCEL, Ordering::AcqRel);
     }
@@ -34,6 +66,9 @@ impl TransferControl {
         self.check()?;
         self.state.fetch_or(REQUESTED, Ordering::AcqRel);
         self.check()
+    }
+    pub(super) fn rejected(&self) {
+        self.state.fetch_and(!REQUESTED, Ordering::AcqRel);
     }
     pub(super) fn check(&self) -> Result<(), BridgeError> {
         if self.cancelled() {

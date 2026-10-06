@@ -144,6 +144,7 @@ impl RuntimeStore {
             "CREATE INDEX IF NOT EXISTS runtime_operations_started ON runtime_operations (started_at_unix_ms DESC)",
             "CREATE INDEX IF NOT EXISTS runtime_operations_owner ON runtime_operations (owner_session_id)",
             "CREATE TABLE IF NOT EXISTS runtime_async_transfers (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), phase TEXT NOT NULL, updated_at_unix_ms INTEGER NOT NULL, sha256 TEXT)",
+            "CREATE TABLE IF NOT EXISTS runtime_transfer_context (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), options_json TEXT NOT NULL, context_json TEXT)",
             "CREATE TABLE IF NOT EXISTS runtime_task_owners (request_id TEXT PRIMARY KEY REFERENCES runtime_tasks(request_id), owner_session_id TEXT NOT NULL, initiated_by TEXT NOT NULL, created_at_unix_ms INTEGER NOT NULL)",
             "CREATE INDEX IF NOT EXISTS runtime_task_owners_session ON runtime_task_owners (owner_session_id, created_at_unix_ms DESC)",
             "CREATE TABLE IF NOT EXISTS runtime_download_claims (destination_key TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES runtime_operations(id))",
