@@ -6,6 +6,89 @@ use serde_json::{Value, json};
 use std::time::Duration;
 mod support;
 use support::{Client, stop};
+
+#[tokio::test]
+#[ignore = "requires an explicitly prepared foreground click fixture and result file"]
+async fn monitor_click_reaches_owned_application_fixture() {
+    let code = std::env::var("PAB_TEST_DEVICE_CODE").expect("device");
+    let x: u32 = std::env::var("PAB_TEST_CLICK_X")
+        .expect("fixture x")
+        .parse()
+        .unwrap();
+    let y: u32 = std::env::var("PAB_TEST_CLICK_Y")
+        .expect("fixture y")
+        .parse()
+        .unwrap();
+    let path = std::env::var("PAB_TEST_CLICK_PATH").expect("fixture result path");
+    let (client, child) = start().await;
+    let connected = call(&client, "pab_connect", json!({"device_code":code})).await;
+    assert_eq!(connected["connected"], true);
+    let before = support::call(
+        &client,
+        "pab_file_read",
+        json!({"device_code":code,"path":path}),
+        Duration::from_secs(10),
+    )
+    .await;
+    let before = before
+        .structured_content
+        .expect("fixture precondition result");
+    assert_eq!(
+        before["result"]["error"]["code"], "not_found",
+        "result file must not already exist; no click sent"
+    );
+    let monitors = call(&client, "pab_list_monitors", json!({"device_code":code})).await;
+    let target = monitors["result"]["data"]["snapshot"]["monitors"][0]["input_target"].clone();
+    let id = pab_protocol::RequestId::new().to_string();
+    let mut result = call(
+        &client,
+        "pab_desktop_input",
+        json!({"device_code":code,"request_id":id,
+        "monitor_input":{"target":target,"action":{"type":"click","x":x,"y":y,"button":"left"}}}),
+    )
+    .await;
+    for _ in 0..20 {
+        if result["result"]["state"] != "running" {
+            break;
+        }
+        result = call(
+            &client,
+            "pab_get_operation",
+            json!({"device_code":code,"operation_id":id,"wait_until":"complete","wait_ms":1000}),
+        )
+        .await;
+    }
+    assert_eq!(
+        result["result"]["state"], "completed",
+        "inspect original operation {id}"
+    );
+    // Read-only observation: the click is never repeated if application delivery is delayed.
+    let mut observed = false;
+    for _ in 0..20 {
+        let raw = support::call(
+            &client,
+            "pab_file_read",
+            json!({"device_code":code,"path":path}),
+            Duration::from_secs(10),
+        )
+        .await;
+        if raw
+            .structured_content
+            .as_ref()
+            .and_then(|d| d["text"].as_str())
+            == Some("clicked")
+        {
+            observed = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    stop(client, child).await;
+    assert!(
+        observed,
+        "application marker missing; do not replay click {id}"
+    );
+}
 async fn start() -> (Client, tokio::process::Child) {
     support::start(tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))).await
 }
@@ -36,6 +119,87 @@ async fn query(client: &Client, code: &str) {
     .await;
     assert_eq!(info["result"]["state"], "completed");
     assert!(info["result"]["metadata"]["kind"].is_string());
+}
+
+#[tokio::test]
+#[ignore = "requires a live device; changes only this test's local task snapshot to simulate a stopped observer"]
+async fn status_queries_reconcile_stale_accepted_command_without_resubmitting() {
+    let code = std::env::var("PAB_TEST_DEVICE_CODE").unwrap();
+    let root = std::path::PathBuf::from(std::env::var_os("PAB_DATA_DIR").unwrap());
+    let database = std::env::var_os("PAB_BRIDGE_DATABASE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("bridge.sqlite3"));
+    let (client, child) = start().await;
+    let target = call(&client, "pab_connect", json!({"device_code":code})).await;
+    assert_eq!(target["connected"], true);
+    let windows = target["target"]["execution"]["os_family"] == "windows";
+    let id = pab_protocol::RequestId::new().to_string();
+    let command = if windows {
+        json!({"program":"cmd.exe","args":["/d","/c","echo PAB_status_fixture"]})
+    } else {
+        json!({"program":"/bin/echo","args":["PAB_status_fixture"]})
+    };
+    let mut args = command;
+    args["device_code"] = json!(code);
+    args["request_id"] = json!(id);
+    args["wait_ms"] = json!(1000);
+    let accepted = call(&client, "pab_run_command", args).await;
+    let task_id = accepted["operation_ref"]["task_id"].clone();
+    let finished = call(
+        &client,
+        "pab_get_operation",
+        json!({"device_code":code,"operation_id":id,"wait_ms":10000,"wait_until":"complete"}),
+    )
+    .await;
+    assert_eq!(finished["snapshot"]["state"], "succeeded");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(database))
+        .await
+        .unwrap();
+    let original: String =
+        sqlx::query_scalar("SELECT snapshot_json FROM runtime_tasks WHERE request_id = ?")
+            .bind(&id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let mut stale: Value = serde_json::from_str(&original).unwrap();
+    stale["state"] = json!("running");
+    stale["completion"] = Value::Null;
+    stale["finished_at_unix_ms"] = Value::Null;
+    for name in ["pab_get_operation", "pab_get_task"] {
+        sqlx::query("UPDATE runtime_tasks SET snapshot_json = ? WHERE request_id = ?")
+            .bind(serde_json::to_string(&stale).unwrap())
+            .bind(&id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut lookup = json!({"device_code":code,"wait_ms":10000,"wait_until":"complete"});
+        if name == "pab_get_operation" {
+            lookup["operation_id"] = json!(id);
+        } else {
+            lookup["task_id"] = task_id.clone();
+        }
+        let response = support::call(&client, name, lookup, Duration::from_secs(15)).await;
+        // Restore our row even on assertion failure, never leave test corruption behind.
+        sqlx::query("UPDATE runtime_tasks SET snapshot_json = ? WHERE request_id = ?")
+            .bind(&original)
+            .bind(&id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_ne!(response.is_error, Some(true), "{response:?}");
+        let result = response.structured_content.unwrap();
+        assert_eq!(
+            result["snapshot"]["state"], "succeeded",
+            "{name} kept a stale snapshot"
+        );
+        assert_eq!(result["snapshot"]["task_ref"]["task_id"], task_id);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    pool.close().await;
+    stop(client, child).await;
 }
 
 #[tokio::test]

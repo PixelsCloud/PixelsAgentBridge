@@ -55,6 +55,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "pab_list_sessions"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "pab_list_sessions"
         }
       ]
     },
@@ -163,6 +170,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "copy file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "copy file"
         }
       ]
     },
@@ -190,6 +204,13 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "cleanup owned fixture"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "cleanup owned fixture"
         }
       ]
@@ -233,6 +254,20 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "copied hash"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "hash modified file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "copied hash"
         }
       ]
     },
@@ -260,6 +295,13 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "move file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "move file"
         }
       ]
@@ -316,6 +358,27 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "apply hash guarded patch"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "reject stale hash"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "dry-run patch"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "apply hash guarded patch"
         }
       ]
@@ -401,6 +464,41 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "archive content verified"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "read exact Unicode content"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "dry-run preserves file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "read tail after patch"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "moved content"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "archive content verified"
         }
       ]
     },
@@ -429,6 +527,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "regex content search"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "regex content search"
         }
       ]
     },
@@ -456,6 +561,13 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "old move path absent"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "old move path absent"
         }
       ]
@@ -513,6 +625,27 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "empty file round trip"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "Unicode path and UTF-8 write"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "reject overwrite conflict"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "empty file round trip"
         }
       ]
     },
@@ -553,6 +686,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "create isolated fixture"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "create isolated fixture"
         }
       ]
     },
@@ -580,6 +720,13 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "archive create"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "archive create"
         }
       ]
@@ -609,6 +756,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "archive extract"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "archive extract"
         }
       ]
     },
@@ -622,7 +776,7 @@
       ],
       "live_suite": "live-desktop",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_desktop_input": {
       "group": "desktop",
@@ -633,8 +787,8 @@
         "crates/protocol/src/screenshot.rs"
       ],
       "live_suite": "live-desktop",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Built SDK clients: monitor move/stale/dedup on both remotes, Mac Cocoa click marker twice; local Windows owned-window click. Installed AI host new schema still requires reload."
     },
     "pab_focus_window": {
       "group": "desktop",
@@ -768,6 +922,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "pab_system_info"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "pab_system_info"
         }
       ]
     },
@@ -792,6 +953,13 @@
           "stage": "after_upgrade",
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_disks"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "pab_list_disks"
         }
       ]
@@ -827,6 +995,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "pab_list_network_interfaces"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "pab_list_network_interfaces"
         }
       ]
     },
@@ -846,7 +1021,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_list_processes": {
       "group": "system",
@@ -870,6 +1045,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "pab_list_processes"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "pab_list_processes"
         }
       ]
     },
@@ -880,7 +1062,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_get_service": {
       "group": "system",
@@ -889,7 +1071,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_list_services": {
       "group": "system",
@@ -913,6 +1095,13 @@
           "status": "pass",
           "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
           "case": "pab_list_services"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
+          "case": "pab_list_services"
         }
       ]
     },
@@ -923,7 +1112,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 temporary service start/restart/disable/stop/enable and disabled-start rejection; fixture removed. Mac native pending. See acceptance/2026-10-06.md."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_checkout": {
       "group": "git",
@@ -932,7 +1121,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_commit": {
       "group": "git",
@@ -941,7 +1130,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_diff": {
       "group": "git",
@@ -950,7 +1139,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_fetch": {
       "group": "git",
@@ -959,7 +1148,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_log": {
       "group": "git",
@@ -968,7 +1157,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_pull": {
       "group": "git",
@@ -977,7 +1166,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_push": {
       "group": "git",
@@ -986,7 +1175,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_git_status": {
       "group": "git",
@@ -995,7 +1184,7 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
     },
     "pab_container_control": {
       "group": "container",

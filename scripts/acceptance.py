@@ -73,7 +73,8 @@ def run_suite(suite, timeout):
             report["finished_at"] = now()
             save(directory, report)
             return 2, directory
-        commands = [["cargo", "test", "-p", "pab-bridge", "--test", "mcp_endpoint_live", "--", "--ignored"]]
+        commands = [["cargo", "test", "-p", "pab-bridge", "--test", "mcp_endpoint_live", "--", "--ignored",
+                     "--skip", "monitor_click_reaches_owned_application_fixture"]]
     else:
         report["cases"].append({"case": "native host acceptance", "status": "blocked",
                                 "evidence": "Requires native pixels.pab_* fixture observations; record them with the record command. No desktop/lifecycle mutations were executed."})

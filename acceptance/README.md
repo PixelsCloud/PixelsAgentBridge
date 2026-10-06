@@ -11,11 +11,29 @@ and the live suite that must verify them. This is a coverage **plan**, not a cla
 that every tool passed. The real rmcp catalog test rejects missing/stale tools
 and exports schemas as `catalog.json` for the report.
 
-`run live-basic` is opt-in to the existing two-client transport test. Set
+`run live-basic` is opt-in to the two-client transport and monitor-move tests. Set
 `PAB_TEST_DEVICE_CODE`, `PAB_TEST_PATH` (a disposable/existing fixture), and
 `PAB_DATA_DIR` explicitly; control/relay configuration must select the same server
 as the installed product. This tests built stdio clients, not recovery of an
 installed AI host. Never store device passwords in test arguments or reports.
+
+The separate ignored `monitor_click_reaches_owned_application_fixture` test is
+excluded from `live-basic`. Prepare a fresh, foreground application fixture first.
+`fixtures/macos_click.m` compiles with `clang -framework Cocoa`; run its executable
+in the signed-in GUI session with a fresh result path as its sole argument. Its
+window is at Cocoa (800,300), with the button center at (1000,380); on the tested
+2560×1080, 100% primary display this maps to native/logical (1000,700). Recompute
+and inspect the position for other displays. Set `PAB_TEST_CLICK_X`,
+`PAB_TEST_CLICK_Y` and `PAB_TEST_CLICK_PATH`, then explicitly select this test.
+It requires the result file to be absent, sends one click and observes the
+application-written marker without replay. The fixture exits after four minutes;
+remove its owned directory after closing it. No lifecycle suite starts it implicitly.
+
+For one-time Mac installation jobs, use an explicit launchd plist with
+`RunAtLoad=true`, `KeepAlive=false`, no interval/calendar trigger, and a durable
+completion guard checked before invoking Installer. Do not use `launchctl submit`
+as a one-shot installation launcher: the 2026-10-06 temporary job repeatedly ran
+after completion. Remove the exact job after recording its original outcome.
 
 `live-desktop`, `lifecycle`, and `upgrade` require native `pixels.pab_*` calls and
 application/OS observations. The driver reports blocked if asked to automate

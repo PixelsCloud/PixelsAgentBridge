@@ -581,9 +581,18 @@ impl OperationManager {
     }
 
     async fn get(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
-        super::mcp_waiting::wait_value(args, || self.get_once(args)).await
+        let mut first_read = true;
+        super::mcp_waiting::wait_value(args, || {
+            let resume_observer = std::mem::replace(&mut first_read, false);
+            self.get_once(args, resume_observer)
+        })
+        .await
     }
-    async fn get_once(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
+    async fn get_once(
+        self: &Arc<Self>,
+        args: &Value,
+        resume_observer: bool,
+    ) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if let Ok((device, cached)) = self.queue.system_record(id, code).await {
             let lookup = async {
@@ -642,11 +651,33 @@ impl OperationManager {
                 .map_err(|e| e.to_string())?;
             return Ok(transfer_result(record, &device.os_reminder));
         }
-        let task = self
+        let mut task = self
             .queue
             .command(id, code)
             .await
             .map_err(|e| e.to_string())?;
+        // A subscription worker may have stopped while the device was offline.
+        // Resume observation of an already accepted task only; never submit a
+        // snapshot-less pending command from a status query.
+        if resume_observer
+            && !task.is_complete()
+            && let Some(snapshot) = &task.snapshot
+        {
+            let task_ref = snapshot.task_ref;
+            let _ = tokio::time::timeout(Duration::from_millis(200), async {
+                self.runtime()
+                    .await?
+                    .follow_task(task_ref)
+                    .await
+                    .map_err(|e| e.to_string())
+            })
+            .await;
+            task = self
+                .queue
+                .command(id, code)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
         let target = task
             .snapshot
             .as_ref()

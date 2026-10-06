@@ -146,6 +146,12 @@ pub(super) async fn call_tool(
         }
         "pab_get_task" => {
             let task_ref = resolve_task(runtime, arguments).await?;
+            let record = runtime.task(task_ref).await.map_err(|e| e.to_string())?;
+            if !record.is_complete() {
+                // Once per call, not once per wait poll. Observe an accepted
+                // task only; this cannot resubmit its command.
+                let _ = runtime.follow_task(task_ref).await;
+            }
             super::mcp_waiting::wait_value(arguments, || async {
                 let record = runtime.task(task_ref).await.map_err(|e|e.to_string())?;
                 Ok(json!({"task_ref":task_ref,"snapshot":record.snapshot,"complete":record.is_complete(),"last_event_seq":record.last_event_seq,"stdout":record.stdout,"stderr":record.stderr}))
