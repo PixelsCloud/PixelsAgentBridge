@@ -327,7 +327,8 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E4应用MCP/Bridge入口 | 三个正式工具、严格解析/v12协商、原身份结果验证/历史去重及活动操作计数已接入；三平台各67项Bridge、38项MCP、7项stdio测试通过，见 acceptance/execution-e4-app-mcp-2026-10-07.md；安装宿主验收仍待完成 |
 | E4 Windows应用helper | 已增加各活动WTS用户的原始令牌应用helper、旧桌面路由隔离和原生调用阻塞退出；Windows/Mac各22项IPC与Linux18项回归通过，见 acceptance/execution-e4-application-helper-2026-10-07.md；安装后多会话与故障注入仍待验收 |
 | E5最小UI源码 | 命令/目录/终端/传输用户选择、双桌面应用入口及实际身份历史已接入；传输复用MCP队列，原连接取消/观察与未确认结果保留。三平台各69项Bridge和38项MCP测试、11项浏览器测试通过，见 acceptance/execution-e5-ui-2026-10-07.md；已安装桌面实际操作待验收 |
+| E6真实SSH首批 | Mac/Linux已通过原生用户worker + 独立OpenSSH agent的真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份推送核对；见 acceptance/execution-e6-ssh-2026-10-07.md；Windows SSH、Keychain及慢凭据helper仍待验收 |
 | E2–E8剩余增量 | 用户环境/真实凭据边界、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
-| Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
+| Linux无界面测试目标 | 已核实并运行Debian无GUI容器；已有Linux包脚本仍依赖Desktop，须补无界面交付入口，再完成完整服务安装/正式宿主验收 |
 | 下一动作 | 最小UI源码已接入；继续Windows helper实机生命周期、Mac锁屏边界与测试文档清理、真实Git凭据、终端启动模式、完整异常矩阵和打包安装后的UI及正式宿主验收 |

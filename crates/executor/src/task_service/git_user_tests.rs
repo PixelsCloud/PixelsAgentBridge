@@ -176,16 +176,38 @@ async fn native_user_git_acceptance() {
         )
         .await;
     }
+    let ssh_fixture: Option<serde_json::Value> = std::env::var("PAB_EXECUTION_TEST_GIT_SSH")
+        .ok()
+        .map(|text| serde_json::from_str(&text).unwrap());
+    if let Some(fixture) = &ssh_fixture {
+        command(
+            &svc,
+            selected,
+            "git",
+            vec![
+                "config".into(),
+                "core.sshCommand".into(),
+                fixture["command"].as_str().unwrap().into(),
+            ],
+            Some(&repo),
+        )
+        .await;
+    }
+    let remote_url = ssh_fixture
+        .as_ref()
+        .map(|fixture| {
+            format!(
+                "{}{}",
+                fixture["prefix"].as_str().unwrap(),
+                remote.to_str().unwrap()
+            )
+        })
+        .unwrap_or_else(|| remote.to_str().unwrap().into());
     command(
         &svc,
         selected,
         "git",
-        vec![
-            "remote".into(),
-            "add".into(),
-            "origin".into(),
-            remote.to_str().unwrap().into(),
-        ],
+        vec!["remote".into(), "add".into(), "origin".into(), remote_url],
         Some(&repo),
     )
     .await;
@@ -317,6 +339,82 @@ async fn native_user_git_acceptance() {
     )
     .await;
     assert_eq!(oid.trim(), published.trim());
+    if let Some(fixture) = &ssh_fixture {
+        let fetch = || {
+            query(
+                &repo,
+                selected,
+                GitAction::Fetch {
+                    remote: "origin".into(),
+                    branch: Some("main".into()),
+                },
+            )
+        };
+        let fetched = result(&svc, RequestId::new(), fetch()).await;
+        assert_eq!(
+            fetched.state, "completed",
+            "SSH agent fetch failed: {fetched:?}"
+        );
+        for (field, marker) in [
+            ("wrong_host_command", "Host key verification failed"),
+            ("no_agent_command", "Permission denied"),
+        ] {
+            command(
+                &svc,
+                selected,
+                "git",
+                vec![
+                    "config".into(),
+                    "core.sshCommand".into(),
+                    fixture[field].as_str().unwrap().into(),
+                ],
+                Some(&repo),
+            )
+            .await;
+            let started = tokio::time::Instant::now();
+            let rejected = result(&svc, RequestId::new(), fetch()).await;
+            assert_eq!(rejected.state, "failed", "{field}: {rejected:?}");
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "authentication did not fail within its deadline"
+            );
+            assert!(
+                serde_json::to_string(&rejected).unwrap().contains(marker),
+                "{field}: {rejected:?}"
+            );
+            assert_eq!(
+                rejected
+                    .execution_context
+                    .as_ref()
+                    .unwrap()
+                    .identity
+                    .as_ref()
+                    .unwrap()
+                    .account_id,
+                expected.account_id
+            );
+        }
+        command(
+            &svc,
+            selected,
+            "git",
+            vec![
+                "config".into(),
+                "core.sshCommand".into(),
+                fixture["command"].as_str().unwrap().into(),
+            ],
+            Some(&repo),
+        )
+        .await;
+        let restored = result(&svc, RequestId::new(), fetch()).await;
+        assert_eq!(
+            restored.state, "completed",
+            "restored agent fetch failed: {restored:?}"
+        );
+        println!(
+            "SSH_ACCEPTANCE agent_push=pass agent_fetch=pass wrong_host=pass no_agent=pass restored=pass"
+        );
+    }
     // Reconciliation must execute as the originally accepted user even when the
     // new network connection no longer holds the old discovery reference.
     let reconcile_id = RequestId::new();
