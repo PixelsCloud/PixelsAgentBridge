@@ -115,10 +115,11 @@ impl UiElement {
                 .is_some_and(|v| self.read_only != Some(v))
             || expected.checked.is_some_and(|v| self.checked != Some(v))
             || expected.selected.is_some_and(|v| self.selected != Some(v))
-            || expected
-                .value
-                .as_ref()
-                .is_some_and(|v| self.protected || self.value.as_ref() != Some(v))
+            || expected.value.as_ref().is_some_and(|v| {
+                self.protected
+                    || self.field_errors.contains_key("value")
+                    || self.value.as_ref() != Some(v)
+            })
         {
             return Err("precondition_failed");
         }
@@ -150,7 +151,9 @@ pub fn evaluate_ui_condition(
     };
     Ok(match condition {
         UiCondition::Enabled { value } => e.enabled == Some(*value),
-        UiCondition::ValueEquals { value } => !e.protected && e.value.as_ref() == Some(value),
+        UiCondition::ValueEquals { value } => {
+            !e.protected && !e.field_errors.contains_key("value") && e.value.as_ref() == Some(value)
+        }
         UiCondition::Checked { value } => e.checked == Some(*value),
         UiCondition::Selected { value } => e.selected == Some(*value),
         _ => unreachable!(),

@@ -29,6 +29,11 @@ fn main() {
         }
     }
     match std::env::args().nth(1).as_deref() {
+        Some("--ui-worker") => {
+            if pab_desktop_control::ui_worker_entry::run().is_err() {
+                std::process::exit(1);
+            }
+        }
         #[cfg(target_os = "macos")]
         Some("--macos-check") => {
             println!("{}", pab_desktop_lib::macos_diagnostics());

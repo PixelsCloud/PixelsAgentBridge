@@ -10,7 +10,8 @@ const OWNER_LIMIT: usize = 512;
 const TOTAL_LIMIT: usize = 4096;
 const IDLE_TTL: Duration = Duration::from_secs(600);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UiOwner {
     pub connection: RequestId,
     pub helper_instance: String,

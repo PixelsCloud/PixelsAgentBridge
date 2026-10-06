@@ -6,17 +6,20 @@ rust-version.workspace = true
 [dependencies]
 pab-protocol = { path = "../protocol" }
 serde_json.workspace = true
+serde.workspace = true
+pab-os-control = { path = "../os-control" }
 pab-screenshot = { path = "../screenshot" }
 [target.'cfg(any(target_os="windows",target_os="linux",target_os="macos"))'.dependencies]
 xcap = "=0.8.2"
 enigo = { version="=0.5.0",default-features=false,features=["x11rb"] }
 [target.'cfg(windows)'.dependencies]
+uiautomation = { version = "=0.25.1", default-features = false, features = ["pattern", "input"] }
+windows = { version = "=0.62.2", features = ["Win32_System_Com", "Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging"] }
 windows-sys = {version="0.61",features=["Win32_Foundation","Win32_UI_WindowsAndMessaging","Win32_Graphics_Gdi","Win32_System_LibraryLoader","Win32_UI_Input_KeyboardAndMouse"]}
 [target.'cfg(target_os="linux")'.dependencies]
 x11rb = "=0.13.2"
 
 [target.'cfg(target_os="macos")'.dependencies]
-pab-os-control = { path = "../os-control" }
 dispatch2 = "=0.3.1"
 libc = "0.2"
 objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFString"] }
