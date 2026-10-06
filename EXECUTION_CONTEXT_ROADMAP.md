@@ -298,6 +298,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E0用户执行原型 | Windows两个WTS用户、Mac UID 501、Linux无GUI账户均已实测，见 acceptance/execution-e0-2026-10-06.md；应用入口原型尚待完成 |
 | E1身份协议基础 | 已提交push：2ea721c；实际身份观察、连接绑定注册表已完成，尚未接入执行接受/指纹 |
 | E1账户发现 | 已实现 pab_list_execution_contexts，三平台相关测试通过；旧设备拒绝新查询，尚未安装到正式宿主 |
+| E2本地通道 | Tokio管道/Unix socket已实现，系统核对两端PID；Windows两个用户、Mac、Linux跨账户通信通过；产品worker路由和子进程树回收仍待接入 |
 | E2–E8剩余增量 | 用户worker IPC/生命周期、现有工具用户执行、应用入口、最小UI、完整验收与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |

@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub mod channel;
+
 #[cfg(unix)]
 mod unix;
 #[cfg(windows)]
