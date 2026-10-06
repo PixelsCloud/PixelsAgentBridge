@@ -27,6 +27,7 @@ mod filesystem;
 mod filesystem_archive;
 mod filesystem_bulk;
 mod filesystem_bulk_io;
+pub(crate) mod filesystem_engine;
 mod filesystem_hash;
 mod filesystem_io;
 mod filesystem_log;
@@ -34,6 +35,8 @@ mod filesystem_mkdir;
 mod filesystem_publish;
 mod filesystem_search;
 mod filesystem_text;
+#[cfg(test)]
+mod filesystem_user_tests;
 pub(crate) mod git;
 mod subscription;
 mod system_query;

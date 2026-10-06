@@ -15,6 +15,12 @@ impl UploadPathLocks {
         &self,
         destination: &Path,
     ) -> io::Result<Option<UploadPathGuard>> {
+        self.try_acquire_key(Self::canonical_key(destination).await?)
+    }
+
+    /// Resolve in the account that performs filesystem IO. The coordinator only
+    /// compares keys; it must not inspect a user's path with service privileges.
+    pub(super) async fn canonical_key(destination: &Path) -> io::Result<PathBuf> {
         let parent = destination
             .parent()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing parent path"))?;
@@ -25,7 +31,16 @@ impl UploadPathLocks {
         let key = canonical_parent.join(file_name);
         #[cfg(windows)]
         let key = PathBuf::from(key.to_string_lossy().to_lowercase());
+        Ok(key)
+    }
 
+    pub(super) fn try_acquire_key(&self, key: PathBuf) -> io::Result<Option<UploadPathGuard>> {
+        if !key.is_absolute() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "lock key must be absolute",
+            ));
+        }
         let mut active = self
             .active
             .lock()

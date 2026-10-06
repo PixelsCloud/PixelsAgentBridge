@@ -53,9 +53,10 @@ impl TaskService {
             let _permit = permit;
             let mut final_reply = reply.clone();
             let mut stop = receiver.clone();
+            let engine = worker.file_engine();
             let result = tokio::select! {
                 changed = stop.changed() => { let _ = changed; Err(FileError::new("cancelled", "hash", "hash task stopped after cancellation")) },
-                result = tokio::time::timeout(Duration::from_secs(30 * 60), worker.hash_file(&mut final_reply, &mut receiver)) => result.unwrap_or_else(|_| Err(FileError::new("time_limit", "hash", "hash exceeded 30 minutes"))),
+                result = tokio::time::timeout(Duration::from_secs(30 * 60), engine.hash_file(&mut final_reply, &mut receiver)) => result.unwrap_or_else(|_| Err(FileError::new("time_limit", "hash", "hash exceeded 30 minutes"))),
             };
             match result {
                 Ok(()) => final_reply.state = "completed".to_owned(),
@@ -123,8 +124,10 @@ impl TaskService {
             .await
             .map_err(Into::into)
     }
+}
 
-    async fn hash_file(
+impl super::filesystem_engine::FileEngine {
+    pub(crate) async fn hash_file(
         &self,
         reply: &mut FileSystemReply,
         cancel: &mut watch::Receiver<bool>,

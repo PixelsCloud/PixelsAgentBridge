@@ -1,6 +1,6 @@
 use super::{
-    filesystem::FileError, filesystem_bulk::Work, filesystem_io as base,
-    upload_lock::UploadPathGuard,
+    filesystem::FileError, filesystem_bulk::Work, filesystem_engine::FileGuard,
+    filesystem_io as base,
 };
 use pab_protocol::FileOperationLimits;
 use sha2::{Digest, Sha256};
@@ -141,7 +141,7 @@ pub(super) fn separate(source: &Path, target: &Path) -> Result<(), FileError> {
     }
     Ok(())
 }
-pub(super) fn lock(work: &Work, path: &Path) -> Result<UploadPathGuard, FileError> {
+pub(super) fn lock(work: &Work, path: &Path) -> Result<FileGuard, FileError> {
     work.handle
         .block_on(work.service.upload_locks.try_acquire(path))
         .map_err(|e| error("lock", e))?

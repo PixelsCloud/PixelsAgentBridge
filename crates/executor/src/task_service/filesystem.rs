@@ -14,7 +14,7 @@ use std::{path::Path, time::Duration};
 use tokio::fs;
 
 #[derive(Debug)]
-pub(super) struct FileError(pub FileSystemError);
+pub(crate) struct FileError(pub FileSystemError);
 
 impl FileError {
     pub(super) fn new(code: &str, phase: &str, message: impl Into<String>) -> Self {
@@ -201,7 +201,10 @@ impl TaskService {
             return Ok((self.start_bulk(request).await?, Vec::new()));
         }
         let mut reply = FileSystemReply::pending(request);
-        let result = self.prepare_filesystem(request, payload, &mut reply).await;
+        let result = self
+            .file_engine()
+            .prepare_filesystem(request, payload, &mut reply)
+            .await;
         let bytes = match result {
             Ok(bytes) => {
                 reply.state = "completed".to_owned();
@@ -216,8 +219,10 @@ impl TaskService {
         self.store.finish_filesystem(&reply).await?;
         Ok((reply, bytes))
     }
+}
 
-    async fn prepare_filesystem(
+impl super::filesystem_engine::FileEngine {
+    pub(crate) async fn prepare_filesystem(
         &self,
         request: &FileSystemRequest,
         payload: &[u8],

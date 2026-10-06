@@ -1,9 +1,9 @@
-use super::{TaskService, filesystem::FileError, filesystem_io as io};
+use super::{filesystem::FileError, filesystem_engine::FileEngine, filesystem_io as io};
 use pab_protocol::FileSystemReply;
 use std::path::Path;
 use tokio::fs;
 
-impl TaskService {
+impl FileEngine {
     pub(super) async fn mkdir(
         &self,
         path: &Path,

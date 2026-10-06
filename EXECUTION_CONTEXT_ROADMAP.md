@@ -302,7 +302,8 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E3指定用户命令 | v3参数、身份复核、原记录去重、中文输入输出、超时和取消已实现；Windows两个用户/Mac/Linux实测通过，见 acceptance/execution-e2-command-2026-10-06.md；尚未安装验收 |
 | E3指定用户终端 | 复用portable-pty接入user-worker；身份冻结、连接隔离、重复打开/关闭、中文及断线清理三平台源码集成通过，见 acceptance/execution-e3-terminal-2026-10-07.md；正式宿主与完整异常矩阵待验收 |
 | E3指定用户Git | 八工具v11接入user-worker，父进程共享仓库锁与持久化，原身份push核对；三平台源码集成通过，见 acceptance/execution-e3-git-2026-10-07.md；真实凭据和完整异常矩阵待验收 |
+| E3指定用户文件后端 | 复用文件引擎接入原生user-worker，二进制帧、父端路径锁和持久化确认；Windows两用户/Mac/Linux实测与文件回归通过，见 acceptance/execution-e3-filesystem-worker-2026-10-07.md；公开execution参数、历史身份、目录/传输尚未接入 |
 | E2–E8剩余增量 | 文件/传输用户执行、用户环境/凭据边界、应用入口、最小UI、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面测试目标 | 已核实并运行Debian无GUI容器；完整服务安装/正式宿主验收仍需完成 |
-| 下一动作 | 将现有文件/传输接入用户worker；继续补齐用户环境/凭据、生命周期边界和Bridge/UI身份记录，保留服务账户默认行为 |
+| 下一动作 | 接入文件公开execution协议、原子身份记录及原身份核对；将已验证文件后端接入原异步配额/取消，再做目录与上传下载；继续用户环境/凭据、应用、UI及交付 |

@@ -25,7 +25,7 @@ pub(super) struct BulkTestGate {
 }
 
 pub(super) struct Work {
-    pub service: TaskService,
+    pub service: super::filesystem_engine::FileEngine,
     pub request: FileSystemRequest,
     pub reply: FileSystemReply,
     pub handle: tokio::runtime::Handle,
@@ -69,42 +69,16 @@ impl TaskService {
         let cancel = Arc::new(AtomicBool::new(false));
         let worker = self.clone();
         let id = request.request_id;
-        let mut work = Work {
-            service: worker.clone(),
-            request: request.clone(),
-            reply: reply.clone(),
-            handle: tokio::runtime::Handle::current(),
-            cancel: cancel.clone(),
-            deadline: Instant::now() + Duration::from_secs(30 * 60),
-            last_record: Instant::now(),
-        };
+        let mut work = Work::new(
+            worker.file_engine(),
+            request.clone(),
+            reply.clone(),
+            cancel.clone(),
+        );
         let mut jobs = self.bulk_jobs.lock().await;
         let task = tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work.run()));
-            match result {
-                Ok(Ok(())) => work.reply.state = "completed".to_owned(),
-                Ok(Err(error)) => {
-                    work.reply.state = if error.0.code == "cancelled" {
-                        "cancelled"
-                    } else {
-                        "failed"
-                    }
-                    .to_owned();
-                    work.reply.error = Some(error.0);
-                }
-                Err(_) => {
-                    work.reply.state = "unconfirmed".to_owned();
-                    work.reply.error = Some(FileError::new("worker_panicked", "execute", "worker stopped before its outcome could be confirmed; query the original ID").0);
-                }
-            }
-            let changed = work
-                .reply
-                .mutation
-                .as_ref()
-                .is_some_and(|m| m.published_entries > 0 || m.deleted_entries > 0);
-            work.reply.mutation.as_mut().unwrap().partial =
-                work.reply.state != "completed" && changed;
+            work.finish();
             if let Err(error) = work
                 .handle
                 .block_on(worker.store.finish_filesystem(&work.reply))
@@ -151,6 +125,48 @@ impl TaskService {
 }
 
 impl Work {
+    pub(super) fn new(
+        service: super::filesystem_engine::FileEngine,
+        request: FileSystemRequest,
+        reply: FileSystemReply,
+        cancel: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            service,
+            request,
+            reply,
+            handle: tokio::runtime::Handle::current(),
+            cancel,
+            deadline: Instant::now() + Duration::from_secs(30 * 60),
+            last_record: Instant::now(),
+        }
+    }
+    pub(super) fn finish(&mut self) {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.run()));
+        match result {
+            Ok(Ok(())) => self.reply.state = "completed".to_owned(),
+            Ok(Err(error)) => {
+                self.reply.state = if error.0.code == "cancelled" {
+                    "cancelled"
+                } else {
+                    "failed"
+                }
+                .to_owned();
+                self.reply.error = Some(error.0);
+            }
+            Err(_) => {
+                self.reply.state = "unconfirmed".to_owned();
+                self.reply.error = Some(FileError::new("worker_panicked", "execute", "worker stopped before its outcome could be confirmed; query the original ID").0);
+            }
+        }
+        let changed = self
+            .reply
+            .mutation
+            .as_ref()
+            .is_some_and(|m| m.published_entries > 0 || m.deleted_entries > 0);
+        self.reply.mutation.as_mut().unwrap().partial = self.reply.state != "completed" && changed;
+    }
+
     pub fn check(&self) -> Result<(), FileError> {
         if self.cancel.load(Ordering::Acquire) {
             return Err(FileError::new(

@@ -1,13 +1,13 @@
 use super::{
-    TaskService,
     filesystem::FileError,
+    filesystem_engine::FileEngine,
     filesystem_io::{Staging, check_hash, digest, io_error, load, metadata, no_links},
 };
 use pab_protocol::{FileSystemReply, FileSystemRequest, RequestId};
 use std::path::Path;
 use tokio::{fs, io::AsyncWriteExt};
 
-impl TaskService {
+impl FileEngine {
     pub(super) async fn publish_text(
         &self,
         request: &FileSystemRequest,
