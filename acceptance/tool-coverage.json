@@ -39,8 +39,24 @@
         "crates/bridge/tests/mcp_endpoint_live.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_list_sessions"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_sessions"
+        }
+      ]
     },
     "pab_get_operation": {
       "group": "operations",
@@ -131,8 +147,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "copy file"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "copy file"
+        }
+      ]
     },
     "pab_file_delete": {
       "group": "files",
@@ -143,8 +175,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "cleanup owned fixture"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "cleanup owned fixture"
+        }
+      ]
     },
     "pab_file_hash": {
       "group": "files",
@@ -155,8 +203,38 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "hash modified file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "copied hash"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "hash modified file"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "copied hash"
+        }
+      ]
     },
     "pab_file_move": {
       "group": "files",
@@ -167,8 +245,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "move file"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "move file"
+        }
+      ]
     },
     "pab_file_patch": {
       "group": "files",
@@ -179,8 +273,52 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "reject stale hash"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "dry-run patch"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "apply hash guarded patch"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "reject stale hash"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "dry-run patch"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "apply hash guarded patch"
+        }
+      ]
     },
     "pab_file_read": {
       "group": "files",
@@ -191,8 +329,80 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "read exact Unicode content"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "dry-run preserves file"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "read tail after patch"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "moved content"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "archive content verified"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "read exact Unicode content"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "dry-run preserves file"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "read tail after patch"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "moved content"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "archive content verified"
+        }
+      ]
     },
     "pab_file_search": {
       "group": "files",
@@ -203,8 +413,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "regex content search"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "regex content search"
+        }
+      ]
     },
     "pab_file_stat": {
       "group": "files",
@@ -215,8 +441,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "old move path absent"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "old move path absent"
+        }
+      ]
     },
     "pab_file_write": {
       "group": "files",
@@ -227,8 +469,52 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "Unicode path and UTF-8 write"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "reject overwrite conflict"
+        },
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "empty file round trip"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "Unicode path and UTF-8 write"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "reject overwrite conflict"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "empty file round trip"
+        }
+      ]
     },
     "pab_list_directory": {
       "group": "files",
@@ -251,8 +537,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "create isolated fixture"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "create isolated fixture"
+        }
+      ]
     },
     "pab_archive_create": {
       "group": "files",
@@ -263,8 +565,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "archive create"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "archive create"
+        }
+      ]
     },
     "pab_archive_extract": {
       "group": "files",
@@ -275,8 +593,24 @@
         "crates/executor/src/task_service/filesystem_b3_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "archive extract"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "archive extract"
+        }
+      ]
     },
     "pab_capture_screenshot": {
       "group": "desktop",
@@ -287,8 +621,8 @@
         "crates/protocol/src/screenshot.rs"
       ],
       "live_suite": "live-desktop",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_desktop_input": {
       "group": "desktop",
@@ -369,8 +703,8 @@
         "crates/executor/src/task_service/tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_terminal_close": {
       "group": "terminal",
@@ -379,8 +713,8 @@
         "crates/executor/src/task_service/tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_terminal_input": {
       "group": "terminal",
@@ -389,8 +723,8 @@
         "crates/executor/src/task_service/tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_terminal_read": {
       "group": "terminal",
@@ -399,8 +733,8 @@
         "crates/executor/src/task_service/tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_terminal_resize": {
       "group": "terminal",
@@ -418,8 +752,24 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_system_info"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_system_info"
+        }
+      ]
     },
     "pab_list_disks": {
       "group": "system",
@@ -427,8 +777,24 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_list_disks"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_disks"
+        }
+      ]
     },
     "pab_list_network_connections": {
       "group": "system",
@@ -445,8 +811,24 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_list_network_interfaces"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_network_interfaces"
+        }
+      ]
     },
     "pab_resolve_dns": {
       "group": "system",
@@ -463,8 +845,8 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_list_processes": {
       "group": "system",
@@ -472,8 +854,24 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_list_processes"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_processes"
+        }
+      ]
     },
     "pab_terminate_process": {
       "group": "system",
@@ -481,8 +879,8 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_get_service": {
       "group": "system",
@@ -490,8 +888,8 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_list_services": {
       "group": "system",
@@ -499,8 +897,24 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Only the named observed cases; other platforms/paths are not implied.",
+      "observations": [
+        {
+          "device_code": "603527578",
+          "stage": "before_upgrade",
+          "status": "pass",
+          "run_id": "9ac13355-bb4a-4ae1-a8cc-23c5e8c20001",
+          "case": "pab_list_services"
+        },
+        {
+          "device_code": "211399447",
+          "stage": "after_upgrade",
+          "status": "pass",
+          "run_id": "3eef73c1-36df-4fd3-bd9d-07954f7e6f63",
+          "case": "pab_list_services"
+        }
+      ]
     },
     "pab_service_control": {
       "group": "system",
@@ -508,8 +922,8 @@
         "crates/executor/src/task_service/system_query_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 temporary service start/restart/disable/stop/enable and disabled-start rejection; fixture removed. Mac native pending. See acceptance/2026-10-06.md."
     },
     "pab_git_checkout": {
       "group": "git",
@@ -517,8 +931,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_commit": {
       "group": "git",
@@ -526,8 +940,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_diff": {
       "group": "git",
@@ -535,8 +949,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_fetch": {
       "group": "git",
@@ -544,8 +958,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_log": {
       "group": "git",
@@ -553,8 +967,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_pull": {
       "group": "git",
@@ -562,8 +976,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_push": {
       "group": "git",
@@ -571,8 +985,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_git_status": {
       "group": "git",
@@ -580,8 +994,8 @@
         "crates/executor/src/task_service/git_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "pass",
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
     },
     "pab_container_control": {
       "group": "container",
@@ -589,8 +1003,8 @@
         "crates/executor/src/task_service/container_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "skip",
+      "scope": "No Docker Engine on either remote; isolated tests are separate evidence."
     },
     "pab_container_logs": {
       "group": "container",
@@ -598,8 +1012,8 @@
         "crates/executor/src/task_service/container_tests.rs"
       ],
       "live_suite": "live-basic",
-      "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "live_status": "skip",
+      "scope": "No Docker Engine on either remote; isolated tests are separate evidence."
     },
     "pab_get_container": {
       "group": "container",

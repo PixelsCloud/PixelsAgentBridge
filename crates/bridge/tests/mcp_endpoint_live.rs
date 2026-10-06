@@ -67,3 +67,83 @@ async fn two_mcp_processes_connect_disconnect_and_restart_independently() {
     query(&second, &code).await;
     stop(second, second_child).await;
 }
+
+#[tokio::test]
+#[ignore = "requires an upgraded authorized desktop; moves pointer only, never clicks user content"]
+async fn monitor_move_checks_geometry_session_and_deduplicates() {
+    let code = std::env::var("PAB_TEST_DEVICE_CODE").expect("PAB_TEST_DEVICE_CODE");
+    std::env::var_os("PAB_DATA_DIR").expect("explicit shared credential store required");
+    let (client, child) = start().await;
+    let mut connected = false;
+    for _ in 0..24 {
+        let state = call(&client, "pab_connect", json!({"device_code":code})).await;
+        if state["connected"] == true {
+            connected = true;
+            break;
+        }
+    }
+    assert!(
+        connected,
+        "connection remains pending; no pointer action sent"
+    );
+    let monitors = call(&client, "pab_list_monitors", json!({"device_code":code})).await;
+    let target = monitors
+        .pointer("/result/data/snapshot/monitors/0/input_target")
+        .expect("upgrade Executor/helper to system v8/helper v3")
+        .clone();
+    let id = pab_protocol::RequestId::new().to_string();
+    let args = json!({"device_code":code,"request_id":id,"monitor_input":{"target":target,"action":{"type":"move","x":100,"y":100}}});
+    let mut result = call(&client, "pab_desktop_input", args.clone()).await;
+    for _ in 0..20 {
+        if result["result"]["state"] != "running" {
+            break;
+        }
+        result = call(
+            &client,
+            "pab_get_operation",
+            json!({"device_code":code,"operation_id":id,"wait_until":"complete","wait_ms":1000}),
+        )
+        .await;
+    }
+    assert_eq!(
+        result["result"]["state"], "completed",
+        "original operation {id} remains unconfirmed"
+    );
+    assert!(
+        result["result"]["data"]["snapshot"]["verification"]
+            .as_str()
+            .unwrap()
+            .contains("pointer observed")
+    );
+    let repeated = call(&client, "pab_desktop_input", args.clone()).await;
+    assert_eq!(
+        repeated["result"], result["result"],
+        "same request ID must return the stored observation"
+    );
+    for field in ["x", "helper_instance", "id"] {
+        let mut stale = args.clone();
+        stale["request_id"] = json!(pab_protocol::RequestId::new());
+        let target = &mut stale["monitor_input"]["target"];
+        target[field] = match field {
+            "x" => json!(target["x"].as_i64().unwrap() + 1),
+            "id" => json!(u32::MAX),
+            _ => json!(pab_protocol::RequestId::new()),
+        };
+        let raw = support::call(&client, "pab_desktop_input", stale, Duration::from_secs(15)).await;
+        let mut rejected = raw.structured_content.unwrap();
+        for _ in 0..20 {
+            if rejected["result"]["state"] != "running" {
+                break;
+            }
+            let reference = rejected["operation_ref"].clone();
+            rejected = support::call(&client, "pab_get_operation", json!({"device_code":code,"operation_id":reference["operation_id"],"wait_until":"complete","wait_ms":1000}), Duration::from_secs(15))
+                .await.structured_content.unwrap();
+        }
+        assert_eq!(rejected["result"]["state"], "failed", "{rejected}");
+        assert_eq!(
+            rejected["result"]["data"]["snapshot"]["action_started"],
+            false
+        );
+    }
+    stop(client, child).await;
+}

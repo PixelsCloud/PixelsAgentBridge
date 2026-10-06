@@ -50,6 +50,7 @@ class Installer(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 pkg.checked_url(value, "wss")
 
+    @unittest.skipUnless(Path("/bin/bash").is_file(), "POSIX shell validation runs on macOS/Linux")
     def test_generated_configuration_is_shell_quoted(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)
