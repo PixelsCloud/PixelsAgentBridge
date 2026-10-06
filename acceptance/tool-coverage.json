@@ -1,0 +1,623 @@
+{
+  "schema_version": 1,
+  "baseline": "3598ad1",
+  "tools": {
+    "pab_connect": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_disconnect": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_devices": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_sessions": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_get_operation": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_cancel_operation": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_operations": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_get_task": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_read_output": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_run_command": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_upload_file": {
+      "group": "transfer",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/transfer_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_download_file": {
+      "group": "transfer",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/transfer_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_copy": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_delete": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_hash": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_move": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_patch": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_read": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_search": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_stat": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_file_write": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_directory": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_mkdir": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_archive_create": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_archive_extract": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_capture_screenshot": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_desktop_input": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_focus_window": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_monitors": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_windows": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_type_text": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_window_control": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "live-desktop",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_open_terminal": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_terminal_close": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_terminal_input": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_terminal_read": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_terminal_resize": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_system_info": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_disks": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_network_connections": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_network_interfaces": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_resolve_dns": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_get_process": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_processes": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_terminate_process": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_get_service": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_services": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_service_control": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_checkout": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_commit": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_diff": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_fetch": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_log": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_pull": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_push": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_git_status": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_container_control": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_container_logs": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_get_container": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_list_containers": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "live-basic",
+      "live_status": "not_run",
+      "scope": "group regression; individual behavior requires reported case evidence"
+    }
+  }
+}

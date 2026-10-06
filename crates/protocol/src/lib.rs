@@ -5,6 +5,8 @@ mod desktop_query;
 pub use desktop_query::*;
 mod desktop_batch;
 pub use desktop_batch::*;
+mod monitor_input;
+pub use monitor_input::*;
 
 mod control;
 mod device;

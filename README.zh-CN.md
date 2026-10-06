@@ -203,6 +203,9 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_container_logs` | 按时间和流读取有限、有界的 Docker 日志 |
 | `pab_container_control` | 异步启动、停止、重启，并核对观测状态 |
 
+指定屏幕输入新增 `monitor_input`（Executor system v8 / helper v3）。从 `pab_list_monitors` 复制 `input_target`，使用屏幕内逻辑坐标，并核对应用实际效果；屏幕几何或 helper 实例改变时拒绝执行。见[坐标约定与可重复验收](acceptance/README.md)。
+
+
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。

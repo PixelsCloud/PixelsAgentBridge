@@ -2,7 +2,7 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 7;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
@@ -94,6 +94,14 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(
+            self,
+            Self::Desktop {
+                query: crate::DesktopQuery::MonitorInput { .. }
+            }
+        ) {
+            return 8;
+        }
         if matches!(
             self,
             Self::Desktop {

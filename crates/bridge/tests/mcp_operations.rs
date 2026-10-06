@@ -2,49 +2,62 @@
 //! This is transport testing, not a replacement for installed-host acceptance.
 use pab_bridge::BridgeLocalStore;
 use pab_protocol::{DeviceId, DeviceRef, RequestId, TenantId};
-use rmcp::{
-    RoleClient, ServiceExt,
-    model::{CallToolRequestParams, CallToolResult},
-    service::RunningService,
-};
+use rmcp::model::{CallToolRequestParams, CallToolResult};
+mod support;
 use serde_json::{Value, json};
 use std::{path::Path, process::Stdio, time::Duration};
-
-type Client = RunningService<RoleClient, ()>;
+use support::{Client, stop};
 
 async fn start(root: &Path, database: &Path, port: u16) -> (Client, tokio::process::Child) {
-    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"));
+    command
         .env("PAB_DATA_DIR", root)
         .env("PAB_BRIDGE_DATABASE", database)
-        .env("PAB_MCP_GUEST", "1")
         .env("PAB_CONTROL_URL", format!("wss://127.0.0.1:{port}"))
-        .env("PAB_RELAY_URLS", "https://127.0.0.1:1")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let stdin = child.stdin.take().unwrap();
-    let client = tokio::time::timeout(Duration::from_secs(5), ().serve((stdout, stdin)))
-        .await
-        .unwrap()
-        .unwrap();
-    (client, child)
+        .env("PAB_RELAY_URLS", "https://127.0.0.1:1");
+    support::start(command).await
+}
+async fn call(client: &Client, name: &str, args: Value) -> CallToolResult {
+    support::call(client, name, args, Duration::from_secs(2)).await
 }
 
-async fn call(client: &Client, name: &str, args: Value) -> CallToolResult {
-    tokio::time::timeout(
-        Duration::from_secs(2),
-        client.call_tool(
-            CallToolRequestParams::new(name.to_owned())
-                .with_arguments(args.as_object().unwrap().clone()),
-        ),
+#[tokio::test]
+async fn registered_catalog_has_coverage_and_exports_real_schemas() {
+    let directory = tempfile::tempdir().unwrap();
+    let (client, child) = start(
+        directory.path(),
+        &directory.path().join("catalog.sqlite3"),
+        1,
     )
-    .await
-    .expect("tool was blocked behind network I/O")
-    .unwrap()
+    .await;
+    let listed = client.list_all_tools().await.unwrap();
+    let coverage: Value =
+        serde_json::from_str(include_str!("../../../acceptance/tool-coverage.json")).unwrap();
+    let expected: std::collections::BTreeSet<_> = coverage["tools"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    let actual: std::collections::BTreeSet<_> =
+        listed.iter().map(|tool| tool.name.as_ref()).collect();
+    assert_eq!(
+        actual, expected,
+        "register new tools in the acceptance coverage map"
+    );
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for case in coverage["tools"].as_object().unwrap().values() {
+        for source in case["existing_test_sources"].as_array().unwrap() {
+            assert!(
+                root.join(source.as_str().unwrap()).is_file(),
+                "missing test source {source}"
+            );
+        }
+    }
+    if let Some(path) = std::env::var_os("PAB_TEST_CATALOG_PATH") {
+        std::fs::write(path, serde_json::to_vec_pretty(&listed).unwrap()).unwrap();
+    }
+    stop(client, child).await;
 }
 
 fn result(response: CallToolResult) -> Value {
@@ -52,15 +65,6 @@ fn result(response: CallToolResult) -> Value {
     response
         .structured_content
         .expect("missing structured result")
-}
-
-async fn stop(client: Client, mut child: tokio::process::Child) {
-    client.cancel().await.unwrap();
-    let status = tokio::time::timeout(Duration::from_secs(8), child.wait())
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(status.success(), "MCP did not shut down cleanly: {status}");
 }
 
 #[tokio::test]

@@ -4,6 +4,12 @@ use std::collections::HashMap;
 mod batch;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;
+mod monitor_input;
+// Exercise the exact vendored normalization code without adding Enigo's upstream
+// development dependency tree to the product workspace.
+#[cfg(test)]
+#[path = "../../../vendor/enigo/src/win/desktop_coordinates.rs"]
+mod enigo_desktop_coordinates;
 #[cfg(target_os = "macos")]
 pub use macos_display::select_monitor as select_macos_monitor;
 #[cfg(any(target_os = "macos", test))]
@@ -163,7 +169,7 @@ impl DesktopSession {
         &mut self,
         id: RequestId,
         query: &DesktopQuery,
-        mut guard: impl FnMut() -> Result<(), String>,
+        mut guard: impl FnMut() -> Result<(), String> + Send,
     ) -> SystemQueryReply {
         let system = SystemQuery::Desktop {
             query: query.clone(),
@@ -188,6 +194,8 @@ impl DesktopSession {
                     &mut guard,
                     |action, step| self.batch_action(window_ref, action, step),
                 )
+            } else if let DesktopQuery::MonitorInput { input } = query {
+                self.monitor_input(input, &mut snapshot, &mut guard)
             } else {
                 guard()?;
                 self.execute(query, &mut snapshot)
@@ -246,6 +254,9 @@ impl DesktopSession {
     ) -> Result<(), String> {
         check_session()?;
         match query {
+            DesktopQuery::MonitorInput { .. } => {
+                unreachable!("monitor input is guarded by query_guarded")
+            }
             DesktopQuery::Batch { .. } => unreachable!("batches are dispatched by query_guarded"),
             DesktopQuery::Monitors {} => {
                 #[cfg(target_os = "macos")]
@@ -255,6 +266,7 @@ impl DesktopSession {
                 let overflow = monitors.len() > 32;
                 for (_index, m) in monitors.into_iter().take(32).enumerate() {
                     snapshot.monitors.push(MonitorInfo {
+                        input_target: monitor_input::target(&m, &self.instance).ok(),
                         id: m.id().map_err(|e| e.to_string())?,
                         name: short(&m.name().map_err(|e| e.to_string())?, 256),
                         x: m.x().map_err(|e| e.to_string())?,

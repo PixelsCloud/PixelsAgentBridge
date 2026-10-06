@@ -258,7 +258,7 @@ impl DesktopSession {
 }
 
 /// Release even a failed press (which may be partial), in reverse order, without short-circuiting cleanup.
-fn press_and_release<T: Copy>(
+pub(super) fn press_and_release<T: Copy>(
     keys: &[T],
     mut verify: impl FnMut() -> Result<(), String>,
     mut send: impl FnMut(T, bool) -> Result<(), String>,

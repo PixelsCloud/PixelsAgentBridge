@@ -24,3 +24,12 @@ Do not infer that this patch alone fixes LoginWindow or bypasses TCC.
 
 Both workspace manifests patch Enigo because Tauri is a separate Cargo workspace.
 Remove this patch when upstream supports selecting the event tap.
+
+Windows absolute mouse input now normalizes against SM_X/Y/CX/CYVIRTUALSCREEN
+and sends MOUSEEVENTF_VIRTUALDESK. The upstream 0.5.0 primary-only normalization
+cannot address monitors at negative origins. Invalid/empty geometry is rejected
+before SendInput; single-pixel extents do not divide by zero. Relative input and
+key handling are unchanged. Unit tests cover negative origins and both edges;
+PAB's owned-window acceptance observes the actual click.
+Public contract: https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-mouseinput
+Compare upstream implementation: https://github.com/enigo-rs/enigo/blob/main/src/win/win_impl.rs

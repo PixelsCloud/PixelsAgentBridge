@@ -1,11 +1,14 @@
 use crate::RequestId;
 use crate::{DesktopAction, DesktopBatchReport, validate_desktop_batch};
 use serde::{Deserialize, Serialize};
-pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 2;
+pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 3;
 pub const MAX_DESKTOP_TEXT_BYTES: usize = 4096;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DesktopQuery {
+    MonitorInput {
+        input: crate::MonitorInput,
+    },
     Batch {
         window_ref: String,
         actions: Vec<DesktopAction>,
@@ -36,6 +39,7 @@ pub enum WindowControlAction {
 impl DesktopQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::MonitorInput { .. } => "monitor_input",
             Self::Batch { .. } => "desktop_batch",
             Self::Monitors {} => "monitors",
             Self::Windows {} => "desktop_windows",
@@ -57,6 +61,9 @@ impl DesktopQuery {
         }
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::MonitorInput { input } = self {
+            input.validate()?;
+        }
         if let Self::Batch {
             actions,
             timeout_ms,
@@ -79,6 +86,9 @@ impl DesktopQuery {
         Ok(())
     }
     pub fn required_helper_version(&self) -> u16 {
+        if matches!(self, Self::MonitorInput { .. }) {
+            return 3;
+        }
         if matches!(self, Self::Batch { .. }) {
             2
         } else {
@@ -88,6 +98,8 @@ impl DesktopQuery {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MonitorInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_target: Option<crate::MonitorTarget>,
     pub id: u32,
     pub name: String,
     pub x: i32,

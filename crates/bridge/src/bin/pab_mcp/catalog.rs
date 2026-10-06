@@ -381,7 +381,7 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
         .ok_or_else(|| format!("unknown tool: {name}"))?;
     validate_value(args, &definition["inputSchema"], "arguments")?;
     if name == "pab_desktop_input" {
-        if args.get("actions").is_some() {
+        if args.get("actions").is_some() || args.get("monitor_input").is_some() {
             super::mcp_desktop::parse(name, args)?;
         } else {
             if ["window_ref", "timeout_ms", "request_id"]

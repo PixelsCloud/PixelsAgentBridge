@@ -111,6 +111,7 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "window_control"
                 | "type_text"
                 | "desktop_batch"
+                | "monitor_input"
                 | "system_info"
                 | "disks"
                 | "processes"
@@ -149,7 +150,8 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                         | "window_focus"
                         | "window_control"
                         | "type_text"
-                        | "desktop_batch",
+                        | "desktop_batch"
+                        | "monitor_input",
                     Some(SystemQueryData::Desktop { .. })
                 ) | (
                     "network_connections",
@@ -216,6 +218,8 @@ mod tests {
         r.data = Some(SystemQueryData::Desktop {
             snapshot: DesktopSnapshot::new("test".into(), "fake"),
         });
+        assert!(valid(&r, r.request_id));
+        r.kind = "monitor_input".into();
         assert!(valid(&r, r.request_id));
         r.data = Some(SystemQueryData::Disks { entries: vec![] });
         assert!(!valid(&r, r.request_id));

@@ -7,6 +7,29 @@ use pab_protocol::{
 use std::time::Duration;
 
 #[tokio::test]
+async fn monitor_mutation_is_unconfirmed_after_restart_and_not_replayed() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let q: SystemQuery = serde_json::from_value(serde_json::json!({"action":"desktop","query":{
+        "operation":"monitor_input","input":{"target":{"helper_instance":RequestId::new(),
+        "id":1,"x":0,"y":0,"width":1920,"height":1080,"scale_percent":100,"rotation_degrees":0,
+        "coordinate_space":"physical_pixels"},"action":{"type":"move","x":10,"y":20}}
+    }}))
+    .unwrap();
+    let id = RequestId::new();
+    svc.store
+        .accept_system_query(actor(), id, &q)
+        .await
+        .unwrap();
+    svc.store.interrupt_read_operations().await.unwrap();
+    let reopened = service(dir.path()).await;
+    let result = reopened.system_query(actor(), id, q).await.unwrap();
+    assert_eq!(result.state, "unconfirmed");
+    assert!(result.data.is_none());
+    assert!(result.error.unwrap().contains("never replayed"));
+}
+
+#[tokio::test]
 async fn restart_keeps_lifecycle_result_unconfirmed_and_never_replays_request() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path()).await;

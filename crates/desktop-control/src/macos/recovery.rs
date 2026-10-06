@@ -220,6 +220,9 @@ impl RecoveryInput {
     ) -> enigo::InputResult<()> {
         self.engine.move_mouse(x, y, coordinate)
     }
+    pub(crate) fn location(&self) -> enigo::InputResult<(i32, i32)> {
+        self.engine.location()
+    }
     pub(crate) fn scroll(&mut self, length: i32, axis: Axis) -> enigo::InputResult<()> {
         self.engine.scroll(length, axis)
     }

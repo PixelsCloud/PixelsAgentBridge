@@ -41,6 +41,21 @@ pub fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), Strin
             .ok_or("window_ref required")
     };
     let query = match name {
+        "pab_desktop_input" if args.get("monitor_input").is_some() => {
+            if ["event", "actions", "window_ref", "timeout_ms"]
+                .iter()
+                .any(|key| args.get(key).is_some())
+            {
+                return Err(
+                    "monitor_input cannot be combined with legacy event or window batch parameters"
+                        .into(),
+                );
+            }
+            DesktopQuery::MonitorInput {
+                input: serde_json::from_value(args["monitor_input"].clone())
+                    .map_err(|e| e.to_string())?,
+            }
+        }
         "pab_desktop_input" => {
             if args.get("event").is_some() {
                 return Err("event and batch actions are mutually exclusive".into());
@@ -91,6 +106,25 @@ pub fn enhance_input_tool(tool: &mut Value) {
         "Send legacy event OR a window-bound ordered batch (actions), never both. Batch requires window_ref from pab_list_windows, Executor system v7 and helper v2. 1..32 actions: focus, control, type_text, key_chord, click, scroll, wait. Text total <=4096 UTF-8 bytes. Stops on first error, reports zero-based per-step completed/failed/unconfirmed/skipped results; no rollback or automatic replay. Use request_id for batch deduplication; query original operation_ref when running/unconfirmed. timeout_ms (default 5000, 100..10000) is checked between actions, not a hard OS-call deadline. Helper serializes the whole batch with other helper input, but cannot exclude physical input/other software. Keys/buttons are released on ordinary failures. Click coordinates are pixels relative to the current outer window rectangle, NOT screenshot image pixels. Click/scroll require the pointer to target this foreground window; text/keys also require foreground, so start with focus if needed. Input API acceptance does not verify application effects. Legacy event retains its existing behavior and does not accept batch parameters: mouse_move (x/y 0..65535), mouse_button (button left/right/middle, down), mouse_wheel (delta), key (virtual_key, down), secure_attention (Windows Ctrl+Alt+Delete)."
     );
     let p = &mut tool["inputSchema"]["properties"];
+    let integer = |min: i64, max: i64| json!({"type":"integer","minimum":min,"maximum":max});
+    let target = json!({"type":"object","additionalProperties":false,"required":["helper_instance","id","x","y","width","height","scale_percent","rotation_degrees","coordinate_space"],"properties":{
+        "helper_instance":{"type":"string","format":"uuid"},"id":integer(0,u32::MAX.into()),
+        "x":integer(i32::MIN.into(),i32::MAX.into()),"y":integer(i32::MIN.into(),i32::MAX.into()),
+        "width":integer(1,65535),"height":integer(1,65535),"scale_percent":integer(1,800),
+        "rotation_degrees":integer(0,360),"coordinate_space":{"type":"string","enum":["physical_pixels","logical_points"]}
+    }});
+    let monitor_action = |click: bool| {
+        let mut props = json!({"type":{"type":"string","const":if click {"click"} else {"move"}},"x":integer(0,65535),"y":integer(0,65535)});
+        let mut required = vec!["type", "x", "y"];
+        if click {
+            props["button"] = json!({"type":"string","enum":["left","right","middle"]});
+            required.push("button");
+        }
+        json!({"type":"object","additionalProperties":false,"required":required,"properties":props})
+    };
+    p["monitor_input"] = json!({"type":"object","additionalProperties":false,"required":["target","action"],"properties":{
+        "target":target,"action":{"oneOf":[monitor_action(false),monitor_action(true)]}
+    }});
     p["window_ref"] = json!({"type":"string","format":"uuid"});
     p["request_id"] = json!({"type":"string","format":"uuid"});
     p["timeout_ms"] = json!({"type":"integer","minimum":100,"maximum":10000,"default":5000});
@@ -114,9 +148,14 @@ pub fn enhance_input_tool(tool: &mut Value) {
     ]}});
     tool["inputSchema"]["required"] = json!(["device_code"]);
     tool["inputSchema"]["oneOf"] = json!([
-        {"required":["event"],"not":{"anyOf":[{"required":["actions"]},{"required":["window_ref"]},{"required":["timeout_ms"]},{"required":["request_id"]}]}},
-        {"required":["actions","window_ref"],"not":{"required":["event"]}}
+        {"required":["event"],"not":{"anyOf":[{"required":["monitor_input"]},{"required":["actions"]},{"required":["window_ref"]},{"required":["timeout_ms"]},{"required":["request_id"]}]}},
+        {"required":["actions","window_ref"],"not":{"anyOf":[{"required":["event"]},{"required":["monitor_input"]}]}},
+        {"required":["monitor_input"],"not":{"anyOf":[{"required":["event"]},{"required":["actions"]},{"required":["window_ref"]},{"required":["timeout_ms"]}]}}
     ]);
+    let original = tool["description"].as_str().unwrap().to_owned();
+    tool["description"] = json!(format!(
+        "{original} Alternatively use monitor_input with target copied unchanged from pab_list_monitors.input_target and action move/click. Requires Executor system v8/helper v3. x/y are integer logical units relative to that monitor; Windows/X11 native pixels = logical * scale_percent/100, macOS native points = logical. Never use screenshot pixels directly: map image coordinates via desktop_rect and subtract target origin, then convert native units to logical units. Monitor/session/scale changes fail instead of falling back. request_id deduplicates this entire move/click; unconfirmed actions must never be replayed blindly."
+    ));
 }
 pub async fn call(runtime: &BridgeRuntime, name: &str, args: &Value) -> Result<Value, String> {
     let (id, query) = parse(name, args)?;
@@ -137,6 +176,43 @@ pub async fn call(runtime: &BridgeRuntime, name: &str, args: &Value) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn monitor_input_schema_parser_and_version_are_strict() {
+        let target = json!({"helper_instance":RequestId::new(),"id":2,"x":-1920,"y":0,"width":1920,"height":1080,"scale_percent":150,"rotation_degrees":0,"coordinate_space":"physical_pixels"});
+        let valid = json!({"device_code":"123456789","monitor_input":{"target":target,"action":{"type":"click","x":100,"y":200,"button":"left"}}});
+        assert!(super::super::mcp_catalog::validate_arguments("pab_desktop_input", &valid).is_ok());
+        let (_, query) = parse("pab_desktop_input", &valid).unwrap();
+        assert_eq!(query.required_version(), 8);
+        assert_eq!(query.kind(), "monitor_input");
+        if let SystemQuery::Desktop { query } = query {
+            assert_eq!(query.required_helper_version(), 3);
+        }
+        for (key, value) in [
+            ("event", json!({"type":"mouse_move","x":1,"y":1})),
+            ("actions", json!([{"type":"focus"}])),
+            ("window_ref", json!(RequestId::new())),
+            ("timeout_ms", json!(5000)),
+        ] {
+            let mut bad = valid.clone();
+            bad[key] = value;
+            assert!(
+                super::super::mcp_catalog::validate_arguments("pab_desktop_input", &bad).is_err()
+            );
+        }
+        for x in [
+            json!(-1),
+            json!(1280),
+            json!(1.5),
+            json!(null),
+            json!(u64::MAX),
+        ] {
+            let mut bad = valid.clone();
+            bad["monitor_input"]["action"]["x"] = x;
+            assert!(
+                super::super::mcp_catalog::validate_arguments("pab_desktop_input", &bad).is_err()
+            );
+        }
+    }
     #[test]
     fn input_batch_schema_and_parser_reject_mixed_or_incomplete_requests() {
         let reference = RequestId::new().to_string();

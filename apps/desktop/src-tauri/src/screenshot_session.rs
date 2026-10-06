@@ -59,6 +59,7 @@ pub fn capture(
             .ok_or("no primary interactive monitor is available")?
     };
     let id = monitor.id().map_err(|e| e.to_string())?;
+    let before = monitor_geometry(monitor)?;
     let (w, h) = (
         monitor.width().map_err(|e| e.to_string())?,
         monitor.height().map_err(|e| e.to_string())?,
@@ -113,10 +114,44 @@ pub fn capture(
     if (image.width(), image.height()) != expected {
         return Err("captured dimensions changed during monitor selection; retry with fresh monitor information".into());
     }
+    let current = Monitor::all().map_err(|e| e.to_string())?;
+    let selected = current
+        .iter()
+        .find(|m| m.id().ok() == Some(id))
+        .ok_or("selected monitor disappeared during capture")?;
+    if monitor_geometry(selected)? != before
+        || (options.monitor_id.is_none() && !selected.is_primary().map_err(|e| e.to_string())?)
+    {
+        return Err("monitor layout/scaling changed during capture; list monitors again".into());
+    }
     let mut encoded =
         pab_screenshot::encode(DynamicImage::ImageRgba8(image), options, Some(id), origin)?;
     encoded.info.captured_at_unix_ms = captured_at_unix_ms;
+    encoded.info.desktop_rect = Some(pab_protocol::ScreenshotDesktopRect {
+        x: origin.0,
+        y: origin.1,
+        width: expected.0,
+        height: expected.1,
+    });
+    encoded.info.validate(options).map_err(str::to_owned)?;
     Ok(encoded)
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn monitor_geometry(m: &xcap::Monitor) -> Result<(i32, i32, u32, u32, u32, u32), String> {
+    let scale = m.scale_factor().map_err(|e| e.to_string())?;
+    let rotation = m.rotation().map_err(|e| e.to_string())?;
+    if !scale.is_finite() || scale <= 0.0 || !rotation.is_finite() {
+        return Err("invalid monitor scale/rotation".into());
+    }
+    Ok((
+        m.x().map_err(|e| e.to_string())?,
+        m.y().map_err(|e| e.to_string())?,
+        m.width().map_err(|e| e.to_string())?,
+        m.height().map_err(|e| e.to_string())?,
+        scale.to_bits(),
+        rotation.to_bits(),
+    ))
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]

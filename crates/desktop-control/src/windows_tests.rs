@@ -15,6 +15,10 @@ unsafe extern "system" fn procedure(w: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -
     // SAFETY: called only by Windows for our registered fixture window.
     unsafe {
         match msg {
+            WM_LBUTTONUP => {
+                SetPropW(w, wide("PAB_fixture_click").as_ptr(), 1usize as HANDLE);
+                0
+            }
             WM_CLOSE if GetWindowLongPtrW(w, GWLP_USERDATA) == IGNORE_CLOSE => 0,
             CLEANUP => {
                 DestroyWindow(w);
@@ -33,6 +37,89 @@ unsafe extern "system" fn procedure(w: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -
             }
             _ => DefWindowProcW(w, msg, wp, lp),
         }
+    }
+}
+
+#[test]
+#[ignore = "explicit native monitor acceptance: clicks only its own fixture window"]
+fn native_monitor_input_observes_pointer_and_fixture_click() {
+    let fixture = Fixture::new(false);
+    let mut session = DesktopSession::new();
+    let reference = session.reference(fixture.id, std::process::id()).unwrap();
+    let mut rect: RECT = unsafe { std::mem::zeroed() };
+    assert_ne!(
+        unsafe { GetWindowRect(fixture.id as usize as HWND, &mut rect) },
+        0
+    );
+    assert_eq!(
+        session
+            .query(
+                RequestId::new(),
+                &DesktopQuery::Focus {
+                    window_ref: reference
+                }
+            )
+            .state,
+        "completed"
+    );
+    let listed = session.query(RequestId::new(), &DesktopQuery::Monitors {});
+    let Some(SystemQueryData::Desktop { snapshot }) = listed.data else {
+        panic!("no monitor snapshot")
+    };
+    let target = snapshot
+        .monitors
+        .iter()
+        .find(|m| {
+            rect.left >= m.x
+                && rect.top >= m.y
+                && i64::from(rect.right) <= i64::from(m.x) + i64::from(m.width)
+                && i64::from(rect.bottom) <= i64::from(m.y) + i64::from(m.height)
+        })
+        .unwrap()
+        .input_target
+        .clone()
+        .unwrap();
+    let x = ((i64::from(rect.left) + 320 - i64::from(target.x)) * 100
+        / i64::from(target.scale_percent)) as u32;
+    let y = ((i64::from(rect.top) + 155 - i64::from(target.y)) * 100
+        / i64::from(target.scale_percent)) as u32;
+    let input = MonitorInput {
+        target,
+        action: MonitorAction::Click {
+            x,
+            y,
+            button: DesktopMouseButton::Left,
+        },
+    };
+    let mut stale = input.clone();
+    stale.target.x += 1;
+    let rejected = session.query(
+        RequestId::new(),
+        &DesktopQuery::MonitorInput { input: stale },
+    );
+    assert_eq!(rejected.state, "failed");
+    if let Some(SystemQueryData::Desktop { snapshot }) = rejected.data {
+        assert!(!snapshot.action_started);
+    }
+    let reply = session.query(RequestId::new(), &DesktopQuery::MonitorInput { input });
+    assert_eq!(reply.state, "completed", "{:?}", reply.error);
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        if !unsafe {
+            GetPropW(
+                fixture.id as usize as HWND,
+                wide("PAB_fixture_click").as_ptr(),
+            )
+        }
+        .is_null()
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "fixture never received mouse click"
+        );
+        thread::sleep(Duration::from_millis(10));
     }
 }
 struct Fixture {

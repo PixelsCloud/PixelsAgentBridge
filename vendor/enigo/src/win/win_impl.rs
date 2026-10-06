@@ -10,13 +10,14 @@ use windows::Win32::UI::{
         MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
         MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
         MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, MOUSEINPUT,
-        MapVirtualKeyExW, SendInput, VIRTUAL_KEY,
+        MapVirtualKeyExW, SendInput, VIRTUAL_KEY, MOUSEEVENTF_VIRTUALDESK,
     },
     WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
 };
 
 use windows::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN, WHEEL_DELTA,
+    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
 };
 
 use crate::{
@@ -25,6 +26,9 @@ use crate::{
 };
 
 type ScanCode = u16;
+#[path = "desktop_coordinates.rs"]
+mod desktop_coordinates;
+use desktop_coordinates::normalize_desktop_axis;
 pub const EXT: u16 = 0xFF00;
 
 /// The main struct for handling the event emitting
@@ -165,15 +169,14 @@ impl Mouse for Enigo {
             // 0-screen width/height - 1 map to 0-65535
             // Add w/2 or h/2 to round off
             // See https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event#remarks
-            let (w, h) = self.main_display()?;
-            let w = w as i64 - 1;
-            let h = h as i64 - 1;
-            let x = x as i64;
-            let y = y as i64;
-            let x = (x * 65535 + w / 2 * x.signum()) / w;
-            let y = (y * 65535 + h / 2 * y.signum()) / h;
-            // TODO: Check if we should use MOUSEEVENTF_VIRTUALDESK too
-            (MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, x as i32, y as i32)
+            // PAB: desktop absolute coordinates include monitors left/above the
+            // primary monitor. Normalize the virtual desktop, not only primary.
+            let (left, top, width, height) = unsafe { (
+                GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN)) };
+            let x = normalize_desktop_axis(x, left, width).map_err(InputError::Simulate)?;
+            let y = normalize_desktop_axis(y, top, height).map_err(InputError::Simulate)?;
+            (MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK, x, y)
         } else if self.windows_subject_to_mouse_speed_and_acceleration_level {
             // Quote from documentation (http://web.archive.org/web/20241118235853/https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-mouse_event):
             // Relative mouse motion is subject to the settings for mouse speed and

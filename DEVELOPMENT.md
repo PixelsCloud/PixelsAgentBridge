@@ -1,5 +1,9 @@
 # Development
 
+The next cross-platform regression and monitor-targeting delivery task is specified
+in [ACCEPTANCE_ROADMAP.md](ACCEPTANCE_ROADMAP.md), including test coverage,
+single-monitor substitutes, installed-package acceptance and completion criteria.
+
 Product builds use `python scripts/build.py` to allocate one shared version per
 build, starting at 1.2.0 with base-100 minor/patch rollover. See [BUILDING.md](BUILDING.md)
 for targets, packaging, concurrency and failure behavior. Low-level checks/tests

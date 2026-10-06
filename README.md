@@ -229,6 +229,9 @@ for example `pixels.pab_connect`.
 | `pab_container_logs` | Read finite, bounded Docker logs with stream and time selection |
 | `pab_container_control` | Asynchronously start, stop or restart and confirm the observed state |
 
+Monitor-targeted input adds `monitor_input` (Executor system v8 / helper v3). Copy `input_target` from `pab_list_monitors`, use monitor-relative logical coordinates, and verify the application effect. Stale display geometry or helper instances are rejected. See [the coordinate contract and repeatable acceptance suites](acceptance/README.md).
+
+
 Call `pab_connect` first and retain its platform context. Most device tools require
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.

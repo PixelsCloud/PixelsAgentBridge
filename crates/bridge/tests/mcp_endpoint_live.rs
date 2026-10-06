@@ -2,42 +2,16 @@
 //! Set PAB_TEST_DEVICE_CODE, PAB_TEST_PATH (an existing target file), and
 //! PAB_DATA_DIR to the user's shared credential store,
 //! plus PAB_CONTROL_URL/PAB_RELAY_URLS for the test server.
-use std::{process::Stdio, time::Duration};
-
-use rmcp::{RoleClient, ServiceExt, model::CallToolRequestParams, service::RunningService};
 use serde_json::{Value, json};
-
-type Client = RunningService<RoleClient, ()>;
-
+use std::time::Duration;
+mod support;
+use support::{Client, stop};
 async fn start() -> (Client, tokio::process::Child) {
-    let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))
-        .env("PAB_MCP_GUEST", "1")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .unwrap();
-    let stdout = child.stdout.take().unwrap();
-    let stdin = child.stdin.take().unwrap();
-    let client = tokio::time::timeout(Duration::from_secs(10), ().serve((stdout, stdin)))
-        .await
-        .unwrap()
-        .unwrap();
-    (client, child)
+    support::start(tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))).await
 }
 
 async fn call(client: &Client, name: &str, args: Value) -> Value {
-    let response = tokio::time::timeout(
-        Duration::from_secs(45),
-        client.call_tool(
-            CallToolRequestParams::new(name.to_owned())
-                .with_arguments(args.as_object().unwrap().clone()),
-        ),
-    )
-    .await
-    .expect("remote tool timed out")
-    .unwrap();
+    let response = support::call(client, name, args, Duration::from_secs(45)).await;
     assert_ne!(
         response.is_error,
         Some(true),
@@ -62,17 +36,6 @@ async fn query(client: &Client, code: &str) {
     .await;
     assert_eq!(info["result"]["state"], "completed");
     assert!(info["result"]["metadata"]["kind"].is_string());
-}
-
-async fn stop(client: Client, mut child: tokio::process::Child) {
-    client.cancel().await.unwrap();
-    assert!(
-        tokio::time::timeout(Duration::from_secs(10), child.wait())
-            .await
-            .unwrap()
-            .unwrap()
-            .success()
-    );
 }
 
 #[tokio::test]

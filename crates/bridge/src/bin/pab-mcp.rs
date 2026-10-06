@@ -153,7 +153,10 @@ impl ServerHandler for McpServer {
     ) -> Result<CallToolResponse, ErrorData> {
         let mut arguments = Value::Object(request.arguments.unwrap_or_default());
         if (request.name == "pab_run_command"
-            || (request.name == "pab_desktop_input" && arguments.get("actions").is_some()))
+            || (request.name == "pab_desktop_input"
+                && ((arguments.get("actions").is_some()
+                    || arguments.get("monitor_input").is_some())
+                    || arguments.get("monitor_input").is_some())))
             && arguments.get("request_id").is_none()
         {
             arguments["request_id"] = json!(pab_protocol::RequestId::new());

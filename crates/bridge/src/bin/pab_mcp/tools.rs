@@ -182,7 +182,7 @@ pub(super) async fn call_tool(
             Ok(json!({ "list": list, "os_reminder": target.compact_reminder() }))
         }
         "pab_desktop_input" => {
-            if arguments.get("actions").is_some() {
+            if arguments.get("actions").is_some() || arguments.get("monitor_input").is_some() {
                 return super::mcp_desktop::call(runtime, name, arguments).await;
             }
             if ["window_ref", "timeout_ms", "request_id"]

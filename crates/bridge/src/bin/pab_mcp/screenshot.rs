@@ -189,6 +189,56 @@ mod tests {
         assert!(invalid.validate(&ScreenshotOptions::default()).is_err());
     }
     #[test]
+    fn cropped_image_maps_through_native_origin_before_monitor_scaling() {
+        use pab_protocol::*;
+        let mut image = fixture(500);
+        image.meta.capture = Some(ScreenshotInfo {
+            window_ref: None,
+            desktop_rect: Some(ScreenshotDesktopRect {
+                x: -1770,
+                y: 300,
+                width: 600,
+                height: 300,
+            }),
+            captured_at_unix_ms: 1,
+            mode: ScreenshotMode::Jpeg,
+            format: ScreenshotFormat::Jpeg,
+            width: 600,
+            height: 300,
+            source_width: 600,
+            source_height: 300,
+            monitor_id: Some(1),
+            origin_x: -1770,
+            origin_y: 300,
+            quality: Some(85),
+            resized: false,
+        });
+        let (meta, _) = response(image, false);
+        let mapping = &meta["preview_to_desktop"];
+        // Crop starts 150 native pixels into a 150%-scaled monitor at (-1920,0).
+        // Image point (150,150) is native (-1620,450), monitor logical (200,300).
+        assert_eq!(
+            mapping["origin_x"].as_f64().unwrap() + 150.0 * mapping["scale_x"].as_f64().unwrap(),
+            -1620.0
+        );
+        assert_eq!(
+            mapping["origin_y"].as_f64().unwrap() + 150.0 * mapping["scale_y"].as_f64().unwrap(),
+            450.0
+        );
+        let target = MonitorTarget {
+            helper_instance: RequestId::new().to_string(),
+            id: 1,
+            x: -1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            scale_percent: 150,
+            rotation_degrees: 0,
+            coordinate_space: MonitorCoordinateSpace::PhysicalPixels,
+        };
+        assert_eq!(target.native_point(200, 300).unwrap(), (-1620, 450));
+    }
+    #[test]
     fn image_is_present_only_in_image_content_not_json_or_text() {
         let (meta, content) = response(fixture(500), true);
         assert_eq!(meta["image_included"], true);
