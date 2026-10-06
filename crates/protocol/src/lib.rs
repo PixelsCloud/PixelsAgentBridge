@@ -7,6 +7,8 @@ mod desktop_batch;
 pub use desktop_batch::*;
 mod monitor_input;
 pub use monitor_input::*;
+mod ui_automation;
+pub use ui_automation::*;
 
 mod control;
 mod device;
