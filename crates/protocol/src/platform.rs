@@ -87,6 +87,10 @@ pub struct ExecutionContext {
     pub os_version: String,
     pub architecture: CpuArchitecture,
     pub execution_scope: ExecutionScope,
+    /// None means unobserved (including historical records from older versions),
+    /// never an implied root/SYSTEM or interactive user identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<crate::ExecutionIdentity>,
     pub path_style: PathStyle,
     pub interpreter: Option<InterpreterContext>,
     pub cwd: Option<String>,
@@ -152,8 +156,20 @@ impl TargetContext {
             .map(|value| single_line(value, 160))
             .unwrap_or_else(|| "none".to_owned());
         let revision = single_line(&self.execution.environment_revision, 80);
+        let identity = self
+            .execution
+            .identity
+            .as_ref()
+            .map(|i| {
+                format!(
+                    "{} ({})",
+                    single_line(&i.account_name, 100),
+                    single_line(&i.account_id, 100)
+                )
+            })
+            .unwrap_or_else(|| "unobserved".to_owned());
         format!(
-            "Target {}/{} | {} {} | {} | {} | {} | cwd={} | env={}",
+            "Target {}/{} | {} {} | {} | {} | {} | user={} | cwd={} | env={}",
             self.device_ref.tenant_id,
             self.device_ref.device_id,
             self.execution.os_family,
@@ -161,6 +177,7 @@ impl TargetContext {
             self.execution.execution_scope,
             interpreter,
             self.execution.path_style,
+            identity,
             cwd,
             revision,
         )

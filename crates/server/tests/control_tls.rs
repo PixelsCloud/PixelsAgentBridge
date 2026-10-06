@@ -602,6 +602,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             os_version: "21H2".to_owned(),
             architecture: CpuArchitecture::X86_64,
             execution_scope: ExecutionScope::Native,
+            identity: None,
             path_style: PathStyle::Windows,
             interpreter: Some(InterpreterContext {
                 id: "pwsh".to_owned(),

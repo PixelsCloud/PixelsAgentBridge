@@ -30,6 +30,33 @@ pub struct UserIdentity {
     pub logon_id: Option<String>,
 }
 
+impl UserIdentity {
+    pub fn observation(
+        &self,
+        mode: pab_protocol::ExecutionMode,
+        environment_source: pab_protocol::ExecutionEnvironmentSource,
+    ) -> io::Result<pab_protocol::ExecutionIdentity> {
+        let observation = pab_protocol::ExecutionIdentity {
+            mode,
+            account_id: self.account_id.clone(),
+            account_name: self.account_name.clone(),
+            home: self
+                .home
+                .to_str()
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "user home is not UTF-8")
+                })?
+                .to_owned(),
+            primary_group: self.primary_group,
+            session_id: self.session_id.map(|v| v.to_string()),
+            logon_id: self.logon_id.clone(),
+            environment_source,
+        };
+        observation.validate().map_err(io::Error::other)?;
+        Ok(observation)
+    }
+}
+
 /// Captures a verified account/token. A stale reference must be rejected by callers
 /// before constructing this value; spawn rechecks the captured native facts.
 pub struct PreparedUser(native::PreparedUser);

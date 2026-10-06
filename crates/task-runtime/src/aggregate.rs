@@ -305,6 +305,8 @@ pub enum TaskRuntimeError {
     ZeroCapabilityVersion,
     #[error("path style does not match the target OS")]
     PathStyleMismatch,
+    #[error("invalid execution identity: {0}")]
+    InvalidExecutionIdentity(&'static str),
     #[error("accepted can only be recorded when the task is created")]
     DuplicateAccepted,
     #[error("task is already terminal in state {0:?}")]

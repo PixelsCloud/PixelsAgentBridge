@@ -5,6 +5,18 @@ use pab_protocol::{
 };
 
 #[test]
+fn historical_context_without_account_remains_unobserved() {
+    let value = serde_json::json!({
+        "os_family":"linux","os_name":"Linux","os_version":"test",
+        "architecture":"x86_64","execution_scope":"native","path_style":"posix",
+        "interpreter":null,"cwd":"/tmp","environment_revision":"old-env"
+    });
+    let context: ExecutionContext = serde_json::from_value(value.clone()).unwrap();
+    assert!(context.identity.is_none());
+    assert_eq!(serde_json::to_value(context).unwrap(), value);
+}
+
+#[test]
 fn compact_reminder_keeps_target_os_shell_and_revision_visible() {
     let context = TargetContext {
         device_ref: DeviceRef {
@@ -17,6 +29,7 @@ fn compact_reminder_keeps_target_os_shell_and_revision_visible() {
             os_version: "2025".to_owned(),
             architecture: CpuArchitecture::X86_64,
             execution_scope: ExecutionScope::Native,
+            identity: None,
             path_style: PathStyle::Windows,
             interpreter: Some(InterpreterContext {
                 id: "windows_powershell".to_owned(),
@@ -48,6 +61,7 @@ fn expected_environment_requires_both_os_and_revision() {
         os_version: "test".to_owned(),
         architecture: CpuArchitecture::Aarch64,
         execution_scope: ExecutionScope::Native,
+        identity: None,
         path_style: PathStyle::Posix,
         interpreter: None,
         cwd: Some("/tmp/line\nname".to_owned()),

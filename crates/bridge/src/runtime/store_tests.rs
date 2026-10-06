@@ -1114,6 +1114,7 @@ fn snapshot(device_ref: DeviceRef, request_id: RequestId) -> TaskSnapshot {
             os_version: "test".to_owned(),
             architecture: CpuArchitecture::X86_64,
             execution_scope: ExecutionScope::Native,
+            identity: None,
             path_style: PathStyle::Posix,
             interpreter: None,
             cwd: Some("/tmp".to_owned()),

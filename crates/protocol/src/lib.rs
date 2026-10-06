@@ -21,6 +21,8 @@ mod ids;
 mod operator;
 mod peer;
 mod platform;
+mod execution_identity;
+pub use execution_identity::*;
 mod relay_control;
 mod relay_policy;
 mod screenshot;
@@ -60,7 +62,7 @@ pub use filesystem::{
 };
 pub use ids::{
     ChallengeId, ClaimId, ConnectionId, DeviceId, EndpointInstanceId, RequestId, TaskId, TenantId,
-    UserId,
+    UserId, ExecutionContextRef,
 };
 pub use operator::OperatorRef;
 pub use peer::{

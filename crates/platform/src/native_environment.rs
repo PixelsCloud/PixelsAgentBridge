@@ -18,6 +18,16 @@ pub fn detect_native_execution_context() -> Result<ExecutionContext, PlatformDet
         OsFamily::Windows => PathStyle::Windows,
         OsFamily::Linux | OsFamily::Macos => PathStyle::Posix,
     };
+    // Identity lookup failure must not stop the device's service/connection. An
+    // unobserved account is explicit and cannot be used as a run-as context.
+    let identity = pab_os_control::execution::current_identity()
+        .and_then(|value| {
+            value.observation(
+                pab_protocol::ExecutionMode::Service,
+                pab_protocol::ExecutionEnvironmentSource::ServiceProcess,
+            )
+        })
+        .ok();
     let environment_revision = environment_revision(
         os_family,
         &os_name,
@@ -25,6 +35,7 @@ pub fn detect_native_execution_context() -> Result<ExecutionContext, PlatformDet
         architecture,
         path_style,
         &cwd,
+        identity.as_ref(),
     );
     Ok(ExecutionContext {
         os_family,
@@ -32,6 +43,7 @@ pub fn detect_native_execution_context() -> Result<ExecutionContext, PlatformDet
         os_version,
         architecture,
         execution_scope: ExecutionScope::Native,
+        identity,
         path_style,
         interpreter: None,
         cwd: Some(cwd),
@@ -76,10 +88,11 @@ fn environment_revision(
     architecture: CpuArchitecture,
     path_style: PathStyle,
     cwd: &str,
+    identity: Option<&pab_protocol::ExecutionIdentity>,
 ) -> String {
     let mut input = Vec::new();
     for value in [
-        "pab-native-environment-v1",
+        "pab-native-environment-v2",
         &format!("{os_family:?}"),
         os_name,
         os_version,
@@ -90,7 +103,13 @@ fn environment_revision(
         input.extend_from_slice(&(value.len() as u64).to_be_bytes());
         input.extend_from_slice(value.as_bytes());
     }
-    format!("native-v1:{}", blake3::hash(&input).to_hex())
+    // Stable serialization of observed identity includes account and login
+    // generation; a service-account change invalidates the old environment.
+    let identity =
+        serde_json::to_vec(&identity).expect("identity contains only serializable fields");
+    input.extend_from_slice(&(identity.len() as u64).to_be_bytes());
+    input.extend_from_slice(&identity);
+    format!("native-v2:{}", blake3::hash(&input).to_hex())
 }
 
 #[derive(Debug, Error)]
@@ -112,12 +131,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_revision_changes_with_observed_account_or_login_generation() {
+        let mut identity = pab_os_control::execution::current_identity()
+            .unwrap()
+            .observation(
+                pab_protocol::ExecutionMode::Service,
+                pab_protocol::ExecutionEnvironmentSource::ServiceProcess,
+            )
+            .unwrap();
+        let revision = |identity: Option<&pab_protocol::ExecutionIdentity>| {
+            environment_revision(
+                OsFamily::Windows,
+                "Windows",
+                "test",
+                CpuArchitecture::X86_64,
+                PathStyle::Windows,
+                "C:\\",
+                identity,
+            )
+        };
+        let first = revision(Some(&identity));
+        identity.logon_id = Some("different-login".into());
+        assert_ne!(first, revision(Some(&identity)));
+        let next = revision(Some(&identity));
+        identity.account_id.push_str("-changed");
+        assert_ne!(next, revision(Some(&identity)));
+        assert_ne!(first, revision(None));
+    }
+
+    #[test]
     fn native_context_is_stable_and_valid_for_this_process() {
         let first = detect_native_execution_context().unwrap();
         let second = detect_native_execution_context().unwrap();
 
         assert_eq!(first, second);
-        assert!(first.environment_revision.starts_with("native-v1:"));
+        assert!(first.environment_revision.starts_with("native-v2:"));
+        assert!(
+            first.identity.is_some(),
+            "test process native account must be observable"
+        );
         pab_task_runtime::validate_execution_context(&first).unwrap();
 
         #[cfg(target_os = "windows")]

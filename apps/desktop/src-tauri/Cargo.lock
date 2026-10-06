@@ -4930,6 +4930,7 @@ dependencies = [
  "pab-protocol",
  "plist",
  "rustix 1.1.4",
+ "serde",
  "tokio",
  "windows-service",
  "windows-sys 0.61.2",

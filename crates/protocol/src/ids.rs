@@ -70,3 +70,4 @@ uuid_id!(RequestId);
 uuid_id!(TaskId);
 uuid_id!(EndpointInstanceId);
 uuid_id!(ClaimId);
+uuid_id!(ExecutionContextRef);

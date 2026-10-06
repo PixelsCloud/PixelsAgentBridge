@@ -13,6 +13,11 @@ pub fn validate_execution_context(value: &ExecutionContext) -> Result<(), TaskRu
     if value.path_style != expected_path_style {
         return Err(TaskRuntimeError::PathStyleMismatch);
     }
+    if let Some(identity) = &value.identity {
+        identity
+            .validate()
+            .map_err(TaskRuntimeError::InvalidExecutionIdentity)?;
+    }
     if let Some(interpreter) = &value.interpreter {
         for (name, field, max_chars) in [
             ("interpreter.id", interpreter.id.as_str(), 128),

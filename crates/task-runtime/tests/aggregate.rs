@@ -31,6 +31,7 @@ fn accepted(os_family: OsFamily, path_style: PathStyle) -> AcceptedTask {
             os_version: "test".to_owned(),
             architecture: CpuArchitecture::X86_64,
             execution_scope: ExecutionScope::Native,
+            identity: None,
             path_style,
             interpreter: None,
             cwd: Some(match os_family {
