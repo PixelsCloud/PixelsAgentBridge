@@ -5,6 +5,7 @@
 @property(copy) NSString *directory;
 @property(strong) NSTextField *input;
 @property(strong) NSButton *check;
+@property(strong) NSButton *radio;
 @property NSInteger clicks;
 -(void)apply:(id)sender;
 @end
@@ -12,7 +13,8 @@
 -(void)apply:(id)sender {
     self.clicks++;
     NSDictionary *result=@{@"clicks":@(self.clicks),@"value":self.input.stringValue,
-                           @"checked":@(self.check.state==NSControlStateValueOn)};
+                           @"checked":@(self.check.state==NSControlStateValueOn),
+                           @"radio":@(self.radio.state==NSControlStateValueOn)};
     NSData *json=[NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
     [json writeToFile:[self.directory stringByAppendingPathComponent:@"result.json"] atomically:YES];
 }
@@ -31,7 +33,7 @@ int main(int argc,char **argv) {
         NSApplication *app=[NSApplication sharedApplication];
         [app setActivationPolicy:NSApplicationActivationPolicyRegular];
         dispatch_async(dispatch_get_main_queue(), ^{
-        NSWindow *win=[[NSWindow alloc] initWithContentRect:NSMakeRect(800,300,440,260)
+        NSWindow *win=[[NSWindow alloc] initWithContentRect:NSMakeRect(400,100,600,540)
             styleMask:(NSWindowStyleMaskTitled|NSWindowStyleMaskClosable) backing:NSBackingStoreBuffered defer:NO];
         win.title=@"PAB UI acceptance fixture";
         PabControls *target=[PabControls new];target.directory=directory;
@@ -46,6 +48,22 @@ int main(int argc,char **argv) {
         NSButton *button=[[NSButton alloc] initWithFrame:NSMakeRect(20,90,200,40)];
         button.title=@"Apply fixture";button.target=target;button.action=@selector(apply:);
         [win.contentView addSubview:button];
+        NSTextField *readonly=[[NSTextField alloc] initWithFrame:NSMakeRect(20,460,220,30)];
+        readonly.accessibilityLabel=@"Fixture readonly";readonly.stringValue=@"unchanged";readonly.editable=NO;
+        [win.contentView addSubview:readonly];
+        NSSecureTextField *secure=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(20,420,220,30)];
+        secure.accessibilityLabel=@"Fixture secure";secure.stringValue=@"fixture-only-secret";
+        [win.contentView addSubview:secure];
+        NSButton *disabled=[[NSButton alloc] initWithFrame:NSMakeRect(20,380,220,30)];
+        disabled.title=@"Fixture disabled";disabled.enabled=NO;
+        [win.contentView addSubview:disabled];
+        target.radio=[[NSButton alloc] initWithFrame:NSMakeRect(20,340,220,30)];
+        [target.radio setButtonType:NSButtonTypeRadio];target.radio.title=@"Fixture radio";
+        [win.contentView addSubview:target.radio];
+        for(int i=0;i<2;i++){
+            NSButton *duplicate=[[NSButton alloc] initWithFrame:NSMakeRect(300,340+i*40,220,30)];
+            duplicate.title=@"Fixture duplicate";[win.contentView addSubview:duplicate];
+        }
         [win makeKeyAndOrderFront:nil];[app activateIgnoringOtherApps:YES];
         NSAccessibilityPostNotification(win,NSAccessibilityWindowCreatedNotification);
         NSData *json=[NSJSONSerialization dataWithJSONObject:@{@"pid":@(getpid()),@"window_role":win.accessibilityRole ?: @"",@"input_role":target.input.accessibilityRole ?: @"",@"window_number":@(win.windowNumber)} options:0 error:nil];

@@ -57,7 +57,7 @@ impl TaskStore {
 
     pub async fn interrupt_read_operations(&self) -> Result<(), TaskStoreError> {
         sqlx::query(
-            "UPDATE read_operations SET state = CASE WHEN kind IN ('file_write', 'file_patch', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'process_terminate', 'service_control', 'window_focus', 'window_control', 'type_text', 'desktop_batch', 'monitor_input', 'container_control', 'git_commit', 'git_checkout', 'git_fetch', 'git_pull', 'git_push') THEN 'unconfirmed' ELSE 'interrupted' END, finished_at_unix_ms = ?, message = 'Executor stopped before the operation result was confirmed; accepted mutations may have taken effect and are never replayed' WHERE state IN ('running', 'cancel_requested')",
+            "UPDATE read_operations SET state = CASE WHEN kind IN ('file_write', 'file_patch', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'process_terminate', 'service_control', 'window_focus', 'window_control', 'type_text', 'desktop_batch', 'monitor_input', 'ui_action', 'container_control', 'git_commit', 'git_checkout', 'git_fetch', 'git_pull', 'git_push') THEN 'unconfirmed' ELSE 'interrupted' END, finished_at_unix_ms = ?, message = 'Executor stopped before the operation result was confirmed; accepted mutations may have taken effect and are never replayed' WHERE state IN ('running', 'cancel_requested')",
         )
         .bind(now_unix_ms())
         .execute(&self.pool)

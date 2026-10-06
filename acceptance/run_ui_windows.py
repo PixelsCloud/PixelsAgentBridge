@@ -2,7 +2,7 @@
 
 Build: cargo build -p pab-desktop-control --example ui_worker --locked
 Launch ui_controls.ps1 into a fresh directory, then pass that directory here.
-This validates product backend/worker code, not the not-yet-integrated MCP tools.
+This validates product backend/worker code, independently of MCP host acceptance.
 """
 import ctypes
 import json
@@ -68,8 +68,19 @@ def main():
         tree = query(tree_request, ticket)
         assert not tree["error_code"] and not tree["truncated"], tree
         refs = {e["name"]: e["element_ref"] for e in tree["elements"] if e["name"]}
+        assert sum(e["name"] == "Fixture duplicate" for e in tree["elements"]) == 2
+        secure = query({"operation":"get", "element_ref":refs["Fixture secure"], "include_value":True})
+        assert secure["elements"][0]["protected"] and secure["elements"][0]["value"] is None, secure
+        for name, action in [("Fixture readonly", {"type":"set_value","value":"must-not-write"}),
+                             ("Fixture secure", {"type":"set_value","value":"must-not-write"}),
+                             ("Fixture disabled", {"type":"invoke"})]:
+            denied = query({"operation":"action", "element_ref":refs[name], "action":action})
+            assert denied["outcome"] == "rejected" and denied["action_dispatched"] is False, denied
+        for name in ["Fixture radio", "Fixture second"]:
+            assert act(refs[name], {"type":"select"})["verification"] == "matched"
         edit = refs["Fixture input"]
-        assert act(edit, {"type": "set_value", "value": "PAB 中文🙂"})["verification"] == "matched"
+        for value in ["PAB 中文🙂", "", "PAB 中文🙂"]:
+            assert act(edit, {"type": "set_value", "value": value})["verification"] == "matched"
         assert act(refs["Fixture option"], {"type": "set_checked", "checked": True})["verification"] == "matched"
         same = act(refs["Fixture option"], {"type": "set_checked", "checked": True})
         assert same["action_dispatched"] is False
@@ -79,7 +90,7 @@ def main():
                 break
             time.sleep(.1)
         actual = json.loads((root / "result.json").read_text(encoding="utf-8-sig"))
-        assert actual == {"value": "PAB 中文🙂", "clicks": 1, "checked": True}, actual
+        assert actual == {"value": "PAB 中文🙂", "clicks": 1, "checked": True, "radio":True, "selected":1}, actual
         stranger = {**owner, "connection": str(uuid.uuid4())}
         rejected = query({"operation": "get", "element_ref": edit, "include_value": True}, identity=stranger)
         assert rejected["error_code"] == "stale_element", rejected
@@ -90,6 +101,8 @@ def main():
         report = {"actual_value_matches": True, "actual_clicks": actual["clicks"],
                   "actual_checked": actual["checked"], "set_checked_no_replay": True,
                   "cross_connection_rejected": True, "stale_window_rejected": True,
+                  "secure_redacted":True, "readonly_disabled_secure_rejected":True,
+                  "radio_and_list_actual_selected":True, "empty_unicode_values":True,
                   "nodes": len(tree["elements"])}
         (root / "backend-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(json.dumps(report))

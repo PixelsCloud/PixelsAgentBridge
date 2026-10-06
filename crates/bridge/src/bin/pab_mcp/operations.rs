@@ -747,6 +747,7 @@ impl OperationManager {
         let (id, code) = reference(args)?;
         if let Ok((device, reply)) = self.queue.system_record(id, code).await {
             if !reply.kind.starts_with("git_")
+                && !["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&reply.kind.as_str())
                 && ![
                     "containers",
                     "container",
@@ -764,7 +765,7 @@ impl OperationManager {
             )
             .await
             .map_err(
-                |_| "Docker/Git cancellation outcome is unconfirmed; query the original operation_ref",
+                |_| "operation cancellation outcome is unconfirmed; query the original operation_ref",
             )?
             .map_err(|e| e.to_string())?;
             return Ok(

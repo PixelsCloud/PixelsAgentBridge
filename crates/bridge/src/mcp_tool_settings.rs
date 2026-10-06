@@ -82,6 +82,10 @@ impl ToolGroup {
                 "pab_list_monitors",
                 "pab_list_windows",
                 "pab_type_text",
+                "pab_ui_query",
+                "pab_ui_get",
+                "pab_ui_action",
+                "pab_ui_wait",
                 "pab_window_control",
             ],
             Self::Git => &[
@@ -233,8 +237,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 60);
-        assert_eq!(unique.len(), 60);
+        assert_eq!(names.len(), 64);
+        assert_eq!(unique.len(), 64);
         for name in [
             "pab_connect",
             "pab_disconnect",

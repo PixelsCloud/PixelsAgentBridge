@@ -324,6 +324,7 @@ impl<B: UiBackend> UiEngine<B> {
         let (target, parent) = self.target(owner, reference)?;
         let with_value = expected.value.is_some() || matches!(action, UiAction::SetValue { .. });
         let before = self.read(&target, with_value)?;
+        result.visited_count = 1;
         before.check_expected(expected)?;
         if before.enabled != Some(true) {
             return Err("control_not_enabled");
@@ -435,9 +436,9 @@ fn truncate(result: &mut UiSnapshot, reason: &str) {
     result.truncated = true;
     result.stop_reason.get_or_insert_with(|| reason.into());
 }
-fn now() -> u64 {
+fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as u64
+        .as_millis() as i64
 }

@@ -2,7 +2,7 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 8;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
@@ -97,6 +97,14 @@ impl SystemQuery {
         if matches!(
             self,
             Self::Desktop {
+                query: crate::DesktopQuery::Ui { .. }
+            }
+        ) {
+            return 9;
+        }
+        if matches!(
+            self,
+            Self::Desktop {
                 query: crate::DesktopQuery::MonitorInput { .. }
             }
         ) {
@@ -155,6 +163,12 @@ impl SystemQuery {
     /// Persistence-only identity; mutation text is hashed rather than stored here.
     pub fn persistence_form(&self) -> Self {
         let mut value = self.clone();
+        if let Self::Desktop {
+            query: crate::DesktopQuery::Ui { query },
+        } = &mut value
+        {
+            *query = query.persistence_form();
+        }
         if let Self::Git {
             query:
                 crate::GitQuery {

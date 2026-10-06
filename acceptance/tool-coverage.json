@@ -2,6 +2,34 @@
   "schema_version": 1,
   "baseline": "3598ad1",
   "tools": {
+    "pab_ui_query": {
+      "group": "desktop-ui",
+      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "live_suite": "ui-controls",
+      "live_status": "not_run",
+      "scope": "Native backend fixture results are separate evidence; installed-host tools require package installation and host reload."
+    },
+    "pab_ui_get": {
+      "group": "desktop-ui",
+      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "live_suite": "ui-controls",
+      "live_status": "not_run",
+      "scope": "Native backend fixture results are separate evidence; installed-host tools require package installation and host reload."
+    },
+    "pab_ui_action": {
+      "group": "desktop-ui",
+      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "live_suite": "ui-controls",
+      "live_status": "not_run",
+      "scope": "Native backend fixture results are separate evidence; installed-host tools require package installation and host reload."
+    },
+    "pab_ui_wait": {
+      "group": "desktop-ui",
+      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "live_suite": "ui-controls",
+      "live_status": "not_run",
+      "scope": "Native backend fixture results are separate evidence; installed-host tools require package installation and host reload."
+    },
     "pab_connect": {
       "group": "connection",
       "existing_test_sources": [

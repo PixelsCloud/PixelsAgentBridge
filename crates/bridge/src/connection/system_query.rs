@@ -80,6 +80,17 @@ impl AuthenticatedDeviceConnection {
     }
 }
 fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
+    if ["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&r.kind.as_str()) {
+        match &r.data {
+            Some(SystemQueryData::Desktop { snapshot }) => {
+                if snapshot.ui.as_ref().is_none_or(|ui| ui.validate().is_err()) {
+                    return false;
+                }
+            }
+            None if r.state != "completed" => {}
+            _ => return false,
+        }
+    }
     r.request_id == id
         && matches!(
             r.state.as_str(),
@@ -112,6 +123,10 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "type_text"
                 | "desktop_batch"
                 | "monitor_input"
+                | "ui_query"
+                | "ui_get"
+                | "ui_action"
+                | "ui_wait"
                 | "system_info"
                 | "disks"
                 | "processes"
@@ -151,7 +166,11 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                         | "window_control"
                         | "type_text"
                         | "desktop_batch"
-                        | "monitor_input",
+                        | "monitor_input"
+                        | "ui_query"
+                        | "ui_get"
+                        | "ui_action"
+                        | "ui_wait",
                     Some(SystemQueryData::Desktop { .. })
                 ) | (
                     "network_connections",

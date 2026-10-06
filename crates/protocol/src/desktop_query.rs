@@ -1,11 +1,14 @@
 use crate::RequestId;
 use crate::{DesktopAction, DesktopBatchReport, validate_desktop_batch};
 use serde::{Deserialize, Serialize};
-pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 3;
+pub const DESKTOP_HELPER_SCHEMA_VERSION: u16 = 4;
 pub const MAX_DESKTOP_TEXT_BYTES: usize = 4096;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum DesktopQuery {
+    Ui {
+        query: crate::UiRequest,
+    },
     MonitorInput {
         input: crate::MonitorInput,
     },
@@ -39,6 +42,7 @@ pub enum WindowControlAction {
 impl DesktopQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Ui { query } => query.kind(),
             Self::MonitorInput { .. } => "monitor_input",
             Self::Batch { .. } => "desktop_batch",
             Self::Monitors {} => "monitors",
@@ -49,6 +53,9 @@ impl DesktopQuery {
         }
     }
     pub fn is_mutation(&self) -> bool {
+        if let Self::Ui { query } = self {
+            return query.is_mutation();
+        }
         !matches!(self, Self::Monitors {} | Self::Windows {})
     }
     pub fn window_ref(&self) -> Option<&str> {
@@ -61,6 +68,9 @@ impl DesktopQuery {
         }
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Ui { query } = self {
+            return query.validate();
+        }
         if let Self::MonitorInput { input } = self {
             input.validate()?;
         }
@@ -86,6 +96,9 @@ impl DesktopQuery {
         Ok(())
     }
     pub fn required_helper_version(&self) -> u16 {
+        if matches!(self, Self::Ui { .. }) {
+            return 4;
+        }
         if matches!(self, Self::MonitorInput { .. }) {
             return 3;
         }
@@ -128,6 +141,8 @@ pub struct DesktopWindowInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesktopSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui: Option<crate::UiSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub batch: Option<DesktopBatchReport>,
     pub helper_instance: String,
     pub backend: String,
@@ -141,6 +156,7 @@ pub struct DesktopSnapshot {
 impl DesktopSnapshot {
     pub fn new(instance: String, backend: &str) -> Self {
         Self {
+            ui: None,
             batch: None,
             helper_instance: instance,
             backend: backend.into(),

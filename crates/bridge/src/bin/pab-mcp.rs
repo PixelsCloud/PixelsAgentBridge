@@ -24,6 +24,8 @@ mod mcp_screenshot;
 mod mcp_settings;
 #[path = "pab_mcp/tools.rs"]
 mod mcp_tools;
+#[path = "pab_mcp/ui.rs"]
+mod mcp_ui;
 #[path = "pab_mcp/waiting.rs"]
 mod mcp_waiting;
 
@@ -239,6 +241,10 @@ impl ServerHandler for McpServer {
                     | "pab_focus_window"
                     | "pab_window_control"
                     | "pab_type_text"
+                    | "pab_ui_query"
+                    | "pab_ui_get"
+                    | "pab_ui_action"
+                    | "pab_ui_wait"
                     | "pab_desktop_input"
                     | "pab_file_stat"
                     | "pab_file_read"
@@ -381,7 +387,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 60);
+        assert_eq!(catalog.tools.len(), 64);
         let names = catalog
             .tools
             .iter()

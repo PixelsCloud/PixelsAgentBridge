@@ -2,6 +2,9 @@ use pab_bridge::BridgeRuntime;
 use pab_protocol::{DesktopQuery, RequestId, SystemQuery, WindowControlAction};
 use serde_json::{Value, json};
 pub fn handles(name: &str) -> bool {
+    if super::mcp_ui::handles(name) {
+        return true;
+    }
     matches!(
         name,
         "pab_list_monitors"
@@ -24,6 +27,9 @@ pub fn tools() -> Vec<Value> {
     }).collect()
 }
 pub fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), String> {
+    if super::mcp_ui::handles(name) {
+        return super::mcp_ui::parse(name, args);
+    }
     let id = args
         .get("request_id")
         .map(|v| {

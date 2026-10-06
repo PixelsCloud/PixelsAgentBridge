@@ -68,9 +68,6 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
                 return Err("reply identity mismatch".into());
             }
             let result = reply.snapshot.ok_or("no snapshot")?;
-            if let Some(code) = &result.error_code {
-                return Err(code.clone().into());
-            }
             Ok(result)
         };
         let tree = call(
@@ -83,6 +80,9 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
                 limits: UiQueryLimits::default(),
             },
         )?;
+        if let Some(code) = &tree.error_code {
+            return Err(code.clone().into());
+        }
         std::fs::write(
             dir.join("backend-tree.json"),
             serde_json::to_vec_pretty(&tree)?,
@@ -101,7 +101,65 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
             }
             Ok(matches[0].element_ref.clone())
         };
+        if tree
+            .elements
+            .iter()
+            .filter(|e| e.name.as_deref() == Some("Fixture duplicate"))
+            .count()
+            != 2
+        {
+            return Err("duplicate controls missing".into());
+        }
+        let secure = call(
+            None,
+            UiRequest::Get {
+                element_ref: reference("Fixture secure")?,
+                include_value: true,
+            },
+        )?;
+        if secure.elements.len() != 1
+            || !secure.elements[0].protected
+            || secure.elements[0].value.is_some()
+        {
+            return Err("secure value leaked".into());
+        }
+        for (name, action) in [
+            (
+                "Fixture readonly",
+                UiAction::SetValue {
+                    value: "must-not-write".into(),
+                },
+            ),
+            (
+                "Fixture secure",
+                UiAction::SetValue {
+                    value: "must-not-write".into(),
+                },
+            ),
+            ("Fixture disabled", UiAction::Invoke),
+        ] {
+            let result = call(
+                None,
+                UiRequest::Action {
+                    element_ref: reference(name)?,
+                    action,
+                    expected: UiExpected::default(),
+                    timeout_ms: 5000,
+                },
+            )?;
+            if result.outcome != UiOutcome::Rejected || result.action_dispatched != Some(false) {
+                return Err(format!("unsafe action accepted: {name}").into());
+            }
+        }
         for (name, action, verify) in [
+            (
+                "Fixture input",
+                UiAction::SetValue {
+                    value: String::new(),
+                },
+                true,
+            ),
+            ("Fixture radio", UiAction::Select, true),
             (
                 "Fixture input",
                 UiAction::SetValue {
@@ -125,6 +183,9 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
                     timeout_ms: 5000,
                 },
             )?;
+            if let Some(code) = &result.error_code {
+                return Err(format!("{name}: {code}").into());
+            }
             if verify && result.verification != UiVerification::Matched {
                 return Err(format!("verification failed: {name}").into());
             }
@@ -140,6 +201,7 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
         if result["clicks"] != 1
             || result["value"] != "PAB 中文🙂"
             || !(result["checked"] == true || result["checked"] == 1)
+            || !(result["radio"] == true || result["radio"] == 1)
         {
             return Err("actual fixture effect mismatch".into());
         }

@@ -82,11 +82,28 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             *status.0.write().await = None;
                             let _ = handle.emit("local-device-offline", ());
                         }
-                        Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopQuery(id, query))) => {
+                        Ok(Ok(pab_executor::local_ipc::LocalEvent::ReleaseUiConnection(
+                            connection,
+                        ))) => {
+                            desktop_session.release_ui_connection(connection);
+                        }
+                        Ok(Ok(pab_executor::local_ipc::LocalEvent::DesktopQuery(
+                            id,
+                            query,
+                            context,
+                        ))) => {
                             let mut reply = if !cfg!(any(windows, target_os = "macos"))
                                 || session_helper::desktop_is_active(Some("Default"))
                             {
-                                desktop_session.query(id, &query)
+                                desktop_session.query_guarded_context(id, &query, context, || {
+                                    if !cfg!(any(windows, target_os = "macos"))
+                                        || session_helper::desktop_is_active(Some("Default"))
+                                    {
+                                        Ok(())
+                                    } else {
+                                        Err("interactive desktop changed".into())
+                                    }
+                                })
                             } else {
                                 let mut reply = pab_protocol::SystemQueryReply::pending(
                                     id,

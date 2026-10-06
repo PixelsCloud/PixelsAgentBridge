@@ -8,6 +8,14 @@ pub const MAX_UI_SELECTOR_BYTES: usize = 512;
 pub const MAX_UI_REPLY_BYTES: usize = 32 * 1024;
 pub const MAX_UI_VISITED: u32 = 2000;
 
+/// Executor-to-helper metadata, outside the remotely supplied SystemQuery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UiHelperContext {
+    pub connection_id: RequestId,
+    pub sample: bool,
+}
+
 /// A value is only populated on explicit reads of non-protected controls.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiElement {
@@ -80,8 +88,83 @@ pub struct UiSnapshot {
     pub action_dispatched: Option<bool>,
     pub verification: UiVerification,
     pub error_code: Option<String>,
-    pub sampled_from_unix_ms: u64,
-    pub sampled_at_unix_ms: u64,
+    pub sampled_from_unix_ms: i64,
+    pub sampled_at_unix_ms: i64,
+}
+impl UiSnapshot {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.elements.len() > 500
+            || self.visited_count > MAX_UI_VISITED
+            || self.sampled_at_unix_ms < self.sampled_from_unix_ms
+        {
+            return Err("invalid UI snapshot bounds");
+        }
+        if self.error_code.as_ref().is_some_and(|s| s.len() > 256)
+            || self.stop_reason.as_ref().is_some_and(|s| s.len() > 128)
+        {
+            return Err("UI status budget exceeded");
+        }
+        for e in &self.elements {
+            reference(&e.element_ref)?;
+            if let Some(parent) = &e.parent_ref {
+                reference(parent)?;
+            }
+            if e.protected
+                && (e.value.is_some() || e.supported_actions.contains(&UiActionKind::SetValue))
+            {
+                return Err("protected control content in UI snapshot");
+            }
+            for (text, max) in [
+                (&e.name, 1024),
+                (&e.identifier, 512),
+                (&e.value, MAX_UI_TEXT_BYTES),
+            ] {
+                if text.as_ref().is_some_and(|s| s.len() > max) {
+                    return Err("UI field budget exceeded");
+                }
+            }
+            if e.native_role.len() > 128
+                || e.coordinate_space.len() > 64
+                || e.field_errors.len() > 24
+                || e.supported_actions.len() > 7
+            {
+                return Err("UI metadata budget exceeded");
+            }
+            if e.field_errors
+                .iter()
+                .any(|(key, value)| key.len() > 64 || value.len() > 128)
+            {
+                return Err("UI error budget exceeded");
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Local history presentation contains no control names, selectors or text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiOperationSummary {
+    pub outcome: UiOutcome,
+    pub action_dispatched: Option<bool>,
+    pub verification: UiVerification,
+    pub visited_count: u32,
+    pub returned_count: u32,
+    pub truncated: bool,
+    pub error_code: Option<String>,
+}
+impl From<UiSnapshot> for UiOperationSummary {
+    fn from(ui: UiSnapshot) -> Self {
+        Self {
+            outcome: ui.outcome,
+            action_dispatched: ui.action_dispatched,
+            verification: ui.verification,
+            visited_count: ui.visited_count,
+            returned_count: ui.elements.len() as u32,
+            truncated: ui.truncated,
+            error_code: ui.error_code,
+        }
+    }
 }
 
 impl UiElement {
@@ -693,5 +776,45 @@ mod tests {
             selector.name = Some("replacement".into());
         }
         assert!(q.validate().is_err());
+    }
+    #[test]
+    fn worker_snapshots_reject_protected_content_invalid_references_and_oversized_metadata() {
+        let mut e = element();
+        e.element_ref = RequestId::new().to_string();
+        let good = UiSnapshot {
+            elements: vec![e],
+            visited_count: 1,
+            truncated: false,
+            stop_reason: None,
+            outcome: UiOutcome::Completed,
+            action_dispatched: Some(false),
+            verification: UiVerification::NotApplicable,
+            error_code: None,
+            sampled_from_unix_ms: 1,
+            sampled_at_unix_ms: 2,
+        };
+        assert!(good.validate().is_ok());
+        let mut bad = good.clone();
+        bad.elements[0].protected = true;
+        assert!(bad.validate().is_err());
+        bad.elements[0].redact_protected();
+        assert!(bad.validate().is_ok());
+        let mut bad = good.clone();
+        bad.elements[0].element_ref = "123".into();
+        assert!(bad.validate().is_err());
+        let mut bad = good.clone();
+        bad.elements[0]
+            .field_errors
+            .insert("value".into(), "x".repeat(129));
+        assert!(bad.validate().is_err());
+        let mut bad = good.clone();
+        bad.elements = vec![good.elements[0].clone(); 501];
+        assert!(bad.validate().is_err());
+        let mut bad = good.clone();
+        bad.sampled_at_unix_ms = 0;
+        assert!(bad.validate().is_err());
+        let mut bad = good;
+        bad.error_code = Some("x".repeat(257));
+        assert!(bad.validate().is_err());
     }
 }

@@ -7,6 +7,48 @@ use pab_protocol::{
 use std::time::Duration;
 
 #[tokio::test]
+async fn ui_mutation_restart_retains_unconfirmed_and_rejects_changed_payload() {
+    use pab_protocol::*;
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    let id = RequestId::new();
+    let reference = RequestId::new().to_string();
+    let query = |text: &str| SystemQuery::Desktop {
+        query: DesktopQuery::Ui {
+            query: UiRequest::Action {
+                element_ref: reference.clone(),
+                action: UiAction::SetValue { value: text.into() },
+                expected: UiExpected::default(),
+                timeout_ms: 5000,
+            },
+        },
+    };
+    let q = query("private-fixture-中文");
+    svc.store
+        .accept_system_query(actor(), id, &q)
+        .await
+        .unwrap();
+    svc.store.interrupt_read_operations().await.unwrap();
+    let restarted = service(dir.path()).await;
+    assert_eq!(
+        restarted.system_query(actor(), id, q).await.unwrap().state,
+        "unconfirmed"
+    );
+    assert!(
+        restarted
+            .system_query(actor(), id, query("changed"))
+            .await
+            .is_err()
+    );
+    let stored = svc.store.system_query_spec(actor(), id).await.unwrap();
+    assert!(
+        !serde_json::to_string(&stored)
+            .unwrap()
+            .contains("private-fixture")
+    );
+}
+
+#[tokio::test]
 async fn monitor_mutation_is_unconfirmed_after_restart_and_not_replayed() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path()).await;

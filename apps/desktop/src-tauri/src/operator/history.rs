@@ -33,6 +33,7 @@ pub struct HistoryTask {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryOperation {
+    ui: Option<pab_protocol::UiOperationSummary>,
     id: String,
     device_code: String,
     initiated_by: String,
@@ -383,6 +384,7 @@ fn history_operation(
         message: record.message,
         execution_observation: record.execution_observation,
         phase: record.transfer_phase,
+        ui: record.ui,
         mutation: record.filesystem_mutation.map(|m| HistoryMutation {
             phase: m.phase,
             total_entries: m.total_entries,

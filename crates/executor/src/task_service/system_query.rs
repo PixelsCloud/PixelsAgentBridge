@@ -31,7 +31,11 @@ impl TaskService {
         let (git_cancel, mut cancelled) = tokio::sync::watch::channel(false);
         let cancellable = matches!(
             query,
-            SystemQuery::Git { .. } | SystemQuery::Container { .. }
+            SystemQuery::Git { .. }
+                | SystemQuery::Container { .. }
+                | SystemQuery::Desktop {
+                    query: pab_protocol::DesktopQuery::Ui { .. }
+                }
         );
         if cancellable {
             self.cancellable_system_jobs
@@ -41,6 +45,12 @@ impl TaskService {
         }
         drop(jobs);
         let mutation = query.is_mutation();
+        let ui_query = matches!(
+            query,
+            SystemQuery::Desktop {
+                query: pab_protocol::DesktopQuery::Ui { .. }
+            }
+        );
         let service = self.clone();
         let collector = self.system_collector.clone();
         let (send, receive) = tokio::sync::oneshot::channel();
@@ -77,12 +87,32 @@ impl TaskService {
                     return;
                 }
             };
+            // A wait must not occupy the two system collectors and prevent the
+            // action that could satisfy it from being scheduled.
+            let _active = if matches!(
+                query,
+                SystemQuery::Desktop {
+                    query: pab_protocol::DesktopQuery::Ui {
+                        query: pab_protocol::UiRequest::Wait { .. }
+                    }
+                }
+            ) {
+                drop(_active);
+                None
+            } else {
+                Some(_active)
+            };
             let fallback = query.clone();
             let async_query = query.clone();
             let async_result =
                 tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
                     .await;
-            let r = if let SystemQuery::Container { query: container } = &query {
+            let r = if let SystemQuery::Desktop {
+                query: pab_protocol::DesktopQuery::Ui { query: ui },
+            } = &query
+            {
+                service.ui_query(id, ui, cancelled).await
+            } else if let SystemQuery::Container { query: container } = &query {
                 {
                     #[cfg(test)]
                     if let Some((docker, endpoint)) = &service.container_client {
@@ -174,7 +204,7 @@ impl TaskService {
             let _ = send.send(());
         });
         let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(if mutation { 250 } else { 5000 }),
+            std::time::Duration::from_millis(if mutation || ui_query { 250 } else { 5000 }),
             receive,
         )
         .await;
@@ -225,6 +255,7 @@ impl TaskService {
     ) -> Result<SystemQueryReply, TaskServiceError> {
         let mut r = self.store.get_system_query(actor, id).await?;
         if !r.kind.starts_with("git_")
+            && !["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&r.kind.as_str())
             && ![
                 "containers",
                 "container",
@@ -244,7 +275,7 @@ impl TaskService {
             let _ = cancel.send(true);
             r.state = "cancel_requested".into();
             r.error = Some(
-                "cancellation requested; accepted Docker/Git effects are not rolled back".into(),
+                "cancellation requested; already dispatched effects are not rolled back".into(),
             );
         }
         Ok(r)

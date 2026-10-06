@@ -335,8 +335,18 @@ impl UiBackend for MacUi {
         if role == UiRole::CheckBox && (writable || press) && checked.is_some() {
             supported.push(UiActionKind::SetChecked);
         }
-        let selected = optional(boolean(node, "AXSelected"), "selected", &mut errors);
-        if settable(node, "AXSelected") {
+        let selected = if role == UiRole::RadioButton {
+            optional(number(node, "AXValue"), "selected", &mut errors).and_then(|v| match v {
+                0 => Some(false),
+                1 => Some(true),
+                _ => None,
+            })
+        } else {
+            optional(boolean(node, "AXSelected"), "selected", &mut errors)
+        };
+        if settable(node, "AXSelected")
+            || (role == UiRole::RadioButton && press && selected.is_some())
+        {
             supported.push(UiActionKind::Select);
         }
         let expanded = optional(boolean(node, "AXExpanded"), "expanded", &mut errors);
@@ -403,7 +413,19 @@ impl UiBackend for MacUi {
                     Err("mixed_toggle_unsupported")
                 }
             }
-            UiAction::Select => set(node, "AXSelected", CFBoolean::true_value().as_CFType()),
+            UiAction::Select => {
+                if text(node, "AXRole")? == "AXRadioButton" {
+                    match number(node, "AXValue")? {
+                        1 => Ok(()),
+                        0 => node
+                            .perform_action(&CFString::new("AXPress"))
+                            .map_err(mapped),
+                        _ => Err("unsupported_action"),
+                    }
+                } else {
+                    set(node, "AXSelected", CFBoolean::true_value().as_CFType())
+                }
+            }
             UiAction::Expand => set(node, "AXExpanded", CFBoolean::true_value().as_CFType()),
             UiAction::Collapse => set(node, "AXExpanded", CFBoolean::false_value().as_CFType()),
             UiAction::Focus => set(node, "AXFocused", CFBoolean::true_value().as_CFType()),

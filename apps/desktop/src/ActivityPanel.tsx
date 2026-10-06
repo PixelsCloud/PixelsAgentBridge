@@ -74,7 +74,9 @@ export function ActivityPanel({
     : item.kind === "desktop_input"
     ? t.remoteInput
     : item.direction === "upload" ? t.upload : t.download;
-  const operationStateLabel = (item: OperationEntry) => item.kind === "terminal"
+  const operationStateLabel = (item: OperationEntry) => item.ui && item.state !== "running" && item.state !== "cancel_requested"
+    ? t.uiControl.outcomes[item.ui.outcome]
+    : item.kind === "terminal"
     ? t.terminalStates[item.state as keyof typeof t.terminalStates] ?? item.state
     : item.state === "cancel_requested"
     ? t.transferStates.cancel_requested
@@ -83,6 +85,12 @@ export function ActivityPanel({
     : item.kind === "file_transfer" && item.state === "running" && item.phase
     ? t.transferPhases[item.phase as keyof typeof t.transferPhases] ?? t.transferStates.running
     : t.transferStates[item.state as keyof typeof t.transferStates] ?? item.state;
+  const operationMessage = (item: OperationEntry) => {
+    const code = item.ui?.errorCode;
+    if (!code) return item.message;
+    if (code.startsWith("ui_worker_") || code.startsWith("stale_element:")) return t.uiControl.errors.worker_reset;
+    return t.uiControl.errors[code as keyof typeof t.uiControl.errors] ?? item.message;
+  };
 
   return (
     <section className={`${embedded ? "device-activity-panel" : "surface"} activity-panel`}>
@@ -130,6 +138,15 @@ export function ActivityPanel({
               {selectedOperation.kind === "terminal" &&
                 <HistoryTerminal key={selectedOperation.id} id={selectedOperation.id} offset={selectedOperation.offset} language={language} />}
               <div className="operation-details">
+                {selectedOperation.ui && <>
+                  <div><span>{t.uiControl.returned}</span><strong>{selectedOperation.ui.returnedCount}</strong></div>
+                  <div><span>{t.uiControl.visited}</span><strong>{selectedOperation.ui.visitedCount}</strong></div>
+                  {selectedOperation.kind === "ui_action" && <>
+                    <div><span>{t.uiControl.dispatched}</span><strong>{selectedOperation.ui.actionDispatched === null ? t.uiControl.outcomes.unconfirmed : selectedOperation.ui.actionDispatched ? t.yes : t.no}</strong></div>
+                    <div><span>{t.uiControl.verification}</span><strong>{t.uiControl.checks[selectedOperation.ui.verification]}</strong></div>
+                  </>}
+                  {selectedOperation.ui.truncated && <div><span>{t.result}</span><strong>{t.uiControl.truncated}</strong></div>}
+                </>}
                 {selectedOperation.executionObservation === "unconfirmed" && <div><span>{t.transferObservation}</span><strong>{selectedOperation.state === "cancel_requested" ? t.transferCancelUnconfirmed : t.transferUnconfirmed}</strong></div>}
                 {selectedOperation.executionObservation === "unknown" && <div><span>{t.transferObservation}</span><strong>{t.transferUnknown}</strong></div>}
                 <div><span>{t.initiatedBy}</span><strong>{formatActor(selectedOperation.initiatedBy)}</strong></div>
@@ -167,7 +184,7 @@ export function ActivityPanel({
                   <div><span>{t.overwrite}</span><strong>{selectedOperation.overwrite ? t.yes : t.no}</strong></div>
                 </>}
                 {selectedOperation.finishedAtUnixMs && <div><span>{t.finishedAt}</span><strong>{formatTime(selectedOperation.finishedAtUnixMs)}</strong></div>}
-                {selectedOperation.message && <div><span>{t.result}</span><strong>{selectedOperation.message}</strong></div>}
+                {operationMessage(selectedOperation) && <div><span>{t.result}</span><strong>{operationMessage(selectedOperation)}</strong></div>}
               </div>
             </>}
           </div>

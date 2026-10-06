@@ -142,6 +142,7 @@ impl BridgeRuntime {
             .system_record(id, None, &self.inner.initiated_by, &self.inner.session_id)
             .await?;
         if !cached.kind.starts_with("git_")
+            && !["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&cached.kind.as_str())
             && ![
                 "containers",
                 "container",
@@ -151,7 +152,7 @@ impl BridgeRuntime {
             .contains(&cached.kind.as_str())
         {
             return Err(crate::BridgeError::UnexpectedTaskResponse(
-                "only Docker/Git system operations can be cancelled".into(),
+                "this system operation cannot be cancelled".into(),
             )
             .into());
         }
@@ -291,6 +292,68 @@ impl TransferQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn ui_history_presents_metadata_without_names_or_input_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let database = dir.path().join("bridge.sqlite3");
+        let _queue = TransferQueue::open(&database, "owner".into(), "guest".into())
+            .await
+            .unwrap();
+        let store = RuntimeStore::open(&database).await.unwrap();
+        let device = DeviceRef {
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        };
+        let id = RequestId::new();
+        let query = SystemQuery::Desktop {
+            query: DesktopQuery::Ui {
+                query: UiRequest::Action {
+                    element_ref: RequestId::new().to_string(),
+                    action: UiAction::SetValue {
+                        value: "private-fixture".into(),
+                    },
+                    expected: UiExpected::default(),
+                    timeout_ms: 5000,
+                },
+            },
+        };
+        store
+            .accept_system_query(id, &query, device, None, "guest", "owner")
+            .await
+            .unwrap();
+        let mut result = SystemQueryReply::pending(id, &query);
+        result.state = "completed".into();
+        let mut snapshot = DesktopSnapshot::new("helper".into(), "test");
+        snapshot.ui = Some(UiSnapshot {
+            elements: vec![],
+            visited_count: 3,
+            truncated: false,
+            stop_reason: None,
+            outcome: UiOutcome::Completed,
+            action_dispatched: Some(true),
+            verification: UiVerification::Matched,
+            error_code: None,
+            sampled_from_unix_ms: 1,
+            sampled_at_unix_ms: 2,
+        });
+        result.data = Some(SystemQueryData::Desktop { snapshot });
+        store.save_system_reply(&result).await.unwrap();
+        let rows = store.operations().await.unwrap();
+        let ui = rows
+            .iter()
+            .find(|r| r.id == id.to_string())
+            .unwrap()
+            .ui
+            .as_ref()
+            .unwrap();
+        assert_eq!(ui.verification, UiVerification::Matched);
+        assert_eq!(ui.visited_count, 3);
+        assert!(
+            !serde_json::to_string(ui)
+                .unwrap()
+                .contains("private-fixture")
+        );
+    }
     #[tokio::test]
     async fn container_audit_tracks_owner_target_and_unresolved_effects() {
         let dir = tempfile::tempdir().unwrap();

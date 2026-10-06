@@ -2,17 +2,18 @@
 use pab_protocol::*;
 use std::collections::HashMap;
 mod batch;
-pub mod ui_worker;
-pub mod ui_worker_entry;
-pub mod ui_registry;
-pub mod ui_engine;
-#[cfg(target_os = "macos")]
-pub mod ui_macos;
-#[cfg(windows)]
-pub mod ui_windows;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;
 mod monitor_input;
+mod ui_controller;
+pub mod ui_engine;
+#[cfg(target_os = "macos")]
+pub mod ui_macos;
+pub mod ui_registry;
+#[cfg(windows)]
+pub mod ui_windows;
+pub mod ui_worker;
+pub mod ui_worker_entry;
 // Exercise the exact vendored normalization code without adding Enigo's upstream
 // development dependency tree to the product workspace.
 #[cfg(test)]
@@ -59,12 +60,14 @@ struct Entry {
     id: u32,
     pid: u32,
     marker: u32,
+    process_identity: String,
 }
 pub struct DesktopSession {
     instance: String,
     key: String,
     next: u32,
     windows: HashMap<String, Entry>,
+    ui_worker: Option<ui_worker::WorkerProcess>,
 }
 impl Default for DesktopSession {
     fn default() -> Self {
@@ -79,6 +82,7 @@ impl DesktopSession {
             instance,
             next: 1,
             windows: HashMap::new(),
+            ui_worker: None,
         }
     }
     /// Capture the currently referenced window once, encode and drop the source pixels.
@@ -177,8 +181,20 @@ impl DesktopSession {
         &mut self,
         id: RequestId,
         query: &DesktopQuery,
+        guard: impl FnMut() -> Result<(), String> + Send,
+    ) -> SystemQueryReply {
+        self.query_guarded_context(id, query, None, guard)
+    }
+    pub fn query_guarded_context(
+        &mut self,
+        id: RequestId,
+        query: &DesktopQuery,
+        context: Option<UiHelperContext>,
         mut guard: impl FnMut() -> Result<(), String> + Send,
     ) -> SystemQueryReply {
+        if let DesktopQuery::Ui { query: ui } = query {
+            return self.ui_query(id, ui, context, &mut guard);
+        }
         let system = SystemQuery::Desktop {
             query: query.clone(),
         };
@@ -262,6 +278,7 @@ impl DesktopSession {
     ) -> Result<(), String> {
         check_session()?;
         match query {
+            DesktopQuery::Ui { .. } => unreachable!("UI runs in its isolated worker"),
             DesktopQuery::MonitorInput { .. } => {
                 unreachable!("monitor input is guarded by query_guarded")
             }
@@ -437,15 +454,32 @@ impl DesktopSession {
             .next
             .checked_add(1)
             .ok_or("window reference generation exhausted")?;
+        let process_identity = pab_os_control::process_identity(pid)?;
         native::mark(id, pid, &self.key, marker)?;
         let reference = RequestId::new().to_string();
-        self.windows
-            .insert(reference.clone(), Entry { id, pid, marker });
+        self.windows.insert(
+            reference.clone(),
+            Entry {
+                id,
+                pid,
+                marker,
+                process_identity,
+            },
+        );
         Ok(reference)
     }
     fn prune(&mut self) {
-        self.windows
-            .retain(|_, e| native::verify(e.id, e.pid, &self.key, e.marker).is_ok());
+        let mut removed = vec![];
+        self.windows.retain(|reference, e| {
+            let keep = native::verify(e.id, e.pid, &self.key, e.marker).is_ok();
+            if !keep {
+                removed.push(reference.clone());
+            }
+            keep
+        });
+        for reference in removed {
+            self.release_ui_window(reference);
+        }
     }
 }
 impl Drop for DesktopSession {

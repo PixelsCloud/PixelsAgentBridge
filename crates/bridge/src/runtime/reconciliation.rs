@@ -288,6 +288,7 @@ mod tests {
             pab_protocol::EndpointKey::new([2; 32]),
         );
         let record = OperationRecord {
+            ui: None,
             id: request_id.to_string(),
             device_ref: DeviceRef {
                 tenant_id: TenantId::from_u128(4),

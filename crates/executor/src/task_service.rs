@@ -37,6 +37,7 @@ mod git;
 mod subscription;
 mod system_query;
 mod terminal;
+mod ui;
 mod upload_lock;
 
 use crate::session::ActiveSessions;
@@ -50,6 +51,7 @@ const MAX_ACTIVE_TERMINALS: usize = 8;
 
 #[derive(Clone)]
 pub(crate) struct TaskService {
+    ui_connection: Arc<UiConnection>,
     #[cfg(test)]
     container_client: Option<(bollard::Docker, String)>,
     store: TaskStore,
@@ -76,7 +78,39 @@ pub(crate) struct TaskService {
     active_sessions: ActiveSessions,
 }
 
+struct UiConnection {
+    id: pab_protocol::RequestId,
+    used: std::sync::atomic::AtomicBool,
+}
+impl UiConnection {
+    fn new() -> Self {
+        Self {
+            id: pab_protocol::RequestId::new(),
+            used: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+impl Drop for UiConnection {
+    fn drop(&mut self) {
+        if !self.used.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            let id = self.id;
+            runtime.spawn(async move {
+                crate::local_ipc::release_ui_connection(id).await;
+            });
+        }
+    }
+}
+
 impl TaskService {
+    /// Fresh per authenticated network connection, not per shared endpoint key.
+    pub(crate) fn for_ui_connection(&self) -> Self {
+        let mut service = self.clone();
+        service.ui_connection = Arc::new(UiConnection::new());
+        service
+    }
     pub async fn open(
         database_file: &Path,
         device_ref: DeviceRef,
@@ -104,6 +138,7 @@ impl TaskService {
                 .await?;
         }
         Ok(Self {
+            ui_connection: Arc::new(UiConnection::new()),
             #[cfg(test)]
             container_client: None,
             store,

@@ -106,9 +106,12 @@ async fn serve_requests(
             };
         match event {
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
-            LocalEvent::DesktopQuery(id, query) => {
+            LocalEvent::ReleaseUiConnection(connection) => {
+                desktop_session.release_ui_connection(connection)
+            }
+            LocalEvent::DesktopQuery(id, query, context) => {
                 let mut reply = if desktop_is_active(expected_desktop) {
-                    desktop_session.query_guarded(id, &query, || {
+                    desktop_session.query_guarded_context(id, &query, context, || {
                         if desktop_is_active(expected_desktop) {
                             Ok(())
                         } else {

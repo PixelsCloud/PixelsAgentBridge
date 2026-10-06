@@ -54,9 +54,11 @@ struct WindowProvider {
 }
 
 enum HelperRequest {
+    ReleaseUiConnection(pab_protocol::RequestId),
     DesktopQuery(
         pab_protocol::RequestId,
         pab_protocol::DesktopQuery,
+        Option<pab_protocol::UiHelperContext>,
         oneshot::Sender<Result<pab_protocol::SystemQueryReply, LocalIpcError>>,
     ),
     ScreenshotV2(
@@ -223,7 +225,12 @@ pub enum LocalEvent {
     ListWindows,
     CaptureScreenshot,
     CaptureScreenshotV2(pab_protocol::ScreenshotOptions),
-    DesktopQuery(pab_protocol::RequestId, pab_protocol::DesktopQuery),
+    DesktopQuery(
+        pab_protocol::RequestId,
+        pab_protocol::DesktopQuery,
+        Option<pab_protocol::UiHelperContext>,
+    ),
+    ReleaseUiConnection(pab_protocol::RequestId),
     DesktopInput(DesktopInputEvent),
 }
 
@@ -264,8 +271,16 @@ pub async fn next_local_event(socket: &mut LocalSocket) -> Result<LocalEvent, Lo
             let id = serde_json::from_value(frame["request_id"].clone())?;
             let query: pab_protocol::DesktopQuery = serde_json::from_value(frame["query"].clone())?;
             query.validate().map_err(|_| LocalIpcError::Protocol)?;
-            Ok(LocalEvent::DesktopQuery(id, query))
+            let context: Option<pab_protocol::UiHelperContext> =
+                serde_json::from_value(frame["ui_context"].clone())?;
+            if matches!(query, pab_protocol::DesktopQuery::Ui { .. }) && context.is_none() {
+                return Err(LocalIpcError::Protocol);
+            }
+            Ok(LocalEvent::DesktopQuery(id, query, context))
         }
+        Some("release_ui_connection") => Ok(LocalEvent::ReleaseUiConnection(
+            serde_json::from_value(frame["connection_id"].clone())?,
+        )),
         Some("desktop_input") => Ok(LocalEvent::DesktopInput(serde_json::from_value(
             frame["event"].clone(),
         )?)),
@@ -283,6 +298,33 @@ pub(crate) async fn request_desktop_query(
     id: pab_protocol::RequestId,
     query: pab_protocol::DesktopQuery,
 ) -> Result<pab_protocol::SystemQueryReply, LocalIpcError> {
+    request_desktop_query_with_context(id, query, None).await
+}
+
+pub(crate) async fn release_ui_connection(connection_id: pab_protocol::RequestId) {
+    let senders: Vec<_> = window_providers()
+        .lock()
+        .map(|ps| {
+            ps.iter()
+                .filter(|p| p.desktop_schema_version.is_some_and(|v| v >= 4))
+                .map(|p| p.sender.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    for sender in senders {
+        let _ = tokio::time::timeout(
+            Duration::from_secs(5),
+            sender.send(HelperRequest::ReleaseUiConnection(connection_id)),
+        )
+        .await;
+    }
+}
+
+pub(crate) async fn request_desktop_query_with_context(
+    id: pab_protocol::RequestId,
+    query: pab_protocol::DesktopQuery,
+    context: Option<pab_protocol::UiHelperContext>,
+) -> Result<pab_protocol::SystemQueryReply, LocalIpcError> {
     query.validate().map_err(|_| LocalIpcError::Protocol)?;
     let sender = window_providers()
         .lock()
@@ -297,7 +339,7 @@ pub(crate) async fn request_desktop_query(
     tokio::time::timeout(Duration::from_secs(20), async {
         let (reply, receive) = oneshot::channel();
         sender
-            .send(HelperRequest::DesktopQuery(id, query, reply))
+            .send(HelperRequest::DesktopQuery(id, query, context, reply))
             .await
             .map_err(|_| LocalIpcError::WindowHelperUnavailable)?;
         receive.await.map_err(|_| {
@@ -761,9 +803,12 @@ async fn handle_connection(
             request = receiver.recv(), if registration.0.is_some() && pending.is_none() => {
                 if let Some(request) = request {
                     match request {
-                        HelperRequest::DesktopQuery(id,query,reply)=>{
+                        HelperRequest::ReleaseUiConnection(connection_id)=>{
+                            send_json(&mut socket,&json!({"type":"release_ui_connection","connection_id":connection_id})).await?;
+                        },
+                        HelperRequest::DesktopQuery(id,query,context,reply)=>{
                             if reply.is_closed(){continue;}
-                            send_json(&mut socket,&json!({"type":"desktop_query","request_id":id,"query":query})).await?;
+                            send_json(&mut socket,&json!({"type":"desktop_query","request_id":id,"query":query,"ui_context":context})).await?;
                             screenshot_deadline=Some(tokio::time::Instant::now()+Duration::from_secs(30));
                             pending=Some(PendingRequest::DesktopQuery {id,kind:query.kind().into(),reply});
                         },
@@ -824,6 +869,7 @@ pub enum LocalIpcError {
 
 #[cfg(test)]
 mod tests {
+    include!("local_ipc_ui_tests.rs");
     use super::*;
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -852,7 +898,9 @@ mod tests {
         loop {
             match next_local_event(socket).await.unwrap() {
                 LocalEvent::CaptureScreenshotV2(options) => return options,
-                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                LocalEvent::Status(_)
+                | LocalEvent::StatusUnavailable(_)
+                | LocalEvent::ReleaseUiConnection(_) => {}
                 other => panic!("unexpected helper event: {other:?}"),
             }
         }
@@ -901,8 +949,10 @@ mod tests {
     ) -> (pab_protocol::RequestId, pab_protocol::DesktopQuery) {
         loop {
             match next_local_event(socket).await.unwrap() {
-                LocalEvent::DesktopQuery(id, q) => return (id, q),
-                LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                LocalEvent::DesktopQuery(id, q, _) => return (id, q),
+                LocalEvent::Status(_)
+                | LocalEvent::StatusUnavailable(_)
+                | LocalEvent::ReleaseUiConnection(_) => {}
                 other => panic!("unexpected event {other:?}"),
             }
         }
@@ -1609,6 +1659,7 @@ mod tests {
                         panic!("unexpected screenshot request")
                     }
                     Ok(LocalEvent::DesktopInput(_)) => panic!("unexpected desktop input"),
+                    Ok(LocalEvent::ReleaseUiConnection(_)) => {}
                     Ok(LocalEvent::DesktopQuery(..)) => panic!("unexpected desktop query"),
                     Err(error) => panic!("helper connection failed: {error}"),
                 }
@@ -1651,7 +1702,9 @@ mod tests {
                         .unwrap();
                         break;
                     }
-                    LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                    LocalEvent::Status(_)
+                    | LocalEvent::StatusUnavailable(_)
+                    | LocalEvent::ReleaseUiConnection(_) => {}
                     LocalEvent::CaptureScreenshot | LocalEvent::CaptureScreenshotV2(_) => {
                         panic!("unexpected screenshot request")
                     }
@@ -1714,7 +1767,9 @@ mod tests {
                         let _ = received.await;
                         break;
                     }
-                    LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
+                    LocalEvent::Status(_)
+                    | LocalEvent::StatusUnavailable(_)
+                    | LocalEvent::ReleaseUiConnection(_) => {}
                     _ => panic!("unexpected helper request"),
                 }
             }
