@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    path::Path,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -337,22 +336,6 @@ impl OperationManager {
                     .to_owned()
             })?;
         let upload = name == "pab_upload_file";
-        let local = if upload {
-            &args.source
-        } else {
-            &args.destination
-        };
-        let remote = if upload {
-            &args.destination
-        } else {
-            &args.source
-        };
-        if !Path::new(local).is_absolute()
-            || Path::new(local).file_name().is_none()
-            || !remote_absolute(remote, device.os_family)
-        {
-            return Err("source and destination must be absolute file paths for their respective operating systems".to_owned());
-        }
         let spec = TransferRequest {
             options: pab_protocol::FileTransferOptions {
                 execution: args.execution,
@@ -366,6 +349,8 @@ impl OperationManager {
             destination: args.destination,
             overwrite: args.overwrite,
         };
+        spec.validate_paths(device.os_family)
+            .map_err(str::to_owned)?;
         let mut jobs = self.jobs.lock().await;
         if self.closed.load(Ordering::Acquire) {
             return Err("MCP is shutting down".to_owned());
@@ -434,111 +419,13 @@ impl OperationManager {
         self: &Arc<Self>,
         spec: TransferRequest,
         control: TransferControl,
-        mut cancelled: watch::Receiver<bool>,
+        cancelled: watch::Receiver<bool>,
     ) {
+        let needs_recheck = self
+            .queue
+            .run_transfer(&spec, &control, cancelled, self.runtime(), |_, _| {})
+            .await;
         let id = spec.request_id;
-        let offset = Arc::new(AtomicU64::new(0));
-        let size = Arc::new(AtomicU64::new(0));
-        let count = offset.clone();
-        let total = size.clone();
-        let mut operation = Box::pin(async {
-            self.queue
-                .phase(id, "connecting", None)
-                .await
-                .map_err(|e| e.to_string())?;
-            let runtime = self.runtime().await?;
-            runtime
-                .execute_queued_transfer(&spec, &control, move |n, all| {
-                    count.store(n, Ordering::Release);
-                    total.store(all, Ordering::Release);
-                })
-                .await
-                .map_err(|e| e.to_string())
-        });
-        let mut timer = tokio::time::interval(Duration::from_millis(250));
-        timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        let mut last = (0, 0);
-        let result = loop {
-            tokio::select! {
-                biased;
-                outcome = &mut operation => break outcome,
-                _ = cancelled.changed() => {
-                    control.cancel();
-                    if control.committing() { break operation.as_mut().await; }
-                    break Err("transfer cancellation requested".to_owned());
-                },
-                _ = timer.tick() => {
-                    if let Some(snapshot) = control.accepted() {
-                        if let Err(e) = self.queue.observe_acceptance(id, spec.device_code, &snapshot).await {
-                            break Err(e.to_string());
-                        }
-                    }
-                    let progress = (offset.load(Ordering::Acquire), size.load(Ordering::Acquire));
-                    if progress != last {
-                        if let Err(e) = self.queue.progress(id, progress.0, progress.1).await { tracing::warn!(%e, "cannot persist transfer progress"); }
-                        let phase = if progress.0 == progress.1 { "verifying" } else { "transferring" };
-                        let _ = self.queue.phase(id, phase, control.digest().as_deref()).await;
-                        last = progress;
-                    }
-                }
-            }
-        };
-        // Drop the stream before trying to reconcile cancellation with the Executor.
-        drop(operation);
-        let result = if let Some(snapshot) = control.accepted() {
-            match self
-                .queue
-                .observe_acceptance(id, spec.device_code, &snapshot)
-                .await
-            {
-                Ok(()) => result,
-                Err(error) => Err(error.to_string()),
-            }
-        } else {
-            result
-        };
-        let _ = self
-            .queue
-            .progress(
-                id,
-                offset.load(Ordering::Acquire),
-                size.load(Ordering::Acquire),
-            )
-            .await;
-        let state = match &result {
-            Ok(()) => "completed",
-            Err(_)
-                if control.remote_requested()
-                    && (spec.direction == "upload" || control.committing()) =>
-            {
-                "unconfirmed"
-            }
-            Err(_) if control.cancelled() => "cancelled",
-            Err(_) => "failed",
-        };
-        let _ = self
-            .queue
-            .phase(id, state, control.digest().as_deref())
-            .await;
-        if let Err(error) = &result
-            && let Err(e) = self.queue.note(id, error).await
-        {
-            tracing::warn!(%e,%id,"cannot persist unresolved transfer error");
-        }
-        let mut needs_recheck = state == "unconfirmed";
-        if !needs_recheck
-            && let Err(e) = self
-                .queue
-                .finish(id, state, result.as_ref().err().map(String::as_str))
-                .await
-        {
-            tracing::error!(%e, %id, "cannot persist transfer outcome");
-            let _ = self
-                .queue
-                .phase(id, "unconfirmed", control.digest().as_deref())
-                .await;
-            needs_recheck = true;
-        }
         if needs_recheck {
             self.recheck(id, spec.device_code).await;
         }
@@ -1009,26 +896,4 @@ fn parse_cursor(value: &str) -> Result<(i64, String), String> {
     let time = time.parse().map_err(|_| "invalid before timestamp")?;
     let id: RequestId = id.parse().map_err(|_| "invalid before operation ID")?;
     Ok((time, id.to_string()))
-}
-
-fn remote_absolute(path: &str, os: pab_protocol::OsFamily) -> bool {
-    let bytes = path.as_bytes();
-    if path.is_empty() || path.contains('\0') {
-        return false;
-    }
-    match os {
-        pab_protocol::OsFamily::Windows => {
-            (bytes.len() > 3
-                && bytes[0].is_ascii_alphabetic()
-                && bytes[1] == b':'
-                && matches!(bytes[2], b'\\' | b'/'))
-                || (path.starts_with("\\\\")
-                    && path[2..]
-                        .split(['\\', '/'])
-                        .filter(|part| !part.is_empty())
-                        .count()
-                        >= 3)
-        }
-        _ => path.starts_with('/') && path.len() > 1,
-    }
 }

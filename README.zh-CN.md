@@ -252,6 +252,13 @@ Linux 无界面端支持原生用户执行，不依赖桌面或 logind；应用�
 遇到 running/unconfirmed 时保留 `request_id`，用 `pab_get_operation` 查询原记录，不自动重新启动。
 应用动作不支持取消或回滚，底层系统调用也不承诺硬中断。操作数据只保存在本机 SQLite 记录中。
 
+Desktop 的设备“远程命令”面板中，命令、浏览目录、终端和文件传输共用“执行用户”选择。
+刷新可重新发现用户；显式选择过期后禁用提交，必须重新选择。“应用管理”单独指定桌面会话。
+任务详情显示实际观察到的账户/会话，旧记录显示“未记录”。
+传输复用 MCP 的持久化队列；取消只代表请求，不能确认远端是否已写入文件时保留“结果待确认”，
+使用“查询原操作”核对结果，不重新发送文件。上述 UI 已通过源码/浏览器测试，
+Windows/macOS 安装后的验收仍按规划继续进行。
+
 ### Docker 容器操作
 
 四个工具复用 [Bollard 0.21.1](https://docs.rs/bollard/0.21.1/bollard/) 访问 [Docker Engine API](https://docs.docker.com/reference/api/engine/)，要求目标 system-query 能力 **v6**，以及 Executor 运行账户能够访问的 Docker Engine，不依赖 Docker CLI。连接采用本地 `DOCKER_HOST`（Unix socket／Windows named pipe）或标准本机端点；不会隐式复用 Docker CLI context、登录用户的 Docker Desktop 环境或远程 TCP／SSH 端点。Rootless／非标准 socket 需配置给 Executor。协商后的 API 版本通过 Bollard 请求修饰接口明确应用到请求路径。

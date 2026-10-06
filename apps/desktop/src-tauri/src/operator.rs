@@ -13,9 +13,7 @@ use pab_bridge::{
 };
 use pab_protocol::{DeviceCode, EndpointKey, OutputStream, RequestId, TaskId, TaskRef};
 use serde::Serialize;
-use tauri::Emitter;
 use tokio::sync::{Mutex, OnceCell};
-use tokio::task::AbortHandle;
 use zeroize::Zeroizing;
 
 pub(crate) mod directory;
@@ -23,6 +21,7 @@ pub(crate) mod execution;
 pub(crate) mod history;
 pub(crate) mod screenshot;
 pub(crate) mod terminal;
+pub(crate) mod transfer;
 pub(crate) mod windows;
 
 pub struct OperatorState {
@@ -31,7 +30,7 @@ pub struct OperatorState {
     tasks: Mutex<HashMap<TaskId, (TaskRef, Arc<BridgeRuntime>)>>,
     terminal_runtimes: Mutex<HashMap<RequestId, Arc<BridgeRuntime>>>,
     execution_queries: Mutex<HashMap<RequestId, execution::QueryOwner>>,
-    transfers: Arc<Mutex<HashMap<String, AbortHandle>>>,
+    transfers: Arc<Mutex<HashMap<RequestId, Arc<transfer::TransferOwner>>>>,
     events_started: AtomicBool,
     local: OnceCell<Arc<BridgeLocalStore>>,
 }
@@ -322,152 +321,6 @@ pub async fn operator_use_guest_scope(
     Ok(())
 }
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TransferUpdate {
-    id: String,
-    state: &'static str,
-    offset: u64,
-    size: u64,
-    message: Option<String>,
-}
-
-#[tauri::command]
-pub async fn operator_start_transfer(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, OperatorState>,
-    code: String,
-    direction: String,
-    source: String,
-    destination: String,
-    overwrite: bool,
-) -> Result<String, String> {
-    if source.trim().is_empty() || destination.trim().is_empty() {
-        return Err("source and destination paths are required".to_owned());
-    }
-    if direction != "upload" && direction != "download" {
-        return Err("invalid transfer direction".to_owned());
-    }
-    let runtime = state.runtime().await?;
-    let device_ref = runtime
-        .resolve_device_code(parse_code(&code)?)
-        .await
-        .map_err(|error| error.to_string())?;
-    let request_id = RequestId::new();
-    runtime
-        .prepare_transfer_record(
-            request_id,
-            device_ref,
-            &direction,
-            &source,
-            &destination,
-            overwrite,
-        )
-        .await
-        .map_err(|error| error.to_string())?;
-    let id = request_id.to_string();
-    let task_id = id.clone();
-    let transfers = Arc::clone(&state.transfers);
-    let (start_tx, start_rx) = tokio::sync::oneshot::channel::<()>();
-    let handle = tokio::spawn(async move {
-        let _ = start_rx.await;
-        let progress_app = app.clone();
-        let progress_id = task_id.clone();
-        let progress = move |offset, size| {
-            let _ = progress_app.emit(
-                "operator-transfer",
-                TransferUpdate {
-                    id: progress_id.clone(),
-                    state: "running",
-                    offset,
-                    size,
-                    message: None,
-                },
-            );
-        };
-        let result = if direction == "upload" {
-            runtime
-                .upload_file_with_id(
-                    request_id,
-                    device_ref,
-                    std::path::Path::new(&source),
-                    &destination,
-                    overwrite,
-                    progress,
-                )
-                .await
-        } else {
-            runtime
-                .download_file_with_id(
-                    request_id,
-                    device_ref,
-                    &source,
-                    std::path::Path::new(&destination),
-                    overwrite,
-                    progress,
-                )
-                .await
-        };
-        let (state, message) = match result {
-            Ok(()) => ("completed", None),
-            Err(error) => ("failed", Some(error.to_string())),
-        };
-        let _ = app.emit(
-            "operator-transfer",
-            TransferUpdate {
-                id: task_id.clone(),
-                state,
-                offset: 0,
-                size: 0,
-                message,
-            },
-        );
-        transfers.lock().await.remove(&task_id);
-    });
-    state
-        .transfers
-        .lock()
-        .await
-        .insert(id.clone(), handle.abort_handle());
-    let _ = start_tx.send(());
-    Ok(id)
-}
-
-#[tauri::command]
-pub async fn operator_cancel_transfer(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, OperatorState>,
-    id: String,
-) -> Result<(), String> {
-    let handle = state
-        .transfers
-        .lock()
-        .await
-        .remove(&id)
-        .ok_or_else(|| "transfer is not running".to_owned())?;
-    handle.abort();
-    let request_id = id.parse::<RequestId>().map_err(|error| error.to_string())?;
-    let recorded = state
-        .runtime()
-        .await?
-        .cancel_transfer_record(request_id)
-        .await
-        .map_err(|error| error.to_string())?;
-    if !recorded {
-        return Err("local transfer stopped, but its remote outcome is not recorded".to_owned());
-    }
-    let _ = app.emit(
-        "operator-transfer",
-        TransferUpdate {
-            id,
-            state: "cancel_requested",
-            offset: 0,
-            size: 0,
-            message: None,
-        },
-    );
-    Ok(())
-}
 
 fn parse_code(code: &str) -> Result<DeviceCode, String> {
     code.parse::<DeviceCode>()

@@ -10,7 +10,8 @@ import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, T
 import { RemoteConnectionPanel } from "./RemoteConnectionPanel";
 import { DeviceDetailPanel } from "./DeviceDetailPanel";
 import type { OperationKind } from "./RemoteOperationsPanel";
-import type { ExecutionSelection } from "./executionQueries";
+import { executionErrorMessage, type ExecutionSelection } from "./executionQueries";
+import { mergeTransferUpdate } from "./transferUpdates";
 import { formatDeviceCode } from "./deviceCode";
 import { AccountConnectionPanel } from "./AccountConnectionPanel";
 import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
@@ -308,16 +309,14 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     setTransfer((current) => {
       if (!current) return current;
       const record = saved.find((item) => item.id === current.id);
-      if (!record || !["running", "cancel_requested", "completed", "failed"].includes(record.state)) {
+      if (!record || !["running", "cancel_requested", "completed", "failed", "cancelled", "interrupted", "unconfirmed"].includes(record.state)) {
         return current;
       }
-      return {
+      return mergeTransferUpdate(current, {
         ...current,
-        state: record.state as TransferUpdate["state"],
-        offset: record.offset,
-        size: record.size,
-        message: record.message,
-      };
+        state: record.executionObservation === "unconfirmed" ? "unconfirmed" : record.state as TransferUpdate["state"],
+        offset: record.offset, size: record.size, message: record.message, executionIdentity: record.executionIdentity,
+      });
     });
     setOperations((current) => {
       const refreshed = new Set(saved.map((item) => item.id));
@@ -542,20 +541,18 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       stopTransfer = await listen<TransferUpdate>("operator-transfer", (event) => {
         setTransfer((current) => {
           const next = event.payload;
-          if (current && current.id !== next.id) return current;
-          if (next.state !== "running" && current?.id === next.id) {
-            return { ...next, offset: current.offset, size: current.size };
-          }
-          return next;
+          if (!current || current.id !== next.id) return current;
+          return mergeTransferUpdate(current, next);
         });
         setOperations((current) => current.map((item) => item.id === event.payload.id ? {
           ...item,
           state: event.payload.state,
-          offset: event.payload.state === "running" ? event.payload.offset : item.offset,
-          size: event.payload.state === "running" ? event.payload.size : item.size,
+          offset: event.payload.offset,
+          size: event.payload.size,
+          executionIdentity: event.payload.executionIdentity,
           message: event.payload.message,
-          executionObservation: event.payload.state === "cancel_requested" ? "unconfirmed" : event.payload.state === "running" ? item.executionObservation : null,
-          finishedAtUnixMs: event.payload.state === "running" || event.payload.state === "cancel_requested" ? null : Date.now(),
+          executionObservation: ["cancel_requested", "unconfirmed"].includes(event.payload.state) ? "unconfirmed" : event.payload.state === "running" ? item.executionObservation : null,
+          finishedAtUnixMs: ["running", "cancel_requested", "unconfirmed"].includes(event.payload.state) ? null : Date.now(),
         } : item));
         if (event.payload.state !== "running") {
           void refreshOperations();
@@ -756,57 +753,44 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     }
   }
 
-  async function startTransfer() {
-    if (!selected?.connected || !transferSource.trim() || !transferDestination.trim()) return;
-    setStartingTransfer(true);
-    setError("");
+  async function startTransfer(execution: ExecutionSelection) {
+    if (!selected?.connected || !transferSource.trim() || !transferDestination.trim() || startingTransfer) return;
+    const id = crypto.randomUUID();
+    const initial: TransferUpdate = { id, deviceCode: selected.deviceCode, state: "running", offset: 0, size: 0, message: null };
+    setTransfer(initial); setStartingTransfer(true); setError("");
     try {
-      const id = await invoke<string>("operator_start_transfer", {
-        code: selected.deviceCode,
-        direction: transferDirection,
-        source: transferSource.trim(),
-        destination: transferDestination.trim(),
-        overwrite: transferOverwrite,
+      const next = await invoke<TransferUpdate>("operator_start_transfer", {
+        code: selected.deviceCode, requestId: id, execution, direction: transferDirection,
+        source: transferSource.trim(), destination: transferDestination.trim(), overwrite: transferOverwrite,
       });
-      setTransfer((current) => current?.id === id ? current : {
-        id,
-        state: "running",
-        offset: 0,
-        size: 0,
-        message: null,
-      });
-      setOperations((current) => [{
-        id,
-        deviceCode: selected.deviceCode,
-        initiatedBy: "guest",
-        kind: "file_transfer",
-        direction: transferDirection,
-        source: transferSource.trim(),
-        destination: transferDestination.trim(),
-        overwrite: transferOverwrite,
-        state: "running",
-        offset: 0,
-        size: 0,
-        startedAtUnixMs: Date.now(),
-        finishedAtUnixMs: null,
-        message: null,
-        executionObservation: "active",
-      }, ...current.filter((item) => item.id !== id)]);
+      setTransfer((current) => current?.id === id ? mergeTransferUpdate(current, next) : current);
       setSelectedActivityId(id);
+      void refreshOperations();
     } catch (cause) {
-      setError(`${t.transferFailed}: ${String(cause)}`);
-    } finally {
-      setStartingTransfer(false);
-    }
+      const knownRejection = typeof cause === "object" && cause !== null && "outcome" in cause && cause.outcome === "not_submitted";
+      const message = executionErrorMessage(cause);
+      setTransfer((current) => current?.id !== id ? current : knownRejection ? null : mergeTransferUpdate(current, { ...initial, state: "unconfirmed", message }));
+      setError(`${t.transferFailed}: ${message}`);
+    } finally { setStartingTransfer(false); }
+  }
+
+  async function inspectTransfer() {
+    if (!transfer) return;
+    const current = transfer;
+    try {
+      const next = await invoke<TransferUpdate>("operator_transfer_result", { id: current.id, code: current.deviceCode });
+      setTransfer((value) => value?.id === current.id ? mergeTransferUpdate(value, next) : value);
+      void refreshOperations();
+    } catch (cause) { setError(executionErrorMessage(cause)); }
   }
 
   async function cancelTransfer() {
     if (!transfer || transfer.state !== "running") return;
+    const current = transfer;
     try {
-      await invoke("operator_cancel_transfer", { id: transfer.id });
-    } catch (cause) {
-      setError(String(cause));
-    }
+      const next = await invoke<TransferUpdate>("operator_cancel_transfer", { id: current.id, code: current.deviceCode });
+      setTransfer((value) => value?.id === current.id ? mergeTransferUpdate(value, next) : value);
+    } catch (cause) { setError(executionErrorMessage(cause)); }
   }
 
   return (
@@ -936,9 +920,10 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                   onTransferDestinationChange={setTransferDestination}
                   transferOverwrite={transferOverwrite}
                   onTransferOverwriteChange={setTransferOverwrite}
-                  transfer={transfer}
+                  transfer={transfer?.deviceCode === selected.deviceCode ? transfer : null}
                   startingTransfer={startingTransfer}
-                  onStartTransfer={() => void startTransfer()}
+                  onStartTransfer={(execution) => void startTransfer(execution)}
+                  onInspectTransfer={() => void inspectTransfer()}
                   onCancelTransfer={() => void cancelTransfer()}
                   onAuditChange={() => void refreshOperations()}
                 />

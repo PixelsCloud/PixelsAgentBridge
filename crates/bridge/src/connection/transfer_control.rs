@@ -110,6 +110,99 @@ impl TransferControl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn shared_runner_preserves_unknown_publication_and_cancel_facts() {
+        use crate::{TransferQueue, TransferRequest};
+        use pab_protocol::{DeviceId, DeviceRef, RequestId, TenantId};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("runner.db");
+        let queue = TransferQueue::open(&path, "runner".into(), "guest".into())
+            .await
+            .unwrap();
+        let spec = TransferRequest {
+            request_id: RequestId::new(),
+            device_ref: DeviceRef {
+                tenant_id: TenantId::from_u128(2),
+                device_id: DeviceId::from_u128(3),
+            },
+            device_code: "123456789".parse().unwrap(),
+            direction: "upload".into(),
+            source: dir.path().join("input").to_string_lossy().into_owned(),
+            destination: "/remote/file".into(),
+            overwrite: false,
+            options: Default::default(),
+        };
+        for (remote_requested, cancel, expected) in [
+            (false, false, "failed"),
+            (false, true, "cancelled"),
+            (true, false, "unconfirmed"),
+            (true, true, "unconfirmed"),
+        ] {
+            let mut spec = spec.clone();
+            spec.request_id = RequestId::new();
+            queue.submit(&spec).await.unwrap();
+            let control = TransferControl::default();
+            if remote_requested {
+                control.request().unwrap();
+            }
+            if cancel {
+                control.cancel();
+            }
+            let (_tx, rx) = tokio::sync::watch::channel(false);
+            let unresolved = queue
+                .run_transfer(
+                    &spec,
+                    &control,
+                    rx,
+                    async { Err("fixture lost response".into()) },
+                    |_, _| {},
+                )
+                .await;
+            assert_eq!(unresolved, expected == "unconfirmed");
+            let reopened = TransferQueue::open(&path, "runner".into(), "guest".into())
+                .await
+                .unwrap();
+            let record = reopened
+                .get(spec.request_id, spec.device_code)
+                .await
+                .unwrap();
+            assert_eq!(record.phase, expected);
+            assert_eq!(record.operation.finished_at_unix_ms.is_none(), unresolved);
+            assert_eq!(
+                record.operation.message.as_deref(),
+                Some("fixture lost response")
+            );
+            assert!(
+                !reopened.submit(&spec).await.unwrap().1,
+                "observing a lost response never starts another worker"
+            );
+        }
+        // Cancellation while runtime initialization is pending must wake the
+        // runner without needing a network connection or aborting its owner.
+        let mut waiting = spec.clone();
+        waiting.request_id = RequestId::new();
+        queue.submit(&waiting).await.unwrap();
+        let control = TransferControl::default();
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        tx.send(true).unwrap();
+        let unresolved = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            queue.run_transfer(&waiting, &control, rx, std::future::pending(), |_, _| {}),
+        )
+        .await
+        .unwrap();
+        assert!(!unresolved);
+        assert_eq!(
+            queue
+                .get(waiting.request_id, waiting.device_code)
+                .await
+                .unwrap()
+                .operation
+                .state,
+            "cancelled"
+        );
+    }
     #[test]
     fn cancellation_and_publication_have_a_single_winner() {
         let cancelled = TransferControl::default();

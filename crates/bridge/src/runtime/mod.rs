@@ -18,6 +18,7 @@ mod terminal_store;
 mod transfer;
 mod transfer_identity;
 mod transfer_queue;
+mod transfer_runner;
 mod windows;
 mod worker;
 

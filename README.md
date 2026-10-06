@@ -286,6 +286,16 @@ running/unconfirmed results; never automatically repeat a launch after a lost re
 These actions cannot be cancelled or rolled back, and native OS calls have no guaranteed
 hard interruption. Operation data stays in the local SQLite history.
 
+In Desktop's device **Remote tools** panel, commands, directory browsing, terminals
+and file transfers share an **Execute as** selector. Refresh discovers available
+users; an expired explicit selection disables submission until selected again.
+**Applications** has a separate, explicit desktop-session selector. Task details
+show the observed account/session, or **Not recorded** for older records.
+Transfers use the same durable queue as MCP. Cancellation is a request; an unknown
+publication remains **Unconfirmed**, with **Inspect original operation** to query
+its result without resending the file. These UI additions have source/browser
+coverage; installed Windows/macOS acceptance remains tracked in the roadmap.
+
 ### Docker container operations
 
 The four Docker tools use [Bollard 0.21.1](https://docs.rs/bollard/0.21.1/bollard/)

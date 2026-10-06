@@ -5,6 +5,7 @@ import { DirectoryBrowser } from "./DirectoryBrowser";
 import { WindowBrowser } from "./WindowBrowser";
 import { ScreenshotBrowser } from "./ScreenshotBrowser";
 import { TerminalBrowser } from "./TerminalBrowser";
+import { ExecutionIdentityView } from "./ExecutionIdentityView";
 import { ApplicationBrowser } from "./ApplicationBrowser";
 import { ExecutionPicker, selectedExecution, useExecutionContexts } from "./ExecutionPicker";
 import type { ExecutionSelection } from "./executionQueries";
@@ -36,7 +37,8 @@ type Props = {
   onTransferOverwriteChange: (value: boolean) => void;
   transfer: TransferUpdate | null;
   startingTransfer: boolean;
-  onStartTransfer: () => void;
+  onStartTransfer: (execution: ExecutionSelection) => void;
+  onInspectTransfer: () => void;
   onCancelTransfer: () => void;
   onAuditChange: () => void;
 };
@@ -48,7 +50,7 @@ export function RemoteOperationsPanel({
   transferDirection, onTransferDirectionChange, transferSource,
   onTransferSourceChange, transferDestination, onTransferDestinationChange,
   transferOverwrite, onTransferOverwriteChange, transfer, startingTransfer,
-  onStartTransfer, onCancelTransfer, onAuditChange,
+  onStartTransfer, onCancelTransfer, onInspectTransfer, onAuditChange,
 }: Props) {
   const t = messages[language];
   const contexts = useExecutionContexts(selected?.deviceCode, !!selected?.connected);
@@ -75,7 +77,7 @@ export function RemoteOperationsPanel({
             onClick={({ key }) => onOperationChange(key as OperationKind)} />
           <div className="operation-panel" role="tabpanel">
             {!selected.connected && <p className="form-hint">{t.reconnectHint}</p>}
-            {["command", "directory", "terminal"].includes(operation) && <ExecutionPicker language={language} contexts={contexts}
+            {["command", "directory", "terminal", "transfer"].includes(operation) && <ExecutionPicker language={language} contexts={contexts}
               mode="user" value={executionKey} onChange={setExecutionKey} connected={selected.connected} />}
             {operation === "command" && (
               <>
@@ -116,8 +118,8 @@ export function RemoteOperationsPanel({
                 <Checkbox className="check-row" checked={transferOverwrite} onChange={(event) => onTransferOverwriteChange(event.target.checked)}>{t.overwriteExisting}</Checkbox>
                 <Button type="primary"
                   className="primary-button"
-                  loading={startingTransfer} disabled={transfer?.state === "running" || !selected.connected || !transferSource.trim() || !transferDestination.trim()}
-                  onClick={() => onStartTransfer()}
+                  loading={startingTransfer} disabled={(!!transfer && ["running", "cancel_requested", "unconfirmed"].includes(transfer.state)) || !execution || !selected.connected || !transferSource.trim() || !transferDestination.trim()}
+                  onClick={() => { if (execution) onStartTransfer(execution); }}
                 >
                   {startingTransfer ? t.startingTransfer : t.startTransfer}
                   <ArrowRight size={17} />
@@ -126,7 +128,8 @@ export function RemoteOperationsPanel({
                   <div className="transfer-status">
                     <div><strong>{t.transferStates[transfer.state]}</strong><span>{transfer.size ? `${Math.round(transfer.offset / transfer.size * 100)}% · ${transfer.offset} / ${transfer.size} B` : ""}</span></div>
                     <Progress percent={transfer.size ? Math.round(transfer.offset / transfer.size * 100) : 0} size="small" showInfo={false} />
-                    {transfer.state === "cancel_requested" && <small>{t.transferCancelUnconfirmed}</small>}
+                    {["cancel_requested", "unconfirmed"].includes(transfer.state) && <><small>{t.transferCancelUnconfirmed}</small><Button onClick={onInspectTransfer}>{t.appsInspect}</Button></>}
+                    {transfer.executionIdentity && <ExecutionIdentityView identity={transfer.executionIdentity} language={language} />}
                     {transfer.message && <small>{transfer.message}</small>}
                     {transfer.state === "running" && <Button type="text" onClick={() => onCancelTransfer()}>{t.cancelTransfer}</Button>}
                   </div>

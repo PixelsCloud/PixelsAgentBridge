@@ -17,6 +17,6 @@ pub use runtime::{
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
     LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, QueuedTransfer,
     RememberedDevice, RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind,
-    RuntimePresenceSource, SqliteDevicePasswordProvider, TerminalAuditEvent, TransferQueue,
+    RuntimePresenceSource, RuntimeStoreError, SqliteDevicePasswordProvider, TerminalAuditEvent, TransferQueue,
     TransferRequest,
 };

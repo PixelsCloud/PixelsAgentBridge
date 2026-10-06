@@ -1,4 +1,34 @@
 import { test, expect } from "@playwright/test";
+import { mergeTransferUpdate } from "../src/transferUpdates";
+
+test("late transfer replies preserve terminal results, device and cancellation", () => {
+  const current = { id: "first", deviceCode: "123456789", state: "completed" as const, offset: 20, size: 20, message: null };
+  expect(mergeTransferUpdate(current, { ...current, state: "running", offset: 0 })).toEqual(current);
+  expect(mergeTransferUpdate({ ...current, state: "cancel_requested" }, { ...current, state: "running", offset: 10 }).state).toBe("cancel_requested");
+  expect(mergeTransferUpdate({ ...current, state: "unconfirmed" }, current).state).toBe("completed");
+  expect(mergeTransferUpdate(current, { ...current, deviceCode: "987654321" })).toEqual(current);
+});
+
+test("transfer passes the selected user and observes uncertainty without resubmission", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/execution-ui.html");
+  await page.getByRole("menuitem", { name: "File transfer", exact: true }).click();
+  await page.getByRole("combobox", { name: "Execute as" }).click();
+  await page.locator(".ant-select-dropdown:visible").getByText("Alice · Session 2", { exact: true }).click();
+  const start = page.getByRole("button", { name: "Start transfer", exact: true });
+  await start.click();
+  await expect(start).toBeDisabled();
+  await expect(page.getByText("Unconfirmed", { exact: true })).toBeVisible();
+  await expect(page.locator(".transfer-status").getByText(/Alice/)).toBeVisible();
+  await page.getByRole("button", { name: "Inspect original operation" }).click();
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls.filter((c: any) => c.command === "ui_start_transfer")).toHaveLength(1);
+  expect(calls.find((c: any) => c.command === "ui_start_transfer").args.execution.mode).toBe("user");
+  expect(calls.find((c: any) => c.command === "ui_inspect_transfer").args.id).toBe("original-transfer");
+  await page.evaluate(() => (window as any).fixture.transferState("cancel_requested"));
+  await expect(start).toBeDisabled();
+  await page.evaluate(() => (window as any).fixture.transferState("completed"));
+  await expect(start).toBeEnabled();
+});
 
 const url = "http://127.0.0.1:1429/tests/execution-ui.html";
 test("explicit user survives refresh as expired instead of reverting to service", async ({ page }) => {
@@ -65,7 +95,7 @@ for (const language of ["en", "zh-CN", "zh-TW"]) for (const theme of ["light", "
     await applications.click();
     await expect(applications).toHaveClass(/ant-menu-item-selected/);
     await expect(page.locator(".application-browser")).toBeVisible();
-    await page.screenshot({ path: info.outputPath(`${language}-${theme}.png`), fullPage: true });
+    await page.screenshot({ path: info.outputPath(`${language}-${theme}.png`), fullPage: true, animations: "disabled" });
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

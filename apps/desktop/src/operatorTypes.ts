@@ -83,7 +83,9 @@ export type TaskEntry = TaskUpdate & {
 
 export type TransferUpdate = {
   id: string;
-  state: "running" | "completed" | "failed" | "cancel_requested";
+  deviceCode: string;
+  executionIdentity?: ExecutionIdentity | null;
+  state: "running" | "completed" | "failed" | "cancel_requested" | "unconfirmed" | "cancelled" | "interrupted";
   offset: number;
   size: number;
   message: string | null;

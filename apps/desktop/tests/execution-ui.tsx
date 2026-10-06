@@ -41,6 +41,8 @@ const receipt = (id: string) => completed(id, { type: "applications", snapshot: 
 } };
 
 function Panel() {
+  const [transfer, setTransfer] = useState<any>(null);
+  fixture.transferState = (state: string) => setTransfer((old: any) => ({ ...old, state }));
   const [operation, setOperation] = useState<OperationKind>("command");
   const [program, setProgram] = useState("fixture-program");
   const [code, setCode] = useState("123456789");
@@ -51,8 +53,11 @@ function Panel() {
     <RemoteOperationsPanel key={code} language={language} selected={{ deviceId: "fixture", deviceCode: code, alias: "Test Mac", osFamily: "macos", osReminder: "fixture", connected: true }}
       operation={operation} onOperationChange={setOperation} program={program} onProgramChange={setProgram} argumentsText="" onArgumentsTextChange={() => {}} cwd="" onCwdChange={() => {}}
       submitting={false} onRunCommand={(execution) => fixture.calls.push({ command: "ui_run_command", args: { execution } })}
-      transferDirection="upload" onTransferDirectionChange={() => {}} transferSource="" onTransferSourceChange={() => {}} transferDestination="" onTransferDestinationChange={() => {}}
-      transferOverwrite={false} onTransferOverwriteChange={() => {}} transfer={null} startingTransfer={false} onStartTransfer={() => {}} onCancelTransfer={() => {}} onAuditChange={() => {}} />
+      transferDirection="upload" onTransferDirectionChange={() => {}} transferSource="C:\fixture\source.bin" onTransferSourceChange={() => {}} transferDestination="/Users/alice/中文.bin" onTransferDestinationChange={() => {}}
+      transferOverwrite={false} onTransferOverwriteChange={() => {}} transfer={transfer} startingTransfer={false} onStartTransfer={(execution) => {
+        fixture.calls.push({ command: "ui_start_transfer", args: { execution } });
+        setTransfer({ id: "original-transfer", deviceCode: code, state: "unconfirmed", offset: 10, size: 20, message: null, executionIdentity: identity() });
+      }} onInspectTransfer={() => fixture.calls.push({ command: "ui_inspect_transfer", args: { id: transfer.id } })} onCancelTransfer={() => {}} onAuditChange={() => {}} />
   </main></App></ConfigProvider>;
 }
 createRoot(document.getElementById("root")!).render(<Panel />);

@@ -21,6 +21,49 @@ pub struct TransferRequest {
     pub overwrite: bool,
 }
 
+impl TransferRequest {
+    pub fn validate_paths(&self, os: pab_protocol::OsFamily) -> Result<(), &'static str> {
+        let (local, remote) = if self.direction == "upload" {
+            (&self.source, &self.destination)
+        } else {
+            (&self.destination, &self.source)
+        };
+        if !matches!(self.direction.as_str(), "upload" | "download")
+            || local.contains('\0')
+            || !Path::new(local).is_absolute()
+            || Path::new(local).file_name().is_none()
+            || !remote_absolute(remote, os)
+        {
+            return Err(
+                "source and destination must be absolute file paths for their respective operating systems",
+            );
+        }
+        Ok(())
+    }
+}
+
+fn remote_absolute(path: &str, os: pab_protocol::OsFamily) -> bool {
+    let bytes = path.as_bytes();
+    if path.is_empty() || path.contains('\0') {
+        return false;
+    }
+    match os {
+        pab_protocol::OsFamily::Windows => {
+            (bytes.len() > 3
+                && bytes[0].is_ascii_alphabetic()
+                && bytes[1] == b':'
+                && matches!(bytes[2], b'\\' | b'/'))
+                || (path.starts_with("\\\\")
+                    && path[2..]
+                        .split(['\\', '/'])
+                        .filter(|part| !part.is_empty())
+                        .count()
+                        >= 3)
+        }
+        _ => path.starts_with('/') && path.len() > 1,
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct QueuedTransfer {
     #[serde(flatten)]
