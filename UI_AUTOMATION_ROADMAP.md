@@ -1,7 +1,7 @@
 # 桌面控件查询与操作：完整开发长任务
 
 规划日期：2026-10-06。代码基线：main / 9f2d7a2。
-状态：执行中，U0原型验证（2026-10-06）。当前安装版：Windows 1.2.21，Mac 1.2.22。
+状态：执行中，U0基础原型通过，进入U1协议与隔离执行器（2026-10-06）。当前安装版：Windows 1.2.21，Mac 1.2.22。
 上一轮交付及新会话复验见 [验收报告](acceptance/2026-10-06.md)。
 
 ## 1. 目标与交付边界
@@ -62,7 +62,7 @@ Server 任务存储、deployment ID、逐条审批。保持 Mac 固定免费签�
 
 | 工具 | 输入与行为 | 输出 |
 |---|---|---|
-| `pab_ui_query` | 明确的 `window_ref` 或 `element_ref` 子树；按 role/name/identifier 及有限层级路径过滤；默认只读 | 有界控件快照、引用、能力和截断原因 |
+| `pab_ui_query` | 明确的 `window_ref` 或 `element_ref` 子树；按 role/name/identifier 过滤；通过对子树继续查询逐级定位；默认只读 | 有界控件快照、引用、能力和截断原因 |
 | `pab_ui_get` | 一个 `element_ref`；重新读取指定字段 | 当前属性、字段错误、观测时间 |
 | `pab_ui_action` | 一个 `element_ref`、一个动作、`request_id`；可带明确的属性前置条件 | 是否派发、执行结果、观测结果和原操作 ID |
 | `pab_ui_wait` | 明确窗口内的选择条件，或已有引用；条件、超时和采样间隔 | matched/timed_out/cancelled、最后一次观测及引用 |

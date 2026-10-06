@@ -18,6 +18,10 @@
 }
 @end
 
+// Keep the window/controller alive throughout NSApplication.run under ARC.
+static NSWindow *fixtureWindow;
+static PabControls *fixtureTarget;
+
 int main(int argc,char **argv) {
     if(argc!=2)return 2;
     @autoreleasepool {
@@ -26,10 +30,12 @@ int main(int argc,char **argv) {
         if([[NSFileManager defaultManager] fileExistsAtPath:ready])return 3;
         NSApplication *app=[NSApplication sharedApplication];
         [app setActivationPolicy:NSApplicationActivationPolicyRegular];
+        dispatch_async(dispatch_get_main_queue(), ^{
         NSWindow *win=[[NSWindow alloc] initWithContentRect:NSMakeRect(800,300,440,260)
             styleMask:(NSWindowStyleMaskTitled|NSWindowStyleMaskClosable) backing:NSBackingStoreBuffered defer:NO];
         win.title=@"PAB UI acceptance fixture";
         PabControls *target=[PabControls new];target.directory=directory;
+        fixtureWindow=win;fixtureTarget=target;
         target.input=[[NSTextField alloc] initWithFrame:NSMakeRect(20,200,360,30)];
         target.input.accessibilityLabel=@"Fixture input";
         target.input.accessibilityIdentifier=@"fixture_input";
@@ -41,7 +47,8 @@ int main(int argc,char **argv) {
         button.title=@"Apply fixture";button.target=target;button.action=@selector(apply:);
         [win.contentView addSubview:button];
         [win makeKeyAndOrderFront:nil];[app activateIgnoringOtherApps:YES];
-        NSData *json=[NSJSONSerialization dataWithJSONObject:@{@"pid":@(getpid())} options:0 error:nil];
+        NSAccessibilityPostNotification(win,NSAccessibilityWindowCreatedNotification);
+        NSData *json=[NSJSONSerialization dataWithJSONObject:@{@"pid":@(getpid()),@"window_role":win.accessibilityRole ?: @"",@"input_role":target.input.accessibilityRole ?: @"",@"window_number":@(win.windowNumber)} options:0 error:nil];
         [json writeToFile:ready atomically:YES];
         [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer *t){
             NSFileManager *fm=[NSFileManager defaultManager];
@@ -50,6 +57,7 @@ int main(int argc,char **argv) {
             if([fm fileExistsAtPath:hang]){[fm removeItemAtPath:hang error:nil];[NSThread sleepForTimeInterval:10];}
         }];
         [NSTimer scheduledTimerWithTimeInterval:300 repeats:NO block:^(NSTimer *t){[app terminate:nil];}];
+        });
         [app run];
     }
     return 0;
