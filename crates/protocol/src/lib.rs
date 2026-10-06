@@ -31,7 +31,9 @@ mod relay_policy;
 mod screenshot;
 mod task;
 mod task_session;
+mod terminal;
 pub use file_transfer::*;
+pub use terminal::{TerminalStartup, TerminalStartupMode};
 mod window;
 
 pub use control::{

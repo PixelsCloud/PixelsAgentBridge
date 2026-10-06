@@ -80,6 +80,8 @@ pub(super) struct ActiveTerminal {
     connection: RequestId,
     selection: pab_protocol::ExecutionSelection,
     identity: Option<pab_protocol::ExecutionIdentity>,
+    shell: String,
+    startup: pab_protocol::TerminalStartup,
     cols: u16,
     rows: u16,
     session: Arc<Session>,
@@ -254,6 +256,8 @@ impl TaskService {
             connection: self.ui_connection.id,
             selection,
             identity,
+            shell: shell.to_owned(),
+            startup: crate::user_worker::terminal::startup(),
             cols,
             rows,
             session: Arc::new(session),
@@ -281,12 +285,12 @@ impl TaskService {
                 let entry = self
                     .open_terminal_session(initiated_by, request_id, cols, rows, execution)
                     .await?;
-                let (shell, _) = crate::user_worker::terminal::shell();
                 stream
                     .send_json(
                         &DeviceTaskResponse::TerminalOpened {
                             session_id: request_id,
-                            shell: shell.to_owned(),
+                            shell: entry.shell.clone(),
+                            startup: Some(entry.startup.clone()),
                             cols,
                             rows,
                             identity: entry.identity.clone(),

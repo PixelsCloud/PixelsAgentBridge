@@ -11,6 +11,7 @@ pub struct TerminalOpenedView {
     execution_identity: Option<pab_protocol::ExecutionIdentity>,
     session_id: RequestId,
     shell: String,
+    startup: Option<pab_protocol::TerminalStartup>,
     cols: u16,
     rows: u16,
 }
@@ -65,6 +66,7 @@ pub async fn operator_open_terminal(
         execution_identity: opened.identity,
         session_id: opened.session_id,
         shell: opened.shell,
+        startup: opened.startup,
         cols: opened.cols,
         rows: opened.rows,
     })

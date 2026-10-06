@@ -169,10 +169,9 @@ async fn native_user_terminal_acceptance() {
     ));
     entry.session.resize(100, 32).await.unwrap();
     #[cfg(windows)]
-    let command =
-        "whoami /user; Write-Output ([string][char]0x4E2D+[char]0x6587); (Get-Location).Path\r";
+    let command = "whoami /user; Write-Output ([string][char]0x4E2D+[char]0x6587); (Get-Location).Path; (Get-CimInstance Win32_Process -Filter \"ProcessId=$PID\").CommandLine\r";
     #[cfg(unix)]
-    let command = "id; printf '\\344\\270\\255\\346\\226\\207\\n'; pwd\n";
+    let command = "id; printf '\\344\\270\\255\\346\\226\\207\\n'; pwd; ps -p $$ -o args=\n";
     entry.session.input(command.as_bytes()).await.unwrap();
     let marker = if cfg!(windows) {
         expected.account_id.clone()
@@ -187,12 +186,19 @@ async fn native_user_terminal_acceptance() {
         offset = chunk.next_offset;
         bytes.extend(chunk.bytes);
         let text = String::from_utf8_lossy(&bytes);
-        if text.contains(&marker) && text.contains("中文") {
+        if text.contains(&marker)
+            && text.contains("中文")
+            && entry
+                .startup
+                .arguments
+                .iter()
+                .all(|argument| text.contains(argument))
+        {
             break;
         }
         assert!(
             tokio::time::Instant::now() < until,
-            "missing identity/Unicode: {text}"
+            "missing identity/Unicode/actual shell arguments: {text}"
         );
         tokio::time::sleep(Duration::from_millis(50)).await;
     }

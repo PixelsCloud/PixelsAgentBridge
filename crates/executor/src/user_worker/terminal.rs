@@ -19,6 +19,7 @@ pub(super) enum Request {
 pub(super) enum Reply {
     Opened {
         shell: String,
+        startup: pab_protocol::TerminalStartup,
     },
     Applied,
     Output {
@@ -41,6 +42,20 @@ pub(crate) fn shell() -> (&'static str, &'static [&'static str]) {
     }
 }
 
+pub(crate) fn startup() -> pab_protocol::TerminalStartup {
+    use pab_protocol::{TerminalStartup, TerminalStartupMode};
+    TerminalStartup {
+        arguments: shell().1.iter().map(|arg| (*arg).to_owned()).collect(),
+        mode: if cfg!(windows) {
+            TerminalStartupMode::InteractiveNoProfile
+        } else if cfg!(target_os = "macos") {
+            TerminalStartupMode::InteractiveLogin
+        } else {
+            TerminalStartupMode::Interactive
+        },
+    }
+}
+
 pub(super) async fn serve(mut peer: Peer, cols: u16, rows: u16) -> io::Result<()> {
     let (shell, args) = shell();
     let session = Arc::new(
@@ -52,6 +67,7 @@ pub(super) async fn serve(mut peer: Peer, cols: u16, rows: u16) -> io::Result<()
     peer.control(Control::TerminalReply {
         reply: Reply::Opened {
             shell: shell.into(),
+            startup: startup(),
         },
     })
     .await?;
@@ -159,8 +175,8 @@ impl UserTerminal {
         if !matches!(
             decode(opened)?,
             Control::TerminalReply {
-                reply: Reply::Opened { .. }
-            }
+                reply: Reply::Opened { shell: actual_shell, startup: actual_startup }
+            } if actual_shell == shell().0 && actual_startup == startup()
         ) {
             return Err(io::Error::other("terminal open not confirmed"));
         }

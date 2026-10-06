@@ -10,7 +10,7 @@ import { ExecutionIdentityView } from "./ExecutionIdentityView";
 import type { ExecutionIdentity } from "./operatorTypes";
 import type { ExecutionSelection } from "./executionQueries";
 
-type Opened = { sessionId: string; shell: string; cols: number; rows: number; executionIdentity: ExecutionIdentity | null };
+type Opened = { sessionId: string; shell: string; startup?: { arguments: string[]; mode: string } | null; cols: number; rows: number; executionIdentity: ExecutionIdentity | null };
 type Output = { data: string; ended: boolean };
 
 function decode(data: string): Uint8Array<ArrayBuffer> {
@@ -188,7 +188,7 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
     <div className="terminal-actions">
       <Button type="primary" loading={busy} disabled={!connected || !!session.current || !execution} onClick={() => void start()}>{t.openTerminal}<TerminalIcon size={17} /></Button>
       <Button disabled={!session.current} onClick={() => void stop()}>{t.closeTerminal}</Button>
-      {opened && <span>{opened.shell}</span>}
+      {opened && <span>{[opened.shell, ...(opened.startup?.arguments ?? [])].join(" ")}</span>}
     </div>
     {opened && <ExecutionIdentityView identity={opened.executionIdentity} language={language} />}
     {error && <div className="inline-error" role="alert">{error}</div>}

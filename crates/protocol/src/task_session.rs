@@ -407,6 +407,8 @@ pub enum DeviceTaskResponse {
     TerminalOpened {
         session_id: RequestId,
         shell: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        startup: Option<crate::TerminalStartup>,
         cols: u16,
         rows: u16,
         #[serde(default, skip_serializing_if = "Option::is_none")]

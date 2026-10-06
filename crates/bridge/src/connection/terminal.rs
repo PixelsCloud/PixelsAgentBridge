@@ -8,6 +8,7 @@ use super::{AuthenticatedDeviceConnection, BridgeError, unexpected_task_response
 pub struct TerminalOpened {
     pub session_id: RequestId,
     pub shell: String,
+    pub startup: Option<pab_protocol::TerminalStartup>,
     pub cols: u16,
     pub rows: u16,
     pub identity: Option<pab_protocol::ExecutionIdentity>,
@@ -71,6 +72,7 @@ impl AuthenticatedDeviceConnection {
             DeviceTaskResponse::TerminalOpened {
                 session_id: returned,
                 shell,
+                startup,
                 cols: returned_cols,
                 rows: returned_rows,
                 identity,
@@ -87,6 +89,7 @@ impl AuthenticatedDeviceConnection {
                 Ok(TerminalOpened {
                     session_id,
                     shell,
+                    startup,
                     cols,
                     rows,
                     identity,

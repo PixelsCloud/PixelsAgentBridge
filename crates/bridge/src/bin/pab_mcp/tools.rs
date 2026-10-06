@@ -253,6 +253,7 @@ pub(super) async fn call_tool(
             Ok(json!({
                 "session_id": opened.session_id,
                 "shell": opened.shell,
+                "startup": opened.startup,
                 "cols": opened.cols,
                 "rows": opened.rows,
                 "execution_identity": opened.identity,

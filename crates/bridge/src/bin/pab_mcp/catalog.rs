@@ -155,7 +155,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_open_terminal",
-            "Open an interactive shell. Default execution is service; user requires a context_ref discovered on this connection. Identity is fixed for this session and never falls back. Subsequent calls use session_id. Disconnect closes the session; no automatic reopen or replay of input.",
+            "Open an interactive shell. Returns actual shell and startup arguments/mode when reported by the peer (Windows no-profile, macOS login-interactive, Linux interactive). Default execution is service; user requires a context_ref discovered on this connection. Identity is fixed for this session and never falls back. Subsequent calls use session_id. Disconnect closes the session; no automatic reopen or replay of input.",
             json!({
                 "type": "object",
                 "properties": {

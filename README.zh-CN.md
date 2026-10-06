@@ -221,6 +221,13 @@ Linux 当前只交付 **Executor + MCP 无界面版**，不依赖 Desktop 或图
 
 先调用 `pab_connect` 并保留目标环境。大部分设备工具需要 `device_code`；
 终端后续操作使用打开终端时返回的 `session_id`。
+
+打开终端还会返回实际 `startup.arguments` 与 `startup.mode`：Windows 为
+`powershell.exe -NoLogo -NoProfile`（`interactive_no_profile`），macOS 为
+`/bin/zsh -l -i`（`interactive_login`），Linux 为 `/bin/sh -i`（`interactive`）。
+Mac 会按选中账户读取登录/交互 shell 配置，Linux 遵循 `/bin/sh` 的交互配置规则；
+非交互命令工具本身不加载 shell 启动文件。旧端缺少 `startup` 时保留未知，
+不根据操作系统猜测。Desktop 终端栏同步显示实际 shell 和参数。
 密码从本机 Bridge 数据库读取，不作为工具参数传递。
 
 ### 工具分组设置

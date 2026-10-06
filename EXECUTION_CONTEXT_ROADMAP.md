@@ -321,6 +321,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E3传输协议与Executor | transfer v2、接受事务、完整参数和身份冻结、重复请求查原记录、显式续传约束、原用户只读发布核对已完成；三平台原生QUIC及回归通过，见 acceptance/execution-e3-transfer-executor-2026-10-07.md |
 | E3传输Bridge/MCP | execution/resume_from、能力检查、二进制前身份回执、队列指纹及实际身份、查询/后台恢复核对已接入；分层源码证据见 acceptance/execution-e3-transfer-bridge-2026-10-07.md；正式安装宿主验收待完成 |
 | E2用户环境首批 | 用户 PATH、Mac Homebrew/系统 paths、选中用户 SSH agent 查询及身份环境覆盖校验已实现；Mac/Linux 原生切换实测通过，见 acceptance/execution-e2-environment-2026-10-07.md；真实认证等仍待验收 |
+| E2终端启动信息 | shell实际参数/启动模式贯通Executor、Bridge/MCP及Desktop；三平台真实用户PTY参数、身份、中文及清理通过，见 acceptance/execution-e2-terminal-startup-2026-10-07.md；安装后回执/UI及异常启动脚本矩阵仍待完成 |
 | E4应用发现后端 | Windows AppsFolder/可见应用进程、Mac 标准应用目录/NSWorkspace、搜索与有界响应已实测，Linux明确不支持；见 acceptance/execution-e4-app-discovery-2026-10-07.md。启动/打开、身份路由和正式工具的进度见后续三行 |
 | E4启动/打开后端 | Windows Shell、Mac NSWorkspace 的 ID/路径启动及指定/默认应用打开文件已实现并实测首批流程，见 acceptance/execution-e4-app-actions-2026-10-07.md；桌面身份路由/记录/正式工具已继续接入，见后续两行。Mac锁屏下保留一份测试文档待解锁后清理 |
 | E4应用身份路由/记录 | system-query v12、内核核验helper进程身份、连接绑定desktop_user上下文、接受前冻结通道/身份及原记录去重已接入；双桌面编译/IPC与Linux拒绝边界通过，见 acceptance/execution-e4-app-routing-2026-10-07.md；正式入口见下一行；完整生命周期仍待完成 |
@@ -331,4 +332,4 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E2–E8剩余增量 | 用户环境/真实凭据边界、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面交付入口 | 已移除Linux包的Desktop/前端依赖，Executor+MCP在精简镜像编译、手动安装/强制回收与真实systemd安装生命周期通过，见 acceptance/execution-linux-headless-package-2026-10-07.md；正式版本包、真实设备身份保留及宿主验收仍待E7/E8完成 |
-| 下一动作 | 最小UI源码已接入；继续Windows helper实机生命周期、Mac锁屏边界与测试文档清理、真实Git凭据、终端启动模式、完整异常矩阵和打包安装后的UI及正式宿主验收 |
+| 下一动作 | 最小UI、终端启动信息及Linux无界面安装源码已接入；继续Windows helper实机生命周期、Mac锁屏边界与测试文档清理、Windows真实Git凭据、完整异常矩阵和打包安装后的UI及正式宿主验收 |

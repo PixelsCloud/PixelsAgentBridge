@@ -250,6 +250,15 @@ Call `pab_connect` first and retain its platform context. Most device tools requ
 `device_code`; terminal follow-up tools use the returned `session_id`. Passwords
 come from the local Bridge database and are not tool arguments.
 
+Terminal open results also report `startup.arguments` and `startup.mode` from the
+actual launch: Windows uses `powershell.exe -NoLogo -NoProfile`
+(`interactive_no_profile`), macOS uses `/bin/zsh -l -i` (`interactive_login`), and
+Linux uses `/bin/sh -i` (`interactive`). macOS therefore loads login/interactive
+shell configuration under the selected account; Linux follows `/bin/sh`'s
+interactive configuration rules. Noninteractive command tools do not load shell
+startup files themselves. An older peer that omits `startup` is reported as unknown,
+not inferred from its OS. Desktop shows the returned shell and arguments.
+
 ### Tool group settings
 
 Open **Settings → MCP tools** to choose six static groups. All 68 tools are enabled by default, preserving existing use. Connections/tasks (15) are required; files (15), system (12), desktop (14), Git (8), and Docker (4) can be disabled individually. Save, then restart the MCP process through your AI client to load the selection. Restarting only Desktop does not reload an already running MCP process.
