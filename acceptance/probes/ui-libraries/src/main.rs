@@ -42,11 +42,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(target_os="macos")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let outcome=mac_probe();
+    if let Some(path)=std::env::args().nth(3) {
+        std::fs::write(path,serde_json::to_vec(&serde_json::json!({"success":outcome.is_ok(),"error":outcome.as_ref().err().map(|e|e.to_string())}))?)?;
+    }
+    outcome
+}
+
+#[cfg(target_os="macos")]
+fn mac_probe() -> Result<(), Box<dyn std::error::Error>> {
     use accessibility::{AXUIElement, AXUIElementAttributes, AXAttribute};
     use core_foundation::{base::TCFType, string::CFString};
     let args: Vec<_> = std::env::args().collect();
     let app = AXUIElement::application(args[1].parse()?);
     app.set_messaging_timeout(0.5)?;
+    app.role()?; // Permission/provider failures must not look like an empty successful tree.
     let mut stack = vec![app];
     let mut entries = Vec::new();
     while let Some(element) = stack.pop() {
