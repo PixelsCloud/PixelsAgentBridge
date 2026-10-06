@@ -68,12 +68,11 @@ def package_windows():
 def package_unix(platform, architecture, binaries):
     archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-{args.profile}.tar.gz"
     files = [
-        *(binaries / name for name in (
-            ("pab-mcp", "pab-executor") if platform == "macos"
-            else ("pab-mcp", "pab-executor", "pab-desktop")
-        )),
+        *(binaries / name for name in ("pab-mcp", "pab-executor")),
         *(scripts / ("macos" if platform == "macos" else "unix") / name for name in (
-            "install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh"
+            ("install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh")
+            if platform == "macos" else
+            ("install.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh", "INSTALL-LINUX.txt")
         )),
     ]
     if platform == "macos":
@@ -96,7 +95,7 @@ def package_unix(platform, architecture, binaries):
     else:
         from build_version import verify_artifacts
 
-        versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:3]})
+        versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:2]})
     with tarfile.open(archive_path, "w:gz") as archive:
         if platform == "macos":
             def app_permissions(info):
@@ -108,7 +107,7 @@ def package_unix(platform, architecture, binaries):
             archive.add(args.macos_app, arcname="Pixels Agent Bridge.app", filter=app_permissions)
         for file in files:
             info = archive.gettarinfo(str(file), arcname=file.name)
-            info.mode = 0o644 if file.suffix == ".plist" else 0o755
+            info.mode = 0o644 if file.suffix in (".plist", ".txt") else 0o755
             if file.suffix == ".sh":
                 content = file.read_bytes().replace(b"\r\n", b"\n")
                 info.size = len(content)

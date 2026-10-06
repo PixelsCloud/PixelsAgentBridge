@@ -5,15 +5,7 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' \
         /etc/apt/sources.list.d/debian.sources \
     && apt-get -o Acquire::Retries=3 update \
     && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-    libwebkit2gtk-4.1-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev \
     libssl-dev \
-    libpipewire-0.3-dev \
-    libclang-dev \
-    libgbm-dev \
-    libxdo-dev \
-    patchelf \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,11 +22,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && cargo build --locked $cargo_flags \
         -p pab-executor --bin pab-executor \
         -p pab-bridge --bin pab-mcp \
-    && cargo build --locked $cargo_flags --manifest-path apps/desktop/src-tauri/Cargo.toml \
     && mkdir -p /out \
     && cp /src/target/$build_dir/pab-executor /out/pab-executor \
-    && cp /src/target/$build_dir/pab-mcp /out/pab-mcp \
-    && cp /src/target/$build_dir/pab-desktop /out/pab-desktop
+    && cp /src/target/$build_dir/pab-mcp /out/pab-mcp
 
 FROM scratch
 COPY --from=builder /out/ /

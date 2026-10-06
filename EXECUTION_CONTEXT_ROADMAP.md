@@ -330,5 +330,5 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E6真实SSH首批 | Mac/Linux已通过原生用户worker + 独立OpenSSH agent的真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份推送核对；见 acceptance/execution-e6-ssh-2026-10-07.md；Windows SSH、Keychain及慢凭据helper仍待验收 |
 | E2–E8剩余增量 | 用户环境/真实凭据边界、完整异常矩阵与交付尚待完成 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
-| Linux无界面测试目标 | 已核实并运行Debian无GUI容器；已有Linux包脚本仍依赖Desktop，须补无界面交付入口，再完成完整服务安装/正式宿主验收 |
+| Linux无界面交付入口 | 已移除Linux包的Desktop/前端依赖，Executor+MCP在精简镜像编译、手动安装/强制回收与真实systemd安装生命周期通过，见 acceptance/execution-linux-headless-package-2026-10-07.md；正式版本包、真实设备身份保留及宿主验收仍待E7/E8完成 |
 | 下一动作 | 最小UI源码已接入；继续Windows helper实机生命周期、Mac锁屏边界与测试文档清理、真实Git凭据、终端启动模式、完整异常矩阵和打包安装后的UI及正式宿主验收 |

@@ -149,6 +149,12 @@ On Linux and macOS, register the installed `run-mcp.sh` entry point so it loads 
 deployment settings. Other MCP clients can use the stdio entry point; their automatic
 setup and compatibility have not yet been validated to the same extent as Codex.
 
+Linux is a **headless** distribution containing Executor and MCP only. See
+[Linux installation](packaging/desktop/unix/INSTALL-LINUX.txt) for systemd and
+container installation, device credentials, upgrades and data retention. No Desktop
+or graphical login is required. The headless packaging change has passed isolated
+installation tests; the new release's installed-host remote acceptance is pending.
+
 ### 4. Ask the agent to operate a device
 
 Example requests:
@@ -946,7 +952,7 @@ stdio stream. Automatic host recovery remains under investigation.
 | Windows desktop, commands, files, and terminals | Implemented; core remote workflows verified on real machines |
 | Windows screenshots and desktop input | Signed-in desktop verified; signed-out screenshots and secure attention also exercised |
 | Linux commands and files | Verified on real remote Linux machines |
-| Linux graphical desktop | Components implemented; graphical-machine validation remains; input requires X11 |
+| Linux distribution | Headless Executor + MCP; no Linux desktop package. Legacy GUI components are outside current delivery scope |
 | macOS | Native app/launchd package and backends implemented; ARM automated tests and Intel compilation pass; graphical and deployed-host acceptance remain limited by permissions/environment. See [MACOS.md](MACOS.md) |
 | Codex | One-click registration and actual tool calls verified |
 | Other MCP hosts | Manual stdio entry point available; host-specific validation remains |

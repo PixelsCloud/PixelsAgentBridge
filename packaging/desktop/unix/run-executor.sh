@@ -8,4 +8,4 @@ case $(uname -s) in
     Darwin) export PAB_DATA_DIR='/Library/Application Support/PixelsAgentBridgeData' ;;
     *) echo 'unsupported platform' >&2; exit 2 ;;
 esac
-exec "$install_dir/pab-executor"
+exec "$install_dir/pab-executor" "$@"

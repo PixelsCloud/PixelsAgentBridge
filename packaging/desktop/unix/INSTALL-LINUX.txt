@@ -1,0 +1,33 @@
+Pixels Agent Bridge - Linux headless (x86_64, glibc 2.36 or newer)
+
+Executor and MCP only. No Desktop, display server, logind or graphical login
+is required for core tools. Install Git and your workload programs separately.
+
+System service (root; systemd required):
+  sudo bash install.sh wss://YOUR_SERVER/control https://YOUR_RELAY
+  sudo systemctl status pixels-agent-bridge-executor.service
+
+Container / external process supervisor (no systemd):
+  sudo bash install.sh --no-service wss://YOUR_SERVER/control https://YOUR_RELAY
+  sudo /opt/pixels-agent-bridge/run-executor.sh
+Use a persistent /var/lib/pixels-agent-bridge volume in containers.
+Stop your external supervisor before upgrade or uninstall.
+
+Once Executor has registered with your server, display its device code/password:
+  sudo /opt/pixels-agent-bridge/run-executor.sh show-access
+Do not paste this password into public logs. The installer never prints it.
+
+For an AI client running here, register the stdio command:
+  /opt/pixels-agent-bridge/run-mcp.sh
+Run MCP as the AI client's user. Its data is stored in that user's directory,
+separately from the root Executor database.
+Root Executor can run supported tools as an explicitly selected OS user.
+GUI application, screenshot and desktop input tools are unavailable here.
+Service inventory/control requires systemd; login-session inventory needs logind.
+
+Upgrade: run install.sh from the new package, with the same server URLs.
+Device identity and task data in /var/lib/pixels-agent-bridge are retained.
+Old Linux Desktop binaries/autostart entries are removed during upgrade.
+Uninstall:
+  sudo /opt/pixels-agent-bridge/uninstall.sh
+Program files are removed; device and user data are retained.

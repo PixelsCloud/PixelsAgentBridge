@@ -117,6 +117,27 @@ class Versions(TestCase):
         self.assertEqual(len(commands), 2)
         self.assertTrue(all(cmd[-1] == 'build:assets' for cmd in commands))
 
+    def test_linux_build_requires_no_node_and_records_only_headless_binaries(self):
+        import build
+        if build.os.name != 'nt':
+            self.skipTest('Linux Docker orchestration currently runs on Windows')
+        commands = []
+
+        def fake_run(command, cwd=None):
+            commands.append(command)
+            folder = self.root / '.build/guest-desktop-linux-debug'
+            folder.mkdir(parents=True, exist_ok=True)
+            for name in ('pab-mcp', 'pab-executor'):
+                (folder / name).write_bytes(b'fixture')
+
+        with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: None if x in ('npm', 'node') else x), patch.object(sys, 'argv', ['build.py', 'linux']):
+            build.main()
+        self.assertEqual(len(commands), 1)
+        self.assertIn('-ComponentsOnly', commands[0])
+        record = json.loads((self.root / '.build/builds/linux-debug.json').read_text())
+        self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor'})
+        self.assertEqual(read_state(self.root)['build_count'], 1)
+
     def test_macos_both_architectures_share_one_reserved_version(self):
         import build
         cli = self.root / 'apps/desktop/node_modules/@tauri-apps/cli/tauri.js'

@@ -12,7 +12,7 @@ if (-not $ComponentsOnly) {
 }
 $dockerfile = Join-Path $PSScriptRoot 'Dockerfile.linux'
 $mount = "type=bind,source=$root,target=/src"
-$image = 'pab-linux-build-deps:bookworm'
+$image = 'pab-linux-headless-build-deps:bookworm'
 
 & docker build --target dependencies -t $image -f $dockerfile $root
 if ($LASTEXITCODE -ne 0) {
@@ -23,9 +23,8 @@ $cargoFlags = if ($Profile -eq 'release') { '--release' } else { '' }
 $buildScript = @"
 set -eu
 cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp
-cargo build --locked $cargoFlags --manifest-path apps/desktop/src-tauri/Cargo.toml
 mkdir -p .build/guest-desktop-linux-$Profile
-cp .build/linux-target/$Profile/pab-executor .build/linux-target/$Profile/pab-mcp .build/linux-target/$Profile/pab-desktop .build/guest-desktop-linux-$Profile/
+cp .build/linux-target/$Profile/pab-executor .build/linux-target/$Profile/pab-mcp .build/guest-desktop-linux-$Profile/
 "@
 $buildScript = $buildScript.Replace("`r`n", "`n")
 

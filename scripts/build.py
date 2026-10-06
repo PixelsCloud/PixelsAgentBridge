@@ -84,7 +84,7 @@ def main():
         parser.error('--image requires the docker target')
     if 'docker' in targets and args.profile != 'release':
         parser.error('docker uses release binaries; specify --profile release explicitly')
-    needs_node = any(t != 'docker' for t in targets)
+    needs_node = any(t not in ('docker', 'linux') for t in targets)
     required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
     if 'macos' in targets:
         required += ['node', 'rustup'] + (['/usr/bin/pkgbuild', '/usr/bin/productbuild'] if args.package else [])
@@ -139,9 +139,8 @@ def main():
             elif target == 'docker':
                 run(['docker', 'build', '-f', 'packaging/docker/Dockerfile', '-t', args.image or f'pixels-agent-bridge:{version}', '.'])
             elif target == 'linux':
-                frontend('desktop')
                 run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
-                files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp', 'pab-desktop']}
+                files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp']}
                 record_artifacts(ROOT, target, args.profile, version, files)
                 if args.package:
                     run([sys.executable, 'packaging/desktop/build.py', '--platform', 'linux', '--profile', args.profile])

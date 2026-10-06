@@ -124,6 +124,11 @@ default_tools_approval_mode = "approve"
 Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署配置。
 其他 MCP 客户端可以接入 stdio 入口，其自动配置及兼容性尚未完成与 Codex 同等程度的验证。
 
+Linux 当前只交付 **Executor + MCP 无界面版**，不依赖 Desktop 或图形登录。
+[Linux 安装说明](packaging/desktop/unix/INSTALL-LINUX.txt) 包含 systemd 服务、容器前台运行、
+设备码/密码查看、升级及数据保留方式。新的无界面打包与隔离安装测试已通过，
+新版安装后的正式宿主远程验收仍待完成。
+
 ### 4. 让 Agent 操作设备
 
 示例提示：
@@ -643,7 +648,7 @@ Desktop 的连接状态属于自己的 Runtime，可以在“设置 → AI Agent
 | Windows 桌面、命令、文件和终端 | 已实现，核心远程流程完成真机验证 |
 | Windows 截图和输入 | 已验证登录后桌面，也验证了未登录截图和安全注意序列 |
 | Linux 命令和文件 | 已完成真实远程 Linux 设备验证 |
-| Linux 图形桌面 | 已有实现组件，仍需图形真机验证；输入需要 X11 |
+| Linux 交付 | Executor + MCP 无界面版；当前不提供 Linux 桌面包，旧图形组件不在本轮交付范围 |
 | macOS | 原生 app、launchd 安装包和后端已实现；ARM 自动化与 Intel 编译通过，图形及正式部署验收受权限/环境限制，见 [MACOS.md](MACOS.md) |
 | Codex | 已验证一键注册和真实工具调用 |
 | 其他 MCP 宿主 | 可手动接入 stdio，仍需逐宿主验证 |
