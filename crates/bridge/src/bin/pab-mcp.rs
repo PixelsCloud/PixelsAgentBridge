@@ -254,6 +254,7 @@ impl ServerHandler for McpServer {
                     | "pab_list_network_connections"
                     | "pab_resolve_dns"
                     | "pab_list_sessions"
+                    | "pab_list_execution_contexts"
                     | "pab_terminate_process"
                     | "pab_list_services"
                     | "pab_get_service"
@@ -387,7 +388,7 @@ mod tests {
     fn catalog_is_compatible_with_sdk() {
         let catalog: ListToolsResult =
             serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
-        assert_eq!(catalog.tools.len(), 64);
+        assert_eq!(catalog.tools.len(), 65);
         let names = catalog
             .tools
             .iter()

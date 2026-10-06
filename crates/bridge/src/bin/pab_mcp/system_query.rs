@@ -8,6 +8,7 @@ pub(super) fn tools() -> Vec<Value> {
     let limit = json!({"type":"integer","minimum":1,"maximum":1000,"default":100});
     let cpu = json!({"type":"boolean","default":false});
     [
+        ("pab_list_execution_contexts","Observe the service account and native user execution contexts. The service row is always included. user is an exact account-name filter (Windows also accepts domain-qualified names); include_system=false hides conventional Unix service accounts unless user is explicit. Windows lists existing login tokens; Unix uses native account inventory without logind or a GUI. Unavailable rows have no selection and an explicit reason. context_ref is bound to this device, caller and MCP connection; query afresh after reconnect/account/login changes. This inventory does not imply that every tool supports execution selection; obey each tool's capability. No password input, no implicit active-user choice.",json!({"user":filter,"include_system":{"type":"boolean","default":false},"limit":limit}),vec!["device_code"]),
         ("pab_terminate_process","Terminate exactly one target process using pid and termination_identity from pab_get_process. Default force=false, timeout_ms=5000. Windows sends WM_CLOSE only to top-level windows; windowless/console programs have no generic graceful exit and fail unless force=true (then immediate TerminateProcess). Linux sends SIGTERM through a retained pidfd identity lease (10 minutes, up to 256); optional force=true escalates to SIGKILL after timeout. Force exit confirmation has an extra 5s budget. Protects Executor/init. No process-tree termination.",json!({"pid":{"type":"integer","minimum":1,"maximum":4294967295u64},"identity":{"type":"string","minLength":1,"maxLength":256},"timeout_ms":{"type":"integer","minimum":100,"maximum":60000,"default":5000},"force":{"type":"boolean","default":false}}),vec!["device_code","pid","identity"]),
         ("pab_list_services","List Windows SCM Win32 services (not kernel drivers), or Linux systemd system .service units, including installed not_loaded units. Optional name is a case-insensitive literal substring; state exact and backend-specific. List rows are inventory summaries; use pab_get_service for configuration/PID/details. Filters before limit. No shell, no live pagination.",json!({"name":filter,"state":filter,"limit":limit}),vec!["device_code"]),
         ("pab_get_service","Get one service by exact native name, Linux requires .service suffix. Includes backend/state/substate/start mode/PID/executable/account/exit code and field errors. Linux uses system bus (not per-user systemd). Permission denied/unavailable fields are explicit; no configuration changes.",json!({"name":filter}),vec!["device_code","name"]),
@@ -23,7 +24,7 @@ pub(super) fn tools() -> Vec<Value> {
     ].into_iter().map(|(name,description,extra,required)| {
         let mut properties=base.clone();properties.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         let mutation=["pab_terminate_process","pab_service_control"].contains(&name);
-        let version=if ["pab_terminate_process","pab_list_services","pab_get_service","pab_service_control"].contains(&name){3}else if ["pab_list_network_connections","pab_resolve_dns","pab_list_sessions"].contains(&name){2}else{1};
+        let version=if name=="pab_list_execution_contexts"{10}else if ["pab_terminate_process","pab_list_services","pab_get_service","pab_service_control"].contains(&name){3}else if ["pab_list_network_connections","pab_resolve_dns","pab_list_sessions"].contains(&name){2}else{1};
         let behavior=if mutation {"Asynchronous lifecycle control: returns running after about 250 ms if still active. Keep request_id and poll pab_get_operation for the original operation; disconnect/caller cancellation does not cancel an accepted action. Same request ID is never replayed, even after restart; a different request ID is a new action. Cannot cancel/undo lifecycle actions."} else {"Read-only query. Keep request_id to retrieve the SAME sampled result using pab_get_operation; omit it for a new sample. Queries cannot be cancelled. OS/driver calls may delay completion; no hard interruption of blocking native calls. CPU basis points: 10000 = 100%, per-process CPU may exceed 10000."};
         json!({"name":name,"description":format!("{description} Requires system-query capability v{version}. Bounded 32 KiB result with timestamps and explicit truncation; unavailable fields are null. {behavior}"),"inputSchema":{"type":"object","properties":properties,"required":required,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":name=="pab_resolve_dns"}})
     }).collect()
@@ -151,6 +152,18 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
             state: filter("state"),
             limit,
         },
+        "pab_list_execution_contexts" => SystemQuery::ExecutionContexts {
+            user: args
+                .get("user")
+                .map(|v| v.as_str().map(str::to_owned).ok_or("invalid user filter"))
+                .transpose()?,
+            include_system: args
+                .get("include_system")
+                .map(|v| v.as_bool().ok_or("invalid include_system"))
+                .transpose()?
+                .unwrap_or(false),
+            limit,
+        },
         "pab_system_info" => SystemQuery::Info {
             include_gpu: args
                 .get("include_gpu")
@@ -202,6 +215,31 @@ pub(super) async fn call(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn execution_context_discovery_is_strict_versioned_and_read_only() {
+        let (_, query) = parse("pab_list_execution_contexts", &json!({})).unwrap();
+        assert_eq!(query.required_version(), 10);
+        assert_eq!(query.kind(), "execution_contexts");
+        assert!(!query.is_mutation());
+        assert!(matches!(
+            query,
+            SystemQuery::ExecutionContexts {
+                user: None,
+                include_system: false,
+                limit: 100
+            }
+        ));
+        for args in [
+            json!({"device_code":"123456789","username":"fake"}),
+            json!({"device_code":"123456789","include_system":"yes"}),
+            json!({"device_code":"123456789","limit":0}),
+        ] {
+            assert!(
+                super::super::mcp_catalog::validate_arguments("pab_list_execution_contexts", &args)
+                    .is_err()
+            );
+        }
+    }
     #[test]
     fn catalog_defaults_and_filters_are_strict_and_have_no_pagination() {
         let (_, q) = parse("pab_system_info", &json!({})).unwrap();

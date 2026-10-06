@@ -81,12 +81,14 @@ pub(crate) struct TaskService {
 struct UiConnection {
     id: pab_protocol::RequestId,
     used: std::sync::atomic::AtomicBool,
+    execution_contexts: Mutex<pab_task_runtime::ExecutionContextRegistry>,
 }
 impl UiConnection {
     fn new() -> Self {
         Self {
             id: pab_protocol::RequestId::new(),
             used: std::sync::atomic::AtomicBool::new(false),
+            execution_contexts: Mutex::new(pab_task_runtime::ExecutionContextRegistry::default()),
         }
     }
 }

@@ -99,6 +99,7 @@ impl SystemCollector {
                 return reply;
             }
             SystemQuery::Container { .. }
+            | SystemQuery::ExecutionContexts { .. }
             | SystemQuery::Git { .. }
             | SystemQuery::TerminateProcess { .. }
             | SystemQuery::Services { .. }
@@ -454,10 +455,11 @@ pub(super) fn failed(mut r: SystemQueryReply, error: &str) -> SystemQueryReply {
     r.sampled_at_unix_ms = Some(now());
     r
 }
-pub(super) fn bound_reply(reply: &mut SystemQueryReply) {
+pub fn bound_reply(reply: &mut SystemQueryReply) {
     reply.warnings.truncate(8);
     loop {
         reply.returned_count = match &reply.data {
+            Some(SystemQueryData::ExecutionContexts { entries, .. }) => entries.len() as u32,
             Some(SystemQueryData::Services { entries, .. }) => entries.len() as u32,
             Some(SystemQueryData::Connections { entries, .. }) => entries.len() as u32,
             Some(SystemQueryData::Sessions { entries, .. }) => entries.len() as u32,
@@ -474,6 +476,7 @@ pub(super) fn bound_reply(reply: &mut SystemQueryReply) {
         reply.truncated = true;
         reply.stop_reason = Some("output_bytes_limit".into());
         let removed = match &mut reply.data {
+            Some(SystemQueryData::ExecutionContexts { entries, .. }) => entries.pop().is_some(),
             Some(SystemQueryData::Services { entries, .. }) => entries.pop().is_some(),
             Some(SystemQueryData::Connections { entries, .. }) => entries.pop().is_some(),
             Some(SystemQueryData::Sessions { entries, .. }) => entries.pop().is_some(),

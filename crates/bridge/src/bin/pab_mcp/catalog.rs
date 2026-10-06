@@ -537,7 +537,7 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 64);
+        assert_eq!(all.len(), 65);
         assert_eq!(enabled_tools(&McpToolSettings::default()), all);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {

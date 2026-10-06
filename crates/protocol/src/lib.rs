@@ -16,12 +16,12 @@ mod device_code;
 mod device_network;
 mod directory;
 mod endpoint_proof;
+mod execution_identity;
 mod filesystem;
 mod ids;
 mod operator;
 mod peer;
 mod platform;
-mod execution_identity;
 pub use execution_identity::*;
 mod relay_control;
 mod relay_policy;
@@ -61,8 +61,8 @@ pub use filesystem::{
     TextReadRange, cancellable_filesystem_kind, valid_file_hash,
 };
 pub use ids::{
-    ChallengeId, ClaimId, ConnectionId, DeviceId, EndpointInstanceId, RequestId, TaskId, TenantId,
-    UserId, ExecutionContextRef,
+    ChallengeId, ClaimId, ConnectionId, DeviceId, EndpointInstanceId, ExecutionContextRef,
+    RequestId, TaskId, TenantId, UserId,
 };
 pub use operator::OperatorRef;
 pub use peer::{

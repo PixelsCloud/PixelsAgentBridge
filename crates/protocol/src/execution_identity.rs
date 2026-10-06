@@ -48,6 +48,52 @@ pub enum ExecutionEnvironmentSource {
     InteractiveSession,
 }
 
+/// Account inventory is not a claim that every tool can execute in this mode.
+/// Tool capability negotiation remains separate. An unavailable row has no
+/// selection reference and includes the native preparation failure reason.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionContextEntry {
+    pub mode: ExecutionMode,
+    pub account_name: String,
+    pub account_id: Option<String>,
+    pub session_id: Option<String>,
+    pub identity: Option<ExecutionIdentity>,
+    pub selection: Option<ExecutionSelection>,
+    pub unavailable_reason: Option<String>,
+}
+impl ExecutionContextEntry {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.account_name.is_empty() || self.account_name.len() > 256 {
+            return Err("invalid context account name");
+        }
+        if let Some(identity) = &self.identity {
+            identity.validate()?;
+            if identity.mode != self.mode
+                || identity.account_name != self.account_name
+                || Some(&identity.account_id) != self.account_id.as_ref()
+                || identity.session_id != self.session_id
+            {
+                return Err("context identity fields disagree");
+            }
+        }
+        if let Some(selection) = self.selection {
+            if selection.mode() != self.mode
+                || self.identity.is_none()
+                || self.unavailable_reason.is_some()
+            {
+                return Err("invalid selectable execution context");
+            }
+        } else if self
+            .unavailable_reason
+            .as_ref()
+            .is_none_or(|v| v.is_empty() || v.len() > 1024)
+        {
+            return Err("unavailable execution context needs a reason");
+        }
+        Ok(())
+    }
+}
+
 /// Observed identity only: no credentials, token handles, private keys or full env.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionIdentity {

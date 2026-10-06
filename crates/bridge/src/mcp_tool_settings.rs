@@ -30,6 +30,7 @@ impl ToolGroup {
         match self {
             Self::Core => &[
                 "pab_list_devices",
+                "pab_list_execution_contexts",
                 "pab_connect",
                 "pab_run_command",
                 "pab_get_task",
@@ -237,8 +238,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 64);
-        assert_eq!(unique.len(), 64);
+        assert_eq!(names.len(), 65);
+        assert_eq!(unique.len(), 65);
         for name in [
             "pab_connect",
             "pab_disconnect",

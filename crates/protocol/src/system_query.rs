@@ -2,11 +2,16 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 9;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SystemQuery {
+    ExecutionContexts {
+        user: Option<String>,
+        include_system: bool,
+        limit: u16,
+    },
     Container {
         query: crate::ContainerQuery,
     },
@@ -76,6 +81,7 @@ pub enum SystemQuery {
 impl SystemQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::ExecutionContexts { .. } => "execution_contexts",
             Self::Container { query } => query.kind(),
             Self::Git { query } => query.kind(),
             Self::Desktop { query } => query.kind(),
@@ -94,6 +100,9 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::ExecutionContexts { .. }) {
+            return 10;
+        }
         if matches!(
             self,
             Self::Desktop {
@@ -270,6 +279,7 @@ impl SystemQuery {
             filter.validate()?;
         }
         let (limit, filters, pid) = match self {
+            Self::ExecutionContexts { user, limit, .. } => (Some(*limit), vec![user], None),
             Self::Connections { filter, limit } => (Some(*limit), vec![], filter.pid),
             Self::Services { name, state, limit } => (Some(*limit), vec![name, state], None),
             Self::Sessions { user, state, limit } => (Some(*limit), vec![user, state], None),
@@ -337,6 +347,10 @@ impl SystemQueryReply {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SystemQueryData {
+    ExecutionContexts {
+        backend: String,
+        entries: Vec<crate::ExecutionContextEntry>,
+    },
     Container {
         snapshot: Box<crate::ContainerSnapshot>,
     },

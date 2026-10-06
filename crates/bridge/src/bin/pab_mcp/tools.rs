@@ -25,6 +25,7 @@ pub(super) async fn call_tool(
         "pab_list_network_connections"
         | "pab_resolve_dns"
         | "pab_list_sessions"
+        | "pab_list_execution_contexts"
         | "pab_terminate_process"
         | "pab_list_services"
         | "pab_get_service"

@@ -107,7 +107,37 @@ impl TaskService {
             let async_result =
                 tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
                     .await;
-            let r = if let SystemQuery::Desktop {
+            let r = if matches!(query, SystemQuery::ExecutionContexts { .. }) {
+                let mut reply = pab_platform::collect_execution_contexts(id, &query).await;
+                if let Some(pab_protocol::SystemQueryData::ExecutionContexts { entries, .. }) =
+                    &mut reply.data
+                {
+                    let caller = pab_task_runtime::ExecutionCaller {
+                        device: service.device_ref,
+                        actor,
+                        connection: service.ui_connection.id,
+                    };
+                    let mut registry = service.ui_connection.execution_contexts.lock().await;
+                    for entry in entries {
+                        let Some(identity) = entry.identity.as_ref() else {
+                            continue;
+                        };
+                        if identity.mode == pab_protocol::ExecutionMode::Service {
+                            entry.selection = Some(pab_protocol::ExecutionSelection::Service {});
+                        } else {
+                            match registry.register(caller, identity.clone()) {
+                                Ok(context_ref) => {
+                                    entry.selection =
+                                        Some(pab_protocol::ExecutionSelection::User { context_ref })
+                                }
+                                Err(error) => entry.unavailable_reason = Some(error.to_string()),
+                            }
+                        }
+                    }
+                }
+                pab_platform::bound_system_reply(&mut reply);
+                reply
+            } else if let SystemQuery::Desktop {
                 query: pab_protocol::DesktopQuery::Ui { query: ui },
             } = &query
             {

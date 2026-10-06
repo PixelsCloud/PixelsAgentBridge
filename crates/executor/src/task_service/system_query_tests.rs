@@ -6,6 +6,125 @@ use pab_protocol::{
 };
 use std::time::Duration;
 
+#[cfg(unix)]
+#[tokio::test]
+async fn execution_context_query_binds_native_user_references_to_each_mcp_connection() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = service(dir.path()).await;
+    let first = base.for_ui_connection();
+    let second = base.for_ui_connection();
+    let name = base
+        .execution_context
+        .identity
+        .as_ref()
+        .unwrap()
+        .account_name
+        .clone();
+    let query = SystemQuery::ExecutionContexts {
+        user: Some(name),
+        include_system: true,
+        limit: 16,
+    };
+    let mut selections = vec![];
+    for svc in [&first, &second] {
+        let id = RequestId::new();
+        let mut result = svc.system_query(actor(), id, query.clone()).await.unwrap();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+        while result.state == "running" {
+            assert!(tokio::time::Instant::now() < deadline);
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            result = svc.get_system_query(actor(), id).await.unwrap();
+        }
+        assert_eq!(result.state, "completed");
+        let Some(SystemQueryData::ExecutionContexts { entries, .. }) = result.data else {
+            panic!("missing context inventory")
+        };
+        let row = entries
+            .into_iter()
+            .find(|e| e.mode == pab_protocol::ExecutionMode::User)
+            .expect("current native user must be enumerable");
+        row.validate().unwrap();
+        let selection = row.selection.unwrap();
+        let identity = row.identity.unwrap();
+        let caller = pab_task_runtime::ExecutionCaller {
+            device: svc.device_ref,
+            actor: actor(),
+            connection: svc.ui_connection.id,
+        };
+        assert!(
+            svc.ui_connection
+                .execution_contexts
+                .lock()
+                .await
+                .resolve(caller, selection, &identity)
+                .is_ok()
+        );
+        selections.push((selection, identity));
+    }
+    assert_ne!(selections[0].0, selections[1].0);
+    let second_caller = pab_task_runtime::ExecutionCaller {
+        device: second.device_ref,
+        actor: actor(),
+        connection: second.ui_connection.id,
+    };
+    assert!(
+        second
+            .ui_connection
+            .execution_contexts
+            .lock()
+            .await
+            .resolve(second_caller, selections[0].0, &selections[0].1)
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn execution_context_query_records_native_service_and_deduplicates_sample() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await.for_ui_connection();
+    let id = RequestId::new();
+    let query = SystemQuery::ExecutionContexts {
+        user: None,
+        include_system: false,
+        limit: 1,
+    };
+    let mut reply = svc.system_query(actor(), id, query.clone()).await.unwrap();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+    while reply.state == "running" {
+        assert!(tokio::time::Instant::now() < deadline);
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        reply = svc.get_system_query(actor(), id).await.unwrap();
+    }
+    assert_eq!(reply.state, "completed", "{:?}", reply.error);
+    let Some(SystemQueryData::ExecutionContexts { entries, .. }) = &reply.data else {
+        panic!("wrong result")
+    };
+    assert_eq!(entries.len(), 1);
+    entries[0].validate().unwrap();
+    assert_eq!(
+        entries[0].selection,
+        Some(pab_protocol::ExecutionSelection::Service {})
+    );
+    assert_eq!(
+        entries[0].identity.as_ref(),
+        svc.execution_context.identity.as_ref()
+    );
+    assert_eq!(svc.system_query(actor(), id, query).await.unwrap(), reply);
+    assert!(
+        svc.system_query(
+            actor(),
+            id,
+            SystemQuery::ExecutionContexts {
+                user: Some("changed".into()),
+                include_system: false,
+                limit: 1
+            }
+        )
+        .await
+        .is_err()
+    );
+}
+
 #[tokio::test]
 async fn ui_mutation_restart_retains_unconfirmed_and_rejects_changed_payload() {
     use pab_protocol::*;

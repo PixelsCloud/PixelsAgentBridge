@@ -21,9 +21,7 @@ impl AuthenticatedDeviceConnection {
                 system_query_schema_version,
                 ..
             } if context.device_ref == self.device_ref => {
-                if system_query_schema_version.is_none_or(|v| v < query.required_version()) {
-                    return Err(BridgeError::UnsupportedSystemQuery);
-                }
+                require_capability(system_query_schema_version, &query)?;
             }
             response => return Err(unexpected_task_response(response)),
         }
@@ -79,7 +77,20 @@ impl AuthenticatedDeviceConnection {
         }
     }
 }
+fn require_capability(version: Option<u16>, query: &SystemQuery) -> Result<(), BridgeError> {
+    if version.is_none_or(|v| v < query.required_version()) {
+        return Err(BridgeError::UnsupportedSystemQuery);
+    }
+    Ok(())
+}
 fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
+    if let Some(SystemQueryData::ExecutionContexts { entries, .. }) = &r.data {
+        if entries.iter().any(|row| row.validate().is_err())
+            || r.returned_count as usize != entries.len()
+        {
+            return false;
+        }
+    }
     if ["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&r.kind.as_str()) {
         match &r.data {
             Some(SystemQueryData::Desktop { snapshot }) => {
@@ -135,6 +146,7 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "network_connections"
                 | "dns"
                 | "os_sessions"
+                | "execution_contexts"
                 | "process_terminate"
                 | "services"
                 | "service"
@@ -177,6 +189,10 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                     Some(SystemQueryData::Connections { .. })
                 ) | ("dns", Some(SystemQueryData::Dns { .. }))
                     | ("os_sessions", Some(SystemQueryData::Sessions { .. }))
+                    | (
+                        "execution_contexts",
+                        Some(SystemQueryData::ExecutionContexts { .. })
+                    )
                     | ("services", Some(SystemQueryData::Services { .. }))
                     | ("service", Some(SystemQueryData::Service { .. }))
                     | (
@@ -198,6 +214,22 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn execution_context_discovery_rejects_old_peers_without_blocking_existing_queries() {
+        let query = SystemQuery::ExecutionContexts {
+            user: None,
+            include_system: false,
+            limit: 10,
+        };
+        for version in [None, Some(1), Some(9)] {
+            assert!(matches!(
+                require_capability(version, &query),
+                Err(BridgeError::UnsupportedSystemQuery)
+            ));
+        }
+        assert!(require_capability(Some(10), &query).is_ok());
+        assert!(require_capability(Some(9), &SystemQuery::Disks { limit: 10 }).is_ok());
+    }
     #[test]
     fn capability_is_additive_and_reply_must_match_request_kind_identity_and_budget() {
         let json = serde_json::json!({"type":"environment","filesystem_schema_version":3,"context":{"device_ref":{"tenant_id":TenantId::from_u128(2),"device_id":DeviceId::from_u128(3)},"execution":{"os_family":"windows","os_name":"Windows","os_version":"fixture","architecture":"x86_64","execution_scope":"native","path_style":"windows","interpreter":null,"cwd":null,"environment_revision":"fixture"},"source":"executor_verified","observed_at_unix_ms":1,"freshness":"current"}});
