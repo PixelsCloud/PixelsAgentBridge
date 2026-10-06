@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ResultDirectory)
+param([Parameter(Mandatory=$true)][string]$ResultDirectory, [ValidateRange(0,1000)][int]$NodeCount = 0)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -58,6 +58,13 @@ foreach ($index in 0..1) {
     $duplicate.Text = 'Fixture duplicate'
     $duplicate.SetBounds(20,(320+40*$index),200,30)
     $form.Controls.Add($duplicate)
+}
+for ($index=0; $index -lt $NodeCount; $index++) {
+    $label=New-Object System.Windows.Forms.Label
+    $label.Text="Budget node $index"
+    $label.AccessibleName=$label.Text
+    $label.SetBounds(260,(280+$index*22),180,20)
+    $form.Controls.Add($label)
 }
 $script:started = [DateTime]::UtcNow
 $timer = New-Object System.Windows.Forms.Timer

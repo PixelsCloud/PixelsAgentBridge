@@ -29,6 +29,25 @@ impl Drop for UiApartment {
 pub struct WindowsUi {
     automation: UIAutomation,
 }
+/// Cache UIA's opaque identity while retaining the native element. Comparing
+/// every pair through COM makes wide trees unnecessarily expensive.
+#[derive(Clone)]
+pub struct WindowsElement {
+    native: UIElement,
+    runtime_id: Option<Vec<i32>>,
+}
+impl WindowsElement {
+    fn new(native: UIElement) -> Self {
+        let runtime_id = native.get_runtime_id().ok().filter(|id| !id.is_empty());
+        Self { native, runtime_id }
+    }
+}
+impl std::ops::Deref for WindowsElement {
+    type Target = UIElement;
+    fn deref(&self) -> &UIElement {
+        &self.native
+    }
+}
 impl WindowsUi {
     pub fn new(_: &UiApartment) -> Result<Self, &'static str> {
         Ok(Self {
@@ -92,8 +111,8 @@ fn checked(v: ToggleState) -> UiCheckState {
 }
 
 impl UiBackend for WindowsUi {
-    type Element = UIElement;
-    fn root(&mut self, window: &UiWindow) -> Result<UIElement, &'static str> {
+    type Element = WindowsElement;
+    fn root(&mut self, window: &UiWindow) -> Result<WindowsElement, &'static str> {
         self.verify_window(window)?;
         let root = self
             .automation
@@ -102,23 +121,28 @@ impl UiBackend for WindowsUi {
         if root.get_process_id().map_err(err)? != window.pid {
             return Err("stale_window");
         }
-        Ok(root)
+        Ok(WindowsElement::new(root))
     }
-    fn same(&self, a: &UIElement, b: &UIElement) -> bool {
-        self.automation.compare_elements(a, b).unwrap_or(false)
+    fn same(&self, a: &WindowsElement, b: &WindowsElement) -> bool {
+        match (&a.runtime_id, &b.runtime_id) {
+            (Some(a), Some(b)) => a == b,
+            _ => self.automation.compare_elements(a, b).unwrap_or(false),
+        }
     }
     fn validate(
         &mut self,
         window: &UiWindow,
-        root: &UIElement,
-        node: &UIElement,
+        root: &WindowsElement,
+        node: &WindowsElement,
     ) -> Result<(), &'static str> {
         self.verify_window(window)?;
         let current = self
             .automation
             .element_from_handle((window.id as i32 as isize).into())
             .map_err(err)?;
-        if !self.same(root, &current) || node.get_process_id().map_err(err)? != window.pid {
+        if !self.same(root, &WindowsElement::new(current))
+            || node.get_process_id().map_err(err)? != window.pid
+        {
             return Err("stale_element");
         }
         let walker = self.automation.get_control_view_walker().map_err(err)?;
@@ -127,15 +151,16 @@ impl UiBackend for WindowsUi {
             if self.same(&current, root) {
                 return Ok(());
             }
-            current = walker.get_parent(&current).map_err(|_| "stale_element")?;
+            current =
+                WindowsElement::new(walker.get_parent(&current).map_err(|_| "stale_element")?);
         }
         Err("element_outside_window")
     }
     fn children(
         &mut self,
-        node: &UIElement,
+        node: &WindowsElement,
         max: usize,
-    ) -> Result<(Vec<UIElement>, bool), &'static str> {
+    ) -> Result<(Vec<WindowsElement>, bool), &'static str> {
         let walker = self.automation.get_control_view_walker().map_err(err)?;
         let mut next = walk_child(&walker, node, false)?;
         let mut children = vec![];
@@ -143,6 +168,7 @@ impl UiBackend for WindowsUi {
             let Some(child) = next else {
                 return Ok((children, false));
             };
+            let child = WindowsElement::new(child);
             if children.len() >= max {
                 return Ok((children, true));
             }
@@ -154,7 +180,11 @@ impl UiBackend for WindowsUi {
         }
     }
 
-    fn read(&mut self, node: &UIElement, include_value: bool) -> Result<UiElement, &'static str> {
+    fn read(
+        &mut self,
+        node: &WindowsElement,
+        include_value: bool,
+    ) -> Result<UiElement, &'static str> {
         let t = node.get_control_type().map_err(err)?;
         let mut errors = BTreeMap::new();
         let protected = optional(node.is_password(), "protected", &mut errors).unwrap_or(true);
@@ -236,7 +266,7 @@ impl UiBackend for WindowsUi {
             field_errors: errors,
         })
     }
-    fn act(&mut self, node: &UIElement, action: &UiAction) -> Result<(), &'static str> {
+    fn act(&mut self, node: &WindowsElement, action: &UiAction) -> Result<(), &'static str> {
         if !node.is_enabled().map_err(err)? {
             return Err("control_not_enabled");
         }

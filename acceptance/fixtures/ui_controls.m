@@ -1,20 +1,31 @@
 #import <Cocoa/Cocoa.h>
 #include <unistd.h>
 
-@interface PabControls : NSObject
+@interface PabControls : NSObject <NSTableViewDataSource,NSTableViewDelegate>
 @property(copy) NSString *directory;
 @property(strong) NSTextField *input;
 @property(strong) NSButton *check;
 @property(strong) NSButton *radio;
+@property(strong) NSTableView *table;
 @property NSInteger clicks;
 -(void)apply:(id)sender;
 @end
 @implementation PabControls
+-(NSInteger)numberOfRowsInTableView:(NSTableView*)table {return 2;}
+-(id)tableView:(NSTableView*)table objectValueForTableColumn:(NSTableColumn*)column row:(NSInteger)row {
+    return row==0 ? @"Fixture first" : @"Fixture second";
+}
+-(NSTableRowView*)tableView:(NSTableView*)table rowViewForRow:(NSInteger)row {
+    NSTableRowView *view=[NSTableRowView new];
+    view.accessibilityLabel=row==0 ? @"Fixture first row" : @"Fixture second row";
+    return view;
+}
 -(void)apply:(id)sender {
     self.clicks++;
     NSDictionary *result=@{@"clicks":@(self.clicks),@"value":self.input.stringValue,
                            @"checked":@(self.check.state==NSControlStateValueOn),
-                           @"radio":@(self.radio.state==NSControlStateValueOn)};
+                           @"radio":@(self.radio.state==NSControlStateValueOn),
+                           @"selected":@(self.table.selectedRow)};
     NSData *json=[NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
     [json writeToFile:[self.directory stringByAppendingPathComponent:@"result.json"] atomically:YES];
 }
@@ -25,7 +36,7 @@ static NSWindow *fixtureWindow;
 static PabControls *fixtureTarget;
 
 int main(int argc,char **argv) {
-    if(argc!=2)return 2;
+    if(argc<2 || argc>3)return 2;
     @autoreleasepool {
         NSString *directory=[NSString stringWithUTF8String:argv[1]];
         NSString *ready=[directory stringByAppendingPathComponent:@"ready.json"];
@@ -60,9 +71,23 @@ int main(int argc,char **argv) {
         target.radio=[[NSButton alloc] initWithFrame:NSMakeRect(20,340,220,30)];
         [target.radio setButtonType:NSButtonTypeRadio];target.radio.title=@"Fixture radio";
         [win.contentView addSubview:target.radio];
+        target.table=[[NSTableView alloc] initWithFrame:NSMakeRect(300,200,220,100)];
+        NSTableColumn *column=[[NSTableColumn alloc] initWithIdentifier:@"fixture_column"];
+        column.width=200;[target.table addTableColumn:column];
+        target.table.headerView=nil;target.table.dataSource=target;target.table.delegate=target;
+        target.table.accessibilityLabel=@"Fixture list";
+        NSScrollView *scroll=[[NSScrollView alloc] initWithFrame:target.table.frame];
+        scroll.documentView=target.table;[win.contentView addSubview:scroll];
+        [target.table reloadData];
         for(int i=0;i<2;i++){
             NSButton *duplicate=[[NSButton alloc] initWithFrame:NSMakeRect(300,340+i*40,220,30)];
             duplicate.title=@"Fixture duplicate";[win.contentView addSubview:duplicate];
+        }
+        int nodeCount=argc==3 ? atoi(argv[2]) : 0;
+        if(nodeCount<0 || nodeCount>1000)exit(4);
+        for(int i=0;i<nodeCount;i++){
+            NSTextField *label=[NSTextField labelWithString:[NSString stringWithFormat:@"Budget node %d",i]];
+            label.frame=NSMakeRect(300,450+i*22,200,20);[win.contentView addSubview:label];
         }
         [win makeKeyAndOrderFront:nil];[app activateIgnoringOtherApps:YES];
         NSAccessibilityPostNotification(win,NSAccessibilityWindowCreatedNotification);

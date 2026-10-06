@@ -153,6 +153,10 @@ Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署�
 | `pab_focus_window` | 聚焦指定引用窗口，遵守系统前台限制 |
 | `pab_window_control` | 最小化、最大化、还原或请求正常关闭窗口 |
 | `pab_type_text` | 向明确指定的前台窗口输入 Unicode 文字 |
+| `pab_ui_query` | 在明确窗口或控件内查询有界可访问性控件树 |
+| `pab_ui_get` | 读取指定控件属性，可显式读取非保护字段值 |
+| `pab_ui_action` | 执行控件支持的调用、填值、勾选、选择、展开、收起或聚焦 |
+| `pab_ui_wait` | 异步等待控件条件，采样间释放输入队列 |
 | `pab_capture_screenshot` | 以采集分辨率返回桌面或指定窗口的 JPEG，附带坐标、尺寸和哈希 |
 | `pab_desktop_input` | 发送原有单事件，或按顺序执行绑定窗口的桌面操作批次 |
 | `pab_open_terminal` | 打开交互终端 |
@@ -325,6 +329,40 @@ DNS 使用 `hickory-resolver`，每次读取目标系统 DNS 配置，不回退�
 `mutation` 返回阶段、计划/处理项数、写入/删除数、`partial`、`source_removed` 和有限逐项结果（64 项或 8 KiB）。取消在检查点停止，阻塞 OS I/O 可能延迟停止；只有 `cancelled` 确认 worker 已退出。失败或取消保留已生效项，包括后续 ZIP 条目 CRC 损坏前已解出的文件，不自动回滚。删除只移除计划项，拒绝盘符/根目录。结果未确认时查询原 ID，不重新执行。PAB 路径锁覆盖祖先和子路径，但不提供对外部程序的原子目录操作；ZIP 不保留 ACL、属主和扩展元数据。
 
 新文件工具已完成 Windows 本地自动化验证，包括隔离 QUIC 与 MCP stdio。安装后的宿主调用、物理跨盘和 Windows/Linux 双机验收仍待完成；旧安装包不含这些新增工具。
+
+### 控件查询与操作
+
+四个 `pab_ui_*` 工具要求系统能力 v9、桌面 helper v4。Windows 复用精确固定的
+`uiautomation 0.25.1`（Apache-2.0）及微软官方绑定；macOS 复用
+`accessibility`/`accessibility-sys 0.2.0`（MIT/Apache-2.0）。原生对象运行在可回收的
+内部 `--ui-worker` 进程中，仍属于桌面程序，不增加网络连接。
+
+先用 `pab_list_windows` 获取窗口引用，再调用 `pab_ui_query`：
+
+```json
+{"device_code":"123456789","scope":{"type":"window","window_ref":"<返回的 UUID>"},"selector":{"role":"text_field","name":"搜索"}}
+```
+
+从返回结果明确选择一个 `element_ref`，供 get/action 使用；名称不保证唯一。
+填值使用 `"action":{"type":"set_value","value":"hello"}`。query 和 action 不返回字段值，
+需要时显式 get 并设置 `"include_value":true`。密码字段不读取也不写入。
+无名表格行可以查询子树、读取单元格后确定父行引用。只执行 `supported_actions` 声明的能力，
+失败不隐式改用坐标点击或键盘输入。
+
+查询默认100个结果、深度6、3秒，最大500个结果、深度12、访问2000节点、10秒。
+响应不超过32 KiB并标明截断；应缩小范围，不对变化中的树做offset分页。
+wait支持exists/absent/enabled/value_equals/checked/selected，默认5秒、250毫秒采样，
+最长30秒。部分查询不能证明控件消失，需要唯一目标的条件遇到多个匹配会报ambiguous。
+
+引用绑定当前认证连接和helper会话；窗口关闭、worker重启或引用过期后需重新查询。
+可以通过 `expected` 前置条件拒绝已经变化的控件，但原生校验和动作不是原子事务。
+约250毫秒未完成时返回操作引用；保留 `request_id`，用 `pab_get_operation` 观察，
+未确认的动作不能盲目重放。取消不撤销已派发效果。`verification` 区分原生API返回和
+实际属性达成；调用按钮不等于已经完成保存等业务。本地摘要不显示控件名和输入文字；
+显式query/get的结果会在本地保留，AI宿主也可能保留这些返回内容。
+
+开发范围和当前验收证据见[控件长任务](UI_AUTOMATION_ROADMAP.md)及
+[验证报告](acceptance/ui-u0-2026-10-06.md)。本轮不包含Linux可访问性、安全桌面及任意自绘控件。
 
 ### 窗口引用、控制与 Unicode 输入
 

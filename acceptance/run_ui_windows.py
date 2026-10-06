@@ -65,6 +65,38 @@ def main():
 
     try:
         tree_request = {"operation": "query", "scope": {"type": "window", "window_ref": ticket["window_ref"]}}
+        if len(sys.argv)>2 and sys.argv[2] == "--stress":
+            process = kernel.OpenProcess(0x1000, False, child.pid)
+            assert process
+            def handles():
+                count=ctypes.c_uint32()
+                assert kernel.GetProcessHandleCount(ctypes.c_void_p(process),ctypes.byref(count))
+                return count.value
+            rounds=[]
+            try:
+                bounded={**tree_request, "limits":{"limit":500,"max_visited":2000,"max_depth":12,"timeout_ms":10000}}
+                start=time.monotonic()
+                large=query(bounded,ticket,timeout=12)
+                first_ms=round((time.monotonic()-start)*1000)
+                reply_bytes=len(json.dumps(large,separators=(",",":"),ensure_ascii=False).encode())
+                assert large["truncated"] and reply_bytes<32768, (large["stop_reason"],reply_bytes)
+                scan={**bounded,"limits":{**bounded["limits"],"timeout_ms":3000},"selector":{"name":"nonexistent budget selector"}}
+                # Warm provider/COM caches before collecting the resource baseline.
+                query(scan,ticket,timeout=12)
+                baseline=handles()
+                for _ in range(50):
+                    start=time.monotonic(); sample=query(scan,ticket,timeout=12)
+                    assert not sample["error_code"] and (not sample["truncated"] or sample["stop_reason"]=="time_budget"), sample
+                    rounds.append({"ms":round((time.monotonic()-start)*1000),"visited":sample["visited_count"],"handles":handles(),"truncated":sample["truncated"]})
+                end=handles()
+                assert end<=baseline+8, (baseline,end)
+                report={"rounds":50,"baseline_handles":baseline,"final_handles":end,"max_ms":max(r["ms"] for r in rounds),"min_visited":min(r["visited"] for r in rounds),"bounded_query_ms":first_ms,"stop_reason":large["stop_reason"],"returned":len(large["elements"]),"response_bytes":reply_bytes}
+                report["time_limited_rounds"]=sum(r["truncated"] for r in rounds)
+                (root/"stress-report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+                print(json.dumps(report))
+                return
+            finally:
+                kernel.CloseHandle(ctypes.c_void_p(process))
         tree = query(tree_request, ticket)
         assert not tree["error_code"] and not tree["truncated"], tree
         refs = {e["name"]: e["element_ref"] for e in tree["elements"] if e["name"]}

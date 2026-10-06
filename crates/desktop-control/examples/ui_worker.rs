@@ -49,6 +49,7 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
         let mut command = Command::new(std::env::current_exe()?);
         command.arg("--ui-worker");
         let mut worker = WorkerProcess::spawn(&mut command).map_err(|e| format!("worker {e:?}"))?;
+        let worker_pid = worker.process_id();
         let mut call = |ticket: Option<UiWindow>,
                         request: UiRequest|
          -> Result<UiSnapshot, Box<dyn std::error::Error>> {
@@ -74,7 +75,7 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
             Some(ticket.clone()),
             UiRequest::Query {
                 scope: UiScope::Window {
-                    window_ref: ticket.window_ref,
+                    window_ref: ticket.window_ref.clone(),
                 },
                 selector: UiSelector::default(),
                 limits: UiQueryLimits::default(),
@@ -83,6 +84,51 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
         if let Some(code) = &tree.error_code {
             return Err(code.clone().into());
         }
+        if std::env::args().nth(3).as_deref() == Some("--stress") {
+            let rss = || -> Result<u64, Box<dyn std::error::Error>> {
+                let output = Command::new("/bin/ps")
+                    .args(["-o", "rss=", "-p", &worker_pid.to_string()])
+                    .output()?;
+                Ok(String::from_utf8(output.stdout)?.trim().parse()?)
+            };
+            let baseline = rss()?;
+            let mut max_ms = 0;
+            let mut min_visited = u32::MAX;
+            let mut truncated = 0;
+            for _ in 0..50 {
+                let start = std::time::Instant::now();
+                let result = call(
+                    Some(ticket.clone()),
+                    UiRequest::Query {
+                        scope: UiScope::Window {
+                            window_ref: ticket.window_ref.clone(),
+                        },
+                        selector: UiSelector {
+                            name: Some("nonexistent budget selector".into()),
+                            ..Default::default()
+                        },
+                        limits: UiQueryLimits::default(),
+                    },
+                )?;
+                if result.error_code.is_some() {
+                    return Err("stress provider failed".into());
+                }
+                min_visited = min_visited.min(result.visited_count);
+                max_ms = max_ms.max(start.elapsed().as_millis());
+                truncated += usize::from(result.truncated);
+            }
+            let final_rss = rss()?;
+            if final_rss > baseline + 8192 {
+                return Err("worker RSS grew beyond 8 MiB budget".into());
+            }
+            std::fs::write(
+                dir.join("stress-report.json"),
+                serde_json::to_vec_pretty(
+                    &serde_json::json!({"rounds":50,"baseline_rss_kib":baseline,"final_rss_kib":final_rss,"max_ms":max_ms,"min_visited":min_visited,"truncated_rounds":truncated,"initial_truncated":tree.truncated,"initial_stop_reason":tree.stop_reason,"initial_bytes":serde_json::to_vec(&tree)?.len()}),
+                )?,
+            )?;
+            return Ok(());
+        }
         std::fs::write(
             dir.join("backend-tree.json"),
             serde_json::to_vec_pretty(&tree)?,
@@ -90,7 +136,31 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
         if tree.truncated {
             return Err("unexpected truncated fixture".into());
         }
+        // Cell-based AppKit tables expose unnamed AXRows. Resolve the row by
+        // explicitly reading its child cell, exactly as an agent can do.
+        let mut second_row = None;
+        for cell in tree
+            .elements
+            .iter()
+            .filter(|e| e.role == UiRole::TextField && e.name.is_none())
+        {
+            let read = call(
+                None,
+                UiRequest::Get {
+                    element_ref: cell.element_ref.clone(),
+                    include_value: true,
+                },
+            )?;
+            if read.elements.first().and_then(|e| e.value.as_deref()) == Some("Fixture second") {
+                second_row = cell.parent_ref.clone();
+            }
+        }
         let reference = |name: &str| -> Result<String, Box<dyn std::error::Error>> {
+            if name == "Fixture second row" {
+                return second_row
+                    .clone()
+                    .ok_or_else(|| "second row missing".into());
+            }
             let matches: Vec<_> = tree
                 .elements
                 .iter()
@@ -160,6 +230,7 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
                 true,
             ),
             ("Fixture radio", UiAction::Select, true),
+            ("Fixture second row", UiAction::Select, true),
             (
                 "Fixture input",
                 UiAction::SetValue {
@@ -202,6 +273,7 @@ fn accept_fixture(dir: &std::path::Path) -> Result<(), String> {
             || result["value"] != "PAB 中文🙂"
             || !(result["checked"] == true || result["checked"] == 1)
             || !(result["radio"] == true || result["radio"] == 1)
+            || result["selected"] != 1
         {
             return Err("actual fixture effect mismatch".into());
         }

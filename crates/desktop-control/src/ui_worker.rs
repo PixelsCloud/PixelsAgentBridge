@@ -32,6 +32,9 @@ pub struct WorkerProcess {
 }
 
 impl WorkerProcess {
+    pub fn process_id(&self) -> u32 {
+        self.child.id()
+    }
     pub fn spawn(command: &mut Command) -> Result<Self, WorkerFailure> {
         command
             .stdin(Stdio::piped())

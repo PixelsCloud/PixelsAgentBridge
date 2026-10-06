@@ -14,6 +14,10 @@ struct State {
     dead: bool,
     fail_after_effect: bool,
     protected: bool,
+    node_count: Option<u32>,
+    cycle: bool,
+    permission_denied: bool,
+    ignore_action: bool,
 }
 impl UiBackend for Fake {
     type Element = u32;
@@ -24,14 +28,25 @@ impl UiBackend for Fake {
         a == b
     }
     fn validate(&mut self, _: &UiWindow, _: &u32, _: &u32) -> Result<(), &'static str> {
-        if self.state.lock().unwrap().dead {
+        let state = self.state.lock().unwrap();
+        if state.permission_denied {
+            return Err("accessibility_permission_required");
+        }
+        if state.dead {
             Err("stale_element")
         } else {
             Ok(())
         }
     }
     fn children(&mut self, node: &u32, max: usize) -> Result<(Vec<u32>, bool), &'static str> {
-        let children = if *node == 0 { vec![1, 2] } else { vec![] };
+        let state = self.state.lock().unwrap();
+        let children = if *node == 0 {
+            (1..=state.node_count.unwrap_or(2)).collect::<Vec<_>>()
+        } else if state.cycle {
+            vec![0]
+        } else {
+            vec![]
+        };
         let omitted = children.len() > max;
         Ok((children.into_iter().take(max).collect(), omitted))
     }
@@ -67,7 +82,9 @@ impl UiBackend for Fake {
     fn act(&mut self, _: &u32, action: &UiAction) -> Result<(), &'static str> {
         let mut s = self.state.lock().unwrap();
         s.calls += 1;
-        if let UiAction::SetValue { value } = action {
+        if let UiAction::SetValue { value } = action
+            && !s.ignore_action
+        {
             s.value = value.clone();
         }
         if s.fail_after_effect {
@@ -279,4 +296,74 @@ fn truncated_values_do_not_satisfy_expected_value_or_verification() {
         },
     );
     assert_ne!(sample.outcome, UiOutcome::Matched);
+}
+#[test]
+fn wide_trees_cycles_and_byte_budgets_remain_bounded_and_cannot_prove_absence() {
+    let (mut engine, owner, ticket, state) = fixture();
+    state.lock().unwrap().node_count = Some(500);
+    state.lock().unwrap().cycle = true;
+    let mut request = query(&ticket);
+    if let UiRequest::Query { limits, .. } = &mut request {
+        limits.limit = 500;
+    }
+    let result = engine.run(&owner, Some(&ticket), &request);
+    assert!(result.truncated);
+    assert_eq!(result.stop_reason.as_deref(), Some("byte_budget"));
+    assert!(serde_json::to_vec(&result).unwrap().len() < MAX_UI_REPLY_BYTES);
+    if let UiRequest::Query { selector, .. } = &mut request {
+        selector.name = Some("absent".into());
+    }
+    let scan = engine.run(&owner, Some(&ticket), &request);
+    assert!(!scan.truncated);
+    assert_eq!(scan.visited_count, 501);
+    if let UiRequest::Query { limits, .. } = &mut request {
+        limits.max_visited = 100;
+        limits.limit = 100;
+    }
+    let partial = engine.run(&owner, Some(&ticket), &request);
+    assert!(partial.truncated);
+    assert!(partial.visited_count <= 100);
+    assert_ne!(
+        evaluate_ui_condition(&partial.elements, false, &UiCondition::Absent),
+        Ok(true)
+    );
+}
+#[test]
+fn permission_revocation_cache_release_and_native_success_without_effect_are_distinct() {
+    let (mut engine, owner, ticket, state) = fixture();
+    let reference = engine.run(&owner, Some(&ticket), &query(&ticket)).elements[1]
+        .element_ref
+        .clone();
+    state.lock().unwrap().permission_denied = true;
+    let denied = engine.run(&owner, None, &action(reference.clone(), "value"));
+    assert_eq!(
+        denied.error_code.as_deref(),
+        Some("accessibility_permission_required")
+    );
+    assert_eq!(denied.action_dispatched, Some(false));
+    state.lock().unwrap().permission_denied = false;
+    state.lock().unwrap().ignore_action = true;
+    let no_effect = engine.run(&owner, None, &action(reference.clone(), "value"));
+    assert_eq!(no_effect.action_dispatched, Some(true));
+    assert_eq!(no_effect.verification, UiVerification::Mismatched);
+    engine.release_owner(&owner);
+    assert_eq!(
+        engine
+            .run(&owner, None, &action(reference, "value"))
+            .error_code
+            .as_deref(),
+        Some("stale_element")
+    );
+    let reference = engine.run(&owner, Some(&ticket), &query(&ticket)).elements[1]
+        .element_ref
+        .clone();
+    engine.release_window(&ticket.window_ref);
+    assert_eq!(
+        engine
+            .run(&owner, None, &action(reference, "value"))
+            .error_code
+            .as_deref(),
+        Some("stale_element")
+    );
+    assert_eq!(state.lock().unwrap().calls, 1);
 }

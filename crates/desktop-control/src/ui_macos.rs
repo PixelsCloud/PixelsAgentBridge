@@ -55,6 +55,23 @@ fn number(node: &AXUIElement, key: &str) -> Result<i64, &'static str> {
         .and_then(|n| n.to_i64())
         .ok_or("provider_type_mismatch")
 }
+fn enabled(node: &AXUIElement) -> Result<bool, &'static str> {
+    match boolean(node, "AXEnabled") {
+        // AppKit rows omit AXEnabled; their owning table controls availability.
+        // Do not turn an arbitrary missing attribute/provider error into true.
+        Err("unsupported_attribute_or_action") if text(node, "AXRole")? == "AXRow" => {
+            let parent = attr(node, "AXParent")?
+                .downcast::<AXUIElement>()
+                .ok_or("provider_type_mismatch")?;
+            parent.set_messaging_timeout(0.5).map_err(mapped)?;
+            match text(&parent, "AXRole")?.as_str() {
+                "AXTable" | "AXOutline" => boolean(&parent, "AXEnabled"),
+                _ => Err("attribute_unavailable"),
+            }
+        }
+        result => result,
+    }
+}
 fn settable(node: &AXUIElement, key: &str) -> bool {
     node.is_settable(&AXAttribute::<CFType>::new(&CFString::new(key)))
         .unwrap_or(false)
@@ -370,7 +387,7 @@ impl UiBackend for MacUi {
             identifier: optional(text(node, "AXIdentifier"), "identifier", &mut errors),
             value,
             protected,
-            enabled: optional(boolean(node, "AXEnabled"), "enabled", &mut errors),
+            enabled: optional(enabled(node), "enabled", &mut errors),
             visible: None,
             offscreen: None,
             focused: optional(boolean(node, "AXFocused"), "focused", &mut errors),
@@ -385,7 +402,7 @@ impl UiBackend for MacUi {
         })
     }
     fn act(&mut self, node: &AXUIElement, action: &UiAction) -> Result<(), &'static str> {
-        if !boolean(node, "AXEnabled")? {
+        if !enabled(node)? {
             return Err("control_not_enabled");
         }
         match action {

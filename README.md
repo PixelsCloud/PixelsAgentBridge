@@ -179,6 +179,10 @@ for example `pixels.pab_connect`.
 | `pab_focus_window` | Focus a referenced window, respecting OS foreground policy |
 | `pab_window_control` | Minimize, maximize, restore or request normal close of a referenced window |
 | `pab_type_text` | Enter Unicode text into an explicitly referenced foreground window |
+| `pab_ui_query` | Query a bounded accessibility subtree of a referenced window or control |
+| `pab_ui_get` | Read a referenced control, optionally including its non-protected value |
+| `pab_ui_action` | Invoke, set text/check state, select, expand, collapse or focus a supported control |
+| `pab_ui_wait` | Wait asynchronously for a bounded control condition without holding the input queue |
 | `pab_capture_screenshot` | Capture current desktop or referenced window as JPEG at captured resolution, with metadata and hash |
 | `pab_desktop_input` | Send a legacy input event or an ordered window-bound batch of desktop actions |
 | `pab_open_terminal` | Open an interactive terminal |
@@ -561,6 +565,50 @@ ownership or extended metadata.
 These new file tools have Windows local automated coverage, including isolated
 QUIC and MCP stdio tests. Installed-host, physical cross-volume and Windows/Linux
 two-machine acceptance are still pending; older installers do not include them.
+
+### Accessibility control tools
+
+The four `pab_ui_*` tools require system capability v9 and desktop helper v4.
+Windows uses pinned `uiautomation 0.25.1` (Apache-2.0) and Microsoft's Windows
+bindings; macOS uses `accessibility`/`accessibility-sys 0.2.0` (MIT/Apache-2.0).
+Native objects live in a recoverable internal `--ui-worker` process. This is
+part of the desktop executable, with no additional network connection.
+
+Start with `pab_list_windows`, then query that `window_ref`. For example:
+
+```json
+{"device_code":"123456789","scope":{"type":"window","window_ref":"<returned UUID>"},"selector":{"role":"text_field","name":"Search"}}
+```
+
+Pass those arguments to `pab_ui_query`. Choose an explicit returned `element_ref`
+for `pab_ui_get` or `pab_ui_action`; names need not be unique. `set_value` uses
+`"action":{"type":"set_value","value":"hello"}`. Values are omitted from queries
+and action results; explicit get can request `"include_value":true`. Password
+values are never read or set. Unnamed table rows can be identified by querying
+their subtree and reading a child cell. Only advertised `supported_actions`
+are available; there is no implicit coordinate-click or keyboard fallback.
+
+Queries default to 100 results, depth 6 and 3 seconds; maximums are 500 results,
+depth 12, 2000 visited nodes and 10 seconds. Responses fit 32 KiB and report
+truncation. Narrow the scope instead of paging a changing tree. Wait accepts
+exists/absent/enabled/value_equals/checked/selected, defaults to 5 seconds and
+250 ms sampling, and permits up to 30 seconds. Partial queries cannot prove
+absence, and non-unique value/state matches return ambiguous.
+
+References belong to one authenticated connection and helper session. Closed
+windows, restarted workers and expired references require a fresh query.
+Use `expected` preconditions to reject changed controls; OS validation and
+action dispatch cannot be atomic against other desktop users. Operations that
+take over about 250 ms return an operation reference. Reuse `request_id`, poll
+`pab_get_operation`, and never replay an unconfirmed action. Cancellation does
+not undo dispatched effects. `verification` distinguishes native API return
+from observed desired state; invoking a button does not certify business success.
+Local summaries omit control names and entered text. Explicit query/get replies
+are retained locally and may be retained by the AI host.
+
+Implementation and current acceptance boundaries: [UI roadmap](UI_AUTOMATION_ROADMAP.md)
+and [UI verification report](acceptance/ui-u0-2026-10-06.md). Linux accessibility,
+secure desktops and arbitrary custom-drawn controls are outside this delivery.
 
 ### Referenced window control and Unicode input
 
