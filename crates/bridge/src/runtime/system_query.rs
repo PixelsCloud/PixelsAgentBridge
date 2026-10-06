@@ -424,6 +424,7 @@ mod tests {
         let id = RequestId::new();
         let query = SystemQuery::Git {
             query: GitQuery {
+                execution: Default::default(),
                 repo: "C:\\private-repo".into(),
                 action: GitAction::Commit {
                     files: vec!["selected.txt".into()],

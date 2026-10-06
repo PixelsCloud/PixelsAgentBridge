@@ -4,7 +4,7 @@ use pab_protocol::{
     ExecutionContextRef, ExecutionSelection, ExpectedEnvironment, RequestId, TaskState,
 };
 
-fn spec(svc: &TaskService) -> CommandTaskSpec {
+pub(super) fn spec(svc: &TaskService) -> CommandTaskSpec {
     CommandTaskSpec {
         program: if cfg!(windows) {
             "C:\\Windows\\System32\\whoami.exe"
@@ -22,7 +22,7 @@ fn spec(svc: &TaskService) -> CommandTaskSpec {
         },
     }
 }
-async fn finished(svc: &TaskService, task: TaskRef) -> TaskSnapshot {
+pub(super) async fn finished(svc: &TaskService, task: TaskRef) -> TaskSnapshot {
     tokio::time::timeout(Duration::from_secs(25), async {
         loop {
             let value = svc.store.get_task(actor(), task).await.unwrap();

@@ -3,6 +3,27 @@ use pab_protocol::{OperatorRef, RequestId, SystemQuery, SystemQueryReply};
 use sqlx::Row;
 
 impl TaskStore {
+    pub async fn existing_system_query(
+        &self,
+        actor: OperatorRef,
+        id: RequestId,
+        query: &SystemQuery,
+    ) -> Result<bool, TaskStoreError> {
+        let row=sqlx::query("SELECT o.initiated_by_json, q.query_json FROM read_operations o LEFT JOIN system_query_results q ON q.request_id=o.request_id WHERE o.request_id=?").bind(id.to_string()).fetch_optional(&self.pool).await?;
+        let Some(row) = row else {
+            return Ok(false);
+        };
+        if serde_json::from_str::<OperatorRef>(row.try_get("initiated_by_json")?)? != actor {
+            return Err(TaskStoreError::NotFound);
+        }
+        let Some(stored) = row.try_get::<Option<String>, _>("query_json")? else {
+            return Err(TaskStoreError::RequestConflict);
+        };
+        if serde_json::from_str::<SystemQuery>(&stored)? != query.persistence_form() {
+            return Err(TaskStoreError::RequestConflict);
+        }
+        Ok(true)
+    }
     pub async fn unresolved_container_control(
         &self,
         engine: &str,
@@ -32,11 +53,22 @@ impl TaskStore {
             .bind(serde_json::to_string(r)?).bind(r.request_id.to_string()).execute(&self.pool).await?;
         Ok(())
     }
+    #[cfg(test)]
     pub async fn accept_system_query(
         &self,
         actor: OperatorRef,
         id: RequestId,
         query: &SystemQuery,
+    ) -> Result<bool, TaskStoreError> {
+        self.accept_system_query_with_context(actor, id, query, None)
+            .await
+    }
+    pub async fn accept_system_query_with_context(
+        &self,
+        actor: OperatorRef,
+        id: RequestId,
+        query: &SystemQuery,
+        context: Option<&pab_protocol::ExecutionContext>,
     ) -> Result<bool, TaskStoreError> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let prior=sqlx::query("SELECT o.initiated_by_json, q.query_json FROM read_operations o LEFT JOIN system_query_results q ON q.request_id=o.request_id WHERE o.request_id=?").bind(id.to_string()).fetch_optional(&mut *tx).await?;
@@ -60,9 +92,11 @@ impl TaskStore {
         )
         .bind(id.to_string())
         .bind(serde_json::to_string(&query.persistence_form())?)
-        .bind(serde_json::to_string(&SystemQueryReply::pending(
-            id, query,
-        ))?)
+        .bind(serde_json::to_string(&{
+            let mut reply = SystemQueryReply::pending(id, query);
+            reply.execution_context = context.cloned();
+            reply
+        })?)
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;

@@ -44,8 +44,21 @@ struct Runner {
     cancelled: watch::Receiver<bool>,
     r: SystemQueryReply,
     snapshot: GitSnapshot,
-    store: Option<TaskStore>,
+    sink: GitSink,
     effects_started: bool,
+}
+
+#[derive(Clone)]
+pub(crate) enum GitSink {
+    Store(Option<TaskStore>),
+    Worker(tokio::sync::mpsc::Sender<GitEvent>),
+}
+pub(crate) enum GitEvent {
+    Lock(PathBuf, tokio::sync::oneshot::Sender<Result<(), String>>),
+    Progress(
+        SystemQueryReply,
+        tokio::sync::oneshot::Sender<Result<(), String>>,
+    ),
 }
 fn now() -> i64 {
     std::time::SystemTime::now()
@@ -80,7 +93,7 @@ async fn pipe(mut read: impl tokio::io::AsyncRead + Unpin) -> std::io::Result<(V
         overflow |= take != n;
     }
 }
-async fn repo_lock(path: PathBuf) -> Arc<Mutex<()>> {
+pub(crate) async fn repo_lock(path: PathBuf) -> Arc<Mutex<()>> {
     let mut locks = REPOS.get_or_init(Mutex::default).lock().await;
     locks.retain(|_, w| w.strong_count() > 0);
     if let Some(lock) = locks.get(&path).and_then(std::sync::Weak::upgrade) {
@@ -91,6 +104,39 @@ async fn repo_lock(path: PathBuf) -> Arc<Mutex<()>> {
     lock
 }
 impl Runner {
+    async fn worker_ack(
+        &mut self,
+        receive: tokio::sync::oneshot::Receiver<Result<(), String>>,
+    ) -> Result<(), Failure> {
+        let outcome = tokio::select! {
+            r=receive=>r.unwrap_or_else(|_|Err("user worker coordinator disconnected".into())),
+            _=tokio::time::sleep_until(self.deadline)=>Err("Git coordinator deadline exceeded".into()),
+            _=self.cancelled.wait_for(|v|*v)=>Err("Git cancellation requested".into()),
+        };
+        outcome.map_err(|message| Failure {
+            message,
+            unconfirmed: self.effects_started,
+            cancelled: *self.cancelled.borrow(),
+        })
+    }
+    async fn lock_repository(
+        &mut self,
+        path: PathBuf,
+    ) -> Result<Option<tokio::sync::OwnedMutexGuard<()>>, Failure> {
+        if let GitSink::Worker(send) = &self.sink {
+            let (answer, receive) = tokio::sync::oneshot::channel();
+            send.send(GitEvent::Lock(path, answer))
+                .await
+                .map_err(|_| Failure::from("Git coordinator unavailable".to_owned()))?;
+            self.worker_ack(receive).await?;
+            Ok(None)
+        } else {
+            let lock = repo_lock(path).await;
+            lock.try_lock_owned().map(Some).map_err(|_| {
+                Failure::from("git_repository_busy: another PAB Git operation is active".to_owned())
+            })
+        }
+    }
     async fn run(&mut self, args: &[String], effects: bool) -> Result<Output, Failure> {
         if *self.cancelled.borrow() {
             return Err(Failure {
@@ -238,15 +284,27 @@ impl Runner {
         self.snapshot.phase = phase.into();
         self.snapshot.command_completed = false;
         self.snapshot.exit_code = None;
-        if let Some(store) = &self.store {
-            let mut r = self.r.clone();
-            r.data = Some(SystemQueryData::Git {
-                snapshot: self.snapshot.clone(),
-            });
-            store
-                .save_system_progress(&r)
-                .await
-                .map_err(|e| Failure::from(format!("cannot persist Git phase: {e}")))?;
+        let r = bounded(self.r.clone(), self.snapshot.clone());
+        match &self.sink {
+            GitSink::Store(Some(store)) => {
+                store.save_system_progress(&r).await.map_err(|e| Failure {
+                    message: format!("cannot persist Git phase: {e}"),
+                    unconfirmed: self.effects_started,
+                    cancelled: false,
+                })?
+            }
+            GitSink::Store(None) => {}
+            GitSink::Worker(send) => {
+                let (answer, receive) = tokio::sync::oneshot::channel();
+                send.send(GitEvent::Progress(r, answer))
+                    .await
+                    .map_err(|_| Failure {
+                        message: "Git coordinator disconnected".into(),
+                        unconfirmed: self.effects_started,
+                        cancelled: false,
+                    })?;
+                self.worker_ack(receive).await?;
+            }
         }
         Ok(())
     }
@@ -322,10 +380,7 @@ impl Runner {
                 .into());
         }
         self.snapshot.repo = self.cwd.to_string_lossy().into_owned();
-        let lock = repo_lock(git_dir).await;
-        let _guard = lock.try_lock().map_err(|_| {
-            Failure::from("git_repository_busy: another PAB Git operation is active".to_owned())
-        })?;
+        let _guard = self.lock_repository(git_dir).await?;
         let head = self
             .run(
                 &["rev-parse".into(), "--verify".into(), "HEAD".into()],
@@ -732,14 +787,26 @@ fn bounded(mut r: SystemQueryReply, mut s: GitSnapshot) -> SystemQueryReply {
         return r;
     }
 }
+#[cfg(test)]
 pub(super) async fn query(
     id: RequestId,
     q: &GitQuery,
     cancelled: watch::Receiver<bool>,
     store: Option<TaskStore>,
 ) -> SystemQueryReply {
+    query_with_sink(id, q, cancelled, GitSink::Store(store), None).await
+}
+
+pub(crate) async fn query_with_sink(
+    id: RequestId,
+    q: &GitQuery,
+    cancelled: watch::Receiver<bool>,
+    sink: GitSink,
+    execution_context: Option<ExecutionContext>,
+) -> SystemQueryReply {
     let system = SystemQuery::Git { query: q.clone() };
     let mut r = SystemQueryReply::pending(id, &system);
+    r.execution_context = execution_context;
     r.sampled_from_unix_ms = Some(now());
     let mut runner = Runner {
         program: PathBuf::from("git"),
@@ -748,7 +815,7 @@ pub(super) async fn query(
         cancelled,
         r: r.clone(),
         snapshot: GitSnapshot::default(),
-        store,
+        sink,
         effects_started: false,
     };
     let result = if let Err(e) = q.validate() {
@@ -782,7 +849,7 @@ pub(super) async fn query(
 
 /// Resolve a lost push receipt only from the exact originally selected object/reference.
 /// A matching remote ref establishes the desired state, not which process published it.
-pub(super) async fn reconcile_push(
+pub(crate) async fn reconcile_push(
     q: &GitQuery,
     original: &SystemQueryReply,
 ) -> Option<SystemQueryReply> {
@@ -805,7 +872,7 @@ pub(super) async fn reconcile_push(
         cancelled,
         r: original.clone(),
         snapshot: snapshot.clone(),
-        store: None,
+        sink: GitSink::Store(None),
         effects_started: false,
     };
     let out = runner

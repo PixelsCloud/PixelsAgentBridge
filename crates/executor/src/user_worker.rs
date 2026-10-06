@@ -15,10 +15,20 @@ use tokio::{
 const HANDSHAKE: Duration = Duration::from_secs(15);
 const CONTROL_LIMIT: usize = 64 * 1024;
 const BINARY_LIMIT: usize = 256 * 1024;
+pub(crate) mod git;
 pub(crate) mod terminal;
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum Control {
+    Git {
+        request: git::Request,
+    },
+    GitReply {
+        reply: git::Reply,
+    },
+    GitAck {
+        error: Option<String>,
+    },
     Hello {
         version: u16,
         identity: UserIdentity,
@@ -167,6 +177,7 @@ pub async fn run(address: &str, parent_pid: u32) -> io::Result<()> {
         .await
         .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "worker request timed out"))??;
     let command = match decode(request)? {
+        Control::Git { request } => return git::serve(peer, request).await,
         Control::Command { command } => command,
         Control::Terminal {
             request: terminal::Request::Open { cols, rows },

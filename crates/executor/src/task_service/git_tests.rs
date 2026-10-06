@@ -44,6 +44,7 @@ impl Fixture {
     }
     fn spec(&self, action: GitAction) -> GitQuery {
         GitQuery {
+            execution: Default::default(),
             repo: self.repo.to_string_lossy().into(),
             action,
             timeout_ms: 10_000,
@@ -246,6 +247,7 @@ async fn empty_repository_bad_references_truncation_and_checkout_preserve_change
     let r = query(
         RequestId::new(),
         &GitQuery {
+            execution: Default::default(),
             repo: empty.to_string_lossy().into(),
             action: GitAction::Log {
                 start: None,
@@ -474,7 +476,7 @@ async fn literal_file_selection_repo_busy_missing_git_and_merge_conflicts_are_ex
         cancelled,
         r: SystemQueryReply::pending(RequestId::new(), &system),
         snapshot: GitSnapshot::default(),
-        store: None,
+        sink: GitSink::Store(None),
         effects_started: false,
     };
     let error = match runner.run(&["status".into()], false).await {

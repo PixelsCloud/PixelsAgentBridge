@@ -2,7 +2,7 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 10;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 11;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
@@ -100,6 +100,9 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::Git { query } if !query.execution.is_service()) {
+            return 11;
+        }
         if matches!(self, Self::ExecutionContexts { .. }) {
             return 10;
         }
@@ -312,6 +315,8 @@ impl SystemQuery {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SystemQueryReply {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_context: Option<crate::ExecutionContext>,
     pub request_id: RequestId,
     pub kind: String,
     pub state: String,
@@ -328,6 +333,7 @@ pub struct SystemQueryReply {
 impl SystemQueryReply {
     pub fn pending(id: RequestId, query: &SystemQuery) -> Self {
         Self {
+            execution_context: None,
             request_id: id,
             kind: query.kind().into(),
             state: "running".into(),

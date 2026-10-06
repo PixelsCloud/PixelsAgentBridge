@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GitQuery {
+    #[serde(default, skip_serializing_if = "crate::ExecutionSelection::is_service")]
+    pub execution: crate::ExecutionSelection,
     pub repo: String,
     pub action: GitAction,
     pub timeout_ms: u32,
@@ -76,6 +78,12 @@ impl GitQuery {
         )
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if matches!(
+            self.execution,
+            crate::ExecutionSelection::DesktopUser { .. }
+        ) {
+            return Err("Git supports service or user execution, not desktop_user");
+        }
         if !serde_json::to_vec(self).is_ok_and(|b| b.len() <= 60 * 1024) {
             return Err(
                 "Git request exceeds the 60 KiB control payload budget; select fewer files",
@@ -233,6 +241,7 @@ mod tests {
     #[test]
     fn git_contract_rejects_injection_paths_and_conflicting_diff_and_hashes_commit_identity() {
         let mut q = GitQuery {
+            execution: Default::default(),
             repo: "C:\\repo".into(),
             action: GitAction::Commit {
                 files: vec!["中文 空格.txt".into()],

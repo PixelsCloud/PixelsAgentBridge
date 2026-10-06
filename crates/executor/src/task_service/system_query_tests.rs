@@ -480,6 +480,7 @@ async fn queued_cancellation_never_executes_and_queue_deadline_is_persisted() {
     let id = RequestId::new();
     let query = SystemQuery::Git {
         query: pab_protocol::GitQuery {
+            execution: Default::default(),
             repo: dir
                 .path()
                 .join("not-a-repository")

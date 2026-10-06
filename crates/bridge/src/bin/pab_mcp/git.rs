@@ -18,8 +18,9 @@ pub(super) fn tools() -> Vec<Value> {
         let mutation=!["status","diff","log"].contains(&action);
         let mut properties=json!({"device_code":{"type":"string","pattern":"^[0-9]{9}$"},"request_id":{"type":"string","format":"uuid"},"repo":{"type":"string","minLength":1,"maxLength":4096},"timeout_ms":{"type":"integer","minimum":100,"maximum":300000,"default":if ["fetch","pull","push"].contains(&action){300000}else{30000}}});
         properties.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        properties["execution"]=json!({"oneOf":[{"type":"object","properties":{"mode":{"const":"service"}},"required":["mode"],"additionalProperties":false},{"type":"object","properties":{"mode":{"const":"user"},"context_ref":{"type":"string","format":"uuid"}},"required":["mode","context_ref"],"additionalProperties":false}]});
         let mut fields=vec!["device_code","repo"];fields.extend(required);
-        json!({"name":format!("pab_git_{action}"),"description":format!("{description} repo must be absolute on the TARGET OS. Git/SSH/credential configuration belongs to the Executor process OS identity, which may be a service account rather than the logged-in user. Requests are limited to 60 KiB. Requires native Git (switch >=2.23) and system-query capability v5. Results up to 32 KiB with explicit truncation. Keep request_id and poll pab_get_operation for the ORIGINAL result; same ID/params never re-executes, even after restart. Mutations return running after about 250ms. pab_cancel_operation requests stopping the owned Git process; accepted local/remote effects are not rolled back and may remain unconfirmed. Git descendants/native hooks may outlive cancellation. Operations on the same discovered git directory fail busy while another PAB Git operation runs."),"inputSchema":{"type":"object","properties":properties,"required":fields,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":(["fetch","pull","push"].contains(&action))}})
+        json!({"name":format!("pab_git_{action}"),"description":format!("{description} repo must be absolute on the TARGET OS. Default execution is service. Choose execution user/context_ref discovered on this connection to use that user’s Git/SSH/configuration; no fallback to the service account. User execution requires capability v11. Identity is frozen in the original record. Requests are limited to 60 KiB. Requires native Git (switch >=2.23) and system-query capability v5. Results up to 32 KiB with explicit truncation. Keep request_id and poll pab_get_operation for the ORIGINAL result; same ID/params never re-executes, even after restart. Mutations return running after about 250ms. pab_cancel_operation requests stopping the owned Git process; accepted local/remote effects are not rolled back and may remain unconfirmed. Git descendants/native hooks may outlive cancellation. Operations on the same discovered git directory fail busy while another PAB Git operation runs."),"inputSchema":{"type":"object","properties":properties,"required":fields,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":(["fetch","pull","push"].contains(&action))}})
     }).collect()
 }
 pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), String> {
@@ -36,6 +37,9 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
         .map_err(|e| e.to_string())?
         .unwrap_or_default();
     let repo = fields.remove("repo").ok_or("repo required")?;
+    let execution = fields
+        .remove("execution")
+        .unwrap_or(json!({"mode":"service"}));
     let timeout = fields
         .remove("timeout_ms")
         .unwrap_or(json!(if ["fetch", "pull", "push"].contains(&action) {
@@ -61,15 +65,45 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
     fields.insert("action".into(), json!(action));
     let action: GitAction =
         serde_json::from_value(Value::Object(fields)).map_err(|e| e.to_string())?;
-    let query: GitQuery =
-        serde_json::from_value(json!({"repo":repo,"action":action,"timeout_ms":timeout}))
-            .map_err(|e| e.to_string())?;
+    let query: GitQuery = serde_json::from_value(
+        json!({"repo":repo,"action":action,"timeout_ms":timeout,"execution":execution}),
+    )
+    .map_err(|e| e.to_string())?;
     query.validate().map_err(str::to_owned)?;
     Ok((id, SystemQuery::Git { query }))
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn selected_user_requires_v11_and_cannot_claim_a_username_or_password() {
+        let context_ref = pab_protocol::ExecutionContextRef::new();
+        let (_, q) = parse(
+            "pab_git_status",
+            &json!({"repo":"/repo","execution":{"mode":"user","context_ref":context_ref}}),
+        )
+        .unwrap();
+        assert_eq!(q.required_version(), 11);
+        for execution in [
+            json!({"mode":"user","username":"fixture"}),
+            json!({"mode":"service","password":"fixture"}),
+            json!({"mode":"desktop_user","context_ref":context_ref}),
+        ] {
+            assert!(
+                parse(
+                    "pab_git_status",
+                    &json!({"repo":"/repo","execution":execution})
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            serde_json::to_value(q.persistence_form())
+                .unwrap()
+                .to_string()
+                .contains(&context_ref.to_string())
+        );
+    }
     #[test]
     fn eight_tools_have_strict_parameters_and_preserve_request_identity() {
         assert_eq!(tools().len(), 8);

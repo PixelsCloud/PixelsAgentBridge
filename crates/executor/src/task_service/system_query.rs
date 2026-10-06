@@ -11,7 +11,33 @@ impl TaskService {
         query.validate().map_err(TaskServiceError::InvalidRequest)?;
         // Serialize acceptance/registration to keep a duplicate from observing a missing worker.
         let mut jobs = self.system_jobs.lock().await;
-        if !self.store.accept_system_query(actor, id, &query).await? {
+        if self.store.existing_system_query(actor, id, &query).await? {
+            drop(jobs);
+            return self.get_system_query(actor, id).await;
+        }
+        let mut git_context = None;
+        let mut git_user = None;
+        if let SystemQuery::Git { query: git } = &query {
+            let mut context = self.execution_context.clone();
+            context.cwd = Some(git.repo.clone());
+            if let Some((prepared, identity)) = self.prepare_user(actor, git.execution).await? {
+                use sha2::Digest;
+                context.environment_revision = format!(
+                    "user-v1:{:x}",
+                    sha2::Sha256::digest(serde_json::to_vec(&identity).map_err(|_| {
+                        TaskServiceError::InvalidRequest("invalid execution identity")
+                    })?)
+                );
+                context.identity = Some(identity);
+                git_user = Some(prepared);
+            }
+            git_context = Some(context);
+        }
+        if !self
+            .store
+            .accept_system_query_with_context(actor, id, &query, git_context.as_ref())
+            .await?
+        {
             drop(jobs);
             return self.get_system_query(actor, id).await;
         }
@@ -19,6 +45,7 @@ impl TaskService {
             Ok(p) => p,
             Err(_) => {
                 let mut r = SystemQueryReply::pending(id, &query);
+                r.execution_context = git_context.clone();
                 r.state = "failed".into();
                 r.error =
                     Some("executor_busy: system query queue is full (16 accepted queries)".into());
@@ -70,6 +97,7 @@ impl TaskService {
                 Some(Ok(Ok(p))) if !*cancelled.borrow() => p,
                 _ => {
                     let mut r = SystemQueryReply::pending(id, &query);
+                    r.execution_context = git_context.clone();
                     if *cancelled.borrow() {
                         r.state = "cancelled".into();
                         r.error = Some("cancelled before execution".into());
@@ -169,7 +197,44 @@ impl TaskService {
                         .await
                 }
             } else if let SystemQuery::Git { query: git } = &query {
-                super::git::query(id, git, cancelled, Some(service.store.clone())).await
+                if let Some(prepared) = git_user {
+                    let result = async {
+                        crate::user_worker::git::execute(
+                            &service.user_worker_executable()?,
+                            prepared,
+                            id,
+                            git.clone(),
+                            git_context.clone().expect("Git context frozen"),
+                            service.store.clone(),
+                            cancelled,
+                        )
+                        .await
+                    }
+                    .await;
+                    match result {
+                        Ok(reply) => reply,
+                        Err(_) => {
+                            let mut reply = service
+                                .store
+                                .get_system_query(actor, id)
+                                .await
+                                .unwrap_or_else(|_| SystemQueryReply::pending(id, &query));
+                            reply.execution_context = git_context.clone();
+                            reply.state = "unconfirmed".into();
+                            reply.error=Some("user Git worker result unconfirmed; inspect the original operation, do not replay".into());
+                            reply
+                        }
+                    }
+                } else {
+                    super::git::query_with_sink(
+                        id,
+                        git,
+                        cancelled,
+                        super::git::GitSink::Store(Some(service.store.clone())),
+                        git_context.clone(),
+                    )
+                    .await
+                }
             } else if let SystemQuery::Desktop { query: desktop } = &query {
                 match crate::local_ipc::request_desktop_query(id, desktop.clone()).await {
                     Ok(r) => r,
@@ -261,7 +326,7 @@ impl TaskService {
             && r.kind == "git_push"
             && !self.system_jobs.lock().await.contains(&id)
             && let SystemQuery::Git { query } = self.store.system_query_spec(actor, id).await?
-            && let Some(updated) = super::git::reconcile_push(&query, &r).await
+            && let Some(updated) = self.reconcile_git(&query, &r).await
         {
             self.store.finish_system_query(&updated).await?;
             r = updated;
@@ -277,6 +342,31 @@ impl TaskService {
             r = updated;
         }
         Ok(r)
+    }
+    async fn reconcile_git(
+        &self,
+        query: &pab_protocol::GitQuery,
+        original: &SystemQueryReply,
+    ) -> Option<SystemQueryReply> {
+        if query.execution.is_service() {
+            return super::git::reconcile_push(query, original).await;
+        }
+        let identity = original.execution_context.as_ref()?.identity.clone()?;
+        let prepared = tokio::task::spawn_blocking(move || {
+            pab_os_control::execution::PreparedUser::from_observation(&identity)
+        })
+        .await
+        .ok()?
+        .ok()?;
+        crate::user_worker::git::reconcile(
+            &self.user_worker_executable().ok()?,
+            prepared,
+            query.clone(),
+            original.clone(),
+        )
+        .await
+        .ok()
+        .flatten()
     }
     pub(crate) async fn cancel_system_query(
         &self,

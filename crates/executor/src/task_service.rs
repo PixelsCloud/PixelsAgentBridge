@@ -34,7 +34,7 @@ mod filesystem_mkdir;
 mod filesystem_publish;
 mod filesystem_search;
 mod filesystem_text;
-mod git;
+pub(crate) mod git;
 mod subscription;
 mod system_query;
 mod terminal;
@@ -1004,6 +1004,8 @@ impl TaskServiceError {
 
 #[cfg(test)]
 mod execution_tests;
+#[cfg(test)]
+mod git_user_tests;
 #[cfg(test)]
 mod tests;
 
