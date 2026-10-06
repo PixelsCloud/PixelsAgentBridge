@@ -17,6 +17,9 @@ while IFS= read -r command; do
     case $command in
         '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --session-helper') ;;
         '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --session-helper --desktop=LoginWindow') ;;
+        # The helper owns this child; install.sh bootouts the helper job before
+        # replacing the bundle. It is not an independently running GUI client.
+        '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop --ui-worker') ;;
         '/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop'*|'/Library/Application Support/PixelsAgentBridge/pab-mcp'*)
             echo 'Quit Pixels Agent Bridge and its MCP clients, then retry installation.' >&2; exit 1 ;;
     esac
