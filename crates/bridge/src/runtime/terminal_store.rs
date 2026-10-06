@@ -13,6 +13,30 @@ pub struct TerminalAuditEvent {
 }
 
 impl RuntimeStore {
+    pub(super) async fn save_terminal_identity(
+        &self,
+        id: RequestId,
+        identity: Option<&pab_protocol::ExecutionIdentity>,
+    ) -> Result<(), RuntimeStoreError> {
+        let Some(identity) = identity else { return Ok(()); };
+        identity.validate().map_err(|_| RuntimeStoreError::SnapshotIdentityMismatch)?;
+        let encoded = serde_json::to_string(identity)?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let existing: Option<String> = sqlx::query_scalar("SELECT identity_json FROM runtime_terminal_identity WHERE id=?")
+            .bind(id.to_string()).fetch_optional(&mut *tx).await?;
+        if let Some(existing) = existing {
+            if serde_json::from_str::<pab_protocol::ExecutionIdentity>(&existing)? != *identity {
+                return Err(RuntimeStoreError::SnapshotIdentityMismatch);
+            }
+        } else {
+            let inserted = sqlx::query("INSERT INTO runtime_terminal_identity (id,identity_json) SELECT id,? FROM runtime_operations WHERE id=? AND kind='terminal'")
+                .bind(encoded).bind(id.to_string()).execute(&mut *tx).await?;
+            if inserted.rows_affected() != 1 { return Err(RuntimeStoreError::NotFound); }
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn start_terminal_operation(
         &self,
         id: RequestId,

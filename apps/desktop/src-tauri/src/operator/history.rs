@@ -15,6 +15,7 @@ const HISTORY_PAGE_SIZE: usize = 40;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryTask {
+    execution_identity: Option<pab_protocol::ExecutionIdentity>,
     id: String,
     device_code: String,
     initiated_by: String,
@@ -33,6 +34,7 @@ pub struct HistoryTask {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryOperation {
+    execution_identity: Option<pab_protocol::ExecutionIdentity>,
     ui: Option<pab_protocol::UiOperationSummary>,
     id: String,
     device_code: String,
@@ -368,6 +370,7 @@ fn history_operation(
         .or_else(|| record.device_code.map(|code| code.to_string()))
         .unwrap_or_else(|| record.device_ref.device_id.to_string());
     HistoryOperation {
+        execution_identity: record.execution_identity,
         id: record.id,
         device_code,
         initiated_by: record.initiated_by,
@@ -428,6 +431,7 @@ async fn history_task(
     let stdout_offset = stdout.offset + stdout.bytes.len() as u64;
     let stderr_offset = stderr.offset + stderr.bytes.len() as u64;
     Ok(HistoryTask {
+        execution_identity: snapshot.execution_context.identity.clone(),
         id: task_ref.task_id.to_string(),
         device_code,
         initiated_by: match snapshot.initiated_by {

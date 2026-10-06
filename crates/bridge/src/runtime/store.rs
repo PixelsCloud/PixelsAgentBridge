@@ -145,6 +145,7 @@ impl RuntimeStore {
             "CREATE INDEX IF NOT EXISTS runtime_operations_owner ON runtime_operations (owner_session_id)",
             "CREATE TABLE IF NOT EXISTS runtime_async_transfers (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), phase TEXT NOT NULL, updated_at_unix_ms INTEGER NOT NULL, sha256 TEXT)",
             "CREATE TABLE IF NOT EXISTS runtime_transfer_context (id TEXT PRIMARY KEY REFERENCES runtime_operations(id), options_json TEXT NOT NULL, context_json TEXT)",
+            "CREATE TABLE IF NOT EXISTS runtime_terminal_identity (id TEXT PRIMARY KEY REFERENCES runtime_operations(id) ON DELETE CASCADE, identity_json TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS runtime_task_owners (request_id TEXT PRIMARY KEY REFERENCES runtime_tasks(request_id), owner_session_id TEXT NOT NULL, initiated_by TEXT NOT NULL, created_at_unix_ms INTEGER NOT NULL)",
             "CREATE INDEX IF NOT EXISTS runtime_task_owners_session ON runtime_task_owners (owner_session_id, created_at_unix_ms DESC)",
             "CREATE TABLE IF NOT EXISTS runtime_download_claims (destination_key TEXT PRIMARY KEY, operation_id TEXT NOT NULL REFERENCES runtime_operations(id))",
@@ -171,6 +172,10 @@ impl RuntimeStore {
         ] {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
+        // Project observed results only. A requested username or context_ref
+        // must never appear as the identity that actually executed an operation.
+        sqlx::query("CREATE VIEW IF NOT EXISTS runtime_operation_identity AS SELECT o.id, CASE WHEN o.kind = 'terminal' THEN t.identity_json WHEN o.kind = 'file_transfer' THEN json_extract(c.context_json, '$.identity') WHEN f.id IS NOT NULL THEN json_extract(f.reply_json, '$.execution_context.identity') ELSE json_extract(q.reply_json, '$.execution_context.identity') END AS identity_json FROM runtime_operations o LEFT JOIN runtime_terminal_identity t ON t.id=o.id LEFT JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_filesystem_results f ON f.id=o.id LEFT JOIN runtime_system_results q ON q.id=o.id")
+            .execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(Self { pool })
     }

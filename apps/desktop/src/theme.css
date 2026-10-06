@@ -146,6 +146,8 @@
   background: #23282f;
 }
 
+[data-theme="dark"] .application-browser > .ant-segmented { background: #23282f; }
+
 [data-theme="dark"] .home-recent-device,
 [data-theme="dark"] .device-basic-grid > div,
 [data-theme="dark"] .task-row,

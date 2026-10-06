@@ -19,6 +19,7 @@ pub async fn operator_list_directory(
     code: String,
     path: String,
     after: Option<String>,
+    execution: Option<pab_protocol::ExecutionSelection>,
 ) -> Result<DirectoryPageView, String> {
     let runtime = state.runtime().await?;
     let device_ref = runtime
@@ -26,7 +27,7 @@ pub async fn operator_list_directory(
         .await
         .map_err(|error| error.to_string())?;
     let page = runtime
-        .list_directory(device_ref, &path, after.as_deref(), 8)
+        .list_directory_as(device_ref, &path, after.as_deref(), 8, execution.unwrap_or_default())
         .await
         .map_err(|error| error.to_string())?;
     Ok(DirectoryPageView {

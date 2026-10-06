@@ -512,10 +512,22 @@ impl BridgeRuntime {
         args: Vec<String>,
         cwd: Option<String>,
     ) -> Result<TaskSnapshot, RuntimeError> {
+        self.submit_command_as(device_ref, request_id, program, args, cwd, Default::default()).await
+    }
+
+    pub async fn submit_command_as(
+        &self,
+        device_ref: DeviceRef,
+        request_id: RequestId,
+        program: String,
+        args: Vec<String>,
+        cwd: Option<String>,
+        execution: pab_protocol::ExecutionSelection,
+    ) -> Result<TaskSnapshot, RuntimeError> {
         let target = self.current_environment(device_ref).await?;
         let display_summary = display_summary(&program, &args);
         let command = CommandTaskSpec {
-            options: Default::default(),
+            options: pab_protocol::CommandOptions { execution, ..Default::default() },
             program,
             args,
             cwd,

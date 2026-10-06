@@ -299,6 +299,7 @@ mod tests {
             pab_protocol::EndpointKey::new([2; 32]),
         );
         let record = OperationRecord {
+            execution_identity: None,
             ui: None,
             id: request_id.to_string(),
             device_ref: DeviceRef {

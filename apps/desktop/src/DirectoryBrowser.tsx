@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { File, Folder, Link2 } from "lucide-react";
 import { Button, Input } from "antd";
 import { messages, type Language } from "./i18n";
+import type { ExecutionSelection } from "./executionQueries";
 
 type DirectoryEntry = {
   name: string;
@@ -17,7 +18,8 @@ type DirectoryPage = {
   nextAfter: string | null;
 };
 
-export function DirectoryBrowser({ code, osFamily, connected, language, onAuditChange }: {
+export function DirectoryBrowser({ code, osFamily, connected, language, onAuditChange, execution }: {
+  execution: ExecutionSelection | null;
   code: string;
   osFamily: string;
   connected: boolean;
@@ -42,11 +44,12 @@ export function DirectoryBrowser({ code, osFamily, connected, language, onAuditC
   }, [code, windows]);
 
   async function browse(target: string, cursor: string | null, direction: "first" | "next" | "back") {
-    if (!target.trim() || loading) return;
+    if (!target.trim() || loading || !execution || !connected) return;
     setLoading(true);
     setError("");
     try {
       const result = await invoke<DirectoryPage>("operator_list_directory", {
+        execution,
         code,
         path: target,
         after: cursor,
@@ -80,7 +83,7 @@ export function DirectoryBrowser({ code, osFamily, connected, language, onAuditC
         setAfter(null);
         setBack([]);
       }} />
-      <Button loading={loading} disabled={!connected || !path.trim()} onClick={() => void browse(path, null, "first")}>{loading ? t.loadingHistory : t.directoryBrowse}</Button>
+      <Button loading={loading} disabled={!connected || !path.trim() || !execution} onClick={() => void browse(path, null, "first")}>{loading ? t.loadingHistory : t.directoryBrowse}</Button>
     </div>
     {error && <div className="inline-error" role="alert">{error}</div>}
     {page && <>

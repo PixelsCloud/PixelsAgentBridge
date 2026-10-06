@@ -1,13 +1,17 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { useState } from "react";
 import { Button, Checkbox, Input, Menu, Progress, Segmented } from "antd";
 import { DirectoryBrowser } from "./DirectoryBrowser";
 import { WindowBrowser } from "./WindowBrowser";
 import { ScreenshotBrowser } from "./ScreenshotBrowser";
 import { TerminalBrowser } from "./TerminalBrowser";
+import { ApplicationBrowser } from "./ApplicationBrowser";
+import { ExecutionPicker, selectedExecution, useExecutionContexts } from "./ExecutionPicker";
+import type { ExecutionSelection } from "./executionQueries";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice, TransferUpdate } from "./operatorTypes";
 
-export type OperationKind = "command" | "transfer" | "directory" | "windows" | "screenshot" | "terminal";
+export type OperationKind = "command" | "transfer" | "directory" | "windows" | "screenshot" | "terminal" | "applications";
 
 type Props = {
   language: Language;
@@ -21,7 +25,7 @@ type Props = {
   cwd: string;
   onCwdChange: (value: string) => void;
   submitting: boolean;
-  onRunCommand: () => void;
+  onRunCommand: (execution: ExecutionSelection) => void;
   transferDirection: "upload" | "download";
   onTransferDirectionChange: (value: "upload" | "download") => void;
   transferSource: string;
@@ -47,15 +51,19 @@ export function RemoteOperationsPanel({
   onStartTransfer, onCancelTransfer, onAuditChange,
 }: Props) {
   const t = messages[language];
+  const contexts = useExecutionContexts(selected?.deviceCode, !!selected?.connected);
+  const [executionKey, setExecutionKey] = useState("service");
+  const execution = selectedExecution(contexts.entries, executionKey, "user");
   const operations: { kind: OperationKind; label: string }[] = [
     { kind: "command", label: t.commandTitle },
     { kind: "transfer", label: t.fileTransfer },
     { kind: "directory", label: t.directoryBrowse },
-    ...(selected?.osFamily.toLowerCase().includes("windows")
+    ...(/windows|mac/i.test(selected?.osFamily ?? "")
       ? [{ kind: "windows" as const, label: t.windowList }]
       : []),
     { kind: "screenshot", label: t.screenshot },
     { kind: "terminal", label: t.terminal },
+    { kind: "applications", label: t.applications },
   ];
 
   return (
@@ -67,6 +75,8 @@ export function RemoteOperationsPanel({
             onClick={({ key }) => onOperationChange(key as OperationKind)} />
           <div className="operation-panel" role="tabpanel">
             {!selected.connected && <p className="form-hint">{t.reconnectHint}</p>}
+            {["command", "directory", "terminal"].includes(operation) && <ExecutionPicker language={language} contexts={contexts}
+              mode="user" value={executionKey} onChange={setExecutionKey} connected={selected.connected} />}
             {operation === "command" && (
               <>
                 <p className="form-hint">{t.nativeCommandHint}</p>
@@ -86,8 +96,8 @@ export function RemoteOperationsPanel({
                 </div>
                 <Button type="primary"
                   className="primary-button"
-                  loading={submitting} disabled={!selected.connected || !program.trim()}
-                  onClick={() => onRunCommand()}
+                  loading={submitting} disabled={!selected.connected || !program.trim() || !execution}
+                  onClick={() => { if (execution) onRunCommand(execution); }}
                 >
                   {submitting ? t.runningCommand : t.runCommand}
                   <ArrowRight size={17} />
@@ -123,10 +133,11 @@ export function RemoteOperationsPanel({
                 )}
               </>
             )}
-            {operation === "directory" && <DirectoryBrowser code={selected.deviceCode} osFamily={selected.osFamily} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
+            {operation === "directory" && <DirectoryBrowser key={executionKey} execution={execution} code={selected.deviceCode} osFamily={selected.osFamily} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
             {operation === "windows" && <WindowBrowser code={selected.deviceCode} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
             {operation === "screenshot" && <ScreenshotBrowser code={selected.deviceCode} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
-            <TerminalBrowser code={selected.deviceCode} connected={selected.connected} language={language} visible={operation === "terminal"} onAuditChange={onAuditChange} />
+            <TerminalBrowser execution={execution} code={selected.deviceCode} connected={selected.connected} language={language} visible={operation === "terminal"} onAuditChange={onAuditChange} />
+            <div hidden={operation !== "applications"}><ApplicationBrowser code={selected.deviceCode} connected={selected.connected} language={language} contexts={contexts} onAuditChange={onAuditChange} /></div>
           </div>
         </>
       ) : (

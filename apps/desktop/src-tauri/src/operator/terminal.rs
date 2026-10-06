@@ -8,6 +8,7 @@ use super::{OperatorState, parse_code};
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalOpenedView {
+    execution_identity: Option<pab_protocol::ExecutionIdentity>,
     session_id: RequestId,
     shell: String,
     cols: u16,
@@ -44,6 +45,7 @@ pub async fn operator_open_terminal(
     code: String,
     cols: u16,
     rows: u16,
+    execution: Option<pab_protocol::ExecutionSelection>,
 ) -> Result<TerminalOpenedView, String> {
     let runtime = state.runtime().await?;
     let device_ref = runtime
@@ -51,7 +53,7 @@ pub async fn operator_open_terminal(
         .await
         .map_err(|error| error.to_string())?;
     let opened = runtime
-        .open_terminal(device_ref, cols, rows)
+        .open_terminal_as(device_ref, cols, rows, execution.unwrap_or_default())
         .await
         .map_err(|error| error.to_string())?;
     state
@@ -60,6 +62,7 @@ pub async fn operator_open_terminal(
         .await
         .insert(opened.session_id, runtime);
     Ok(TerminalOpenedView {
+        execution_identity: opened.identity,
         session_id: opened.session_id,
         shell: opened.shell,
         cols: opened.cols,

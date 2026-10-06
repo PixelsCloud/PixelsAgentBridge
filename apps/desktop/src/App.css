@@ -322,6 +322,15 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .command-audit { display: grid; gap: 4px; margin-top: 15px; color: #c9e6dc; font-size: 11px; }
 .command-audit span { color: #8da8b3; }
 .command-audit code { overflow-wrap: anywhere; }
+.execution-picker { display: grid; gap: 8px; margin-bottom: 16px; }
+.execution-picker small { opacity: .75; }
+.application-browser { display: grid; gap: 12px; min-width: 0; }
+.application-browser .execution-picker { margin-bottom: 0; }
+.application-browser > .ant-btn { justify-self: start; min-width: 120px; }
+.application-browser > .ant-segmented { justify-self: start; background: #eef4f3; }
+.application-browser .execution-identity, .terminal-browser .execution-identity { color: inherit; }
+.application-browser .execution-identity span, .terminal-browser .execution-identity span { color: inherit; opacity: .7; }
+.operation-details .execution-identity { margin-top: 0; }
 .check-row { display: flex; align-items: flex-start; gap: 9px; margin-top: 17px; color: #667e8c; font-size: 11px; line-height: 1.4; }
 .check-row input { width: 14px; height: 14px; flex: none; margin: 0; accent-color: #218574; }
 .toast { align-self: flex-end; flex: none; max-width: 340px; margin-bottom: 10px; padding: 10px 13px; border: 1px solid; border-radius: 9px; background: #fff; box-shadow: 0 12px 30px #1c375020; font-size: 11px; }

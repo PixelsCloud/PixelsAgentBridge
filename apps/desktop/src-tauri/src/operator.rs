@@ -19,6 +19,7 @@ use tokio::task::AbortHandle;
 use zeroize::Zeroizing;
 
 pub(crate) mod directory;
+pub(crate) mod execution;
 pub(crate) mod history;
 pub(crate) mod screenshot;
 pub(crate) mod terminal;
@@ -29,6 +30,7 @@ pub struct OperatorState {
     passwords: Arc<MemoryDevicePasswordProvider>,
     tasks: Mutex<HashMap<TaskId, (TaskRef, Arc<BridgeRuntime>)>>,
     terminal_runtimes: Mutex<HashMap<RequestId, Arc<BridgeRuntime>>>,
+    execution_queries: Mutex<HashMap<RequestId, execution::QueryOwner>>,
     transfers: Arc<Mutex<HashMap<String, AbortHandle>>>,
     events_started: AtomicBool,
     local: OnceCell<Arc<BridgeLocalStore>>,
@@ -58,6 +60,7 @@ impl OperatorState {
             )))),
             tasks: Mutex::new(HashMap::new()),
             terminal_runtimes: Mutex::new(HashMap::new()),
+            execution_queries: Mutex::new(HashMap::new()),
             transfers: Arc::new(Mutex::new(HashMap::new())),
             events_started: AtomicBool::new(false),
             local: OnceCell::new(),
@@ -210,6 +213,7 @@ pub async fn operator_saved_device_presence(
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskUpdate {
+    execution_identity: Option<pab_protocol::ExecutionIdentity>,
     state: String,
     complete: bool,
     stdout: String,
@@ -655,6 +659,7 @@ pub async fn operator_run_command(
     program: String,
     args: Vec<String>,
     cwd: Option<String>,
+    execution: Option<pab_protocol::ExecutionSelection>,
 ) -> Result<String, String> {
     if program.trim().is_empty() {
         return Err("program is required".to_owned());
@@ -665,7 +670,7 @@ pub async fn operator_run_command(
         .await
         .map_err(|error| error.to_string())?;
     let snapshot = runtime
-        .submit_command(device_ref, RequestId::new(), program, args, cwd)
+        .submit_command_as(device_ref, RequestId::new(), program, args, cwd, execution.unwrap_or_default())
         .await
         .map_err(|error| error.to_string())?;
     state.tasks.lock().await.insert(
@@ -740,6 +745,7 @@ pub async fn operator_task(
         .map(|snapshot| format!("{:?}", snapshot.state))
         .unwrap_or_else(|| "Pending".to_owned());
     Ok(TaskUpdate {
+        execution_identity: record.snapshot.as_ref().and_then(|snapshot| snapshot.execution_context.identity.clone()),
         state,
         complete: record.is_complete()
             && stdout_offset + stdout.bytes.len() as u64 >= record.stdout.available_to

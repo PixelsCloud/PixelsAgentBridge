@@ -6,8 +6,11 @@ import { Button } from "antd";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { messages, type Language } from "./i18n";
+import { ExecutionIdentityView } from "./ExecutionIdentityView";
+import type { ExecutionIdentity } from "./operatorTypes";
+import type { ExecutionSelection } from "./executionQueries";
 
-type Opened = { sessionId: string; shell: string; cols: number; rows: number };
+type Opened = { sessionId: string; shell: string; cols: number; rows: number; executionIdentity: ExecutionIdentity | null };
 type Output = { data: string; ended: boolean };
 
 function decode(data: string): Uint8Array<ArrayBuffer> {
@@ -17,7 +20,8 @@ function decode(data: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-export function TerminalBrowser({ code, connected, language, visible, onAuditChange }: {
+export function TerminalBrowser({ code, connected, language, visible, onAuditChange, execution }: {
+  execution: ExecutionSelection | null;
   code: string;
   connected: boolean;
   language: Language;
@@ -29,12 +33,14 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
   const terminal = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
   const session = useRef<string | null>(null);
+  const generation = useRef(0);
   const queue = useRef(Promise.resolve());
   const [opened, setOpened] = useState<Opened | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    generation.current++;
     if (!host.current) return;
     const instance = new Terminal({
       convertEol: true,
@@ -64,20 +70,30 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
         setError(String(cause));
       });
     });
+    let resizeFrame = 0;
+    let lastSize = "";
     const observer = new ResizeObserver(() => {
-      if (!host.current || host.current.clientWidth === 0) return;
-      addon.fit();
-      const id = session.current;
-      if (!id || instance.cols < 20 || instance.rows < 5) return;
-      queue.current = queue.current.then(() => invoke<void>("operator_terminal_resize", {
-        id,
-        cols: instance.cols,
-        rows: instance.rows,
-      })).catch((cause) => setError(String(cause)));
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        if (!host.current || host.current.clientWidth === 0) return;
+        addon.fit();
+        const id = session.current;
+        if (!id || instance.cols < 20 || instance.rows < 5) return;
+        const size = `${id}:${instance.cols}:${instance.rows}`;
+        if (lastSize === size) return;
+        lastSize = size;
+        queue.current = queue.current.then(() => invoke<void>("operator_terminal_resize", {
+          id,
+          cols: instance.cols,
+          rows: instance.rows,
+        })).catch((cause) => setError(String(cause)));
+      });
     });
     observer.observe(host.current);
     return () => {
+      generation.current++;
       observer.disconnect();
+      cancelAnimationFrame(resizeFrame);
       input.dispose();
       instance.dispose();
       terminal.current = null;
@@ -126,35 +142,41 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
   }, [opened?.sessionId]);
 
   async function start() {
-    if (!connected || busy || session.current) return;
+    if (!connected || busy || session.current || !execution) return;
     setBusy(true);
     setError("");
     terminal.current?.clear();
+    const current = generation.current;
     try {
       fit.current?.fit();
       const result = await invoke<Opened>("operator_open_terminal", {
+        execution,
         code,
         cols: Math.max(20, terminal.current?.cols ?? 80),
         rows: Math.max(5, terminal.current?.rows ?? 24),
       });
+      if (current !== generation.current) {
+        await invoke("operator_terminal_close", { id: result.sessionId });
+        return;
+      }
       session.current = result.sessionId;
       setOpened(result);
       terminal.current?.focus();
       onAuditChange();
     } catch (cause) {
-      setError(String(cause));
+      if (current === generation.current) setError(String(cause));
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
 
   async function stop() {
     const id = session.current;
     if (!id) return;
-    session.current = null;
     try {
       await queue.current;
       await invoke("operator_terminal_close", { id });
+      if (session.current === id) session.current = null;
       onAuditChange();
     } catch (cause) {
       setError(String(cause));
@@ -164,10 +186,11 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
   return <div className="terminal-browser" style={{ display: visible ? undefined : "none" }}>
     <p className="form-hint">{t.terminalHint}</p>
     <div className="terminal-actions">
-      <Button type="primary" loading={busy} disabled={!connected || !!session.current} onClick={() => void start()}>{t.openTerminal}<TerminalIcon size={17} /></Button>
+      <Button type="primary" loading={busy} disabled={!connected || !!session.current || !execution} onClick={() => void start()}>{t.openTerminal}<TerminalIcon size={17} /></Button>
       <Button disabled={!session.current} onClick={() => void stop()}>{t.closeTerminal}</Button>
       {opened && <span>{opened.shell}</span>}
     </div>
+    {opened && <ExecutionIdentityView identity={opened.executionIdentity} language={language} />}
     {error && <div className="inline-error" role="alert">{error}</div>}
     <div className="terminal-canvas" ref={host} />
   </div>;

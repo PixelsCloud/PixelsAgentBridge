@@ -10,6 +10,7 @@ import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, T
 import { RemoteConnectionPanel } from "./RemoteConnectionPanel";
 import { DeviceDetailPanel } from "./DeviceDetailPanel";
 import type { OperationKind } from "./RemoteOperationsPanel";
+import type { ExecutionSelection } from "./executionQueries";
 import { formatDeviceCode } from "./deviceCode";
 import { AccountConnectionPanel } from "./AccountConnectionPanel";
 import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
@@ -444,6 +445,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           return {
             ...item,
             state: update.state,
+            executionIdentity: update.executionIdentity,
             complete: update.complete,
             stdout: item.stdout + update.stdout,
             stderr: item.stderr + update.stderr,
@@ -610,7 +612,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }, [connectedCodes]);
 
   useEffect(() => {
-    if (operation === "windows" && selected && !selected.osFamily.toLowerCase().includes("windows")) {
+    if (operation === "windows" && selected && !/windows|mac/i.test(selected.osFamily)) {
       setOperation("command");
     }
   }, [operation, selected?.osFamily]);
@@ -679,12 +681,13 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     }
   }
 
-  async function runCommand() {
+  async function runCommand(execution: ExecutionSelection) {
     if (!selected?.connected || !program.trim()) return;
     setSubmitting(true);
     setError("");
     try {
       const id = await invoke<string>("operator_run_command", {
+        execution,
         code: selected.deviceCode,
         program: program.trim(),
         args: argumentsText.split(/\r?\n/).filter((line) => line.length > 0),
@@ -709,8 +712,8 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       setTasks(tasksRef.current);
       setSelectedActivityId(id);
       void refreshTask(id);
-    } catch {
-      setError(t.commandFailed);
+    } catch (cause) {
+      setError(`${t.commandFailed}: ${String(cause)}`);
     } finally {
       setSubmitting(false);
     }
@@ -912,6 +915,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
             command={selected && (
               <Suspense fallback={<div className="empty-device">{t.loading}</div>}>
                 <RemoteOperationsPanel
+                  key={`${selected.deviceCode}:${activeScope?.tenantId ?? "guest"}:${activeScope?.userId ?? "guest"}`}
                   language={language}
                   selected={selected}
                   operation={operation}
@@ -923,7 +927,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                   cwd={cwd}
                   onCwdChange={setCwd}
                   submitting={submitting}
-                  onRunCommand={() => void runCommand()}
+                  onRunCommand={(execution) => void runCommand(execution)}
                   transferDirection={transferDirection}
                   onTransferDirectionChange={setTransferDirection}
                   transferSource={transferSource}

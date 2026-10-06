@@ -143,6 +143,20 @@ impl BridgeRuntime {
                         offset: 0,
                     })),
                 );
+                if let Err(error) = self.inner.store.save_terminal_identity(id, opened.identity.as_ref()).await {
+                    // A successful native open must not leave an unreachable
+                    // child. Close directly: the usual audited close first
+                    // writes to the database that just failed.
+                    let cleanup = async {
+                        device.connection().await?.terminal_close(id, 1).await.map_err(RuntimeError::from)
+                    }.await;
+                    if let Err(close_error) = cleanup {
+                        return Err(RuntimeError::TaskOperation(format!("terminal {id} identity could not be saved ({error}); close outcome unconfirmed: {close_error}")));
+                    }
+                    self.inner.terminals.lock().await.remove(&id);
+                    let _ = self.inner.store.finish_operation(id, "failed", Some("terminal identity could not be saved; native terminal closed")).await;
+                    return Err(error.into());
+                }
                 Ok(opened)
             }
             Err(error) => {

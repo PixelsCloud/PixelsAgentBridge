@@ -319,6 +319,8 @@ pub fn run() {
             operator::history::operator_operations,
             operator::history::operator_rename_device,
             operator::operator_run_command,
+            operator::execution::operator_execution_query,
+            operator::execution::operator_execution_query_result,
             operator::operator_start_transfer,
             operator::operator_cancel_transfer,
             operator::directory::operator_list_directory,

@@ -12,6 +12,62 @@ use super::store::*;
 use super::{BridgeLocalStore, DevicePasswordProvider, SqliteDevicePasswordProvider};
 
 #[tokio::test]
+async fn operation_identity_survives_reopen_and_never_uses_requested_account() {
+    use pab_protocol::{ExecutionIdentity, ExecutionMode, ExecutionEnvironmentSource};
+    let directory = tempdir().unwrap();
+    let path = directory.path().join("identities.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    store.start_session("desktop").await.unwrap();
+    let identity = ExecutionIdentity {
+        mode: ExecutionMode::User, account_name: "alice".into(), account_id: "uid:23001".into(),
+        home: "/home/alice".into(), primary_group: Some(23001), session_id: None, logon_id: None,
+        environment_source: ExecutionEnvironmentSource::NativeAccount,
+    };
+    let mut ids = Vec::new();
+    for kind in ["terminal", "file_transfer", "file_read", "git_status", "old"] {
+        let id = RequestId::new();
+        store.start_terminal_operation(id, device_ref(), None, "guest", "fixture", "desktop").await.unwrap();
+        if kind == "terminal" {
+            store.save_terminal_identity(id, Some(&identity)).await.unwrap();
+            store.save_terminal_identity(id, Some(&identity)).await.unwrap();
+            let mut other = identity.clone(); other.account_id = "uid:23002".into(); other.account_name = "bob".into();
+            assert!(store.save_terminal_identity(id, Some(&other)).await.is_err());
+        } else if kind != "old" {
+            sqlx::query("UPDATE runtime_operations SET kind=? WHERE id=?").bind(kind).bind(id.to_string()).execute(&store.pool).await.unwrap();
+            let reply = serde_json::json!({"execution_context":{"identity":identity}}).to_string();
+            match kind {
+                "file_transfer" => { sqlx::query("INSERT INTO runtime_transfer_context (id, options_json, context_json) VALUES (?, ?, ?)")
+                    .bind(id.to_string()).bind(r#"{"execution":{"mode":"user","context_ref":"request-only"}}"#)
+                    .bind(serde_json::json!({"identity":identity}).to_string()).execute(&store.pool).await.unwrap(); },
+                "file_read" => { sqlx::query("INSERT INTO runtime_filesystem_results (id, fingerprint, reply_json) VALUES (?, 'fixture', ?)")
+                    .bind(id.to_string()).bind(reply).execute(&store.pool).await.unwrap(); },
+                _ => { sqlx::query("INSERT INTO runtime_system_results (id, query_json, reply_json) VALUES (?, '{}', ?)")
+                    .bind(id.to_string()).bind(reply).execute(&store.pool).await.unwrap(); },
+            }
+        }
+        ids.push((id.to_string(), kind));
+    }
+    store.close().await;
+    let reopened = RuntimeStore::open(&path).await.unwrap();
+    for records in [
+        reopened.operations().await.unwrap(),
+        reopened.operations_for_session("desktop").await.unwrap(),
+        reopened.operations_page(None, 20).await.unwrap(),
+        reopened.operations_page_for_device(device_ref(), None, 20).await.unwrap(),
+        reopened.operations_refresh().await.unwrap(),
+    ] {
+        assert_eq!(records.len(), ids.len());
+        for (id, kind) in &ids {
+            let record = records.iter().find(|r| &r.id == id).unwrap();
+            assert_eq!(record.execution_identity.as_ref(), if *kind == "old" { None } else { Some(&identity) });
+        }
+    }
+    // A requested context without an observed receipt is still unknown.
+    sqlx::query("UPDATE runtime_transfer_context SET context_json=NULL").execute(&reopened.pool).await.unwrap();
+    assert!(reopened.operations().await.unwrap().iter().find(|r| r.kind == "file_transfer").unwrap().execution_identity.is_none());
+}
+
+#[tokio::test]
 async fn concurrent_stores_initialize_one_database() {
     let directory = tempdir().unwrap();
     let path = directory.path().join("bridge.sqlite3");

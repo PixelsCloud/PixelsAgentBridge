@@ -10,6 +10,8 @@ const SESSION_STALE_AFTER_MS: i64 = 15_000;
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OperationRecord {
     #[serde(skip)]
+    pub execution_identity: Option<pab_protocol::ExecutionIdentity>,
+    #[serde(skip)]
     pub ui: Option<pab_protocol::UiOperationSummary>,
     pub id: String,
     pub device_ref: DeviceRef,
@@ -258,7 +260,7 @@ impl RuntimeStore {
 
     pub async fn operations(&self) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id ORDER BY o.started_at_unix_ms DESC, o.id DESC",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id ORDER BY o.started_at_unix_ms DESC, o.id DESC",
         )
             .fetch_all(&self.pool)
             .await?;
@@ -273,7 +275,7 @@ impl RuntimeStore {
         session_id: &str,
     ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o \
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o \
              LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id \
              WHERE o.owner_session_id = ? AND (o.finished_at_unix_ms IS NULL OR o.id IN \
                (SELECT id FROM runtime_operations WHERE owner_session_id = ? AND finished_at_unix_ms IS NOT NULL \
@@ -293,7 +295,7 @@ impl RuntimeStore {
     ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let stale_before = now_unix_ms().saturating_sub(SESSION_STALE_AFTER_MS);
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
         )
         .bind(before.map(|value| value.0))
         .bind(before.map(|value| value.0))
@@ -314,7 +316,7 @@ impl RuntimeStore {
     ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let stale_before = now_unix_ms().saturating_sub(SESSION_STALE_AFTER_MS);
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.device_ref_json = ? AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.device_ref_json = ? AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
         )
         .bind(serde_json::to_string(&device_ref)?)
         .bind(before.map(|value| value.0))
@@ -333,7 +335,7 @@ impl RuntimeStore {
         let stale_before = now.saturating_sub(SESSION_STALE_AFTER_MS);
         let recent_finish = now.saturating_sub(5 * 60 * 1_000);
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.state IN ('running', 'cancel_requested') OR o.finished_at_unix_ms >= ? OR o.id IN (SELECT id FROM runtime_operations ORDER BY started_at_unix_ms DESC, id DESC LIMIT 40) ORDER BY (o.state IN ('running', 'cancel_requested')) DESC, o.finished_at_unix_ms DESC, o.started_at_unix_ms DESC, o.id DESC LIMIT 200",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.state IN ('running', 'cancel_requested') OR o.finished_at_unix_ms >= ? OR o.id IN (SELECT id FROM runtime_operations ORDER BY started_at_unix_ms DESC, id DESC LIMIT 40) ORDER BY (o.state IN ('running', 'cancel_requested')) DESC, o.finished_at_unix_ms DESC, o.started_at_unix_ms DESC, o.id DESC LIMIT 200",
         )
         .bind(recent_finish)
         .fetch_all(&self.pool)
@@ -350,7 +352,7 @@ impl RuntimeStore {
     ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let stale_before = now_unix_ms().saturating_sub(SESSION_STALE_AFTER_MS);
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.kind = 'file_transfer' AND o.state = 'running' AND o.owner_session_id IS NOT NULL AND (s.id IS NULL OR s.stopped_at_unix_ms IS NOT NULL OR s.heartbeat_at_unix_ms < ?) AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.kind = 'file_transfer' AND o.state = 'running' AND o.owner_session_id IS NOT NULL AND (s.id IS NULL OR s.stopped_at_unix_ms IS NOT NULL OR s.heartbeat_at_unix_ms < ?) AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
         )
         .bind(stale_before)
         .bind(cursor.map(|value| value.0))
@@ -371,7 +373,7 @@ impl RuntimeStore {
     ) -> Result<Vec<OperationRecord>, RuntimeStoreError> {
         let stale_before = now_unix_ms().saturating_sub(SESSION_STALE_AFTER_MS);
         let rows = sqlx::query(
-            "SELECT o.*, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.kind = 'file_transfer' AND o.state = 'cancel_requested' AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
+            "SELECT o.*, (SELECT i.identity_json FROM runtime_operation_identity i WHERE i.id=o.id) AS execution_identity, COALESCE((SELECT a.phase FROM runtime_async_transfers a WHERE a.id = o.id), (SELECT json_extract(f.reply_json, '$.state') FROM runtime_filesystem_results f WHERE f.id = o.id), (SELECT json_extract(q.reply_json, '$.state') FROM runtime_system_results q WHERE q.id = o.id)) AS phase, (SELECT json_extract(f.reply_json, '$.mutation') FROM runtime_filesystem_results f WHERE f.id = o.id) AS filesystem_mutation, (SELECT json_extract(q.reply_json, '$.data.snapshot.ui') FROM runtime_system_results q WHERE q.id = o.id) AS ui_snapshot, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id WHERE o.kind = 'file_transfer' AND o.state = 'cancel_requested' AND (? IS NULL OR (o.started_at_unix_ms, o.id) < (?, ?)) ORDER BY o.started_at_unix_ms DESC, o.id DESC LIMIT ?",
         )
         .bind(cursor.map(|value| value.0))
         .bind(cursor.map(|value| value.0))
@@ -408,6 +410,11 @@ pub(super) fn decode_operation(
         Some("active".to_owned())
     };
     Ok(OperationRecord {
+        execution_identity: row
+            .try_get::<Option<String>, _>("execution_identity")
+            .unwrap_or(None)
+            .map(|s| serde_json::from_str(&s))
+            .transpose()?,
         ui: row
             .try_get::<Option<String>, _>("ui_snapshot")
             .unwrap_or(None)

@@ -10,6 +10,8 @@
 /tools/nsis/
 /apps/desktop/src-tauri/icons/android/
 /apps/desktop/src-tauri/icons/ios/
+/apps/desktop/test-results/
+/apps/desktop/playwright-report/
 /.build/
 /dist/
 /.idea/

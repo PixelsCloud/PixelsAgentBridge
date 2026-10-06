@@ -1,3 +1,12 @@
+export type ExecutionIdentity = {
+  mode: "service" | "user" | "desktop_user";
+  account_id: string;
+  account_name: string;
+  home: string;
+  session_id: string | null;
+  logon_id: string | null;
+};
+
 export type ConnectedDevice = {
   deviceId: string;
   deviceCode: string;
@@ -30,6 +39,7 @@ export type HistoryPage = {
 export type OperatorBootstrap = HistoryPage & { devices: ConnectedDevice[] };
 
 export type OperationEntry = {
+  executionIdentity?: ExecutionIdentity | null;
   ui?: { outcome: "completed" | "matched" | "timed_out" | "cancelled" | "rejected" | "unconfirmed"; actionDispatched: boolean | null; verification: "not_applicable" | "native_returned" | "matched" | "mismatched" | "unavailable"; visitedCount: number; returnedCount: number; truncated: boolean; errorCode: string | null } | null;
   phase?: string | null;
   mutation?: { phase: string; totalEntries: number; processedEntries: number; publishedEntries: number; deletedEntries: number; partial: boolean; sourceRemoved: boolean } | null;
@@ -51,6 +61,7 @@ export type OperationEntry = {
 };
 
 export type TaskUpdate = {
+  executionIdentity?: ExecutionIdentity | null;
   state: string;
   complete: boolean;
   stdout: string;
@@ -60,6 +71,7 @@ export type TaskUpdate = {
 };
 
 export type TaskEntry = TaskUpdate & {
+  executionIdentity?: ExecutionIdentity | null;
   id: string;
   deviceCode: string;
   initiatedBy: string;

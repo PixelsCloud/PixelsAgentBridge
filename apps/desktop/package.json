@@ -4,6 +4,7 @@
   "version": "1.2.26",
   "type": "module",
   "scripts": {
+    "test:execution-ui": "playwright test",
     "dev": "vite",
     "dev:desktop": "tauri dev --no-watch",
     "build": "python ../../scripts/build.py desktop-web",
@@ -22,6 +23,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
