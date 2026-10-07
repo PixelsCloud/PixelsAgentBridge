@@ -145,19 +145,12 @@ On a Windows host, build the Linux archive with
 `powershell -File packaging/desktop/build-linux.ps1` delegates to that entry point.
 It keeps Cargo downloads and compilation output in `.build` on the workspace drive
 and creates the Debug tarball. Use `--profile release` only for a release build.
-The archive includes the same Tauri app and background components.
-Run `install.sh` as root with the control URL and Relay URL, then launch
-`run-app.sh` as the interactive user. The old browser UI is absent from both
-platforms. On Linux, installation registers a hidden XDG autostart entry for
-the session helper. It captures the desktop in the logged-in graphical session;
-mouse and keyboard control currently require X11. A Wayland session returns an
-explicit unsupported-input error. Linux graphical control and pre-login
-capture still require testing on a graphical Linux machine.
-Headless Linux can run the Executor, but opening the desktop requires the
-distribution's GTK 3, WebKit2GTK 4.1, JavaScriptCoreGTK 4.1, libsoup 3, GBM,
-and display-session libraries. The SG headless host does not have these desktop
-runtime libraries; its real package install and upgrade have validated the
-background Executor, not the graphical application.
+The Linux archive contains Executor, MCP and service/install scripts; it does
+not include Tauri, a desktop helper or XDG autostart. No GTK/WebKit/display stack
+is required. Run `install.sh` as root with the control URL and Relay URL.
+Service and selected-user commands, PTYs, Git, files and transfers work without
+graphical login. Desktop queries, screenshots and input return unsupported;
+this is the current product scope, not a missing permission to repair.
 Re-running `install.sh` stops the installed service and processes before
 replacing binaries, restarts the service, and preserves data under
 `/var/lib/pixels-agent-bridge` and the user's local data directory.

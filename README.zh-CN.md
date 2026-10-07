@@ -9,7 +9,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 使用交互终端，以及调用受支持的桌面能力。桌面应用提供设备管理、任务记录，
 并实时展示正在操作设备的 MCP 进程及其状态。
 
-项目处于持续开发阶段。Windows、Linux 的远程命令与文件流程已经完成真机验证；
+项目处于持续开发阶段。Windows、macOS、Linux 的远程命令与文件流程已经完成真机验证；
 各平台支持范围与验证状态见下文。
 
 ## 目录
@@ -44,6 +44,21 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 
 桌面支持亮色、暗色主题，以及简体中文、繁体中文和英文。
 首次启动根据系统语言选择，用户手动切换后保存选择。
+
+## 执行身份与平台范围
+
+命令、PTY、Git、文件及传输默认使用设备服务账户。先用
+`pab_list_execution_contexts` 查询，再显式选择 `user`；重连或登录状态变化后重新查询。
+Windows/macOS 应用工具使用 `desktop_user`。账户不可用时不会退回服务身份，
+结果及本地任务历史保留实际执行身份。
+
+Linux 当前提供无界面的 Executor/MCP，不提供 Linux 桌面版。核心工具无需显示服务
+或图形登录；桌面调用明确返回不支持。原生命令文本输出使用 UTF-8，Windows 程序若
+输出本地代码页，应先配置该程序输出 UTF-8；文件文本工具另有编码选择。
+结果未确认时沿原请求 ID 查询，不重新执行修改操作。
+
+安装后的完整流程证据及硬件未测范围见
+[执行验收报告](acceptance/execution-e8-handoff-2026-10-07.md)。
 
 ## 工作流程
 

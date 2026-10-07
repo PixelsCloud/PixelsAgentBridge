@@ -1,0 +1,2508 @@
+{
+  "date": "2026-10-07",
+  "host": "native Pixels MCP 1.2.32",
+  "rounds": [
+    {
+      "name": "linux-u1-r1-final",
+      "device_code": "565893930",
+      "execution": {
+        "context_ref": "140ae780-118b-4296-9a13-b80bce33bf25",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "ba9f9bcd-9da0-47ec-abb9-308fecbd7349",
+            "task_id": "4237c0fa-f29d-4dae-99d6-2093a06ce877"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_write",
+            "operation_id": "1366ae4a-0fbd-4041-9b17-280181cb9eaf"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "4a67ef0d-8fed-4f51-972f-be0e78c0ce94"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_read",
+            "operation_id": "ab300ba9-2cd9-4f87-9ba8-222ef8940d41"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_patch",
+            "operation_id": "a77f7807-c360-4a3d-8683-fd1545ec2eca"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_diff",
+            "operation_id": "0e3b0ba7-3ec5-44d6-be3a-d1e25edd21f2"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "4a017f7e-a668-4b17-97eb-fb24ca1c4817"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_log",
+            "operation_id": "7c8a66e6-b8cc-43b9-bac9-a72b93f47ae6"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "c8aa506a-f30e-44d7-ad0c-849bfaa674d3"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "38aa6596-86cd-45e7-a4b0-0095fab55541"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_push",
+            "operation_id": "cd29796d-85a3-4fce-9036-150cdec85741"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "be36e50f-3fcc-4435-b4cf-a1aa1cb238c0",
+            "task_id": "e0ddc678-b46f-4fa3-aa73-b58d4ce76448"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_fetch",
+            "operation_id": "0294082e-24b8-4377-8f99-95bba31c8c0d"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_pull",
+            "operation_id": "5294f72c-99aa-4e73-b3f7-a5c06c607cda"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_status",
+            "operation_id": "745a6ef9-6ad3-4d4f-8439-59ade885f60a"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_search",
+            "operation_id": "55caff4b-f397-430e-a44c-adbdbe647532"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_copy",
+            "operation_id": "526ab6b3-0087-403c-afe4-1ae0820d2223"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_move",
+            "operation_id": "89703f80-5c7c-46a6-b5c4-bfdba6d30b51"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_hash",
+            "operation_id": "b236eb1d-e78f-4dfd-b12c-7658f78d7e47"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_create",
+            "operation_id": "e6c7ac82-7039-44bc-b110-d1bce3f44f00"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_extract",
+            "operation_id": "39cbd529-3997-4c8d-b360-cc77abdda909"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "69d167ed-e446-4ced-8db8-e4a1319dce18"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "9c47e119-ece7-4961-8f94-1c930f345ba5"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "eefca4fc-f8c4-4db6-9000-de095e4c9551",
+            "task_id": "ca179335-0bea-4083-8d2b-7dac755a776c"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 23001, \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_delete",
+            "operation_id": "aebf14a9-2ef1-4384-9879-e62f6e8acd03"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "linux-u1-r2-final",
+      "device_code": "565893930",
+      "execution": {
+        "context_ref": "140ae780-118b-4296-9a13-b80bce33bf25",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "91d54377-326a-49a9-9e1b-69bde897093d",
+            "task_id": "6711bfbb-a1e6-4ed1-8e7f-dbd623f21d75"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_write",
+            "operation_id": "7a6ed8e7-c26b-4bb4-87d5-8b69bcc256dd"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "8516bb59-686e-45ff-b19f-0205865acc8a"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_read",
+            "operation_id": "9dfcdc32-845b-4c7f-9a58-4b27c8988cae"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_patch",
+            "operation_id": "e1cf23a7-e44b-4c6e-adc2-07a1e63015b4"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_diff",
+            "operation_id": "95f16fea-223b-4710-9a00-8af7fbc4583e"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "b772d0c4-04d5-4f47-928c-e3dcfafdea23"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_log",
+            "operation_id": "4747cadf-8022-4a2e-8a26-52c3af8387c1"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "f3135f10-d782-46ba-a068-4f8dc13038e8"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "74795acb-8a39-4962-b23f-4c43233a1ece"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_push",
+            "operation_id": "e1b88e43-5854-423c-a589-578f66629da9"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "65fd1cf6-974d-4b3f-8126-703fba8ef4ea",
+            "task_id": "42f319be-432b-4cb3-94b7-8df5662189f8"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_fetch",
+            "operation_id": "9300505e-d2a1-4c30-92f6-a1a37265e3a5"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_pull",
+            "operation_id": "fdcf25ee-ac9c-4e95-af69-90c9464e7038"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_status",
+            "operation_id": "5436ab96-78dc-4854-8f06-c13b9fa9cd20"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_search",
+            "operation_id": "e80c6fbe-291b-4f17-a2e7-4ec638fe0c99"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_copy",
+            "operation_id": "9e39d8b9-3f08-4399-81d4-083ed16cef4c"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_move",
+            "operation_id": "9835675c-7690-487d-b5a0-ca21f08f905a"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_hash",
+            "operation_id": "10ed3607-4258-4a70-bfdc-230be117e289"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_create",
+            "operation_id": "c78acd96-d9dc-4bad-aeb0-df77ff244c9d"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_extract",
+            "operation_id": "435fae7c-4b13-4265-9f48-8d8ac75b786a"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "b977f5d9-dd82-4080-b268-e03a977f3bb6"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "7dd8d4f9-3d3a-4853-b345-bf5ae70aad7c"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "46597e0a-f3f2-440a-ab38-23ceaf5208f3",
+            "task_id": "d7f8991e-64e0-4400-8a97-42149fb6ff1c"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 23001, \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_delete",
+            "operation_id": "54d702e1-2da8-4376-9e2b-016fb2d78bb0"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "linux-u2-r2-final",
+      "device_code": "565893930",
+      "execution": {
+        "context_ref": "d9d62cd9-5386-4d96-b83c-391b7ea1b364",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "8509c4b8-0843-4cb5-9f6f-6da8bbc97e3c",
+            "task_id": "256a30ec-cf4f-43a1-b289-469b0c7b8d5d"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_write",
+            "operation_id": "3d175009-cdaa-4dc7-93c1-646623de4e22"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "086e83fc-efe2-4807-a62a-d20f7ac38dc0"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_read",
+            "operation_id": "b28177f3-4fa6-4d4d-bc82-cce5ca98df81"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_patch",
+            "operation_id": "8fecfdf9-7b0c-4ae5-b00e-1dbe3de2b56b"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_diff",
+            "operation_id": "df77aa65-c015-4fd0-be30-1671ec6249c1"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "8a15f99e-3006-4a3d-bef7-a09b81c4a06e"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_log",
+            "operation_id": "affbb7bd-0b11-4ad9-b978-bf9029b5be2b"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "3df27b6f-9368-4631-a851-af8e1acca902"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "64a2b2ae-fcca-48da-afd0-d25e03292f9d"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_push",
+            "operation_id": "9d879dd6-0f03-44a0-a538-678ecc24bb4f"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "a39d96ae-626f-4687-a53d-83185e700ff9",
+            "task_id": "a6254c9f-47c4-40d2-9540-269552939c46"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_fetch",
+            "operation_id": "76bbeba1-e4f3-41b2-a57e-5f326f3b0cf6"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_pull",
+            "operation_id": "c2f51521-42ea-4c37-ad0f-f3ce9360ff34"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_status",
+            "operation_id": "aca56d81-1217-43a8-ab14-8d895a8db904"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_search",
+            "operation_id": "bea0d0fb-807f-4186-841d-38b4f5106d65"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_copy",
+            "operation_id": "7491d7e8-68a4-461c-af8b-f9a951b3bb74"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_move",
+            "operation_id": "058315ab-f04c-4319-ba9e-d901835280d9"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_hash",
+            "operation_id": "77f9ade4-c6a4-45c8-8964-bbe35facd6b8"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_create",
+            "operation_id": "2dc3712f-4e20-4eb6-a652-55a9631c1c38"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_extract",
+            "operation_id": "4ee15b91-03d1-41a9-a080-6c6e5c78fac4"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "b3ba9093-2824-4f9f-aa39-411c20ee539f"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "de4edcd0-024e-4c0b-8f5b-6f75e228fbce"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "5f85fc2b-2942-4b01-ad7a-b34f11f04215",
+            "task_id": "2d3a55a4-7ef4-4a2f-8d29-ca5672658761"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 23002, \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_delete",
+            "operation_id": "1a8a62d7-9458-487c-bffa-9b6b1a535022"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "linux-service-r1-final",
+      "device_code": "565893930",
+      "execution": {
+        "mode": "service"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "812ae738-682d-4447-99d7-5aa5db9aed25",
+            "task_id": "1f9344b0-569a-4aa8-894d-c22bc2c20d70"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_write",
+            "operation_id": "18f28b82-2a5c-4d76-9acc-471cd93933f1"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "5d198202-15e7-44f7-915a-24d3d86172e1"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_read",
+            "operation_id": "407afaf1-462b-46ed-80df-bf8aeae65614"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_patch",
+            "operation_id": "fa27d0b8-7756-46a8-88cf-995998c2ef6b"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_diff",
+            "operation_id": "dff65802-be8e-4de0-8abc-9974b1cc1ecf"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "d2ca5db9-8145-4075-a226-ec60302c1e66"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_log",
+            "operation_id": "82347c08-6421-40eb-bfc0-0a482a54cdd9"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "d3b6c786-c124-48bb-a984-cb447838ee49"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "e6ad0151-2016-4c6e-a60b-df4eba649394"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_push",
+            "operation_id": "2801829b-f14f-4b53-ad88-752f2879884f"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "f712f5bd-11d7-4817-ae7f-e531a5908bfd",
+            "task_id": "6c367dc2-2e9d-46ca-b00d-55f64b99edee"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_fetch",
+            "operation_id": "f5297b20-f8f4-4b31-8be0-10ebff8cedec"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_pull",
+            "operation_id": "093dc98e-ce49-452d-a304-5e695f2b6ea7"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_status",
+            "operation_id": "158bd6b4-3c6d-4db6-a8dc-89a7c55bfb83"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_search",
+            "operation_id": "3b37522c-4a5b-46b0-9661-8c5bb29b5d17"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_copy",
+            "operation_id": "fdf66d1f-63ed-48ba-bfce-09f57f302738"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_move",
+            "operation_id": "834c25b0-ce74-40ee-a9c1-7d560dfdf07b"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_hash",
+            "operation_id": "bacb870b-55e6-42f2-9057-a109616b80bf"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_create",
+            "operation_id": "c3cfad06-d79e-46d1-ab27-200648c09ecb"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_extract",
+            "operation_id": "b3d77e39-2d8c-4777-bdee-d30cafe601ad"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "4195dad8-0d90-42e0-9b05-d1e53d5c8c43"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "80b3623c-26ef-4256-a941-982698efb2fb"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "40a4d4f8-88cb-4981-a73b-fac724748509",
+            "task_id": "bc05a5d5-a1d4-4886-ba5f-b3ebdfc4ae8e"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 0, \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_delete",
+            "operation_id": "7e00097d-d3e5-4fce-8090-2367200a040b"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "linux-service-r2-final",
+      "device_code": "565893930",
+      "execution": {
+        "mode": "service"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "80009aa4-331e-4726-86ef-2489eaca651a",
+            "task_id": "903b4a1e-9cc9-4518-aae0-37f3c3f97b72"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_write",
+            "operation_id": "689f33ac-f9f1-4771-be8a-6cccdf615e41"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "eb11df4f-6c8c-42da-818d-594989d5de8c"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_read",
+            "operation_id": "4c746d5a-57de-46c2-b2ef-00b9ffa32f7a"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_patch",
+            "operation_id": "f6385ccc-1e0a-4404-b3a2-75c56cb3f97b"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_diff",
+            "operation_id": "2b53c4a5-2180-4d93-a0f5-fe533d32070d"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_commit",
+            "operation_id": "0710735d-696d-4218-a4ef-883e79186211"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_log",
+            "operation_id": "369cef5e-2491-4991-ab89-a7dfbe18c931"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "5aab72aa-f058-4108-945b-f928cbf0def3"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_checkout",
+            "operation_id": "087cc16c-8cd5-4922-bbb9-906994401ab4"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_push",
+            "operation_id": "f64f87d4-4ce1-450e-8b6b-27c173a2454e"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "7f9985b0-0664-4423-9a59-e25b33ead861",
+            "task_id": "3341db1a-809e-4f1b-b08c-7b77f6318373"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_fetch",
+            "operation_id": "7e6f0b6c-0344-496f-9071-38bef96cb2e5"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_pull",
+            "operation_id": "03a67299-7b72-4d4d-9798-8ff423b4ae85"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "git_status",
+            "operation_id": "a0c1a56d-f02d-4c46-b0d8-1e8685e3778b"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_search",
+            "operation_id": "9492eab3-50d2-4cdf-a176-4b16962f2e53"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_copy",
+            "operation_id": "205d6e3e-e5b2-4e9c-ab0d-7e18312371d8"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_move",
+            "operation_id": "3f403466-5c1f-4ca0-a344-f4c6d8a6d3fd"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_hash",
+            "operation_id": "743ed79e-861f-4767-86a0-98b0872165eb"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_create",
+            "operation_id": "75a2cac8-e9c3-4ec7-b892-56bdea4663a6"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "archive_extract",
+            "operation_id": "7838ca35-1d97-4c17-8449-0bb863be0b7d"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "532dec3a-8821-48bb-aa73-8c1c01168f37"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "565893930",
+            "device_ref": {
+              "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+              "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+            },
+            "kind": "file_transfer",
+            "operation_id": "d3f85df7-bf02-4d59-b0df-90f579876c10"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "command",
+            "operation_id": "d332835a-9960-473e-a01b-a0aee39b01fb",
+            "task_id": "208124eb-3aa7-4048-aed2-3357b997efec"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 0, \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "565893930",
+            "kind": "file_delete",
+            "operation_id": "de0b40d6-7665-4809-8c9c-4cff389c2d7b"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "mac-user-r1-final",
+      "device_code": "603527578",
+      "execution": {
+        "context_ref": "d1a0a4b0-a85c-4952-adfb-5869fd20e587",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "15317223-933e-446a-a4f9-cb54e61fa609",
+            "task_id": "c43233c7-b78b-4748-b8fa-75dc92e08769"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_write",
+            "operation_id": "b91b7708-2e17-42f0-87d3-daa713e74407"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_commit",
+            "operation_id": "8c388b4f-4c6c-492b-bdf2-6963ef22d895"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_read",
+            "operation_id": "6fc0df61-75eb-4f74-9a31-ad069fd523b5"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_patch",
+            "operation_id": "b675999c-ef0b-4e88-b2b4-79266f7a1f2d"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_diff",
+            "operation_id": "de66e9d2-7395-4586-902c-ed6614576286"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_commit",
+            "operation_id": "225014ab-2f0e-4924-8423-131f62b0cffa"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_log",
+            "operation_id": "8dbd0d9f-cdcd-474a-b26c-781e51e95eb5"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_checkout",
+            "operation_id": "9b3dbdfe-a511-4e15-b50b-cd66da7b0224"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_checkout",
+            "operation_id": "33801f01-a865-4f65-a169-8687e0fb8b1d"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_push",
+            "operation_id": "a878cf74-3474-4952-8cbd-5f14d3787230"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "b302ab90-86b2-4cdd-bfdc-28bed52e694f",
+            "task_id": "3273f4a3-4ea5-4b33-9052-2e3c074dae15"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_fetch",
+            "operation_id": "68ce6508-a2a5-4ddd-b093-3b80b5ce16ab"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_pull",
+            "operation_id": "2f312669-d48b-48f7-9292-e0dfa06f58d6"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_status",
+            "operation_id": "bdcea311-387d-401c-87d1-a7b6f120d12d"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_search",
+            "operation_id": "1fa1cee7-9c04-496d-8219-d88fbcc19fe3"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_copy",
+            "operation_id": "6befafc4-b980-4b4d-b543-fc84a3a566b8"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_move",
+            "operation_id": "7a3f0ad6-3b7a-403b-a39f-1c00f4d42fa7"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_hash",
+            "operation_id": "90584e2d-c7a7-4308-8059-f025a5c17e18"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "archive_create",
+            "operation_id": "07626231-2009-4ecf-a5b8-3c0d08861482"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "archive_extract",
+            "operation_id": "b766eaa0-aab4-475f-967c-9ea21361bcde"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "603527578",
+            "device_ref": {
+              "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+              "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+            },
+            "kind": "file_transfer",
+            "operation_id": "253d9757-f64b-45b3-a829-77a878c5e04c"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "603527578",
+            "device_ref": {
+              "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+              "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+            },
+            "kind": "file_transfer",
+            "operation_id": "48b39d36-57f0-4bc3-955c-af301262816a"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "c7732448-b5af-40e2-b490-3be296ca1b48",
+            "task_id": "c1dee883-dd7f-4c7e-a8a2-d32cb7ea1778"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 501, \"owned_paths\": 182, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_delete",
+            "operation_id": "f3abc98f-b41b-401b-9e83-050574094083"
+          },
+          "state": "completed",
+          "deleted_entries": 182,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "mac-user-r2-final",
+      "device_code": "603527578",
+      "execution": {
+        "context_ref": "d1a0a4b0-a85c-4952-adfb-5869fd20e587",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "e30270ab-34ab-4ea5-8ee7-804a1b7ec8ed",
+            "task_id": "32798ac1-bbd4-4b39-9868-081965dca912"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_write",
+            "operation_id": "a53a7230-3b78-4b94-b546-321c5ff21e5d"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_commit",
+            "operation_id": "8d0e7993-2ed7-454d-9d34-e0d455e10dce"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_read",
+            "operation_id": "debdcaf1-5df0-4759-b1c8-f9f30723f710"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_patch",
+            "operation_id": "c1be6548-dccb-4929-b2da-f2e5a0320c31"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_diff",
+            "operation_id": "ee85f9a5-a1d4-48c3-a569-cc43cd160afd"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_commit",
+            "operation_id": "06d9085c-501a-404d-b137-fa60e5eee6b0"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_log",
+            "operation_id": "6238bb98-7303-4164-a2c9-8f181370fd33"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_checkout",
+            "operation_id": "ad32c32d-93ea-495d-bc72-a9e512863e21"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_checkout",
+            "operation_id": "a038e88f-0fab-41b2-96db-14f86fd659b0"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_push",
+            "operation_id": "dd06e3ec-1f13-4263-b79a-b7856134a2aa"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "5f9550cc-7302-425e-b8c1-5d71cf7733e4",
+            "task_id": "d58503f0-5fb8-4dd3-b2a4-efb58c3d97a4"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_fetch",
+            "operation_id": "c9c98eb2-b87c-4d3c-a07a-0db3cbc635de"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_pull",
+            "operation_id": "cb999545-41c3-4702-b1b9-97d6dc858c5a"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "git_status",
+            "operation_id": "221fc4a3-966b-4259-91b0-579b73f09c14"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_search",
+            "operation_id": "927a6fab-0d30-42b0-970f-b3997a64c306"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_copy",
+            "operation_id": "56fb68c7-1183-45e2-b8fe-998af3e30a56"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_move",
+            "operation_id": "986b6904-dc92-4dbd-b31d-58cd5fe04600"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_hash",
+            "operation_id": "90a5f2e8-9906-48cd-ab4c-b76098a64330"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "archive_create",
+            "operation_id": "d2335dcb-916e-4c6e-bb17-674c5be1b102"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "archive_extract",
+            "operation_id": "ea047fee-8c1d-4aa7-8758-863954ce8c70"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "603527578",
+            "device_ref": {
+              "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+              "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+            },
+            "kind": "file_transfer",
+            "operation_id": "930cfd0c-cd13-44ee-a07d-a5fca4e03d3e"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "603527578",
+            "device_ref": {
+              "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+              "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+            },
+            "kind": "file_transfer",
+            "operation_id": "ebc62526-ca33-477f-9e8c-5a497ba52674"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "command",
+            "operation_id": "fc2bcc0e-61f1-4b84-9c18-fe5e3c621968",
+            "task_id": "7e326c12-cb5d-4e06-9dbd-ec53da9e72f2"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"uid\": 501, \"owned_paths\": 182, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "603527578",
+            "kind": "file_delete",
+            "operation_id": "a69b41c5-d825-4e1e-8ec9-8810cb0e632c"
+          },
+          "state": "completed",
+          "deleted_entries": 182,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "win-user-r1-final",
+      "device_code": "211399447",
+      "execution": {
+        "context_ref": "9cfb7729-8375-4521-8bd4-578a199588c7",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "375730df-bdc5-4c36-957c-6054b0c746c1",
+            "task_id": "1e19e2aa-ae7a-4471-b221-e18ce40760b1"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_write",
+            "operation_id": "f1828b17-c00c-4958-9813-5c9d8f24dc8b"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_commit",
+            "operation_id": "37484f36-3d27-463f-958a-a2c5afcf0b7d"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_read",
+            "operation_id": "e98c7be7-2f68-4e27-80e5-5bec1388edef"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_patch",
+            "operation_id": "7c2b1a6d-80c0-41e4-9ae2-faf8e7ed2a57"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_diff",
+            "operation_id": "c5252f6f-a6e5-4f2e-a4ab-63478a145e0b"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_commit",
+            "operation_id": "5431a59c-3035-41be-93dd-3afcb05febc2"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_log",
+            "operation_id": "9eb1dd2c-2a44-45d8-a7a8-fa1de908b041"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_checkout",
+            "operation_id": "73aa3c60-75b6-46d9-8bc2-04ee740e5555"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_checkout",
+            "operation_id": "48c630a9-9d04-4e31-9f31-53e37d1b93e0"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_push",
+            "operation_id": "6f20b08b-cccf-4634-b775-95d078cc985e"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "e24f71fa-f095-4a46-acd4-c29e33caf0cc",
+            "task_id": "dcf8f1e6-1b7d-46bd-9dfe-4ddeda6913a8"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_fetch",
+            "operation_id": "d0d977af-ba46-4034-9dc6-ef13b4566c33"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_pull",
+            "operation_id": "ff5693b8-7259-4fbb-8592-46851cc10543"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_status",
+            "operation_id": "90c39b10-d994-452b-8452-0b860e385688"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_search",
+            "operation_id": "a68cb590-7536-4cbd-98e6-0ece0c7b9598"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_copy",
+            "operation_id": "a6a4ae5b-a62f-4c38-a8b1-2bd593d590e9"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_move",
+            "operation_id": "8a172f3c-268d-4ec3-9d73-507c9b48946a"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_hash",
+            "operation_id": "da1b9d7e-bb2d-4931-987d-a2ec30397128"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "archive_create",
+            "operation_id": "a809c491-58da-4e77-a98d-0f6e0a2362f4"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "archive_extract",
+            "operation_id": "c3a638dd-67bd-4b84-aecd-3390890ac27e"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "211399447",
+            "device_ref": {
+              "device_id": "0bd5c72f-9c58-4f76-ba35-d65f86dea7c6",
+              "tenant_id": "b51f855d-8d9b-4ec3-9f18-7cf720acaa05"
+            },
+            "kind": "file_transfer",
+            "operation_id": "a1151cc8-4d3b-4ac5-b0c7-c39bbfd64751"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "211399447",
+            "device_ref": {
+              "device_id": "0bd5c72f-9c58-4f76-ba35-d65f86dea7c6",
+              "tenant_id": "b51f855d-8d9b-4ec3-9f18-7cf720acaa05"
+            },
+            "kind": "file_transfer",
+            "operation_id": "8372b3b3-a769-472a-8db9-63a606373a5c"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "cc1b33ef-b348-4d0a-abfa-01acd148c724",
+            "task_id": "a5e50390-4e7f-4a53-9b24-a21409b0d87e"
+          },
+          "state": "failed",
+          "verification": ""
+        },
+        "verify_utf8": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "6af50b24-671f-46d6-849a-65f284e126d2",
+            "task_id": "13e60250-bf45-4a83-96df-c0842aa960d6"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"account\": \"Administrator\", \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\r\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_delete",
+            "operation_id": "21c294d5-3b49-431d-a639-0bb23fe86b6e"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    },
+    {
+      "name": "win-user-r2-final",
+      "device_code": "211399447",
+      "execution": {
+        "context_ref": "9cfb7729-8375-4521-8bd4-578a199588c7",
+        "mode": "user"
+      },
+      "complete": true,
+      "steps": {
+        "setup": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "199410d0-c29f-428d-85a1-478701c83e34",
+            "task_id": "abc1d87e-da4d-41a1-9ba1-b3000b45c0f4"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "write": {
+          "tool": "pab_file_write",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_write",
+            "operation_id": "a1c39bc9-ebbd-4868-9072-c57a5c54e3c8"
+          },
+          "state": "completed"
+        },
+        "commit1": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_commit",
+            "operation_id": "a386853e-f4bf-4486-a26d-4da94c4c4110"
+          },
+          "state": "completed"
+        },
+        "read1": {
+          "tool": "pab_file_read",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_read",
+            "operation_id": "a8f917d4-e765-44d2-8a9b-610fddb93146"
+          },
+          "state": "completed"
+        },
+        "patch": {
+          "tool": "pab_file_patch",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_patch",
+            "operation_id": "30bed18a-fd03-4f2e-ad06-9507e8aa8226"
+          },
+          "state": "completed"
+        },
+        "diff": {
+          "tool": "pab_git_diff",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_diff",
+            "operation_id": "489c8099-fda4-4895-aa3c-1aaa81cb9ae4"
+          },
+          "state": "completed"
+        },
+        "commit2": {
+          "tool": "pab_git_commit",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_commit",
+            "operation_id": "fef8bb15-757e-41a4-af1c-ee6943f926bc"
+          },
+          "state": "completed"
+        },
+        "log": {
+          "tool": "pab_git_log",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_log",
+            "operation_id": "6a4e8c52-25cd-4e83-8a36-610d2e049936"
+          },
+          "state": "completed"
+        },
+        "detach": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_checkout",
+            "operation_id": "68032a2a-3c5a-484f-be9c-16dddcf160f9"
+          },
+          "state": "completed"
+        },
+        "checkout": {
+          "tool": "pab_git_checkout",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_checkout",
+            "operation_id": "97ba8be9-6db8-412c-9c9c-39b1a92db97b"
+          },
+          "state": "completed"
+        },
+        "push": {
+          "tool": "pab_git_push",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_push",
+            "operation_id": "6b6ed77b-9d48-4ee3-bd08-7476a25dd5ae"
+          },
+          "state": "completed"
+        },
+        "peer": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "a20bd3fa-4161-4af1-ae25-42ff0bad246b",
+            "task_id": "d69bfd20-7664-4d90-a0f8-9fefc846e88d"
+          },
+          "state": "succeeded",
+          "exit_code": 0
+        },
+        "fetch": {
+          "tool": "pab_git_fetch",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_fetch",
+            "operation_id": "02adcb2b-693a-4f0e-8d2c-1754aeb96491"
+          },
+          "state": "completed"
+        },
+        "pull": {
+          "tool": "pab_git_pull",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_pull",
+            "operation_id": "f33f1751-0b1c-4441-aba3-dab92ba372a3"
+          },
+          "state": "completed"
+        },
+        "status": {
+          "tool": "pab_git_status",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "git_status",
+            "operation_id": "ce8bdbdd-ea51-4c8b-9ed3-56f4a59c6ed5"
+          },
+          "state": "completed"
+        },
+        "search": {
+          "tool": "pab_file_search",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_search",
+            "operation_id": "1b6db4d8-02be-46db-9a8a-65c5c666d4d4"
+          },
+          "state": "completed"
+        },
+        "copy": {
+          "tool": "pab_file_copy",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_copy",
+            "operation_id": "c2dc976e-765f-439c-831f-cb632e389557"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "move": {
+          "tool": "pab_file_move",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_move",
+            "operation_id": "ce29d24d-5f69-413e-aed1-4144eeb45e16"
+          },
+          "state": "completed",
+          "deleted_entries": 1,
+          "partial": false
+        },
+        "hash": {
+          "tool": "pab_file_hash",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_hash",
+            "operation_id": "c71970c6-9c4f-4c9e-80ac-fe13c0794584"
+          },
+          "state": "completed"
+        },
+        "zip": {
+          "tool": "pab_archive_create",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "archive_create",
+            "operation_id": "d994032d-d231-419a-8cde-94bba1918da3"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "unzip": {
+          "tool": "pab_archive_extract",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "archive_extract",
+            "operation_id": "96553d47-3b08-4a3d-9b8d-0748a882d691"
+          },
+          "state": "completed",
+          "deleted_entries": 0,
+          "partial": false
+        },
+        "list": {
+          "tool": "pab_list_directory"
+        },
+        "upload": {
+          "tool": "pab_upload_file",
+          "operation_ref": {
+            "device_code": "211399447",
+            "device_ref": {
+              "device_id": "0bd5c72f-9c58-4f76-ba35-d65f86dea7c6",
+              "tenant_id": "b51f855d-8d9b-4ec3-9f18-7cf720acaa05"
+            },
+            "kind": "file_transfer",
+            "operation_id": "c8bc97cf-52b5-4fa5-8000-08597dc42892"
+          },
+          "state": "completed"
+        },
+        "download": {
+          "tool": "pab_download_file",
+          "operation_ref": {
+            "device_code": "211399447",
+            "device_ref": {
+              "device_id": "0bd5c72f-9c58-4f76-ba35-d65f86dea7c6",
+              "tenant_id": "b51f855d-8d9b-4ec3-9f18-7cf720acaa05"
+            },
+            "kind": "file_transfer",
+            "operation_id": "edba1068-f7a2-4383-9a0e-aea8e65256fd"
+          },
+          "state": "completed"
+        },
+        "terminal": {
+          "tool": "pab_open_terminal"
+        },
+        "resize": {
+          "tool": "pab_terminal_resize"
+        },
+        "input": {
+          "tool": "pab_terminal_input"
+        },
+        "terminalReady": {},
+        "close": {
+          "tool": "pab_terminal_close"
+        },
+        "verify_utf8": {
+          "tool": "pab_run_command",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "command",
+            "operation_id": "a6035139-f0bc-4724-a54a-f4f332531297",
+            "task_id": "9e9e99d2-24f6-44ea-9ddb-76f7e4642142"
+          },
+          "state": "succeeded",
+          "exit_code": 0,
+          "verification": "{\"account\": \"Administrator\", \"owned_paths\": 180, \"contents\": true, \"git_clean\": true, \"transfer_hash\": true}\r\n"
+        },
+        "cleanup": {
+          "tool": "pab_file_delete",
+          "operation_ref": {
+            "device_code": "211399447",
+            "kind": "file_delete",
+            "operation_id": "9dde692b-f2c0-4b0c-a01e-0365f1a59616"
+          },
+          "state": "completed",
+          "deleted_entries": 180,
+          "partial": false
+        }
+      }
+    }
+  ]
+}

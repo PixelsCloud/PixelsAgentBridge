@@ -10,7 +10,7 @@ system, run native commands, transfer files, use an interactive terminal, and wo
 with supported desktop capabilities. The desktop app provides device management,
 task history, and a live view of the MCP processes operating your devices.
 
-The project is in active development. Windows and Linux command and file workflows
+The project is in active development. Windows, macOS and Linux command and file workflows
 have been exercised on real machines. Platform-specific support and validation
 status are described below.
 
@@ -29,7 +29,7 @@ status are described below.
 
 ## Features
 
-- **Server Web console:** React + Ant Design management for accounts, current device
+- **Server Web console:** React + Ant Design management for accounts,
   device lists and live online status, Teams, Relay policy health and management
   changes. English, Simplified/Traditional Chinese and light/dark themes are included.
   Remote task records stay local. See the [deployment guide](WEB_DEPLOYMENT.md)
@@ -56,6 +56,23 @@ status are described below.
 
 The desktop supports light and dark themes, Simplified Chinese, Traditional Chinese,
 and English. It selects the system language on first launch and remembers your choice.
+
+## Execution account and platform scope
+
+Commands, PTYs, Git, file operations and transfers default to the device service
+account. Use `pab_list_execution_contexts` to choose an explicit `user` context;
+re-query after reconnect or login changes. Windows and macOS application tools
+require a `desktop_user` context. Unavailable identities never fall back to the
+service account. Results and local history retain the actual execution identity.
+
+Linux is currently a headless Executor/MCP product, with no Linux desktop app.
+Core tools work without a display or GUI login; desktop requests return an explicit
+unsupported result. Native command text output uses UTF-8: configure programs that
+otherwise emit a Windows code page accordingly. File text tools expose their own
+encoding selection. Keep original request IDs when an outcome is unconfirmed.
+
+Installed workflow evidence and hardware exclusions are in the
+[execution acceptance report](acceptance/execution-e8-handoff-2026-10-07.md).
 
 ## Workflow
 

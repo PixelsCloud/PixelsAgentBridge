@@ -2,20 +2,18 @@
 
 ## 当前执行状态（2026-10-07）
 
-执行用户/应用管理已进入 ARM/Intel 完整包，当前 Mac ARM 已升级 1.2.30；Intel 1.2.30 仅构建和签名检查。
-Desktop 已接入命令、终端、目录、传输的执行用户选择及应用管理面板；实际身份进入本地任务历史，
-未知传输结果沿原操作核对。Mac ARM 的 Bridge 69 项、MCP 38 项测试和 Desktop 编译检查已通过。
-见[执行规划](EXECUTION_CONTEXT_ROADMAP.md)及[UI 源码报告](acceptance/execution-e5-ui-2026-10-07.md)。
-实际升级及服务/签名保留见[修复版本安装报告](acceptance/execution-e7-refresh-2026-10-07.md)。
-Git 子进程回收、退出竞态和终端末尾输出修复已纳入安装包；正式工具的指定用户终端关闭首轮通过。
-应用完整生命周期、新 MCP 大输出并发归档和完整两轮工作流仍待验收。
+当前 ARM 安装版和 ARM/Intel 完整包为 1.2.37，已纳入执行用户、应用管理、
+终端归档及语言/列表 UI 修复。ARM 设备身份、文件哈希、固定证书及现有 TCC 保留通过。
+指定用户两轮命令/PTY/Git/文件/传输完成；真实 TextEdit 中文编辑、保存、回读、正常关闭
+以及旧引用/禁用控件拒绝已验证。保存必须核对真实文件，不能用 AX 接受代替业务成功。
 
-2026-10-07 通用前端另修复了“重复选择当前语言未保存”和“长任务标题挤出右侧状态”。
-Windows 1.2.32 已完成完整包安装及三语/主题实际界面复验，见
-[安装 UI 报告](acceptance/execution-e7-ui-refresh-2026-10-07.md)。Mac 已安装的 1.2.30 尚未包含这两项修复；
-需同步源码后重新生成 ARM/Intel 包，并在 Mac ARM 安装验证，不能以 Windows 结果替代。
-没有重置当前 TCC 授权。独立 SSH agent 与隔离 Keychain 的指定用户凭据测试已通过；
-Keychain 锁定时明确失败，选择 UID 不等于自动解锁用户的登录钥匙串。
+安装界面三语×亮暗设置页面已逐一检查；真实选择 huayang 执行 id，任务历史中的身份与
+UID 501 一致。测试文档、自建本机连接和主窗口已清理，helper 仍工作，七份按键账本全零。
+实际结果、保存面板兼容修复及明确边界见
+[Mac 安装验收](acceptance/execution-e8-macos-installed-2026-10-07.md)与
+[完整核心工作流](acceptance/execution-e8-final-rounds-2026-10-07.md)。
+Intel 没有实机；免费固定证书不是 Developer ID 或公证。以下旧版本记录保留为历史，
+不代表当前版本仍停在旧进度。源码异常矩阵与硬件排除见[执行规划](EXECUTION_CONTEXT_ROADMAP.md)。
 
 Finder窗口查询问题已修复并实机验收：AXWindows混入的AXScrollArea不再导致整个
 查询失败，仍严格要求目标AXWindow唯一且符合进程/标题/几何信息。此前 Mac 安装 1.2.26 时，

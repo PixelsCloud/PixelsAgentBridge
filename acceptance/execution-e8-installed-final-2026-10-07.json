@@ -1,0 +1,2549 @@
+{
+  "date": "2026-10-07",
+  "source_commit": "40f48f2",
+  "installed": {
+    "windows": "1.2.32",
+    "macos_arm": "1.2.37",
+    "linux_headless": "1.2.39",
+    "host_mcp": "1.2.32"
+  },
+  "notes": [
+    "Only operation references and result metadata; no tool arguments, typed values, environment or credentials.",
+    "Expected rejection/validation cases and intermediate observations are preserved; state alone is not the acceptance verdict. Read accompanying reports.",
+    "Mac final IPC regression at 40f48f2: 22 passed, 0 failed."
+  ],
+  "events": {
+    "win-installed-open2": {
+      "tool": "pab_open_file",
+      "operation_ref": {
+        "device_code": "211399447",
+        "kind": "app_open_file",
+        "operation_id": "8f302470-faf8-44cd-8027-d737800cde7f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "win-installed-close2": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "211399447",
+        "kind": "window_control",
+        "operation_id": "01b01cc0-9fb6-4b05-90c4-45ddbeffa4aa"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "win-stale-afterclose2": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "211399447",
+        "kind": "ui_query",
+        "operation_id": "0049d1ce-1a7f-4304-9723-a391e3798581"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed",
+      "outcome": "rejected",
+      "action_dispatched": false,
+      "verification": "unavailable"
+    },
+    "win-clean-ui-第一轮": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "211399447",
+        "kind": "file_delete",
+        "operation_id": "02567a6b-c8ca-4614-b255-fa9bfe7c1d19"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "win-clean-ui-第二轮": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "211399447",
+        "kind": "file_delete",
+        "operation_id": "960423f8-2bb9-42da-93ae-a795a009cd0f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "linux-restart-units": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "command",
+        "operation_id": "72ba6cdc-1e3a-4029-ac1d-e947e2cf0f81",
+        "task_id": "991828d8-1a24-4312-b71d-54220178babd"
+      },
+      "task_id": "991828d8-1a24-4312-b71d-54220178babd",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "linux-old-round-clean": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "file_delete",
+        "operation_id": "b709a033-2238-4029-93fc-9b5f2fcd45e6"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-source": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "8dc521f4-df7c-4b54-b0ba-f67d13c4f283"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "mac37-build": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "154e78e7-ab73-4751-88bb-cdfdbdbad93d",
+        "task_id": "bd945eea-49c9-46df-91d6-813b39d5352d"
+      },
+      "task_id": "bd945eea-49c9-46df-91d6-813b39d5352d",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-build-status": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "bd945eea-49c9-46df-91d6-813b39d5352d",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-build-status2": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "bd945eea-49c9-46df-91d6-813b39d5352d",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-hashes": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "f501a357-bb52-4a44-9494-5c9b84bfcf16",
+        "task_id": "8d60efba-5c8a-4e8f-8e46-a8d81e695e17"
+      },
+      "task_id": "8d60efba-5c8a-4e8f-8e46-a8d81e695e17",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-build-done": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "bd945eea-49c9-46df-91d6-813b39d5352d",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-dir": {
+      "tool": "pab_mkdir",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "mkdir",
+        "operation_id": "a597b47a-0896-43a6-be84-c41ebda252c5"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-upload": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "280ad943-53ac-450f-a9e4-6690d1ec2db2"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "mac37-install-start": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "6eacd9e5-7bbb-422a-b878-58190f155214",
+        "task_id": "f9a5cbbb-694b-4b03-b1c8-0352c8e16775"
+      },
+      "task_id": "f9a5cbbb-694b-4b03-b1c8-0352c8e16775",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-connect": {
+      "tool": "pab_connect",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-result": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "7c108fd0-479c-4a0e-8e1f-f180874504cf"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "3d78f0aa-12b4-46a6-9944-90756cd75e06"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-save-query": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "68c0821f-a75d-4ddb-b702-9bc986cbb194"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-save-name1": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "4800b92a-fd7b-4943-9746-869a398b55e7"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "matched"
+    },
+    "mac37-save-invoke1": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "ed94567d-543d-4fdc-9331-ecffb3479a15"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "unavailable"
+    },
+    "mac37-saved1-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "3fb13aa3-b2c7-433d-b0a9-49b113e86aaa"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-saved1-read": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "97a6a77a-f72e-4d10-9b97-c6d437716393"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "not_found"
+    },
+    "mac37-find-saved1": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "c1178b1c-99ff-4c10-aa53-04616434600d",
+        "task_id": "e785d59b-61e7-4373-b43b-f8d4cced9a45"
+      },
+      "task_id": "e785d59b-61e7-4373-b43b-f8d4cced9a45",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-saved1-actual-read": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "d04a273d-1957-408b-a8a8-70c570134bdd"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-close1": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_control",
+        "operation_id": "41afc74f-a273-4410-a17b-fcd67a8b17da"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-oldhelper-ref": {
+      "tool": "pab_ui_get",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_get",
+        "operation_id": "59e9c4e6-b754-4801-8c8b-6ddd42648eaa"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed",
+      "outcome": "rejected",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-focus-old": {
+      "tool": "pab_focus_window",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_focus",
+        "operation_id": "351e346f-1895-4ded-aa36-5d28494c394b"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-new2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "bef4d9c2-ee87-47a7-a63e-0677c84dd4fa"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-round2-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "d42c1bb9-c399-4764-b219-7c10608913f4"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-git-status": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "cc8b0ccd-9279-4a73-99b3-bbaefe5a8378",
+        "task_id": "22fca269-7391-4698-9322-561f18237462"
+      },
+      "task_id": "22fca269-7391-4698-9322-561f18237462",
+      "state": "failed",
+      "complete": true,
+      "error_code": "process_exit_failed"
+    },
+    "mac37-contexts": {
+      "tool": "pab_list_execution_contexts",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "execution_contexts",
+        "operation_id": "60575949-1b05-4116-ade4-f83358d2715f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-round2-windows-ready": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "340ac099-3e39-4afb-a9dc-36687a911141"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-plaintext2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "fe170bdf-7d0f-4eea-b3c1-1f856b5d9be5"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-textquery2": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "4d31041c-4dfc-434d-ad4c-5c3d558725e7"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-git-userstatus": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "7b06ce49-20d1-44ef-bc2a-dd3627003182",
+        "task_id": "401f12fc-6e14-4314-ba13-e6a77b7e796e"
+      },
+      "task_id": "401f12fc-6e14-4314-ba13-e6a77b7e796e",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-set2": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "44f78b03-8f1e-4991-bbac-437377d551ff"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "matched"
+    },
+    "mac37-unsaved-close2": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_control",
+        "operation_id": "b4ddd20c-0300-4186-b082-c0336576861d"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-close-dialog2": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "678ea909-2a23-4667-bf26-2e9d3b115df7"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-save-fields2": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "77af291a-43c1-4e00-947c-2da24ac9ce69"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-where2": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "b410818d-801f-46d9-ba66-9f46dfdffcff"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-name2": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "74d4d00b-e719-49c9-91d6-99642f2b8761"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "matched"
+    },
+    "mac37-location-menu": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "c279ea7f-0c7e-40b3-ba46-3fe78f47bdbd"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-location-options": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "4575719a-abd0-4187-a9e8-6890085fdb3a"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-disabled-rejected": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "cdfa0d81-f9cf-4c44-bc6a-34c1cba40d56"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed",
+      "outcome": "rejected",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-home2": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "88ad7666-f469-47ce-93a3-b0314033e1e2"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-save2": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "3750f8b8-4e40-4fa1-9b6a-1ec03548d080"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "unavailable"
+    },
+    "mac37-read2": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "d62587e0-8dc7-453e-99f4-1ac0cdf8a71c"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "not_found"
+    },
+    "mac37-saved2-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "51864639-0bca-47d8-bec0-bd764ab2a46a"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-find-saved2": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "578d5995-1eb5-4521-9521-cd0686edf9d4",
+        "task_id": "43976706-08e0-4d25-a175-8e75d1dba136"
+      },
+      "task_id": "43976706-08e0-4d25-a175-8e75d1dba136",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-reopen2": {
+      "tool": "pab_open_file",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "app_open_file",
+        "operation_id": "07c61cf5-9f85-48d1-89ab-13a3814a2c06"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-reopen2-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "1d20bbc3-e864-4807-a41f-0ab245a03e4f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-reopen2-editor": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "840f6b01-4f36-488c-a664-252bfbc03a82"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-reopen2-set": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "746ef7e5-43d2-44cf-b8fc-26f9d31b4436"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "matched"
+    },
+    "mac37-reopen2-get": {
+      "tool": "pab_ui_get",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_get",
+        "operation_id": "07d239ab-f630-4089-ae90-bc5e191f5ac8"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-reopen2-save": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "eb94ec8c-4369-4679-9728-a9e70232e9e0"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-reopen2-file": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "534e044e-c036-4933-b33e-c37590b0a9af"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-reopen2-close": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_control",
+        "operation_id": "7e94984f-5a12-4f5c-8dee-a8c86e5daf63"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-reopen2-stale": {
+      "tool": "pab_ui_get",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_get",
+        "operation_id": "3b3bdac1-816a-4980-914a-6b7be44f2cad"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed",
+      "outcome": "rejected",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-desktop-launch": {
+      "tool": "pab_launch_app",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "app_launch",
+        "operation_id": "bc2bf01b-78ff-43d1-82ef-37b513830c13"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-desktop-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "47f68fce-a444-4640-a5cd-25015cf2a78c"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-processes": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "318f91f8-2844-4197-baf9-f7f6dc7ff090",
+        "task_id": "a290a8b3-a54d-48bc-8df7-29db132fd3e5"
+      },
+      "task_id": "a290a8b3-a54d-48bc-8df7-29db132fd3e5",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-ui-open-new": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "f353d176-f118-4a32-a6d8-32a5c27faff5",
+        "task_id": "8373faf7-9a9b-4047-b7f2-e76410305062"
+      },
+      "task_id": "8373faf7-9a9b-4047-b7f2-e76410305062",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-ui-opened-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "dc19a10c-befe-4ab4-96cd-b043a5755e83"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-ui-tree": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "4b0e0925-562f-4968-a637-d9a049c86f68"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-settings-click": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "221e2bbc-8e29-4b6e-8e36-fbf772bf20ad"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-settings-legacy-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-settings-legacy-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-settings-legacy-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-open-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-open-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-open-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-diffcheck": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "9d6dcc23-3798-4d19-94eb-c70d42283954",
+        "task_id": "f625d1c4-e738-4ca0-b9ca-e5873e05ab6b"
+      },
+      "task_id": "f625d1c4-e738-4ca0-b9ca-e5873e05ab6b",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-version-state": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_read",
+        "operation_id": "d89af3e5-5ff3-48ea-aea7-a73ba8814955"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-arrow-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-arrow-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-arrow-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-webax-recheck": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "7378f72d-35ed-4c16-9a2f-ceb369ace66d"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-language-cn-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-cn-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-language-cn-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-ui-buttons": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "ddc82541-92cb-4cf3-b349-9a7d56ead3f6"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-theme-dark-cn-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-dark-cn-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-dark-cn-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-final-stat": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "acc89744-408c-46cc-b194-6c84eee5c0af",
+        "task_id": "e7e46e71-3d77-45ad-a4d5-625c6f31929e"
+      },
+      "task_id": "e7e46e71-3d77-45ad-a4d5-625c6f31929e",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-remote": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "8f8f6df7-6ad0-48c6-bb9e-cc456850ed92",
+        "task_id": "185ed64f-a1e6-48a8-807e-20c1c9053515"
+      },
+      "task_id": "185ed64f-a1e6-48a8-807e-20c1c9053515",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-ui-full": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "ac95b0dd-638f-4927-bdea-b7ab0ea2dbf0"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-commit-push": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "47269abc-15a1-4dab-aaa1-dc2d025f782c",
+        "task_id": "7e60aba6-31e4-46ab-8a49-e824ad73f359"
+      },
+      "task_id": "7e60aba6-31e4-46ab-8a49-e824ad73f359",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-combo-expand": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "e50676a0-66a4-4154-95e0-12bf53d07cf3"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "mismatched"
+    },
+    "mac37-trad-option": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "e7080498-340f-42e3-8bbf-9045bdd8eed0"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-commit-result": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "7e60aba6-31e4-46ab-8a49-e824ad73f359",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-commit-stdout": {
+      "tool": "pab_read_output",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-commit-stderr": {
+      "tool": "pab_read_output",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-trad-option-ready": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "3bd827da-88b0-47ad-8d89-b4a28ed750b6"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-lang-open-key-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-open-key-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-open-key-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-key-40-true": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-key-40-false": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-key-13-true": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-key-13-false": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-preferences-locate": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "a4915ad2-be6a-49e8-8c22-25af7c11982a",
+        "task_id": "8b7e112b-dfef-437e-ab45-2cdf26bdf1f9"
+      },
+      "task_id": "8b7e112b-dfef-437e-ab45-2cdf26bdf1f9",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-preferences-trad": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "18315b5c-1978-49a3-8a45-9fa59325dfa1",
+        "task_id": "18ca7f50-cb6c-44a2-808f-9605487d32f2"
+      },
+      "task_id": "18ca7f50-cb6c-44a2-808f-9605487d32f2",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-theme-light-tw-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-light-tw-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-light-tw-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-preferences-tw-light": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "8336fb4f-40fc-4379-9190-2e25915ac8f0",
+        "task_id": "72451424-3040-4867-9e80-e4204f7b7401"
+      },
+      "task_id": "72451424-3040-4867-9e80-e4204f7b7401",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-lang-en-open-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-en-open-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-en-open-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-en-key-40-true": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-en-key-40-false": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-en-key-13-true": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-en-key-13-false": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-preferences-en": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "b9f70412-d9ad-4f2f-a98a-58e9a84d1f7b",
+        "task_id": "6e869e8a-247b-4b02-8528-0ff4ce5ce72a"
+      },
+      "task_id": "6e869e8a-247b-4b02-8528-0ff4ce5ce72a",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-preferences-en-ready": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "a118ded0-106d-41be-9c4c-2a3f322e50ce",
+        "task_id": "70486f65-14c7-4197-bd5a-005bc3a63669"
+      },
+      "task_id": "70486f65-14c7-4197-bd5a-005bc3a63669",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-theme-dark-en-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-dark-en-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-theme-dark-en-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-files-final-verified": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "63da9e1f-454a-4596-8f90-97674a4a2264",
+        "task_id": "2dca61e9-97ac-4399-a3f9-cbba27310c26"
+      },
+      "task_id": "2dca61e9-97ac-4399-a3f9-cbba27310c26",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-close-old-owned": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_control",
+        "operation_id": "033d40e7-8ac0-4afe-9867-d4b1ffb8396b"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed"
+    },
+    "mac37-lang-cn-open-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-cn-open-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-lang-cn-open-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-restore-theme-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-restore-theme-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-restore-theme-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-cleanup-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "986e4f91-fc3b-4696-9573-3f4df56021f2"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-close-old-refreshed": {
+      "tool": "pab_window_control",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "window_control",
+        "operation_id": "b58c7438-7be3-4e6e-b729-969465ca149f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-preferences-restored": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "c9783b74-db33-4f18-86c4-27e7d3c22af2",
+        "task_id": "dd3aadcb-c82e-4e9d-8b06-9e35599197e4"
+      },
+      "task_id": "dd3aadcb-c82e-4e9d-8b06-9e35599197e4",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-activity-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-activity-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-activity-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-file-0": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_delete",
+        "operation_id": "ff71700c-89a5-4bd3-8aa9-ace0f7d98317"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-file-1": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_delete",
+        "operation_id": "4443af8e-184e-4755-b0d9-022d3aaea250"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-file-2": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_delete",
+        "operation_id": "331d9729-5624-4822-9f2f-efd3d51c599e"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-history-identity-query": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "aa45c55c-b69d-4ddf-945c-37715fa54800"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-download-aarch64": {
+      "tool": "pab_download_file",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "b1924000-eafa-4857-8652-b9d8d6a56255"
+      },
+      "task_id": null,
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-download-x86_64": {
+      "tool": "pab_download_file",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "92e89e22-9e9b-4b0a-a92e-b945e38d8c25"
+      },
+      "task_id": null,
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-self-mydevice-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-mydevice-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-mydevice-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-fields": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "19b9f383-089c-4769-89e1-9764c13cb31a"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-self-code": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "5909623c-d900-454f-bf1b-17492c078431"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "mismatched"
+    },
+    "mac37-self-password-focus-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-password-focus-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-password-focus-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-code-focus-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-code-focus-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-code-focus-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-code-type": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "3a1a9879-6dc7-4933-8515-dfd70b164f2f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-connectbutton": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "5ade3abd-d888-47f8-b6d7-1a1ee85dcf54"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-download-done-aarch64": {
+      "tool": "pab_get_operation",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "b1924000-eafa-4857-8652-b9d8d6a56255"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "mac37-download-done-x86_64": {
+      "tool": "pab_get_operation",
+      "operation_ref": {
+        "device_code": "603527578",
+        "device_ref": {
+          "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+          "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+        },
+        "kind": "file_transfer",
+        "operation_id": "92e89e22-9e9b-4b0a-a92e-b945e38d8c25"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "mac37-self-connect": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "7d95360c-7005-48f2-a750-c0f9c0c2d13c"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-self-result-buttons": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "65739f12-da78-4e4f-bede-1202657a435e"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-self-open-device": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "7282fead-4761-4c10-9a9f-f3f728fba9a6"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "unavailable"
+    },
+    "mac37-remote-tab-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-remote-tab-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-remote-tab-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-remote-ui": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "e8864907-e9dc-4edb-a06d-9c2341a7b116"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-remote-web-ui": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "0fcb5d40-7178-4fb4-8b39-c0bd25353c5d"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-execution-select-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-execution-select-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-execution-select-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-command-focus-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-command-focus-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-command-focus-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-command-input": {
+      "tool": "pab_desktop_input",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_batch",
+        "operation_id": "7182d26c-d090-469d-9a36-6840c3fb4b5f"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-command-button": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "8fd129fa-5e71-4a22-8cbb-f11c7394232c"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-ui-command-run": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "be028dee-684c-41ee-90fa-1c63d29c385c"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-ui-task-history-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-ui-task-history-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-ui-task-history-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-ui-task-record": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "fa36ee84-8fc8-43ca-8764-4d7ec9903b04"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-clean-installer-jobs": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "3d845f7a-5c4c-4508-90fc-6dba71e62559",
+        "task_id": "d3b0860a-e0ed-42d9-9fc8-4e877d0212af"
+      },
+      "task_id": "d3b0860a-e0ed-42d9-9fc8-4e877d0212af",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-clean-device-list-0": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-device-list-1": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-device-list-2": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-device-menu": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "f776214b-9296-41bc-8626-0975fe37e15d"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-self-delete": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "14921403-15e9-4e86-91ba-38725c273b99"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-self-delete-confirm": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "c4917c63-105a-4cee-97e7-fc7797fdc241"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-self-delete-confirmed": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "1d00c726-279c-4d38-8db6-298323d30368"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "native_returned"
+    },
+    "mac37-cleanup-ui-state": {
+      "tool": "pab_ui_query",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_query",
+        "operation_id": "871415a2-0fee-4b0f-a830-0aa9daa47cce"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": false,
+      "verification": "not_applicable"
+    },
+    "mac37-ui-final-settings": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "2c6ada3b-3686-4a29-8392-d73f91004302",
+        "task_id": "42e88630-e3cd-4611-a4a3-1fb9c51a42e4"
+      },
+      "task_id": "42e88630-e3cd-4611-a4a3-1fb9c51a42e4",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-close-test-ui": {
+      "tool": "pab_ui_action",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "ui_action",
+        "operation_id": "430e230c-3f2b-4c5f-bc93-285e6cd08d3e"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null,
+      "outcome": "completed",
+      "action_dispatched": true,
+      "verification": "unavailable"
+    },
+    "mac37-post-ui-close-check": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "f6166a11-e028-4b02-94ec-63fcc7f082c3",
+        "task_id": "794730c5-f076-4e86-b69c-4ba5634fc893"
+      },
+      "task_id": "794730c5-f076-4e86-b69c-4ba5634fc893",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-clean-finish-ax-probe": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_delete",
+        "operation_id": "3a088bb9-a0ba-4179-94cf-05e50984510d"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-clean-finish-ax-probe.m": {
+      "tool": "pab_file_delete",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "file_delete",
+        "operation_id": "aec6d859-807d-4afc-945c-a261e305ad13"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-self-removed-db": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "5a0a6516-f5b8-419b-bddb-31f1077ae4c8",
+        "task_id": "26d48cca-47bf-46d7-a77d-71061960c7bc"
+      },
+      "task_id": "26d48cca-47bf-46d7-a77d-71061960c7bc",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac37-final-windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "desktop_windows",
+        "operation_id": "99a5f6b3-5a9d-46b2-a95d-e8ee874327e1"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "mac37-input-ledgers-locate": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "a4c8715d-9c2e-4d6e-a8db-a2988d73758a",
+        "task_id": "cc519e60-cd81-492e-a45f-5341ab2c1fcf"
+      },
+      "task_id": "cc519e60-cd81-492e-a45f-5341ab2c1fcf",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "linux39-dir": {
+      "tool": "pab_mkdir",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "mkdir",
+        "operation_id": "26de09e5-81ad-4c0c-80ef-89ddaf7053a7"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "linux39-upload-install.py": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "565893930",
+        "device_ref": {
+          "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+          "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+        },
+        "kind": "file_transfer",
+        "operation_id": "9270d3d8-c3b2-43ca-ad05-3be2a36792c2"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "linux39-upload-manifest.json": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "565893930",
+        "device_ref": {
+          "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+          "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+        },
+        "kind": "file_transfer",
+        "operation_id": "8259a770-363e-4799-a85b-cac8255d65aa"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "linux39-upload-package.sha256": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "565893930",
+        "device_ref": {
+          "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+          "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+        },
+        "kind": "file_transfer",
+        "operation_id": "cf880ceb-0f3e-4c25-ba96-36073d9fd3a7"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "linux39-upload-package.tar.gz": {
+      "tool": "pab_upload_file",
+      "operation_ref": {
+        "device_code": "565893930",
+        "device_ref": {
+          "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+          "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+        },
+        "kind": "file_transfer",
+        "operation_id": "bbbed5b7-6321-4e8f-903a-baddc916f455"
+      },
+      "task_id": null,
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac37-input-ledgers-empty": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "770401ad-6b6f-403e-a0ee-87077744a818",
+        "task_id": "bc6e75bc-14f1-41a2-bf30-03aec2c4b8ce"
+      },
+      "task_id": "bc6e75bc-14f1-41a2-bf30-03aec2c4b8ce",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "linux39-upload-status": {
+      "tool": "pab_get_operation",
+      "operation_ref": {
+        "device_code": "565893930",
+        "device_ref": {
+          "device_id": "53ce8365-896c-4945-9d69-27e428b62679",
+          "tenant_id": "a1b6a60f-f6a7-4c31-8844-ed125de35b0c"
+        },
+        "kind": "file_transfer",
+        "operation_id": "bbbed5b7-6321-4e8f-903a-baddc916f455"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": true,
+      "error_code": null
+    },
+    "linux39-install-start": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "command",
+        "operation_id": "82b3962a-8779-4f80-9ed9-b42101882a85",
+        "task_id": "bad09335-de3f-4337-a03a-241905697c00"
+      },
+      "task_id": "bad09335-de3f-4337-a03a-241905697c00",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "linux39-connect": {
+      "tool": "pab_connect",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "linux39-install-result": {
+      "tool": "pab_file_read",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "file_read",
+        "operation_id": "96e7ed52-06af-4e29-a62b-ea7f1bee22fe"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "linux39-unsupported-pab_list_windows": {
+      "tool": "pab_list_windows",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "desktop_windows",
+        "operation_id": "5be95395-0c07-4b58-96d4-f58e5323bf7e"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed"
+    },
+    "linux39-unsupported-pab_list_monitors": {
+      "tool": "pab_list_monitors",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "monitors",
+        "operation_id": "901cca01-0e61-408b-aa03-f6c4f2cbfd02"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": "remote_operation_failed"
+    },
+    "linux39-contexts": {
+      "tool": "pab_list_execution_contexts",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "execution_contexts",
+        "operation_id": "65ef354f-dc00-4b1c-8cc5-35536a085b3b"
+      },
+      "task_id": null,
+      "state": "completed",
+      "complete": null,
+      "error_code": null
+    },
+    "linux39-user-smoke": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "command",
+        "operation_id": "fe9530ce-8f74-4305-9759-66da5655724c",
+        "task_id": "4205168c-5c9b-4af2-88fb-c6e08fd3b8aa"
+      },
+      "task_id": "4205168c-5c9b-4af2-88fb-c6e08fd3b8aa",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "linux39-interrupted-preserved": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "293a9a94-06b3-4591-8431-5368c101190a",
+      "state": "interrupted",
+      "complete": true,
+      "error_code": null
+    },
+    "linux39-unsupported-durable": {
+      "tool": "pab_get_operation",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "desktop_windows",
+        "operation_id": "5be95395-0c07-4b58-96d4-f58e5323bf7e"
+      },
+      "task_id": null,
+      "state": "failed",
+      "complete": null,
+      "error_code": null
+    },
+    "linux39-install-jobs-clean": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "565893930",
+        "kind": "command",
+        "operation_id": "9072ca86-8ddb-485b-89ba-1c644fddbf81",
+        "task_id": "5e71e210-7b59-45e3-ae6e-cb4fa4d830e8"
+      },
+      "task_id": "5e71e210-7b59-45e3-ae6e-cb4fa4d830e8",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac-final-ipc-regression": {
+      "tool": "pab_run_command",
+      "operation_ref": {
+        "device_code": "603527578",
+        "kind": "command",
+        "operation_id": "e7d1deee-c48e-4a58-940b-423bfa1ac6da",
+        "task_id": "c16d7537-5c08-421e-9f10-ada8dd0d83f7"
+      },
+      "task_id": "c16d7537-5c08-421e-9f10-ada8dd0d83f7",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "linux39-screenshot-unsupported": {
+      "tool": "pab_capture_screenshot",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": "operation_error"
+    },
+    "linux39-input-unsupported": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": "invalid_arguments"
+    },
+    "linux39-input-valid-unsupported": {
+      "tool": "pab_desktop_input",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": "operation_error"
+    },
+    "mac-final-ipc-status": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "c16d7537-5c08-421e-9f10-ada8dd0d83f7",
+      "state": "running",
+      "complete": false,
+      "error_code": null
+    },
+    "mac-final-ipc-status2": {
+      "tool": "pab_get_task",
+      "operation_ref": null,
+      "task_id": "c16d7537-5c08-421e-9f10-ada8dd0d83f7",
+      "state": "succeeded",
+      "complete": true,
+      "error_code": null,
+      "exit_code": 0
+    },
+    "mac-final-ipc-stdout": {
+      "tool": "pab_read_output",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    },
+    "mac-final-ipc-stderr": {
+      "tool": "pab_read_output",
+      "operation_ref": null,
+      "task_id": null,
+      "state": null,
+      "complete": null,
+      "error_code": null
+    }
+  }
+}

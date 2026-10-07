@@ -10,17 +10,20 @@
         "crates/task-runtime/src/execution.rs"
       ],
       "live_suite": "execution-context-applications",
-      "live_status": "not_run",
-      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "live_status": "pass",
+      "scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-macos-installed-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e1-discovery-2026-10-06.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Connection-bound contexts selected through native tools on Windows/macOS/Linux; account lifecycle and full installed workflows remain pending."
+        "remaining_scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion."
       }
     },
     "pab_list_apps": {
@@ -33,15 +36,18 @@
         "crates/bridge/tests/mcp_operations.rs"
       ],
       "live_suite": "execution-context-applications",
-      "live_status": "not_run",
-      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "live_status": "pass",
+      "scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-macos-installed-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e4-app-mcp-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+        "remaining_scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion."
       }
     },
     "pab_launch_app": {
@@ -54,15 +60,18 @@
         "crates/bridge/tests/mcp_operations.rs"
       ],
       "live_suite": "execution-context-applications",
-      "live_status": "not_run",
-      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "live_status": "pass",
+      "scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-macos-installed-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e4-app-mcp-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+        "remaining_scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion."
       }
     },
     "pab_open_file": {
@@ -75,41 +84,60 @@
         "crates/bridge/tests/mcp_operations.rs"
       ],
       "live_suite": "execution-context-applications",
-      "live_status": "not_run",
-      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "live_status": "pass",
+      "scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-macos-installed-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e4-app-mcp-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+        "remaining_scope": "Named Windows WTS 1 and Mac UID 501 installed workflows passed. Windows focus denial is reported; Intel hardware, multiple active WTS desktops and split-token variants are not covered. Provider acceptance is not business completion."
       }
     },
     "pab_ui_query": {
       "group": "desktop-ui",
-      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
       "live_suite": "ui-controls",
       "live_status": "pass",
       "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_get": {
       "group": "desktop-ui",
-      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
       "live_suite": "ui-controls",
       "live_status": "pass",
       "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_action": {
       "group": "desktop-ui",
-      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
       "live_suite": "ui-controls",
       "live_status": "pass",
       "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
     },
     "pab_ui_wait": {
       "group": "desktop-ui",
-      "existing_test_sources": ["crates/bridge/src/bin/pab_mcp/ui.rs", "crates/desktop-control/src/ui_engine/tests.rs", "crates/executor/src/local_ipc_ui_tests.rs"],
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
       "live_suite": "ui-controls",
       "live_status": "pass",
       "scope": "Native AI-host tools on Windows 1.2.24 and Mac ARM 1.2.25 passed two fixture rounds per device after reload. See nativeUi*-2026-10-06.json and ui-u0-2026-10-06.md for exact scope and limitations."
@@ -217,13 +245,15 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e2-command-2026-10-06.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_read_output": {
@@ -236,12 +266,14 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e2-command-2026-10-06.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_run_command": {
@@ -254,13 +286,15 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e2-command-2026-10-06.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_upload_file": {
@@ -273,14 +307,16 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Installed Linux user upload/download matched binary SHA-256 and UID. Full Windows/macOS and Linux service/two-user rounds, cancellation and restart acceptance remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_download_file": {
@@ -293,14 +329,16 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Installed Linux user upload/download matched binary SHA-256 and UID. Full Windows/macOS and Linux service/two-user rounds, cancellation and restart acceptance remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_file_copy": {
@@ -338,14 +376,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_delete": {
@@ -383,14 +423,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_hash": {
@@ -449,14 +491,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_move": {
@@ -494,14 +538,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_patch": {
@@ -581,14 +627,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_read": {
@@ -710,14 +758,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_search": {
@@ -755,14 +805,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_stat": {
@@ -800,14 +852,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_file_write": {
@@ -887,14 +941,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_list_directory": {
@@ -909,14 +965,16 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_mkdir": {
@@ -954,13 +1012,15 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_archive_create": {
@@ -998,14 +1058,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_archive_extract": {
@@ -1043,14 +1105,16 @@
         }
       ],
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
         ],
-        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+        "remaining_scope": "Two native installed core rounds per tested identity passed, including content, hash and owner checks. See final report for hardware and source-only exclusions; this does not claim every filesystem fault was repeated on final installed builds."
       }
     },
     "pab_capture_screenshot": {
@@ -1147,13 +1211,15 @@
       "live_status": "pass",
       "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_terminal_close": {
@@ -1166,13 +1232,15 @@
       "live_status": "pass",
       "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_terminal_input": {
@@ -1185,13 +1253,15 @@
       "live_status": "pass",
       "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_terminal_read": {
@@ -1204,13 +1274,15 @@
       "live_status": "pass",
       "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_terminal_resize": {
@@ -1223,13 +1295,15 @@
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
-        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_system_info": {
@@ -1455,8 +1529,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1464,7 +1540,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_commit": {
@@ -1476,8 +1552,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1485,7 +1563,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_diff": {
@@ -1497,8 +1575,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1506,7 +1586,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_fetch": {
@@ -1518,8 +1598,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1527,7 +1609,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_log": {
@@ -1539,8 +1621,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1548,7 +1632,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_pull": {
@@ -1560,8 +1644,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1569,7 +1655,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_push": {
@@ -1581,8 +1667,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1590,7 +1678,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_git_status": {
@@ -1602,8 +1690,10 @@
       "live_status": "pass",
       "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
       "execution_acceptance": {
-        "status": "partial",
+        "status": "pass",
         "evidence": [
+          "acceptance/execution-e8-handoff-2026-10-07.md",
+          "acceptance/execution-e8-final-rounds-2026-10-07.md",
           "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
@@ -1611,7 +1701,7 @@
           "acceptance/execution-e6-windows-ssh-2026-10-07.md",
           "acceptance/execution-e6-keychain-2026-10-07.md"
         ],
-        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+        "remaining_scope": "Two installed native core rounds per tested Windows/Mac identity and Linux service/UID23001/UID23002 passed; see exact receipts and source-vs-installed exclusions. UTF-8 output contract does not imply arbitrary Windows code-page decoding."
       }
     },
     "pab_container_control": {
