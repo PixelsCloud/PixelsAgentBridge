@@ -492,4 +492,4 @@ async fn hash_file(path: &Path) -> Result<String, std::io::Error> {
 
 #[cfg(test)]
 #[path = "file_transfer_tests.rs"]
-mod tests;
+pub(super) mod tests;

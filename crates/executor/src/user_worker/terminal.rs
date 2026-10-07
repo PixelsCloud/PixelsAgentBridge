@@ -1,7 +1,9 @@
 //! A fixed-identity PTY in the existing user worker. Requests are serialized by
 //! an actor so a cancelled network read cannot leave a half-consumed IPC frame.
 use super::*;
-use pab_terminal::{MAX_INPUT_BYTES, MAX_READ_BYTES, TerminalOutput, TerminalSession};
+use pab_terminal::{
+    MAX_INPUT_BYTES, MAX_READ_BYTES, MAX_RETAINED_BYTES, TerminalOutput, TerminalSession,
+};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -118,9 +120,45 @@ pub(super) async fn serve(mut peer: Peer, cols: u16, rows: u16) -> io::Result<()
                 Reply::Applied
             }
             Request::Close => {
-                // Close/drop (including ConPTY handles) before acknowledging.
+                // Preserve the bounded tail before dropping the PTY/worker. The
+                // network client drains it after the close acknowledgement.
+                let closing = Arc::clone(&session);
+                tokio::task::spawn_blocking(move || closing.close())
+                    .await
+                    .map_err(io::Error::other)?
+                    .map_err(io::Error::other)?;
+                let until = tokio::time::Instant::now() + Duration::from_secs(3);
+                let mut offset = 0;
+                loop {
+                    let output = session.read(offset, MAX_READ_BYTES);
+                    peer.control(Control::TerminalReply {
+                        reply: Reply::Output {
+                            retained_from: output.retained_from,
+                            offset: output.offset,
+                            next_offset: output.next_offset,
+                            size: output.bytes.len(),
+                            ended: output.ended,
+                        },
+                    })
+                    .await?;
+                    if !output.bytes.is_empty() {
+                        peer.send(4, &output.bytes).await?;
+                    }
+                    offset = output.next_offset;
+                    if output.ended {
+                        break;
+                    }
+                    if tokio::time::Instant::now() >= until {
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "terminal tail did not finish",
+                        ));
+                    }
+                    if output.bytes.is_empty() {
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                    }
+                }
                 tokio::task::spawn_blocking(move || {
-                    session.close()?;
                     drop(session);
                     Ok::<_, pab_terminal::TerminalError>(())
                 })
@@ -156,6 +194,7 @@ struct Call {
 pub(crate) struct UserTerminal {
     calls: mpsc::Sender<Call>,
     closed: tokio::sync::Mutex<bool>,
+    tail: Arc<tokio::sync::Mutex<Option<TerminalOutput>>>,
 }
 impl UserTerminal {
     pub(crate) async fn start(
@@ -181,6 +220,8 @@ impl UserTerminal {
             return Err(io::Error::other("terminal open not confirmed"));
         }
         let (calls, mut receive) = mpsc::channel::<Call>(8);
+        let tail = Arc::new(tokio::sync::Mutex::new(None));
+        let final_tail = Arc::clone(&tail);
         tokio::spawn(async move {
             while let Some(call) = receive.recv().await {
                 let closing = matches!(call.action, Action::Close);
@@ -192,6 +233,11 @@ impl UserTerminal {
                 let failed = result.is_err();
                 if closing && !failed {
                     let cleanup = wait_exit(&mut child).await;
+                    if cleanup.is_ok() {
+                        if let Ok(ResultValue::Output(output)) = result {
+                            *final_tail.lock().await = Some(output);
+                        }
+                    }
                     let _ = call.answer.send(cleanup.map(|_| ResultValue::Applied));
                     return;
                 }
@@ -208,6 +254,7 @@ impl UserTerminal {
         Ok(Self {
             calls,
             closed: tokio::sync::Mutex::new(false),
+            tail,
         })
     }
     async fn call(&self, action: Action) -> io::Result<ResultValue> {
@@ -235,6 +282,25 @@ impl UserTerminal {
                 io::ErrorKind::InvalidInput,
                 "invalid terminal read limit",
             ));
+        }
+        if let Some(tail) = self.tail.lock().await.as_ref() {
+            let offset = offset.max(tail.retained_from);
+            let start = (offset - tail.retained_from).min(tail.bytes.len() as u64) as usize;
+            let bytes = tail
+                .bytes
+                .iter()
+                .skip(start)
+                .take(limit)
+                .copied()
+                .collect::<Vec<_>>();
+            let next_offset = offset + bytes.len() as u64;
+            return Ok(TerminalOutput {
+                retained_from: tail.retained_from,
+                offset,
+                next_offset,
+                ended: next_offset >= tail.next_offset,
+                bytes,
+            });
         }
         match self.call(Action::Read(offset, limit)).await? {
             ResultValue::Output(output) => Ok(output),
@@ -282,6 +348,58 @@ async fn exchange(peer: &mut Peer, action: Action) -> io::Result<ResultValue> {
     peer.control(Control::Terminal { request }).await?;
     if let Action::Input(bytes) = &action {
         peer.send(3, bytes).await?;
+    }
+    if matches!(action, Action::Close) {
+        let mut tail = TerminalOutput {
+            retained_from: 0,
+            offset: 0,
+            next_offset: 0,
+            bytes: vec![],
+            ended: false,
+        };
+        loop {
+            match decode(peer.receive().await?)? {
+                Control::TerminalReply {
+                    reply:
+                        Reply::Output {
+                            retained_from,
+                            offset,
+                            next_offset,
+                            size,
+                            ended,
+                        },
+                } if !tail.ended
+                    && size <= MAX_READ_BYTES
+                    && offset == tail.next_offset.max(retained_from)
+                    && offset.checked_add(size as u64) == Some(next_offset) =>
+                {
+                    if retained_from > tail.retained_from {
+                        let discard = (retained_from - tail.retained_from)
+                            .min(tail.bytes.len() as u64)
+                            as usize;
+                        tail.bytes.drain(..discard);
+                        tail.retained_from = retained_from;
+                        tail.offset = retained_from;
+                    }
+                    if size > 0 {
+                        let frame = peer.receive().await?;
+                        if frame.tag != 4
+                            || frame.bytes.len() != size
+                            || tail.bytes.len() + size > MAX_RETAINED_BYTES
+                        {
+                            return Err(io::Error::other("invalid terminal closing output"));
+                        }
+                        tail.bytes.extend_from_slice(&frame.bytes);
+                    }
+                    tail.next_offset = next_offset;
+                    tail.ended = ended;
+                }
+                Control::TerminalReply {
+                    reply: Reply::Closed,
+                } if tail.ended => return Ok(ResultValue::Output(tail)),
+                _ => return Err(io::Error::other("terminal closing output not confirmed")),
+            }
+        }
     }
     let Control::TerminalReply { reply } = decode(peer.receive().await?)? else {
         return Err(io::Error::other("missing terminal reply"));

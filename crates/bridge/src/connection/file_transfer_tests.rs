@@ -7,7 +7,7 @@ fn context() -> ExecutionContext {
     serde_json::from_value(serde_json::json!({"os_family":"linux","os_name":"Linux","os_version":"test","architecture":"x86_64","execution_scope":"native","path_style":"posix","interpreter":null,"cwd":"/home/fixture","environment_revision":"user-v1:test","identity":{"mode":"user","account_id":"uid:23001","account_name":"fixture","home":"/home/fixture","primary_group":23001,"session_id":null,"logon_id":null,"environment_source":"native_account"}})).unwrap()
 }
 
-async fn pair() -> (
+pub(crate) async fn pair() -> (
     PabEndpoint,
     PabEndpoint,
     AuthenticatedDeviceConnection,

@@ -8,7 +8,7 @@ use std::{
 use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use thiserror::Error;
 
-const MAX_RETAINED_BYTES: usize = 1024 * 1024;
+pub const MAX_RETAINED_BYTES: usize = 1024 * 1024;
 pub const MAX_INPUT_BYTES: usize = 4 * 1024;
 pub const MAX_READ_BYTES: usize = 32 * 1024;
 

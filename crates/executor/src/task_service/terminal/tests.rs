@@ -2,6 +2,141 @@ use super::*;
 use crate::task_service::transfer_tests::{actor, service};
 use pab_protocol::{ExecutionMode, ExecutionSelection, SystemQuery, SystemQueryData};
 
+// Exercise the actual close-then-read wire contract, including more than one
+// binary frame. Direct Session::close tests missed premature registry removal.
+async fn close_and_drain_over_quic(svc: &TaskService, id: RequestId, disconnect: bool) -> Vec<u8> {
+    use pab_protocol::DEVICE_TASK_SCHEMA_VERSION as V;
+    let (_a, _b, client, server) = crate::task_service::transfer_tests::pair().await;
+    let timeout = Duration::from_secs(15);
+    let handle = |request: DeviceTaskRequest| {
+        let svc = svc.clone();
+        let server = server.clone();
+        let client = client.clone();
+        async move {
+            let receiver = tokio::spawn(async move {
+                let stream = server.accept_bi(timeout).await.unwrap();
+                svc.handle_stream(actor(), stream, timeout).await
+            });
+            let mut stream = client.open_bi(timeout).await.unwrap();
+            stream.send_json(&request, timeout).await.unwrap();
+            let reply: DeviceTaskResponse = stream.receive_json(timeout).await.unwrap();
+            let bytes = match &reply {
+                DeviceTaskResponse::TerminalOutput { size, .. } if *size > 0 => {
+                    stream.receive_binary_frame(timeout).await.unwrap()
+                }
+                _ => vec![],
+            };
+            receiver.await.unwrap().unwrap();
+            (reply, bytes)
+        }
+    };
+    assert!(
+        matches!(handle(DeviceTaskRequest::TerminalClose { schema_version: V,
+        session_id: id, sequence: 1 }).await.0,
+        DeviceTaskResponse::TerminalClosed { session_id } if session_id == id)
+    );
+    assert!(svc.terminals.lock().await.contains_key(&id));
+    if disconnect {
+        svc.close_connection_terminals().await;
+        assert!(svc.terminals.lock().await.is_empty());
+        return vec![];
+    }
+    // Another connection must not gain access to a closed session's tail.
+    assert!(matches!(
+        svc.for_ui_connection().terminal_entry(id, actor()).await,
+        Err(TaskServiceError::AccessDenied)
+    ));
+    let mut all = Vec::new();
+    let until = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let (reply, bytes) = handle(DeviceTaskRequest::TerminalRead {
+            schema_version: V,
+            session_id: id,
+            offset: all.len() as u64,
+            limit: 1024,
+        })
+        .await;
+        let DeviceTaskResponse::TerminalOutput {
+            offset,
+            next_offset,
+            ended,
+            ..
+        } = reply
+        else {
+            panic!("close tail unavailable: {reply:?}");
+        };
+        assert_eq!(offset, all.len() as u64);
+        all.extend(bytes);
+        assert_eq!(next_offset, all.len() as u64);
+        if ended {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < until,
+            "terminal never reached EOF"
+        );
+        if all.len() as u64 == offset {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+    assert!(!svc.terminals.lock().await.contains_key(&id));
+    all
+}
+
+#[tokio::test]
+async fn terminal_close_preserves_output_until_wire_eof() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await.for_ui_connection();
+    let id = RequestId::new();
+    let entry = svc
+        .open_terminal_session(actor(), id, 80, 24, Default::default())
+        .await
+        .unwrap();
+    #[cfg(windows)]
+    let command = "[Console]::Write(('q'*8192)); [Console]::Write('TAIL-'+'COMPLETE')\r";
+    #[cfg(unix)]
+    let command = "printf '%8192s' '' | tr ' ' q; printf 'TAIL-'; printf 'COMPLETE'\n";
+    entry.session.input(command.as_bytes()).await.unwrap();
+    let until = tokio::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let output = entry.session.read(0, MAX_READ_BYTES).await.unwrap();
+        if String::from_utf8_lossy(&output.bytes).contains("TAIL-COMPLETE") {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < until,
+            "fixture did not print its marker"
+        );
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let bytes = close_and_drain_over_quic(&svc, id, false).await;
+    assert!(bytes.len() > 8192);
+    assert!(String::from_utf8_lossy(&bytes).contains("TAIL-COMPLETE"));
+}
+
+#[tokio::test]
+async fn closed_tail_disconnect_does_not_regress_to_interrupted() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await.for_ui_connection();
+    let id = RequestId::new();
+    svc.open_terminal_session(actor(), id, 80, 24, Default::default())
+        .await
+        .unwrap();
+    close_and_drain_over_quic(&svc, id, true).await;
+    let pool = sqlx::SqlitePool::connect(&format!(
+        "sqlite:{}",
+        dir.path().join("executor.sqlite3").display()
+    ))
+    .await
+    .unwrap();
+    let state: String = sqlx::query_scalar("SELECT state FROM terminal_sessions WHERE id=?")
+        .bind(id.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(state, "closed");
+}
+
 #[tokio::test]
 async fn unknown_user_terminal_does_not_create_a_service_session() {
     let dir = tempfile::tempdir().unwrap();
@@ -218,7 +353,8 @@ async fn native_user_terminal_acceptance() {
         serde_json::from_str::<pab_protocol::ExecutionIdentity>(&persisted).unwrap(),
         entry.identity.clone().unwrap()
     );
-    entry.session.close().await.unwrap();
+    let final_output = close_and_drain_over_quic(&svc, id, false).await;
+    assert!(final_output.starts_with(&bytes));
     entry.session.close().await.unwrap();
     assert!(entry.session.input(b"never execute\n").await.is_err());
     // A second PTY is closed by connection teardown, with a durable result.

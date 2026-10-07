@@ -25,6 +25,11 @@ pub(super) struct DeviceSession {
 }
 
 impl DeviceSession {
+    #[cfg(test)]
+    pub(super) async fn set_test_connection(&self, connection: AuthenticatedDeviceConnection) {
+        *self.connection.write().await = Some(Arc::new(connection));
+    }
+
     pub(super) fn new(device_ref: DeviceRef, runtime: Arc<RuntimeInner>) -> Self {
         Self {
             device_ref,

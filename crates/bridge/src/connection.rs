@@ -31,6 +31,9 @@ mod terminal;
 mod transfer_control;
 mod windows;
 
+#[cfg(test)]
+pub(crate) use file_transfer::tests::pair as test_connection_pair;
+
 pub use filesystem::FileSystemResult;
 pub use screenshot::Screenshot;
 pub use terminal::{TerminalOpened, TerminalOutput};

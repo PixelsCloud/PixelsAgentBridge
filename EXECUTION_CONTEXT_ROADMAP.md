@@ -336,4 +336,6 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E7首批产物与安装 | Windows/Linux 1.2.27、Mac ARM/Intel 1.2.28完整产物已生成；本机/90/Mac ARM/Linux测试端已安装，哈希/身份/服务通过，远端原生连接首轮通过，见 acceptance/execution-e7-packages-2026-10-07.md；当前AI会话已恢复并加载68工具，完整E8仍待完成 |
 | E7 Linux持久化 | 实际注册设备的服务重启、容器重启和1.2.27同版本重装通过，设备身份/凭据/原任务/事件/输出保留，服务器重新认证；见 acceptance/execution-e7-linux-persistence-2026-10-07.md；运行中恢复及跨版本升级不在本证据范围 |
 | E8 Windows应用首轮 | 原生MCP已完成解锁、应用发现、用户文件创建、记事本打开/中文控件编辑/保存提示/正常退出/内容归属核对及清理；见 acceptance/execution-e8-windows-app-first-2026-10-07.md；focus被系统策略拒绝，未冒充成功，完整两轮仍待完成 |
-| 下一动作 | 正式MCP已恢复，90已解锁，Mac仍待解锁。继续三平台正式工具两轮工作流、Windows helper生命周期/真实Git凭据和E6剩余矩阵，再生成包含Git清理及Mac退出竞态修复的新包并安装复验；不重新实现已有能力 |
+| E8 Linux正式工具首轮 | pabuser1 的实际身份、中文文件、八种Git操作及上传下载哈希/所有者通过；终端关闭暴露NotFound，不能记为完整一轮。见 acceptance/execution-e8-linux-first-2026-10-07.md；测试树保留待升级核对及最终清理 |
+| E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；三平台QUIC、真实用户PTY、700003字节归档/并发和断线状态回归通过。见 acceptance/execution-e8-terminal-close-2026-10-07.md；安装后正式工具复验待完成 |
+| 下一动作 | 将终端关闭修复纳入后续完整包并继续正式工具两轮工作流；Windows helper生命周期/真实Git凭据、E6剩余矩阵及Mac解锁后UI验收仍待完成。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |

@@ -86,6 +86,7 @@ pub(super) struct ActiveTerminal {
     rows: u16,
     session: Arc<Session>,
     next_sequence: Mutex<u64>,
+    closed: std::sync::atomic::AtomicBool,
 }
 
 impl TaskService {
@@ -135,6 +136,10 @@ impl TaskService {
                 .collect::<Vec<_>>()
         };
         for (id, entry) in entries {
+            let _action = entry.next_sequence.lock().await;
+            if entry.closed.load(std::sync::atomic::Ordering::Acquire) {
+                continue;
+            }
             let result = entry.session.close().await;
             let _ = self
                 .store
@@ -262,6 +267,7 @@ impl TaskService {
             rows,
             session: Arc::new(session),
             next_sequence: Mutex::new(1),
+            closed: std::sync::atomic::AtomicBool::new(false),
         });
         sessions.insert(id, entry.clone());
         Ok(entry)
@@ -353,6 +359,9 @@ impl TaskService {
                     ));
                 }
                 let entry = self.terminal_entry(session_id, initiated_by).await?;
+                // Serialize reads with close so a user-worker IPC read cannot
+                // race the handoff to the retained final output.
+                let _action = entry.next_sequence.lock().await;
                 let output = match entry.session.read(offset, limit as usize).await {
                     Ok(output) => output,
                     Err(error) => {
@@ -388,6 +397,9 @@ impl TaskService {
                     self.store
                         .finish_terminal(session_id, "closed", None)
                         .await?;
+                    entry
+                        .closed
+                        .store(true, std::sync::atomic::Ordering::Release);
                     self.terminals.lock().await.remove(&session_id);
                 }
             }
@@ -447,7 +459,18 @@ impl TaskService {
                 self.store
                     .finish_terminal(session_id, "closed", None)
                     .await?;
-                self.terminals.lock().await.remove(&session_id);
+                entry
+                    .closed
+                    .store(true, std::sync::atomic::Ordering::Release);
+                // Keep the bounded output until EOF is read. A client that
+                // disappears without draining cannot retain a slot forever.
+                let sessions = Arc::downgrade(&self.terminals);
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    if let Some(sessions) = sessions.upgrade() {
+                        sessions.lock().await.remove(&session_id);
+                    }
+                });
                 stream
                     .send_json(&DeviceTaskResponse::TerminalClosed { session_id }, timeout)
                     .await?;

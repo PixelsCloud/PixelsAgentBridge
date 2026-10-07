@@ -15,10 +15,15 @@ use super::{BridgeRuntime, RuntimeError};
 
 const MAX_TERMINAL_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024;
 
+#[cfg(test)]
+#[path = "terminal_tests.rs"]
+mod tests;
+
 pub(super) struct TerminalRuntimeSession {
     device_ref: DeviceRef,
     next_sequence: u64,
     offset: u64,
+    ended: bool,
 }
 
 pub(super) fn terminal_dir(database_path: &Path) -> PathBuf {
@@ -141,20 +146,42 @@ impl BridgeRuntime {
                         device_ref,
                         next_sequence: 1,
                         offset: 0,
+                        ended: false,
                     })),
                 );
-                if let Err(error) = self.inner.store.save_terminal_identity(id, opened.identity.as_ref()).await {
+                if let Err(error) = self
+                    .inner
+                    .store
+                    .save_terminal_identity(id, opened.identity.as_ref())
+                    .await
+                {
                     // A successful native open must not leave an unreachable
                     // child. Close directly: the usual audited close first
                     // writes to the database that just failed.
                     let cleanup = async {
-                        device.connection().await?.terminal_close(id, 1).await.map_err(RuntimeError::from)
-                    }.await;
+                        device
+                            .connection()
+                            .await?
+                            .terminal_close(id, 1)
+                            .await
+                            .map_err(RuntimeError::from)
+                    }
+                    .await;
                     if let Err(close_error) = cleanup {
-                        return Err(RuntimeError::TaskOperation(format!("terminal {id} identity could not be saved ({error}); close outcome unconfirmed: {close_error}")));
+                        return Err(RuntimeError::TaskOperation(format!(
+                            "terminal {id} identity could not be saved ({error}); close outcome unconfirmed: {close_error}"
+                        )));
                     }
                     self.inner.terminals.lock().await.remove(&id);
-                    let _ = self.inner.store.finish_operation(id, "failed", Some("terminal identity could not be saved; native terminal closed")).await;
+                    let _ = self
+                        .inner
+                        .store
+                        .finish_operation(
+                            id,
+                            "failed",
+                            Some("terminal identity could not be saved; native terminal closed"),
+                        )
+                        .await;
                     return Err(error.into());
                 }
                 Ok(opened)
@@ -220,6 +247,29 @@ impl BridgeRuntime {
     pub async fn terminal_read(&self, id: RequestId) -> Result<TerminalOutput, RuntimeError> {
         let entry = self.terminal_entry(id).await?;
         let mut session = entry.lock().await;
+        let output = self.read_terminal_session(id, &mut session).await?;
+        if output.ended {
+            self.inner.terminals.lock().await.remove(&id);
+        }
+        Ok(output)
+    }
+
+    async fn read_terminal_session(
+        &self,
+        id: RequestId,
+        session: &mut TerminalRuntimeSession,
+    ) -> Result<TerminalOutput, RuntimeError> {
+        // A read already waiting on the session mutex may resume after close
+        // finished draining. Never query the released remote session again.
+        if session.ended {
+            return Ok(TerminalOutput {
+                retained_from: session.offset,
+                offset: session.offset,
+                next_offset: session.offset,
+                bytes: vec![],
+                ended: true,
+            });
+        }
         let connection = self
             .inner
             .device(session.device_ref)
@@ -264,8 +314,7 @@ impl BridgeRuntime {
                 .store
                 .finish_operation(id, "completed", None)
                 .await?;
-            drop(session);
-            self.inner.terminals.lock().await.remove(&id);
+            session.ended = true;
         }
         Ok(output)
     }
@@ -314,6 +363,9 @@ impl BridgeRuntime {
     pub async fn terminal_close(&self, id: RequestId) -> Result<(), RuntimeError> {
         let entry = self.terminal_entry(id).await?;
         let mut session = entry.lock().await;
+        if session.ended {
+            return Ok(());
+        }
         let sequence = session.next_sequence;
         self.inner
             .store
@@ -343,12 +395,31 @@ impl BridgeRuntime {
             )
             .await?;
         result?;
-        drop(session);
-        for _ in 0..20 {
-            match self.terminal_read(id).await {
-                Ok(output) if output.ended => return Ok(()),
-                Ok(_) => tokio::time::sleep(std::time::Duration::from_millis(100)).await,
-                Err(error) => return Err(error),
+        // Keep the same lock through draining: Desktop polling must not race
+        // close and consume EOF between the close acknowledgement and its read.
+        let until = tokio::time::Instant::now() + std::time::Duration::from_secs(15);
+        while tokio::time::Instant::now() < until {
+            match self.read_terminal_session(id, &mut session).await {
+                Ok(output) if output.ended => {
+                    self.inner.terminals.lock().await.remove(&id);
+                    return Ok(());
+                }
+                Ok(output) if output.bytes.is_empty() => {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    self.inner
+                        .store
+                        .finish_operation(
+                            id,
+                            "failed",
+                            Some("terminal closed, but final output could not be archived"),
+                        )
+                        .await?;
+                    self.inner.terminals.lock().await.remove(&id);
+                    return Err(error);
+                }
             }
         }
         self.inner
