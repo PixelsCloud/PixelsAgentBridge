@@ -315,6 +315,7 @@ mod tests {
             },
             query: AppQuery::Execute {
                 request: AppActionRequest::Launch {
+                    new_instance: false,
                     application: AppTarget::Id {
                         id: "fixture.app".into(),
                     },

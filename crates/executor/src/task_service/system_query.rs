@@ -15,13 +15,16 @@ impl TaskService {
             drop(jobs);
             return self.get_system_query(actor, id).await;
         }
-        if !cfg!(any(windows, target_os = "macos"))
-            && matches!(query, SystemQuery::Desktop { .. })
+        if !cfg!(any(windows, target_os = "macos")) && matches!(query, SystemQuery::Desktop { .. })
         {
             // Preserve a definitive result for clients that already recorded
             // this operation before sending it. A transport-level rejection
             // otherwise becomes "unconfirmed" in older Bridge clients.
-            if !self.store.accept_system_query_with_context(actor, id, &query, None).await? {
+            if !self
+                .store
+                .accept_system_query_with_context(actor, id, &query, None)
+                .await?
+            {
                 drop(jobs);
                 return self.get_system_query(actor, id).await;
             }
@@ -34,7 +37,11 @@ impl TaskService {
         let mut operation_context = None;
         let mut git_user = None;
         let mut application_route = None;
-        if let SystemQuery::Applications { execution, .. } = &query {
+        if let SystemQuery::Applications {
+            execution,
+            query: app_query,
+        } = &query
+        {
             if !cfg!(any(windows, target_os = "macos")) {
                 return Err(TaskServiceError::InvalidRequest(
                     "unsupported_platform: application management is unavailable on the headless product",
@@ -54,9 +61,13 @@ impl TaskService {
                 .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?
                 .clone();
             let selected = identity.clone();
+            let required_version = app_query.required_helper_version();
             application_route = Some(
                 tokio::task::spawn_blocking(move || {
-                    crate::local_ipc::applications::ApplicationRoute::select(&selected)
+                    crate::local_ipc::applications::ApplicationRoute::select(
+                        &selected,
+                        required_version,
+                    )
                 })
                 .await?
                 .map_err(|e| TaskServiceError::ExecutionContext(e.to_string()))?,

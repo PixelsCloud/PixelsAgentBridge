@@ -5,9 +5,10 @@ import { ExecutionPicker, selectedExecution, type useExecutionContexts } from ".
 import { ExecutionIdentityView } from "./ExecutionIdentityView";
 import { executionQuery, executionErrorMessage, observeExecutionQuery, isPending, type AppInfo, type AppTarget, type ExecutionReply } from "./executionQueries";
 
-export function ApplicationBrowser({ code, connected, language, contexts, onAuditChange }: {
+export function ApplicationBrowser({ code, connected, language, contexts, osFamily, onAuditChange }: {
   code: string; connected: boolean; language: Language;
   contexts: ReturnType<typeof useExecutionContexts>; onAuditChange: () => void;
+  osFamily?: string;
 }) {
   const t = messages[language];
   const [desktop, setDesktop] = useState("");
@@ -17,6 +18,7 @@ export function ApplicationBrowser({ code, connected, language, contexts, onAudi
   const [selected, setSelected] = useState<number | null>(null);
   const [file, setFile] = useState("");
   const [withSelected, setWithSelected] = useState(false);
+  const [newInstance, setNewInstance] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reply, setReply] = useState<ExecutionReply | null>(null);
@@ -73,7 +75,11 @@ export function ApplicationBrowser({ code, connected, language, contexts, onAudi
       rowSelection={{ type: "radio", selectedRowKeys: selected === null ? [] : [selected], onChange: (keys) => setSelected(Number(keys[0])) }}
       columns={[{ title: t.appsName, dataIndex: "name" }, { title: "PID", render: (_, app) => app.instance?.process_id ?? "—", width: 80 }]}
       locale={{ emptyText: t.appsEmpty }} />
-    <Button type="primary" disabled={unavailable || !target} onClick={() => void run({ action: "execute", request: { operation: "launch", application: target } })}>{t.appsLaunch}</Button>
+    {osFamily === "macos" && <Checkbox checked={newInstance} disabled={busy || !!unresolved}
+      onChange={event => setNewInstance(event.target.checked)}>{t.appsNewInstance}</Checkbox>}
+    <Button type="primary" disabled={unavailable || !target} onClick={() => void run({ action: "execute", request: {
+      operation: "launch", application: target, ...(osFamily === "macos" && newInstance ? { new_instance: true } : {}),
+    } })}>{t.appsLaunch}</Button>
     <label className="field-label">{t.appsFilePath}</label>
     <Input value={file} onChange={(event) => setFile(event.target.value)} placeholder={t.appsFilePath} />
     <Checkbox checked={withSelected} disabled={!target} onChange={(event) => setWithSelected(event.target.checked)}>{t.appsUseSelected}</Checkbox>

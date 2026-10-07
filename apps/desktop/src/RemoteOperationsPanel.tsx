@@ -140,7 +140,7 @@ export function RemoteOperationsPanel({
             {operation === "windows" && <WindowBrowser code={selected.deviceCode} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
             {operation === "screenshot" && <ScreenshotBrowser code={selected.deviceCode} connected={selected.connected} language={language} onAuditChange={onAuditChange} />}
             <TerminalBrowser execution={execution} code={selected.deviceCode} connected={selected.connected} language={language} visible={operation === "terminal"} onAuditChange={onAuditChange} />
-            <div hidden={operation !== "applications"}><ApplicationBrowser code={selected.deviceCode} connected={selected.connected} language={language} contexts={contexts} onAuditChange={onAuditChange} /></div>
+            <div hidden={operation !== "applications"}><ApplicationBrowser code={selected.deviceCode} connected={selected.connected} language={language} contexts={contexts} osFamily={selected.osFamily} onAuditChange={onAuditChange} /></div>
           </div>
         </>
       ) : (

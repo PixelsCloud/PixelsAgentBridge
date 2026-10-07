@@ -63,9 +63,15 @@ test("application mutations inspect the same ID without replay", async ({ page }
   await expect(page.getByRole("button", { name: "Launch application" })).toBeDisabled();
   await page.getByRole("button", { name: "Inspect original operation" }).click();
   await expect(page.getByText("Request accepted by the system")).toBeVisible();
+  await page.getByRole("checkbox", { name: "Open a new app instance" }).check();
+  await page.getByRole("button", { name: "Launch application" }).click();
+  await page.getByRole("button", { name: "Inspect original operation" }).click();
+  await expect(page.getByRole("button", { name: "Launch application" })).toBeEnabled();
   const calls = await page.evaluate(() => (window as any).fixture.calls);
   const launches = calls.filter((c: any) => c.command === "operator_execution_query" && c.args.query.query?.action === "execute");
-  expect(launches).toHaveLength(2); // one known pre-dispatch rejection, one accepted mutation
+  expect(launches).toHaveLength(3); // pre-dispatch rejection, default launch, explicit new instance
+  expect(launches[1].args.query.query.request.new_instance).toBeUndefined();
+  expect(launches[2].args.query.query.request.new_instance).toBe(true);
   expect(calls.find((c: any) => c.command === "operator_execution_query_result").args.requestId).toBe(launches[1].args.requestId);
   await page.getByPlaceholder("Full path to the remote file").fill("/Users/alice/中文 文件.txt");
   await page.getByRole("checkbox", { name: "Open with the selected application" }).check();

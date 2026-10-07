@@ -237,6 +237,7 @@ mod tests {
         identity.session_id = Some("invalid-session".into());
         let query = AppQuery::Execute {
             request: AppActionRequest::Launch {
+                new_instance: false,
                 application: AppTarget::Id {
                     id: "fixture.never-launched".into(),
                 },
@@ -309,6 +310,7 @@ mod tests {
         );
         for request in [
             AppActionRequest::Launch {
+                new_instance: false,
                 application: AppTarget::Id {
                     id: "fixture".into(),
                 },

@@ -4,7 +4,7 @@ use accessibility::{AXAttribute, AXUIElement};
 use accessibility_sys::*;
 use core_foundation::{
     array::CFArray,
-    base::{CFType, TCFType},
+    base::{CFRange, CFType, TCFType},
     boolean::CFBoolean,
     number::CFNumber,
     string::CFString,
@@ -492,7 +492,50 @@ impl UiBackend for MacUi {
                 if text(node, "AXSubrole").ok().as_deref() == Some("AXSecureTextField") {
                     return Err("protected_control");
                 }
-                set(node, "AXValue", CFString::new(value).as_CFType())
+                if text(node, "AXRole")?.as_str() == "AXTextArea"
+                    && settable(node, "AXSelectedTextRange")
+                    && settable(node, "AXSelectedText")
+                {
+                    // NSTextView AXValue can replace display text without marking
+                    // a NEW document edited. Use the editable selection API so
+                    // AppKit records a real text edit. Do not synthesize keys or
+                    // retry with AXValue after a partially dispatched edit.
+                    let current = text(node, "AXValue")?;
+                    let range = CFRange {
+                        location: 0,
+                        length: isize::try_from(current.encode_utf16().count())
+                            .map_err(|_| "text_range_overflow")?,
+                    };
+                    let raw = unsafe {
+                        AXValueCreate(kAXValueTypeCFRange, (&range as *const CFRange).cast())
+                    };
+                    if raw.is_null() {
+                        return Err("provider_failed");
+                    }
+                    let range_value = unsafe { CFType::wrap_under_create_rule(raw.cast()) };
+                    set(node, "AXSelectedTextRange", range_value)?;
+                    let observed = attr(node, "AXSelectedTextRange")?;
+                    let mut actual = CFRange {
+                        location: 0,
+                        length: 0,
+                    };
+                    if observed.type_of() != unsafe { AXValueGetTypeID() }
+                        || !unsafe {
+                            AXValueGetValue(
+                                observed.as_CFTypeRef().cast_mut().cast(),
+                                kAXValueTypeCFRange,
+                                (&mut actual as *mut CFRange).cast(),
+                            )
+                        }
+                        || actual.location != 0
+                        || actual.length != range.length
+                    {
+                        return Err("text_selection_not_applied");
+                    }
+                    set(node, "AXSelectedText", CFString::new(value).as_CFType())
+                } else {
+                    set(node, "AXValue", CFString::new(value).as_CFType())
+                }
             }
             UiAction::SetChecked { checked } => {
                 let current = number(node, "AXValue")?;

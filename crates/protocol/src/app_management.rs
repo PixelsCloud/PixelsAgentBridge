@@ -25,6 +25,21 @@ impl AppQuery {
     pub fn is_mutation(&self) -> bool {
         matches!(self, Self::Execute { .. })
     }
+    pub fn required_helper_version(&self) -> u16 {
+        if matches!(
+            self,
+            Self::Execute {
+                request: AppActionRequest::Launch {
+                    new_instance: true,
+                    ..
+                }
+            }
+        ) {
+            2
+        } else {
+            1
+        }
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -56,6 +71,9 @@ impl AppTarget {
 pub enum AppActionRequest {
     Launch {
         application: AppTarget,
+        /// macOS NSWorkspace option; never silently ignored on other platforms.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        new_instance: bool,
     },
     OpenFile {
         path: String,
@@ -65,7 +83,7 @@ pub enum AppActionRequest {
 impl AppActionRequest {
     pub fn validate(&self) -> Result<(), &'static str> {
         match self {
-            Self::Launch { application } => application.validate(),
+            Self::Launch { application, .. } => application.validate(),
             Self::OpenFile { path, application } => {
                 if path.trim().is_empty() || path.len() > 4096 || path.contains('\0') {
                     return Err("local file path must be 1..4096 UTF-8 bytes without NUL");
@@ -76,6 +94,32 @@ impl AppActionRequest {
                 Ok(())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod instance_policy_tests {
+    use super::*;
+    #[test]
+    fn default_wire_shape_and_new_instance_capability_are_distinct() {
+        let old =
+            serde_json::json!({"operation":"launch","application":{"kind":"id","id":"fixture"}});
+        let request: AppActionRequest = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&request).unwrap(), old);
+        assert_eq!(AppQuery::Execute { request }.required_helper_version(), 1);
+        let new = AppQuery::Execute {
+            request: AppActionRequest::Launch {
+                application: AppTarget::Id {
+                    id: "fixture".into(),
+                },
+                new_instance: true,
+            },
+        };
+        assert_eq!(new.required_helper_version(), 2);
+        assert_eq!(
+            serde_json::to_value(&new).unwrap()["request"]["new_instance"],
+            true
+        );
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -223,6 +267,7 @@ mod tests {
         for id in [String::new(), "x\0y".into(), "中".repeat(1366)] {
             assert!(
                 AppActionRequest::Launch {
+                    new_instance: false,
                     application: AppTarget::Id { id }
                 }
                 .validate()

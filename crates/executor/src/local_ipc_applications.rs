@@ -9,19 +9,38 @@ pub(crate) struct ApplicationRoute {
     helper: helper_identity::VerifiedHelper,
 }
 impl ApplicationRoute {
-    pub fn select(expected: &ExecutionIdentity) -> Result<Self, LocalIpcError> {
+    pub fn select(
+        expected: &ExecutionIdentity,
+        required_version: u16,
+    ) -> Result<Self, LocalIpcError> {
         let candidates = window_providers()
             .lock()
             .map_err(|_| LocalIpcError::Protocol)?
             .iter()
             .rev()
             .filter(|p| p.application_schema_version.is_some_and(|v| v >= 1))
-            .filter_map(|p| p.identity.clone().map(|i| (p.sender.clone(), i)))
+            .filter_map(|p| {
+                p.identity.clone().map(|i| {
+                    (
+                        p.sender.clone(),
+                        i,
+                        p.application_schema_version.unwrap_or(0),
+                    )
+                })
+            })
             .collect::<Vec<_>>();
-        for (sender, helper) in candidates {
+        let mut upgrade_required = false;
+        for (sender, helper, version) in candidates {
             if &helper.identity == expected && helper.current() && !sender.is_closed() {
+                if version < required_version {
+                    upgrade_required = true;
+                    continue;
+                }
                 return Ok(Self { sender, helper });
             }
+        }
+        if upgrade_required {
+            return Err(LocalIpcError::Remote("application_helper_upgrade_required: install the matching desktop helper before using new_instance; no action dispatched".into()));
         }
         Err(LocalIpcError::WindowHelperUnavailable)
     }

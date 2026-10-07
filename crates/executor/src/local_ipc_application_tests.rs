@@ -26,7 +26,14 @@ async fn application_only_registration_preserves_window_route_and_release_broadc
     let _guard = TEST_HELPER_LOCK.lock().await;
     let (_win_dir, mut windows, window_server, window_id) = screenshot_helper().await;
     let (_app_dir, mut apps, app_server, app_id, identity) = application_helper_mode(true).await;
-    assert!(applications::ApplicationRoute::select(&identity).is_ok());
+    assert!(applications::ApplicationRoute::select(&identity, 1).is_ok());
+    assert!(applications::ApplicationRoute::select(&identity, 2).is_ok());
+    {
+        let mut providers = window_providers().lock().unwrap();
+        providers.iter_mut().find(|p| p.id == app_id).unwrap().application_schema_version = Some(1);
+    }
+    assert!(applications::ApplicationRoute::select(&identity, 2).is_err());
+    assert!(applications::ApplicationRoute::select(&identity, 1).is_ok());
     let request = tokio::spawn(request_window_list());
     tokio::time::timeout(Duration::from_secs(3), async {
         loop {
@@ -104,13 +111,13 @@ async fn application_routes_bind_native_identity_and_durable_duplicates() {
     assert_eq!(identity.mode, ExecutionMode::DesktopUser);
     let mut different = identity.clone();
     different.session_id = Some("other-session".into());
-    assert!(applications::ApplicationRoute::select(&different).is_err());
+    assert!(applications::ApplicationRoute::select(&different, 1).is_err());
     different = identity.clone(); different.account_id.push_str("-other");
-    assert!(applications::ApplicationRoute::select(&different).is_err());
+    assert!(applications::ApplicationRoute::select(&different, 1).is_err());
     let svc = service(directory.path()).await.for_ui_connection();
     let selection = application_selection(&svc, &identity).await;
     let other = svc.for_ui_connection();
-    let request = AppQuery::Execute { request: AppActionRequest::Launch { application: AppTarget::Id { id: "fixture.never-launched".into() } } };
+    let request = AppQuery::Execute { request: AppActionRequest::Launch { new_instance: false, application: AppTarget::Id { id: "fixture.never-launched".into() } } };
     let query = SystemQuery::Applications { execution: selection, query: request.clone() };
     assert!(other.system_query(actor(), RequestId::new(), query.clone()).await.is_err());
     let id = RequestId::new();
@@ -138,7 +145,7 @@ async fn application_routes_bind_native_identity_and_durable_duplicates() {
     let restarted = service(directory.path()).await.for_ui_connection();
     assert_eq!(restarted.system_query(actor(), id, query.clone()).await.unwrap(), result);
     let mut changed = query.clone();
-    if let SystemQuery::Applications { query: AppQuery::Execute { request: AppActionRequest::Launch { application: AppTarget::Id { id } } }, .. } = &mut changed { id.push_str("changed"); }
+    if let SystemQuery::Applications { query: AppQuery::Execute { request: AppActionRequest::Launch { new_instance: false, application: AppTarget::Id { id } } }, .. } = &mut changed { id.push_str("changed"); }
     assert!(svc.system_query(actor(), id, changed).await.is_err());
 }
 
@@ -148,10 +155,10 @@ async fn application_disconnect_is_unconfirmed_and_never_replayed_to_replacement
     use pab_protocol::*;
     let _guard = TEST_HELPER_LOCK.lock().await;
     let (directory, mut socket, local, provider, identity) = application_helper().await;
-    let frozen = applications::ApplicationRoute::select(&identity).unwrap();
+    let frozen = applications::ApplicationRoute::select(&identity, 1).unwrap();
     let svc = service(directory.path()).await;
     let selection = application_selection(&svc, &identity).await;
-    let app = AppQuery::Execute { request: AppActionRequest::Launch { application: AppTarget::Id { id: "fixture.never-launched".into() } } };
+    let app = AppQuery::Execute { request: AppActionRequest::Launch { new_instance: false, application: AppTarget::Id { id: "fixture.never-launched".into() } } };
     let query = SystemQuery::Applications { execution: selection, query: app.clone() };
     let id = RequestId::new();
     assert_eq!(svc.system_query(actor(), id, query.clone()).await.unwrap().state, "running");
@@ -184,7 +191,7 @@ async fn application_reply_rejects_wrong_account_and_wrong_payload_kind() {
     let _guard = TEST_HELPER_LOCK.lock().await;
     let (_directory, mut socket, local, provider, identity) = application_helper().await;
     for wrong_account in [true, false] {
-        let route = applications::ApplicationRoute::select(&identity).unwrap();
+        let route = applications::ApplicationRoute::select(&identity, 1).unwrap();
         let id = RequestId::new();
         let query = AppQuery::List { request: AppListRequest { scope: AppListScope::Running, search: String::new(), limit: 10 } };
         let work = tokio::spawn(route.execute(id, query.clone()));

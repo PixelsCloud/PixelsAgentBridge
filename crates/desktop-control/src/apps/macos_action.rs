@@ -49,7 +49,7 @@ pub(crate) fn act(
     let (receive, prior) = crate::on_input_thread(move || {
         let workspace = NSWorkspace::sharedWorkspace();
         let (target, file) = match &request {
-            AppActionRequest::Launch { application } => (Some(application), None),
+            AppActionRequest::Launch { application, .. } => (Some(application), None),
             AppActionRequest::OpenFile { path, application } => (application.as_ref(), Some(path)),
         };
         let application = match target {
@@ -98,7 +98,13 @@ pub(crate) fn act(
             });
         let config = NSWorkspaceOpenConfiguration::configuration();
         config.setActivates(true);
-        config.setCreatesNewApplicationInstance(false);
+        config.setCreatesNewApplicationInstance(matches!(
+            request,
+            AppActionRequest::Launch {
+                new_instance: true,
+                ..
+            }
+        ));
         config.setAddsToRecentItems(false);
         match (application, file) {
             (Some(app), None) => workspace.openApplicationAtURL_configuration_completionHandler(

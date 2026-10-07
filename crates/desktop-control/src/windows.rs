@@ -82,7 +82,7 @@ pub fn act(
                 }
                 if SetForegroundWindow(target) == 0 {
                     return Err(
-                        "Windows foreground policy refused focus; no bypass attempted".into(),
+                        "foreground_activation_denied: Windows refused focus. Activate this window in the selected desktop (for example, click it or use Alt+Tab), then re-query its window_ref before sending input. If it is elevated, use a matching permitted desktop helper; no automatic elevation or focus bypass was attempted".into(),
                     );
                 }
             }

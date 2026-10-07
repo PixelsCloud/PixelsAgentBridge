@@ -34,7 +34,8 @@ pub(super) fn tools() -> Vec<Value> {
             }
             "pab_launch_app" => {
                 properties["application"] = target.clone(); required.push("application");
-                "Launch or activate an application by its exact OS ID from pab_list_apps or absolute native application path (Windows executable/macOS .app). Uses Windows Shell/macOS NSWorkspace without arbitrary command arguments. The OS may reuse an existing instance."
+                properties["new_instance"] = json!({"type":"boolean","default":false});
+                "Launch or activate an application by its exact OS ID from pab_list_apps or absolute native application path (Windows executable/macOS .app). Uses Windows Shell/macOS NSWorkspace without arbitrary command arguments. The OS may reuse an existing instance. On macOS, new_instance=true requests a fresh instance (system-query v13/helper v2); Windows/Linux reject it without launching. Use only when a separate instance is intended, for example a background helper occupies the same app bundle. An app may still apply its own single-instance policy; observe the returned process/window."
             }
             _ => {
                 properties["path"] = json!({"type":"string","minLength":1,"maxLength":4096});
@@ -141,6 +142,23 @@ mod tests {
             parse("pab_launch_app", &launch).unwrap().1.kind(),
             "app_launch"
         );
+        assert_eq!(
+            parse("pab_launch_app", &launch)
+                .unwrap()
+                .1
+                .required_version(),
+            12
+        );
+        launch["new_instance"] = json!(true);
+        super::super::mcp_catalog::validate_arguments("pab_launch_app", &launch).unwrap();
+        assert_eq!(
+            parse("pab_launch_app", &launch)
+                .unwrap()
+                .1
+                .required_version(),
+            13
+        );
+        launch.as_object_mut().unwrap().remove("new_instance");
         for bad_target in [
             json!({"kind":"id","id":"x","path":"/tmp/x"}),
             json!({"kind":"path"}),

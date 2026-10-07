@@ -268,7 +268,9 @@ pub async fn register_application_helper(socket: &mut LocalSocket) -> Result<(),
     register_helper(socket, true, false).await
 }
 
-pub async fn register_application_only_helper(socket: &mut LocalSocket) -> Result<(), LocalIpcError> {
+pub async fn register_application_only_helper(
+    socket: &mut LocalSocket,
+) -> Result<(), LocalIpcError> {
     register_helper(socket, true, true).await
 }
 
@@ -278,7 +280,7 @@ async fn register_helper(
     applications_only: bool,
 ) -> Result<(), LocalIpcError> {
     let pid = cfg!(any(windows, target_os = "macos")).then(std::process::id);
-    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(1),"applications_only":applications_only,"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
+    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(2),"applications_only":applications_only,"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
@@ -365,7 +367,9 @@ pub(crate) async fn release_ui_connection(connection_id: pab_protocol::RequestId
         .lock()
         .map(|ps| {
             ps.iter()
-                .filter(|p| !p.applications_only && p.desktop_schema_version.is_some_and(|v| v >= 4))
+                .filter(|p| {
+                    !p.applications_only && p.desktop_schema_version.is_some_and(|v| v >= 4)
+                })
                 .map(|p| p.sender.clone())
                 .collect()
         })

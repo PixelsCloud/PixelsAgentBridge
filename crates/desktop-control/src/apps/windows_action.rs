@@ -61,6 +61,18 @@ pub(crate) fn act(
     request: &AppActionRequest,
     identity: &UserIdentity,
 ) -> Result<AppActionResult, AppActionError> {
+    if matches!(
+        request,
+        AppActionRequest::Launch {
+            new_instance: true,
+            ..
+        }
+    ) {
+        return Err(fail(
+            false,
+            "unsupported_platform: new_instance is only supported by macOS; no application was launched",
+        ));
+    }
     unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok() }.map_err(|e| fail(false, e))?;
     let _apartment = Apartment;
     let observed = identity
@@ -70,7 +82,7 @@ pub(crate) fn act(
         )
         .map_err(|e| fail(false, e))?;
     let (app, file) = match request {
-        AppActionRequest::Launch { application } => (Some(application), None),
+        AppActionRequest::Launch { application, .. } => (Some(application), None),
         AppActionRequest::OpenFile { path, application } => {
             (application.as_ref(), Some(path.as_str()))
         }
