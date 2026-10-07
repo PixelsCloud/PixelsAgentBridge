@@ -328,7 +328,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E4应用MCP/Bridge入口 | 三个正式工具、严格解析/v12协商、原身份结果验证/历史去重及活动操作计数已接入；三平台各67项Bridge、38项MCP、7项stdio测试通过，见 acceptance/execution-e4-app-mcp-2026-10-07.md；安装宿主验收仍待完成 |
 | E4 Windows应用helper | 已增加各活动WTS用户的原始令牌应用helper、旧桌面路由隔离和原生调用阻塞退出；Windows/Mac各22项IPC与Linux18项回归通过，见 acceptance/execution-e4-application-helper-2026-10-07.md；安装后多会话与故障注入仍待验收 |
 | E5最小UI源码 | 命令/目录/终端/传输用户选择、双桌面应用入口及实际身份历史已接入；传输复用MCP队列，原连接取消/观察与未确认结果保留。三平台各69项Bridge和38项MCP测试、11项浏览器测试通过，见 acceptance/execution-e5-ui-2026-10-07.md；已安装桌面实际操作待验收 |
-| E6真实SSH首批 | Mac/Linux已通过原生用户worker + 独立OpenSSH agent的真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份推送核对；见 acceptance/execution-e6-ssh-2026-10-07.md；Windows SSH、Keychain及慢凭据helper仍待验收 |
+| E6真实SSH | Mac/Linux原生用户worker + 独立OpenSSH agent通过；Windows已补齐Git for Windows OpenSSH真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份核对。见 acceptance/execution-e6-ssh-2026-10-07.md 及 acceptance/execution-e6-windows-ssh-2026-10-07.md；Mac Keychain待验收，慢凭据helper见下一行 |
 | E6慢Git凭据程序 | Windows实测发现取消后宽限退出让helper继续写入，已修复为收到最终响应后立即回收进程树并保留仓库锁；Windows与Linux两用户通过，见 acceptance/execution-e6-slow-credential-2026-10-07.md；Mac退出竞态已补修并通过5轮正常工作流/慢凭据/12项回归，见 acceptance/execution-e6-macos-exit-race-2026-10-07.md；包含修复的新安装包待完成 |
 | E2–E8剩余增量 | 主体实现及四类产物已完成；剩余是环境/凭据边界、完整异常矩阵、已安装UI与正式宿主验收，不重复开发现有能力 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
@@ -338,4 +338,4 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E8 Windows应用首轮 | 原生MCP已完成解锁、应用发现、用户文件创建、记事本打开/中文控件编辑/保存提示/正常退出/内容归属核对及清理；见 acceptance/execution-e8-windows-app-first-2026-10-07.md；focus被系统策略拒绝，未冒充成功，完整两轮仍待完成 |
 | E8 Linux正式工具首轮 | pabuser1 的实际身份、中文文件、八种Git操作及上传下载哈希/所有者通过；终端关闭暴露NotFound，不能记为完整一轮。见 acceptance/execution-e8-linux-first-2026-10-07.md；测试树保留待升级核对及最终清理 |
 | E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；三平台QUIC、真实用户PTY、700003字节归档/并发和断线状态回归通过。见 acceptance/execution-e8-terminal-close-2026-10-07.md；安装后正式工具复验待完成 |
-| 下一动作 | 将终端关闭修复纳入后续完整包并继续正式工具两轮工作流；Windows helper生命周期/真实Git凭据、E6剩余矩阵及Mac解锁后UI验收仍待完成。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |
+| 下一动作 | 将终端关闭修复纳入后续完整包并继续正式工具两轮工作流；Windows helper生命周期、Mac Keychain、E6剩余矩阵及Mac解锁后UI验收仍待完成。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |

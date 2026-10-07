@@ -107,6 +107,9 @@ async fn native_user_git_acceptance() {
     #[cfg(unix)]
     let prepared = PreparedUser::for_uid(user).unwrap();
     let expected = prepared.identity().clone();
+    let ssh_fixture: Option<serde_json::Value> = std::env::var("PAB_EXECUTION_TEST_GIT_SSH")
+        .ok()
+        .map(|text| serde_json::from_str(&text).unwrap());
     let dir = tempfile::tempdir().unwrap();
     let base = service(dir.path()).await;
     let mut svc = base.for_ui_connection();
@@ -138,10 +141,42 @@ async fn native_user_git_acceptance() {
         .unwrap()
         .selection
         .unwrap();
+    let root_path = ssh_fixture
+        .as_ref()
+        .and_then(|fixture| fixture.get("workspace"))
+        .and_then(serde_json::Value::as_str)
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            expected
+                .home
+                .join(format!("pab-git-acceptance-{}", RequestId::new()))
+        });
+    // A Windows SSH fixture binds only this generated directory into its
+    // isolated server. Never accept a real user directory as a test workspace.
+    assert_eq!(root_path.parent(), Some(expected.home.as_path()));
+    assert!(
+        root_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("pab-git-acceptance-")
+    );
+    if root_path.exists() {
+        assert!(
+            !std::fs::symlink_metadata(&root_path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(
+            root_path.canonicalize().unwrap().parent(),
+            Some(expected.home.canonicalize().unwrap().as_path())
+        );
+        assert!(std::fs::read_dir(&root_path).unwrap().next().is_none());
+    }
     let root = Workspace {
-        path: expected
-            .home
-            .join(format!("pab-git-acceptance-{}", RequestId::new())),
+        path: root_path,
         home: expected.home.clone(),
     };
     let repo = root.path.join("repo");
@@ -176,9 +211,6 @@ async fn native_user_git_acceptance() {
         )
         .await;
     }
-    let ssh_fixture: Option<serde_json::Value> = std::env::var("PAB_EXECUTION_TEST_GIT_SSH")
-        .ok()
-        .map(|text| serde_json::from_str(&text).unwrap());
     if let Some(fixture) = &ssh_fixture {
         command(
             &svc,
@@ -196,6 +228,12 @@ async fn native_user_git_acceptance() {
     let remote_url = ssh_fixture
         .as_ref()
         .map(|fixture| {
+            if let Some(url) = fixture
+                .get("remote_url")
+                .and_then(serde_json::Value::as_str)
+            {
+                return url.to_owned();
+            }
             format!(
                 "{}{}",
                 fixture["prefix"].as_str().unwrap(),
