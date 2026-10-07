@@ -47,7 +47,8 @@ class Packages(unittest.TestCase):
                     out = root / platform
                     if platform != "macos":
                         suffix = ".exe" if platform == "windows" else ""
-                        files = {name + suffix: binaries / (name + suffix) for name in ("pab-executor", "pab-mcp", "pab-desktop")}
+                        components = ("pab-executor", "pab-mcp", "pab-desktop") if platform == "windows" else ("pab-executor", "pab-mcp")
+                        files = {name + suffix: binaries / (name + suffix) for name in components}
                         record_artifacts(root, "desktop" if platform == "windows" else platform, "debug", "1.2.0", files)
                     else:
                         record_artifacts(root, 'macos-aarch64', 'debug', '1.2.0', macos_artifacts(binaries, app))
@@ -85,7 +86,9 @@ class Packages(unittest.TestCase):
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.executor.plist").mode, 0o644)
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.login-helper.plist").mode, 0o644)
                             else:
-                                self.assertIn("pab-desktop", package.getnames())
+                                self.assertNotIn("pab-desktop", package.getnames())
+                                self.assertNotIn("run-app.sh", package.getnames())
+                                self.assertIn("lifecycle.sh", package.getnames())
                                 self.assertNotIn("com.pixelsagentbridge.executor.plist", package.getnames())
 
 
