@@ -93,6 +93,14 @@ fn number(node: &AXUIElement, key: &str) -> Result<i64, &'static str> {
 }
 fn enabled(node: &AXUIElement) -> Result<bool, &'static str> {
     match boolean(node, "AXEnabled") {
+        // NSTextView may expose AXValue as writable without implementing
+        // AXEnabled (TextEdit's plain-text editor). Restrict this inference to
+        // ordinary text areas; provider errors, secure fields and explicit
+        // disabled states must still reject input.
+        Err("unsupported_attribute_or_action") if text(node, "AXRole")? == "AXTextArea" => {
+            let secure = text(node, "AXSubrole").ok().as_deref() == Some("AXSecureTextField");
+            Ok(!secure && settable(node, "AXValue"))
+        }
         // AppKit rows omit AXEnabled; their owning table controls availability.
         // Do not turn an arbitrary missing attribute/provider error into true.
         Err("unsupported_attribute_or_action") if text(node, "AXRole")? == "AXRow" => {
@@ -331,10 +339,42 @@ impl UiBackend for MacUi {
             return Err("stale_window");
         }
         let mut pid = 0;
-        if unsafe { AXUIElementGetPid(node.as_concrete_TypeRef(), &mut pid) } != 0
-            || pid != window.pid as i32
-        {
+        if unsafe { AXUIElementGetPid(node.as_concrete_TypeRef(), &mut pid) } != 0 || pid <= 0 {
             return Err("stale_element");
+        }
+        // AppKit save/open sheets embed controls from its XPC panel service.
+        // Their PID differs from the document application. Prove containment
+        // against the exact live, process-verified root instead of accepting
+        // or rejecting the element solely by its PID.
+        if pid != window.pid as i32 {
+            // Remote AppKit views can omit the cross-process AXParent edge.
+            // Re-observe their containment from the selected document root;
+            // never accept the foreign PID or an AXWindow attribute alone.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_millis(400);
+            let mut pending = vec![(root.clone(), 0usize)];
+            let mut visited: Vec<AXUIElement> = vec![];
+            while let Some((current, depth)) = pending.pop() {
+                if std::time::Instant::now() >= deadline || visited.len() >= 2000 {
+                    return Err("containment_budget");
+                }
+                if visited.iter().any(|seen| seen == &current) {
+                    continue;
+                }
+                if &current == node {
+                    return Ok(());
+                }
+                visited.push(current.clone());
+                if depth >= 64 {
+                    continue;
+                }
+                let remaining = 2000usize.saturating_sub(visited.len() + pending.len());
+                let (children, truncated) = list(&current, "AXChildren", remaining)?;
+                if truncated {
+                    return Err("containment_budget");
+                }
+                pending.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
+            }
+            return Err("element_outside_window");
         }
         let mut current = node.clone();
         for _ in 0..64 {
@@ -362,8 +402,13 @@ impl UiBackend for MacUi {
         let protected =
             subrole.as_deref() == Some("AXSecureTextField") || native_role == "AXSecureTextField";
         let mut errors = BTreeMap::new();
-        let actions = node.action_names().map_err(mapped)?;
-        let press = actions.iter().any(|a| a.to_string() == "AXPress");
+        // Remote save-panel containers can expose children but fail action
+        // enumeration. Retain that field error without hiding their controls;
+        // never infer AXPress from a role or from failed enumeration.
+        let actions = optional(node.action_names().map_err(mapped), "actions", &mut errors);
+        let press = actions
+            .as_ref()
+            .is_some_and(|names| names.iter().any(|a| a.to_string() == "AXPress"));
         let mut supported = vec![];
         if press {
             supported.push(UiActionKind::Invoke);

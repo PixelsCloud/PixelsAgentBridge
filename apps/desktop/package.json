@@ -1,7 +1,7 @@
 {
   "name": "pab-desktop",
   "private": true,
-  "version": "1.2.32",
+  "version": "1.2.37",
   "type": "module",
   "scripts": {
     "test:execution-ui": "playwright test",

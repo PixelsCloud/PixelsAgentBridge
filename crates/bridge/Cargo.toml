@@ -1,6 +1,6 @@
 [package]
 name = "pab-bridge"
-version = "1.2.32"
+version = "1.2.37"
 edition.workspace = true
 rust-version.workspace = true
 
