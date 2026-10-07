@@ -269,7 +269,8 @@ Desktop 的设备“远程命令”面板中，命令、浏览目录、终端和
 任务详情显示实际观察到的账户/会话，旧记录显示“未记录”。
 传输复用 MCP 的持久化队列；取消只代表请求，不能确认远端是否已写入文件时保留“结果待确认”，
 使用“查询原操作”核对结果，不重新发送文件。上述 UI 已通过源码/浏览器测试，
-Windows/macOS 安装后的验收仍按规划继续进行。
+Windows 1.2.29 安装版另已验证三语、亮暗主题设置及真实终端任务身份展示，发现的两处 UI 问题已修复源码，
+仍需更新安装包复验；这不等于完整业务流程或 Mac UI 已验收。见[安装界面报告](acceptance/execution-e8-windows-ui-2026-10-07.md)。
 
 Git 使用所选账户自己的配置和凭据助手。选择用户不会自动解锁钥匙串、取得不可用的 SSH agent，
 也不会获得交互认证权限。后台工作前应配置好该账户的凭据；认证失败或超时时查询原操作。
@@ -294,7 +295,7 @@ HTTP替身、QUIC、stdio及Windows named pipe连接Docker Desktop Linux Engine�
 
 ### Git 操作
 
-Git 工具要求目标 system-query 能力 **v5**，以及原生 Git（`switch` 需要 2.23 或更新版本）。复用成熟的 [Git](https://git-scm.com/docs) 仓库、传输、凭据和 hooks 实现，通过明确的程序参数调用，不拼接 Shell。Git 配置属于 Executor 的运行账户：Windows 服务若以 SYSTEM 运行，不会自动使用登录用户的 SSH 私钥和提交身份。缺少 Git、认证和权限问题直接返回错误。远端参数使用已配置的名字，如 `origin`，不接收 URL 或密码。
+Git 工具要求目标 system-query 能力 **v5**，以及原生 Git（`switch` 需要 2.23 或更新版本）。复用成熟的 [Git](https://git-scm.com/docs) 仓库、传输、凭据和 hooks 实现，通过明确的程序参数调用，不拼接 Shell。不传 `execution` 时使用 Executor 服务账户的 Git 配置：Windows SYSTEM 服务不会自动取得登录用户的密钥和提交身份。需要使用该账户时，先发现并传入其 `user` 选择（要求 system-query **v11**）。缺少 Git、认证和权限问题直接返回错误。远端参数使用已配置的名字，如 `origin`，不接收 URL 或密码。
 
 `repo` 必须是**目标计算机**的绝对路径。Status 是有界的当前观测，不是原子仓库快照。Diff 禁用外部 diff/textconv，二进制变化返回摘要。历史分页保留返回的 `start_commit`，后续传入 `start`，并使用返回的 `next_skip`；因字节预算截短时也不会跳过未返回的提交。单个结果最多 32 KiB，明确标记截断；请求总量最多 60 KiB。
 
@@ -311,11 +312,11 @@ Git 工具要求目标 system-query 能力 **v5**，以及原生 Git（`switch` 
 
 Commit 要求明确的相对文件路径和提交说明，支持已跟踪文件的删除，拒绝目录。只暂存指定路径并提交其当前工作区内容，保留无关的暂存修改；失败时已选文件可能仍留在暂存区。Checkout 不强制覆盖、不自动 stash。Pull 要求干净且已检出分支的工作区，必须指定 `strategy`：`ff_only`、`merge` 或 `rebase`；冲突保留给后续检查，不自动 abort。
 
-修改类操作约 250 ms 后仍运行就返回操作引用，保留 `request_id`，通过 `pab_get_operation` 查询；相同 ID 永远不重执行。网络操作默认期限 300000 ms，其他默认 30000 ms。取消请求停止本次 Git 进程，不承诺回滚，SSH/hooks 子进程可能继续存在。已开始的修改遇到超时或取消，结果可以是 `unconfirmed`。同一实际 Git 目录上的其他 PAB 操作返回忙；外部程序仍由 Git 自身锁保护。
+修改类操作约 250 ms 后仍运行就返回操作引用，保留 `request_id`，通过 `pab_get_operation` 查询；相同 ID 永远不重执行。网络操作默认期限 300000 ms，其他默认 30000 ms。取消请求停止本次 Git 进程，不承诺回滚；service 模式的 SSH/hooks 子进程可能继续存在。显式 user 操作会在释放仓库锁前回收所属工作进程树，但不能撤销既有副作用或停止已交给独立服务的工作。已开始的修改遇到超时或取消，结果可以是 `unconfirmed`。同一实际 Git 目录上的其他 PAB 操作返回忙；外部程序仍由 Git 自身锁保护。
 
 Push 固定选定的提交 ID，默认 `force=false`；`force=true` 使用刚观测的远端引用作为明确 lease。推送回执丢失后，查询可核对原提交与远端引用，不会重推；引用匹配只证明目标状态已经存在，不归因于某个进程。不自动 reset、强推、创建提交身份或绕过 hooks。请求身份对提交说明做摘要，Git 输出与任务历史仍可能包含提交说明。
 
-Windows/macOS 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 测试已通过。安装后的宿主 SSH 认证及 Linux 运行时验收仍待完成。需要重新构建 MCP 与目标 Executor，并重启 AI 客户端；macOS 安装包及验证范围见 [MACOS.md](MACOS.md)。
+Windows/macOS 临时仓库、本地 bare 远端、取消、持久化、QUIC 和 stdio 测试已通过。三平台指定用户 worker 的真实 SSH 认证测试也已通过；安装后的 Linux 指定用户已用八种 Git 工具完成隔离本地远端流程，见[Linux 报告](acceptance/execution-e8-linux-first-2026-10-07.md)。这些证据不代表正式宿主 SSH 认证或完整两轮工作流已验收。需要重新构建 MCP 与目标 Executor，并重启 AI 客户端；macOS 安装包及验证范围见 [MACOS.md](MACOS.md)。
 
 ### 系统查询
 

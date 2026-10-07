@@ -317,7 +317,10 @@ show the observed account/session, or **Not recorded** for older records.
 Transfers use the same durable queue as MCP. Cancellation is a request; an unknown
 publication remains **Unconfirmed**, with **Inspect original operation** to query
 its result without resending the file. These UI additions have source/browser
-coverage; installed Windows/macOS acceptance remains tracked in the roadmap.
+coverage. Installed Windows 1.2.29 also passed three-language/light-dark checks
+of settings and actual terminal-history identity; two resulting UI fixes still
+need an updated installer check. This is not full workflow or macOS UI acceptance.
+See [the installed UI report](acceptance/execution-e8-windows-ui-2026-10-07.md).
 
 ### Docker container operations
 
@@ -388,9 +391,10 @@ see [MACOS.md](MACOS.md).
 Git tools require target system-query capability **v5** and native Git (2.23 or
 newer for `switch`). They reuse [Git](https://git-scm.com/docs)'s repository,
 transport, credentials and hooks through explicit program arguments without a
-shell. Configuration belongs to the Executor's OS identity; a Windows service
-running as SYSTEM does not automatically use the logged-in user's SSH keys or
-Git author configuration. Missing Git, authentication and permissions errors are
+shell. Without `execution`, configuration belongs to the Executor's service identity;
+a Windows SYSTEM service does not automatically use the logged-in user's keys or
+Git author configuration. To use that account, discover and pass its `user` selection
+(system-query **v11** or later). Missing Git, authentication and permissions errors are
 returned directly. Remote parameters name existing configured remotes, such as
 `origin`; URLs and passwords are not tool arguments.
 
@@ -424,7 +428,9 @@ Mutations still running after about 250 ms return an operation reference. Keep
 `request_id` and query `pab_get_operation`; repeating the same ID never reruns the
 operation. Network deadlines default to 300000 ms, others to 30000 ms.
 `pab_cancel_operation` requests stopping the owned Git process, not rollback;
-SSH or hook descendants may outlive it. Once a mutation starts, timeout or
+service-mode SSH or hook descendants may outlive it. Explicit user operations
+reap their owned worker tree before releasing the repository lock; this cannot
+roll back effects or stop work submitted to an independent service. Once a mutation starts, timeout or
 cancellation can leave its result `unconfirmed`. Other PAB operations on the same
 discovered Git directory return busy while it runs; Git's own locks still apply.
 
@@ -437,8 +443,11 @@ performed. Request identity hashes the commit message; Git results may still
 contain commit messages and are retained in task history.
 
 Windows and macOS temporary-repository, local bare-remote, cancellation,
-persistence, QUIC and stdio tests pass. Installed-host SSH authentication and Linux
-runtime acceptance remain pending. Rebuild both MCP and Executor and restart the
+persistence, QUIC and stdio tests pass. User-worker SSH authentication tests now pass
+on all three platforms. An installed Linux user also completed all eight Git tools
+against an isolated local remote; this does not prove installed-host SSH authentication
+or the full two-round workflow. See [the Linux report](acceptance/execution-e8-linux-first-2026-10-07.md).
+Rebuild both MCP and Executor and restart the
 AI client; macOS package/verification details are in [MACOS.md](MACOS.md).
 
 ### System queries

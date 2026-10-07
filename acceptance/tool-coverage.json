@@ -11,7 +11,16 @@
       ],
       "live_suite": "execution-context-applications",
       "live_status": "not_run",
-      "scope": "Native account/context discovery and caller-bound references have source test evidence. Installed-host execution-selection acceptance remains pending E8."
+      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e1-discovery-2026-10-06.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Connection-bound contexts selected through native tools on Windows/macOS/Linux; account lifecycle and full installed workflows remain pending."
+      }
     },
     "pab_list_apps": {
       "group": "desktop-applications",
@@ -24,7 +33,15 @@
       ],
       "live_suite": "execution-context-applications",
       "live_status": "not_run",
-      "scope": "Source protocol/native backend evidence is recorded in execution-e4-app-*.md. Installed AI-host application tools are not yet deployed or accepted."
+      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e4-app-mcp-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+      }
     },
     "pab_launch_app": {
       "group": "desktop-applications",
@@ -37,7 +54,15 @@
       ],
       "live_suite": "execution-context-applications",
       "live_status": "not_run",
-      "scope": "Source protocol/native backend evidence is recorded in execution-e4-app-*.md. Installed AI-host application tools are not yet deployed or accepted."
+      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e4-app-mcp-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+      }
     },
     "pab_open_file": {
       "group": "desktop-applications",
@@ -50,7 +75,15 @@
       ],
       "live_suite": "execution-context-applications",
       "live_status": "not_run",
-      "scope": "Source protocol/native backend evidence is recorded in execution-e4-app-*.md. Installed AI-host application tools are not yet deployed or accepted."
+      "scope": "Complete execution-context/application live suite pending; partial installed evidence is listed separately below.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e4-app-mcp-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "Installed on both desktop platforms. Windows discovery and open-file/UI-save/normal-close partial workflow is recorded; launch/reuse/Save As and both complete rounds remain pending, especially macOS."
+      }
     },
     "pab_ui_query": {
       "group": "desktop-ui",
@@ -181,7 +214,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e2-command-2026-10-06.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+      }
     },
     "pab_read_output": {
       "group": "operations",
@@ -191,7 +232,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e2-command-2026-10-06.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+      }
     },
     "pab_run_command": {
       "group": "operations",
@@ -201,7 +250,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e2-command-2026-10-06.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Commands carry actual identity and user-aware source regressions exist. Native installed user commands have been used on three platforms; full two-round command/output/cancel/recovery workflows remain pending."
+      }
     },
     "pab_upload_file": {
       "group": "transfer",
@@ -211,7 +268,16 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Installed Linux user upload/download matched binary SHA-256 and UID. Full Windows/macOS and Linux service/two-user rounds, cancellation and restart acceptance remain pending."
+      }
     },
     "pab_download_file": {
       "group": "transfer",
@@ -221,7 +287,16 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Installed Linux user upload/download matched binary SHA-256 and UID. Full Windows/macOS and Linux service/two-user rounds, cancellation and restart acceptance remain pending."
+      }
     },
     "pab_file_copy": {
       "group": "files",
@@ -256,7 +331,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "copy file"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_delete": {
       "group": "files",
@@ -291,7 +375,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "cleanup owned fixture"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_hash": {
       "group": "files",
@@ -347,7 +440,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "copied hash"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_move": {
       "group": "files",
@@ -382,7 +484,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "move file"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_patch": {
       "group": "files",
@@ -459,7 +570,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "apply hash guarded patch"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_read": {
       "group": "files",
@@ -578,7 +698,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "archive content verified"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_search": {
       "group": "files",
@@ -613,7 +742,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "regex content search"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_stat": {
       "group": "files",
@@ -648,7 +786,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "old move path absent"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_file_write": {
       "group": "files",
@@ -725,7 +872,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "empty file round trip"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_list_directory": {
       "group": "files",
@@ -737,7 +893,16 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_mkdir": {
       "group": "files",
@@ -772,7 +937,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "create isolated fixture"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_archive_create": {
       "group": "files",
@@ -807,7 +981,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "archive create"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_archive_extract": {
       "group": "files",
@@ -842,7 +1025,16 @@
           "run_id": "4d6d0f5a-80ad-4167-b093-f31351683610",
           "case": "archive extract"
         }
-      ]
+      ],
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-filesystem-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e8-windows-app-first-2026-10-07.md"
+        ],
+        "remaining_scope": "User-aware source integration and native account tests exist. Only selected installed file paths/operations are covered by the first Windows/Linux reports, not every entry or the complete two-round matrix."
+      }
     },
     "pab_capture_screenshot": {
       "group": "desktop",
@@ -936,7 +1128,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e8-terminal-close-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+      }
     },
     "pab_terminal_close": {
       "group": "terminal",
@@ -946,7 +1146,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e8-terminal-close-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+      }
     },
     "pab_terminal_input": {
       "group": "terminal",
@@ -956,7 +1164,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e8-terminal-close-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+      }
     },
     "pab_terminal_read": {
       "group": "terminal",
@@ -966,7 +1182,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence."
+      "scope": "Windows 211399447 after upgrade only; see acceptance/2026-10-06.md for exact case and operation evidence.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e8-terminal-close-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+      }
     },
     "pab_terminal_resize": {
       "group": "terminal",
@@ -976,7 +1200,15 @@
       ],
       "live_suite": "live-basic",
       "live_status": "not_run",
-      "scope": "group regression; individual behavior requires reported case evidence"
+      "scope": "group regression; individual behavior requires reported case evidence",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e8-terminal-close-2026-10-07.md",
+          "acceptance/execution-e7-refresh-2026-10-07.md"
+        ],
+        "remaining_scope": "Source close/drain/concurrency regressions pass. Installed updated Executors closed selected-user terminals and preserved Chinese output on all three platforms; new MCP large-output concurrency and full rounds await host reload."
+      }
     },
     "pab_system_info": {
       "group": "system",
@@ -1199,7 +1431,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_commit": {
       "group": "git",
@@ -1208,7 +1451,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_diff": {
       "group": "git",
@@ -1217,7 +1471,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_fetch": {
       "group": "git",
@@ -1226,7 +1491,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_log": {
       "group": "git",
@@ -1235,7 +1511,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_pull": {
       "group": "git",
@@ -1244,7 +1531,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_push": {
       "group": "git",
@@ -1253,7 +1551,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_git_status": {
       "group": "git",
@@ -1262,7 +1571,18 @@
       ],
       "live_suite": "live-basic",
       "live_status": "pass",
-      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths."
+      "scope": "Windows 211399447 and Mac 603527578 native cases recorded in acceptance/2026-10-06.md; no claim beyond named paths.",
+      "execution_acceptance": {
+        "status": "partial",
+        "evidence": [
+          "acceptance/execution-e3-git-2026-10-07.md",
+          "acceptance/execution-e8-linux-first-2026-10-07.md",
+          "acceptance/execution-e6-ssh-2026-10-07.md",
+          "acceptance/execution-e6-windows-ssh-2026-10-07.md",
+          "acceptance/execution-e6-keychain-2026-10-07.md"
+        ],
+        "remaining_scope": "All eight native Git tools passed an installed Linux selected-user local-remote workflow; three-platform user-worker SSH and isolated Mac Keychain have separate source evidence. Full installed desktop and Linux identity rounds remain pending."
+      }
     },
     "pab_container_control": {
       "group": "container",

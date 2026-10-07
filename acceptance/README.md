@@ -6,10 +6,17 @@ reports and raw test logs remain in `.build/acceptance/<run-id>/` locally.
 It never installs packages, restarts a machine, or runs ignored desktop tests.
 Run twice after the final changes to check independence.
 
-`tool-coverage.json` maps all 60 registered tools to existing regression sources
+`tool-coverage.json` maps all 68 registered tools to existing regression sources
 and the live suite that must verify them. This is a coverage **plan**, not a claim
 that every tool passed. The real rmcp catalog test rejects missing/stale tools
 and exports schemas as `catalog.json` for the report.
+
+Execution-context evidence is tracked separately in each affected tool's
+`execution_acceptance` field. A historical `live_status: pass` for service-mode
+behavior does not prove the new user selection or two complete installed-host
+rounds. `execution_acceptance.status: partial` lists the exact reports and remaining
+cases; it is not a terminal acceptance pass. The full gate is
+[`EXECUTION_CONTEXT_ROADMAP.md`](../EXECUTION_CONTEXT_ROADMAP.md), sections 10–11.
 
 `run live-basic` is opt-in to the two-client transport and monitor-move tests. Set
 `PAB_TEST_DEVICE_CODE`, `PAB_TEST_PATH` (a disposable/existing fixture), and
