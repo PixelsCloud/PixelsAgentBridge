@@ -309,7 +309,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | Finder修复 | 1.2.26已安装验证，已提交push：dfe7221 |
 | E0用户执行原型 | Windows两个WTS用户、Mac UID 501、Linux无GUI账户均已实测，见 acceptance/execution-e0-2026-10-06.md；应用发现及启动/打开首批原型已实测，完整应用工作流仍待完成 |
 | E1身份协议基础 | 实际身份观察、连接绑定注册表以及命令/终端/Git/文件/目录/传输的选择、去重及记录已接入源码；完整生命周期矩阵及正式安装验收待完成 |
-| E1账户发现 | 已实现 pab_list_execution_contexts，三平台相关测试通过；新版已安装到本机/90/Mac/Linux测试端，当前AI宿主待重载新工具后验收 |
+| E1账户发现 | 已实现 pab_list_execution_contexts，三平台相关测试通过；当前AI宿主已加载68工具，三平台正式上下文查询及选择已使用，详见各E8报告；无需重新开发或重复等待首次工具加载 |
 | E2本地通道/生命周期 | 内核核对PID的通道、内部user-worker命令路由、Windows Job/Unix进程组回收已实现；三平台原生测试通过，完整异常矩阵仍待完成 |
 | E3指定用户命令 | v3参数、身份复核、原记录去重、中文输入输出、超时和取消已实现；Windows两个用户/Mac/Linux实测通过，见 acceptance/execution-e2-command-2026-10-06.md；新版已安装，正式宿主验收待完成 |
 | E3指定用户终端 | 复用portable-pty接入user-worker；身份冻结、连接隔离、重复打开/关闭、中文及断线清理三平台源码集成通过，见 acceptance/execution-e3-terminal-2026-10-07.md；正式宿主与完整异常矩阵待验收 |
@@ -330,7 +330,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E5最小UI源码 | 命令/目录/终端/传输用户选择、双桌面应用入口及实际身份历史已接入；传输复用MCP队列，原连接取消/观察与未确认结果保留。三平台各69项Bridge和38项MCP测试、11项浏览器测试通过，见 acceptance/execution-e5-ui-2026-10-07.md；已安装桌面实际操作待验收 |
 | E6真实SSH | Mac/Linux原生用户worker + 独立OpenSSH agent通过；Windows已补齐Git for Windows OpenSSH真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份核对。见 acceptance/execution-e6-ssh-2026-10-07.md 及 acceptance/execution-e6-windows-ssh-2026-10-07.md；Keychain与慢凭据helper见后续两行 |
 | E6 Mac Keychain | 正式用户命令调用Security API及真实user-worker Git fetch均验证独立Keychain的可读、锁定拒绝和恢复；实际身份、20秒边界、结果隐私及用户默认Keychain/搜索列表不变通过。见 acceptance/execution-e6-keychain-2026-10-07.md；不承诺自动解锁登录Keychain或任意第三方helper兼容 |
-| E6慢Git凭据程序 | Windows实测发现取消后宽限退出让helper继续写入，已修复为收到最终响应后立即回收进程树并保留仓库锁；Windows与Linux两用户通过，见 acceptance/execution-e6-slow-credential-2026-10-07.md；Mac退出竞态已补修并通过5轮正常工作流/慢凭据/12项回归，见 acceptance/execution-e6-macos-exit-race-2026-10-07.md；包含修复的新安装包待完成 |
+| E6慢Git凭据程序 | Windows实测发现取消后宽限退出让helper继续写入，已修复为收到最终响应后立即回收进程树并保留仓库锁；Windows与Linux两用户通过，见 acceptance/execution-e6-slow-credential-2026-10-07.md；Mac退出竞态已补修并通过5轮正常工作流/慢凭据/12项回归，见 acceptance/execution-e6-macos-exit-race-2026-10-07.md；修复已纳入Windows/Linux 1.2.29及Mac 1.2.30安装包 |
 | E2–E8剩余增量 | 主体实现及四类产物已完成；剩余是环境/凭据边界、完整异常矩阵、已安装UI与正式宿主验收，不重复开发现有能力 |
 | 已有工具、桌面能力、打包和记录框架 | 复用，仅做受影响范围的回归 |
 | Linux无界面交付入口 | 已移除Linux包的Desktop/前端依赖，Executor+MCP在精简镜像编译、手动安装/强制回收与真实systemd安装生命周期通过，见 acceptance/execution-linux-headless-package-2026-10-07.md；正式版本包及安装已完成；真实设备身份/已完成任务的重启与同版本重装保留通过，见 acceptance/execution-e7-linux-persistence-2026-10-07.md；指定用户正式宿主验收仍待完成 |
@@ -338,5 +338,6 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E7 Linux持久化 | 实际注册设备的服务重启、容器重启和1.2.27同版本重装通过，设备身份/凭据/原任务/事件/输出保留，服务器重新认证；见 acceptance/execution-e7-linux-persistence-2026-10-07.md；运行中恢复及跨版本升级不在本证据范围 |
 | E8 Windows应用首轮 | 原生MCP已完成解锁、应用发现、用户文件创建、记事本打开/中文控件编辑/保存提示/正常退出/内容归属核对及清理；见 acceptance/execution-e8-windows-app-first-2026-10-07.md；focus被系统策略拒绝，未冒充成功，完整两轮仍待完成 |
 | E8 Linux正式工具首轮 | pabuser1 的实际身份、中文文件、八种Git操作及上传下载哈希/所有者通过；终端关闭暴露NotFound，不能记为完整一轮。见 acceptance/execution-e8-linux-first-2026-10-07.md；测试树保留待升级核对及最终清理 |
-| E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；三平台QUIC、真实用户PTY、700003字节归档/并发和断线状态回归通过。见 acceptance/execution-e8-terminal-close-2026-10-07.md；安装后正式工具复验待完成 |
-| 下一动作 | 将终端关闭修复纳入后续完整包并继续正式工具两轮工作流；Windows helper生命周期、E6剩余矩阵及Mac解锁后UI验收仍待完成。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |
+| E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；三平台QUIC、真实用户PTY、700003字节归档/并发和断线状态回归通过，见 acceptance/execution-e8-terminal-close-2026-10-07.md；安装后旧MCP连接新版三平台Executor的指定用户终端关闭/中文归档通过。新MCP的大输出并发复验待会话重载 |
+| E7修复版本 | Windows/Linux 1.2.29、Mac ARM/Intel 1.2.30完整包已生成；本机/90/Mac ARM/Linux均升级并核对身份/文件哈希，Mac固定证书保留；Linux旧任务/事件/输出/用户文件跨版本保留通过。见 acceptance/execution-e7-refresh-2026-10-07.md；Intel仍无实机，新MCP正式验收待重载 |
+| 下一动作 | 本机升级已结束旧MCP，重载会话后继续正式工具两轮工作流及大输出并发归档；Windows helper完整生命周期、E6剩余矩阵及Mac解锁后UI验收仍待完成。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |
