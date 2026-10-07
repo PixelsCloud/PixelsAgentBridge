@@ -317,10 +317,10 @@ show the observed account/session, or **Not recorded** for older records.
 Transfers use the same durable queue as MCP. Cancellation is a request; an unknown
 publication remains **Unconfirmed**, with **Inspect original operation** to query
 its result without resending the file. These UI additions have source/browser
-coverage. Installed Windows 1.2.29 also passed three-language/light-dark checks
-of settings and actual terminal-history identity; two resulting UI fixes still
-need an updated installer check. This is not full workflow or macOS UI acceptance.
-See [the installed UI report](acceptance/execution-e8-windows-ui-2026-10-07.md).
+coverage. Installed Windows 1.2.32 passed three-language/light-dark checks of settings,
+actual terminal-history identity, persistence when choosing the current language,
+and task-row/status layout. This is not full workflow or macOS UI acceptance.
+See [the installed UI report](acceptance/execution-e7-ui-refresh-2026-10-07.md).
 
 ### Docker container operations
 
