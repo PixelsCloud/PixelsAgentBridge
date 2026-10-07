@@ -15,6 +15,22 @@ impl TaskService {
             drop(jobs);
             return self.get_system_query(actor, id).await;
         }
+        if !cfg!(any(windows, target_os = "macos"))
+            && matches!(query, SystemQuery::Desktop { .. })
+        {
+            // Preserve a definitive result for clients that already recorded
+            // this operation before sending it. A transport-level rejection
+            // otherwise becomes "unconfirmed" in older Bridge clients.
+            if !self.store.accept_system_query_with_context(actor, id, &query, None).await? {
+                drop(jobs);
+                return self.get_system_query(actor, id).await;
+            }
+            let mut reply = SystemQueryReply::pending(id, &query);
+            reply.state = "failed".into();
+            reply.error = Some(TaskServiceError::DesktopUnsupported.to_string());
+            self.store.finish_system_query(&reply).await?;
+            return Ok(reply);
+        }
         let mut operation_context = None;
         let mut git_user = None;
         let mut application_route = None;

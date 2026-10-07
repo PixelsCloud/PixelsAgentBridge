@@ -386,12 +386,8 @@ impl TaskService {
         stream: &mut PabBiStream,
         timeout: Duration,
     ) -> Result<usize, TaskServiceError> {
-        if !cfg!(any(
-            target_os = "windows",
-            target_os = "linux",
-            target_os = "macos"
-        )) {
-            return Err(TaskServiceError::Unsupported);
+        if !cfg!(any(windows, target_os = "macos")) {
+            return Err(TaskServiceError::DesktopUnsupported);
         }
         let (bytes, width, height, format, capture) = if let Some(options) = options {
             let image = crate::local_ipc::request_screenshot_v2(options.clone())
@@ -552,6 +548,9 @@ impl TaskService {
                 Ok(DeviceTaskResponse::Directory { page: result? })
             }
             DeviceTaskRequest::ListWindows { request_id, .. } => {
+                if !cfg!(any(windows, target_os = "macos")) {
+                    return Err(TaskServiceError::DesktopUnsupported);
+                }
                 self.store
                     .start_window_read(request_id, initiated_by)
                     .await?;
@@ -582,6 +581,9 @@ impl TaskService {
             DeviceTaskRequest::DesktopInput {
                 request_id, event, ..
             } => {
+                if !cfg!(any(windows, target_os = "macos")) {
+                    return Err(TaskServiceError::DesktopUnsupported);
+                }
                 // macOS has a native helper backend, including standalone key-up
                 // events needed to recover a modifier left down after a crash.
                 if !cfg!(any(windows, target_os = "macos"))
@@ -857,6 +859,12 @@ pub(crate) fn validate_command(command: &CommandTaskSpec) -> Result<(), TaskServ
 }
 
 fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
+    if matches!(error, TaskServiceError::DesktopUnsupported) {
+        return DeviceTaskResponse::Error {
+            code: DeviceTaskErrorCode::Unsupported,
+            message: error.to_string(),
+        };
+    }
     if let TaskServiceError::InvalidRequest(
         message
         @ "unsupported_platform: application management is unavailable on the headless product",
@@ -942,6 +950,7 @@ fn error_response(error: &TaskServiceError) -> DeviceTaskResponse {
         )) => DeviceTaskErrorCode::NotCancellable,
         TaskServiceError::NotCancellable => DeviceTaskErrorCode::NotCancellable,
         TaskServiceError::Unsupported
+        | TaskServiceError::DesktopUnsupported
         | TaskServiceError::WindowHelper(_)
         | TaskServiceError::SecureAttention(_) => DeviceTaskErrorCode::Unsupported,
         TaskServiceError::Store(_) => DeviceTaskErrorCode::StorageUnavailable,
@@ -1022,6 +1031,8 @@ pub(crate) enum TaskServiceError {
     Worker(#[from] tokio::task::JoinError),
     #[error("window listing is unsupported on this device")]
     Unsupported,
+    #[error("unsupported_platform: desktop operations are unavailable on the headless product")]
+    DesktopUnsupported,
     #[error("interactive window helper failed: {0}")]
     WindowHelper(crate::local_ipc::LocalIpcError),
     #[error("Windows secure attention failed: {0}")]

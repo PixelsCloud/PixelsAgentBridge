@@ -1,4 +1,5 @@
 #[tokio::test]
+#[cfg(any(windows, target_os = "macos"))]
 async fn ui_waits_release_slots_connections_are_distinct_and_action_deduplicates() {
     use crate::task_service::transfer_tests::{actor, service};
     use pab_protocol::*;

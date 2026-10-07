@@ -5,6 +5,47 @@ use pab_protocol::{DeviceId, ExpectedEnvironment, RequestId, TaskState, TenantId
 
 use super::*;
 
+#[cfg(not(any(windows, target_os = "macos")))]
+#[tokio::test]
+async fn headless_desktop_requests_are_unsupported_before_helper_dispatch() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = TaskService::open(
+        &directory.path().join("tasks.sqlite3"),
+        DeviceRef {
+            tenant_id: TenantId::from_u128(2),
+            device_id: DeviceId::from_u128(3),
+        },
+        detect_native_execution_context().unwrap(),
+    ).await.unwrap();
+    let requests = [
+        DeviceTaskRequest::ListWindows {
+            schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            request_id: RequestId::new(),
+        },
+        DeviceTaskRequest::DesktopInput {
+            schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            request_id: RequestId::new(),
+            event: DesktopInputEvent::Key { virtual_key: 65, down: false },
+        },
+    ];
+    for request in requests {
+        let error = service.handle_request(account(9), request).await.unwrap_err();
+        assert!(matches!(error, TaskServiceError::DesktopUnsupported));
+        assert!(matches!(error_response(&error), DeviceTaskResponse::Error {
+            code: DeviceTaskErrorCode::Unsupported, message
+        } if message.starts_with("unsupported_platform:")));
+    }
+    let id = RequestId::new();
+    let query = pab_protocol::SystemQuery::Desktop {
+        query: pab_protocol::DesktopQuery::Windows {},
+    };
+    let result = service.system_query(account(9), id, query.clone()).await.unwrap();
+    assert_eq!(result.state, "failed");
+    assert!(result.error.as_deref().unwrap().starts_with("unsupported_platform:"));
+    let duplicate = service.system_query(account(9), id, query).await.unwrap();
+    assert_eq!(duplicate, result);
+}
+
 #[cfg(target_os = "macos")]
 #[tokio::test]
 #[ignore = "run alone: verifies dispatch with no in-process desktop helper registered"]

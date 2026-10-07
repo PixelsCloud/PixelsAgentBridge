@@ -1031,6 +1031,7 @@ mod tests {
             }
         }
     }
+    #[cfg(any(windows, target_os = "macos"))]
     #[tokio::test]
     async fn desktop_mutation_survives_quic_drop_deduplicates_and_replies_by_identity() {
         use crate::task_service::transfer_tests::{actor, pair, service};
@@ -1194,6 +1195,7 @@ mod tests {
         wait_helper_removed(provider).await;
         server.abort();
     }
+    #[cfg(any(windows, target_os = "macos"))]
     #[tokio::test]
     async fn concurrent_batches_serialize_at_helper_and_duplicate_never_redispatches() {
         use crate::task_service::transfer_tests::{actor, service};
@@ -1459,6 +1461,7 @@ mod tests {
         wait_helper_removed(id).await;
         server.abort();
     }
+    #[cfg(any(windows, target_os = "macos"))]
     #[tokio::test]
     async fn large_native_jpeg_crosses_helper_and_real_quic_without_size_caps_or_json_image_payload()
      {
@@ -1570,6 +1573,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(any(windows, target_os = "macos"))]
     async fn window_metadata_and_binary_cross_real_quic_without_json_image_payload() {
         use crate::task_service::transfer_tests::{actor, pair, service};
         use pab_protocol::{
