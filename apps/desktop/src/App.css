@@ -300,15 +300,16 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .activity-refresh { display: inline-flex; align-items: center; gap: 5px; margin-top: 0; white-space: nowrap; }
 .activity-refresh:disabled { opacity: .55; cursor: default; }
 .task-layout { display: grid; grid-template-columns: minmax(220px, .4fr) minmax(0, .6fr); gap: 18px; flex: 1; min-height: 0; margin-top: 22px; }
-.task-list { display: grid; align-content: start; gap: 7px; min-height: 0; overflow: auto; scrollbar-width: none; }
+.task-list { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 7px; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: none; }
 .task-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 1px solid #e5edf0; border-radius: 10px; background: #fafcfc; text-align: left; }
 .task-row:hover { border-color: #8bcbb5; background: #f1f9f5; }
 .task-row.active { border-color: #8bcbb5; background: #f1f9f5; }
-.task-icon { color: #2a9c80; font-size: 14px; font-weight: 800; }
-.task-row strong, .task-row small { display: block; }
+.task-icon { flex-shrink: 0; color: #2a9c80; font-size: 14px; font-weight: 800; }
+.task-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.task-row strong, .task-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-row strong { color: #2b4555; font-size: 12px; }
 .task-row small { margin-top: 4px; color: #8fa2ac; font-size: 10px; }
-.task-row em { margin-left: auto; color: #5a9e86; font-size: 10px; font-style: normal; }
+.task-row em { flex-shrink: 0; margin-left: auto; color: #5a9e86; font-size: 10px; font-style: normal; }
 .task-output { min-width: 0; min-height: 0; padding: 19px; border: 1px solid #dbe6e9; border-radius: 12px; background: #142633; overflow: auto; scrollbar-width: none; }
 .output-heading { display: flex; justify-content: space-between; color: #ebf5f4; font-size: 13px; }
 .output-heading span { color: #8de0b8; font-size: 11px; }

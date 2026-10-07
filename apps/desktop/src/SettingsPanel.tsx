@@ -108,7 +108,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <h2>{t.language}</h2>
         <p>{t.languageHint}</p>
         <Select className="settings-language" aria-label={t.language} value={language}
-          onChange={(value: Language) => onLanguageChange(value)}
+          onSelect={(value: Language) => onLanguageChange(value)}
           options={[
             { value: "zh-CN", label: "简体中文" },
             { value: "zh-TW", label: "繁體中文" },
