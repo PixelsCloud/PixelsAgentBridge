@@ -338,8 +338,9 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E7 Linux持久化 | 实际注册设备的服务重启、容器重启和1.2.27同版本重装通过，设备身份/凭据/原任务/事件/输出保留，服务器重新认证；见 acceptance/execution-e7-linux-persistence-2026-10-07.md；运行中恢复及跨版本升级不在本证据范围 |
 | E8 Windows应用首轮 | 原生MCP已完成解锁、应用发现、用户文件创建、记事本打开/中文控件编辑/保存提示/正常退出/内容归属核对及清理；见 acceptance/execution-e8-windows-app-first-2026-10-07.md；focus被系统策略拒绝，未冒充成功，完整两轮仍待完成 |
 | E8 Linux正式工具首轮 | pabuser1 的实际身份、中文文件、八种Git操作及上传下载哈希/所有者通过；终端关闭暴露NotFound，不能记为完整一轮。见 acceptance/execution-e8-linux-first-2026-10-07.md；测试树保留待升级核对及最终清理 |
-| E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；三平台QUIC、真实用户PTY、700003字节归档/并发和断线状态回归通过，见 acceptance/execution-e8-terminal-close-2026-10-07.md；安装后旧MCP连接新版三平台Executor的指定用户终端关闭/中文归档通过。新MCP的大输出并发复验待会话重载 |
-| E7修复版本 | Windows/Linux 1.2.29、Mac ARM/Intel 1.2.30完整包已生成；本机/90/Mac ARM/Linux均升级并核对身份/文件哈希，Mac固定证书保留；Linux旧任务/事件/输出/用户文件跨版本保留通过。见 acceptance/execution-e7-refresh-2026-10-07.md；Intel仍无实机，新MCP正式验收待重载 |
+| E8终端关闭修复 | 已修复过早删除会话、用户工作进程退出丢失输出、Bridge关闭与轮询竞争及20次读取上限；源码证据见 acceptance/execution-e8-terminal-close-2026-10-07.md。会话重载后1.2.32原生MCP连接三平台安装版，超过640KiB的并发读取/关闭、实际文件归档和历史核对通过；Windows另以7000完整编号行排除ConPTY重绘重复字节干扰，见 acceptance/execution-e8-native-reload-2026-10-07.md |
+| E7修复版本 | Windows/Linux 1.2.29、Mac ARM/Intel 1.2.30完整包已生成；本机/90/Mac ARM/Linux均升级并核对身份/文件哈希，Mac固定证书保留；Linux旧任务/事件/输出/用户文件跨版本保留通过。见 acceptance/execution-e7-refresh-2026-10-07.md；Intel仍无实机。本机已进一步升级1.2.32并完成MCP重载，新增正式复验见 acceptance/execution-e8-native-reload-2026-10-07.md |
 | E8 Windows安装UI | 1.2.29发现同值语言选择未保存、长任务标题撑开列表；源码修复及20项浏览器回归通过。1.2.32完整包已生成并升级本机，安装后同值选择保存、三语×亮暗主题实际任务身份、卡片/状态边界全部通过，见 acceptance/execution-e7-ui-refresh-2026-10-07.md。90/Mac此次未升级，Mac实际UI仍待验收 |
-| UI更新包构建记录 | 1.2.31的Desktop编译因D盘空间耗尽退出1（Rust no space on device），未产出完整安装包、未安装；保留已分配版本，不回退计数。用户再次授权后清理产物及临时缓存，实际释放164.77GiB；结果 .build/cleanup-generated-result.json。1.2.32已通过统一入口完整构建、打包并安装本机，日志 .build/execution-ui-refresh-1.2.32.log；MCP仍待会话重载 |
-| 下一动作 | 本机已安装1.2.32，但当前MCP通道仍未重载；重启会话后继续正式工具两轮工作流及大输出并发归档，并更新90及Mac包。Windows helper完整生命周期、E6剩余矩阵及Mac解锁后UI验收仍待完成。Windows两项UI修复已完成安装复验，Mac仍需打包安装检查。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |
+| UI更新包构建记录 | 1.2.31的Desktop编译因D盘空间耗尽退出1（Rust no space on device），未产出完整安装包、未安装；保留已分配版本，不回退计数。用户再次授权后清理产物及临时缓存，实际释放164.77GiB；结果 .build/cleanup-generated-result.json。1.2.32已通过统一入口完整构建、打包并安装本机，日志 .build/execution-ui-refresh-1.2.32.log；MCP重载及三平台连接已核验 |
+| E8重载后Linux增量 | UID23002第一轮文件/八种Git/二进制上传下载/PTY及180路径归属与清理通过；跨用户拒绝、取消父子进程回收、相同ID不重放/改身份拒绝、运行中断线重连及旧上下文拒绝通过。见 acceptance/execution-e8-native-reload-2026-10-07.md；还未覆盖各身份两轮和运行中服务重启 |
+| 下一动作 | MCP已恢复，大输出关闭复验已通过，不再等待会话重载。继续正式工具完整两轮工作流、服务重启恢复，并更新90及Mac包。Windows helper完整生命周期、E6剩余矩阵及Mac解锁后UI验收仍待完成。Linux无界面窗口错误当前仍为helper unavailable，Windows原生命令代码页中文需单独核对；不混同终端中文通过。Windows两项UI修复已完成安装复验，Mac仍需打包安装检查。已有能力不重新实现；源码测试、首轮局部通过、安装后完整通过分别记录 |

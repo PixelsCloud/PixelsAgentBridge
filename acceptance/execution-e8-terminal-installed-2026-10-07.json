@@ -1,0 +1,185 @@
+{
+  "passed": true,
+  "entries": [
+    {
+      "name": "win",
+      "device_code": "211399447",
+      "session_id": "18dac335-eb53-4c4e-842b-837b7f900111",
+      "shell": "powershell.exe",
+      "startup": {
+        "arguments": [
+          "-NoLogo",
+          "-NoProfile"
+        ],
+        "mode": "interactive_no_profile"
+      },
+      "execution_identity": {
+        "account_id": "S-1-5-21-651462275-30253513-3142702281-500",
+        "account_name": "WIN-RASS8RC6V3H\\Administrator",
+        "environment_source": "native_account",
+        "home": "C:\\Users\\Administrator",
+        "logon_id": "00000000:00103b90",
+        "mode": "user",
+        "primary_group": null,
+        "session_id": "1"
+      },
+      "parallel_read": {
+        "offset": 0,
+        "next_offset": 32768,
+        "ended": false
+      },
+      "close": {
+        "closed": true,
+        "session_id": "18dac335-eb53-4c4e-842b-837b7f900111"
+      },
+      "cleanup_operation": "645100cc-401a-435e-b1b0-bc7136805ad4",
+      "cleanup": {
+        "state": "completed",
+        "deleted_entries": 1,
+        "partial": false
+      },
+      "archive_bytes": 742456,
+      "sha256": "1169a53a913d238628fa045bbf83a4c964177bfaddf0faeaa13d3381265caefc",
+      "bridge_state": "completed",
+      "chinese_tail": true,
+      "validation": {
+        "raw_character_count_not_applicable": "ConPTY screen repaint duplicates bytes; complete sequence validated in win_lines"
+      }
+    },
+    {
+      "name": "mac",
+      "device_code": "603527578",
+      "session_id": "44345f72-4ff0-4e31-a123-45822b8e37c7",
+      "shell": "/bin/zsh",
+      "startup": {
+        "arguments": [
+          "-l",
+          "-i"
+        ],
+        "mode": "interactive_login"
+      },
+      "execution_identity": {
+        "account_id": "uid:501",
+        "account_name": "huayang",
+        "environment_source": "native_account",
+        "home": "/Users/huayang",
+        "logon_id": null,
+        "mode": "user",
+        "primary_group": 20,
+        "session_id": null
+      },
+      "parallel_read": {
+        "offset": 0,
+        "next_offset": 32768,
+        "ended": false
+      },
+      "close": {
+        "closed": true,
+        "session_id": "44345f72-4ff0-4e31-a123-45822b8e37c7"
+      },
+      "cleanup_operation": "647bd8cf-e0af-49d5-b4ac-f6905654ac2a",
+      "cleanup": {
+        "state": "completed",
+        "deleted_entries": 1,
+        "partial": false
+      },
+      "archive_bytes": 701279,
+      "sha256": "33ef0a302441b703699886363f8b63b71439baf870defcf5b51ce01480b86add",
+      "bridge_state": "completed",
+      "chinese_tail": true,
+      "validation": {
+        "exact_payload_characters": 700003
+      }
+    },
+    {
+      "name": "linux",
+      "device_code": "565893930",
+      "session_id": "5bce3856-3992-40d2-a5c4-88ebded5c34d",
+      "shell": "/bin/sh",
+      "startup": {
+        "arguments": [
+          "-i"
+        ],
+        "mode": "interactive"
+      },
+      "execution_identity": {
+        "account_id": "uid:23001",
+        "account_name": "pabuser1",
+        "environment_source": "native_account",
+        "home": "/home/pabuser1",
+        "logon_id": null,
+        "mode": "user",
+        "primary_group": 23001,
+        "session_id": null
+      },
+      "parallel_read": {
+        "offset": 0,
+        "next_offset": 32768,
+        "ended": false
+      },
+      "close": {
+        "closed": true,
+        "session_id": "5bce3856-3992-40d2-a5c4-88ebded5c34d"
+      },
+      "cleanup_operation": "afca40fc-d224-460b-973c-a8fbe2a9aa53",
+      "cleanup": {
+        "state": "completed",
+        "deleted_entries": 1,
+        "partial": false
+      },
+      "archive_bytes": 700382,
+      "sha256": "c5d6a00786fa664b0ecf2bf94cc2c15d5e743ab5c671ff667e9b40bcb69d2325",
+      "bridge_state": "completed",
+      "chinese_tail": true,
+      "validation": {
+        "exact_payload_characters": 700003
+      }
+    },
+    {
+      "name": "win_lines",
+      "device_code": "211399447",
+      "session_id": "e70c1a79-c11c-43ca-a267-7fe001a4b799",
+      "shell": "powershell.exe",
+      "startup": {
+        "arguments": [
+          "-NoLogo",
+          "-NoProfile"
+        ],
+        "mode": "interactive_no_profile"
+      },
+      "execution_identity": {
+        "account_id": "S-1-5-21-651462275-30253513-3142702281-500",
+        "account_name": "WIN-RASS8RC6V3H\\Administrator",
+        "environment_source": "native_account",
+        "home": "C:\\Users\\Administrator",
+        "logon_id": "00000000:00103b90",
+        "mode": "user",
+        "primary_group": null,
+        "session_id": "1"
+      },
+      "parallel_read": {
+        "offset": 0,
+        "next_offset": 32768,
+        "ended": false
+      },
+      "close": {
+        "closed": true,
+        "session_id": "e70c1a79-c11c-43ca-a267-7fe001a4b799"
+      },
+      "cleanup_operation": "0d7ff3d7-543c-45f1-890e-99a9ecb206d8",
+      "cleanup": {
+        "state": "completed",
+        "deleted_entries": 1,
+        "partial": false
+      },
+      "archive_bytes": 749867,
+      "sha256": "743ff9b75961c87728a0d6d4f8ca76ccfb762af5a75be9c70c7702f160f223a7",
+      "bridge_state": "completed",
+      "chinese_tail": true,
+      "validation": {
+        "unique_complete_lines": 7000,
+        "missing_lines": 0
+      }
+    }
+  ]
+}

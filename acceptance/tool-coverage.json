@@ -15,6 +15,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e1-discovery-2026-10-06.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
@@ -218,6 +219,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e2-command-2026-10-06.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -254,6 +256,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e2-command-2026-10-06.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -272,6 +275,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
@@ -291,6 +295,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-transfer-bridge-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
@@ -335,6 +340,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -379,6 +385,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -444,6 +451,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -488,6 +496,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -574,6 +583,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -702,6 +712,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -746,6 +757,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -790,6 +802,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -876,6 +889,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -897,6 +911,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -985,6 +1000,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -1029,6 +1045,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-filesystem-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e8-windows-app-first-2026-10-07.md"
@@ -1132,6 +1149,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -1150,6 +1168,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -1168,6 +1187,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -1186,6 +1206,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -1204,6 +1225,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e8-terminal-close-2026-10-07.md",
           "acceptance/execution-e7-refresh-2026-10-07.md"
         ],
@@ -1435,6 +1457,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1455,6 +1478,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1475,6 +1499,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1495,6 +1520,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1515,6 +1541,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1535,6 +1562,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1555,6 +1583,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
@@ -1575,6 +1604,7 @@
       "execution_acceptance": {
         "status": "partial",
         "evidence": [
+          "acceptance/execution-e8-native-reload-2026-10-07.md",
           "acceptance/execution-e3-git-2026-10-07.md",
           "acceptance/execution-e8-linux-first-2026-10-07.md",
           "acceptance/execution-e6-ssh-2026-10-07.md",
