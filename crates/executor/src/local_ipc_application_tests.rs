@@ -164,7 +164,13 @@ async fn application_disconnect_is_unconfirmed_and_never_replayed_to_replacement
     assert_eq!(svc.get_system_query(actor(), id).await.unwrap().state, "unconfirmed");
     let (_dir2, mut replacement, local2, provider2, _) = application_helper().await;
     assert!(matches!(frozen.execute(RequestId::new(), app).await, Err(LocalIpcError::WindowHelperUnavailable)));
-    assert_eq!(svc.system_query(actor(), id, query).await.unwrap().state, "unconfirmed");
+    let original = svc.system_query(actor(), id, query.clone()).await.unwrap();
+    assert_eq!(original.state, "unconfirmed");
+    assert_eq!(original.execution_context.as_ref().unwrap().identity.as_ref(), Some(&identity));
+    // Reopening the durable store and using a new UI connection must observe
+    // the same uncertain mutation, never dispatch it to the replacement.
+    let restarted = service(directory.path()).await.for_ui_connection();
+    assert_eq!(restarted.system_query(actor(), id, query).await.unwrap(), original);
     let unexpected = tokio::time::timeout(Duration::from_millis(150), async {
         loop { if matches!(next_local_event(&mut replacement).await.unwrap(), LocalEvent::ApplicationQuery(..)) { return; } }
     }).await;

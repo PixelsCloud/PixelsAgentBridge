@@ -326,7 +326,7 @@ Linux无界面端各以service/可用指定用户执行至少两轮：
 | E4启动/打开后端 | Windows Shell、Mac NSWorkspace 的 ID/路径启动及指定/默认应用打开文件已实现并实测首批流程，见 acceptance/execution-e4-app-actions-2026-10-07.md；桌面身份路由/记录/正式工具已继续接入，见后续两行。Mac锁屏下保留一份测试文档待解锁后清理 |
 | E4应用身份路由/记录 | system-query v12、内核核验helper进程身份、连接绑定desktop_user上下文、接受前冻结通道/身份及原记录去重已接入；双桌面编译/IPC与Linux拒绝边界通过，见 acceptance/execution-e4-app-routing-2026-10-07.md；正式入口见下一行；完整生命周期仍待完成 |
 | E4应用MCP/Bridge入口 | 三个正式工具、严格解析/v12协商、原身份结果验证/历史去重及活动操作计数已接入；三平台各67项Bridge、38项MCP、7项stdio测试通过，见 acceptance/execution-e4-app-mcp-2026-10-07.md；安装宿主验收仍待完成 |
-| E4 Windows应用helper | 已增加各活动WTS用户的原始令牌应用helper、旧桌面路由隔离和原生调用阻塞退出；Windows/Mac各22项IPC与Linux18项回归通过，见 acceptance/execution-e4-application-helper-2026-10-07.md；安装后多会话与故障注入仍待验收 |
+| E4 Windows应用helper | 各活动WTS用户原始令牌、旧桌面路由隔离和原生调用阻塞退出已实现；原回归见 acceptance/execution-e4-application-helper-2026-10-07.md。新增真实独立进程20秒退出/子进程存活测试及双桌面原记录重开不重放检查通过，见 acceptance/execution-e6-application-deadline-2026-10-07.md；安装后多会话与完整故障注入仍待验收 |
 | E5最小UI源码 | 命令/目录/终端/传输用户选择、双桌面应用入口及实际身份历史已接入；传输复用MCP队列，原连接取消/观察与未确认结果保留。三平台各69项Bridge和38项MCP测试、11项浏览器测试通过，见 acceptance/execution-e5-ui-2026-10-07.md；已安装桌面实际操作待验收 |
 | E6真实SSH | Mac/Linux原生用户worker + 独立OpenSSH agent通过；Windows已补齐Git for Windows OpenSSH真实push/fetch、错误主机密钥与缺失agent拒绝、恢复和原身份核对。见 acceptance/execution-e6-ssh-2026-10-07.md 及 acceptance/execution-e6-windows-ssh-2026-10-07.md；Keychain与慢凭据helper见后续两行 |
 | E6 Mac Keychain | 正式用户命令调用Security API及真实user-worker Git fetch均验证独立Keychain的可读、锁定拒绝和恢复；实际身份、20秒边界、结果隐私及用户默认Keychain/搜索列表不变通过。见 acceptance/execution-e6-keychain-2026-10-07.md；不承诺自动解锁登录Keychain或任意第三方helper兼容 |

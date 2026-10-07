@@ -5,6 +5,9 @@ use pab_executor::local_ipc::{self, LocalEvent, LocalSocket};
 
 use crate::{desktop_input, screenshot_session, window_session};
 
+#[path = "application_deadline.rs"]
+mod application_deadline;
+
 pub fn run() -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
     let expected_desktop = std::env::args()
@@ -134,18 +137,12 @@ async fn serve_application_requests(socket: &mut LocalSocket) -> Result<(), Stri
                 // are not in a kill-on-close job. Retire just this helper on a
                 // deadline; the parent records an unconfirmed result, without
                 // replaying the request or terminating a launched application.
-                let operation = tokio::task::spawn_blocking(move || {
+                let reply = application_deadline::run(id, move || {
                     pab_desktop_control::apps::query_guarded(id, &query, &identity, || {
                         application_desktop_is_active()
                     })
-                });
-                let reply = match tokio::time::timeout(Duration::from_secs(20), operation).await {
-                    Ok(result) => result.map_err(|e| e.to_string())?,
-                    Err(_) => {
-                        tracing::error!(%id, "application call exceeded deadline; retiring helper without replay");
-                        std::process::exit(1);
-                    }
-                };
+                })
+                .await?;
                 local_ipc::reply_desktop_query(socket, &reply)
                     .await
                     .map_err(|e| e.to_string())?;
