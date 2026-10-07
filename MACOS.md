@@ -2,14 +2,17 @@
 
 ## 当前执行状态（2026-10-07）
 
-执行用户/应用管理的源码增量正在验收，尚未替换安装版 1.2.26。
+执行用户/应用管理已进入 ARM/Intel 1.2.28 完整包，Mac ARM 已安装；Intel 目前仅构建和签名检查。
 Desktop 已接入命令、终端、目录、传输的执行用户选择及应用管理面板；实际身份进入本地任务历史，
 未知传输结果沿原操作核对。Mac ARM 的 Bridge 69 项、MCP 38 项测试和 Desktop 编译检查已通过。
 见[执行规划](EXECUTION_CONTEXT_ROADMAP.md)及[UI 源码报告](acceptance/execution-e5-ui-2026-10-07.md)。
-应用真实生命周期、完整包升级和正式 AI 宿主验收仍待完成；没有重置当前 TCC 授权。
+实际升级及服务/签名保留见[安装报告](acceptance/execution-e7-packages-2026-10-07.md)。
+后续 Git 子进程回收、退出竞态和终端末尾输出修复还需新包安装；应用完整生命周期和正式 AI 宿主验收仍待完成。
+没有重置当前 TCC 授权。独立 SSH agent 与隔离 Keychain 的指定用户凭据测试已通过；
+Keychain 锁定时明确失败，选择 UID 不等于自动解锁用户的登录钥匙串。
 
 Finder窗口查询问题已修复并实机验收：AXWindows混入的AXScrollArea不再导致整个
-查询失败，仍严格要求目标AXWindow唯一且符合进程/标题/几何信息。Mac已安装1.2.26，
+查询失败，仍严格要求目标AXWindow唯一且符合进程/标题/几何信息。此前 Mac 安装 1.2.26 时，
 原签名和授权保留，Finder/Terminal查询及21项正式控件回归通过；ARM/Intel完整包已生成。
 见[修复报告](acceptance/finder-window-fix-2026-10-06.md)。下方1.2.25记录为修复前交付。
 

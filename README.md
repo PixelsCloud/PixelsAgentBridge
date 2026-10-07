@@ -269,8 +269,8 @@ Configuration has version 1 and a required `enabledGroups` array of `core`, `fil
 
 ### Execution users and application tools
 
-These additions are in source development; the installed-host acceptance and package
-rollout are tracked in [the execution roadmap](EXECUTION_CONTEXT_ROADMAP.md).
+These additions are implemented and included in the first acceptance packages;
+remaining fixes and installed-host acceptance are tracked in [the execution roadmap](EXECUTION_CONTEXT_ROADMAP.md).
 An older MCP/Executor installation does not gain them by updating these docs.
 
 Call `pab_list_execution_contexts` on the same device connection and use the returned
@@ -282,6 +282,14 @@ v3/v2/v11/v5/v6/v2 respectively. Explicit user execution never falls back to the
 References are bound to the device, caller and connection; rediscover after reconnect
 or login changes. Linux headless supports native user execution without a desktop or
 logind, but application tools explicitly return unsupported.
+
+Git uses the selected account's configuration and credential helpers. Selecting a
+user does not unlock a keychain, make an unavailable SSH agent accessible, or grant
+interactive authentication. Configure credentials for that user before background
+work; inspect the original operation if authentication fails or times out. Tests
+with isolated SSH agents passed on Windows, macOS and Linux. The isolated macOS
+Keychain test covers unlocked/locked/restored access through a user worker; it does
+not promise automatic access to every login keychain or third-party helper.
 
 Application tools require system-query **v12** and an available user helper. Use
 `pab_list_apps` with `scope="installed"` (default) or `"running"`, optional literal

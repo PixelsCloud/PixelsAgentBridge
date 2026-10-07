@@ -759,3 +759,182 @@ async fn native_user_git_slow_credential_cleanup() {
     }
     server.abort();
 }
+
+#[cfg(target_os = "macos")]
+#[tokio::test]
+#[ignore = "requires isolated execution_keychain_acceptance.py server and native user worker"]
+async fn native_user_git_keychain_acceptance() {
+    let uid: u32 = std::env::var("PAB_EXECUTION_TEST_USER")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let prepared = pab_os_control::execution::PreparedUser::for_uid(uid).unwrap();
+    let expected = prepared.identity().clone();
+    let config: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(std::env::var_os("PAB_EXECUTION_TEST_KEYCHAIN_CONFIG").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let field = |name: &str| config[name].as_str().unwrap().to_owned();
+    let root = PathBuf::from(field("root"));
+    assert_eq!(root.parent(), Some(expected.home.as_path()));
+    assert!(
+        root.file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("pab-keychain-acceptance-")
+    );
+    assert!(!root.is_symlink());
+    let repo = PathBuf::from(field("repo"));
+    assert_eq!(repo, root.join("client"));
+    assert!(!repo.exists());
+    let dir = tempfile::tempdir().unwrap();
+    let mut svc = service(dir.path()).await.for_ui_connection();
+    svc.worker_executable = Some(
+        std::env::var_os("PAB_EXECUTION_TEST_WORKER")
+            .unwrap()
+            .into(),
+    );
+    let inventory = result(
+        &svc,
+        RequestId::new(),
+        SystemQuery::ExecutionContexts {
+            user: Some(expected.account_name.clone()),
+            include_system: true,
+            limit: 100,
+        },
+    )
+    .await;
+    let Some(SystemQueryData::ExecutionContexts { entries, .. }) = inventory.data else {
+        panic!("no contexts");
+    };
+    let selected = entries
+        .iter()
+        .find(|e| {
+            e.mode == ExecutionMode::User && e.account_id.as_ref() == Some(&expected.account_id)
+        })
+        .unwrap()
+        .selection
+        .unwrap();
+    command(
+        &svc,
+        selected,
+        "git",
+        vec!["init".into(), repo.to_str().unwrap().into()],
+        None,
+    )
+    .await;
+    for (key, value) in [
+        ("credential.helper", "".to_owned()),
+        ("credential.helper", field("helper")),
+        ("credential.username", "fixture".into()),
+        ("http.proxy", "".into()),
+    ] {
+        command(
+            &svc,
+            selected,
+            "git",
+            vec!["config".into(), "--add".into(), key.into(), value],
+            Some(&repo),
+        )
+        .await;
+    }
+    command(
+        &svc,
+        selected,
+        "git",
+        vec!["remote".into(), "add".into(), "origin".into(), field("url")],
+        Some(&repo),
+    )
+    .await;
+    for stage in ["unlocked", "locked", "restored"] {
+        if stage != "unlocked" {
+            let output = command(
+                &svc,
+                selected,
+                &field("python"),
+                vec![
+                    field("controller"),
+                    if stage == "locked" { "lock" } else { "unlock" }.into(),
+                    "--root".into(),
+                    field("root"),
+                ],
+                None,
+            )
+            .await;
+            let control: serde_json::Value = serde_json::from_str(&output).unwrap();
+            assert_eq!(control["confirmed"], true);
+            assert_eq!(control["uid"], uid);
+        }
+        let started = tokio::time::Instant::now();
+        let reply = result(
+            &svc,
+            RequestId::new(),
+            query(
+                &repo,
+                selected,
+                GitAction::Fetch {
+                    remote: "origin".into(),
+                    branch: Some("main".into()),
+                },
+            ),
+        )
+        .await;
+        assert!(
+            started.elapsed() < Duration::from_secs(20),
+            "Keychain operation did not finish within deadline"
+        );
+        assert_eq!(
+            reply
+                .execution_context
+                .as_ref()
+                .unwrap()
+                .identity
+                .as_ref()
+                .unwrap()
+                .account_id,
+            expected.account_id
+        );
+        let serialized = serde_json::to_string(&reply).unwrap();
+        assert!(
+            !serialized.contains("PAB_FAKE_KEYCHAIN_SECRET_"),
+            "credential leaked into result"
+        );
+        if stage == "locked" {
+            assert_eq!(reply.state, "failed", "{reply:?}");
+            let Some(SystemQueryData::Git { snapshot }) = &reply.data else {
+                panic!("missing git diagnostics");
+            };
+            assert!(
+                snapshot
+                    .stderr
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("terminal prompts disabled"),
+                "{reply:?}"
+            );
+            assert!(
+                !snapshot
+                    .stderr
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("repository not found"),
+                "credential failure misreported"
+            );
+        } else {
+            assert_eq!(reply.state, "completed", "{reply:?}");
+            let oid = command(
+                &svc,
+                selected,
+                "git",
+                vec!["rev-parse".into(), "FETCH_HEAD".into()],
+                Some(&repo),
+            )
+            .await;
+            assert_eq!(oid.trim(), field("expected_oid"));
+        }
+        println!(
+            "KEYCHAIN_ACCEPTANCE {stage}=pass actual_user=verified credential_in_result=false"
+        );
+    }
+}
