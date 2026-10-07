@@ -22,9 +22,11 @@ export function CommandOutput({ task, language }: { task: TaskEntry; language: L
   const generation = useRef(0);
   const current = useRef<TaskUpdate>(task);
   const active = useRef(false);
+  const pendingRefresh = useRef(false);
 
   async function read(reset: boolean, version: number, selected: Encoding) {
-    if (active.current && !reset) return;
+    if (active.current && !reset) { pendingRefresh.current = true; return; }
+    pendingRefresh.current = false;
     active.current = true;
     setBusy(true);
     const previous = current.current;
@@ -47,7 +49,15 @@ export function CommandOutput({ task, language }: { task: TaskEntry; language: L
     } catch (cause) {
       if (generation.current === version) setError(`${t.taskRefreshFailed}: ${String(cause)}`);
     } finally {
-      if (generation.current === version) { active.current = false; setBusy(false); }
+      if (generation.current === version) {
+        active.current = false;
+        setBusy(false);
+        // A completion notification may arrive while the previous byte read is
+        // in flight. Preserve it so the final output needs no manual refresh.
+        if (pendingRefresh.current && !current.current.complete) {
+          void read(false, version, selected);
+        }
+      }
     }
   }
 
@@ -58,7 +68,7 @@ export function CommandOutput({ task, language }: { task: TaskEntry; language: L
     current.current = blank;
     setOutput(blank);
     void read(true, version, encoding);
-    return () => { ++generation.current; active.current = false; };
+    return () => { ++generation.current; active.current = false; pendingRefresh.current = false; };
   }, [task.id, encoding]);
 
   useEffect(() => {

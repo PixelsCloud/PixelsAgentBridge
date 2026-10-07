@@ -51,4 +51,8 @@
 - C1：共享解码、MCP/历史界面已实现；Windows 解码 4 项、MCP 40 项、浏览器 21 项、
   TypeScript 及 Desktop Rust 检查通过。见 [源码回归](acceptance/compatibility-c1-source-2026-10-07.md)。
   跨平台和正式安装验收待执行；当前宿主尚未加载新增参数。
-- C2–C5：待执行；不得仅凭计划或编译结果标成完成。
+- C2：实例选项与版本门槛、Mac 原生文本编辑候选、Windows focus 指导已提交；
+  见 [源码与待验收项](acceptance/compatibility-c2-source-2026-10-08.md)。Mac Release 1.2.40 编译中。
+- C3：已有普通用户命令/文件/PTY 与拒绝边界通过，见 [安装态基线](acceptance/compatibility-c3-user-2026-10-08.md)；
+  当前缺少该账户可用交互桌面，应用交互未通过验收，不能借用管理员会话替代。
+- C4–C5：进行中；不得仅凭计划或编译结果标成完成。

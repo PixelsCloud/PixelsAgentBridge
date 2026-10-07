@@ -1,6 +1,19 @@
 import { test, expect } from "@playwright/test";
 
 const url = "http://127.0.0.1:1429/tests/history-settings-ui.html";
+test("completion arriving during a byte read drains the final stdout and stderr", async ({ page }) => {
+  await page.goto(`${url}?language=en&streaming=true`);
+  await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.releaseInitial)).toBe("function");
+  await page.evaluate(() => (window as any).fixture.finishTask());
+  await expect(page.locator(".task-row em")).toHaveText("Succeeded");
+  await page.evaluate(() => (window as any).fixture.releaseInitial());
+  await expect(page.locator(".task-output pre").first()).toHaveText("first\nlast\n");
+  await expect(page.locator(".task-output pre.stderr-output")).toHaveText("done\n");
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls).toHaveLength(2);
+  expect(calls[1].args.stdoutOffset).toBe(6);
+  expect(calls[1].args.stderrOffset).toBe(0);
+});
 for (const [language, label] of [["en", "English"], ["zh-CN", "简体中文"], ["zh-TW", "繁體中文"]]) {
   test(`explicitly choosing the current ${language} default is remembered`, async ({ page }) => {
     await page.goto(`${url}?panel=settings&language=${language}`);
