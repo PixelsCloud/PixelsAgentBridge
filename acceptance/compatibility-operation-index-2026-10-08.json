@@ -1,0 +1,568 @@
+[
+  {
+    "tag": "compat-mac-contexts",
+    "tool": "pab_list_execution_contexts",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "execution_contexts",
+      "operation_id": "4d9546cc-d323-40d2-b01c-6ccd10cb8413"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-mac-windows",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "e4ac78e2-ccc8-4d1b-9163-1f616d9a3784"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-mac-processes",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "889b1509-c0c8-4ec0-af38-0393e41bcc7e",
+      "task_id": "1e573c10-31be-432c-9651-bd26a804fb79"
+    },
+    "state": "succeeded",
+    "task_id": "1e573c10-31be-432c-9651-bd26a804fb79"
+  },
+  {
+    "tag": "compat-mac-session-state",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "7e9da48e-23bd-4c0c-bad0-bd3b4ce40e63",
+      "task_id": "4d664dee-6030-49be-9f70-52da6cc5a315"
+    },
+    "state": "succeeded",
+    "task_id": "4d664dee-6030-49be-9f70-52da6cc5a315"
+  },
+  {
+    "tag": "compat-mac-c1-tests",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "eaa1958f-7d54-4188-ada2-b5260e91d5bd",
+      "task_id": "e5fcf3b1-6f7e-4472-b981-d674091331d4"
+    },
+    "state": "running",
+    "task_id": "e5fcf3b1-6f7e-4472-b981-d674091331d4"
+  },
+  {
+    "tag": "compat-mac-lock-check",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "cd141f46-5609-4bdc-a098-1e0044a040ca",
+      "task_id": "09130131-ec35-444a-9be8-5f0b72d04e21"
+    },
+    "state": "succeeded",
+    "task_id": "09130131-ec35-444a-9be8-5f0b72d04e21"
+  },
+  {
+    "tag": "compat-mac-awake-windows",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "ebc703b7-0612-4a48-bff5-aa855b5937ee"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-launch",
+    "tool": "pab_launch_app",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_launch",
+      "operation_id": "c1e8ca13-043d-4f97-9ed4-516b1531b463"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-mac-c1-status",
+    "tool": "pab_get_task"
+  },
+  {
+    "tag": "compat-mac-c1-stdout",
+    "tool": "pab_read_output"
+  },
+  {
+    "tag": "compat-textedit-create",
+    "tool": "pab_file_write",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_write",
+      "operation_id": "c1b1095c-5574-4597-b5a0-e333a6aa21dc"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-open",
+    "tool": "pab_open_file",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_open_file",
+      "operation_id": "4f84e110-ebe0-4cb5-b282-43b590d7399d"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-window",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "e3f0e886-ed3c-483e-8424-0d7aef912703"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-fields",
+    "tool": "pab_ui_query",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "68d2dd5b-9c81-4375-b86e-ffa3bbd077b6"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-set",
+    "tool": "pab_ui_action",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "24eebd7b-b656-44f3-baa0-f7132bfcf057"
+    },
+    "state": "failed",
+    "error_code": "remote_operation_failed"
+  },
+  {
+    "tag": "compat-textedit-close",
+    "tool": "pab_window_control",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "window_control",
+      "operation_id": "754521ed-eb26-4d6c-bd44-ca2ffec19379"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-after-close",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "491e2147-7186-40af-9058-0928e382ae57"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-close-read",
+    "tool": "pab_file_read",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_read",
+      "operation_id": "6fa354c7-224d-499e-9ecd-b711f038be4d"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-reopen",
+    "tool": "pab_open_file",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_open_file",
+      "operation_id": "5b6a8f33-7c69-4ea4-8786-a22fc7fddfc6"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-reopened-list",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "61993d9a-19b3-4351-b1b5-8c51cd101fd7"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-reopened-list2",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "4fbaa7c1-601e-492c-96ee-fdc9ec164a78"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-reopened-fields2",
+    "tool": "pab_ui_query",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "ec00fd2a-c2e8-42f2-b54e-64d86700047d"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-set-valid2",
+    "tool": "pab_ui_action",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "d2275b75-d028-44d1-800a-46ad0a8290ec"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-close-after-set",
+    "tool": "pab_window_control",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "window_control",
+      "operation_id": "fd46193f-e537-466e-bd71-387009b7dfc3"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-close-content",
+    "tool": "pab_file_read",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_read",
+      "operation_id": "de8a1a8b-f06f-4f01-a1e8-176eb9aeafd3"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-open-for-new",
+    "tool": "pab_open_file",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_open_file",
+      "operation_id": "7f5f6a0e-5a86-4a33-bf05-5923f8d04e55"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-new-source",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "f43eb429-56f3-4abc-94c5-832d51d0ee68"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-new-source2",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "23f5299d-0791-4991-96dd-adbc9e984c68"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-textedit-newdoc",
+    "tool": "pab_desktop_input",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "36512ca5-29a5-4696-9da6-6baf2f4fe439"
+    },
+    "state": "failed",
+    "error_code": "remote_operation_failed"
+  },
+  {
+    "tag": "compat-after-new-observe",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "78f505fb-e8cd-4047-b067-a257d2f2957f"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-fields",
+    "tool": "pab_ui_query",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "eaa80b52-5ebe-43b2-ae08-4fea4486dc13"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-plaintext",
+    "tool": "pab_desktop_input",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "6e0cef02-8622-4511-9164-ee002f8894ba"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-plain-fields",
+    "tool": "pab_ui_query",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "55cc4270-8f34-4f79-8153-7511215cec96"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-set",
+    "tool": "pab_ui_action",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "f33d477e-0dc1-4557-bd33-d1d4f867005d"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-close",
+    "tool": "pab_window_control",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "window_control",
+      "operation_id": "e8d63bf0-97e3-4eba-9874-9a370d375e13"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-new-save-dialog",
+    "tool": "pab_ui_query",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "71a71e69-e4ce-44fc-b5e2-8182ddba141e"
+    },
+    "state": "failed",
+    "error_code": "remote_operation_failed"
+  },
+  {
+    "tag": "compat-new-save-windows",
+    "tool": "pab_list_windows",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "0949e2d3-0cc0-41e8-b6d0-2d8bd88ef994"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-c2-patch-upload",
+    "tool": "pab_upload_file",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "bf0bd8cd-d9b5-4bfd-a0d1-0807941827ab"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-mac-c2-source-tests",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "7bfbb2e0-e76b-4227-a62b-c55f2e272f12",
+      "task_id": "f36627ca-a86a-4e21-b695-32afe035162e"
+    },
+    "state": "running",
+    "task_id": "f36627ca-a86a-4e21-b695-32afe035162e"
+  },
+  {
+    "tag": "compat-mac-c2-tests-fix",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "f44f230d-b486-4d2c-8d52-0f4c50c94443",
+      "task_id": "f6ac5373-85db-4c64-8d24-4fb78dddc175"
+    },
+    "state": "running",
+    "task_id": "f6ac5373-85db-4c64-8d24-4fb78dddc175"
+  },
+  {
+    "tag": "compat-win-connect",
+    "tool": "pab_connect"
+  },
+  {
+    "tag": "compat-win-contexts",
+    "tool": "pab_list_execution_contexts",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "execution_contexts",
+      "operation_id": "dd841815-ebb1-40fe-a35e-7995d982fc61"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-win-nonadmin-whoami",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "command",
+      "operation_id": "ef9e967e-c545-4297-806f-2d8b9a9ac834",
+      "task_id": "a7c210e4-98d3-4672-9c09-1de282ffd978"
+    },
+    "state": "succeeded",
+    "task_id": "a7c210e4-98d3-4672-9c09-1de282ffd978"
+  },
+  {
+    "tag": "compat-win-user-file",
+    "tool": "pab_file_write",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "file_write",
+      "operation_id": "ea442d6d-1975-4b70-a555-009c9e3fbf5c"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-win-user-denied",
+    "tool": "pab_file_write",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "file_write",
+      "operation_id": "ce190b3b-76a5-45e7-afa2-a0819a4e78e4"
+    },
+    "state": "failed",
+    "error_code": "access_denied"
+  },
+  {
+    "tag": "compat-win-user-pty",
+    "tool": "pab_open_terminal"
+  },
+  {
+    "tag": "compat-win-user-file-owner",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "command",
+      "operation_id": "b0cd91c0-68a1-46b3-a528-f1597c666d52",
+      "task_id": "7638126f-d536-46b0-aadc-9738e5b51771"
+    },
+    "state": "succeeded",
+    "task_id": "7638126f-d536-46b0-aadc-9738e5b51771"
+  },
+  {
+    "tag": "compat-win-user-pty-input",
+    "tool": "pab_terminal_input"
+  },
+  {
+    "tag": "compat-win-user-pty-output",
+    "tool": "pab_terminal_read"
+  },
+  {
+    "tag": "compat-mac-source-preflight",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "9e75202a-1f5c-4c2a-9d4b-b77b662b5487",
+      "task_id": "65abf572-4fcd-403c-b929-5c1c68751db8"
+    },
+    "state": "running",
+    "task_id": "65abf572-4fcd-403c-b929-5c1c68751db8"
+  },
+  {
+    "tag": "compat-mac-release-build",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "a1fe9f20-08c2-4b22-9fb3-0b8b875cfcab",
+      "task_id": "3c9b26c4-ff85-4c82-af9a-48baab09bbb6"
+    },
+    "state": "running",
+    "task_id": "3c9b26c4-ff85-4c82-af9a-48baab09bbb6"
+  },
+  {
+    "tag": "compat-mac-build-status",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "1f8e29f9-585b-4025-a70f-48b5099df4c0",
+      "task_id": "b8c89285-4ef5-433c-bcab-70b64c469a2a"
+    },
+    "state": "succeeded",
+    "task_id": "b8c89285-4ef5-433c-bcab-70b64c469a2a"
+  },
+  {
+    "tag": "compat-mac-version40",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "f854fc66-dd7c-4c7f-83d3-7ca4d1a7e7a9",
+      "task_id": "d47919a3-672a-4670-bcd4-c05a0fa52d10"
+    },
+    "state": "running",
+    "task_id": "d47919a3-672a-4670-bcd4-c05a0fa52d10"
+  },
+  {
+    "tag": "compat-win-no-desktop-fallback",
+    "tool": "pab_list_apps",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "app_list",
+      "operation_id": "bf16aac0-f07f-4d75-beb1-1dcc62aec3b7"
+    },
+    "state": "failed",
+    "error_code": "remote_operation_failed"
+  },
+  {
+    "tag": "compat-win-user-readback",
+    "tool": "pab_file_read",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "file_read",
+      "operation_id": "e11efb7b-81e4-462a-a7e7-82db2b0799c0"
+    },
+    "state": "completed"
+  },
+  {
+    "tag": "compat-mac-arm40-manifest",
+    "tool": "pab_run_command",
+    "operation_ref": {
+      "device_code": "603527578",
+      "operation_id": "cfbe8454-665a-4f80-81dc-c0bce44f5cf2"
+    },
+    "error_code": "operation_error"
+  },
+  {
+    "tag": "compat-mac-refresh-contexts",
+    "tool": "pab_list_execution_contexts",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "execution_contexts",
+      "operation_id": "714a11ea-b93e-4ba1-93d8-aa6e780d15ea"
+    },
+    "state": "completed"
+  }
+]

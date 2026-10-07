@@ -5,9 +5,13 @@ set -euo pipefail
 [[ ! -e /opt/pixels-agent-bridge ]] || exit 2
 payload=$(mktemp -d)
 trap 'rm -rf -- "$payload"' EXIT
-cp /src/packaging/desktop/unix/{install,uninstall,lifecycle,run-mcp,run-executor}.sh "$payload/"
-cp /src/packaging/desktop/unix/INSTALL-LINUX.txt "$payload/"
-cp /src/.build/linux-target/debug/{pab-executor,pab-mcp} "$payload/"
+if [[ $# -eq 1 ]]; then
+    tar -xzf "$1" -C "$payload"
+else
+    cp /src/packaging/desktop/unix/{install,uninstall,lifecycle,run-mcp,run-executor}.sh "$payload/"
+    cp /src/packaging/desktop/unix/INSTALL-LINUX.txt "$payload/"
+    cp /src/.build/linux-target/debug/{pab-executor,pab-mcp} "$payload/"
+fi
 sed -i 's/\r$//' "$payload/"*.sh
 unit=pixels-agent-bridge-executor.service
 installed=/opt/pixels-agent-bridge
