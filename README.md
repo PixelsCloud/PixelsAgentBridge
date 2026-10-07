@@ -334,6 +334,11 @@ For Save As, navigate to the directory separately from entering the filename, th
 the resulting file to verify its content. Do not replay a shortcut just because opening
 a new window changed focus and the batch result became unconfirmed.
 
+Known macOS TextEdit issue, reproduced on installed 1.2.42: closing an unsaved document
+after an AX edit may omit the save prompt or save an empty file from the close dialog.
+Explicit Save, file readback, then Close has been verified; the unsaved-close issue remains
+unresolved. See the [compatibility acceptance record](acceptance/compatibility-release-2026-10-08.md).
+
 The result reports native execution identity and an observed instance when available.
 OS acceptance does not prove a new process, a ready window or changed document content.
 Use the existing window/UI tools to observe, focus, interact and request normal close;

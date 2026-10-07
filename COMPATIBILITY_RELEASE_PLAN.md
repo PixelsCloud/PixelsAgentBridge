@@ -50,9 +50,16 @@
   已确认需共享显式解码与边界处理。Mac NSWorkspace 默认复用实例，window_ready 当前为未知。
 - C1：共享解码、MCP/历史界面已实现；Windows 解码 4 项、MCP 40 项、浏览器 21 项、
   TypeScript 及 Desktop Rust 检查通过。见 [源码回归](acceptance/compatibility-c1-source-2026-10-07.md)。
-  跨平台和正式安装验收待执行；当前宿主尚未加载新增参数。
+  跨平台源码回归及安装升级已通过；当前宿主尚未加载新增参数，正式 MCP 参数验收仍待重载。
 - C2：实例选项与版本门槛、Mac 原生文本编辑候选、Windows focus 指导已提交；
-  见 [源码与待验收项](acceptance/compatibility-c2-source-2026-10-08.md)。Mac Release 1.2.40 编译中。
+  见 [源码与待验收项](acceptance/compatibility-c2-source-2026-10-08.md)。Mac 1.2.42 安装版明确保存、回读、再关闭通过。
+  未保存文稿直接关闭仍有空文件/不提示问题，C2 未全部完成，不能把 AX 值匹配当保存成功。
 - C3：已有普通用户命令/文件/PTY 与拒绝边界通过，见 [安装态基线](acceptance/compatibility-c3-user-2026-10-08.md)；
   当前缺少该账户可用交互桌面，应用交互未通过验收，不能借用管理员会话替代。
-- C4–C5：进行中；不得仅凭计划或编译结果标成完成。
+- C4：Windows/Linux 1.2.41、Mac ARM/Intel 1.2.42 Release 包已完成；90、Mac、Linux、本机已安装，
+  身份/历史保留及程序哈希通过。Linux 最终包手动与 systemd 安装生命周期通过。
+  Windows/Mac 全新系统安装/卸载、Intel 原生运行及缺失硬件的测试尚未验收。
+- C5：源码已提交推送，远端先装、本机最后的交付完成，现场证据见
+  [Release 验收记录](acceptance/compatibility-release-2026-10-08.md)。
+  宿主重载后继续新增 encoding/include_base64/new_instance 参数验收，并处理 C2 未保存关闭问题。
+  本长任务仍未全部完成。
