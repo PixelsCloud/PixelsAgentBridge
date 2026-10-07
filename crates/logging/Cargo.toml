@@ -1,6 +1,6 @@
 [package]
 name = "pab-logging"
-version = "1.2.39"
+version = "1.2.40"
 edition.workspace = true
 rust-version.workspace = true
 
