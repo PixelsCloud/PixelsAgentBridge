@@ -323,6 +323,17 @@ to `pab_launch_app`. `pab_open_file` takes an existing absolute target-local `pa
 omit `application` to use that user's default. No URL schemes or arbitrary arguments.
 All three require the `desktop_user` selection in `execution`.
 
+On macOS, `pab_launch_app` additionally accepts `new_instance: true` when you explicitly
+need a separate instance rather than the default OS reuse behavior. This requires
+system-query v13 and application helper v2; older helpers reject it before dispatch.
+Windows rejects this option. The application may enforce its own single-instance policy,
+and neither mode guarantees a ready window. Inspect the returned process and window list.
+
+Setting a text control changes its value; it does not verify that the document was saved.
+For Save As, navigate to the directory separately from entering the filename, then read
+the resulting file to verify its content. Do not replay a shortcut just because opening
+a new window changed focus and the batch result became unconfirmed.
+
 The result reports native execution identity and an observed instance when available.
 OS acceptance does not prove a new process, a ready window or changed document content.
 Use the existing window/UI tools to observe, focus, interact and request normal close;
