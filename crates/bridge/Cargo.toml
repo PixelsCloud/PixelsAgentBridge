@@ -7,6 +7,7 @@ rust-version.workspace = true
 [dependencies]
 futures-util = "0.3"
 base64 = "0.22"
+encoding_rs = "0.8"
 argon2 = "0.5"
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }

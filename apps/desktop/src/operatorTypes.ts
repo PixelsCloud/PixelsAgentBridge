@@ -61,6 +61,8 @@ export type OperationEntry = {
 };
 
 export type TaskUpdate = {
+  decodingReplacements?: boolean;
+  outputGap?: boolean;
   executionIdentity?: ExecutionIdentity | null;
   state: string;
   complete: boolean;

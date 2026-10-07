@@ -410,7 +410,7 @@ async fn history_task(
         .as_ref()
         .expect("history task has a snapshot");
     let task_ref = snapshot.task_ref;
-    let (stdout, _) = local
+    let (stdout, stdout_range) = local
         .read_output(
             task_ref,
             OutputStream::Stdout,
@@ -419,7 +419,7 @@ async fn history_task(
         )
         .await
         .map_err(|error| error.to_string())?;
-    let (stderr, _) = local
+    let (stderr, stderr_range) = local
         .read_output(
             task_ref,
             OutputStream::Stderr,
@@ -428,8 +428,12 @@ async fn history_task(
         )
         .await
         .map_err(|error| error.to_string())?;
-    let stdout_offset = stdout.offset + stdout.bytes.len() as u64;
-    let stderr_offset = stderr.offset + stderr.bytes.len() as u64;
+    let stdout_text = pab_bridge::output_text::decode_output(&stdout.bytes, Default::default(),
+        stdout_range.complete && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to);
+    let stderr_text = pab_bridge::output_text::decode_output(&stderr.bytes, Default::default(),
+        stderr_range.complete && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to);
+    let stdout_offset = stdout.offset + stdout_text.consumed as u64;
+    let stderr_offset = stderr.offset + stderr_text.consumed as u64;
     Ok(HistoryTask {
         execution_identity: snapshot.execution_context.identity.clone(),
         id: task_ref.task_id.to_string(),
@@ -465,8 +469,8 @@ async fn history_task(
         complete: record.is_complete()
             && stdout_offset >= record.stdout.available_to
             && stderr_offset >= record.stderr.available_to,
-        stdout: super::decode_command_output(&stdout.bytes),
-        stderr: super::decode_command_output(&stderr.bytes),
+        stdout: stdout_text.text,
+        stderr: stderr_text.text,
         stdout_offset,
         stderr_offset,
         started_at_unix_ms: snapshot.created_at_unix_ms,

@@ -34,3 +34,22 @@ for (const [language, label] of [["en", "English"], ["zh-CN", "简体中文"], [
     });
   }
 }
+
+test("changing output encoding rereads the completed task and drops a delayed old reply", async ({ page }) => {
+  await page.goto(`${url}?language=en&invalid=true`);
+  await expect(page.getByText("Some bytes could not be decoded. Try another encoding.")).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.delayGbk = true; });
+  await page.getByLabel("Output encoding").click();
+  await page.locator(".ant-select-dropdown:visible").getByText("GBK / CP936", { exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.releaseGbk)).toBe("function");
+  await page.getByLabel("Output encoding").click();
+  await page.locator(".ant-select-dropdown:visible").getByText("Big5 / CP950", { exact: true }).click();
+  await expect(page.locator(".task-output pre")).toHaveText("繁體結果");
+  await page.evaluate(() => (window as any).fixture.releaseGbk());
+  await expect(page.locator(".task-output pre")).toHaveText("繁體結果");
+  await expect(page.getByText("Some bytes could not be decoded. Try another encoding.")).toHaveCount(0);
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls.every((call: any) => call.command === "operator_task")).toBeTruthy();
+  expect(calls.filter((call: any) => ["gbk", "big5"].includes(call.args.encoding)).every((call: any) =>
+    call.args.taskId === "long-title" && call.args.stdoutOffset === 0 && call.args.stderrOffset === 0)).toBeTruthy();
+});

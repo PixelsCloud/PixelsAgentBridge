@@ -67,9 +67,15 @@ service account. Results and local history retain the actual execution identity.
 
 Linux is currently a headless Executor/MCP product, with no Linux desktop app.
 Core tools work without a display or GUI login; desktop requests return an explicit
-unsupported result. Native command text output uses UTF-8: configure programs that
-otherwise emit a Windows code page accordingly. File text tools expose their own
-encoding selection. Keep original request IDs when an outcome is unconfirmed.
+unsupported result. Command output defaults to UTF-8; `pab_read_output` and the
+`pab_run_command` preview accept `encoding` (`utf8`, `gbk`, `gb18030`, `big5`,
+`utf16_le`, `utf16_be`). History provides the same display selection. Changing it
+re-reads stored bytes, never reruns the command. Preserve `next_offset` with the
+same encoding: incomplete trailing characters remain for the next read; invalid
+bytes at EOF report replacements. `include_base64` returns unfiltered raw bytes
+for `[offset,next_offset)`. Arbitrary/tail starting character boundaries are not
+guaranteed. File text tools have their own encoding selection. Keep original
+request IDs when an outcome is unconfirmed.
 
 Installed workflow evidence and hardware exclusions are in the
 [execution acceptance report](acceptance/execution-e8-handoff-2026-10-07.md).

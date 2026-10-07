@@ -1,5 +1,6 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use pab_agent_core::{DataPaths, DataScope};
+use pab_bridge::output_text::{OutputEncoding, decode_output};
 use pab_bridge::{BridgeLocalStore, BridgeRuntime};
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
 use serde_json::{Value, json};
@@ -66,6 +67,7 @@ pub(super) async fn call_tool(
             }))
         }
         "pab_run_command" => {
+            let encoding = output_encoding(arguments)?;
             let device_ref = resolve_target(runtime, arguments).await?;
             let program = required_text(arguments, "program")?.to_owned();
             let args = arguments
@@ -142,15 +144,28 @@ pub(super) async fn call_tool(
                     ("stdout", OutputStream::Stdout, record.stdout),
                     ("stderr", OutputStream::Stderr, record.stderr),
                 ] {
-                    let offset = range
-                        .available_to
-                        .saturating_sub(8192)
-                        .max(range.retained_from);
-                    let (chunk, _) = runtime
+                    let offset = encoding
+                        .align_start(
+                            range
+                                .available_to
+                                .saturating_sub(8192)
+                                .max(range.retained_from),
+                        )
+                        .min(range.available_to);
+                    let (chunk, actual_range) = runtime
                         .read_output(snapshot.task_ref, stream, offset, 8192)
                         .await
                         .map_err(|e| e.to_string())?;
-                    result["output"][name] = json!({"text":String::from_utf8_lossy(&chunk.bytes),"offset":offset,"next_offset":offset+chunk.bytes.len() as u64,"truncated":offset>0});
+                    let mut preview = output_result(
+                        arguments,
+                        offset,
+                        offset,
+                        &chunk.bytes,
+                        &actual_range,
+                        encoding,
+                    );
+                    preview["truncated"] = json!(offset > 0);
+                    result["output"][name] = preview;
                 }
             }
             Ok(result)
@@ -384,6 +399,10 @@ fn terminal_size(arguments: &Value, key: &str, default: u16) -> Result<u16, Stri
 }
 
 async fn read_output(runtime: &BridgeRuntime, args: &Value) -> Result<Value, String> {
+    let encoding = output_encoding(args)?;
+    if let Some(offset) = args["offset"].as_u64() {
+        encoding.validate_offset(offset)?;
+    }
     let task_ref = resolve_task(runtime, args).await?;
     let stream = match required_text(args, "stream")? {
         "stdout" => OutputStream::Stdout,
@@ -409,22 +428,24 @@ async fn read_output(runtime: &BridgeRuntime, args: &Value) -> Result<Value, Str
                 .map(|n| range.available_to.saturating_sub(n))
                 .unwrap_or(0)
         });
-        let offset = wanted.max(range.retained_from);
+        let offset = encoding
+            .align_start(wanted.max(range.retained_from))
+            .min(range.available_to);
         let (chunk, actual_range) = runtime
             .read_output(task_ref, stream, offset, maximum)
             .await
             .map_err(|e| e.to_string())?;
-        if !chunk.bytes.is_empty()
+        let mut result = output_result(args, wanted, offset, &chunk.bytes, &actual_range, encoding);
+        if result["next_offset"].as_u64().unwrap_or(offset) > offset
             || actual_range.complete
             || tokio::time::Instant::now() >= deadline
         {
-            return Ok(output_result(
-                args,
-                wanted,
-                offset,
-                &chunk.bytes,
-                &actual_range,
-            ));
+            result["wait_expired"] = json!(
+                result["next_offset"] == json!(offset)
+                    && !actual_range.complete
+                    && super::mcp_waiting::wait_ms(args) > 0
+            );
+            return Ok(result);
         }
         tokio::time::sleep_until(
             deadline.min(tokio::time::Instant::now() + std::time::Duration::from_millis(100)),
@@ -433,30 +454,81 @@ async fn read_output(runtime: &BridgeRuntime, args: &Value) -> Result<Value, Str
     }
 }
 
+fn output_encoding(args: &Value) -> Result<OutputEncoding, String> {
+    serde_json::from_value(args.get("encoding").cloned().unwrap_or(json!("utf8")))
+        .map_err(|e| format!("invalid output encoding: {e}"))
+}
+
 fn output_result(
     args: &Value,
     wanted: u64,
     offset: u64,
     bytes: &[u8],
     range: &pab_protocol::OutputRange,
+    encoding: OutputEncoding,
 ) -> Value {
-    let text = String::from_utf8_lossy(bytes);
+    let decoded = decode_output(
+        bytes,
+        encoding,
+        range.complete && offset + bytes.len() as u64 >= range.available_to,
+    );
+    let text = &decoded.text;
     let filtered = args["contains"].as_str().map(|pattern| {
         text.lines()
             .filter(|line| line.contains(pattern))
             .collect::<Vec<_>>()
             .join("\n")
     });
-    json!({"text":filtered.as_deref().unwrap_or(&text),"offset":offset,"next_offset":offset+bytes.len() as u64,"range":range,
+    let mut result = json!({"text":filtered.as_deref().unwrap_or(text),"encoding":encoding,"offset":offset,"next_offset":offset+decoded.consumed as u64,"range":range,
         "gap":if offset>wanted {Some(json!({"from":wanted,"to":offset}))}else{None},
-        "decoding_replacements":matches!(text,std::borrow::Cow::Owned(_)),
+        "decoding_replacements":decoded.replacements,"pending_bytes":decoded.pending_bytes,
+        "start_boundary_unverified":offset>0,
         "filter_scope":if filtered.is_some(){Some("returned_chunk_lines")}else{None},
-        "wait_expired":bytes.is_empty() && !range.complete && super::mcp_waiting::wait_ms(args)>0})
+        "wait_expired":decoded.consumed==0 && !range.complete && super::mcp_waiting::wait_ms(args)>0});
+    if args["include_base64"] == true {
+        result["base64"] = json!(STANDARD.encode(&bytes[..decoded.consumed]));
+    }
+    result
 }
 
 #[cfg(test)]
 mod output_tests {
     use super::*;
+    #[test]
+    fn explicit_encoding_raw_bytes_and_split_characters_are_consistent() {
+        let range = pab_protocol::OutputRange {
+            retained_from: 0,
+            available_to: 4,
+            complete: false,
+        };
+        let first = output_result(
+            &json!({"include_base64":true,"contains":"中"}),
+            0,
+            0,
+            &[0xd6, 0xd0, 0xce],
+            &range,
+            OutputEncoding::Gbk,
+        );
+        assert_eq!(first["text"], "中");
+        assert_eq!(first["next_offset"], 2);
+        assert_eq!(first["pending_bytes"], 1);
+        assert_eq!(first["base64"], STANDARD.encode([0xd6, 0xd0]));
+        let last = output_result(
+            &json!({"include_base64":true}),
+            2,
+            2,
+            &[0xce, 0xc4],
+            &pab_protocol::OutputRange {
+                complete: true,
+                ..range
+            },
+            OutputEncoding::Gbk,
+        );
+        assert_eq!(last["text"], "文");
+        assert_eq!(last["next_offset"], 4);
+        assert_eq!(last["pending_bytes"], 0);
+        assert!(output_encoding(&json!({"encoding":"guess"})).is_err());
+    }
     #[test]
     fn filtered_output_advances_over_all_bytes_and_reports_retention_gaps_and_invalid_utf8() {
         let bytes = "skip\n保留 😀\n".as_bytes();
@@ -465,15 +537,29 @@ mod output_tests {
             available_to: 100 + bytes.len() as u64,
             complete: false,
         };
-        let result = output_result(&json!({"contains":"保留"}), 0, 100, bytes, &range);
+        let result = output_result(
+            &json!({"contains":"保留"}),
+            0,
+            100,
+            bytes,
+            &range,
+            OutputEncoding::Utf8,
+        );
         assert_eq!(result["text"], "保留 😀");
         assert_eq!(result["next_offset"], range.available_to);
         assert_eq!(result["gap"], json!({"from":0,"to":100}));
         assert_eq!(result["decoding_replacements"], false);
-        let empty = output_result(&json!({"contains":"absent"}), 100, 100, bytes, &range);
+        let empty = output_result(
+            &json!({"contains":"absent"}),
+            100,
+            100,
+            bytes,
+            &range,
+            OutputEncoding::Utf8,
+        );
         assert_eq!(empty["text"], "");
         assert_eq!(empty["next_offset"], range.available_to);
-        let invalid = output_result(&json!({}), 100, 100, &[0xff], &range);
+        let invalid = output_result(&json!({}), 100, 100, &[0xff], &range, OutputEncoding::Utf8);
         assert_eq!(invalid["decoding_replacements"], true);
         let pending = output_result(
             &json!({"wait_ms":5}),
@@ -481,6 +567,7 @@ mod output_tests {
             range.available_to,
             &[],
             &range,
+            OutputEncoding::Utf8,
         );
         assert_eq!(pending["wait_expired"], true);
         assert_eq!(pending["next_offset"], range.available_to);
@@ -493,6 +580,7 @@ mod output_tests {
                 complete: true,
                 ..range
             },
+            OutputEncoding::Utf8,
         );
         assert_eq!(done["wait_expired"], false);
     }

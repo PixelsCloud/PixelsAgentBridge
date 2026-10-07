@@ -4,6 +4,7 @@ import { Button, Pagination, Select, Tag } from "antd";
 import { HistoryScreenshot } from "./HistoryScreenshot";
 import { HistoryTerminal } from "./HistoryTerminal";
 import { ExecutionIdentityView } from "./ExecutionIdentityView";
+import { CommandOutput } from "./CommandOutput";
 import { messages, type Language } from "./i18n";
 import type { OperationEntry, TaskEntry } from "./operatorTypes";
 import { formatDeviceCode } from "./deviceCode";
@@ -37,7 +38,7 @@ type Props = {
 export function ActivityPanel({
   embedded = false, language, tasks, operations, totalCount, selectedId, onSelect, hasMore,
   hasMoreTasks, hasMoreOperations, loadingMore, refreshing, refreshError, onLoadMore,
-  deviceOptions, deviceCode = "", onDeviceChange, onRefresh, onRefreshTask,
+  deviceOptions, deviceCode = "", onDeviceChange, onRefresh,
 }: Props) {
   const t = messages[language];
   const [page, setPage] = useState(1);
@@ -128,9 +129,7 @@ export function ActivityPanel({
               <ExecutionIdentityView identity={selectedTask.executionIdentity} language={language} />
               <div className="command-audit"><span>{t.commandArguments}</span><code>{selectedTask.args.length ? selectedTask.args.join(" · ") : "—"}</code></div>
               {selectedTask.cwd && <div className="command-audit"><span>{t.cwd}</span><code>{selectedTask.cwd}</code></div>}
-              <pre>{selectedTask.stdout || (!selectedTask.stderr && t.waitingOutput)}</pre>
-              {selectedTask.stderr && <pre className="stderr-output">{selectedTask.stderr}</pre>}
-              {!selectedTask.complete && <Button type="text" onClick={() => onRefreshTask(selectedTask.id)}>{t.loadMoreOutput}</Button>}
+              <CommandOutput key={selectedTask.id} task={selectedTask} language={language} />
             </>}
             {selectedOperation && <>
               <div className="output-heading"><strong>{operationLabel(selectedOperation)}</strong><span>{operationStateLabel(selectedOperation)}</span></div>

@@ -309,6 +309,13 @@ pub(super) fn tools() -> Vec<Value> {
                 json!({"type":"integer","minimum":1,"maximum":86400000}),
             );
         }
+        if matches!(name.as_str(), "pab_read_output" | "pab_run_command") {
+            properties.insert("encoding".into(), json!({"type":"string","enum":["utf8","gbk","gb18030","big5","utf16_le","utf16_be"],"default":"utf8"}));
+            properties.insert(
+                "include_base64".into(),
+                json!({"type":"boolean","default":false}),
+            );
+        }
         if name == "pab_read_output" {
             properties.insert(
                 "max_bytes".into(),
@@ -331,13 +338,13 @@ pub(super) fn tools() -> Vec<Value> {
                 " Defaults to service. User execution requires filesystem v6 and a current connection context_ref from pab_list_execution_contexts. Use the same selection for subsequent name-cursor pages. No service fallback; pages report actual execution identity. Directory contents may change between pages."
             }
             "pab_run_command" => {
-                " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Output ranges are returned; use pab_read_output for bytes."
+                " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. encoding only decodes the returned output preview (UTF-8 default), never changes the program or stored bytes. include_base64 returns unfiltered bytes for [offset,next_offset). Use pab_read_output to re-decode the original task without rerunning."
             }
             "pab_get_task" | "pab_get_operation" => {
                 " wait_ms optionally waits up to 30s for change or completion. Reuse after_revision to avoid missing updates. Expiry returns observed facts, not a task failure."
             }
             "pab_read_output" => {
-                " tail_bytes and offset are exclusive. max_bytes bounds scanned bytes. contains filters only lines/fragments in this returned chunk; no whole-log or cross-chunk match guarantee. next_offset advances over scanned bytes. gap reports discarded retained output. wait_ms waits for new bytes or EOF."
+                " encoding explicitly selects display decoding (UTF-8 default); bytes remain unchanged. tail_bytes and offset are exclusive. max_bytes bounds scanned bytes. next_offset excludes a non-final incomplete character; re-read there with the same encoding. pending_bytes reports that suffix; EOF invalid bytes set decoding_replacements. include_base64 returns unfiltered bytes for [offset,next_offset). contains filters only this chunk's lines/fragments, not across chunks. Arbitrary/tail/retention starting boundaries are unverified; explicit UTF-16 offsets must be even, tail/gap starts align forward. gap reports skipped retained bytes. wait_ms waits for a complete character or EOF; changing encoding never reruns the task."
             }
             "pab_connect" => {
                 " wait_ms defaults to 5000; if pending, returns connection_ref and connected=false. Call pab_connect again to observe the same in-flight attempt. At most 120s per attempt; pab_disconnect stops this session's attempt."
@@ -719,5 +726,23 @@ mod tests {
         assert!(validate_arguments("pab_run_command", &args).is_ok());
         assert!(validate_arguments("pab_get_operation",&json!({"device_code":"123456789","operation_id":pab_protocol::RequestId::new(),"after_revision":"bad"})).is_err());
         assert!(validate_arguments("pab_read_output",&json!({"device_code":"123456789","task_id":pab_protocol::TaskId::new(),"stream":"stdout","tail_bytes":4,"offset":0})).is_err());
+    }
+
+    #[test]
+    fn output_encoding_is_explicit_and_validated_before_dispatch() {
+        for name in ["pab_run_command", "pab_read_output"] {
+            let mut args = if name == "pab_run_command" {
+                json!({"device_code":"123456789","program":"echo","args":[]})
+            } else {
+                json!({"device_code":"123456789","task_id":pab_protocol::TaskId::new(),"stream":"stdout"})
+            };
+            for encoding in ["utf8", "gbk", "gb18030", "big5", "utf16_le", "utf16_be"] {
+                args["encoding"] = json!(encoding);
+                args["include_base64"] = json!(true);
+                assert!(validate_arguments(name, &args).is_ok());
+            }
+            args["encoding"] = json!("auto");
+            assert!(validate_arguments(name, &args).is_err());
+        }
     }
 }

@@ -4796,6 +4796,7 @@ version = "1.2.39"
 dependencies = [
  "argon2",
  "base64 0.22.1",
+ "encoding_rs",
  "futures-util",
  "iroh-base",
  "pab-agent-core",

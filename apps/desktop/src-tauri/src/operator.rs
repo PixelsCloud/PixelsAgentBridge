@@ -219,6 +219,8 @@ pub struct TaskUpdate {
     stderr: String,
     stdout_offset: u64,
     stderr_offset: u64,
+    decoding_replacements: bool,
+    output_gap: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -539,7 +541,11 @@ pub async fn operator_task(
     task_id: String,
     stdout_offset: u64,
     stderr_offset: u64,
+    encoding: Option<pab_bridge::output_text::OutputEncoding>,
 ) -> Result<TaskUpdate, String> {
+    let encoding = encoding.unwrap_or_default();
+    encoding.validate_offset(stdout_offset)?;
+    encoding.validate_offset(stderr_offset)?;
     let task_id = task_id
         .parse::<TaskId>()
         .map_err(|_| "invalid task ID".to_owned())?;
@@ -584,12 +590,14 @@ pub async fn operator_task(
         .task(task_ref)
         .await
         .map_err(|error| error.to_string())?;
-    let (stdout, _) = local
-        .read_output(task_ref, OutputStream::Stdout, stdout_offset, 32 * 1024)
+    let stdout_start = encoding.align_start(stdout_offset.max(record.stdout.retained_from)).min(record.stdout.available_to);
+    let stderr_start = encoding.align_start(stderr_offset.max(record.stderr.retained_from)).min(record.stderr.available_to);
+    let (stdout, stdout_range) = local
+        .read_output(task_ref, OutputStream::Stdout, stdout_start, 32 * 1024)
         .await
         .map_err(|error| error.to_string())?;
-    let (stderr, _) = local
-        .read_output(task_ref, OutputStream::Stderr, stderr_offset, 32 * 1024)
+    let (stderr, stderr_range) = local
+        .read_output(task_ref, OutputStream::Stderr, stderr_start, 32 * 1024)
         .await
         .map_err(|error| error.to_string())?;
     let state = record
@@ -597,25 +605,23 @@ pub async fn operator_task(
         .as_ref()
         .map(|snapshot| format!("{:?}", snapshot.state))
         .unwrap_or_else(|| "Pending".to_owned());
+    let stdout_text = pab_bridge::output_text::decode_output(&stdout.bytes, encoding,
+        stdout_range.complete && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to);
+    let stderr_text = pab_bridge::output_text::decode_output(&stderr.bytes, encoding,
+        stderr_range.complete && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to);
+    let next_stdout = stdout.offset + stdout_text.consumed as u64;
+    let next_stderr = stderr.offset + stderr_text.consumed as u64;
     Ok(TaskUpdate {
         execution_identity: record.snapshot.as_ref().and_then(|snapshot| snapshot.execution_context.identity.clone()),
         state,
         complete: record.is_complete()
-            && stdout_offset + stdout.bytes.len() as u64 >= record.stdout.available_to
-            && stderr_offset + stderr.bytes.len() as u64 >= record.stderr.available_to,
-        stdout: decode_command_output(&stdout.bytes),
-        stderr: decode_command_output(&stderr.bytes),
-        stdout_offset: stdout_offset + stdout.bytes.len() as u64,
-        stderr_offset: stderr_offset + stderr.bytes.len() as u64,
+            && next_stdout >= stdout_range.available_to
+            && next_stderr >= stderr_range.available_to,
+        decoding_replacements: stdout_text.replacements || stderr_text.replacements,
+        output_gap: stdout_start > stdout_offset || stderr_start > stderr_offset,
+        stdout: stdout_text.text,
+        stderr: stderr_text.text,
+        stdout_offset: next_stdout,
+        stderr_offset: next_stderr,
     })
-}
-
-fn decode_command_output(bytes: &[u8]) -> String {
-    if let Ok(text) = std::str::from_utf8(bytes) {
-        return text.to_owned();
-    }
-    // Windows console programs on Chinese systems commonly write CP936 bytes.
-    // Keep the stored output and offsets as raw bytes; decode only for display.
-    let (text, _, _) = encoding_rs::GBK.decode(bytes);
-    text.into_owned()
 }

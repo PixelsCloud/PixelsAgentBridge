@@ -13,7 +13,15 @@ import "../src/theme.css";
 const params = new URLSearchParams(location.search);
 const dark = params.get("theme") === "dark";
 document.documentElement.dataset.theme = dark ? "dark" : "light";
-(window as any).__TAURI_INTERNALS__ = { invoke: async (command: string) => {
+const fixture = (window as any).fixture = { calls: [] as any[], delayGbk: false, releaseGbk: null as null | (() => void) };
+(window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
+  fixture.calls.push({ command, args });
+  if (command === "operator_task") {
+    if (args.encoding === "gbk" && fixture.delayGbk) await new Promise<void>(resolve => { fixture.releaseGbk = resolve; });
+    const text = args.encoding === "big5" ? "繁體結果" : args.encoding === "gbk" ? "中文结果" : "fixture output";
+    return { state: "Succeeded", complete: true, stdout: text, stderr: "", stdoutOffset: 10, stderrOffset: 0,
+      decodingReplacements: params.get("invalid") === "true" && args.encoding === "utf8", outputGap: false };
+  }
   if (command === "operator_server_settings") return { controlUrl: "", relayUrl: "" };
   if (command === "codex_integration_status") return { available: true, enabled: true, occupied: false };
   throw Error(`unexpected fixture call: ${command}`);
