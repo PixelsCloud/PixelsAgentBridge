@@ -1,44 +1,18 @@
 use super::*;
 
-pub(super) async fn require_active_user(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    user_id: UserId,
-) -> Result<(), StoreError> {
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND status = 'active')",
-    )
-    .bind(user_id.as_uuid())
-    .fetch_one(&mut **tx)
-    .await?;
-    if exists {
-        Ok(())
-    } else {
-        Err(StoreError::NotFound)
-    }
-}
-
-pub(super) async fn require_active_membership(
+pub(super) async fn require_account_namespace(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: UserId,
     tenant_id: TenantId,
-) -> Result<TeamRole, StoreError> {
-    let role = sqlx::query_scalar::<_, String>(
-        r#"
-        SELECT m.role
-        FROM memberships m
-        JOIN users u ON u.id = m.user_id
-        JOIN tenants t ON t.id = m.tenant_id
-        WHERE m.tenant_id = $1 AND m.user_id = $2
-          AND m.status = 'active' AND u.status = 'active' AND t.status = 'active'
-        "#,
-    )
-    .bind(tenant_id.as_uuid())
-    .bind(user_id.as_uuid())
-    .fetch_optional(&mut **tx)
-    .await?
-    .ok_or(StoreError::PermissionDenied)?;
-    TeamRole::from_db(&role)
-        .ok_or_else(|| StoreError::InvalidData(format!("unknown membership role {role}")))
+) -> Result<(), StoreError> {
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM users u JOIN personal_tenants p ON p.user_id=u.id JOIN tenants t ON t.id=p.tenant_id WHERE u.id=$1 AND p.tenant_id=$2 AND u.status='active' AND t.status='active')",
+    ).bind(user_id.as_uuid()).bind(tenant_id.as_uuid()).fetch_one(&mut **tx).await?;
+    if exists {
+        Ok(())
+    } else {
+        Err(StoreError::PermissionDenied)
+    }
 }
 
 pub(super) async fn bump_policy_revision(

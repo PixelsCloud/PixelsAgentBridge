@@ -122,11 +122,12 @@ async fn removed_claim_routes_cannot_change_devices(pool: PgPool) {
         .0,
         StatusCode::OK
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM device_claim_requests")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(count, 0);
+    let legacy: Option<String> =
+        sqlx::query_scalar("SELECT to_regclass('device_claim_requests')::text")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(legacy.is_none());
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -277,9 +278,8 @@ async fn app(pool: PgPool, registration_enabled: bool) -> (Router, ControlPlane)
         ControlPlane::new(PostgresStore::from_pool(pool), PasswordPolicy::default()).unwrap();
     control
         .initialize_settings(RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         })
         .await
         .unwrap();
@@ -321,6 +321,338 @@ async fn call(
     let body = serde_json::from_slice(&bytes)
         .unwrap_or_else(|_| json!({"raw":String::from_utf8_lossy(&bytes)}));
     (status, cookie, body)
+}
+
+async fn native_call(
+    app: &Router,
+    method: &str,
+    path: &str,
+    token: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let mut request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header(header::HOST, "web.example")
+        .header(header::CONTENT_TYPE, "application/json");
+    if !token.is_empty() {
+        request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let response = app
+        .clone()
+        .oneshot(request.body(Body::from(body.to_string())).unwrap())
+        .await
+        .unwrap();
+    assert!(response.headers().get(header::SET_COOKIE).is_none());
+    assert_eq!(
+        response.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn native_and_browser_sessions_share_accounts_but_logout_is_independent(pool: PgPool) {
+    let (app, _) = app(pool.clone(), true).await;
+    let creds = json!({"username":"native-user","password":"test password long enough"});
+    let (status, registered) =
+        native_call(&app, "POST", "/api/account/register", "", creds.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{registered}");
+    let token = registered["access_token"].as_str().unwrap();
+    let (status, cookie, user) = call(&app, "POST", "/api/web/session", "", creds).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(user["id"], registered["user"]["id"]);
+    sqlx::query("UPDATE web_sessions SET created_at=now()-interval '10 years'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let hash = blake3::hash(token.as_bytes()).to_hex().to_string();
+    for index in 0..25u64 {
+        sqlx::query("INSERT INTO web_sessions(token_hash,user_id) SELECT $1,user_id FROM web_sessions WHERE token_hash=$2")
+            .bind(format!("{index:064x}")).bind(&hash).execute(&pool).await.unwrap();
+    }
+    assert_eq!(
+        native_call(
+            &app,
+            "POST",
+            "/api/account/session",
+            "",
+            json!({"username":"native-user","password":"test password long enough"})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM web_sessions")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        28
+    );
+    assert_eq!(
+        native_call(&app, "GET", "/api/account/session", token, Value::Null)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/web/session", &cookie, Value::Null)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    // Cookie-only calls cannot authenticate on the native API.
+    assert_eq!(
+        call(&app, "GET", "/api/account/session", &cookie, Value::Null)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        native_call(&app, "POST", "/api/account/logout", token, Value::Null)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        native_call(&app, "GET", "/api/account/session", token, Value::Null)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/web/session", &cookie, Value::Null)
+            .await
+            .0,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn user_relay_limits_replace_team_routes_and_validate_admin_access(pool: PgPool) {
+    let (app, control) = app(pool.clone(), true).await;
+    let (_, cookie, user) = call(
+        &app,
+        "POST",
+        "/api/web/register",
+        "",
+        json!({"username":"quota-admin","password":"test password long enough"}),
+    )
+    .await;
+    let path = format!("/api/web/accounts/{}/traffic", user["id"].as_str().unwrap());
+    assert_eq!(
+        call(&app, "PUT", &path, &cookie, json!({"mbps":12}))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    pab_server::web::bootstrap_admin(&control, "quota-admin")
+        .await
+        .unwrap();
+    assert_eq!(
+        call(&app, "PUT", &path, &cookie, json!({"mbps":0})).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        call(&app, "PUT", &path, &cookie, json!({"mbps":12}))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&app, "GET", "/api/web/traffic", &cookie, Value::Null)
+            .await
+            .2["user_mbps"],
+        12
+    );
+    let snapshot = control
+        .relay_policy_snapshot(std::time::Duration::from_secs(60))
+        .await
+        .unwrap();
+    assert_eq!(snapshot.user_limits.len(), 1);
+    assert_eq!(snapshot.user_limits[0].mbps, 12);
+    assert_eq!(
+        call(
+            &app,
+            "PUT",
+            "/api/web/service",
+            &cookie,
+            json!({"user_mbps":8,"guest_mbps":2})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&app, "PUT", &path, &cookie, json!({"mbps":null}))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let traffic = call(&app, "GET", "/api/web/traffic", &cookie, Value::Null)
+        .await
+        .2;
+    assert_eq!(traffic["user_mbps"], 8);
+    assert_eq!(traffic["guest_mbps"], 2);
+    assert_eq!(
+        call(&app, "GET", "/api/web/teams", &cookie, Value::Null)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+    let legacy: Option<String> = sqlx::query_scalar("SELECT to_regclass('teams')::text")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(legacy.is_none());
+}
+
+fn context_update(secret: &iroh_base::SecretKey, token: &str, revision: u64) -> Value {
+    let mut update = pab_protocol::EndpointUserContextUpdate {
+        endpoint_key: pab_protocol::EndpointKey::new(*secret.public().as_bytes()),
+        revision,
+        issued_at_unix_ms: (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000)
+            as i64,
+        signature: pab_protocol::EndpointSignature::from_bytes([0; 64]),
+    };
+    let hash = if token.is_empty() {
+        String::new()
+    } else {
+        blake3::hash(token.as_bytes()).to_hex().to_string()
+    };
+    update.signature = pab_protocol::EndpointSignature::from_bytes(
+        secret
+            .sign(&update.signing_message("https://web.example", &hash))
+            .to_bytes(),
+    );
+    serde_json::to_value(update).unwrap()
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn verified_user_context_switches_without_changing_device_endpoint_identity(pool: PgPool) {
+    use pab_protocol::{EndpointKey, RelayEndpointOwner, TrafficScope};
+    let (app, control) = app(pool.clone(), true).await;
+    let (_, account) = native_call(
+        &app,
+        "POST",
+        "/api/account/register",
+        "",
+        json!({"username":"context-user","password":"test password long enough"}),
+    )
+    .await;
+    let token = account["access_token"].as_str().unwrap();
+    let secret = iroh_base::SecretKey::generate();
+    let key = EndpointKey::new(*secret.public().as_bytes());
+    let tenant = uuid::Uuid::new_v4();
+    sqlx::query("INSERT INTO tenants(id,kind) VALUES($1,'guest')")
+        .bind(tenant)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind) VALUES($1,$2,'guest')")
+        .bind(key.as_bytes().as_slice())
+        .bind(tenant)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let route = "/api/account/endpoint-context";
+    let accepted = native_call(&app, "PUT", route, token, context_update(&secret, token, 1)).await;
+    assert_eq!(accepted.0, StatusCode::OK, "{}", accepted.1);
+    assert_eq!(accepted.1["user"]["user_id"], account["user"]["id"]);
+    let version = accepted.1["policy_version"].clone();
+    let user_id: uuid::Uuid = account["user"]["id"].as_str().unwrap().parse().unwrap();
+    sqlx::query("UPDATE users SET status='disabled' WHERE id=$1")
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let unavailable =
+        native_call(&app, "PUT", route, token, context_update(&secret, token, 1)).await;
+    assert_eq!(unavailable.0, StatusCode::OK);
+    assert!(unavailable.1["user"].is_null());
+    assert_eq!(
+        control
+            .relay_policy_snapshot(std::time::Duration::from_secs(60))
+            .await
+            .unwrap()
+            .endpoints[0]
+            .owner,
+        RelayEndpointOwner::Guest
+    );
+    sqlx::query("UPDATE users SET status='active' WHERE id=$1")
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        native_call(&app, "PUT", route, token, context_update(&secret, token, 1))
+            .await
+            .1["user"]["user_id"],
+        account["user"]["id"]
+    );
+    assert_eq!(
+        native_call(&app, "PUT", route, token, context_update(&secret, token, 1))
+            .await
+            .1["policy_version"],
+        version
+    );
+    assert_eq!(
+        native_call(&app, "PUT", route, "", context_update(&secret, "", 0))
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
+    let mut forged = context_update(&iroh_base::SecretKey::generate(), token, 2);
+    forged["endpoint_key"] = serde_json::to_value(key).unwrap();
+    assert_eq!(
+        native_call(&app, "PUT", route, token, forged).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let snapshot = control
+        .relay_policy_snapshot(std::time::Duration::from_secs(60))
+        .await
+        .unwrap();
+    assert!(matches!(
+        snapshot.endpoints[0].owner,
+        RelayEndpointOwner::User {
+            scope: TrafficScope::User { .. }
+        }
+    ));
+    let principal = control.store().registered_endpoint(key).await.unwrap();
+    assert_eq!(
+        principal.principal,
+        pab_protocol::EndpointProofPrincipal::Guest
+    );
+    assert_eq!(
+        native_call(&app, "POST", "/api/account/logout", token, Value::Null)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    let snapshot = control
+        .relay_policy_snapshot(std::time::Duration::from_secs(60))
+        .await
+        .unwrap();
+    assert_eq!(snapshot.endpoints[0].owner, RelayEndpointOwner::Guest);
+    assert!(snapshot.policy_version > version.as_u64().unwrap());
+    assert_eq!(
+        native_call(&app, "PUT", route, token, context_update(&secret, token, 2))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        native_call(&app, "PUT", route, "", context_update(&secret, "", 2))
+            .await
+            .0,
+        StatusCode::OK
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -374,7 +706,7 @@ async fn browser_session_register_restore_logout_and_origin(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn password_change_revokes_all_sessions_and_admin_is_explicit(pool: PgPool) {
+async fn password_change_preserves_sessions_and_admin_is_explicit(pool: PgPool) {
     let (app, control) = app(pool, true).await;
     let creds = json!({"username":"web-admin","password":"original password long enough"});
     let (_, first, _) = call(&app, "POST", "/api/web/register", "", creds.clone()).await;
@@ -403,7 +735,7 @@ async fn password_change_revokes_all_sessions_and_admin_is_explicit(pool: PgPool
             call(&app, "GET", "/api/web/session", &cookie, Value::Null)
                 .await
                 .0,
-            StatusCode::UNAUTHORIZED
+            StatusCode::OK
         );
     }
     assert_eq!(
@@ -421,7 +753,7 @@ async fn password_change_revokes_all_sessions_and_admin_is_explicit(pool: PgPool
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn registration_disabled_expired_and_disabled_accounts(pool: PgPool) {
+async fn registration_disabled_permanent_session_and_disabled_accounts(pool: PgPool) {
     let (app, control) = app(pool.clone(), false).await;
     assert_eq!(
         call(
@@ -441,12 +773,15 @@ async fn registration_disabled_expired_and_disabled_accounts(pool: PgPool) {
         .unwrap();
     let creds = json!({"username":"existing","password":"correct horse battery staple"});
     let (_, cookie, _) = call(&app, "POST", "/api/web/session", "", creds.clone()).await;
-    sqlx::query("UPDATE web_sessions SET created_at=now()-interval '2 days',expires_at=now()-interval '1 day'").execute(&pool).await.unwrap();
+    sqlx::query("UPDATE web_sessions SET created_at=now()-interval '10 years'")
+        .execute(&pool)
+        .await
+        .unwrap();
     assert_eq!(
         call(&app, "GET", "/api/web/session", &cookie, Value::Null)
             .await
             .0,
-        StatusCode::UNAUTHORIZED
+        StatusCode::OK
     );
     let (_, cookie, _) = call(&app, "POST", "/api/web/session", "", creds.clone()).await;
     sqlx::query("UPDATE users SET status='disabled'")
@@ -612,147 +947,6 @@ async fn device_lists_use_current_ownership_and_exact_filtered_totals(pool: PgPo
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn team_web_management_obeys_membership_and_audits_real_changes(pool: PgPool) {
-    let (app, control) = app(pool, true).await;
-    let (_, admin_cookie, admin) = call(
-        &app,
-        "POST",
-        "/api/web/register",
-        "",
-        json!({"username":"team-web-admin","password":"test password long enough"}),
-    )
-    .await;
-    let (_, member_cookie, member) = call(
-        &app,
-        "POST",
-        "/api/web/register",
-        "",
-        json!({"username":"team-web-member","password":"test password long enough"}),
-    )
-    .await;
-    assert_eq!(
-        call(
-            &app,
-            "GET",
-            "/api/web/accounts",
-            &member_cookie,
-            Value::Null
-        )
-        .await
-        .0,
-        StatusCode::FORBIDDEN
-    );
-    pab_server::web::bootstrap_admin(&control, "team-web-admin")
-        .await
-        .unwrap();
-    let create = call(
-        &app,
-        "POST",
-        "/api/web/teams",
-        &admin_cookie,
-        json!({"name":"Web Team","owner_id":admin["id"]}),
-    )
-    .await;
-    assert_eq!(create.0, StatusCode::OK, "{}", create.2);
-    let team = create.2["id"].as_str().unwrap();
-    assert_eq!(
-        call(&app, "GET", "/api/web/teams", &member_cookie, Value::Null)
-            .await
-            .2["total"],
-        0
-    );
-    assert_eq!(
-        call(
-            &app,
-            "POST",
-            &format!("/api/web/teams/{team}/actions"),
-            &admin_cookie,
-            json!({"action":"add_member","user_id":member["id"],"role":"member"})
-        )
-        .await
-        .0,
-        StatusCode::OK
-    );
-    assert_eq!(
-        call(&app, "GET", "/api/web/teams", &member_cookie, Value::Null)
-            .await
-            .2["total"],
-        1
-    );
-    let members = call(
-        &app,
-        "GET",
-        &format!("/api/web/teams/{team}/members"),
-        &admin_cookie,
-        Value::Null,
-    )
-    .await;
-    assert_eq!(members.0, StatusCode::OK, "{}", members.2);
-    assert_eq!(members.2["total"], 2);
-    let assignment = format!(
-        "/api/web/accounts/{}/traffic",
-        member["id"].as_str().unwrap()
-    );
-    assert_eq!(
-        call(
-            &app,
-            "POST",
-            &assignment,
-            &admin_cookie,
-            json!({"team_id":team})
-        )
-        .await
-        .0,
-        StatusCode::OK
-    );
-    assert_eq!(
-        call(
-            &app,
-            "POST",
-            &format!("/api/web/teams/{team}/actions"),
-            &admin_cookie,
-            json!({"action":"set_limits","total_mbps":30,"member_mbps":6})
-        )
-        .await
-        .0,
-        StatusCode::OK
-    );
-    assert_eq!(
-        call(&app, "GET", "/api/web/traffic", &member_cookie, Value::Null)
-            .await
-            .2["scopes"]["default_tenant_id"],
-        team
-    );
-    assert_eq!(
-        call(
-            &app,
-            "POST",
-            &format!("/api/web/teams/{team}/actions"),
-            &admin_cookie,
-            json!({"action":"remove_member","user_id":member["id"]})
-        )
-        .await
-        .0,
-        StatusCode::OK
-    );
-    assert_eq!(
-        call(&app, "GET", "/api/web/traffic", &member_cookie, Value::Null)
-            .await
-            .2["scopes"]["default_tenant_id"],
-        member["personal_tenant_id"]
-    );
-    let events = call(&app, "GET", "/api/web/audit", &admin_cookie, Value::Null).await;
-    assert_eq!(events.0, StatusCode::OK, "{}", events.2);
-    assert!(events.2["total"].as_i64().unwrap() >= 6);
-    assert_eq!(
-        call(&app, "GET", "/api/web/audit", &member_cookie, Value::Null)
-            .await
-            .0,
-        StatusCode::FORBIDDEN
-    );
-}
-
-#[sqlx::test(migrations = "./migrations")]
 async fn concurrent_admin_changes_keep_an_active_administrator(pool: PgPool) {
     let (app, control) = app(pool.clone(), true).await;
     let (_, a, ua) = call(
@@ -855,8 +1049,8 @@ async fn input_boundaries_privileged_configuration_and_no_task_routes(pool: PgPo
         .await
         .unwrap();
     let (_, _, config) = call(&app, "GET", "/api/web/service", &cookie, Value::Null).await;
-    assert_eq!(config["default_team_mbps"], 20);
-    assert_eq!(config["session_hours"], 12);
+    assert_eq!(config["default_user_mbps"], 5);
+    assert_eq!(config["session_expires"], false);
     for forbidden in ["secret", "password", "database", "token"] {
         assert!(!config.to_string().contains(forbidden));
     }
@@ -933,87 +1127,6 @@ async fn relay_expiry_restart_and_thousand_device_pagination(pool: PgPool) {
             .2["relays"],
         0
     );
-}
-
-#[sqlx::test(migrations = false)]
-async fn upgrade_from_twelve_preserves_accounts_devices_and_teams(pool: PgPool) {
-    let mut old = sqlx::migrate!("./migrations");
-    old.migrations =
-        std::borrow::Cow::Owned(old.iter().filter(|m| m.version <= 12).cloned().collect());
-    old.run(&pool).await.unwrap();
-    let (_, control) = app(pool.clone(), true).await;
-    let account = control
-        .register_account("upgrade-user", "test password long enough")
-        .await
-        .unwrap();
-    let team_id = uuid::Uuid::new_v4();
-    sqlx::query("INSERT INTO tenants (id, kind, created_by_user_id) VALUES ($1, 'team', $2)")
-        .bind(team_id)
-        .bind(account.id.as_uuid())
-        .execute(&pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO teams (tenant_id, name) VALUES ($1, 'Preserved Team')")
-        .bind(team_id)
-        .execute(&pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO memberships (tenant_id, user_id, role) VALUES ($1, $2, 'owner')")
-        .bind(team_id)
-        .bind(account.id.as_uuid())
-        .execute(&pool)
-        .await
-        .unwrap();
-    let endpoint = unclaimed_fixture(&pool).await;
-    let pab_protocol::EndpointProofPrincipal::Device { device_id } = endpoint.principal else {
-        panic!("expected device")
-    };
-    sqlx::query("INSERT INTO device_claim_requests(id,device_id,owner_tenant_id,requested_by_user_id,expires_at) VALUES($1,$2,$3,$4,now()+interval '10 minutes')")
-        .bind(uuid::Uuid::new_v4()).bind(device_id.as_uuid()).bind(account.personal_tenant_id.as_uuid()).bind(account.id.as_uuid()).execute(&pool).await.unwrap();
-    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-    sqlx::migrate!("./migrations").run(&pool).await.unwrap(); // Restart is idempotent.
-    let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM teams WHERE tenant_id=$1 AND name='Preserved Team'",
-    )
-    .bind(team_id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(count, 1);
-    let resolution: String =
-        sqlx::query_scalar("SELECT resolution FROM device_claim_requests WHERE device_id=$1")
-            .bind(device_id.as_uuid())
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(resolution, "cancelled");
-    let identity: (uuid::Uuid, i32, Option<uuid::Uuid>) =
-        sqlx::query_as("SELECT tenant_id,code,owner_tenant_id FROM devices WHERE id=$1")
-            .bind(device_id.as_uuid())
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(identity, (endpoint.tenant_id.as_uuid(), 345678901, None));
-    let (app, _) = app_from_existing(control);
-    let response = call(
-        &app,
-        "POST",
-        "/api/web/session",
-        "",
-        json!({"username":"upgrade-user","password":"test password long enough"}),
-    )
-    .await;
-    assert_eq!(response.0, StatusCode::OK);
-    assert_eq!(response.2["server_admin"], false);
-}
-
-fn app_from_existing(control: ControlPlane) -> (Router, ControlPlane) {
-    let state = ControlApiState::new(
-        control.clone(),
-        ControlApiConfig::default(),
-        RelayControlAuth::new("web-test-secret-with-at-least-32-characters").unwrap(),
-    );
-    (pab_server::control_router(state), control)
 }
 
 #[sqlx::test(migrations = "./migrations")]

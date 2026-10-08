@@ -30,7 +30,7 @@ use pab_relay::{
 };
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
-    RelayControlAuth, TeamRole, control_router,
+    RelayControlAuth, control_router,
 };
 use pab_transport::{PabEndpoint, PabEndpointConfig};
 use rustls::{ClientConfig, RootCertStore};
@@ -120,9 +120,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
     control
         .initialize_settings(RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         })
         .await
         .unwrap();
@@ -233,36 +232,23 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         },
     )
     .await;
-    let second_user_id = match receive(&mut second_account_socket).await {
+    let (second_user_id, second_namespace) = match receive(&mut second_account_socket).await {
         ControlServerMessage::AccountAuthenticated {
             request_id,
             user_id,
+            personal_tenant_id,
             ..
-        } if request_id == second_register_id => user_id,
+        } if request_id == second_register_id => (user_id, personal_tenant_id),
         response => panic!("unexpected second account response: {response:?}"),
     };
-    let team = inspection_control
-        .admin_create_team(user_id, "Integration Team", "integration-test-admin")
-        .await
-        .unwrap();
-    let team_id = team.tenant_id;
-    inspection_control
-        .admin_add_team_member(
-            team_id,
-            second_user_id,
-            TeamRole::Member,
-            "integration-test-admin",
-        )
-        .await
-        .unwrap();
-    let second_team_secret = SecretKey::generate();
+    let second_user_secret = SecretKey::generate();
     let second_endpoint_request_id = RequestId::new();
     send(
         &mut second_account_socket,
         &ControlClientMessage::BeginEndpointRegistration {
             request_id: second_endpoint_request_id,
-            tenant_id: team_id,
-            endpoint_key: EndpointKey::new(*second_team_secret.public().as_bytes()),
+            tenant_id: second_namespace,
+            endpoint_key: EndpointKey::new(*second_user_secret.public().as_bytes()),
             registration: EndpointRegistration::User,
         },
     )
@@ -280,7 +266,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             );
             challenge
         }
-        response => panic!("unexpected Team endpoint challenge: {response:?}"),
+        response => panic!("unexpected user endpoint challenge: {response:?}"),
     };
     let second_endpoint_complete_id = RequestId::new();
     send(
@@ -290,7 +276,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             proof: EndpointProofResponse {
                 challenge_id: second_challenge.challenge_id,
                 signature: EndpointSignature::from_bytes(
-                    second_team_secret
+                    second_user_secret
                         .sign(&second_challenge.signing_message())
                         .to_bytes(),
                 ),
@@ -303,8 +289,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         ControlServerMessage::EndpointRegistered {
             request_id: second_endpoint_complete_id,
             result: EndpointRegistrationResult::User {
-                tenant_id: team_id,
-                endpoint_key: EndpointKey::new(*second_team_secret.public().as_bytes()),
+                tenant_id: second_namespace,
+                endpoint_key: EndpointKey::new(*second_user_secret.public().as_bytes()),
             },
         }
     );
@@ -316,7 +302,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         &mut socket,
         &ControlClientMessage::BeginEndpointRegistration {
             request_id: begin_request_id,
-            tenant_id: team_id,
+            tenant_id: personal_tenant_id,
             endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
             registration: EndpointRegistration::User,
         },
@@ -358,7 +344,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             assert_eq!(
                 result,
                 EndpointRegistrationResult::User {
-                    tenant_id: team_id,
+                    tenant_id: personal_tenant_id,
                     endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
                 }
             );
@@ -504,7 +490,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         ControlServerMessage::EndpointAuthenticated {
             request_id: complete_authentication_request_id,
             result: EndpointAuthenticationResult {
-                tenant_id: team_id,
+                tenant_id: personal_tenant_id,
                 endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
                 principal: EndpointProofPrincipal::User { user_id },
             },
@@ -515,7 +501,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let connector = tls_connector(Some(&std::fs::read(&certificate_path).unwrap())).unwrap();
     let agent_config = EndpointControlConfig {
         url: format!("wss://localhost:{}/control", address.port()),
-        tenant_id: team_id,
+        tenant_id: personal_tenant_id,
         principal: EndpointProofPrincipal::User { user_id },
         operation_timeout: Duration::from_secs(5),
     };
@@ -526,7 +512,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert_eq!(
         agent_connection.identity(),
         EndpointAuthenticationResult {
-            tenant_id: team_id,
+            tenant_id: personal_tenant_id,
             endpoint_key: EndpointKey::new(*secret.public().as_bytes()),
             principal: EndpointProofPrincipal::User { user_id },
         }
@@ -862,16 +848,13 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             assert_eq!(request_id, scopes_request_id);
             assert_eq!(options.personal_tenant_id, personal_tenant_id);
             assert_eq!(options.personal_mbps, 5);
-            assert_eq!(options.teams.len(), 1);
-            assert_eq!(options.teams[0].tenant_id, team_id);
-            assert_eq!(options.teams[0].name, "Integration Team");
         }
         response => panic!("unexpected traffic scopes response: {response:?}"),
     }
     drop(login_socket);
 
     let account_control_url = format!("wss://localhost:{}/control", address.port());
-    let (_, visible_scopes) = login_traffic_scopes(
+    let (_, _visible_scopes) = login_traffic_scopes(
         &account_control_url,
         "alice".to_owned(),
         zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
@@ -880,25 +863,24 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     )
     .await
     .unwrap();
-    assert_eq!(visible_scopes.teams[0].tenant_id, team_id);
     let account_scope_directory = tempfile::tempdir().unwrap();
     let account_registration = register_account_traffic_scope(
         &account_control_url,
         "alice".to_owned(),
         zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
-        team_id,
+        personal_tenant_id,
         account_scope_directory.path(),
         connector.clone(),
         Duration::from_secs(5),
     )
     .await
     .unwrap();
-    assert_eq!(account_registration.tenant_id, team_id);
+    assert_eq!(account_registration.tenant_id, personal_tenant_id);
     let account_secret = read_endpoint_secret(&account_registration.endpoint_secret_file).unwrap();
     let account_endpoint = AuthenticatedControlConnection::connect(
         &EndpointControlConfig {
             url: account_control_url.clone(),
-            tenant_id: team_id,
+            tenant_id: personal_tenant_id,
             principal: EndpointProofPrincipal::User { user_id },
             operation_timeout: Duration::from_secs(5),
         },
@@ -912,7 +894,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         &account_control_url,
         "alice".to_owned(),
         zeroize::Zeroizing::new("correct horse battery staple".to_owned()),
-        team_id,
+        personal_tenant_id,
         account_scope_directory.path(),
         connector.clone(),
         Duration::from_secs(5),
@@ -965,10 +947,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             .endpoint_owner(secret.public())
             .expect("Relay policy lock"),
         Some(pab_protocol::RelayEndpointOwner::User {
-            scope: pab_protocol::TrafficScope::Team {
-                tenant_id: team_id,
-                user_id,
-            },
+            scope: pab_protocol::TrafficScope::User { user_id },
         })
     );
     assert_eq!(
@@ -1029,7 +1008,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let bridge_secret_path = bridge_directory.path().join("bridge-endpoint.key");
     std::fs::write(&bridge_secret_path, endpoint_secret_text(&secret)).unwrap();
     let mut bridge = BridgeClient::connect(BridgeConfig {
-        tenant_id: team_id,
+        tenant_id: personal_tenant_id,
         identity: pab_bridge::BridgeIdentity::Account(user_id),
         control_url: format!("wss://localhost:{}/control", address.port()),
         relay_urls: vec![pab_relay_url.clone()],
@@ -1040,18 +1019,18 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     })
     .await
     .unwrap();
-    let second_team_secret_path = bridge_directory.path().join("second-team-endpoint.key");
+    let second_user_secret_path = bridge_directory.path().join("second-user-endpoint.key");
     std::fs::write(
-        &second_team_secret_path,
-        endpoint_secret_text(&second_team_secret),
+        &second_user_secret_path,
+        endpoint_secret_text(&second_user_secret),
     )
     .unwrap();
     let second_bridge = BridgeClient::connect(BridgeConfig {
-        tenant_id: team_id,
+        tenant_id: second_namespace,
         identity: pab_bridge::BridgeIdentity::Account(second_user_id),
         control_url: format!("wss://localhost:{}/control", address.port()),
         relay_urls: vec![pab_relay_url],
-        endpoint_secret_file: second_team_secret_path,
+        endpoint_secret_file: second_user_secret_path,
         control_ca_cert: Some(certificate_path.clone()),
         relay_ca_cert: Some(certificate_path.clone()),
         operation_timeout: Duration::from_secs(10),
@@ -1468,12 +1447,12 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             zeroize::Zeroizing::new(device_password.to_owned()),
         )
         .await
-        .expect("two Team accounts and a guest can share one device");
+        .expect("two users and a guest can share one device");
     assert_eq!(
         second_account_connection.operator(),
         OperatorRef::account(
             second_user_id,
-            EndpointKey::new(*second_team_secret.public().as_bytes()),
+            EndpointKey::new(*second_user_secret.public().as_bytes()),
         )
     );
     assert_eq!(account_connection.get_presence().await.unwrap(), 3);
@@ -1481,6 +1460,156 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert_eq!(guest_connection.get_presence().await.unwrap(), 3);
     let guest_target = guest_connection.get_environment().await.unwrap();
     assert_eq!(guest_target.execution, native_context);
+    // HTTP login changes user metadata on an already-open device connection,
+    // without changing the endpoint that owns tasks and transfers.
+    let http_account = pab_agent_core::account::AccountClient::new(
+        &account_control_url,
+        Some(certified.cert.pem().as_bytes()),
+    )
+    .unwrap();
+    let rejected_session = http_account
+        .login(
+            "http-storage-failure",
+            zeroize::Zeroizing::new("test password long enough".into()),
+            true,
+        )
+        .await
+        .unwrap();
+    let rejected_token = zeroize::Zeroizing::new(rejected_session.access_token.clone());
+    let rejected_directory = tempfile::tempdir().unwrap();
+    let rejected_store = pab_agent_core::account::AccountStore::new(
+        rejected_directory.path(),
+        http_account.origin(),
+    )
+    .unwrap();
+    // A directory at the lock-file path forces atomic persistence to fail after
+    // credential creation, without changing permissions outside this fixture.
+    let scope = blake3::hash(http_account.origin().as_bytes()).to_hex();
+    std::fs::create_dir(
+        rejected_directory
+            .path()
+            .join("accounts")
+            .join(format!("{scope}.lock")),
+    )
+    .unwrap();
+    assert!(
+        http_account
+            .save_session(&rejected_store, rejected_session)
+            .await
+            .is_err()
+    );
+    assert!(matches!(
+        http_account.current(&rejected_token).await,
+        Err(pab_agent_core::account::AccountError::Http(401))
+    ));
+    let logged_in = http_account
+        .login(
+            "http-live-user",
+            zeroize::Zeroizing::new("test password long enough".into()),
+            true,
+        )
+        .await
+        .unwrap();
+    let receipt = http_account
+        .bind_endpoint(&guest_secret, 1, Some(&logged_in.access_token))
+        .await
+        .unwrap();
+    let remote_user = guest_connection.user_context().await.unwrap();
+    assert_eq!(remote_user.revision, 1);
+    assert_eq!(
+        remote_user.user.as_ref().unwrap().user_id,
+        logged_in.user.id
+    );
+    assert_eq!(remote_user.user, receipt.context.user);
+    let endpoint_operator = guest_connection.operator();
+    #[cfg(windows)]
+    let (identity_program, identity_args) = (
+        "cmd.exe",
+        vec!["/D", "/C", "echo http-user && ping -n 4 127.0.0.1 >nul"],
+    );
+    #[cfg(not(windows))]
+    let (identity_program, identity_args) = ("/bin/sh", vec!["-c", "printf http-user; sleep 3"]);
+    let identity_task = guest_connection
+        .submit_command(
+            RequestId::new(),
+            CommandTaskSpec {
+                options: Default::default(),
+                program: identity_program.into(),
+                args: identity_args.into_iter().map(str::to_owned).collect(),
+                cwd: None,
+                expected_environment: ExpectedEnvironment {
+                    os_family: guest_target.execution.os_family,
+                    environment_revision: guest_target.execution.environment_revision.clone(),
+                },
+                display_summary: "HTTP user identity switch".into(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(identity_task.initiating_user, remote_user.user);
+    http_account.logout(&logged_in.access_token).await.unwrap();
+    http_account
+        .bind_endpoint(&guest_secret, 2, None)
+        .await
+        .unwrap();
+    assert!(
+        guest_connection
+            .user_context()
+            .await
+            .unwrap()
+            .user
+            .is_none()
+    );
+    assert_eq!(guest_connection.operator(), endpoint_operator);
+    assert_eq!(
+        guest_connection
+            .get_task(identity_task.task_ref)
+            .await
+            .unwrap()
+            .initiating_user,
+        remote_user.user
+    );
+    assert!(
+        account_connection
+            .get_task(identity_task.task_ref)
+            .await
+            .is_err()
+    );
+    let switched = http_account
+        .login(
+            "http-second-user",
+            zeroize::Zeroizing::new("test password long enough".into()),
+            true,
+        )
+        .await
+        .unwrap();
+    http_account
+        .bind_endpoint(&guest_secret, 3, Some(&switched.access_token))
+        .await
+        .unwrap();
+    assert_eq!(
+        guest_connection
+            .user_context()
+            .await
+            .unwrap()
+            .user
+            .unwrap()
+            .user_id,
+        switched.user.id
+    );
+    assert_eq!(
+        guest_connection
+            .get_task(identity_task.task_ref)
+            .await
+            .unwrap()
+            .initiating_user,
+        remote_user.user
+    );
+    http_account.logout(&switched.access_token).await.unwrap();
+    http_account
+        .bind_endpoint(&guest_secret, 4, None)
+        .await
+        .unwrap();
     assert_eq!(
         account_connection
             .get_environment()
@@ -1503,13 +1632,13 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         vec![
             "/D".to_owned(),
             "/C".to_owned(),
-            "echo team-bob-ok".to_owned(),
+            "echo user-bob-ok".to_owned(),
         ],
     );
     #[cfg(not(windows))]
     let (second_program, second_args) = (
         "/bin/sh".to_owned(),
-        vec!["-c".to_owned(), "printf 'team-bob-ok\\n'".to_owned()],
+        vec!["-c".to_owned(), "printf 'user-bob-ok\\n'".to_owned()],
     );
     let second_task = second_account_connection
         .submit_command(
@@ -1523,7 +1652,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
                     os_family: second_target.execution.os_family,
                     environment_revision: second_target.execution.environment_revision,
                 },
-                display_summary: "second Team account command".to_owned(),
+                display_summary: "second user account command".to_owned(),
             },
         )
         .await
@@ -1532,7 +1661,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         second_task.initiated_by,
         OperatorRef::account(
             second_user_id,
-            EndpointKey::new(*second_team_secret.public().as_bytes()),
+            EndpointKey::new(*second_user_secret.public().as_bytes()),
         )
     );
     assert!(
@@ -1635,12 +1764,12 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         }
     })
     .await
-    .expect("second Team account command did not finish");
+    .expect("second user account command did not finish");
     assert_eq!(second_task_final.state, TaskState::Succeeded);
     second_account_connection.close();
     tokio::time::timeout(Duration::from_secs(5), second_account_server)
         .await
-        .expect("second Team account session did not close")
+        .expect("second user account session did not close")
         .unwrap()
         .unwrap();
     assert_eq!(guest_connection.get_presence().await.unwrap(), 1);

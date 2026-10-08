@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::{
     active_endpoints::ActiveEndpoints,
     auth::{CredentialError, PasswordEngine, PasswordPolicy, normalize_username},
-    domain::{Account, Device, RegisteredEndpoint, Team, TeamRole},
+    domain::{Account, Device, RegisteredEndpoint},
     endpoint_proof::VerifiedEndpointProof,
     postgres::{PostgresStore, StoreError},
 };
@@ -142,68 +142,6 @@ impl ControlPlane {
             .await?
             .map(|credential| credential.account.id)
             .ok_or(StoreError::NotFound.into())
-    }
-
-    pub async fn admin_create_team(
-        &self,
-        owner: UserId,
-        name: &str,
-        operator_label: &str,
-    ) -> Result<Team, ServiceError> {
-        Ok(self
-            .store
-            .admin_create_team(owner, name, operator_label)
-            .await?)
-    }
-
-    pub async fn admin_add_team_member(
-        &self,
-        tenant_id: TenantId,
-        user_id: UserId,
-        role: TeamRole,
-        operator_label: &str,
-    ) -> Result<bool, ServiceError> {
-        Ok(self
-            .store
-            .admin_add_team_member(tenant_id, user_id, role, operator_label)
-            .await?)
-    }
-
-    pub async fn admin_remove_team_member(
-        &self,
-        tenant_id: TenantId,
-        user_id: UserId,
-        operator_label: &str,
-    ) -> Result<bool, ServiceError> {
-        Ok(self
-            .store
-            .admin_remove_team_member(tenant_id, user_id, operator_label)
-            .await?)
-    }
-
-    pub async fn admin_set_default_traffic_team(
-        &self,
-        user_id: UserId,
-        team_id: Option<TenantId>,
-        operator_label: &str,
-    ) -> Result<bool, ServiceError> {
-        Ok(self
-            .store
-            .admin_set_default_traffic_team(user_id, team_id, operator_label)
-            .await?)
-    }
-
-    pub async fn admin_set_team_limits(
-        &self,
-        tenant_id: TenantId,
-        total_mbps: u32,
-        member_mbps: u32,
-        operator_label: &str,
-    ) -> Result<bool, ServiceError> {
-        Ok(self
-            .store
-            .admin_set_team_limits(tenant_id, total_mbps, member_mbps, operator_label)
-            .await?)
     }
 
     pub async fn register_user_endpoint(

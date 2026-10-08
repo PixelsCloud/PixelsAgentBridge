@@ -26,6 +26,7 @@ impl RelayControlClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlServerMessage {
+    PolicyChanged,
     PolicySnapshot {
         request_id: RequestId,
         snapshot: RelayPolicySnapshot,

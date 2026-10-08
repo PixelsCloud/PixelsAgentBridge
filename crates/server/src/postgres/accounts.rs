@@ -45,16 +45,6 @@ impl PostgresStore {
             .bind(user_id.as_uuid())
             .execute(&mut *tx)
             .await?;
-        sqlx::query(
-            r#"
-            INSERT INTO memberships (tenant_id, user_id, role)
-            VALUES ($1, $2, 'owner')
-            "#,
-        )
-        .bind(tenant_id.as_uuid())
-        .bind(user_id.as_uuid())
-        .execute(&mut *tx)
-        .await?;
         tx.commit().await?;
 
         Ok(Account {

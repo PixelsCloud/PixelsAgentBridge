@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 import json
+import os
 import subprocess
 import zipfile
 import sys
@@ -73,7 +74,7 @@ def main() -> None:
     if not compiler.is_file():
         raise FileNotFoundError(f"Copy NSIS into {compiler.parent} first")
 
-    output = PACKAGES / f"pixels-agent-bridge-windows-x86_64-{profile}-setup.exe"
+    output = PACKAGES / f"pixels-agent-bridge-windows-x86_64-{profile}-{version}-setup.exe"
     with zipfile.ZipFile(archive) as package, TemporaryDirectory(
         prefix="pab-nsis-", dir=ROOT / ".build"
     ) as temporary:
@@ -99,7 +100,11 @@ def main() -> None:
             f"/DAPP_VERSION={version}",
             str(script),
         ]
-        subprocess.run(command, cwd=ROOT, check=True)
+        # NSIS maps large temporary files while compressing. Keep those files
+        # beside the staged payload instead of filling the system TEMP drive.
+        environment = os.environ.copy()
+        environment.update(TEMP=str(payload), TMP=str(payload))
+        subprocess.run(command, cwd=ROOT, env=environment, check=True)
 
     metadata = {"file": output.name, "version": version, "bytes": output.stat().st_size, "sha256": digest_file(output)}
     (PACKAGES / f"SHA256-windows-setup-{profile}.json").write_text(

@@ -39,7 +39,7 @@ class Packages(unittest.TestCase):
             executable.parent.mkdir(parents=True)
             executable.write_bytes(b"fixture")
             executable.chmod(0o700)
-            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleShortVersionString": "1.2.0"}))
+            (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleShortVersionString": "0.1.0"}))
             (app / "Contents/Info.plist").chmod(0o600)
             executable.parent.chmod(0o700)
             for platform in ("windows", "linux", "macos"):

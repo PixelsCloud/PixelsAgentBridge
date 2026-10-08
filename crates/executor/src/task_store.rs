@@ -42,11 +42,19 @@ pub(crate) enum AcceptTaskOutcome {
 
 #[derive(Clone)]
 pub(crate) struct TaskStore {
+    initiating_user: Option<pab_protocol::UserAttribution>,
     pool: SqlitePool,
     changes: broadcast::Sender<TaskChange>,
 }
 
 impl TaskStore {
+    pub(crate) fn with_initiating_user(
+        mut self,
+        user: Option<pab_protocol::UserAttribution>,
+    ) -> Self {
+        self.initiating_user = user;
+        self
+    }
     pub async fn open(path: &Path) -> Result<Self, TaskStoreError> {
         pab_agent_core::ensure_data_parent(path).map_err(TaskStoreError::Io)?;
         let options = SqliteConnectOptions::new()
@@ -60,6 +68,7 @@ impl TaskStore {
             .await?;
         let mut tx = pool.begin().await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS operation_user_attributions (operator_key TEXT NOT NULL, request_id TEXT NOT NULL, user_json TEXT NOT NULL, PRIMARY KEY(operator_key,request_id))",
             "CREATE TABLE IF NOT EXISTS system_query_results (request_id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(request_id) REFERENCES read_operations(request_id) ON DELETE CASCADE)",
             r#"
             CREATE TABLE IF NOT EXISTS task_records (
@@ -141,11 +150,39 @@ impl TaskStore {
         sqlx::query("CREATE TABLE IF NOT EXISTS transfer_execution (request_id TEXT PRIMARY KEY REFERENCES transfer_operations(request_id), fingerprint TEXT NOT NULL, request_json TEXT NOT NULL, context_json TEXT NOT NULL)").execute(&mut *tx).await?;
         tx.commit().await?;
         let (changes, _) = broadcast::channel(CHANGE_BUFFER);
-        Ok(Self { pool, changes })
+        Ok(Self {
+            pool,
+            changes,
+            initiating_user: None,
+        })
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<TaskChange> {
         self.changes.subscribe()
+    }
+
+    pub async fn record_user_attribution(
+        &self,
+        operator: OperatorRef,
+        request_id: RequestId,
+    ) -> Result<(), TaskStoreError> {
+        sqlx::query("INSERT INTO operation_user_attributions(operator_key,request_id,user_json) VALUES(?,?,?) ON CONFLICT DO NOTHING")
+            .bind(operator.storage_key()).bind(request_id.to_string()).bind(serde_json::to_string(&self.initiating_user)?).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn initiating_user(
+        &self,
+        operator: OperatorRef,
+        request_id: RequestId,
+    ) -> Result<Option<pab_protocol::UserAttribution>, TaskStoreError> {
+        let value: Option<String> = sqlx::query_scalar("SELECT user_json FROM operation_user_attributions WHERE operator_key=? AND request_id=?")
+            .bind(operator.storage_key()).bind(request_id.to_string()).fetch_optional(&self.pool).await?;
+        value
+            .map(|json| serde_json::from_str(&json))
+            .transpose()
+            .map(|user| user.flatten())
+            .map_err(Into::into)
     }
 
     pub async fn incomplete_task_refs(&self) -> Result<Vec<TaskRef>, TaskStoreError> {
@@ -205,7 +242,8 @@ impl TaskStore {
             execution_context,
             accepted_at_unix_ms,
         })?;
-        let snapshot = aggregate.snapshot().clone();
+        let mut snapshot = aggregate.snapshot().clone();
+        snapshot.initiating_user = self.initiating_user.clone();
         sqlx::query(
             "INSERT INTO task_records (task_id, initiated_by, request_id, snapshot_json, command_json) VALUES (?, ?, ?, ?, ?)",
         )

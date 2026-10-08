@@ -3,16 +3,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pab_protocol::{EndpointKey, TenantId, TrafficScope, UserId};
+use pab_protocol::{EndpointKey, TrafficScope, UserId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKey {
-    Team(TenantId),
-    Member {
-        tenant_id: TenantId,
-        user_id: UserId,
-    },
-    Personal(TenantId),
+    User(UserId),
     Guest(EndpointKey),
 }
 
@@ -105,17 +100,17 @@ impl AggregateLimiter {
         }
     }
 
-    pub fn retain(&mut self, mut keep: impl FnMut(LimitKey) -> bool) {
-        self.buckets.retain(|key, _| keep(*key));
+    pub fn retain(&mut self, now: Instant, mut keep: impl FnMut(LimitKey) -> bool) {
+        // Briefly retain removed scopes until they could naturally refill.
+        // Logout/login must not manufacture a fresh burst of traffic credit.
+        self.buckets.retain(|key, bucket| {
+            keep(*key) || now.saturating_duration_since(bucket.updated_at) < bucket.rate.burst
+        });
     }
 
     pub fn acquire(&mut self, scope: TrafficScope, bytes: u64, now: Instant) -> Acquire {
         let keys: [Option<LimitKey>; 2] = match scope {
-            TrafficScope::Team { tenant_id, user_id } => [
-                Some(LimitKey::Team(tenant_id)),
-                Some(LimitKey::Member { tenant_id, user_id }),
-            ],
-            TrafficScope::Personal { tenant_id, .. } => [Some(LimitKey::Personal(tenant_id)), None],
+            TrafficScope::User { user_id } => [Some(LimitKey::User(user_id)), None],
             TrafficScope::Guest { endpoint_key } => [Some(LimitKey::Guest(endpoint_key)), None],
         };
 
@@ -151,110 +146,108 @@ impl AggregateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const BURST: Duration = Duration::from_millis(100);
-
-    fn rate(bytes_per_second: u64) -> Rate {
-        Rate::new(bytes_per_second, BURST).unwrap()
-    }
-
-    fn tenant(value: u128) -> TenantId {
-        TenantId::from_u128(value)
-    }
-
-    fn user(value: u128) -> UserId {
-        UserId::from_u128(value)
+    fn rate(bytes: u64) -> Rate {
+        Rate::new(bytes, Duration::from_millis(100)).unwrap()
     }
 
     #[test]
-    fn team_and_member_budgets_are_consumed_atomically() {
+    fn connections_for_one_user_share_budget_but_other_users_do_not() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Team(tenant(1)), rate(1_000), now);
-        limiter.set_rate(
-            LimitKey::Member {
-                tenant_id: tenant(1),
-                user_id: user(10),
-            },
-            rate(500),
-            now,
-        );
-        let scope = TrafficScope::Team {
-            tenant_id: tenant(1),
-            user_id: user(10),
-        };
-
-        assert_eq!(limiter.acquire(scope, 50, now), Acquire::Ready);
-        assert_eq!(limiter.acquire(scope, 1, now), Acquire::Wait(BURST / 50));
-
-        let other_member = TrafficScope::Team {
-            tenant_id: tenant(1),
-            user_id: user(11),
-        };
-        limiter.set_rate(
-            LimitKey::Member {
-                tenant_id: tenant(1),
-                user_id: user(11),
-            },
-            rate(500),
-            now,
-        );
-        assert_eq!(limiter.acquire(other_member, 50, now), Acquire::Ready);
-    }
-
-    #[test]
-    fn waiting_on_member_does_not_consume_team_budget() {
-        let now = Instant::now();
-        let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Team(tenant(1)), rate(1_000), now);
-        for user_id in [user(10), user(11)] {
-            limiter.set_rate(
-                LimitKey::Member {
-                    tenant_id: tenant(1),
-                    user_id,
-                },
-                rate(500),
-                now,
-            );
+        let first = UserId::new();
+        let second = UserId::new();
+        for user in [first, second] {
+            limiter.set_rate(LimitKey::User(user), rate(500), now);
         }
-        let first = TrafficScope::Team {
-            tenant_id: tenant(1),
-            user_id: user(10),
-        };
-        let second = TrafficScope::Team {
-            tenant_id: tenant(1),
-            user_id: user(11),
-        };
-        assert_eq!(limiter.acquire(first, 50, now), Acquire::Ready);
-        assert!(matches!(limiter.acquire(first, 1, now), Acquire::Wait(_)));
-        assert_eq!(limiter.acquire(second, 50, now), Acquire::Ready);
+        assert_eq!(
+            limiter.acquire(TrafficScope::User { user_id: first }, 50, now),
+            Acquire::Ready
+        );
+        assert_eq!(
+            limiter.acquire(TrafficScope::User { user_id: first }, 1, now),
+            Acquire::Wait(Duration::from_millis(2))
+        );
+        assert_eq!(
+            limiter.acquire(TrafficScope::User { user_id: second }, 50, now),
+            Acquire::Ready
+        );
     }
 
     #[test]
-    fn reconnects_share_the_same_personal_bucket() {
+    fn refreshing_and_reducing_rate_do_not_refill_quota() {
         let now = Instant::now();
         let mut limiter = AggregateLimiter::default();
-        limiter.set_rate(LimitKey::Personal(tenant(7)), rate(500), now);
-        let scope = TrafficScope::Personal {
-            tenant_id: tenant(7),
-            user_id: user(7),
-        };
-        assert_eq!(limiter.acquire(scope, 50, now), Acquire::Ready);
-        assert!(matches!(limiter.acquire(scope, 1, now), Acquire::Wait(_)));
-    }
-
-    #[test]
-    fn rate_reduction_does_not_refill_the_bucket() {
-        let now = Instant::now();
-        let mut limiter = AggregateLimiter::default();
-        let key = LimitKey::Personal(tenant(7));
-        let scope = TrafficScope::Personal {
-            tenant_id: tenant(7),
-            user_id: user(7),
-        };
+        let user_id = UserId::new();
+        let key = LimitKey::User(user_id);
+        let scope = TrafficScope::User { user_id };
         limiter.set_rate(key, rate(1_000), now);
         assert_eq!(limiter.acquire(scope, 80, now), Acquire::Ready);
+        limiter.set_rate(key, rate(1_000), now);
         limiter.set_rate(key, rate(500), now);
         assert!(matches!(limiter.acquire(scope, 21, now), Acquire::Wait(_)));
+        assert_eq!(
+            limiter.acquire(scope, 21, now + Duration::from_millis(2)),
+            Acquire::Ready
+        );
+    }
+
+    #[test]
+    fn guests_have_independent_endpoint_quotas_and_unknown_scopes_fail() {
+        let now = Instant::now();
+        let mut limiter = AggregateLimiter::default();
+        let first = EndpointKey::new([1; 32]);
+        let second = EndpointKey::new([2; 32]);
+        limiter.set_rate(LimitKey::Guest(first), rate(500), now);
+        limiter.set_rate(LimitKey::Guest(second), rate(500), now);
+        assert_eq!(
+            limiter.acquire(
+                TrafficScope::Guest {
+                    endpoint_key: first
+                },
+                50,
+                now
+            ),
+            Acquire::Ready
+        );
+        assert!(matches!(
+            limiter.acquire(
+                TrafficScope::Guest {
+                    endpoint_key: first
+                },
+                1,
+                now
+            ),
+            Acquire::Wait(_)
+        ));
+        assert_eq!(
+            limiter.acquire(
+                TrafficScope::Guest {
+                    endpoint_key: second
+                },
+                50,
+                now
+            ),
+            Acquire::Ready
+        );
+        assert!(matches!(
+            limiter.acquire(
+                TrafficScope::User {
+                    user_id: UserId::new()
+                },
+                1,
+                now
+            ),
+            Acquire::Missing(_)
+        ));
+        assert!(matches!(
+            limiter.acquire(
+                TrafficScope::Guest {
+                    endpoint_key: second
+                },
+                51,
+                now
+            ),
+            Acquire::Oversized { .. }
+        ));
     }
 }

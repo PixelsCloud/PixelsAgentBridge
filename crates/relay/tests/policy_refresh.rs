@@ -85,11 +85,10 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         issued_at_unix_ms: now_ms() - 1,
         expires_at_unix_ms: now_ms() + 60_000,
         defaults: RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         },
-        team_limits: vec![],
+        user_limits: vec![],
         endpoints: vec![
             RelayEndpointPolicy {
                 endpoint_key: EndpointKey::new(*operator.public().as_bytes()),

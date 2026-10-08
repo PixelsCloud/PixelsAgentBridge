@@ -25,6 +25,9 @@ pub(super) struct DeviceSession {
 }
 
 impl DeviceSession {
+    pub(super) async fn cached_connection(&self) -> Option<Arc<AuthenticatedDeviceConnection>> {
+        self.connection.read().await.clone()
+    }
     #[cfg(test)]
     pub(super) async fn set_test_connection(&self, connection: AuthenticatedDeviceConnection) {
         *self.connection.write().await = Some(Arc::new(connection));
@@ -80,6 +83,7 @@ impl DeviceSession {
         &self,
     ) -> Result<Arc<AuthenticatedDeviceConnection>, RuntimeError> {
         self.ensure_enabled()?;
+        self.runtime.wait_account_ready().await?;
         if let Some(connection) = self.connection.read().await.as_ref() {
             return Ok(Arc::clone(connection));
         }

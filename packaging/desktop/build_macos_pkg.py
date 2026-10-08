@@ -21,6 +21,8 @@ from urllib.parse import urlsplit
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from build_version import parse_version
 SCRIPTS = ROOT / "packaging/desktop/macos"
 PACKAGES = ROOT / ".build/packages"
 APP = "Pixels Agent Bridge.app"
@@ -129,7 +131,6 @@ def main():
     stem = f"pixels-agent-bridge-macos-{args.arch}-{args.profile}"
     archive = packages / f"{stem}.tar.gz"
     manifest = packages / ("SHA256.json" if args.profile == "release" else "SHA256-debug.json")
-    output = packages / f"{stem}-setup.pkg"
     with tempfile.TemporaryDirectory(prefix="pab-pkg-", dir=ROOT / ".build") as temporary:
         stage = Path(temporary)
         scripts = stage / "scripts"
@@ -138,10 +139,10 @@ def main():
         extract_verified(archive, manifest, payload)
         verify_binaries(payload, arch)
         with (payload / APP / "Contents/Info.plist").open("rb") as source:
-            version = plistlib.load(source)["CFBundleShortVersionString"]
-        archive_version = json.loads(manifest.read_text())[archive.name].get('version')
-        if archive_version != version:
-            raise ValueError('macOS archive version does not match its app')
+            parse_version(plistlib.load(source)["CFBundleShortVersionString"])
+        version = json.loads(manifest.read_text())[archive.name].get('version')
+        parse_version(version)
+        output = packages / f"{stem}-{version}-setup.pkg"
         prepare_scripts(scripts, arch, control, relay)
         component = stage / "component.pkg"
         subprocess.run(["/usr/bin/pkgbuild", "--nopayload", "--scripts", str(scripts),

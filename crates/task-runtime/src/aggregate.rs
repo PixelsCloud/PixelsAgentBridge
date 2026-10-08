@@ -48,6 +48,7 @@ impl TaskAggregate {
             kind: TaskEventKind::Accepted,
         };
         let snapshot = TaskSnapshot {
+            initiating_user: None,
             schema_version: TASK_SCHEMA_VERSION,
             task_ref: value.task_ref,
             request_id: value.request_id,

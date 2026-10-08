@@ -30,13 +30,14 @@ status are described below.
 ## Features
 
 - **Server Web console:** React + Ant Design management for accounts,
-  device lists and live online status, Teams, Relay policy health and management
+  device lists and live online status, user bandwidth limits, Relay policy health and management
   changes. English, Simplified/Traditional Chinese and light/dark themes are included.
   Remote task records stay local. See the [deployment guide](WEB_DEPLOYMENT.md)
   and [development/test plan](WEB_DEVELOPMENT.md).
 
 - **Agent-driven operations:** select devices and perform remote operations through
-  a consistent set of `pab_*` MCP tools. Codex integration is implemented.
+  a consistent set of `pab_*` MCP tools, with integrations for Codex, Kimi Code,
+  Claude Code, DeepSeek Harness, and OpenCode.
 - **Native commands:** execute a program with an explicit argument array, query its
   task state, and read stdout or stderr. Results include the verified target OS.
 - **File transfer:** upload and download binary files using absolute paths, with
@@ -51,7 +52,7 @@ status are described below.
 - **Task history:** filter records by device, browse paginated results, and view a
   device's history alongside its information and remote tools.
 - **MCP activity:** view live processes, client identities, device connections, tool
-  calls, tasks, and transfer summaries in Settings.
+  calls, tasks, and transfer summaries on the MCP connections sidebar page.
 - **Self-hosting:** deploy the control backend, PostgreSQL, and Relay using Docker Compose.
 
 The desktop supports light and dark themes, Simplified Chinese, Traditional Chinese,
@@ -150,12 +151,19 @@ window does not have to stay open to accept connections.
 Device codes are displayed with spaces for readability. MCP arguments and copied
 IDs use nine digits without spaces, such as `123456789`.
 
-### 3. Enable Codex
+### 3. Enable an AI agent
 
-Install Codex CLI for the current OS user and make it available on `PATH`.
-Open **Settings → AI Agent** in Desktop and enable Codex. This verifies the bundled
-MCP executable, registers `pixels` for the current OS user, and configures tools to
-run without individual approval prompts. Restart Codex to load the entry.
+Install your chosen client for the current OS user. In **Settings → AI Agent**, enable
+Codex, Kimi Code (2.x or newer), Claude Code, DeepSeek Harness, or OpenCode independently.
+Desktop verifies the bundled MCP executable and merges Pixels configuration and
+tool grants without approving unrelated tools. Conflicting rules or malformed files
+produce an error without overwriting the configuration. Start a new session or restart
+the client to apply changes. “Configured” does not mean connected; disabling the
+configuration does not terminate existing sessions.
+
+OpenCode uses a local MCP command array and a `pixels_*` allow rule;
+existing JSONC comments, other servers, and unrelated permissions are preserved.
+Live agent sessions are shown on the **MCP connections** sidebar page below **Device list**.
 
 For manual Windows setup, use the following Codex configuration, adjusting the path:
 
@@ -168,9 +176,11 @@ default_tools_approval_mode = "approve"
 `approve` pre-approves tool calls. `auto` may still request approval based on tool
 annotations. Remote device authentication and operating system permissions still apply.
 
-On Linux and macOS, register the installed `run-mcp.sh` entry point so it loads the
-deployment settings. Other MCP clients can use the stdio entry point; their automatic
-setup and compatibility have not yet been validated to the same extent as Codex.
+macOS Desktop provides the same integration controls. Headless Linux and other MCP
+clients can register the installed `run-mcp.sh` entry point manually. See the
+[integration plan and acceptance report](acceptance/agent-integrations-2026-10-08.md)
+for configuration paths, tested client versions, and validation limits. These source
+changes require updated Desktop and MCP binaries; existing installers do not include them.
 
 Linux is a **headless** distribution containing Executor and MCP only. See
 [Linux installation](packaging/desktop/unix/INSTALL-LINUX.txt) for systemd and
@@ -998,7 +1008,7 @@ a device connection. An online device may still be disconnected in Desktop.
 
 `pab_connect` establishes or reuses that MCP process's connection using the saved
 credential. Desktop's connection indicator belongs to Desktop's own runtime.
-Check **Settings → AI Agent → MCP connections** to inspect agent activity.
+Check **MCP connections** in the sidebar to inspect agent activity.
 
 **Can multiple agents operate the same computer?**
 
@@ -1070,13 +1080,14 @@ python packaging/desktop/build_nsis.py --profile debug --control-url "wss://cont
 ```
 
 Replace the deployment values before running. Output is under `.build/packages/`,
-including `pixels-agent-bridge-windows-x86_64-debug-setup.exe` and checksum manifests.
+including `pixels-agent-bridge-windows-x86_64-debug-<version>-setup.exe` and checksum manifests.
 Use complete packages for installation and upgrade testing. Release packaging needs
 the matching Release binaries and explicit profile selection.
 
-Each unified build allocates one shared version: first `1.2.0`, then one patch per
+Each unified build allocates one product/installer version: first `1.2.0`, then one patch per
 build, with `1.2.99 → 1.3.0` and `1.99.99 → 2.0.0`. Packaging does not increment
-again or rename the installer. See [BUILDING.md](BUILDING.md) for all targets.
+again. Every EXE/PKG installer filename includes its verified release version. Internal Rust, npm and Tauri versions remain unchanged for all builds. Cargo rebuilds changed inputs and reuses other cached artifacts; installer version allocation never edits component manifests or lockfiles.
+See [BUILDING.md](BUILDING.md) for all targets and incremental build rules.
 
 ### Checks
 

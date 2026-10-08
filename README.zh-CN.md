@@ -14,7 +14,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 
 ## 目录
 
-新增 **Server Web 管理端**：React + Ant Design，支持账号、设备列表与实时在线状态、Team、Relay 策略健康和管理变更记录；管理员直接管理全站设备，无需设备认领。提供简体中文、繁体中文、英文及亮暗主题。远程任务记录仅保存在本地。见[部署指南](WEB_DEPLOYMENT.md)和[完整开发与测试计划](WEB_DEVELOPMENT.md)。
+新增 **Server Web 管理端**：React + Ant Design，支持账号、设备列表与实时在线状态、用户限速、Relay 策略健康和管理变更记录；管理员直接管理全站设备，无需设备认领。提供简体中文、繁体中文、英文及亮暗主题。远程任务记录仅保存在本地。见[部署指南](WEB_DEPLOYMENT.md)和[完整开发与测试计划](WEB_DEVELOPMENT.md)。
 
 - [主要能力](#主要能力)
 - [工作流程与组件](#工作流程)
@@ -29,7 +29,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 
 ## 主要能力
 
-- **Agent 操作设备**：通过统一的 `pab_*` MCP 工具选择目标并执行操作，已实现 Codex 接入。
+- **Agent 操作设备**：通过统一的 `pab_*` MCP 工具选择目标并执行操作，支持 Codex、Kimi Code、Claude Code、DeepSeek Harness、OpenCode 接入。
 - **执行原生命令**：指定程序和参数数组，查询任务状态，读取标准输出和错误输出。
   返回结果携带经过验证的目标操作系统。
 - **传输文件**：用绝对路径上传、下载二进制文件，校验完整性，并显式决定是否覆盖。
@@ -39,7 +39,7 @@ Pixels Agent Bridge 通过 Model Context Protocol（MCP），将本机 AI Agent
 - **设备管理**：保存历史设备、重命名、复制信息，分别显示在线状态和连接状态；
   已连接卡片展示当前使用 P2P 还是 Relay。
 - **任务记录**：按设备筛选、分页查看，也可在单个设备面板中查看该设备的历史任务。
-- **MCP 活动**：在设置中查看进程、客户端身份、设备连接、工具调用、任务和传输摘要。
+- **MCP 活动**：在左侧“MCP 连接”页查看进程、客户端身份、设备连接、工具调用、任务和传输摘要。
 - **自部署**：使用 Docker Compose 部署控制服务、PostgreSQL 和 Relay。
 
 桌面支持亮色、暗色主题，以及简体中文、繁体中文和英文。
@@ -123,11 +123,17 @@ Windows 无人值守访问由机器级服务承担，被操作端无需一直打
 
 界面将设备码分组显示。MCP 参数和复制的 ID 使用不带空格的九位数字，例如 `123456789`。
 
-### 3. 启用 Codex
+### 3. 启用 AI Agent
 
-先为当前系统用户安装 Codex CLI，并确保 `PATH` 中可以找到它。
-在“设置 → AI Agent”中启用 Codex。应用验证同包 MCP 程序，为当前系统用户注册
-`pixels`，并配置工具直接执行，不逐项弹出审批提示。启用后重新启动 Codex 加载配置。
+先为当前系统用户安装需要的客户端。在“设置 → AI Agent”中分别启用
+Codex、Kimi Code（2.x 及以上）、Claude Code、DeepSeek Harness 或 OpenCode。
+应用验证同包 MCP 程序，并合并当前用户的 Pixels 配置和工具允许规则；不放开其他工具。
+存在冲突规则或损坏配置时显示错误，不覆盖原配置。新建会话或重启客户端后生效。
+“已配置”不代表客户端已连接；停用配置也不终止已有会话。
+
+OpenCode 使用本地 MCP 命令数组及
+`pixels_*` 允许规则，保留已有 JSONC 注释、其他服务和无关权限。
+实时 Agent 会话在左侧“设备列表”下方的独立“MCP 连接”页展示。
 
 也可手动写入 Codex 配置；Windows 示例，程序路径按实际安装位置调整：
 
@@ -140,8 +146,9 @@ default_tools_approval_mode = "approve"
 `approve` 表示预先批准工具调用；`auto` 仍可能根据工具声明触发审批。
 远端设备认证和操作系统权限仍然有效。
 
-Linux、macOS 手动注册安装目录中的 `run-mcp.sh`，使其加载部署配置。
-其他 MCP 客户端可以接入 stdio 入口，其自动配置及兼容性尚未完成与 Codex 同等程度的验证。
+macOS 桌面同样提供上述配置入口。Linux 无界面版和其他 MCP 客户端可手动注册安装目录中的
+`run-mcp.sh`。配置目录、客户端版本和实际验证范围见[接入开发与验收记录](acceptance/agent-integrations-2026-10-08.md)。
+当前源码改动需要更新 Desktop 和 MCP；之前的安装包不会自动获得这些功能。
 
 Linux 当前只交付 **Executor + MCP 无界面版**，不依赖 Desktop 或图形登录。
 [Linux 安装说明](packaging/desktop/unix/INSTALL-LINUX.txt) 包含 systemd 服务、容器前台运行、
@@ -674,7 +681,7 @@ Desktop 重开后 MCP 会重新上报；状态服务不可用不会阻止 MCP �
 **Desktop 显示未连接，为什么 Agent 仍然可以操作？**
 
 `pab_connect` 使用保存的凭据，为该 MCP 进程建立或复用连接。
-Desktop 的连接状态属于自己的 Runtime，可以在“设置 → AI Agent → MCP 连接”查看 Agent 的活动。
+Desktop 的连接状态属于自己的 Runtime，可以在左侧“MCP 连接”页查看 Agent 的活动。
 
 **多个 Agent 可以同时操作同一台机器吗？**
 
@@ -741,12 +748,13 @@ python packaging/desktop/build_nsis.py --profile debug --control-url "wss://cont
 ```
 
 执行前替换部署信息。输出位于 `.build/packages/`，包含
-`pixels-agent-bridge-windows-x86_64-debug-setup.exe` 和校验清单。
+`pixels-agent-bridge-windows-x86_64-debug-<version>-setup.exe` 和校验清单。
 安装、升级测试使用完整包；Release 打包需要对应程序和明确的 profile。
 
-每次整体编译自动分配一个统一版本，首次 `1.2.0`，之后每次 patch 加1；
-`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`。后续打包不再递增，也不改变安装包文件名。
-完整构建入口及规则见 [BUILDING.md](BUILDING.md)。
+每次构建自动分配一个产品/安装包版本，首次 `1.2.0`，之后每次 patch 加1；
+`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`。后续打包不再递增；每次生成的 EXE/PKG 安装包文件名都包含已核验的构建版本号。
+仅安装包发布版本递增；所有 Rust、npm 和 Tauri 内部版本保持不变，不改写清单或锁文件。Cargo 根据源码变化增量编译，其余产物复用缓存。
+完整构建入口及增量规则见 [BUILDING.md](BUILDING.md)。
 
 ### 检查命令
 

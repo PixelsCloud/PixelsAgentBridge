@@ -2,9 +2,9 @@
 
 ## Scope / 范围
 
-The React + Ant Design console is served by `pab-server` on its existing HTTPS listener. No Node runtime is required in production. Server stores account, device, Team and Relay management data only; remote task history, command output, files and screenshots remain local to Bridge/Executor. Device **online** means an authenticated device control connection is alive. This release supports one active control Server per deployment.
+The React + Ant Design console is served by `pab-server` on its existing HTTPS listener. No Node runtime is required in production. Server stores account, device, user bandwidth and Relay management data only; remote task history, command output, files and screenshots remain local to Bridge/Executor. Device **online** means an authenticated device control connection is alive. This release supports one active control Server per deployment.
 
-Web 与现有 `/control`、`/relay-control` 共用 HTTPS 端口，不新增公开端口。任务记录只保存在本地，不上传 Server，也不在 Web 展示。多条设备控制连接使用引用计数，全部断开后才显示离线。Team 仅用于 Relay 流量归属，不授予成员设备访问权。
+Web 与现有 `/control`、`/relay-control` 共用 HTTPS 端口，不新增公开端口。任务记录只保存在本地，不上传 Server，也不在 Web 展示。多条设备控制连接使用引用计数，全部断开后才显示离线。Relay 根据当前已验证的用户聚合限速；未登录端点使用游客限速。用户登录不授予设备访问权。
 
 ## Build / 构建
 
@@ -36,13 +36,13 @@ Use matching Server, Relay, Desktop, MCP and Executor builds. For this developme
 
 | Setting | Behavior |
 |---|---|
-| `PAB_DB_NAME` | Compose database name; defaults to `pab`. A distinct name allows a fresh baseline while retaining the previous database for rollback; create that database first if reusing an existing PostgreSQL volume. |
+| `PAB_DB_NAME` | Compose database name; defaults to `pab`. Create a fresh database before initializing the new development baseline when reusing an existing PostgreSQL volume. Delete the explicitly identified old development database after the switch; legacy data migration is not supported. |
 | `PAB_WEB_DIR` | Optional absolute directory of built Web assets; defaults to `web` beside the executable |
 | `PAB_WEB_ORIGIN` | Optional **public HTTPS origin**, e.g. `https://bridge.example.com`; set explicitly behind a reverse proxy |
 | `PAB_REGISTRATION_ENABLED` | Existing registration switch; reflected by the Web login page |
 | `PAB_RELAY_NODE_ID` | Relay process setting; stable ASCII letters, digits, `_`, `-`, `.`; at most64 characters |
 
-Origin must contain only scheme, host and optional port. Proxy HTTPS and WebSocket upgrades on the same public origin, preserve `Host`, and do not cache `/api/`. Never expose the application through plain HTTP: its session cookie is Secure + HttpOnly + SameSite=Strict. No browser credentials are stored in localStorage. Sessions last12 hours; password, account status and role changes revoke existing sessions. Reverse proxies must allow the `/api/web/events` WebSocket and the existing device/Relay control paths.
+Origin must contain only scheme, host and optional port. Proxy HTTPS and WebSocket upgrades on the same public origin, preserve `Host`, and do not cache `/api/`. Never expose the application through plain HTTP: its session cookie is Secure + HttpOnly + SameSite=Strict. No browser credentials are stored in localStorage. Server sessions do not expire; explicit logout revokes the current session. Password changes preserve sessions, and disabling an account blocks access without deleting them. Browser cookies have a 400-day retention period refreshed by the current-session endpoint. Reverse proxies must allow the `/api/web/events` WebSocket and the existing device/Relay control paths.
 
 An [Nginx configuration example](packaging/server/nginx.conf.example) keeps upstream certificate verification enabled and forwards Web and control WebSockets. Replace the public domain, certificate paths and backend certificate name; set `PAB_WEB_ORIGIN` to that exact public HTTPS origin. Run `nginx -t` before reload. This handles the Server HTTPS endpoint; keep the existing separate Relay HTTPS and UDP configuration.
 
@@ -56,14 +56,14 @@ pab-server web-admin existing-username
 
 For Compose, run this command in the backend container with its existing environment. Registration never automatically grants administrator access. With registration disabled, provision an existing account through the established control registration flow before disabling registration. At least one active administrator is preserved by Web edits.
 
-管理员在“设备列表”和“在线设备”直接查看、管理全站设备，无需认领或 Desktop 确认。设备归属统计/筛选/列/详情及解绑已移除。“我的设备”与“全部设备”已合并为 `/devices`；旧 `/all-devices` 链接保留筛选参数并跳转。普通账号的查询仍受原有权限过滤，不因入口合并获得全站权限。认领页面、HTTP 接口、Desktop 弹窗/轮询及 CLI 已移除；旧控制协议认领消息返回明确错误。迁移16取消存量待处理申请，保留现有设备身份、归属及历史管理记录。旧解绑接口返回404，不改变设备数据。旧owner筛选API参数返回400，浏览器自动清除旧URL中的owner参数及旧页码。已有底层权限关系与历史记录保留，Team流量归集继续独立工作。
+管理员在“设备列表”和“在线设备”直接查看、管理全站设备，无需认领或 Desktop 确认。设备归属统计/筛选/列/详情及解绑已移除。“我的设备”与“全部设备”已合并为 `/devices`；旧 `/all-devices` 链接保留筛选参数并跳转。普通账号的查询仍受原有权限过滤，不因入口合并获得全站权限。认领页面、HTTP 接口、Desktop 弹窗/轮询及 CLI 已移除；旧控制协议认领消息返回明确错误。开发阶段采用全新初始数据库，不迁移旧数据。旧解绑接口返回404，不改变设备数据。旧owner筛选API参数返回400，浏览器自动清除旧URL中的owner参数及旧页码。不提供团队、成员及团队流量归集。
 
-## Upgrade and rollback / 升级与回滚
+## Development database reset / 开发阶段数据库重建
 
-1. Back up PostgreSQL with `pg_dump` and record the current binaries/image, configuration. Check the backup can be restored into a separate database.
-2. Deploy the new binary **together with its matching `web/`**. When switching from the deployment-ID baseline, use a fresh database and run `pab-server init`, with new client data directories and matching client builds as described above. For subsequent versions sharing this baseline, normal `init`/`serve` applies pending migrations. Do not reuse the previous baseline's database or modify its migration checksums.
-3. Start Server and Relay. Verify `/health`, `/api/web/config`, login, device visibility, live device status and SPA deep links. Promote the initial administrator explicitly when needed.
-4. For rollback, stop the new backend and restore the pre-upgrade database backup plus matching old binaries/image. Do not edit `_sqlx_migrations`, remove Docker database volumes or pretend an older binary can safely downgrade the schema.
+1. Stop the old Server and clients before switching to this account release. Remove the explicitly selected old development database and create an empty database; no legacy migration or compatibility layer is provided.
+2. Deploy matching Server, Web, Relay, Executor and Desktop/MCP builds. Run `pab-server init`, register users and devices again and promote the administrator explicitly. Clear the old client data when switching the development baseline.
+3. Verify `/health`, `/api/web/config`, HTTP registration/login/logout, device visibility and online status, MCP account synchronization and Relay policy acknowledgments. Normal subsequent restarts preserve the new database and permanent sessions.
+4. Do not mix new binaries with old schemas or edit `_sqlx_migrations` to bypass a checksum error. Only reset the named development/deployment database, never unrelated database volumes.
 
 在线状态来自当前 Server 内存，重启后由设备重新连接恢复。Relay 节点健康同时绑定 Server 实例和120秒上报时限，避免重启后错误沿用旧在线状态。该状态不表示数据传输路径或吞吐质量。
 
@@ -76,16 +76,16 @@ cargo test -p pab-server --test web_management
 cargo test -p pab-server --test control_tls --test guest_registration
 cd apps/web
 npm test
-npm run build
+npm run build:assets
 npm run test:e2e
 ```
 
-Browser test prerequisites: local HTTPS Server at `https://localhost:38443`, isolated database container `pab-web-test-20261003` / database `pab_web_test`, and Chrome. Build `cargo build -p pab-server --example web-device-fixture` and provide `.build/web-test/cert.pem` to its loopback-only device simulator. `PAB_WEB_TEST_URL` changes the session smoke-test origin; full management fixtures intentionally use the documented fixed local environment and must not target a production URL.
+Browser test prerequisites: local HTTPS Server at `https://localhost:38443`, isolated database container `pab-web-test-20261003` / database `pab_account_test`, and Chrome. Build `cargo build -p pab-server --example web-device-fixture` and provide `.build/web-test/cert.pem` to its loopback-only device simulator. `PAB_WEB_TEST_URL` changes the session smoke-test origin; full management fixtures intentionally use the documented fixed local environment and must not target a production URL.
 
 Reproducible local setup (test credentials only):
 
 ```sh
-docker run -d --name pab-web-test-20261003 -p 127.0.0.1:55435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=pab_web_test postgres:18.6
+docker run -d --name pab-web-test-20261003 -p 127.0.0.1:55435:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=pab_account_test postgres:18.6
 python -m pip install cryptography
 python apps/web/testing/serve.py
 # Leave that terminal running; in another terminal:
@@ -93,6 +93,18 @@ cd apps/web
 npm run test:e2e
 ```
 
-Build Web first using the earlier commands. Set `DATABASE_URL=postgres://postgres@127.0.0.1:55435/pab_web_test` for Rust tests; SQLx creates separate test databases. The launcher ignores production Relay secret-file settings and copies the executable to `.build/` so Windows rebuilds can continue. Stop the launcher with Ctrl+C. These fixed test container names and ports are deliberate safeguards; do not substitute a production instance.
+Build Web first using the earlier commands. Set `DATABASE_URL=postgres://postgres@127.0.0.1:55435/pab_account_test` for Rust tests; SQLx creates separate test databases. The launcher ignores production Relay secret-file settings and copies the executable to `.build/` so Windows rebuilds can continue. Stop the launcher with Ctrl+C. These fixed test container names and ports are deliberate safeguards; do not substitute a production instance.
 
 For Vite development use locally supplied `PAB_WEB_DEV_CERT`, `PAB_WEB_DEV_KEY`, optional `PAB_WEB_BACKEND` and matching backend `PAB_WEB_ORIGIN=https://localhost:1440`. Explicit `PAB_WEB_DEV_SELF_SIGNED=1` is allowed for isolated development only. Production TLS validation must remain enabled.
+
+## HTTP accounts and fresh database (2026-10-08)
+
+The account release replaces the development schema with `0001_initial.sql`. Stop the old Server before removing its development database and creating an empty one. Do not run the new binary against an old schema or mark old migrations as applied. This intentionally discards old accounts, sessions, device registrations and management history. Register accounts and devices again and initialize the administrator explicitly. No compatibility migration is provided.
+
+Browser accounts use `/api/web/register`, `/api/web/session`, `/api/web/logout`; native Desktop/headless clients use `/api/account/register`, `/api/account/session`, `/api/account/logout`. Native responses return a bearer token; browser responses use an HttpOnly secure cookie. Server sessions have no expiration or concurrent-session limit; logout revokes only that session. A password change does not log out other devices. Browser cookie lifetime is capped by browsers and refreshed when retrieving the session.
+
+An MCP signs `/api/account/endpoint-context` with its own endpoint key. The Server derives the user from the bearer session and broadcasts policy changes. Device passwords and endpoint permissions remain independent. Desktop's unauthenticated `0.0.0.0:26035` WebSocket sends only account revision hints; it never sends bearer credentials. MCPs read the current OS user's protected credential store. Windows uses Credential Manager, macOS uses Keychain through the system `/usr/bin/security` client (private stdin/stdout pipes, no credentials in argv), and headless Linux uses a user-only file (directory 0700, file 0600).
+
+Relay defaults are `default_user_mbps` and `default_guest_mbps`; administrators can override `users.relay_limit_mbps` through the Accounts page. All endpoints of a user share one bucket per Relay node. There is no distributed quota across independent Relay nodes. MCP details distinguish the Server's accepted revision from the Relay node's actually applied policy version.
+
+Deploy matching Server, Relay, Executor and Desktop/MCP binaries together: relay policy schema 5, device authentication schema 2 and device task schema 2. Local task records remain local. This source change has not itself been deployed or packaged.

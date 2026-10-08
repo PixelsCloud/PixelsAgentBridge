@@ -21,8 +21,8 @@ export type ConnectedDevice = {
 export type ScopeStatus = {
   userId: string;
   username: string;
-  tenantId: string;
-  teamName: string | null;
+  serverAdmin: boolean;
+  revision: number;
 };
 
 export type HistoryPage = {

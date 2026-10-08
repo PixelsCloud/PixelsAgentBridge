@@ -175,6 +175,8 @@ impl BridgeRuntime {
             )
             .into());
         }
+        self.inner.wait_account_ready().await?;
+        self.inner.wait_account_ready().await?;
         let code = self.inner.device_codes.lock().await.get(&device).copied();
         if !self
             .inner

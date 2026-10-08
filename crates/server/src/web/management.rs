@@ -7,7 +7,6 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
 };
-use pab_protocol::{TenantId, UserId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -89,8 +88,8 @@ pub(crate) async fn accounts(
     Query(query): Query<PageQuery>,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
-    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',u.id,'username',u.username,'status',u.status,'server_admin',u.server_admin,'revision',u.auth_revision,'default_team_id',u.default_traffic_team_id,'default_team_name',t.name,'created_at',(extract(epoch from u.created_at)*1000)::bigint)::text payload
-      FROM users u LEFT JOIN teams t ON t.tenant_id=u.default_traffic_team_id
+    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',u.id,'username',u.username,'status',u.status,'server_admin',u.server_admin,'revision',u.auth_revision,'relay_limit_mbps',u.relay_limit_mbps,'created_at',(extract(epoch from u.created_at)*1000)::bigint)::text payload
+      FROM users u
       WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(u.username))>0 ORDER BY lower(u.username),u.id"#).await
 }
 
@@ -142,10 +141,6 @@ pub(crate) async fn update_account(
         }
     }
     sqlx::query("UPDATE users SET status=$1,server_admin=$2,auth_revision=auth_revision+1,updated_at=now() WHERE id=$3").bind(input.status).bind(input.server_admin).bind(id).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM web_sessions WHERE user_id=$1")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
     sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
         .execute(&mut *tx)
         .await?;
@@ -161,167 +156,79 @@ pub(crate) async fn update_account(
     Ok(Json(json!({"revision":input.revision+1})))
 }
 
-pub(crate) async fn teams(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Query(query): Query<PageQuery>,
-) -> Result<Json<Value>, WebError> {
-    let me = viewer(&state, &headers).await?;
-    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',t.tenant_id,'name',t.name,'total_mbps',COALESCE(t.relay_total_mbps,d.default_team_mbps),'member_mbps',COALESCE(t.relay_member_mbps,d.default_member_mbps),'role',m.role,'member_count',(SELECT count(*) FROM memberships x WHERE x.tenant_id=t.tenant_id AND x.status='active'))::text payload
-      FROM teams t JOIN tenants scope ON scope.id=t.tenant_id AND scope.status='active'
-      CROSS JOIN server_settings d LEFT JOIN memberships m ON m.tenant_id=t.tenant_id AND m.user_id=$2 AND m.status='active'
-      WHERE ($1 OR m.user_id IS NOT NULL) AND position(lower($3) in lower(t.name))>0 ORDER BY lower(t.name),t.tenant_id"#).await
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct TeamCreate {
-    name: String,
-    owner_id: Uuid,
-}
-pub(crate) async fn create_team(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Json(input): Json<TeamCreate>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    let team = state
-        .control
-        .admin_create_team(
-            UserId::from_uuid(input.owner_id),
-            &input.name,
-            &me.id.to_string(),
-        )
-        .await?;
-    state.control.web_changed();
-    Ok(Json(json!({"id":team.tenant_id,"name":team.name})))
-}
-
-pub(crate) async fn members(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Path(id): Path<Uuid>,
-    Query(query): Query<PageQuery>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    // UUID is parsed, then bound by the fixed UUID literal in this internal query.
-    let sql = format!(
-        r#"SELECT jsonb_build_object('id',u.id,'username',u.username,'role',m.role,'status',u.status)::text payload FROM memberships m JOIN users u ON u.id=m.user_id WHERE $1 AND $2::uuid IS NOT NULL AND m.tenant_id='{id}'::uuid AND m.status='active' AND position(lower($3) in lower(u.username))>0 ORDER BY lower(u.username),u.id"#
-    );
-    paged(&state, &me, query, &sql).await
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
-pub(crate) enum TeamAction {
-    Rename { name: String },
-    SetLimits { total_mbps: u32, member_mbps: u32 },
-    AddMember { user_id: Uuid, role: String },
-    RemoveMember { user_id: Uuid },
-}
-pub(crate) async fn team_action(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Path(id): Path<Uuid>,
-    Json(input): Json<TeamAction>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    let team = TenantId::from_uuid(id);
-    let actor = me.id.to_string();
-    match input {
-        TeamAction::Rename { name } => {
-            let name = name.trim();
-            if name.is_empty() || name.chars().count() > 128 || name.chars().any(char::is_control) {
-                return Err(WebError::invalid());
-            }
-            let mut tx = state.control.store().pool().begin().await?;
-            let result = sqlx::query("UPDATE teams SET name=$1 WHERE tenant_id=$2")
-                .bind(name)
-                .bind(id)
-                .execute(&mut *tx)
-                .await?;
-            if result.rows_affected() != 1 {
-                return Err(WebError::new(StatusCode::NOT_FOUND, "not_found"));
-            }
-            sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'team.rename',$2)").bind(me.id).bind(id).execute(&mut *tx).await?;
-            tx.commit().await?;
-        }
-        TeamAction::SetLimits {
-            total_mbps,
-            member_mbps,
-        } => {
-            state
-                .control
-                .admin_set_team_limits(team, total_mbps, member_mbps, &actor)
-                .await?;
-        }
-        TeamAction::AddMember { user_id, role } => {
-            let role = match role.as_str() {
-                "admin" => crate::TeamRole::Admin,
-                "member" => crate::TeamRole::Member,
-                _ => return Err(WebError::invalid()),
-            };
-            state
-                .control
-                .admin_add_team_member(team, UserId::from_uuid(user_id), role, &actor)
-                .await?;
-        }
-        TeamAction::RemoveMember { user_id } => {
-            state
-                .control
-                .admin_remove_team_member(team, UserId::from_uuid(user_id), &actor)
-                .await?;
-        }
-    }
-    state.control.web_changed();
-    Ok(Json(json!({"success":true})))
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Assignment {
-    team_id: Option<Uuid>,
-}
-pub(crate) async fn assign_team(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Path(id): Path<Uuid>,
-    Json(input): Json<Assignment>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    let changed = state
-        .control
-        .admin_set_default_traffic_team(
-            UserId::from_uuid(id),
-            input.team_id.map(TenantId::from_uuid),
-            &me.id.to_string(),
-        )
-        .await?;
-    state.control.web_changed();
-    Ok(Json(json!({"changed":changed})))
-}
-
-pub(crate) async fn eligible_teams(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Path(id): Path<Uuid>,
-    Query(query): Query<PageQuery>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    let sql = format!(
-        "SELECT jsonb_build_object('id',t.tenant_id,'name',t.name)::text payload FROM teams t JOIN tenants scope ON scope.id=t.tenant_id AND scope.status='active' JOIN memberships m ON m.tenant_id=t.tenant_id AND m.user_id='{id}'::uuid AND m.status='active' WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(t.name))>0 ORDER BY lower(t.name),t.tenant_id"
-    );
-    paged(&state, &me, query, &sql).await
-}
-
 pub(crate) async fn service_config(
     State(state): State<WebState>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     administrator(&state, &headers).await?;
-    let row = sqlx::query("SELECT default_team_mbps,default_member_mbps,default_personal_mbps,policy_revision FROM server_settings WHERE singleton").fetch_one(state.control.store().pool()).await?;
+    let row = sqlx::query("SELECT default_user_mbps,default_guest_mbps,policy_revision FROM server_settings WHERE singleton").fetch_one(state.control.store().pool()).await?;
     Ok(Json(
-        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"default_team_mbps":row.try_get::<i32,_>("default_team_mbps")?,"default_member_mbps":row.try_get::<i32,_>("default_member_mbps")?,"default_personal_mbps":row.try_get::<i32,_>("default_personal_mbps")?,"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_hours":12}),
+        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"default_user_mbps":row.try_get::<i32,_>("default_user_mbps")?,"default_guest_mbps":row.try_get::<i32,_>("default_guest_mbps")?,"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_expires":false}),
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UserLimitUpdate {
+    mbps: Option<i32>,
+}
+
+pub(crate) async fn update_user_limit(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(input): Json<UserLimitUpdate>,
+) -> Result<Json<Value>, WebError> {
+    let me = administrator(&state, &headers).await?;
+    if input.mbps.is_some_and(|value| value <= 0) {
+        return Err(WebError::invalid());
+    }
+    let mut tx = state.control.store().pool().begin().await?;
+    let updated = sqlx::query("UPDATE users SET relay_limit_mbps=$1,updated_at=now() WHERE id=$2")
+        .bind(input.mbps)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    if updated.rows_affected() == 0 {
+        return Err(WebError::new(StatusCode::NOT_FOUND, "not_found"));
+    }
+    sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'account.relay_limit_updated',$2)").bind(me.id).bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    state.control.web_changed();
+    Ok(Json(json!({"mbps":input.mbps})))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DefaultLimitsUpdate {
+    user_mbps: i32,
+    guest_mbps: i32,
+}
+
+pub(crate) async fn update_defaults(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Json(input): Json<DefaultLimitsUpdate>,
+) -> Result<Json<Value>, WebError> {
+    let me = administrator(&state, &headers).await?;
+    if input.user_mbps <= 0 || input.guest_mbps <= 0 {
+        return Err(WebError::invalid());
+    }
+    let mut tx = state.control.store().pool().begin().await?;
+    sqlx::query("UPDATE server_settings SET default_user_mbps=$1,default_guest_mbps=$2,policy_revision=policy_revision+1 WHERE singleton").bind(input.user_mbps).bind(input.guest_mbps).execute(&mut *tx).await?;
+    sqlx::query(
+        "INSERT INTO web_admin_events(actor_id,action) VALUES($1,'relay.defaults_updated')",
+    )
+    .bind(me.id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    state.control.web_changed();
+    Ok(Json(
+        json!({"user_mbps":input.user_mbps,"guest_mbps":input.guest_mbps}),
     ))
 }
 
@@ -331,10 +238,8 @@ pub(crate) async fn audit(
     Query(query): Query<PageQuery>,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
-    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',e.id,'actor',COALESCE(u.username,e.actor),'action',e.action,'resource_id',e.resource,'resource_name',COALESCE((SELECT name FROM devices WHERE id=e.resource),(SELECT name FROM teams WHERE tenant_id=e.resource),(SELECT username FROM users WHERE id=e.resource)),'created_at',(extract(epoch from e.at)*1000)::bigint)::text payload FROM (
+    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',e.id,'actor',COALESCE(u.username,e.actor),'action',e.action,'resource_id',e.resource,'resource_name',COALESCE((SELECT name FROM devices WHERE id=e.resource),(SELECT username FROM users WHERE id=e.resource)),'created_at',(extract(epoch from e.at)*1000)::bigint)::text payload FROM (
       SELECT 'web:'||id::text id, actor_id::text actor,action,resource_id resource,created_at at FROM web_admin_events
-      UNION ALL SELECT 'team:'||id::text,operator_label,action,tenant_id,created_at FROM team_admin_events
-      UNION ALL SELECT 'traffic:'||id::text,operator_label,'traffic.assignment',user_id,created_at FROM account_traffic_assignment_events
       ) e LEFT JOIN users u ON u.id::text=e.actor WHERE $1 AND $2::uuid IS NOT NULL AND (position(lower($3) in lower(e.action))>0 OR position(lower($3) in lower(COALESCE(u.username,e.actor,'')))>0) ORDER BY e.at DESC,e.id DESC"#).await
 }
 
@@ -343,15 +248,11 @@ pub(crate) async fn traffic(
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     let me = viewer(&state, &headers).await?;
-    let scopes = state
-        .control
-        .list_traffic_scopes(&crate::Account {
-            id: UserId::from_uuid(me.id),
-            username: me.username,
-            personal_tenant_id: TenantId::from_uuid(me.personal_tenant_id),
-        })
-        .await?;
-    Ok(Json(json!({"scopes":scopes})))
+    let row = sqlx::query("SELECT COALESCE(u.relay_limit_mbps,s.default_user_mbps) AS user_mbps,s.default_guest_mbps FROM users u CROSS JOIN server_settings s WHERE u.id=$1 AND s.singleton")
+        .bind(me.id).fetch_one(state.control.store().pool()).await?;
+    Ok(Json(
+        json!({"user_mbps":row.try_get::<i32,_>("user_mbps")?,"guest_mbps":row.try_get::<i32,_>("default_guest_mbps")?}),
+    ))
 }
 
 pub(crate) async fn relays(

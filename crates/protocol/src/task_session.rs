@@ -5,7 +5,7 @@ use crate::{
     RequestId, ScreenshotMeta, TargetContext, TaskEvent, TaskRef, TaskSnapshot, WindowList,
 };
 
-pub const DEVICE_TASK_SCHEMA_VERSION: u16 = 1;
+pub const DEVICE_TASK_SCHEMA_VERSION: u16 = 2;
 pub const MAX_COMMAND_PROGRAM_BYTES: usize = 4 * 1024;
 pub const MAX_COMMAND_ARGUMENTS: usize = 1024;
 pub const MAX_COMMAND_ARGUMENT_BYTES: usize = 16 * 1024;
@@ -140,6 +140,7 @@ impl CommandOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferSnapshot {
+    pub initiating_user: Option<crate::UserAttribution>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_context: Option<crate::ExecutionContext>,
     pub request_id: RequestId,
@@ -160,6 +161,9 @@ pub struct TransferSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskRequest {
+    GetUserContext {
+        schema_version: u16,
+    },
     TransferFile {
         schema_version: u16,
         request: crate::FileTransferRequest,
@@ -306,8 +310,27 @@ pub enum DeviceTaskRequest {
 }
 
 impl DeviceTaskRequest {
+    /// Read/cancel requests never replace the original resource creator.
+    pub fn initiating_request_id(&self) -> Option<RequestId> {
+        match self {
+            Self::SubmitCommand { request_id, .. }
+            | Self::SystemQuery { request_id, .. }
+            | Self::ListDirectory { request_id, .. }
+            | Self::ListWindows { request_id, .. }
+            | Self::CaptureScreenshot { request_id, .. }
+            | Self::CaptureScreenshotV2 { request_id, .. }
+            | Self::DesktopInput { request_id, .. }
+            | Self::OpenTerminal { request_id, .. }
+            | Self::UploadFile { request_id, .. }
+            | Self::DownloadFile { request_id, .. } => Some(*request_id),
+            Self::TransferFile { request, .. } => Some(request.request_id),
+            Self::FileSystem { request, .. } => Some(request.request_id),
+            _ => None,
+        }
+    }
     pub const fn schema_version(&self) -> u16 {
         match self {
+            Self::GetUserContext { schema_version } => *schema_version,
             Self::TransferFile { schema_version, .. }
             | Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
@@ -356,6 +379,9 @@ pub enum DeviceTaskErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
+    UserContext {
+        context: crate::EndpointUserContext,
+    },
     TransferAccepted {
         snapshot: TransferSnapshot,
     },
@@ -586,6 +612,7 @@ mod tests {
         );
         let response = DeviceTaskResponse::Transfer {
             snapshot: TransferSnapshot {
+                initiating_user: None,
                 execution_context: None,
                 request_id,
                 initiated_by: crate::OperatorRef::account(

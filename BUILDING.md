@@ -8,20 +8,20 @@ macOS PKG 打包需要 Python 3.12+。Mac 的便捷入口会选取可用的 Pyth
 
 `build-version.json` 是版本来源，随代码提交。首次整体编译使用 `1.2.0`，随后每次构建 patch 加1；`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`。minor、patch 范围均为0–99。
 
-统一入口在启动子组件前分配一次版本，并同步自有 Rust crate、两个 Cargo.lock、前端 package/package-lock、Tauri 配置。第三方依赖及协议 schema 版本不变。一个命令内的所有目标使用同一版本，打包不再次递增。构建开始后失败或中断也占用该版本，重新构建递增；同一工作目录禁止两个整体构建并发，以免编译中途版本改变。锁随进程退出自动释放。
+统一入口在启动子组件前分配一次安装包发布版本，只更新 `build-version.json`。**不修改任何 Rust crate、Cargo.lock、npm package/lock 或 Tauri 配置中的内部版本号**，即使对应源码有变化也不自动递增内部版本。源码或依赖变化由 Cargo 自身决定重编译。一个命令内所有安装包共用一次发布版本，打包不再次递增；失败或中断也占用该版本。同一工作目录的并发构建由系统锁阻止，锁随进程退出释放。
 
-版本文件、同步后的清单和锁文件应一起提交。此计数在当前 Git 工作目录中分配，不是跨克隆的中央发号服务；正式构建使用同一个发布工作目录。
+版本文件应随代码提交。此计数在当前 Git 工作目录中分配，不是跨克隆的中央发号服务；正式构建使用同一个发布工作目录。
 
 ## 常用命令（仓库根目录）
 
 ```powershell
-# Windows Desktop、Executor、MCP；同时生成 ZIP 和原名 EXE 安装包
+# Windows Desktop、Executor、MCP；同时生成 ZIP 和带版本号的 EXE 安装包
 python scripts/build.py desktop --package
 
 # Server、Relay 和 Web；生成当前宿主平台归档
 python scripts/build.py server --package
 
-# 一次整体编译，全部组件共用一个版本号
+# 一次构建多个目标，共用一个产品/安装包版本号
 python scripts/build.py desktop server --package
 
 # 只编译前端，每次命令同样递增一次
@@ -44,9 +44,22 @@ python scripts/build.py docker --profile release
 
 `apps/desktop` 和 `apps/web` 的 `npm run build` 已接入各自的前端构建入口；`apps/desktop` 的 `npm run build:desktop` 编译完整 Windows 客户端。Tauri 内部调用 `build:assets`，避免再次递增。
 
-macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_64`、`all`。构建前检查宿主、Python、Tauri 和 Rust target，缺少前置条件不分配版本。完整编译开始后失败仍占用已分配版本；双架构编译过程中不再次分配。`--package` 同时生成 tar.gz 和 PKG，分别保持原有架构文件名。便捷脚本默认 debug；Release 需明确指定。
+macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_64`、`all`。构建前检查宿主、Python、Tauri 和 Rust target，缺少前置条件不分配版本。完整编译开始后失败仍占用已分配版本；双架构编译过程中不再次分配。`--package` 同时生成 tar.gz 和 PKG，PKG 文件名包含架构、profile 和版本号。便捷脚本默认 debug；Release 需明确指定。
 
-`cargo build`、直接调用 Tauri/Docker、`npm run build:assets` 是底层组件命令，只使用当前已同步版本，不负责分配产品版本。开发热更新、`cargo check/test/clippy/fmt`、前端类型检查和测试不递增。正式产物必须使用上面的统一入口。
+`cargo build`、直接调用 Tauri/Docker、`npm run build:assets` 是底层组件命令，只使用当前固定的内部版本，不负责分配产品版本。开发热更新、`cargo check/test/clippy/fmt`、前端类型检查和测试不递增。正式产物必须使用上面的统一入口。
+
+## 增量构建
+
+2026-10-08 按用户最新要求，以下“仅安装包递增”规则取代之前的“受影响组件同步版本”方案。
+
+沿用原命令即可，不执行 `cargo clean`，也不再维护组件版本指纹。
+
+- 只递增安装包版本：内部清单和锁文件完全不变，Cargo 复用全部可用缓存。
+- 只改 UI：重编前端和必要的 Desktop 资源；Executor、MCP 复用缓存。
+- 修改 Rust 源码、共享依赖、编译器或选项：Cargo 正常重编受影响部分，内部版本仍固定。
+- Windows/macOS 使用相同规则，Linux 无界面版继续通过现有 Docker 入口构建。
+
+安装包发布版本与程序内部版本独立。构建记录同时记录发布版本、组件版本和产物 SHA-256；打包仍逐项核验哈希。内部关于页、MCP 握手、设备与 Relay 上报继续显示各组件自己的版本，不伪装成安装包版本。
 
 ## 打包与版本校验
 
@@ -69,17 +82,19 @@ Tauri 的临时 App 随后使用固定证书重签；App、Executor、MCP 的 de
 
 `.build/builds/` 记录成功构建的版本与产物 SHA-256。现有 `packaging/*/build*.py` 仍可单独重打包已构建产物，保持该产物的版本；无构建记录、组件被替换或混入另一批前端时拒绝打包，不给旧二进制贴新版本。
 
-Mac 使用每个架构独立的 `macos-aarch64-<profile>.json` / `macos-x86_64-<profile>.json` 记录，覆盖 Executor、MCP 和完整 App 文件。归档与 PKG 的版本必须与 App 一致；旧的无构建记录产物需要重新构建。
+Mac 使用每个架构独立的 `macos-aarch64-<profile>.json` / `macos-x86_64-<profile>.json` 记录，覆盖 Executor、MCP 和完整 App 文件。归档与 PKG 使用构建记录中的发布版本，App 的内部版本保持固定；完整 App（含 Info.plist）仍由哈希绑定，旧的无构建记录产物需要重新构建。
 
-Windows 安装包文件名保持 `pixels-agent-bridge-windows-x86_64-debug-setup.exe` 等原有名字。版本写入 EXE 文件属性、Windows 已安装应用信息及 SHA-256 清单；Desktop 关于、MCP 握手、设备和 Relay 版本上报、Web 服务版本使用对应编译版本。构建命令不执行安装或部署。
+每次生成的 Windows EXE、macOS PKG 安装包文件名都必须包含构建版本，格式为 `pixels-agent-bridge-<platform>-<arch>-<profile>-<version>-setup.<exe|pkg>`，例如 `pixels-agent-bridge-windows-x86_64-release-1.2.48-setup.exe`。版本取自已核验的构建记录，不取 App 或源码的内部版本；重新打包不额外递增。版本同时写入 EXE 文件属性、Windows 已安装应用信息及 SHA-256 清单；Desktop 关于、MCP 握手、设备和 Relay 版本上报、Web 服务版本使用对应编译版本。构建命令不执行安装或部署。
 
 ## 验证
 
 ```powershell
-python -m unittest discover -s scripts -p test_build_version.py -v
+python -m unittest discover -s scripts -p 'test_build*.py' -v
 ```
 
-覆盖首次编译、连续递增、两级进位、非法版本、清单/锁文件同步、第三方版本不变、失败重试、跨进程互斥、多目标只分配一次，以及打包版本和产物哈希匹配。测试在临时目录运行，不消耗正式版本号。
+覆盖首次编译、连续递增、两级进位、非法版本、所有内部清单/锁文件逐字节不变、失败重试、跨进程互斥、多目标只分配一次，以及打包版本和产物哈希匹配。测试在临时目录运行，不消耗正式版本号。
+
+2026-10-08 早期增量构建回归（后被“仅安装包递增”规则替代）：23 项通过，包含 UI 单独变化、MCP 单独变化、共享依赖变化、源码删除、依赖锁变化、损坏指纹、Windows/macOS/Linux 目标选择。临时 Rust 工作空间实际运行两次 Cargo，第二次只改 UI 并分配新产品版本，服务/MCP/公共库三个产物均报告 `fresh=true`。当前 Windows 1.2.48 完整产物经哈希核验后已记为后续构建基线。
 
 2026-10-04 验证：9项自动化测试通过；`python scripts/build.py desktop server --package` 完成首次 `1.2.0` 实际构建，版本计数为1。Windows 客户端 ZIP/NSIS、Server/Relay/Web 归档均生成成功，Desktop 与安装器的 ProductVersion/FileVersion 均为 `1.2.0`。17个自有 Rust 包版本一致，两份 Cargo.lock 的第三方条目未变。构建日志 `.build/versioned-build.log`。本轮未执行 Linux/Docker 镜像实际构建。
 

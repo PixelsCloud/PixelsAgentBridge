@@ -18,7 +18,7 @@ export function Overview({ liveRevision }: { liveRevision: number }) {
     <Typography.Title level={2}>{t('overview')}</Typography.Title>
     {resource.error && <Alert type="error" title={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/>}
     <Row gutter={[20, 20]}>{(['total', 'online', 'offline'] as const).map(key => <Col xs={24} sm={8} xl={8} key={key}><Card loading={resource.loading}><Statistic title={t(key === 'total' ? 'totalDevices' : key)} value={resource.data?.[key] ?? '—'}/></Card></Col>)}</Row>
-    <Row gutter={[20, 20]}>{['accounts', 'teams', 'relays'].filter(key => resource.data?.[key] !== undefined).map(key => <Col xs={24} sm={12} xl={6} key={key}><Card><Statistic title={t(key === 'relays' ? 'nodes' : key)} value={resource.data?.[key] ?? 0}/><Button type="link" onClick={() => navigate(key === 'relays' ? '/relay' : `/${key}`)}>{t('details')}</Button></Card></Col>)}</Row>
+    <Row gutter={[20, 20]}>{['accounts', 'relays'].filter(key => resource.data?.[key] !== undefined).map(key => <Col xs={24} sm={12} xl={6} key={key}><Card><Statistic title={t(key === 'relays' ? 'nodes' : key)} value={resource.data?.[key] ?? 0}/><Button type="link" onClick={() => navigate(key === 'relays' ? '/relay' : `/${key}`)}>{t('details')}</Button></Card></Col>)}</Row>
     <Card><Space orientation="vertical" size={16}><Monitor size={32}/><Typography.Title level={4}>{t('devices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text><Button type="primary" onClick={() => navigate('/devices')}>{t('devices')}</Button></Space></Card>
   </Space>;
 }

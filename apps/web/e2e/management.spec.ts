@@ -6,7 +6,7 @@ import { createInterface } from 'node:readline';
 // This suite targets only the named isolated database. No deployed credentials.
 const root = resolve(import.meta.dirname, '../../..');
 function sql(query: string) {
-  return execFileSync('docker', ['exec', 'pab-web-test-20261003', 'psql', '-U', 'postgres', '-d', 'pab_web_test', '-At', '-v', 'ON_ERROR_STOP=1', '-c', query], { encoding: 'utf8', windowsHide: true }).trim();
+  return execFileSync('docker', ['exec', 'pab-web-test-20261003', 'psql', '-U', 'postgres', '-d', 'pab_account_test', '-At', '-v', 'ON_ERROR_STOP=1', '-c', query], { encoding: 'utf8', windowsHide: true }).trim();
 }
 
 async function fixture(name: string) {
@@ -87,7 +87,7 @@ test('administrator manages an unassigned device without claiming', async ({ pag
   } finally { device.child.kill(); }
 });
 
-test('administrator team workflow and all management pages', async ({ page, request }) => {
+test('administrator user bandwidth and all management pages', async ({ page, request }) => {
   test.setTimeout(90000);
   const username = `admin-${Date.now()}`;
   const response = await request.post('/api/web/register', { headers: { Origin: 'https://localhost:38443' }, data: { username, password: 'test password long enough' } });
@@ -101,27 +101,23 @@ test('administrator team workflow and all management pages', async ({ page, requ
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     await expect(page.getByText('The service is unavailable. Please try again.', { exact: true })).toHaveCount(0);
   }
-  await page.getByRole('menuitem', { name: 'Teams', exact: true }).click();
-  await page.getByRole('button', { name: 'Create team', exact: true }).click();
-  const name = `Browser Team ${Date.now()}`;
-  await page.getByLabel('Team name', { exact: true }).fill(name);
-  await page.getByLabel('Owner account', { exact: true }).fill(username);
-  await page.getByText(username, { exact: true }).last().click();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  const row = page.getByRole('row').filter({ hasText: name });
+  await expect(page.getByRole('menuitem', { name: 'Teams', exact: true })).toHaveCount(0);
+  await page.getByRole('menuitem', { name: 'Accounts', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Accounts' }).fill(username);
+  await page.getByRole('searchbox', { name: 'Accounts' }).press('Enter');
+  const row = page.getByRole('row').filter({ hasText: username });
   await expect(row).toBeVisible();
   await row.getByRole('button', { name: 'Bandwidth limits', exact: true }).click();
-  await page.getByLabel('Total bandwidth (Mbps)', { exact: true }).fill('30');
-  await page.getByLabel('Member bandwidth (Mbps)', { exact: true }).fill('6');
+  await page.getByRole('dialog').getByRole('spinbutton').fill('30');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(row.getByText('30 Mbps', { exact: true })).toBeVisible();
-  await row.getByRole('button', { name: 'Members', exact: true }).click();
-  await expect(page.locator('.ant-table-tbody').getByText(username, { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove member', exact: true })).toBeDisabled();
+  await row.getByRole('button', { name: 'Bandwidth limits', exact: true }).click();
+  await page.getByRole('dialog').getByRole('spinbutton').fill('');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(row.getByText('30 Mbps', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: resolve(root, '.build/web-test/admin-light.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Dark', exact: true }).click();
   await expect(page.locator('.ant-menu-item').first()).toHaveCSS('color', 'rgba(255, 255, 255, 0.65)');
-  await expect(page.getByRole('button', { name: 'Add member', exact: true })).toHaveCSS('color', 'rgb(16, 39, 40)');
   await page.screenshot({ path: resolve(root, '.build/web-test/admin-dark.png'), fullPage: true, animations: 'disabled' });
 });
 
@@ -153,7 +149,7 @@ test('responsive languages, URL state, transient failure, reconnect and revoked 
   await expect(page.getByText('Live updates interrupted. Reconnecting…',{exact:true})).toBeVisible({timeout:20000});
   await context.setOffline(false);
   await expect(page.getByText('Live updates interrupted. Reconnecting…',{exact:true})).toHaveCount(0,{timeout:20000});
-  sql(`UPDATE users SET auth_revision=auth_revision+1 WHERE id='${me.id}'`);
+  sql(`DELETE FROM web_sessions WHERE user_id='${me.id}'`);
   await expect(page.getByRole('heading',{name:'Sign in',exact:true})).toBeVisible({timeout:20000});
   expect(errors).toEqual([]);
 });

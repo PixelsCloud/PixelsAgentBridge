@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use pab_protocol::{
     DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
-    TrafficScope, UserId,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TenantId, TrafficScope, UserId,
+    UserRelayLimit,
 };
 
 use crate::{PolicyStateError, RelayPolicyState};
@@ -15,14 +15,12 @@ fn snapshot(version: u64, endpoints: Vec<RelayEndpointPolicy>) -> RelayPolicySna
         issued_at_unix_ms: 1_000,
         expires_at_unix_ms: 10_000,
         defaults: RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         },
-        team_limits: vec![TeamRelayLimits {
-            tenant_id: TenantId::from_u128(1),
-            total_mbps: 20,
-            member_mbps: 4,
+        user_limits: vec![UserRelayLimit {
+            user_id: UserId::from_u128(2),
+            mbps: 4,
         }],
         endpoints,
         connection_intents: Vec::new(),
@@ -31,7 +29,6 @@ fn snapshot(version: u64, endpoints: Vec<RelayEndpointPolicy>) -> RelayPolicySna
 
 #[test]
 fn newer_snapshot_revokes_missing_endpoints_and_preserves_scope() {
-    let tenant_id = TenantId::from_u128(1);
     let user_id = UserId::from_u128(2);
     let user_key = EndpointKey::new([1; 32]);
     let device_key = EndpointKey::new([2; 32]);
@@ -39,7 +36,7 @@ fn newer_snapshot_revokes_missing_endpoints_and_preserves_scope() {
     let user = RelayEndpointPolicy {
         endpoint_key: user_key,
         owner: RelayEndpointOwner::User {
-            scope: TrafficScope::Team { tenant_id, user_id },
+            scope: TrafficScope::User { user_id },
         },
     };
     let device = RelayEndpointPolicy {
@@ -60,7 +57,7 @@ fn newer_snapshot_revokes_missing_endpoints_and_preserves_scope() {
     state.apply_snapshot(initial, 2_000, now).unwrap();
     assert_eq!(
         state.traffic_scope(user_key, device_key, 2_000),
-        Some(TrafficScope::Team { tenant_id, user_id })
+        Some(TrafficScope::User { user_id })
     );
     assert_eq!(state.traffic_scope(user_key, device_key, 5_000), None);
 
@@ -85,6 +82,41 @@ fn unchanged_refresh_extends_only_the_matching_policy() {
         state.refresh_expiry(6, 30_000, 3_000),
         Err(PolicyStateError::UnexpectedPolicyVersion)
     );
+}
+
+#[test]
+fn logout_and_login_do_not_reset_user_burst() {
+    let user_id = UserId::from_u128(2);
+    let endpoint_key = EndpointKey::new([24; 32]);
+    let user = RelayEndpointPolicy {
+        endpoint_key,
+        owner: RelayEndpointOwner::User {
+            scope: TrafficScope::User { user_id },
+        },
+    };
+    let guest = RelayEndpointPolicy {
+        endpoint_key,
+        owner: RelayEndpointOwner::Guest,
+    };
+    let now = Instant::now();
+    let mut state = RelayPolicyState::new(Duration::from_millis(100)).unwrap();
+    state
+        .apply_snapshot(snapshot(1, vec![user]), 2_000, now)
+        .unwrap();
+    assert_eq!(
+        state.acquire(TrafficScope::User { user_id }, 50_000, now),
+        crate::Acquire::Ready
+    );
+    state
+        .apply_snapshot(snapshot(2, vec![guest]), 2_001, now)
+        .unwrap();
+    state
+        .apply_snapshot(snapshot(3, vec![user]), 2_002, now)
+        .unwrap();
+    assert!(matches!(
+        state.acquire(TrafficScope::User { user_id }, 1, now),
+        crate::Acquire::Wait(_)
+    ));
 }
 
 #[test]

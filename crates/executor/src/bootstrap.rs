@@ -303,6 +303,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn obsolete_database_is_discarded_and_bootstrap_creates_working_credentials() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("executor.sqlite3");
+        let pool = device_access::tests::create_legacy_database(&path).await;
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
+        let access = device_access::load(&path).await.unwrap();
+        assert_eq!(access.device_code, "123456789");
+        assert_eq!(access.temporary_password.len(), 8);
+        assert!(
+            DeviceCredential::read(&path)
+                .await
+                .unwrap()
+                .verify(Zeroizing::new(access.temporary_password.clone()))
+                .await
+                .unwrap()
+        );
+        ensure_device_access(&path, "tenant".into(), "device".into(), "123456789".into())
+            .await
+            .unwrap();
+        assert_eq!(
+            device_access::load(&path).await.unwrap().temporary_password,
+            access.temporary_password
+        );
+        pool.close().await;
+    }
+
+    #[tokio::test]
     async fn initializes_access_in_an_existing_task_database() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("executor.sqlite3");

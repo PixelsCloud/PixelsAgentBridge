@@ -139,6 +139,7 @@ pub struct TaskEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskSnapshot {
+    pub initiating_user: Option<crate::UserAttribution>,
     pub schema_version: u16,
     pub task_ref: TaskRef,
     pub request_id: RequestId,

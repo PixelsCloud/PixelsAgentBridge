@@ -148,6 +148,7 @@ impl PostgresStore {
         .await?
         .ok_or(StoreError::NotFound)?;
         Ok(AuthorizedDevicePeer {
+            user_context: self.endpoint_user_context(guest_key).await?,
             device_ref: DeviceRef {
                 tenant_id: device_endpoint.tenant_id,
                 device_id,

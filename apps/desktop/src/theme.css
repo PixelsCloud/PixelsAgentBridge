@@ -37,6 +37,9 @@
 [data-theme="dark"] .sidebar-menu.ant-menu .ant-menu-item:hover { color: var(--dark-text); background: #30363e; }
 [data-theme="dark"] .sidebar-menu.ant-menu .ant-menu-item-selected { color: var(--dark-accent); background: var(--dark-accent-soft); }
 [data-theme="dark"] .sidebar-menu.ant-menu .ant-menu-item-icon { color: var(--dark-accent); }
+[data-theme="dark"] .sidebar-account-info small { color: var(--dark-muted); }
+[data-theme="dark"] .sidebar-account .ant-avatar,
+[data-theme="dark"] .account-profile-heading .ant-avatar { color: var(--dark-accent); background: var(--dark-accent-soft); }
 
 [data-theme="dark"] .surface,
 [data-theme="dark"] .toast {
@@ -90,7 +93,7 @@
 [data-theme="dark"] .account-current span,
 [data-theme="dark"] .account-current small,
 [data-theme="dark"] .settings-about,
-[data-theme="dark"] .settings-agent-row > div > span,
+[data-theme="dark"] .settings-agent-row > div > span:not(.ant-tag),
 [data-theme="dark"] .phase-label,
 [data-theme="dark"] .home-recent-device-info small,
 [data-theme="dark"] .device-basic-grid span,

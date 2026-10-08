@@ -1,3 +1,0 @@
-ALTER TABLE guest_device_intents RENAME TO device_connection_intents;
-ALTER TABLE device_connection_intents RENAME COLUMN guest_endpoint_key TO operator_endpoint_key;
-ALTER INDEX guest_device_intents_expiry RENAME TO device_connection_intents_expiry;

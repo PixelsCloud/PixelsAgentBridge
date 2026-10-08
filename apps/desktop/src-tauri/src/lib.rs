@@ -23,6 +23,7 @@ mod operator;
 mod screenshot_session;
 mod server_settings;
 mod session_helper;
+mod tray;
 mod window_session;
 #[cfg(windows)]
 mod windows_session_supervisor;
@@ -54,9 +55,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                     continue;
                 }
                 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
-                if let Err(error) =
-                    session_helper::register_desktop_helper(&mut socket).await
-                {
+                if let Err(error) = session_helper::register_desktop_helper(&mut socket).await {
                     tracing::debug!(%error, "window helper registration failed");
                 }
                 let mut desktop_session = pab_desktop_control::DesktopSession::new();
@@ -281,7 +280,9 @@ pub fn run() {
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
+        .on_window_event(tray::on_window_event)
         .setup(|app| {
+            tray::setup(app)?;
             let reporting = app
                 .state::<mcp_reporting::McpReportingState>()
                 .inner()
@@ -293,6 +294,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            tray::set_tray_language,
             macos_permissions::macos_permissions,
             macos_permissions::request_macos_permission,
             macos_permissions::open_macos_permission_settings,
@@ -304,8 +306,8 @@ pub fn run() {
             server_settings::get_operator_server_settings,
             server_settings::save_operator_server_settings,
             server_settings::restart_desktop,
-            agent_integrations::codex_integration_status,
-            agent_integrations::set_codex_integration,
+            agent_integrations::agent_integration_status,
+            agent_integrations::set_agent_integration,
             operator::operator_connect,
             operator::operator_connect_saved,
             operator::operator_disconnect_device,
@@ -339,13 +341,20 @@ pub fn run() {
             operator::operator_task,
             operator::operator_current_traffic_scope,
             operator::operator_login_account,
+            operator::operator_register_account,
             operator::operator_use_guest_scope,
         ])
         .build(tauri::generate_context!())
         .expect("could not start Pixels Agent Bridge desktop application")
-        .run(|handle, event| {
-            if matches!(event, tauri::RunEvent::Exit) {
-                handle.state::<mcp_reporting::McpReportingState>().stop();
+        .run(|handle, event| match event {
+            tauri::RunEvent::ExitRequested { code, api, .. }
+                if tray::prevent_exit(handle, code) =>
+            {
+                api.prevent_exit()
             }
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => tray::show_window(handle),
+            tauri::RunEvent::Exit => handle.state::<mcp_reporting::McpReportingState>().stop(),
+            _ => {}
         });
 }

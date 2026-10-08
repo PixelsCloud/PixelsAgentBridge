@@ -30,7 +30,7 @@ cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_ke
         .sign(key, hashes.SHA256()))
 (out / 'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 (out / 'key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
-environment.update(PAB_DATABASE_URL='postgres://postgres@127.0.0.1:55435/pab_web_test',
+environment.update(PAB_DATABASE_URL='postgres://postgres@127.0.0.1:55435/pab_account_test',
                    PAB_LISTEN_ADDR='127.0.0.1:38443', PAB_TLS_CERT=str(out/'cert.pem'), PAB_TLS_KEY=str(out/'key.pem'),
                    PAB_WEB_DIR=str(root/'apps/web/dist'), PAB_WEB_ORIGIN='https://localhost:38443',
                    PAB_LOG_DIR=str(out/'logs'),

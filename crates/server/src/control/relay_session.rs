@@ -12,8 +12,17 @@ const RELAY_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub(super) async fn run_relay_socket(socket: WebSocket, state: ControlApiState) {
     let (mut sender, mut receiver) = socket.split();
+    let mut changes = state.control.web_changes();
     loop {
-        let next = tokio::time::timeout(RELAY_IDLE_TIMEOUT, receiver.next()).await;
+        let next = tokio::select! {
+            next = tokio::time::timeout(RELAY_IDLE_TIMEOUT, receiver.next()) => next,
+            changed = changes.changed() => {
+                if changed.is_err() { break; }
+                let encoded = serde_json::to_string(&RelayControlServerMessage::PolicyChanged).expect("policy notification");
+                if sender.send(Message::Text(encoded.into())).await.is_err() { break; }
+                continue;
+            }
+        };
         let message = match next {
             Ok(Some(Ok(message))) => message,
             Ok(Some(Err(_))) | Ok(None) | Err(_) => break,

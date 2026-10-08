@@ -13,38 +13,6 @@ pub(crate) struct AccountCredential {
     pub password_hash: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TeamRole {
-    Owner,
-    Admin,
-    Member,
-}
-
-impl TeamRole {
-    pub(crate) const fn as_db(self) -> &'static str {
-        match self {
-            Self::Owner => "owner",
-            Self::Admin => "admin",
-            Self::Member => "member",
-        }
-    }
-
-    pub(crate) fn from_db(value: &str) -> Option<Self> {
-        match value {
-            "owner" => Some(Self::Owner),
-            "admin" => Some(Self::Admin),
-            "member" => Some(Self::Member),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Team {
-    pub tenant_id: TenantId,
-    pub name: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
     pub id: DeviceId,

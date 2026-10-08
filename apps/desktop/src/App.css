@@ -33,6 +33,19 @@ button:not(.ant-btn):disabled { cursor: not-allowed; opacity: .55; }
 .sidebar-menu.ant-menu .ant-menu-item-icon { display: inline-flex; color: #438d79; }
 .sidebar-menu.ant-menu .ant-menu-item-selected { color: #176f5c; background: #dff1e9; }
 .sidebar-spacer { flex: 1; }
+.sidebar-account.ant-btn { display: flex; flex: none; justify-content: flex-start; gap: 10px; width: 100%; height: auto; min-height: 62px; margin-bottom: 16px; padding: 10px; text-align: left; }
+.sidebar-account .ant-avatar { flex: none; color: #247a6c; background: #dff1e9; }
+.sidebar-account-info { display: grid; gap: 3px; min-width: 0; }
+.sidebar-account-info strong, .sidebar-account-info small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-account-info strong { font-size: 13px; }
+.sidebar-account-info small { color: #718796; font-size: 11px; font-weight: 400; }
+.account-profile-heading { display: flex; align-items: center; gap: 14px; margin: 24px 0; }
+.account-profile-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 20px; }
+.account-profile-heading .ant-avatar { flex: none; color: #247a6c; background: #dff1e9; }
+.home-account .ant-descriptions-item-content { user-select: text; overflow-wrap: anywhere; }
+.account-login-form { display: grid; gap: 10px; padding-top: 12px; }
+.account-login-form > .ant-btn { margin-top: 8px; }
+.account-error { margin-top: 12px; }
 .sidebar-status-group { display: grid; gap: 10px; margin: 0 10px; }
 .sidebar-status { display: flex; align-items: center; gap: 9px; color: #6f8593; font-size: 11px; }
 .sidebar-permission-status { padding: 0; border: 0; background: transparent; text-align: left; line-height: inherit; }
@@ -53,6 +66,7 @@ h1, h2, h3, p { margin: 0; }
 .page-me { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 .page-me .home-account { width: min(100%, 620px); align-self: start; }
 .page-activity { grid-template-columns: minmax(0, 1fr); }
+.page-mcp { grid-template-columns: minmax(0, 1fr); }
 .page-settings { grid-template-columns: 245px minmax(0, 1fr); }
 .settings-menu { padding: 12px; }
 .settings-menu .ant-menu { width: 100%; border: 0 !important; background: transparent; }
@@ -74,15 +88,16 @@ h1, h2, h3, p { margin: 0; }
 .settings-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 19px; }
 .settings-agent-row > div { display: grid; gap: 4px; min-width: 0; }
 .settings-agent-row > div > strong { color: #214356; font-size: 13px; }
-.settings-agent-row > div > span { color: #718796; font-size: 11px; }
+.settings-agent-row > div > span:not(.ant-tag) { color: #718796; font-size: 11px; }
 .settings-agent-row > .ant-btn { font-weight: 600; white-space: nowrap; }
 .settings-ai .settings-scope-note { margin-top: auto !important; padding-top: 10px; }
-.settings-detail:has(.mcp-reporting-panel) { overflow-y: auto; }
-.settings-ai:has(.mcp-reporting-panel) { flex: 0 0 auto; }
-.settings-ai:has(.mcp-reporting-panel) .settings-scope-note { margin-top: 12px !important; }
-.mcp-reporting-panel { margin-top: 20px; min-width: 0; }
+.settings-detail:has(.settings-ai) { overflow-y: auto; }
+.settings-ai { flex: 0 0 auto; }
+.settings-ai .settings-scope-note { margin-top: 12px !important; }
+.surface.mcp-connections-page { overflow-y: auto; }
+.mcp-reporting-panel { min-width: 0; }
 .mcp-reporting-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.mcp-reporting-heading h3 { font-size: 15px; }
+.mcp-reporting-heading h2 { margin: 0; }
 .mcp-process-details { min-width: 0; }
 .mcp-device-list { display: grid; gap: 8px; }
 .mcp-device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--ant-color-border-secondary, #434b5530); }
@@ -357,3 +372,10 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .settings-tool-group p { margin-top: 5px; font-size: 12px; color: #587485; }
 .settings-tool-group .ant-switch { flex-shrink: 0; }
 .settings-tools-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
+/* AI integrations share the surrounding theme and remain usable in narrow panes. */
+.settings-agent-list { display: grid; gap: 14px; }
+.settings-agent { min-width: 0; }
+.settings-agent .settings-agent-row { gap: 12px; flex-wrap: wrap; }
+.settings-agent .settings-agent-row > div:first-child { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.settings-agent .settings-agent-row > .ant-space { display: flex; flex-wrap: wrap; }
+.settings-agent .ant-alert { margin-top: 8px; overflow-wrap: anywhere; }

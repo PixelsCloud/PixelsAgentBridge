@@ -47,9 +47,8 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     let control = ControlPlane::new(store.clone(), PasswordPolicy::default()).unwrap();
     control
         .initialize_settings(RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         })
         .await
         .unwrap();

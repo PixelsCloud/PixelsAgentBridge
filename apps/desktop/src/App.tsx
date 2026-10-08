@@ -2,21 +2,24 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { App as AntdApp, ConfigProvider, Menu, theme as antdTheme } from "antd";
+import { App as AntdApp, Avatar, Button, ConfigProvider, Menu, theme as antdTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import zhTW from "antd/locale/zh_TW";
-import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon, Settings2, Sun, UserRound, X } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, Settings2, Sun, UserRound, X } from "lucide-react";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
+import { McpConnectionsPanel } from "./McpConnectionsPanel";
+import { AccountConnectionPanel, AccountLoginDialog } from "./AccountConnectionPanel";
+import type { ScopeStatus } from "./operatorTypes";
 import { MacosPermissionStatus, requestMacosPermissionsAtStartup } from "./MacosPermissionsPanel";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
 import "./theme.css";
 
-export type View = "home" | "remote" | "activity" | "me" | "settings";
+export type View = "home" | "remote" | "mcp" | "activity" | "me" | "settings";
 type Theme = "light" | "dark";
 
 type DeviceStatus = {
@@ -30,6 +33,7 @@ type DeviceStatus = {
 const navItems = [
   { id: "home", icon: Monitor },
   { id: "remote", icon: MonitorSmartphone },
+  { id: "mcp", icon: Plug },
   { id: "activity", icon: List },
   { id: "me", icon: UserRound },
   { id: "settings", icon: Settings2 },
@@ -41,6 +45,10 @@ function App() {
     () => window.localStorage.getItem("pab.theme") === "dark" ? "dark" : "light",
   );
   const [view, setView] = useState<View>("home");
+  const [activeScope, setActiveScope] = useState<ScopeStatus | null>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountLoadFailed, setAccountLoadFailed] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("preferences");
   const [device, setDevice] = useState<DeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +57,35 @@ function App() {
   const [copiedField, setCopiedField] = useState<"code" | "password" | null>(null);
   const t = messages[language];
   const appWindow = getCurrentWindow();
+
+  useEffect(() => {
+    let active = true;
+    void invoke<ScopeStatus | null>("operator_current_traffic_scope")
+      .then((scope) => { if (active) setActiveScope(scope); })
+      .catch(() => { if (active) setAccountLoadFailed(true); })
+      .finally(() => { if (active) setAccountLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  async function openAccount() {
+    if (accountLoading) return;
+    let scope = activeScope;
+    if (accountLoadFailed) {
+      setAccountLoading(true);
+      try {
+        scope = await invoke<ScopeStatus | null>("operator_current_traffic_scope");
+        setActiveScope(scope);
+        setAccountLoadFailed(false);
+      } catch {
+        return;
+      } finally {
+        setAccountLoading(false);
+      }
+    }
+    setError("");
+    if (scope) setView("me");
+    else setLoginOpen(true);
+  }
 
   useEffect(() => {
     void requestMacosPermissionsAtStartup().catch((cause) => console.error("Could not request macOS permissions", cause));
@@ -70,6 +107,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.lang = language;
+    void invoke("set_tray_language", { language }).catch((cause) => console.error("Could not update tray language", cause));
   }, [language]);
 
   function changeLanguage(value: Language) {
@@ -198,16 +236,26 @@ function App() {
             {theme === "dark" ? <Sun /> : <Moon />}
           </button>
           <button aria-label={t.minimize} title={t.minimize} onClick={() => void appWindow.minimize()}><Minus /></button>
-          <button className="close" aria-label={t.close} title={t.close} onClick={() => void appWindow.close()}><X /></button>
+          <button className="close" aria-label={t.hideToTray} title={t.hideToTray} onClick={() => void appWindow.close()}><X /></button>
         </div>
       </div>
 
       <div className="app-body">
         <aside className="sidebar">
+          <Button type="text" className="sidebar-account" onClick={() => void openAccount()} disabled={accountLoading}
+            aria-label={activeScope ? `${t.nav.me}: ${activeScope.username}` : t.accountConnect}>
+            <Avatar size={38} icon={!activeScope ? <UserRound size={20} /> : undefined}>
+              {activeScope ? Array.from(activeScope.username)[0]?.toUpperCase() : undefined}
+            </Avatar>
+            <span className="sidebar-account-info">
+              <strong title={activeScope?.username}>{accountLoading ? t.loading : accountLoadFailed ? t.accountLoadFailed : activeScope?.username || t.accountNotSignedIn}</strong>
+              <small>{accountLoadFailed ? t.accountRetry : activeScope ? t.accountViewProfile : t.accountConnect}</small>
+            </span>
+          </Button>
           <nav aria-label={t.navigation}>
             <Menu className="sidebar-menu" mode="inline" selectedKeys={[view]}
               items={navItems.map(({ id, icon: Icon }) => ({ key: id, label: t.nav[id], icon: <Icon size={18} strokeWidth={1.8} /> }))}
-              onClick={({ key }) => { setView(key as View); setError(""); }} />
+              onClick={({ key }) => { if (key === "me") { void openAccount(); return; } setView(key as View); setError(""); }} />
           </nav>
           <div className="sidebar-spacer" />
           <div className="sidebar-status-group">
@@ -257,10 +305,18 @@ function App() {
               </section>
             )}
 
-            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} section={settingsSection} onSectionChange={setSettingsSection} /> : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
+            {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} section={settingsSection} onSectionChange={setSettingsSection} />
+              : view === "mcp" ? <section className="surface mcp-connections-page"><McpConnectionsPanel language={language} /></section>
+                : view === "me" && activeScope ? <AccountConnectionPanel language={language} activeScope={activeScope} onSignOut={() => { setActiveScope(null); setView("home"); }} />
+                  : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
       </div>
+      <AccountLoginDialog language={language} open={loginOpen} onClose={() => setLoginOpen(false)} onSignedIn={(scope) => {
+        setActiveScope(scope);
+        setLoginOpen(false);
+        setView("me");
+      }} />
     </div>
     </AntdApp>
     </ConfigProvider>

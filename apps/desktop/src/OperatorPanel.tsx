@@ -4,7 +4,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ArrowUpRight, Copy, Pencil, Trash2, Unplug } from "lucide-react";
 import { messages, type Language } from "./i18n";
-import type { ScopeStatus } from "./operatorTypes";
 import type { View } from "./App";
 import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, TaskEntry, TaskUpdate, TransferUpdate } from "./operatorTypes";
 import { RemoteConnectionPanel } from "./RemoteConnectionPanel";
@@ -13,7 +12,6 @@ import type { OperationKind } from "./RemoteOperationsPanel";
 import { executionErrorMessage, type ExecutionSelection } from "./executionQueries";
 import { mergeTransferUpdate } from "./transferUpdates";
 import { formatDeviceCode } from "./deviceCode";
-import { AccountConnectionPanel } from "./AccountConnectionPanel";
 import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
 import { OsLogo } from "./OsLogo";
 import { SavedConnectionDialog, type SavedConnection } from "./SavedConnectionDialog";
@@ -61,7 +59,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   const [savedConnection, setSavedConnection] = useState<SavedConnection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [activeScope, setActiveScope] = useState<ScopeStatus | null>(null);
   const [aliasDraft, setAliasDraft] = useState("");
   const [operation, setOperation] = useState<OperationKind>("command");
   const [transferDirection, setTransferDirection] = useState<"upload" | "download">("upload");
@@ -167,12 +164,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       window.clearInterval(interval);
     };
   }, [view, savedCodes]);
-
-  function handleScopeChange(scope: ScopeStatus | null) {
-    setActiveScope(scope);
-    setDevices((current) => current.map((device) => ({ ...device, connected: false })));
-    setSelectedCode("");
-  }
 
   useEffect(() => {
     if (!deleteTarget) return;
@@ -298,11 +289,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     }
   }
 
-  useEffect(() => {
-    void invoke<ScopeStatus | null>("operator_current_traffic_scope")
-      .then(setActiveScope)
-      .catch(() => setActiveScope(null));
-  }, []);
 
   async function refreshOperations() {
     const saved = await invoke<OperationEntry[]>("operator_operations");
@@ -806,13 +792,6 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
           onConnect={() => void connect()}
         />
       )}
-      {view === "me" && (
-        <AccountConnectionPanel
-          language={language}
-          activeScope={activeScope}
-          onScopeChange={handleScopeChange}
-        />
-      )}
       {view === "home" && (
         <section className="surface home-recent">
           <h2>{t.previouslyConnectedDevices}</h2>
@@ -899,7 +878,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
             command={selected && (
               <Suspense fallback={<div className="empty-device">{t.loading}</div>}>
                 <RemoteOperationsPanel
-                  key={`${selected.deviceCode}:${activeScope?.tenantId ?? "guest"}:${activeScope?.userId ?? "guest"}`}
+                  key={selected.deviceCode}
                   language={language}
                   selected={selected}
                   operation={operation}

@@ -9,6 +9,100 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Stop-PabInstalledBinary {
+    param([string[]]$Paths)
+    # Compare full paths, never kill the Agent client or another installation.
+    Get-CimInstance Win32_Process -Filter "Name LIKE 'pab-%'" |
+        Where-Object { $_.ExecutablePath -and $Paths -icontains $_.ExecutablePath } |
+        ForEach-Object {
+            $processIdToStop = $_.ProcessId
+            try {
+                Stop-Process -Id $processIdToStop -Force -ErrorAction Stop
+                Wait-Process -Id $processIdToStop -Timeout 5 -ErrorAction SilentlyContinue
+                if (Get-Process -Id $processIdToStop -ErrorAction SilentlyContinue) {
+                    throw 'Process did not exit after forced termination'
+                }
+            } catch {
+                if (Get-Process -Id $processIdToStop -ErrorAction SilentlyContinue) {
+                    throw "Could not stop installed program (PID ${processIdToStop}): $($_.Exception.Message)"
+                }
+            }
+        }
+}
+
+function Install-PabBinaries {
+    param([string]$SourceRoot, [string]$DestinationRoot)
+    $names = @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe')
+    $transaction = [Guid]::NewGuid().ToString('N')
+    $staged = @{}
+    $retired = @{}
+    $published = @()
+    $committed = $false
+    try {
+        # Finish all copying before interrupting the installed programs.
+        foreach ($name in $names) {
+            $binary = Join-Path $DestinationRoot $name
+            $staged[$binary] = "$binary.$transaction.new"
+            Copy-Item -LiteralPath (Join-Path $SourceRoot $name) -Destination $staged[$binary] -Force
+        }
+        foreach ($name in ($names + @('pab-bridge.exe'))) {
+            $binary = Join-Path $DestinationRoot $name
+            $old = "$binary.$transaction.old"
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            while (Test-Path -LiteralPath $binary) {
+                try {
+                    # A running Windows image can normally be renamed. Removing
+                    # its launch path BEFORE killing it prevents client respawn
+                    # from reopening the old binary during replacement.
+                    Move-Item -LiteralPath $binary -Destination $old -ErrorAction Stop
+                    $retired[$binary] = $old
+                    break
+                } catch {
+                    if ([DateTime]::UtcNow -ge $deadline) {
+                        throw "Could not retire installed program after 30 seconds: $binary. $($_.Exception.Message)"
+                    }
+                    Stop-PabInstalledBinary -Paths @($binary)
+                    Start-Sleep -Milliseconds 200
+                }
+            }
+            # Windows may report either the original or renamed executable path.
+            Stop-PabInstalledBinary -Paths @($binary, $old)
+        }
+        foreach ($binary in $staged.Keys) {
+            Move-Item -LiteralPath $staged[$binary] -Destination $binary -ErrorAction Stop
+            $published += $binary
+        }
+        $committed = $true
+    } catch {
+        $failure = $_
+        # Restore the previous files if staging/retirement/publication failed.
+        foreach ($binary in $published) {
+            try {
+                Move-Item -LiteralPath $binary -Destination $staged[$binary] -ErrorAction Stop
+                Stop-PabInstalledBinary -Paths @($binary, $staged[$binary])
+            } catch { Write-Warning "Could not withdraw new program: $binary" }
+        }
+        foreach ($binary in $retired.Keys) {
+            try {
+                Move-Item -LiteralPath $retired[$binary] -Destination $binary -ErrorAction Stop
+            } catch { Write-Warning "Previous program retained at $($retired[$binary]); could not restore $binary" }
+        }
+        throw $failure
+    } finally {
+        $cleanupPaths = @($staged.Values)
+        if ($committed) { $cleanupPaths += @($retired.Values) }
+        foreach ($path in $cleanupPaths) {
+            if (Test-Path -LiteralPath $path) {
+                # Only remove exact files allocated by this invocation. A locked
+                # old image may be left behind without blocking the new install.
+                try { Remove-Item -LiteralPath $path -Force -ErrorAction Stop }
+                catch { Write-Warning "Upgrade temporary file is still in use: $path" }
+            }
+        }
+    }
+}
+
 if (-not $ControlUrl.StartsWith('wss://')) {
     throw 'ControlUrl must use wss://'
 }
@@ -83,30 +177,12 @@ if ($existingService) {
         }
     }
 }
-$binaryNames = @('pab-mcp', 'pab-bridge', 'pab-executor', 'pab-desktop')
-foreach ($name in $binaryNames) {
-    $binary = Join-Path $InstallRoot "$name.exe"
-    Get-CimInstance Win32_Process -Filter "Name = '$name.exe'" |
-        Where-Object { $_.ExecutablePath -eq $binary } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-}
-Start-Sleep -Seconds 2
-foreach ($name in $binaryNames) {
-    $binary = Join-Path $InstallRoot "$name.exe"
-    $running = @(Get-CimInstance Win32_Process -Filter "Name = '$name.exe'" |
-        Where-Object { $_.ExecutablePath -eq $binary })
-    if ($running.Count -gt 0) {
-        throw "Cannot replace running program: $binary"
-    }
-}
+Install-PabBinaries -SourceRoot $source -DestinationRoot $InstallRoot
 foreach ($obsolete in @('run-ui.ps1', 'run-device-ui.ps1', 'run-executor.ps1', 'pab-bridge.exe')) {
     $path = Join-Path $InstallRoot $obsolete
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Force
     }
-}
-foreach ($name in @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe')) {
-    Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
@@ -154,7 +230,27 @@ if ($existingService) {
     New-Service -Name $taskName -BinaryPathName $serviceCommand `
         -DisplayName 'Pixels Agent Bridge Executor' -StartupType Automatic | Out-Null
 }
-Start-Service -Name $taskName
+try {
+    Start-Service -Name $taskName
+} catch {
+    $startupFailure = $_
+    Write-Output 'Executor startup failed. Recent startup diagnostics:'
+    # Surface the actual cause instead of only the generic Start-Service error.
+    # Do not print arbitrary command output, credentials or the whole log.
+    $executorLog = Join-Path $dataRoot 'logs\executor.log'
+    try {
+        if (Test-Path -LiteralPath $executorLog) {
+            Get-Content -LiteralPath $executorLog -Tail 80 |
+                Select-String 'Executor service stopped with an error|Windows Executor service failed|process panicked' |
+                Select-Object -Last 3 |
+                ForEach-Object { Write-Output $_.Line }
+        }
+    } catch {
+        Write-Output "Could not read startup log: $executorLog"
+    }
+    Write-Output "Full Executor log: $executorLog"
+    throw $startupFailure
+}
 
 $supervisorAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +

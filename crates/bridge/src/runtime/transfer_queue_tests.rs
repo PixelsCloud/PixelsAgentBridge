@@ -23,8 +23,52 @@ async fn queue(path: &Path, session: &str) -> TransferQueue {
         .unwrap()
 }
 
+#[tokio::test]
+async fn queued_transfer_keeps_submitting_user_without_an_initialized_runtime() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("db");
+    let q = queue(&path, "lazy-mcp-queue").await;
+    let alice = pab_protocol::UserAttribution {
+        user_id: UserId::new(),
+        username: "Alice".into(),
+    };
+    let bob = pab_protocol::UserAttribution {
+        user_id: UserId::new(),
+        username: "Bob".into(),
+    };
+    let spec = request();
+    let (first, inserted) = q
+        .submit_with_user(&spec, Some(alice.clone()))
+        .await
+        .unwrap();
+    assert!(inserted);
+    assert_eq!(first.operation.initiating_user, Some(alice.clone()));
+    let (repeated, inserted) = q.submit_with_user(&spec, Some(bob.clone())).await.unwrap();
+    assert!(!inserted);
+    assert_eq!(repeated.operation.initiating_user, Some(alice));
+    let next = request();
+    let (second, _) = q.submit_with_user(&next, Some(bob.clone())).await.unwrap();
+    assert_eq!(second.operation.initiating_user, Some(bob));
+    let (guest, _) = q.submit_with_user(&request(), None).await.unwrap();
+    assert!(guest.operation.initiating_user.is_none());
+    q.store.close().await;
+    let reopened = queue(&path, "lazy-mcp-queue").await;
+    assert_eq!(
+        reopened
+            .get(spec.request_id, spec.device_code)
+            .await
+            .unwrap()
+            .operation
+            .initiating_user
+            .unwrap()
+            .username,
+        "Alice"
+    );
+}
+
 fn remote(spec: &TransferRequest, state: &str, published: Option<bool>) -> TransferSnapshot {
     TransferSnapshot {
+        initiating_user: None,
         execution_context: None,
         request_id: spec.request_id,
         initiated_by: OperatorRef::account(UserId::from_u128(7), EndpointKey::new([7; 32])),

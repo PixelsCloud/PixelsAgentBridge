@@ -1,3 +1,4 @@
+mod account;
 mod credential;
 mod device;
 mod directory;
@@ -275,6 +276,7 @@ pub struct BridgeRuntime {
     bridge_task: JoinHandle<()>,
     heartbeat_task: JoinHandle<()>,
     reconciliation_task: JoinHandle<()>,
+    account_task: JoinHandle<()>,
 }
 
 impl BridgeRuntime {
@@ -343,6 +345,7 @@ impl BridgeRuntime {
         };
         let inner = Arc::new(RuntimeInner {
             presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
+                account: Some(crate::desktop_presence::AccountSyncReport::default()),
                 session_id: session_id.clone(),
                 tenant_id: bridge_config.tenant_id.to_string(),
                 identity: initiated_by.clone(),
@@ -373,6 +376,11 @@ impl BridgeRuntime {
             reconciliation_notify: Notify::new(),
         });
         inner.publish(RuntimeEventKind::BridgeConnecting);
+        let account_task = tokio::spawn(account::run(
+            bridge_config.clone(),
+            Arc::clone(&inner),
+            shutdown.subscribe(),
+        ));
         let bridge_task = tokio::spawn(run_bridge_supervisor(
             bridge_config,
             runtime_config.retry_interval,
@@ -393,6 +401,7 @@ impl BridgeRuntime {
             bridge_task,
             heartbeat_task,
             reconciliation_task,
+            account_task,
         };
         if runtime_config.resume_incomplete_on_start {
             for record in runtime.inner.store.incomplete().await? {
@@ -513,7 +522,15 @@ impl BridgeRuntime {
         args: Vec<String>,
         cwd: Option<String>,
     ) -> Result<TaskSnapshot, RuntimeError> {
-        self.submit_command_as(device_ref, request_id, program, args, cwd, Default::default()).await
+        self.submit_command_as(
+            device_ref,
+            request_id,
+            program,
+            args,
+            cwd,
+            Default::default(),
+        )
+        .await
     }
 
     pub async fn submit_command_as(
@@ -528,7 +545,10 @@ impl BridgeRuntime {
         let target = self.current_environment(device_ref).await?;
         let display_summary = display_summary(&program, &args);
         let command = CommandTaskSpec {
-            options: pab_protocol::CommandOptions { execution, ..Default::default() },
+            options: pab_protocol::CommandOptions {
+                execution,
+                ..Default::default()
+            },
             program,
             args,
             cwd,
@@ -818,6 +838,7 @@ impl BridgeRuntime {
         self.bridge_task.await?;
         self.heartbeat_task.await?;
         self.reconciliation_task.await?;
+        self.account_task.await?;
         self.inner
             .store
             .stop_session(&self.inner.session_id)

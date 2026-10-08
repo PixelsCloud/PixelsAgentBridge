@@ -362,7 +362,19 @@ impl OperationManager {
         {
             return Err("MCP transfer capacity reached; resolve an existing operation before submitting more".to_owned());
         }
-        let (record, inserted) = self.queue.submit(&spec).await.map_err(|e| e.to_string())?;
+        let user = pab_agent_core::account::AccountStore::from_env()
+            .and_then(|store| store.read())
+            .map_err(|error| error.to_string())?
+            .user
+            .map(|user| pab_protocol::UserAttribution {
+                user_id: user.id,
+                username: user.username,
+            });
+        let (record, inserted) = self
+            .queue
+            .submit_with_user(&spec, user)
+            .await
+            .map_err(|e| e.to_string())?;
         self.report_queue().await;
         let mut done = None;
         if inserted {
@@ -805,6 +817,7 @@ impl OperationManager {
         self.closed.store(true, Ordering::Release);
         for (_, (_, job)) in self.connections.lock().await.drain() {
             job.abort();
+            let _ = job.await;
         }
         if let Some(task) = self.heartbeat.lock().await.take() {
             task.abort();

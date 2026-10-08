@@ -1,9 +1,9 @@
 use std::{env, fs, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
 
-use pab_protocol::{RelayLimitDefaults, TenantId, UserId};
+use pab_protocol::RelayLimitDefaults;
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
-    RelayControlAuth, TeamRole, serve_tls,
+    RelayControlAuth, serve_tls,
 };
 
 #[tokio::main]
@@ -51,13 +51,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             store.migrate().await?;
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
             control_plane
-                .initialize_settings(
-                    RelayLimitDefaults {
-                        team_mbps: 20,
-                        member_mbps: 4,
-                        personal_mbps: 5,
-                    },
-                )
+                .initialize_settings(RelayLimitDefaults {
+                    user_mbps: 5,
+                    guest_mbps: 1,
+                })
                 .await?;
             println!("PostgreSQL initialized");
         }
@@ -68,118 +65,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let control = ControlPlane::new(store, PasswordPolicy::default())?;
             println!("{}", control.account_id_by_username(username).await?);
         }
-        "team-create" => {
-            let [owner_id, name] = arguments.as_slice() else {
-                return Err("usage: pab-server team-create <owner-account-id> <team-name>".into());
-            };
-            store.migrate().await?;
-            let owner_id = owner_id.parse::<UserId>()?;
-            let operator = required_admin_actor()?;
-            let control = ControlPlane::new(store, PasswordPolicy::default())?;
-            let team = control.admin_create_team(owner_id, name, &operator).await?;
-            println!("Team {} created for account {}", team.tenant_id, owner_id);
-        }
-        "team-add-member" => {
-            let [team_id, user_id, role] = arguments.as_slice() else {
-                return Err(
-                    "usage: pab-server team-add-member <team-id> <account-id> <admin|member>"
-                        .into(),
-                );
-            };
-            store.migrate().await?;
-            let team_id = team_id.parse::<TenantId>()?;
-            let user_id = user_id.parse::<UserId>()?;
-            let role = match role.as_str() {
-                "admin" => TeamRole::Admin,
-                "member" => TeamRole::Member,
-                _ => return Err("role must be admin or member".into()),
-            };
-            let operator = required_admin_actor()?;
-            let control = ControlPlane::new(store, PasswordPolicy::default())?;
-            let added = control
-                .admin_add_team_member(team_id, user_id, role, &operator)
-                .await?;
-            println!(
-                "Team {team_id} account {user_id}: {}",
-                if added {
-                    "member added"
-                } else {
-                    "already a member"
-                }
-            );
-        }
-        "team-remove-member" => {
-            let [team_id, user_id] = arguments.as_slice() else {
-                return Err(
-                    "usage: pab-server team-remove-member <team-id> <account-id>".into(),
-                );
-            };
-            store.migrate().await?;
-            let team_id = team_id.parse::<TenantId>()?;
-            let user_id = user_id.parse::<UserId>()?;
-            let operator = required_admin_actor()?;
-            let control = ControlPlane::new(store, PasswordPolicy::default())?;
-            let removed = control
-                .admin_remove_team_member(team_id, user_id, &operator)
-                .await?;
-            println!(
-                "Team {team_id} account {user_id}: {}",
-                if removed { "member removed" } else { "not an active member" }
-            );
-        }
-        "team-set-limits" => {
-            let [team_id, total_mbps, member_mbps] = arguments.as_slice() else {
-                return Err(
-                    "usage: pab-server team-set-limits <team-id> <total-mbps> <member-mbps>"
-                        .into(),
-                );
-            };
-            store.migrate().await?;
-            let team_id = team_id.parse::<TenantId>()?;
-            let total_mbps = total_mbps.parse::<u32>()?;
-            let member_mbps = member_mbps.parse::<u32>()?;
-            let operator = required_admin_actor()?;
-            let control = ControlPlane::new(store, PasswordPolicy::default())?;
-            let changed = control
-                .admin_set_team_limits(team_id, total_mbps, member_mbps, &operator)
-                .await?;
-            println!(
-                "Team {team_id} speeds: {} (total {total_mbps} Mbps, member {member_mbps} Mbps)",
-                if changed { "updated" } else { "unchanged" }
-            );
-        }
-        "account-set-default-team" => {
-            let [user_id, team_id] = arguments.as_slice() else {
-                return Err(
-                    "usage: pab-server account-set-default-team <account-id> <team-id|personal>"
-                        .into(),
-                );
-            };
-            store.migrate().await?;
-            let user_id = user_id.parse::<UserId>()?;
-            let team_id = if team_id == "personal" {
-                None
-            } else {
-                Some(team_id.parse::<TenantId>()?)
-            };
-            let operator = required_admin_actor()?;
-            let control = ControlPlane::new(store, PasswordPolicy::default())?;
-            let changed = control
-                .admin_set_default_traffic_team(user_id, team_id, &operator)
-                .await?;
-            println!(
-                "Account {user_id} default traffic Team: {} ({})",
-                team_id.map_or_else(|| "personal".to_owned(), |id| id.to_string()),
-                if changed { "updated" } else { "unchanged" }
-            );
-        }
         "serve" => {
             store.migrate().await?;
-            let initialized: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM server_settings WHERE singleton)",
-            )
-            .fetch_one(store.pool())
-            .await?;
+            let initialized: bool =
+                sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM server_settings WHERE singleton)")
+                    .fetch_one(store.pool())
+                    .await?;
             if !initialized {
                 return Err("server settings are not initialized; run pab-server init".into());
             }
@@ -233,21 +124,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             presence.abort();
             result?;
         }
-        _ => return Err(
-            "usage: pab-server [check|migrate|init|serve|web-admin|account-id|team-create|team-add-member|team-remove-member|team-set-limits|account-set-default-team]"
-                .into(),
-        ),
+        _ => {
+            return Err("usage: pab-server [check|migrate|init|serve|web-admin|account-id]".into());
+        }
     }
     Ok(())
-}
-
-fn required_admin_actor() -> Result<String, Box<dyn std::error::Error>> {
-    let actor = env::var("PAB_ADMIN_ACTOR")
-        .map_err(|_| "PAB_ADMIN_ACTOR must name the server administrator")?;
-    if actor.trim().is_empty() {
-        return Err("PAB_ADMIN_ACTOR must not be empty".into());
-    }
-    Ok(actor)
 }
 
 fn required_path(name: &'static str) -> Result<PathBuf, Box<dyn std::error::Error>> {

@@ -180,6 +180,7 @@ impl BridgeConnector {
                 operator,
                 password_version,
                 authenticated_at_unix_ms,
+                user_context: _,
             } if accepted_device == device_ref
                 && operator
                     == self
@@ -223,6 +224,17 @@ pub struct AuthenticatedDeviceConnection {
 }
 
 impl AuthenticatedDeviceConnection {
+    pub async fn user_context(&self) -> Result<pab_protocol::EndpointUserContext, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::GetUserContext {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            })
+            .await?
+        {
+            DeviceTaskResponse::UserContext { context } => Ok(context),
+            response => Err(unexpected_task_response(response)),
+        }
+    }
     pub const fn device_ref(&self) -> DeviceRef {
         self.device_ref
     }

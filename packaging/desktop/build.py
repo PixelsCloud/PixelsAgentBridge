@@ -89,8 +89,7 @@ def package_unix(platform, architecture, binaries):
         from build_version import verify_artifacts, macos_artifacts, macos_app_version
 
         version = verify_artifacts(root, f'macos-{architecture}', args.profile, macos_artifacts(binaries, args.macos_app))
-        if macos_app_version(args.macos_app) != version:
-            raise ValueError('macOS app version does not match its build record')
+        macos_app_version(args.macos_app)  # App identity/version is independent of the installer.
         versions[archive_path.name] = version
     else:
         from build_version import verify_artifacts

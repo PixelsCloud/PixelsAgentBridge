@@ -220,6 +220,7 @@ async fn authenticate(
     stream
         .send_json(
             &DeviceSessionAuthenticationResult::Accepted {
+                user_context: authorized.user_context.clone(),
                 device_ref,
                 operator: authorized.operator,
                 password_version: credential.password_version(),
@@ -253,7 +254,17 @@ async fn authenticate(
                     Ok(stream) => {
                         let tasks = tasks.clone();
                         let initiated_by = authorized.operator;
+                        let current = match authorizer.authorize(peer_endpoint_key).await {
+                            Ok(current) if current.operator == initiated_by && current.device_ref == device_ref => current,
+                            _ => {
+                                connection.close(b"device authorization expired");
+                                return Err(DeviceSessionError::AuthorizationExpired);
+                            }
+                        };
+                        let tasks = tasks.with_user_context(current.user_context);
                         tokio::spawn(async move {
+                            // Resolve the current user at the start of each stream. Already
+                            // running streams keep their original immutable attribution.
                             if let Err(error) = tasks.handle_stream(initiated_by, stream, timeout).await
                                 && !error.is_connection_end()
                             {

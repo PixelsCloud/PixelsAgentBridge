@@ -216,6 +216,25 @@ impl TransferQueue {
         &self,
         spec: &TransferRequest,
     ) -> Result<(QueuedTransfer, bool), RuntimeStoreError> {
+        self.submit_inner(spec, None).await
+    }
+
+    /// Freeze the local submitting account before the asynchronous worker starts.
+    /// This is history only; the remote verifies its own current identity and
+    /// never authorizes requests using this locally supplied attribution.
+    pub async fn submit_with_user(
+        &self,
+        spec: &TransferRequest,
+        user: Option<pab_protocol::UserAttribution>,
+    ) -> Result<(QueuedTransfer, bool), RuntimeStoreError> {
+        self.submit_inner(spec, Some(user)).await
+    }
+
+    async fn submit_inner(
+        &self,
+        spec: &TransferRequest,
+        submitting_user: Option<Option<pab_protocol::UserAttribution>>,
+    ) -> Result<(QueuedTransfer, bool), RuntimeStoreError> {
         if !matches!(spec.direction.as_str(), "upload" | "download") {
             return Err(RuntimeStoreError::RequestConflict);
         }
@@ -272,7 +291,7 @@ impl TransferQueue {
             return Err(RuntimeStoreError::RequestConflict);
         }
         if let Some(original) = spec.options.resume_from {
-            let row = sqlx::query("SELECT o.*, c.context_json, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_sessions s ON s.id=o.owner_session_id WHERE o.id=?")
+            let row = sqlx::query("SELECT o.*, (SELECT u.user_json FROM runtime_operation_users u WHERE u.operation_id=o.id) AS initiating_user, c.context_json, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms FROM runtime_operations o JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_sessions s ON s.id=o.owner_session_id WHERE o.id=?")
                 .bind(original.to_string()).fetch_optional(&mut *tx).await?.ok_or(RuntimeStoreError::NotFound)?;
             if row
                 .try_get::<Option<String>, _>("owner_session_id")?
@@ -313,6 +332,13 @@ impl TransferQueue {
             .bind(now_unix_ms()).bind(&self.session_id).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO runtime_async_transfers (id, phase, updated_at_unix_ms) VALUES (?, 'queued', ?)")
             .bind(spec.request_id.to_string()).bind(now_unix_ms()).execute(&mut *tx).await?;
+        if let Some(user) = submitting_user {
+            sqlx::query("UPDATE runtime_operation_users SET user_json=? WHERE operation_id=?")
+                .bind(serde_json::to_string(&user)?)
+                .bind(spec.request_id.to_string())
+                .execute(&mut *tx)
+                .await?;
+        }
         sqlx::query("INSERT INTO runtime_transfer_context (id, options_json) VALUES (?, ?)")
             .bind(spec.request_id.to_string())
             .bind(options)
@@ -352,7 +378,7 @@ impl TransferQueue {
         id: RequestId,
         code: DeviceCode,
     ) -> Result<QueuedTransfer, RuntimeStoreError> {
-        let row = sqlx::query("SELECT o.*, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms, a.phase, a.updated_at_unix_ms, a.sha256 FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id JOIN runtime_async_transfers a ON a.id = o.id WHERE o.id = ? AND o.device_code = ? AND o.initiated_by = ?")
+        let row = sqlx::query("SELECT o.*, (SELECT u.user_json FROM runtime_operation_users u WHERE u.operation_id=o.id) AS initiating_user, s.heartbeat_at_unix_ms, s.stopped_at_unix_ms, a.phase, a.updated_at_unix_ms, a.sha256 FROM runtime_operations o LEFT JOIN runtime_sessions s ON s.id = o.owner_session_id JOIN runtime_async_transfers a ON a.id = o.id WHERE o.id = ? AND o.device_code = ? AND o.initiated_by = ?")
             .bind(id.to_string()).bind(code.to_string()).bind(&self.initiated_by)
             .fetch_optional(&self.store.pool).await?.ok_or(RuntimeStoreError::NotFound)?;
         let owner: String = row.try_get("owner_session_id")?;

@@ -23,6 +23,7 @@ impl BridgeRuntime {
             .await
             .get(&device_ref)
             .copied();
+        self.inner.wait_account_ready().await?;
         self.inner
             .store
             .start_desktop_input_operation(
@@ -62,6 +63,7 @@ impl BridgeRuntime {
             .await
             .get(&device_ref)
             .copied();
+        self.inner.wait_account_ready().await?;
         self.inner
             .store
             .start_window_operation(

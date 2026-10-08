@@ -11,6 +11,7 @@ async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
     store.start_session("fixture").await.unwrap();
     let (shutdown, receiver) = watch::channel(false);
     Arc::new(BridgeRuntime {
+        account_task: tokio::spawn(async {}),
         inner: Arc::new(RuntimeInner {
             presence: std::sync::Mutex::new(Default::default()),
             store,

@@ -15,7 +15,8 @@ use sqlx::Row;
 use uuid::Uuid;
 
 const COOKIE: &str = "__Host-pab_session";
-const MAX_AGE: u64 = 12 * 60 * 60;
+// Browser cookie retention is capped by browsers; server sessions never expire.
+const MAX_AGE: u64 = 400 * 24 * 60 * 60;
 
 #[derive(Serialize)]
 pub(crate) struct Viewer {
@@ -27,7 +28,7 @@ pub(crate) struct Viewer {
     pub auth_revision: i64,
 }
 
-fn token_hash(headers: &HeaderMap) -> Option<String> {
+fn cookie_token(headers: &HeaderMap) -> Option<&str> {
     let cookie = headers.get(header::COOKIE)?.to_str().ok()?;
     let mut values = cookie
         .split(';')
@@ -39,12 +40,50 @@ fn token_hash(headers: &HeaderMap) -> Option<String> {
     {
         return None;
     }
-    Some(blake3::hash(value.as_bytes()).to_hex().to_string())
+    Some(value)
+}
+
+fn token_hash(headers: &HeaderMap) -> Option<String> {
+    cookie_token(headers).map(hash_token)
+}
+
+fn hash_token(token: &str) -> String {
+    blake3::hash(token.as_bytes()).to_hex().to_string()
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let mut values = headers.get_all(header::AUTHORIZATION).iter();
+    let token = values.next()?.to_str().ok()?.strip_prefix("Bearer ")?;
+    if values.next().is_some() || token.len() != 64 || !token.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return None;
+    }
+    Some(token)
+}
+
+pub(crate) fn native_token_hash(headers: &HeaderMap) -> Option<String> {
+    bearer_token(headers).map(hash_token)
+}
+
+fn cookie(token: &str) -> String {
+    format!("{COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={MAX_AGE}")
 }
 
 pub(crate) async fn viewer(state: &WebState, headers: &HeaderMap) -> Result<Viewer, WebError> {
     let hash = token_hash(headers).ok_or_else(WebError::unauthorized)?;
-    let row = sqlx::query("SELECT u.id, u.username, u.server_admin, u.auth_revision, p.tenant_id FROM web_sessions s JOIN users u ON u.id=s.user_id JOIN personal_tenants p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>now() AND s.auth_revision=u.auth_revision AND u.status='active'")
+    viewer_by_hash(state, &hash).await
+}
+
+pub(crate) async fn native_viewer(
+    state: &WebState,
+    headers: &HeaderMap,
+) -> Result<Viewer, WebError> {
+    let token = bearer_token(headers).ok_or_else(WebError::unauthorized)?;
+    viewer_by_hash(state, &hash_token(token)).await
+}
+
+async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewer, WebError> {
+    let row = sqlx::query("SELECT u.id, u.username, u.server_admin, u.auth_revision, p.tenant_id FROM web_sessions s JOIN users u ON u.id=s.user_id JOIN personal_tenants p ON p.user_id=u.id WHERE s.token_hash=$1 AND u.status='active'")
         .bind(hash).fetch_optional(state.control.store().pool()).await?.ok_or_else(WebError::unauthorized)?;
     Ok(Viewer {
         id: row.try_get("id")?,
@@ -63,8 +102,10 @@ pub(crate) async fn config(State(state): State<WebState>) -> Json<Value> {
 pub(crate) async fn current(
     State(state): State<WebState>,
     headers: HeaderMap,
-) -> Result<Json<Viewer>, WebError> {
-    Ok(Json(viewer(&state, &headers).await?))
+) -> Result<Response, WebError> {
+    let me = viewer(&state, &headers).await?;
+    let token = cookie_token(&headers).ok_or_else(WebError::unauthorized)?;
+    Ok(([(header::SET_COOKIE, cookie(token))], Json(me)).into_response())
 }
 
 #[derive(Deserialize)]
@@ -90,17 +131,22 @@ async fn login_permit(state: &WebState) -> Result<tokio::sync::SemaphorePermit<'
 
 pub(crate) async fn login(
     State(state): State<WebState>,
-    headers: HeaderMap,
     Json(input): Json<Credentials>,
 ) -> Result<Response, WebError> {
     let _permit = login_permit(&state).await?;
-    establish(&state, &headers, input).await
+    establish(&state, input, SessionChannel::Browser).await
+}
+
+#[derive(Clone, Copy)]
+enum SessionChannel {
+    Browser,
+    Native,
 }
 
 async fn establish(
     state: &WebState,
-    headers: &HeaderMap,
     input: Credentials,
+    channel: SessionChannel,
 ) -> Result<Response, WebError> {
     if input.password.len() > 1024 {
         return Err(WebError::unauthorized());
@@ -123,42 +169,28 @@ async fn establish(
     let token: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
     let hash = blake3::hash(token.as_bytes()).to_hex().to_string();
     let mut tx = state.control.store().pool().begin().await?;
-    // Lock the account through creation to serialize password changes and enforce
-    // the per-account session cap across simultaneous browser logins.
+    // Serialize session creation with password changes without expiring other sessions.
     sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
         .bind(account.id.as_uuid())
         .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM web_sessions WHERE expires_at<=now() OR token_hash=$1")
-        .bind(token_hash(headers).unwrap_or_default())
-        .execute(&mut *tx)
-        .await?;
-    let inserted = sqlx::query("INSERT INTO web_sessions (token_hash,user_id,auth_revision,expires_at) SELECT $1,id,auth_revision,now()+interval '12 hours' FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
+    let inserted = sqlx::query("INSERT INTO web_sessions (token_hash,user_id) SELECT $1,id FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
         .bind(&hash).bind(account.id.as_uuid()).bind(revision).execute(&mut *tx).await?;
     if inserted.rows_affected() != 1 {
         return Err(WebError::unauthorized());
     }
-    sqlx::query("DELETE FROM web_sessions WHERE token_hash IN (SELECT token_hash FROM web_sessions WHERE user_id=$1 ORDER BY created_at DESC, token_hash OFFSET 20)")
-        .bind(account.id.as_uuid()).execute(&mut *tx).await?;
     tx.commit().await?;
-    let mut session_headers = HeaderMap::new();
-    session_headers.insert(header::COOKIE, format!("{COOKIE}={token}").parse().unwrap());
-    let me = viewer(state, &session_headers).await?;
-    Ok((
-        [(
-            header::SET_COOKIE,
-            format!(
-                "{COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={MAX_AGE}"
-            ),
-        )],
-        Json(me),
-    )
-        .into_response())
+    let me = viewer_by_hash(state, &hash).await?;
+    Ok(match channel {
+        SessionChannel::Browser => {
+            ([(header::SET_COOKIE, cookie(&token))], Json(me)).into_response()
+        }
+        SessionChannel::Native => Json(json!({"user":me,"access_token":token})).into_response(),
+    })
 }
 
 pub(crate) async fn register(
     State(state): State<WebState>,
-    headers: HeaderMap,
     Json(input): Json<Credentials>,
 ) -> Result<Response, WebError> {
     if !state.registration_enabled {
@@ -172,7 +204,7 @@ pub(crate) async fn register(
         .control
         .register_account(&input.username, &input.password)
         .await?;
-    establish(&state, &headers, input).await
+    establish(&state, input, SessionChannel::Browser).await
 }
 
 pub(crate) async fn logout(
@@ -180,10 +212,7 @@ pub(crate) async fn logout(
     headers: HeaderMap,
 ) -> Result<Response, WebError> {
     if let Some(hash) = token_hash(&headers) {
-        sqlx::query("DELETE FROM web_sessions WHERE token_hash=$1")
-            .bind(hash)
-            .execute(state.control.store().pool())
-            .await?;
+        revoke_session(&state, &hash).await?;
     }
     Ok((
         [(
@@ -193,6 +222,64 @@ pub(crate) async fn logout(
         StatusCode::NO_CONTENT,
     )
         .into_response())
+}
+
+pub(crate) async fn native_current(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+) -> Result<Json<Viewer>, WebError> {
+    Ok(Json(native_viewer(&state, &headers).await?))
+}
+
+pub(crate) async fn native_login(
+    State(state): State<WebState>,
+    Json(input): Json<Credentials>,
+) -> Result<Response, WebError> {
+    let _permit = login_permit(&state).await?;
+    establish(&state, input, SessionChannel::Native).await
+}
+
+pub(crate) async fn native_register(
+    State(state): State<WebState>,
+    Json(input): Json<Credentials>,
+) -> Result<Response, WebError> {
+    if !state.registration_enabled {
+        return Err(WebError::new(
+            StatusCode::FORBIDDEN,
+            "registration_disabled",
+        ));
+    }
+    let _permit = login_permit(&state).await?;
+    state
+        .control
+        .register_account(&input.username, &input.password)
+        .await?;
+    establish(&state, input, SessionChannel::Native).await
+}
+
+pub(crate) async fn native_logout(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+) -> Result<StatusCode, WebError> {
+    let token = bearer_token(&headers).ok_or_else(WebError::unauthorized)?;
+    revoke_session(&state, &hash_token(token)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn revoke_session(state: &WebState, hash: &str) -> Result<(), WebError> {
+    let mut tx = state.control.store().pool().begin().await?;
+    let deleted = sqlx::query("DELETE FROM web_sessions WHERE token_hash=$1")
+        .bind(hash)
+        .execute(&mut *tx)
+        .await?;
+    if deleted.rows_affected() > 0 {
+        sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    state.control.web_changed();
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -233,14 +320,10 @@ pub(crate) async fn change_password(
     if update.rows_affected() != 1 {
         return Err(WebError::new(StatusCode::CONFLICT, "conflict"));
     }
-    sqlx::query("DELETE FROM web_sessions WHERE user_id=$1")
-        .bind(me.id)
-        .execute(&mut *tx)
-        .await?;
     sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES ($1,'account.password_changed',$1)")
         .bind(me.id).execute(&mut *tx).await?;
     tx.commit().await?;
-    logout(State(state.clone()), headers).await
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 #[cfg(test)]

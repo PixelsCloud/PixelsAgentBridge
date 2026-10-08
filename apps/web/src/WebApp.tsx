@@ -12,8 +12,6 @@ import { DeviceDetail, DeviceListPage, Overview } from './DevicePages';
 import { useLiveUpdates } from './useLiveUpdates';
 import brand from './brand.svg';
 const AccountsPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AccountsPage })));
-const TeamsPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TeamsPage })));
-const TeamMembersPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TeamMembersPage })));
 const AuditPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AuditPage })));
 const TrafficPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TrafficPage })));
 const ServiceSettings = lazy(() => import('./ManagementPages').then(m => ({ default: m.ServiceSettings })));
@@ -60,7 +58,6 @@ function Console(props: Preferences) {
     { key: '/devices', icon: <Monitor size={18}/>, label: t('devices') },
     { key: '/online', icon: <Activity size={18}/>, label: t('onlineDevices') },
     ...(me.server_admin ? [{ key: '/accounts', icon: <Users size={18}/>, label: t('accounts') }] : []),
-    { key: '/teams', icon: <Users size={18}/>, label: t('teams') },
     { key: '/relay', icon: <Network size={18}/>, label: t('relay') },
     ...(me.server_admin ? [{ key: '/audit', icon: <List size={18}/>, label: t('events') }] : []),
     { key: '/account', icon: <User size={18}/>, label: t('account') },
@@ -69,7 +66,7 @@ function Console(props: Preferences) {
   async function logout() { try { await post('/logout'); setMe(null); navigate('/'); } catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); } }
   return <Layout className="console-layout"><Layout.Sider width={224} breakpoint="lg" collapsedWidth={64} className="console-sidebar" theme={props.dark ? 'dark' : 'light'}>
     <div className="console-brand"><img className="brand-mark small" src={brand} alt=""/><div><strong>Pixels</strong><span>Agent Bridge</span></div></div>
-    <Menu mode="inline" theme={props.dark ? 'dark' : 'light'} items={items} selectedKeys={[location.pathname.startsWith('/devices/') ? '/devices' : location.pathname.startsWith('/teams/') ? '/teams' : location.pathname]} onClick={({ key }) => navigate(key)}/>
+    <Menu mode="inline" theme={props.dark ? 'dark' : 'light'} items={items} selectedKeys={[location.pathname.startsWith('/devices/') ? '/devices' : location.pathname]} onClick={({ key }) => navigate(key)}/>
   </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t('console')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
     <Layout.Content className="console-content">{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes>
       <Route path="/" element={<Overview liveRevision={liveRevision}/>}/>
@@ -78,11 +75,9 @@ function Console(props: Preferences) {
       <Route path="/all-devices" element={<Navigate to={{ pathname: '/devices', search: location.search, hash: location.hash }} replace/>}/>
       <Route path="/devices/:id" element={<DeviceDetail liveRevision={liveRevision}/>}/>
       <Route path="/accounts" element={me.server_admin ? <AccountsPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
-      <Route path="/teams" element={<TeamsPage me={me} liveRevision={liveRevision}/>}/>
-      <Route path="/teams/:id" element={me.server_admin ? <TeamMembersPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
       <Route path="/audit" element={me.server_admin ? <AuditPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
       <Route path="/relay" element={<TrafficPage liveRevision={liveRevision} me={me}/>}/>
-      <Route path="/account" element={<Account me={me} onChanged={() => setMe(null)}/>}/>
+      <Route path="/account" element={<Account me={me}/>}/>
       <Route path="/settings" element={<PreferencesPanel {...props} version={config.version} admin={me.server_admin}/>}/>
       <Route path="*" element={<Navigate to="/" replace/>}/>
     </Routes></Suspense></Layout.Content></Layout></Layout>;
@@ -97,11 +92,11 @@ function PreferencesPanel(props: Preferences & { version: string; admin: boolean
   </Space>;
 }
 
-function Account({ me, onChanged }: { me: Viewer; onChanged: () => void }) {
+function Account({ me }: { me: Viewer }) {
   const t = useText(); const { message } = App.useApp(); const [busy, setBusy] = useState(false); const [error, setError] = useState<string>();
   async function submit(values: { current_password: string; new_password: string }) {
     setBusy(true); setError(undefined);
-    try { await post('/password', { current_password: values.current_password, new_password: values.new_password }); message.success(t('passwordChanged')); onChanged(); }
+    try { await post('/password', { current_password: values.current_password, new_password: values.new_password }); message.success(t('passwordChanged')); }
     catch (e) { setError(e instanceof ApiError ? e.code : 'networkError'); } finally { setBusy(false); }
   }
   return <Space orientation="vertical" size={20} style={{ width: '100%' }}><Typography.Title level={2}>{t('account')}</Typography.Title>

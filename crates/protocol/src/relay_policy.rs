@@ -4,35 +4,19 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{DeviceId, EndpointKey, TenantId, UserId};
-pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 4;
+pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TrafficScope {
-    Team {
-        tenant_id: TenantId,
-        user_id: UserId,
-    },
-    Personal {
-        tenant_id: TenantId,
-        user_id: UserId,
-    },
-    Guest {
-        endpoint_key: EndpointKey,
-    },
+    User { user_id: UserId },
+    Guest { endpoint_key: EndpointKey },
 }
 
 impl TrafficScope {
-    pub const fn tenant_id(self) -> Option<TenantId> {
-        match self {
-            Self::Team { tenant_id, .. } | Self::Personal { tenant_id, .. } => Some(tenant_id),
-            Self::Guest { .. } => None,
-        }
-    }
-
     pub const fn user_id(self) -> Option<UserId> {
         match self {
-            Self::Team { user_id, .. } | Self::Personal { user_id, .. } => Some(user_id),
+            Self::User { user_id } => Some(user_id),
             Self::Guest { .. } => None,
         }
     }
@@ -40,14 +24,13 @@ impl TrafficScope {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RelayLimitDefaults {
-    pub team_mbps: u32,
-    pub member_mbps: u32,
-    pub personal_mbps: u32,
+    pub user_mbps: u32,
+    pub guest_mbps: u32,
 }
 
 impl RelayLimitDefaults {
     pub fn validate(self) -> Result<Self, LimitConfigError> {
-        if self.team_mbps == 0 || self.member_mbps == 0 || self.personal_mbps == 0 {
+        if self.user_mbps == 0 || self.guest_mbps == 0 {
             return Err(LimitConfigError::ZeroRate);
         }
         Ok(self)
@@ -55,15 +38,14 @@ impl RelayLimitDefaults {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TeamRelayLimits {
-    pub tenant_id: TenantId,
-    pub total_mbps: u32,
-    pub member_mbps: u32,
+pub struct UserRelayLimit {
+    pub user_id: UserId,
+    pub mbps: u32,
 }
 
-impl TeamRelayLimits {
+impl UserRelayLimit {
     pub fn validate(self) -> Result<Self, LimitConfigError> {
-        if self.total_mbps == 0 || self.member_mbps == 0 {
+        if self.mbps == 0 {
             return Err(LimitConfigError::ZeroRate);
         }
         Ok(self)
@@ -86,7 +68,7 @@ pub enum RelayEndpointOwner {
 impl RelayEndpointOwner {
     pub const fn tenant_id(self) -> Option<TenantId> {
         match self {
-            Self::User { scope } => scope.tenant_id(),
+            Self::User { .. } => None,
             Self::Device { tenant_id, .. } => Some(tenant_id),
             Self::Guest => None,
         }
@@ -113,7 +95,7 @@ pub struct RelayPolicySnapshot {
     pub issued_at_unix_ms: i64,
     pub expires_at_unix_ms: i64,
     pub defaults: RelayLimitDefaults,
-    pub team_limits: Vec<TeamRelayLimits>,
+    pub user_limits: Vec<UserRelayLimit>,
     pub endpoints: Vec<RelayEndpointPolicy>,
     pub connection_intents: Vec<RelayConnectionIntent>,
 }
@@ -133,11 +115,11 @@ impl RelayPolicySnapshot {
         }
         self.defaults.validate()?;
 
-        let mut tenants = HashSet::with_capacity(self.team_limits.len());
-        for limits in &self.team_limits {
+        let mut users = HashSet::with_capacity(self.user_limits.len());
+        for limits in &self.user_limits {
             limits.validate()?;
-            if !tenants.insert(limits.tenant_id) {
-                return Err(RelayPolicyError::DuplicateTeam(limits.tenant_id));
+            if !users.insert(limits.user_id) {
+                return Err(RelayPolicyError::DuplicateUser(limits.user_id));
             }
         }
 
@@ -173,8 +155,8 @@ pub enum RelayPolicyError {
     InvalidValidityWindow,
     #[error(transparent)]
     InvalidLimit(#[from] LimitConfigError),
-    #[error("relay policy contains duplicate Team {0}")]
-    DuplicateTeam(TenantId),
+    #[error("relay policy contains duplicate user {0}")]
+    DuplicateUser(UserId),
     #[error("relay policy contains a duplicate endpoint {0:?}")]
     DuplicateEndpoint(EndpointKey),
     #[error("relay policy contains a duplicate connection intent")]
@@ -191,9 +173,8 @@ mod tests {
 
     fn defaults() -> RelayLimitDefaults {
         RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         }
     }
 
@@ -205,7 +186,7 @@ mod tests {
     #[test]
     fn rejects_zero_as_an_implicit_unlimited_value() {
         let result = RelayLimitDefaults {
-            member_mbps: 0,
+            user_mbps: 0,
             ..defaults()
         }
         .validate();
@@ -215,11 +196,10 @@ mod tests {
     #[test]
     fn rejects_duplicate_endpoints_in_a_snapshot() {
         let user_id = UserId::new();
-        let tenant_id = TenantId::new();
         let endpoint = RelayEndpointPolicy {
             endpoint_key: EndpointKey::new([7; 32]),
             owner: RelayEndpointOwner::User {
-                scope: TrafficScope::Personal { tenant_id, user_id },
+                scope: TrafficScope::User { user_id },
             },
         };
         let snapshot = RelayPolicySnapshot {
@@ -228,7 +208,7 @@ mod tests {
             issued_at_unix_ms: 10,
             expires_at_unix_ms: 20,
             defaults: defaults(),
-            team_limits: Vec::new(),
+            user_limits: Vec::new(),
             endpoints: vec![endpoint, endpoint],
             connection_intents: Vec::new(),
         };

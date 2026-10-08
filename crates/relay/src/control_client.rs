@@ -20,6 +20,28 @@ pub struct RelayControlClient {
 }
 
 impl RelayControlClient {
+    pub async fn wait_for_policy_change(&mut self) -> Result<(), RelayControlClientError> {
+        loop {
+            let message = self
+                .socket
+                .next()
+                .await
+                .ok_or(RelayControlClientError::Closed)??;
+            match message {
+                Message::Text(text)
+                    if matches!(
+                        serde_json::from_str::<RelayControlServerMessage>(&text)?,
+                        RelayControlServerMessage::PolicyChanged
+                    ) =>
+                {
+                    return Ok(());
+                }
+                Message::Ping(_) | Message::Pong(_) => {}
+                Message::Close(_) => return Err(RelayControlClientError::Closed),
+                _ => return Err(RelayControlClientError::UnexpectedMessage),
+            }
+        }
+    }
     pub async fn connect(
         url: &str,
         secret: &str,
@@ -62,14 +84,27 @@ impl RelayControlClient {
         .await
         .map_err(|_| RelayControlClientError::Timeout)??;
 
-        let response = tokio::time::timeout(CONTROL_OPERATION_TIMEOUT, self.socket.next())
-            .await
-            .map_err(|_| RelayControlClientError::Timeout)?
-            .ok_or(RelayControlClientError::Closed)??;
-        let Message::Text(response) = response else {
-            return Err(RelayControlClientError::UnexpectedMessage);
-        };
-        let response: RelayControlServerMessage = serde_json::from_str(response.as_str())?;
+        let response = tokio::time::timeout(CONTROL_OPERATION_TIMEOUT, async {
+            loop {
+                match self
+                    .socket
+                    .next()
+                    .await
+                    .ok_or(RelayControlClientError::Closed)??
+                {
+                    Message::Text(text) => {
+                        let response: RelayControlServerMessage = serde_json::from_str(&text)?;
+                        if !matches!(response, RelayControlServerMessage::PolicyChanged) {
+                            return Ok(response);
+                        }
+                    }
+                    Message::Ping(_) | Message::Pong(_) => {}
+                    _ => return Err(RelayControlClientError::UnexpectedMessage),
+                }
+            }
+        })
+        .await
+        .map_err(|_| RelayControlClientError::Timeout)??;
         match response {
             RelayControlServerMessage::PolicySnapshot {
                 request_id: response_id,

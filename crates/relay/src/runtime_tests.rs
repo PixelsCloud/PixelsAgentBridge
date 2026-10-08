@@ -4,8 +4,8 @@ use iroh_base::SecretKey;
 use iroh_relay::server::{ForwardingControl, ForwardingDecision};
 use pab_protocol::{
     DeviceId, EndpointKey, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
-    TrafficScope, UserId,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TenantId, TrafficScope, UserId,
+    UserRelayLimit,
 };
 
 use crate::{RelayPolicyRuntime, RelayPolicyState};
@@ -31,16 +31,15 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
         defaults: RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         },
-        team_limits: Vec::new(),
+        user_limits: Vec::new(),
         endpoints: vec![
             RelayEndpointPolicy {
                 endpoint_key: EndpointKey::new(*user_key.public().as_bytes()),
                 owner: RelayEndpointOwner::User {
-                    scope: TrafficScope::Personal { tenant_id, user_id },
+                    scope: TrafficScope::User { user_id },
                 },
             },
             RelayEndpointPolicy {
@@ -72,11 +71,12 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
 }
 
 #[test]
-fn forwarding_hook_shares_team_budget_across_members() {
+fn forwarding_hook_shares_user_budget_across_connections() {
     let tenant_id = TenantId::new();
     let device_id = DeviceId::new();
     let device_key = SecretKey::generate();
-    let members = [
+    let user_id = UserId::new();
+    let connections = [
         SecretKey::generate(),
         SecretKey::generate(),
         SecretKey::generate(),
@@ -96,15 +96,12 @@ fn forwarding_hook_shares_team_budget_across_members() {
         },
     }];
     let mut connection_intents = Vec::new();
-    for member in &members {
-        let endpoint_key = EndpointKey::new(*member.public().as_bytes());
+    for connection in &connections {
+        let endpoint_key = EndpointKey::new(*connection.public().as_bytes());
         endpoints.push(RelayEndpointPolicy {
             endpoint_key,
             owner: RelayEndpointOwner::User {
-                scope: TrafficScope::Team {
-                    tenant_id,
-                    user_id: UserId::new(),
-                },
+                scope: TrafficScope::User { user_id },
             },
         });
         connection_intents.push(RelayConnectionIntent {
@@ -119,15 +116,10 @@ fn forwarding_hook_shares_team_budget_across_members() {
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
         defaults: RelayLimitDefaults {
-            team_mbps: 20,
-            member_mbps: 4,
-            personal_mbps: 5,
+            user_mbps: 5,
+            guest_mbps: 1,
         },
-        team_limits: vec![TeamRelayLimits {
-            tenant_id,
-            total_mbps: 2,
-            member_mbps: 1,
-        }],
+        user_limits: vec![UserRelayLimit { user_id, mbps: 1 }],
         endpoints,
         connection_intents,
     };
@@ -136,19 +128,39 @@ fn forwarding_hook_shares_team_budget_across_members() {
     runtime.apply_snapshot(snapshot).unwrap();
 
     assert_eq!(
-        ForwardingControl::check(&runtime, members[0].public(), device_key.public(), 12_000),
+        ForwardingControl::check(
+            &runtime,
+            connections[0].public(),
+            device_key.public(),
+            12_000
+        ),
         ForwardingDecision::Allow
     );
     assert!(matches!(
-        ForwardingControl::check(&runtime, members[0].public(), device_key.public(), 1_000),
+        ForwardingControl::check(
+            &runtime,
+            connections[0].public(),
+            device_key.public(),
+            1_000
+        ),
         ForwardingDecision::Wait(_)
     ));
-    assert_eq!(
-        ForwardingControl::check(&runtime, members[1].public(), device_key.public(), 12_000),
-        ForwardingDecision::Allow
-    );
     assert!(matches!(
-        ForwardingControl::check(&runtime, members[2].public(), device_key.public(), 2_000),
+        ForwardingControl::check(
+            &runtime,
+            connections[1].public(),
+            device_key.public(),
+            12_000
+        ),
+        ForwardingDecision::Wait(_)
+    ));
+    assert!(matches!(
+        ForwardingControl::check(
+            &runtime,
+            connections[2].public(),
+            device_key.public(),
+            2_000
+        ),
         ForwardingDecision::Wait(_)
     ));
 }

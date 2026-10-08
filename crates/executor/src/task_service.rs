@@ -60,6 +60,7 @@ const MAX_ACTIVE_TERMINALS: usize = 8;
 
 #[derive(Clone)]
 pub(crate) struct TaskService {
+    user_context: pab_protocol::EndpointUserContext,
     #[cfg(test)]
     worker_executable: Option<std::path::PathBuf>,
     ui_connection: Arc<UiConnection>,
@@ -120,6 +121,11 @@ impl Drop for UiConnection {
 }
 
 impl TaskService {
+    pub(crate) fn with_user_context(mut self, context: pab_protocol::EndpointUserContext) -> Self {
+        self.store = self.store.with_initiating_user(context.user.clone());
+        self.user_context = context;
+        self
+    }
     /// Fresh per authenticated network connection, not per shared endpoint key.
     pub(crate) fn for_ui_connection(&self) -> Self {
         let mut service = self.clone();
@@ -153,6 +159,11 @@ impl TaskService {
                 .await?;
         }
         Ok(Self {
+            user_context: pab_protocol::EndpointUserContext {
+                revision: 0,
+                user: None,
+                policy_version: 0,
+            },
             #[cfg(test)]
             worker_executable: None,
             ui_connection: Arc::new(UiConnection::new()),
@@ -205,6 +216,22 @@ impl TaskService {
                 "unsupported device task schema version",
             )
             .await;
+        }
+        if matches!(request, DeviceTaskRequest::GetUserContext { .. }) {
+            stream
+                .send_json(
+                    &DeviceTaskResponse::UserContext {
+                        context: self.user_context.clone(),
+                    },
+                    timeout,
+                )
+                .await?;
+            return Ok(());
+        }
+        if let Some(request_id) = request.initiating_request_id() {
+            self.store
+                .record_user_attribution(initiated_by, request_id)
+                .await?;
         }
         if let DeviceTaskRequest::TransferFile { request, .. } = request {
             let result = self
@@ -458,6 +485,9 @@ impl TaskService {
         request: DeviceTaskRequest,
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
+            DeviceTaskRequest::GetUserContext { .. } => Ok(DeviceTaskResponse::UserContext {
+                context: self.user_context.clone(),
+            }),
             DeviceTaskRequest::SystemQuery {
                 request_id, query, ..
             } => Ok(DeviceTaskResponse::SystemQuery {

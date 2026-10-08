@@ -14,9 +14,9 @@ On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.9+, run
 contains the ad-hoc signed `Pixels Agent Bridge.app`, MCP, Executor, dedicated
 macOS scripts and launchd plists. It is not Developer-ID signed or notarized.
 The adjacent SHA-256 manifest records the complete archive checksum.
-The dedicated macOS script uses the currently synchronized product version; it
-does not allocate a new version through the Windows/Linux unified build entry.
-macOS tar/PKG metadata uses the built app's version, not a newer checkout version.
+The macOS wrapper uses the unified build entry to allocate one installer release version.
+Rust, npm, Tauri and the built app retain their internal versions. macOS tar/PKG
+metadata uses the verified build record's release version independently of the app version.
 
 Unpack the complete archive and, from a desktop user account, run
 `sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL`.
@@ -73,7 +73,7 @@ steps. To make a single EXE installer for another Windows computer, copy NSIS
 `python packaging/desktop/build_nsis.py`
 after building the complete Windows Debug ZIP. The NSIS builder checks the ZIP
 checksum and every Debug binary before embedding them. The resulting
-`.build/packages/pixels-agent-bridge-windows-x86_64-debug-setup.exe` has the CN
+`.build/packages/pixels-agent-bridge-windows-x86_64-debug-<version>-setup.exe` has the CN
 WSS control and HTTPS Relay URLs by default; use `--control-url` and
 `--relay-url` to target another deployment. It uses the same `install.ps1` and
 `uninstall.ps1` as the ZIP, creates an all-users Start menu entry, and appears

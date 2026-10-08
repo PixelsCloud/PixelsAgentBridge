@@ -299,6 +299,7 @@ mod tests {
             pab_protocol::EndpointKey::new([2; 32]),
         );
         let record = OperationRecord {
+            initiating_user: None,
             execution_identity: None,
             ui: None,
             id: request_id.to_string(),
@@ -324,6 +325,7 @@ mod tests {
             filesystem_mutation: None,
         };
         let mut snapshot = TransferSnapshot {
+            initiating_user: None,
             execution_context: None,
             request_id,
             initiated_by: actor,

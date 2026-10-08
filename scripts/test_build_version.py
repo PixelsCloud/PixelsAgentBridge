@@ -10,7 +10,7 @@ import sys
 import tomllib
 
 from build_version import (build_lock, next_version, parse_version, read_state,
-                           record_artifacts, reserve_version, synchronize, verify_artifacts, write_json,
+                           record_artifacts, reserve_version, verify_artifacts, write_json,
                            macos_artifacts)
 
 
@@ -54,30 +54,22 @@ class Versions(TestCase):
             self.assertEqual(reserve_version(self.root), '1.2.1')
         self.assertEqual(read_state(self.root)['build_count'], 2)
 
-    def test_all_manifests_and_only_owned_lock_entries_change(self):
-        synchronize(self.root, '2.0.0')
-        self.assertEqual(tomllib.loads((self.root / 'crates/core/Cargo.toml').read_text())['package']['version'], '2.0.0')
-        self.assertEqual(tomllib.loads((self.root / 'apps/desktop/src-tauri/Cargo.toml').read_text())['package']['version'], '2.0.0')
-        for relative in ['Cargo.lock', 'apps/desktop/src-tauri/Cargo.lock']:
-            packages = tomllib.loads((self.root / relative).read_text())['package']
-            self.assertEqual([p['version'] for p in packages], ['2.0.0', '1.0.228'])
-        for app in ['desktop', 'web']:
-            folder = self.root / 'apps' / app
-            package = json.loads((folder / 'package.json').read_text())
-            self.assertEqual(package['version'], '2.0.0')
-            self.assertEqual(package['scripts']['build'], 'kept')
-            lock = json.loads((folder / 'package-lock.json').read_text())
-            self.assertEqual(lock['version'], '2.0.0')
-            self.assertEqual(lock['packages']['']['version'], '2.0.0')
-            self.assertEqual(lock['packages']['node_modules/example']['version'], '9.8.7')
-        self.assertEqual(json.loads((self.root / 'apps/desktop/src-tauri/tauri.conf.json').read_text())['version'], '2.0.0')
+    def test_installer_version_does_not_modify_any_component_metadata(self):
+        paths = [path for path in self.root.rglob('*') if path.is_file() and path.name != 'build-version.json']
+        before = {path: path.read_bytes() for path in paths}
+        reserve_version(self.root)
+        reserve_version(self.root)
+        self.assertEqual(read_state(self.root)['version'], '1.2.1')
+        self.assertEqual({path: path.read_bytes() for path in paths}, before)
 
     def test_failed_build_number_is_not_reused(self):
-        with patch('build_version.synchronize', side_effect=OSError('interrupted write')):
-            with self.assertRaises(OSError):
+        with self.assertRaisesRegex(RuntimeError, 'build failed'):
+            with build_lock(self.root):
                 reserve_version(self.root)
-        self.assertEqual(reserve_version(self.root), '1.2.1')
-        self.assertEqual(tomllib.loads((self.root / 'crates/core/Cargo.toml').read_text())['package']['version'], '1.2.1')
+                raise RuntimeError('build failed after allocation')
+        with build_lock(self.root):
+            self.assertEqual(reserve_version(self.root), '1.2.1')
+        self.assertEqual(tomllib.loads((self.root / 'crates/core/Cargo.toml').read_text())['package']['version'], '0.1.0')
 
     def test_parallel_build_rejected_and_lock_released(self):
         code = 'from pathlib import Path; from build_version import build_lock; import sys\nwith build_lock(Path(sys.argv[1])): pass'
@@ -159,7 +151,7 @@ class Versions(TestCase):
                 executable = app / 'Contents/MacOS/pab-desktop'
                 executable.parent.mkdir(parents=True)
                 executable.write_bytes(b'fixture')
-                (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': read_state(self.root)['version']}))
+                (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': '0.1.0'}))
 
         with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\nx86_64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all', '--package']):
             with patch('macos_signing.load_identity', return_value='A' * 40), patch('macos_signing.sign') as signing:

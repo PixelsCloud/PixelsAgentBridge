@@ -25,6 +25,9 @@ export type ReportedOperation = {
   startedAtUnixMs: number; finishedAtUnixMs: number | null;
 };
 export type RuntimeReport = {
+  account?: { localRevision: number; serverRevision: number | null; remoteRevision: number | null;
+    policyVersion: number | null; user: { user_id: string; username: string } | null; error: string | null;
+    relayNodes: { node_id: string; applied_policy_version: number | null; online: boolean }[] } | null;
   sessionId: string; identity: string; controlUrl: string; relayUrls: string[];
   controlPhase: string; lastError: string | null; sampledAtUnixMs: number;
   devices: ReportedDevice[]; tasks: ReportedTask[]; operations: ReportedOperation[];

@@ -12,7 +12,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use uuid::Uuid;
 
 pub const REPORTING_PORT: u16 = 26035;
-pub const REPORTING_PROTOCOL_VERSION: u16 = 1;
+pub const REPORTING_PROTOCOL_VERSION: u16 = 2;
 pub const MAX_REPORT_BYTES: usize = 1024 * 1024;
 pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 pub const HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(20);
@@ -79,6 +79,7 @@ pub struct OperationReport {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeReport {
+    pub account: Option<AccountSyncReport>,
     pub session_id: String,
     pub tenant_id: String,
     pub identity: String,
@@ -94,6 +95,18 @@ pub struct RuntimeReport {
     pub tasks: Vec<TaskReport>,
     pub operations: Vec<OperationReport>,
     pub sampled_at_unix_ms: i64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AccountSyncReport {
+    pub relay_nodes: Vec<pab_protocol::RelayUserContextReceipt>,
+    pub local_revision: u64,
+    pub server_revision: Option<u64>,
+    pub remote_revision: Option<u64>,
+    pub policy_version: Option<u64>,
+    pub user: Option<pab_protocol::UserAttribution>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -199,7 +212,12 @@ pub struct ReportingTask {
 
 impl McpReporter {
     pub fn start() -> (Self, ReportingTask) {
-        Self::start_at(format!("ws://127.0.0.1:{REPORTING_PORT}/ws/mcp"))
+        let url = format!("ws://127.0.0.1:{REPORTING_PORT}/ws/mcp");
+        // Isolated process tests must not stop a user's Desktop occupying 26035.
+        // Installed release builds always use the product's fixed port.
+        #[cfg(debug_assertions)]
+        let url = std::env::var("PAB_TEST_MCP_REPORT_URL").unwrap_or(url);
+        Self::start_at(url)
     }
     pub fn start_at(url: String) -> (Self, ReportingTask) {
         let (report, receiver) = watch::channel(McpReport::new());
@@ -213,10 +231,20 @@ impl McpReporter {
         )
     }
     pub fn set_client(&self, name: String, version: String) {
-        self.report.send_modify(|r| {
-            r.client_name = Some(name);
-            r.client_version = Some(version);
+        let name = name.trim();
+        if name.is_empty() {
+            return;
+        }
+        self.report.send_if_modified(|r| {
+            if r.client_name.as_deref() == Some(name)
+                && r.client_version.as_deref() == Some(&version)
+            {
+                return false;
+            }
+            r.client_name = Some(name.to_owned());
+            r.client_version = Some(version.clone());
             r.updated_at_unix_ms = now_ms();
+            true
         });
     }
     pub fn set_runtime(&self, mut runtime: RuntimeReport) {
@@ -434,6 +462,15 @@ async fn connected_report(
                 },
                 message = socket.next() => match message {
                     Some(Ok(Message::Text(text))) if text.as_str() == "{\"type\":\"ack\"}" => acknowledged = tokio::time::Instant::now(),
+                    Some(Ok(Message::Text(text))) => {
+                        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                            if value.get("type").and_then(|v| v.as_str()) == Some("account_changed") {
+                                if let Some(revision) = value.get("revision").and_then(|v| v.as_u64()) {
+                                    pab_agent_core::account::notify_account_change(revision);
+                                }
+                            }
+                        }
+                    },
                     Some(Ok(Message::Ping(payload))) => { tokio::time::timeout(Duration::from_secs(3), socket.send(Message::Pong(payload))).await??; },
                     Some(Ok(Message::Close(_))) | None => return Ok(()),
                     Some(Err(error)) => return Err(error.into()),

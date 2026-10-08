@@ -98,6 +98,7 @@ impl BridgeRuntime {
             .await
             .get(&device_ref)
             .copied();
+        self.inner.wait_account_ready().await?;
         self.inner
             .store
             .start_operation(

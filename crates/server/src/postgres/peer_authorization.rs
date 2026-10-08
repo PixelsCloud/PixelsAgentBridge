@@ -32,10 +32,6 @@ impl PostgresStore {
             JOIN users peer_user
               ON peer_user.id = peer.user_id
              AND peer_user.status = 'active'
-            JOIN memberships membership
-              ON membership.tenant_id = peer.tenant_id
-             AND membership.user_id = peer.user_id
-             AND membership.status = 'active'
             WHERE device_endpoint.endpoint_key = $1
               AND device_endpoint.tenant_id = $2
               AND device_endpoint.device_id = $3
@@ -52,6 +48,7 @@ impl PostgresStore {
         .ok_or(StoreError::NotFound)?;
 
         Ok(AuthorizedDevicePeer {
+            user_context: self.endpoint_user_context(peer_endpoint_key).await?,
             device_ref: pab_protocol::DeviceRef {
                 tenant_id: device_endpoint.tenant_id,
                 device_id,

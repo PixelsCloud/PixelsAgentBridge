@@ -88,6 +88,7 @@ impl BridgeRuntime {
     ) -> Result<TerminalOpened, RuntimeError> {
         validate_terminal_size(cols, rows)?;
         // A read-only probe refreshes a cached device connection before a non-idempotent open.
+        self.inner.wait_account_ready().await?;
         self.current_environment(device_ref).await?;
         let id = RequestId::new();
         let path = self.inner.terminal_dir.join(format!("{id}.bin"));

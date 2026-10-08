@@ -164,6 +164,7 @@ async fn transfer_v2_bridge_checks_identity_before_binary_and_resumes_download()
             }
             let digest = format!("{:x}", Sha256::digest(&expected));
             let snapshot = TransferSnapshot {
+                initiating_user: None,
                 request_id: id,
                 initiated_by: actor,
                 direction: request.operation.direction().into(),

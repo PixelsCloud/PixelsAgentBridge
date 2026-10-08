@@ -76,6 +76,8 @@ impl RuntimeStore {
             .await?;
         let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS runtime_session_users (session_id TEXT PRIMARY KEY, user_json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS runtime_operation_users (operation_id TEXT PRIMARY KEY REFERENCES runtime_operations(id) ON DELETE CASCADE, user_json TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS runtime_screenshot_results (id TEXT PRIMARY KEY, meta_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             "CREATE TABLE IF NOT EXISTS runtime_system_results (id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             r#"
@@ -172,6 +174,7 @@ impl RuntimeStore {
         ] {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
+        sqlx::query("CREATE TRIGGER IF NOT EXISTS freeze_operation_user AFTER INSERT ON runtime_operations BEGIN INSERT INTO runtime_operation_users(operation_id,user_json) VALUES(NEW.id,COALESCE((SELECT user_json FROM runtime_session_users WHERE session_id=NEW.owner_session_id),'null')); END").execute(&mut *tx).await?;
         // Project observed results only. A requested username or context_ref
         // must never appear as the identity that actually executed an operation.
         sqlx::query("CREATE VIEW IF NOT EXISTS runtime_operation_identity AS SELECT o.id, CASE WHEN o.kind = 'terminal' THEN t.identity_json WHEN o.kind = 'file_transfer' THEN json_extract(c.context_json, '$.identity') WHEN f.id IS NOT NULL THEN json_extract(f.reply_json, '$.execution_context.identity') ELSE json_extract(q.reply_json, '$.execution_context.identity') END AS identity_json FROM runtime_operations o LEFT JOIN runtime_terminal_identity t ON t.id=o.id LEFT JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_filesystem_results f ON f.id=o.id LEFT JOIN runtime_system_results q ON q.id=o.id")

@@ -1,6 +1,7 @@
 import { Alert, Badge, Collapse, Descriptions, Empty, Space, Table, Tabs, Tag, Typography } from "antd";
 import { messages, type Language } from "./i18n";
 import { formatDeviceCode } from "./deviceCode";
+import { mcpClientName } from "./mcpClientName";
 import { useMcpReporting, type ConnectedMcp, type DeviceRef, type ReportedTask, type ReportedOperation, type ToolCall } from "./mcpReporting";
 
 export function McpConnectionsPanel({ language }: { language: Language }) {
@@ -77,7 +78,12 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
         { key: "client", label: t.mcpClient, children: [report.clientName, report.clientVersion].filter(Boolean).join(" · ") || "—" },
         { key: "bridge", label: t.mcpControl, children: runtime ? stateTag(runtime.controlPhase) : t.mcpNotStarted },
         { key: "calls", label: t.mcpActiveCalls, children: report.activeCalls.length },
+        { key: "account", label: t.accountName, children: runtime?.account?.user?.username ?? t.accountNotSignedIn },
+        { key: "accountSync", label: t.accountSync, children: !runtime?.account ? t.mcpNotStarted : runtime.account.serverRevision === runtime.account.localRevision ? t.mcpSucceeded : t.mcpPending },
+        { key: "remoteAccountSync", label: t.accountRemoteSync, children: !runtime?.devices.some(device => device.phase === "connected") ? "—" : runtime.account && runtime.account.remoteRevision === runtime.account.localRevision ? t.mcpSucceeded : t.mcpPending },
+        { key: "relaySync", label: t.accountRelaySync, children: runtime?.account?.relayNodes.length ? runtime.account.relayNodes.map(node => `${node.node_id}: ${node.online && node.applied_policy_version != null && runtime.account?.policyVersion != null && node.applied_policy_version >= runtime.account.policyVersion ? t.mcpSucceeded : t.mcpPending}`).join(" · ") : t.mcpPending },
       ]} />
+      {runtime?.account?.error && <Alert type="warning" showIcon title={runtime.account.error} />}
       {runtime?.lastError && <Alert type="error" showIcon title={runtime.lastError} />}
       <Tabs size="small" items={[
         { key: "devices", label: `${t.mcpDevices} (${runtime?.devices.length ?? 0})`, children: runtime?.devices.length ? <div className="mcp-device-list">{runtime.devices.map(device => <div className="mcp-device-row" key={`${device.deviceRef.tenant_id}/${device.deviceRef.device_id}`}>
@@ -102,12 +108,12 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
   }
 
   return <div className="mcp-reporting-panel">
-    <div className="mcp-reporting-heading"><h3>{t.mcpConnections}</h3><Badge count={status?.count ?? 0} showZero overflowCount={Number.MAX_SAFE_INTEGER} /></div>
+    <div className="mcp-reporting-heading"><h2>{t.mcpConnections}</h2><Badge count={status?.count ?? 0} showZero overflowCount={Number.MAX_SAFE_INTEGER} /></div>
     {(error || status?.error) && <Alert type="error" showIcon title={t.mcpServiceFailed} description={error || status?.error} />}
     {!status && !error ? <p>{t.loading}</p> : status?.running && <>
       {status.clients.length ? <Collapse size="small" items={status.clients.map(client => ({
         key: client.report.sessionId,
-        label: <Space wrap><strong>{client.report.clientName || "MCP"}</strong><Typography.Text type="secondary">PID {client.report.processId}</Typography.Text>{clientStatusTag(client)}</Space>,
+        label: <Space wrap><strong>{mcpClientName(client.report.clientName, t.unknown)}</strong><Typography.Text type="secondary">PID {client.report.processId}</Typography.Text>{clientStatusTag(client)}</Space>,
         children: details(client),
       }))} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t.mcpNoConnections} />}
     </>}

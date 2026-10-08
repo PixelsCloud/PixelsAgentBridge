@@ -17,10 +17,7 @@ impl PostgresStore {
             SELECT device.id, device.tenant_id AS device_tenant_id,
                    device.owner_tenant_id, device.code, device.name
             FROM endpoints requester
-            JOIN memberships member
-              ON member.tenant_id = requester.tenant_id
-             AND member.user_id = requester.user_id
-             AND member.status = 'active'
+            JOIN users requester_account ON requester_account.id=requester.user_id AND requester_account.status='active'
             JOIN devices device
               ON device.status = 'active'
              AND EXISTS (
@@ -68,10 +65,7 @@ impl PostgresStore {
             r#"
             SELECT device.id, device.tenant_id AS device_tenant_id
             FROM endpoints requester
-            JOIN memberships membership
-              ON membership.tenant_id = requester.tenant_id
-             AND membership.user_id = requester.user_id
-             AND membership.status = 'active'
+            JOIN users requester_account ON requester_account.id=requester.user_id AND requester_account.status='active'
             JOIN tenants tenant
               ON tenant.id = requester.tenant_id AND tenant.status = 'active'
             JOIN devices device
@@ -114,10 +108,7 @@ impl PostgresStore {
                    network.observed_at_unix_ms,
                    network.accepted_at
             FROM endpoints requester
-            JOIN memberships membership
-              ON membership.tenant_id = requester.tenant_id
-             AND membership.user_id = requester.user_id
-             AND membership.status = 'active'
+            JOIN users requester_account ON requester_account.id=requester.user_id AND requester_account.status='active'
             JOIN tenants tenant
               ON tenant.id = requester.tenant_id
              AND tenant.status = 'active'

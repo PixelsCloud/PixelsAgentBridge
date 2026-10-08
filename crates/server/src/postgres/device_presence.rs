@@ -30,10 +30,9 @@ impl PostgresStore {
               AND (
                   (requester.owner_kind = 'guest' AND scope.kind = 'guest')
                   OR (requester.owner_kind = 'user' AND EXISTS (
-                      SELECT 1 FROM memberships member
-                      WHERE member.tenant_id = requester.tenant_id
-                        AND member.user_id = requester.user_id
-                        AND member.status = 'active'
+                      SELECT 1 FROM users account
+                      WHERE account.id = requester.user_id
+                        AND account.status = 'active'
                   ))
               )
             "#,

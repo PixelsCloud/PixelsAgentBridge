@@ -2,15 +2,13 @@ use std::time::Duration;
 
 use pab_protocol::{
     DeviceId, EndpointKey, EndpointProofPrincipal, RELAY_POLICY_SCHEMA_VERSION, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TeamRelayLimits, TenantId,
-    TrafficScope, UserId,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicySnapshot, TenantId, TrafficScope, UserId,
 };
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 use thiserror::Error;
 use time::OffsetDateTime;
-use uuid::Uuid;
 
-use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint, Team, TeamRole};
+use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint};
 
 mod accounts;
 mod connection_intents;
@@ -23,7 +21,7 @@ mod guest_access;
 mod guest_registration;
 mod peer_authorization;
 mod support;
-mod teams;
+mod traffic;
 
 #[derive(Debug, Clone)]
 pub struct PostgresStore {
@@ -59,10 +57,9 @@ impl PostgresStore {
         defaults
             .validate()
             .map_err(|error| StoreError::InvalidInput(error.to_string()))?;
-        sqlx::query("INSERT INTO server_settings (default_team_mbps, default_member_mbps, default_personal_mbps) VALUES ($1, $2, $3) ON CONFLICT (singleton) DO NOTHING")
-            .bind(i32::try_from(defaults.team_mbps).map_err(support::invalid_number)?)
-            .bind(i32::try_from(defaults.member_mbps).map_err(support::invalid_number)?)
-            .bind(i32::try_from(defaults.personal_mbps).map_err(support::invalid_number)?)
+        sqlx::query("INSERT INTO server_settings (default_user_mbps, default_guest_mbps) VALUES ($1, $2) ON CONFLICT (singleton) DO NOTHING")
+            .bind(i32::try_from(defaults.user_mbps).map_err(support::invalid_number)?)
+            .bind(i32::try_from(defaults.guest_mbps).map_err(support::invalid_number)?)
             .execute(&self.pool).await?;
         Ok(())
     }

@@ -246,15 +246,6 @@ pub struct TrafficScopeOptions {
     pub personal_tenant_id: TenantId,
     pub default_tenant_id: TenantId,
     pub personal_mbps: u32,
-    pub teams: Vec<TeamTrafficScope>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TeamTrafficScope {
-    pub tenant_id: TenantId,
-    pub name: String,
-    pub total_mbps: u32,
-    pub member_mbps: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

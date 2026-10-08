@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod account;
 mod account_scope;
 mod connection_io;
 mod connection_state;

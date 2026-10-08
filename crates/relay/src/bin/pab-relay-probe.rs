@@ -23,7 +23,7 @@ use iroh_relay::{
     tls::{CaTlsConfig, default_provider},
 };
 use n0_future::{SinkExt, StreamExt};
-use pab_protocol::{TenantId, TrafficScope, UserId, mbps_to_bytes_per_second};
+use pab_protocol::{TrafficScope, UserId, mbps_to_bytes_per_second};
 use pab_relay::{Acquire, AggregateLimiter, LimitKey, Rate};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -44,33 +44,29 @@ impl AccessControl for EndpointAllowlist {
 }
 
 #[derive(Debug)]
-struct TeamForwarding {
+struct UserForwarding {
     limiter: Mutex<AggregateLimiter>,
-    members: HashMap<EndpointId, UserId>,
+    users: HashMap<EndpointId, UserId>,
 }
 
-impl TeamForwarding {
-    fn new(members: HashMap<EndpointId, UserId>, team_mbps: u32, member_mbps: u32) -> Result<Self> {
+impl UserForwarding {
+    fn new(users: HashMap<EndpointId, UserId>, user_mbps: u32) -> Result<Self> {
         let now = Instant::now();
         let burst = Duration::from_millis(150);
-        let tenant_id = TenantId::from_u128(1);
         let mut limiter = AggregateLimiter::default();
-        let team_rate =
-            Rate::new(mbps_to_bytes_per_second(team_mbps), burst).ok_or("invalid Team rate")?;
-        let member_rate =
-            Rate::new(mbps_to_bytes_per_second(member_mbps), burst).ok_or("invalid member rate")?;
-        limiter.set_rate(LimitKey::Team(tenant_id), team_rate, now);
-        for user_id in members.values().copied().collect::<HashSet<_>>() {
-            limiter.set_rate(LimitKey::Member { tenant_id, user_id }, member_rate, now);
+        let rate =
+            Rate::new(mbps_to_bytes_per_second(user_mbps), burst).ok_or("invalid user rate")?;
+        for user_id in users.values().copied().collect::<HashSet<_>>() {
+            limiter.set_rate(LimitKey::User(user_id), rate, now);
         }
         Ok(Self {
             limiter: Mutex::new(limiter),
-            members,
+            users,
         })
     }
 }
 
-impl iroh_relay::server::ForwardingControl for TeamForwarding {
+impl iroh_relay::server::ForwardingControl for UserForwarding {
     fn check(
         &self,
         src: EndpointId,
@@ -78,7 +74,7 @@ impl iroh_relay::server::ForwardingControl for TeamForwarding {
         bytes: usize,
     ) -> iroh_relay::server::ForwardingDecision {
         use iroh_relay::server::ForwardingDecision;
-        let user_id = match (self.members.get(&src), self.members.get(&dst)) {
+        let user_id = match (self.users.get(&src), self.users.get(&dst)) {
             (Some(src_user), None) => *src_user,
             (None, Some(dst_user)) => *dst_user,
             (Some(src_user), Some(dst_user)) if src_user == dst_user => *src_user,
@@ -89,10 +85,7 @@ impl iroh_relay::server::ForwardingControl for TeamForwarding {
             Err(_) => return ForwardingDecision::Drop,
         };
         match self.limiter.lock().expect("limiter lock").acquire(
-            TrafficScope::Team {
-                tenant_id: TenantId::from_u128(1),
-                user_id,
-            },
+            TrafficScope::User { user_id },
             bytes,
             Instant::now(),
         ) {
@@ -156,37 +149,36 @@ async fn run_rate_server(args: &[String]) -> Result<()> {
     if executors.is_empty() {
         return Err("at least one executor endpoint is required".into());
     }
-    let members = required(args, 5, "endpoint:user mappings")?
+    let users = required(args, 5, "endpoint:user mappings")?
         .split(',')
         .map(|mapping| {
             let (endpoint, user) = mapping
                 .split_once(':')
-                .ok_or("member mapping must be endpoint:user")?;
+                .ok_or("user mapping must be endpoint:user")?;
             Ok((
                 EndpointId::from_str(endpoint)?,
                 UserId::from_u128(user.parse::<u128>()?),
             ))
         })
         .collect::<Result<HashMap<_, _>>>()?;
-    if members.is_empty() {
-        return Err("at least one member endpoint is required".into());
+    if users.is_empty() {
+        return Err("at least one user endpoint is required".into());
     }
-    let team_mbps = required(args, 6, "Team Mbps")?.parse::<u32>()?;
-    let member_mbps = required(args, 7, "member Mbps")?.parse::<u32>()?;
-    let allowed = members
+    let user_mbps = required(args, 6, "user Mbps")?.parse::<u32>()?;
+    let allowed = users
         .keys()
         .copied()
         .chain(executors)
         .collect::<HashSet<_>>();
-    let forwarding = Arc::new(TeamForwarding::new(members, team_mbps, member_mbps)?);
+    let forwarding = Arc::new(UserForwarding::new(users, user_mbps)?);
     run_server_with(
         cert_path,
         key_path,
         allowed,
         forwarding,
-        parse_addr(args.get(8), Ipv4Addr::LOCALHOST, 31_443)?,
-        parse_addr(args.get(9), Ipv4Addr::LOCALHOST, 31_444)?,
-        parse_addr(args.get(10), Ipv4Addr::UNSPECIFIED, 7_842)?,
+        parse_addr(args.get(7), Ipv4Addr::LOCALHOST, 31_443)?,
+        parse_addr(args.get(8), Ipv4Addr::LOCALHOST, 31_444)?,
+        parse_addr(args.get(9), Ipv4Addr::UNSPECIFIED, 7_842)?,
     )
     .await
 }
@@ -565,7 +557,7 @@ fn print_usage() {
         "pab-relay-probe server <cert.pem> <key.pem> <endpoint-id,...> [https-addr] [captive-addr] [quic-addr]"
     );
     eprintln!(
-        "pab-relay-probe server-rate <cert.pem> <key.pem> <executor-id,...> <endpoint:user,...> <team-mbps> <member-mbps> [https-addr] [captive-addr] [quic-addr]"
+        "pab-relay-probe server-rate <cert.pem> <key.pem> <executor-id,...> <endpoint:user,...> <user-mbps> [https-addr] [captive-addr] [quic-addr]"
     );
     eprintln!("pab-relay-probe ping <relay-url> <secret-hex>");
     eprintln!("pab-relay-probe qad <server-ip:port> <tls-server-name>");

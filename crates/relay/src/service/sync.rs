@@ -23,6 +23,8 @@ pub async fn connect_and_sync(
         RelayControlClient::connect(&settings.control_url, &settings.control_secret, connector)
             .await?;
     client.sync_policy(runtime).await?;
+    // Report the version actually applied, so Server can distinguish offered/applied.
+    client.sync_policy(runtime).await?;
     Ok(client)
 }
 
@@ -38,6 +40,7 @@ pub fn spawn_refresh_loop(
             let on_demand = tokio::select! {
                 _ = tokio::time::sleep(settings.refresh_interval) => false,
                 _ = runtime.wait_for_refresh_request() => true,
+                _ = client.wait_for_policy_change() => true,
             };
             // Coalesce packet-triggered refreshes and bound database work even
             // when an admitted client continually sends to an unauthorized peer.
@@ -45,6 +48,10 @@ pub fn spawn_refresh_loop(
             match client.sync_policy(&runtime).await {
                 Ok(PolicySync::Updated { policy_version }) => {
                     tracing::info!(policy_version, on_demand, "relay policy updated");
+                    if let Err(error) = client.sync_policy(&runtime).await {
+                        tracing::warn!(%error, "relay policy acknowledgment failed");
+                        client = reconnect(&settings, connector.clone(), &runtime).await;
+                    }
                 }
                 Ok(PolicySync::Unchanged { .. }) => {}
                 Err(error) => {

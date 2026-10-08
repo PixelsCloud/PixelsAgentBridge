@@ -60,6 +60,84 @@ async fn registered_catalog_has_coverage_and_exports_real_schemas() {
     stop(client, child).await;
 }
 
+#[tokio::test]
+async fn catalog_supports_modern_metadata_and_legacy_handshake() {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    for modern in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))
+            .env("PAB_DATA_DIR", directory.path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let mut input = child.stdin.take().unwrap();
+        let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
+        let metadata = json!({
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {"name":"pixels-client-acceptance","version":"1"},
+            "io.modelcontextprotocol/clientCapabilities": {}
+        });
+        let first = if modern {
+            json!({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":metadata}})
+        } else {
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"legacy-acceptance","version":"1"}}})
+        };
+        input
+            .write_all(format!("{first}\n").as_bytes())
+            .await
+            .unwrap();
+        let response = tokio::time::timeout(Duration::from_secs(10), lines.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let first: Value = serde_json::from_str(&response).unwrap();
+        assert!(first.get("result").is_some(), "{first}");
+        if !modern {
+            input
+                .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+                .await
+                .unwrap();
+        }
+        let request = json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":if modern {json!({"_meta":metadata})} else {json!({})}});
+        input
+            .write_all(format!("{request}\n").as_bytes())
+            .await
+            .unwrap();
+        let response = tokio::time::timeout(Duration::from_secs(10), lines.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let response: Value = serde_json::from_str(&response).unwrap();
+        let result = &response["result"];
+        assert!(
+            result["tools"]
+                .as_array()
+                .is_some_and(|tools| tools.len() == 68),
+            "{response}"
+        );
+        if modern {
+            assert_eq!(result["resultType"], "complete");
+            assert_eq!(result["ttlMs"], 0);
+            assert_eq!(result["cacheScope"], "private");
+        } else {
+            assert!(result.get("resultType").is_none());
+        }
+        drop(input);
+        assert!(
+            tokio::time::timeout(Duration::from_secs(10), child.wait())
+                .await
+                .unwrap()
+                .unwrap()
+                .success()
+        );
+    }
+}
+
 fn result(response: CallToolResult) -> Value {
     assert_ne!(response.is_error, Some(true), "{:?}", response.content);
     response

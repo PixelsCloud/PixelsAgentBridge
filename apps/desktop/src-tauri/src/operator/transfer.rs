@@ -190,7 +190,15 @@ pub async fn operator_start_transfer(
         running: AtomicBool::new(false),
         terminal: AtomicBool::new(false),
     });
-    let (record, inserted) = match owner.queue.submit(&spec).await {
+    let user = pab_agent_core::account::AccountStore::from_env()
+        .and_then(|store| store.read())
+        .map_err(|error| rejected(error.to_string()))?
+        .user
+        .map(|user| pab_protocol::UserAttribution {
+            user_id: user.id,
+            username: user.username,
+        });
+    let (record, inserted) = match owner.queue.submit_with_user(&spec, user).await {
         Ok(result) => result,
         Err(error) => {
             // The final read can fail after the acceptance transaction commits.

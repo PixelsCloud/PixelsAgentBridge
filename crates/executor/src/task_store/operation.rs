@@ -23,6 +23,7 @@ impl TaskStore {
             return Err(TaskStoreError::NotFound);
         }
         let mut snapshot = TransferSnapshot {
+            initiating_user: self.initiating_user(initiated_by, request_id).await?,
             execution_context: row
                 .try_get::<Option<String>, _>("context_json")?
                 .map(|value| serde_json::from_str(&value))

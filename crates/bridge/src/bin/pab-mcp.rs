@@ -1,3 +1,6 @@
+#[cfg(test)]
+#[path = "pab_mcp/client_identity_tests.rs"]
+mod client_identity_tests;
 #[path = "pab_mcp/applications.rs"]
 mod mcp_applications;
 #[path = "pab_mcp/container.rs"]
@@ -8,6 +11,8 @@ mod mcp_git;
 mod mcp_system_query;
 use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
+#[path = "pab_mcp/account.rs"]
+mod mcp_account;
 #[path = "pab_mcp/catalog.rs"]
 mod mcp_catalog;
 #[path = "pab_mcp/desktop.rs"]
@@ -40,8 +45,9 @@ use pab_bridge::{
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     model::{
-        CallToolRequestParams, CallToolResponse, CallToolResult, Implementation, ListToolsResult,
-        PaginatedRequestParams, ServerCapabilities, ServerConfig,
+        CallToolRequestParams, CallToolResponse, CallToolResult, DiscoverResult, Implementation,
+        InitializeRequestParams, InitializeResult, ListToolsResult, PaginatedRequestParams,
+        ServerCapabilities, ServerConfig,
     },
     service::RequestContext,
     transport::stdio,
@@ -83,6 +89,10 @@ async fn async_main() {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    if args.first().is_some_and(|arg| arg == "account") {
+        return mcp_account::run(&args[1..]).await;
+    }
     if env::args_os().len() != 1 {
         return Err("pab-mcp accepts no command-line arguments".into());
     }
@@ -99,12 +109,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let result = async {
         let service = server.clone().serve(stdio()).await?;
-        if let Some(info) = service.peer().peer_info() {
-            reporter.set_client(
-                info.client_info.name.clone(),
-                info.client_info.version.clone(),
-            );
-        }
         service.waiting().await?;
         Ok::<_, Box<dyn std::error::Error>>(())
     }
@@ -115,6 +119,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     reporting.shutdown().await;
     if let Some(task) = server.runtime_reporting.lock().await.take() {
         task.abort();
+        let _ = task.await;
     }
     if let Some(runtime) = server.runtime.lock().await.take() {
         Arc::try_unwrap(runtime)
@@ -135,6 +140,35 @@ struct McpServer {
 }
 
 impl ServerHandler for McpServer {
+    async fn initialize(
+        &self,
+        request: InitializeRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<InitializeResult, ErrorData> {
+        let result = self.negotiate_initialize(&request)?;
+        self.reporter.set_client(
+            request.client_info.name.clone(),
+            request.client_info.version.clone(),
+        );
+        context.peer.set_peer_info(request);
+        Ok(result)
+    }
+    async fn discover(
+        &self,
+        context: RequestContext<RoleServer>,
+    ) -> Result<DiscoverResult, ErrorData> {
+        self.report_client(&context);
+        Ok(DiscoverResult::from_server_info(
+            self.supported_protocol_versions().into_owned(),
+            self.get_info(),
+        ))
+    }
+
+    async fn ping(&self, context: RequestContext<RoleServer>) -> Result<(), ErrorData> {
+        self.report_client(&context);
+        Ok(())
+    }
+
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("pixels-agent-bridge", SERVER_VERSION))
@@ -144,17 +178,18 @@ impl ServerHandler for McpServer {
     async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParams>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        serde_json::from_value(json!({ "tools": mcp_catalog::enabled_tools(&self.tool_settings) }))
-            .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+        self.report_client(&context);
+        tool_catalog_result(mcp_catalog::enabled_tools(&self.tool_settings))
     }
 
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
+        self.report_client(&context);
         let mut arguments = Value::Object(request.arguments.unwrap_or_default());
         if (request.name == "pab_run_command"
             || (request.name == "pab_desktop_input"
@@ -325,7 +360,22 @@ impl ServerHandler for McpServer {
     }
 }
 
+fn tool_catalog_result(tools: Vec<Value>) -> Result<ListToolsResult, ErrorData> {
+    // Deserializing the legacy JSON shape leaves result_type unset. Modern
+    // clients require it; rmcp strips it automatically for legacy peers.
+    serde_json::from_value(json!({ "resultType": "complete", "tools": tools,
+        "ttlMs": 0, "cacheScope": "private" }))
+    .map_err(|error| ErrorData::internal_error(error.to_string(), None))
+}
+
 impl McpServer {
+    fn report_client(&self, context: &RequestContext<RoleServer>) {
+        // Modern clients carry identity per request, without legacy initialize state.
+        if let Some(info) = context.client_info() {
+            self.reporter.set_client(info.name, info.version);
+        }
+    }
+
     async fn operation_manager(&self) -> Result<Arc<mcp_operations::OperationManager>, String> {
         let mut manager = self.operations.lock().await;
         if manager.is_none() {
@@ -391,8 +441,16 @@ mod tests {
 
     #[test]
     fn catalog_is_compatible_with_sdk() {
-        let catalog: ListToolsResult =
-            serde_json::from_value(json!({ "tools": mcp_catalog::tools() })).unwrap();
+        let catalog = tool_catalog_result(mcp_catalog::tools()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&catalog).unwrap()["resultType"],
+            "complete"
+        );
+        assert_eq!(catalog.ttl_ms, Some(0));
+        assert_eq!(
+            serde_json::to_value(&catalog).unwrap()["cacheScope"],
+            "private"
+        );
         assert_eq!(catalog.tools.len(), 68);
         let names = catalog
             .tools

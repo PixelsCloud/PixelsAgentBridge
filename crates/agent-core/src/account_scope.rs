@@ -25,7 +25,6 @@ use crate::{
 pub struct AccountScopeRegistration {
     pub user_id: UserId,
     pub tenant_id: TenantId,
-    pub team_name: Option<String>,
     pub endpoint_secret_file: PathBuf,
 }
 
@@ -51,20 +50,9 @@ pub async fn register_account_traffic_scope(
 ) -> Result<AccountScopeRegistration, AccountScopeError> {
     let ((user_id, options), mut socket) =
         login(control_url, username, password, connector.clone(), timeout).await?;
-    if selected_tenant_id != options.personal_tenant_id
-        && !options
-            .teams
-            .iter()
-            .any(|team| team.tenant_id == selected_tenant_id)
-    {
+    if selected_tenant_id != options.personal_tenant_id {
         return Err(AccountScopeError::ScopeUnavailable);
     }
-    let team_name = options
-        .teams
-        .iter()
-        .find(|team| team.tenant_id == selected_tenant_id)
-        .map(|team| team.name.clone());
-
     let endpoint_secret_file = endpoint_secret_dir.join(format!(
         "account-{user_id}-{selected_tenant_id}-endpoint.key"
     ));
@@ -104,7 +92,6 @@ pub async fn register_account_traffic_scope(
     Ok(AccountScopeRegistration {
         user_id,
         tenant_id: selected_tenant_id,
-        team_name,
         endpoint_secret_file,
     })
 }

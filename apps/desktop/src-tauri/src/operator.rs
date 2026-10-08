@@ -3,10 +3,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-use pab_agent_core::{
-    DataPaths, DataScope, login_traffic_scopes, read_endpoint_secret,
-    register_account_traffic_scope, tls_connector,
-};
+use pab_agent_core::{DataPaths, DataScope, read_endpoint_secret};
 use pab_bridge::{
     BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, ConnectionPath,
     MemoryDevicePasswordProvider, RememberedDevice, SqliteDevicePasswordProvider,
@@ -26,6 +23,7 @@ pub(crate) mod windows;
 
 pub struct OperatorState {
     runtimes: Mutex<RuntimeSelection>,
+    account_changes: Mutex<()>,
     passwords: Arc<MemoryDevicePasswordProvider>,
     tasks: Mutex<HashMap<TaskId, (TaskRef, Arc<BridgeRuntime>)>>,
     terminal_runtimes: Mutex<HashMap<RequestId, Arc<BridgeRuntime>>>,
@@ -37,7 +35,6 @@ pub struct OperatorState {
 
 struct RuntimeSelection {
     active: String,
-    active_scope: Option<ScopeStatus>,
     runtimes: HashMap<String, Arc<BridgeRuntime>>,
     endpoints: HashMap<EndpointKey, Arc<BridgeRuntime>>,
 }
@@ -48,9 +45,9 @@ impl OperatorState {
             .expect("could not find user credential database path")
             .bridge_database();
         Self {
+            account_changes: Mutex::new(()),
             runtimes: Mutex::new(RuntimeSelection {
                 active: "guest".to_owned(),
-                active_scope: None,
                 runtimes: HashMap::new(),
                 endpoints: HashMap::new(),
             }),
@@ -228,101 +225,100 @@ pub struct TaskUpdate {
 pub struct ScopeStatus {
     user_id: String,
     username: String,
-    tenant_id: String,
-    team_name: Option<String>,
+    server_admin: bool,
+    revision: u64,
+}
+
+fn account_status(state: &pab_agent_core::account::AccountState) -> Option<ScopeStatus> {
+    state.user.as_ref().map(|user| ScopeStatus {
+        user_id: user.id.to_string(),
+        username: user.username.clone(),
+        server_admin: user.server_admin,
+        revision: state.revision,
+    })
 }
 
 #[tauri::command]
-pub async fn operator_current_traffic_scope(
-    state: tauri::State<'_, OperatorState>,
-) -> Result<Option<ScopeStatus>, String> {
-    Ok(state.runtimes.lock().await.active_scope.clone())
+pub async fn operator_current_traffic_scope() -> Result<Option<ScopeStatus>, String> {
+    let state = pab_agent_core::account::AccountStore::from_env()
+        .and_then(|store| store.read())
+        .map_err(|error| error.to_string())?;
+    Ok(account_status(&state))
+}
+
+async fn sign_in(
+    state: &OperatorState,
+    reporting: &crate::mcp_reporting::McpReportingState,
+    username: String,
+    password: String,
+    register: bool,
+) -> Result<ScopeStatus, String> {
+    use pab_agent_core::account::{AccountClient, AccountStore};
+    let _guard = state.account_changes.lock().await;
+    let client = AccountClient::from_env().map_err(|error| error.to_string())?;
+    let store = AccountStore::from_env().map_err(|error| error.to_string())?;
+    let session = client
+        .login(username.trim(), Zeroizing::new(password), register)
+        .await
+        .map_err(|error| error.to_string())?;
+    let snapshot = client
+        .save_session(&store, session)
+        .await
+        .map_err(|error| {
+            if register {
+                format!(
+                    "Account created, but sign-in could not be saved. Please sign in again: {error}"
+                )
+            } else {
+                error.to_string()
+            }
+        })?;
+    reporting.account_changed(snapshot.revision);
+    pab_agent_core::account::notify_account_change(snapshot.revision);
+    tokio::spawn(async move {
+        let _ = client.flush_logouts(&store).await;
+    });
+    account_status(&snapshot).ok_or_else(|| "account state was not saved".to_owned())
 }
 
 #[tauri::command]
 pub async fn operator_login_account(
-    app: tauri::AppHandle,
     state: tauri::State<'_, OperatorState>,
+    reporting: tauri::State<'_, crate::mcp_reporting::McpReportingState>,
     username: String,
     password: String,
 ) -> Result<ScopeStatus, String> {
-    if username.trim().is_empty() || password.is_empty() {
-        return Err("account and password are required".to_owned());
-    }
-    let control_url = std::env::var("PAB_CONTROL_URL")
-        .map_err(|_| "PAB_CONTROL_URL is not configured".to_owned())?;
-    let ca = std::env::var_os("PAB_CONTROL_CA_CERT")
-        .map(std::fs::read)
-        .transpose()
-        .map_err(|error| error.to_string())?;
-    let connector = tls_connector(ca.as_deref()).map_err(|error| error.to_string())?;
-    let (_, options) = login_traffic_scopes(
-        &control_url,
-        username.trim().to_owned(),
-        Zeroizing::new(password.clone()),
-        connector.clone(),
-        std::time::Duration::from_secs(10),
-    )
-    .await
-    .map_err(|error| error.to_string())?;
-    let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
-    let registration = register_account_traffic_scope(
-        &control_url,
-        username.trim().to_owned(),
-        Zeroizing::new(password),
-        options.default_tenant_id,
-        paths.root(),
-        connector,
-        std::time::Duration::from_secs(10),
-    )
-    .await
-    .map_err(|error| error.to_string())?;
-    let key = format!("{}:{}", registration.user_id, registration.tenant_id);
-    let mut selection = state.runtimes.lock().await;
-    if !selection.runtimes.contains_key(&key) {
-        let config = BridgeConfig::from_env_account(
-            registration.tenant_id,
-            registration.user_id,
-            registration.endpoint_secret_file,
-        )
-        .map_err(|error| error.to_string())?;
-        let secret = read_endpoint_secret(&config.endpoint_secret_file)
-            .map_err(|error| error.to_string())?;
-        let endpoint_key = EndpointKey::new(*secret.public().as_bytes());
-        let mut runtime_config = BridgeRuntimeConfig::new(paths.bridge_database());
-        runtime_config.resume_incomplete_on_start = false;
-        let runtime = Arc::new(
-            BridgeRuntime::start(config, runtime_config, state.passwords.clone())
-                .await
-                .map_err(|error| error.to_string())?,
-        );
-        history::forward_events(app, Arc::clone(&runtime));
-        selection
-            .endpoints
-            .insert(endpoint_key, Arc::clone(&runtime));
-        selection.runtimes.insert(key.clone(), runtime);
-    }
-    selection.active = key;
-    let status = ScopeStatus {
-        user_id: registration.user_id.to_string(),
-        username: username.trim().to_owned(),
-        tenant_id: registration.tenant_id.to_string(),
-        team_name: registration.team_name,
-    };
-    selection.active_scope = Some(status.clone());
-    Ok(status)
+    sign_in(&state, &reporting, username, password, false).await
+}
+
+#[tauri::command]
+pub async fn operator_register_account(
+    state: tauri::State<'_, OperatorState>,
+    reporting: tauri::State<'_, crate::mcp_reporting::McpReportingState>,
+    username: String,
+    password: String,
+) -> Result<ScopeStatus, String> {
+    sign_in(&state, &reporting, username, password, true).await
 }
 
 #[tauri::command]
 pub async fn operator_use_guest_scope(
     state: tauri::State<'_, OperatorState>,
+    reporting: tauri::State<'_, crate::mcp_reporting::McpReportingState>,
 ) -> Result<(), String> {
-    let mut selection = state.runtimes.lock().await;
-    selection.active = "guest".to_owned();
-    selection.active_scope = None;
+    let _guard = state.account_changes.lock().await;
+    let store =
+        pab_agent_core::account::AccountStore::from_env().map_err(|error| error.to_string())?;
+    let snapshot = store.logout().map_err(|error| error.to_string())?;
+    reporting.account_changed(snapshot.revision);
+    pab_agent_core::account::notify_account_change(snapshot.revision);
+    tokio::spawn(async move {
+        if let Ok(client) = pab_agent_core::account::AccountClient::from_env() {
+            let _ = client.flush_logouts(&store).await;
+        }
+    });
     Ok(())
 }
-
 
 fn parse_code(code: &str) -> Result<DeviceCode, String> {
     code.parse::<DeviceCode>()
@@ -525,7 +521,14 @@ pub async fn operator_run_command(
         .await
         .map_err(|error| error.to_string())?;
     let snapshot = runtime
-        .submit_command_as(device_ref, RequestId::new(), program, args, cwd, execution.unwrap_or_default())
+        .submit_command_as(
+            device_ref,
+            RequestId::new(),
+            program,
+            args,
+            cwd,
+            execution.unwrap_or_default(),
+        )
         .await
         .map_err(|error| error.to_string())?;
     state.tasks.lock().await.insert(
@@ -590,8 +593,12 @@ pub async fn operator_task(
         .task(task_ref)
         .await
         .map_err(|error| error.to_string())?;
-    let stdout_start = encoding.align_start(stdout_offset.max(record.stdout.retained_from)).min(record.stdout.available_to);
-    let stderr_start = encoding.align_start(stderr_offset.max(record.stderr.retained_from)).min(record.stderr.available_to);
+    let stdout_start = encoding
+        .align_start(stdout_offset.max(record.stdout.retained_from))
+        .min(record.stdout.available_to);
+    let stderr_start = encoding
+        .align_start(stderr_offset.max(record.stderr.retained_from))
+        .min(record.stderr.available_to);
     let (stdout, stdout_range) = local
         .read_output(task_ref, OutputStream::Stdout, stdout_start, 32 * 1024)
         .await
@@ -605,14 +612,25 @@ pub async fn operator_task(
         .as_ref()
         .map(|snapshot| format!("{:?}", snapshot.state))
         .unwrap_or_else(|| "Pending".to_owned());
-    let stdout_text = pab_bridge::output_text::decode_output(&stdout.bytes, encoding,
-        stdout_range.complete && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to);
-    let stderr_text = pab_bridge::output_text::decode_output(&stderr.bytes, encoding,
-        stderr_range.complete && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to);
+    let stdout_text = pab_bridge::output_text::decode_output(
+        &stdout.bytes,
+        encoding,
+        stdout_range.complete
+            && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to,
+    );
+    let stderr_text = pab_bridge::output_text::decode_output(
+        &stderr.bytes,
+        encoding,
+        stderr_range.complete
+            && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to,
+    );
     let next_stdout = stdout.offset + stdout_text.consumed as u64;
     let next_stderr = stderr.offset + stderr_text.consumed as u64;
     Ok(TaskUpdate {
-        execution_identity: record.snapshot.as_ref().and_then(|snapshot| snapshot.execution_context.identity.clone()),
+        execution_identity: record
+            .snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.execution_context.identity.clone()),
         state,
         complete: record.is_complete()
             && next_stdout >= stdout_range.available_to

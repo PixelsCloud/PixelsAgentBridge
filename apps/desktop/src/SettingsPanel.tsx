@@ -4,19 +4,13 @@ import { Button, Input, Menu, Select } from "antd";
 import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
-import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
+import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { version } from "../package.json";
 
 type ServerSettings = {
   controlUrl: string;
   relayUrl: string;
-};
-
-type CodexIntegration = {
-  available: boolean;
-  enabled: boolean;
-  occupied: boolean;
 };
 
 type Props = {
@@ -34,34 +28,14 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [codex, setCodex] = useState<CodexIntegration | null>(null);
-  const [codexBusy, setCodexBusy] = useState(false);
-  const [codexError, setCodexError] = useState("");
+
 
   useEffect(() => {
     void invoke<ServerSettings>("get_operator_server_settings")
       .then(setSettings)
       .catch((reason) => setError(String(reason)));
-    void invoke<CodexIntegration>("codex_integration_status")
-      .then(setCodex)
-      .catch((reason) => setCodexError(String(reason)));
-  }, []);
 
-  async function toggleCodex() {
-    if (!codex) return;
-    setCodexBusy(true);
-    setCodexError("");
-    try {
-      const updated = await invoke<CodexIntegration>("set_codex_integration", {
-        enabled: !codex.enabled,
-      });
-      setCodex(updated);
-    } catch (reason) {
-      setCodexError(String(reason));
-    } finally {
-      setCodexBusy(false);
-    }
-  }
+  }, []);
 
   async function save() {
     setBusy(true);
@@ -74,19 +48,6 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
     } finally {
       setBusy(false);
     }
-  }
-
-  let codexStatus: string = t.loading;
-  let codexAction: string = t.settingsAiEnable;
-  if (codex) {
-    if (codex.occupied) {
-      codexStatus = t.settingsAiConflict;
-    } else if (!codex.available) {
-      codexStatus = t.settingsAiUnavailable;
-    } else {
-      codexStatus = codex.enabled ? t.settingsAiEnabled : t.settingsAiDisabled;
-    }
-    codexAction = codex.enabled ? t.settingsAiDisable : t.settingsAiEnable;
   }
 
   return (
@@ -121,17 +82,8 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <div className="surface-kicker"><Bot size={15} /> {t.settingsAi}</div>
         <h2>{t.settingsAiTitle}</h2>
         <p>{t.settingsAiHint}</p>
-        <div className="settings-agent-row">
-          <div>
-            <strong>Codex</strong>
-            <span>{codexStatus}</span>
-          </div>
-          <Button type={codex?.enabled ? "default" : "primary"} loading={codexBusy}
-            disabled={!codex?.available || codex.occupied} onClick={() => void toggleCodex()}>{codexAction}</Button>
-        </div>
-        {codexError && <p className="settings-error" role="alert">{codexError}</p>}
+        <AgentIntegrationsPanel language={language} />
         <p className="settings-scope-note">{t.settingsAiNote}</p>
-        <McpConnectionsPanel language={language} />
       </div>}
 
       {section === "server" && <div className="settings-server">

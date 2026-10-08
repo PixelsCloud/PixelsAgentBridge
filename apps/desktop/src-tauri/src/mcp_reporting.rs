@@ -32,6 +32,7 @@ struct Inner {
     status: watch::Sender<McpReportingStatus>,
     next_owner: AtomicU64,
     shutdown: watch::Sender<bool>,
+    account_revision: watch::Sender<u64>,
     idle_timeout: Duration,
 }
 
@@ -49,12 +50,22 @@ impl Default for McpReportingState {
             status,
             next_owner: AtomicU64::new(1),
             shutdown,
+            account_revision: watch::channel(
+                pab_agent_core::account::AccountStore::from_env()
+                    .and_then(|store| store.read())
+                    .map(|state| state.revision)
+                    .unwrap_or(0),
+            )
+            .0,
             idle_timeout: HEARTBEAT_TIMEOUT,
         }))
     }
 }
 
 impl McpReportingState {
+    pub(crate) fn account_changed(&self, revision: u64) {
+        self.0.account_revision.send_replace(revision);
+    }
     pub(crate) fn snapshot(&self) -> McpReportingStatus {
         self.0.status.borrow().clone()
     }
@@ -201,16 +212,39 @@ async fn upgrade(
         .on_upgrade(move |socket| connection(socket, state, peer))
 }
 
+async fn send_account_revision(socket: &mut WebSocket, revision: u64) -> bool {
+    let text = serde_json::json!({"type":"account_changed","revision":revision}).to_string();
+    matches!(
+        tokio::time::timeout(
+            Duration::from_secs(3),
+            socket.send(Message::Text(text.into()))
+        )
+        .await,
+        Ok(Ok(()))
+    )
+}
+
 async fn connection(mut socket: WebSocket, state: McpReportingState, peer: SocketAddr) {
     let owner = state.0.next_owner.fetch_add(1, Ordering::Relaxed);
     let mut session: Option<String> = None;
     let mut shutdown = state.0.shutdown.subscribe();
+    let mut account = state.0.account_revision.subscribe();
+    let initial_revision = *account.borrow_and_update();
+    if !send_account_revision(&mut socket, initial_revision).await {
+        return;
+    }
     loop {
         if *shutdown.borrow() {
             break;
         }
         let message = tokio::select! {
             _ = shutdown.changed() => break,
+            changed = account.changed() => {
+                if changed.is_err() { break; }
+                let revision = *account.borrow_and_update();
+                if !send_account_revision(&mut socket, revision).await { break; }
+                continue;
+            },
             result = tokio::time::timeout(state.0.idle_timeout, socket.recv()) => match result { Ok(Some(Ok(message))) => message, _ => break },
         };
         match message {
@@ -267,6 +301,72 @@ mod tests {
     use pab_bridge::desktop_presence::McpReporter;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio_tungstenite::{connect_async, tungstenite::Message as ClientMessage};
+
+    async fn receive_ack(
+        socket: &mut tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    ) {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                let message = socket.next().await.unwrap().unwrap();
+                if let ClientMessage::Text(text) = message {
+                    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+                    if value["type"] == "ack" {
+                        break;
+                    }
+                    assert_eq!(value["type"], "account_changed");
+                    assert_eq!(value.as_object().unwrap().len(), 2);
+                }
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn account_changes_broadcast_only_revisions_and_reconnect_gets_latest() {
+        let state = McpReportingState::default();
+        state.account_changed(10);
+        let address = bind(state.clone(), "127.0.0.1:0".parse().unwrap())
+            .await
+            .unwrap();
+        let url = format!("ws://{address}/ws/mcp");
+        let (mut first, _) = connect_async(&url).await.unwrap();
+        let (mut second, _) = connect_async(&url).await.unwrap();
+        for revision in [10, 12] {
+            if revision == 12 {
+                state.account_changed(revision);
+            }
+            for socket in [&mut first, &mut second] {
+                let text = tokio::time::timeout(Duration::from_secs(3), socket.next())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .unwrap()
+                    .into_text()
+                    .unwrap();
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&text).unwrap(),
+                    serde_json::json!({"type":"account_changed", "revision":revision})
+                );
+            }
+        }
+        drop(first);
+        let (mut restarted, _) = connect_async(&url).await.unwrap();
+        let text = restarted
+            .next()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_text()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&text).unwrap()["revision"],
+            12
+        );
+        state.stop();
+    }
 
     async fn wait_for(state: &McpReportingState, predicate: impl Fn(&McpReportingStatus) -> bool) {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(7);
@@ -362,7 +462,7 @@ mod tests {
         ))
         .await
         .unwrap();
-        old.next().await.unwrap().unwrap();
+        receive_ack(&mut old).await;
         let (mut new, _) = connect_async(&url).await.unwrap();
         let mut replacement = report.clone();
         replacement.client_name = Some("new".to_owned());
@@ -371,7 +471,7 @@ mod tests {
         ))
         .await
         .unwrap();
-        new.next().await.unwrap().unwrap();
+        receive_ack(&mut new).await;
         assert_eq!(state.snapshot().count, 1);
         old.send(ClientMessage::Text(
             serde_json::to_string(&report).unwrap().into(),
@@ -472,14 +572,22 @@ mod tests {
             .expect("PAB_MCP_SMOKE_EXE must point to the newly built pab-mcp executable");
         let directory = tempfile::tempdir().unwrap();
         let state = McpReportingState::default();
-        let address = bind(state.clone(), "0.0.0.0:26035".parse().unwrap())
+        let address = bind(state.clone(), "127.0.0.1:0".parse().unwrap())
             .await
             .unwrap();
         let mut processes = Vec::new();
         let mut inputs = Vec::new();
-        for index in 0..2 {
+        let account_url = std::env::var("PAB_MCP_ACCOUNT_TEST_URL").ok();
+        let account_ca = std::env::var_os("PAB_MCP_ACCOUNT_TEST_CA");
+        let process_count = std::env::var("PAB_MCP_SMOKE_COUNT")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(2)
+            .clamp(2, 10);
+        for index in 0..process_count {
             let mut command = tokio::process::Command::new(&executable);
             command
+                .env("PAB_TEST_MCP_REPORT_URL", format!("ws://{address}/ws/mcp"))
                 .env("PAB_DATA_DIR", directory.path())
                 .env(
                     "PAB_BRIDGE_DATABASE",
@@ -489,6 +597,15 @@ mod tests {
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::null())
                 .kill_on_drop(true);
+            if let Some(url) = &account_url {
+                command
+                    .env("PAB_CONTROL_URL", url)
+                    .env("PAB_MCP_GUEST", "1")
+                    .env("PAB_RELAY_URLS", "https://localhost:38443/");
+                if let Some(ca) = &account_ca {
+                    command.env("PAB_CONTROL_CA_CERT", ca);
+                }
+            }
             #[cfg(windows)]
             command.creation_flags(0x08000000);
             let mut process = command.spawn().unwrap();
@@ -517,7 +634,7 @@ mod tests {
             inputs.push(input);
         }
         wait_for(&state, |status| {
-            status.count == 2
+            status.count == process_count
                 && status
                     .clients
                     .iter()
@@ -559,15 +676,111 @@ mod tests {
                 "/api/mcp"
             )
             .await["count"],
-            2
+            process_count
         );
+        if let Some(url) = account_url {
+            use pab_agent_core::account::{AccountClient, AccountStore};
+            let ca = account_ca.map(std::fs::read).transpose().unwrap();
+            let client = AccountClient::new(&url, ca.as_deref()).unwrap();
+            let store = AccountStore::new(directory.path(), &url).unwrap();
+            let sessions: Vec<_> = state
+                .snapshot()
+                .clients
+                .iter()
+                .map(|c| c.report.session_id)
+                .collect();
+            // Resolving an intentionally absent device initializes each real runtime.
+            // Device I/O and task preservation are covered by control_tls separately.
+            for index in 0..process_count {
+                inputs[index].write_all(b"{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"pab_connect\",\"arguments\":{\"device_code\":\"111222333\",\"wait_ms\":5000}}}\n").await.unwrap();
+                let response =
+                    tokio::time::timeout(Duration::from_secs(15), processes[index].1.next_line())
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .unwrap();
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&response).unwrap()["id"],
+                    3
+                );
+            }
+            wait_for(&state, |s| {
+                s.count == process_count
+                    && s.clients.iter().all(|c| {
+                        c.report
+                            .runtime
+                            .as_ref()
+                            .and_then(|r| r.account.as_ref())
+                            .is_some_and(|a| a.server_revision == Some(0))
+                    })
+            })
+            .await;
+            for label in ["first", "second"] {
+                let session = client
+                    .login(
+                        &format!("mcp-{label}-{}", pab_protocol::RequestId::new()),
+                        zeroize::Zeroizing::new("test password long enough".into()),
+                        true,
+                    )
+                    .await
+                    .unwrap();
+                let user_id = session.user.id;
+                let account = store.login(session).unwrap();
+                if label == "first" {
+                    state.account_changed(account.revision);
+                }
+                // The second login deliberately loses its IPC notification; polling repairs it.
+                wait_for(&state, |s| {
+                    s.count == process_count
+                        && s.clients.iter().all(|c| {
+                            c.report
+                                .runtime
+                                .as_ref()
+                                .and_then(|r| r.account.as_ref())
+                                .is_some_and(|a| {
+                                    a.local_revision == account.revision
+                                        && a.server_revision == Some(account.revision)
+                                        && a.user.as_ref().is_some_and(|u| u.user_id == user_id)
+                                })
+                        })
+                })
+                .await;
+                assert!(
+                    state
+                        .snapshot()
+                        .clients
+                        .iter()
+                        .all(|c| sessions.contains(&c.report.session_id)
+                            && c.report.runtime.as_ref().unwrap().identity == "guest")
+                );
+                let guest = store.logout().unwrap();
+                state.account_changed(guest.revision);
+                client.flush_logouts(&store).await.unwrap();
+                wait_for(&state, |s| {
+                    s.count == process_count
+                        && s.clients.iter().all(|c| {
+                            c.report
+                                .runtime
+                                .as_ref()
+                                .and_then(|r| r.account.as_ref())
+                                .is_some_and(|a| {
+                                    a.server_revision == Some(guest.revision) && a.user.is_none()
+                                })
+                        })
+                })
+                .await;
+            }
+        }
         processes[0].0.kill().await.unwrap();
-        wait_for(&state, |status| status.count == 1).await;
+        wait_for(&state, |status| status.count == process_count - 1).await;
         inputs.clear();
-        tokio::time::timeout(Duration::from_secs(5), processes[1].0.wait())
-            .await
-            .unwrap()
-            .unwrap();
+        for (process, _) in processes.iter_mut().skip(1) {
+            let status = tokio::time::timeout(Duration::from_secs(15), process.wait())
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(status.success(), "MCP did not shut down cleanly: {status}");
+        }
         wait_for(&state, |status| status.count == 0).await;
         state.stop();
     }

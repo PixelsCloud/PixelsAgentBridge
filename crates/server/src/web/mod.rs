@@ -16,6 +16,7 @@ mod events;
 mod management;
 mod session;
 mod support;
+mod user_context;
 pub use support::WebError;
 pub use support::response_headers;
 
@@ -38,7 +39,7 @@ pub fn router(control: ControlApiState) -> Router {
         subscriptions: Arc::new(Semaphore::new(256)),
         server_instance: control.server_instance,
     };
-    Router::new()
+    let browser = Router::new()
         .route("/api/web/config", get(session::config))
         .route(
             "/api/web/session",
@@ -61,21 +62,14 @@ pub fn router(control: ControlApiState) -> Router {
         )
         .route(
             "/api/web/accounts/{id}/traffic",
-            post(management::assign_team),
+            axum::routing::put(management::update_user_limit),
         )
-        .route(
-            "/api/web/teams",
-            get(management::teams).post(management::create_team),
-        )
-        .route("/api/web/teams/{id}/members", get(management::members))
-        .route("/api/web/teams/{id}/actions", post(management::team_action))
         .route("/api/web/audit", get(management::audit))
         .route("/api/web/traffic", get(management::traffic))
         .route("/api/web/relays", get(management::relays))
-        .route("/api/web/service", get(management::service_config))
         .route(
-            "/api/web/accounts/{id}/teams",
-            get(management::eligible_teams),
+            "/api/web/service",
+            get(management::service_config).put(management::update_defaults),
         )
         .route(
             "/api",
@@ -87,7 +81,23 @@ pub fn router(control: ControlApiState) -> Router {
         )
         .layer(DefaultBodyLimit::max(16 * 1024))
         .layer(middleware::from_fn(support::browser_boundary))
-        .with_state(state)
+        .with_state(state.clone());
+    let native = Router::new()
+        .route(
+            "/api/account/endpoint-context",
+            axum::routing::put(user_context::update),
+        )
+        .route("/api/account/config", get(session::config))
+        .route(
+            "/api/account/session",
+            get(session::native_current).post(session::native_login),
+        )
+        .route("/api/account/register", post(session::native_register))
+        .route("/api/account/logout", post(session::native_logout))
+        .layer(DefaultBodyLimit::max(16 * 1024))
+        .layer(middleware::from_fn(support::native_boundary))
+        .with_state(state);
+    browser.merge(native)
 }
 
 pub fn assets() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {

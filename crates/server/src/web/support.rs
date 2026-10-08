@@ -116,6 +116,22 @@ pub(crate) async fn browser_boundary(request: Request, next: Next) -> Response {
     response
 }
 
+// Native account calls never accept cookie authentication. Cross-origin browser
+// writes are rejected separately from native requests, which have no Origin.
+pub(crate) async fn native_boundary(request: Request, next: Next) -> Response {
+    if request.headers().contains_key(header::ORIGIN) && !same_origin(request.headers()) {
+        return WebError::new(StatusCode::FORBIDDEN, "origin_rejected").into_response();
+    }
+    let mut response = next.run(request).await;
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    response
+        .headers_mut()
+        .insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
+    response
+}
+
 pub async fn response_headers(request: Request, next: Next) -> Response {
     let asset = request.uri().path().starts_with("/assets/");
     let mut response = next.run(request).await;

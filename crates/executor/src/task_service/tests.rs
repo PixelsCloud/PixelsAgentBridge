@@ -5,6 +5,64 @@ use pab_protocol::{DeviceId, ExpectedEnvironment, RequestId, TaskState, TenantId
 
 use super::*;
 
+#[tokio::test]
+async fn account_switch_keeps_task_owner_and_original_user_snapshot() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("users.sqlite3");
+    let context = detect_native_execution_context().unwrap();
+    let device = DeviceRef {
+        tenant_id: TenantId::from_u128(2),
+        device_id: DeviceId::from_u128(3),
+    };
+    let base = crate::task_store::TaskStore::open(&path).await.unwrap();
+    let alice = pab_protocol::UserAttribution {
+        user_id: UserId::new(),
+        username: "Alice".into(),
+    };
+    let bob = pab_protocol::UserAttribution {
+        user_id: UserId::new(),
+        username: "Bob".into(),
+    };
+    let first = base.clone().with_initiating_user(Some(alice.clone()));
+    let next = base.clone().with_initiating_user(Some(bob.clone()));
+    let id = RequestId::new();
+    let command = test_command(&context);
+    let accepted = first
+        .accept_command(device, account(5), id, &command, context.clone(), 1)
+        .await
+        .unwrap();
+    let crate::task_store::AcceptTaskOutcome::Created(snapshot) = accepted else {
+        panic!("new task expected")
+    };
+    assert_eq!(snapshot.initiating_user, Some(alice.clone()));
+    assert_eq!(snapshot.initiated_by, account(5));
+    let duplicate = next
+        .accept_command(device, account(5), id, &command, context.clone(), 2)
+        .await
+        .unwrap();
+    let crate::task_store::AcceptTaskOutcome::Existing(duplicate) = duplicate else {
+        panic!("existing task expected")
+    };
+    assert_eq!(duplicate.initiating_user, Some(alice));
+    assert_eq!(duplicate.task_ref, snapshot.task_ref);
+    assert!(base.get_task(account(6), snapshot.task_ref).await.is_err());
+    let new = next
+        .accept_command(device, account(5), RequestId::new(), &command, context, 3)
+        .await
+        .unwrap();
+    let crate::task_store::AcceptTaskOutcome::Created(new) = new else {
+        panic!("new task expected")
+    };
+    assert_eq!(new.initiating_user, Some(bob));
+    assert_eq!(
+        base.get_task(account(5), snapshot.task_ref)
+            .await
+            .unwrap()
+            .task_ref,
+        snapshot.task_ref
+    );
+}
+
 #[cfg(not(any(windows, target_os = "macos")))]
 #[tokio::test]
 async fn headless_desktop_requests_are_unsupported_before_helper_dispatch() {
@@ -16,7 +74,9 @@ async fn headless_desktop_requests_are_unsupported_before_helper_dispatch() {
             device_id: DeviceId::from_u128(3),
         },
         detect_native_execution_context().unwrap(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let requests = [
         DeviceTaskRequest::ListWindows {
             schema_version: DEVICE_TASK_SCHEMA_VERSION,
@@ -25,11 +85,17 @@ async fn headless_desktop_requests_are_unsupported_before_helper_dispatch() {
         DeviceTaskRequest::DesktopInput {
             schema_version: DEVICE_TASK_SCHEMA_VERSION,
             request_id: RequestId::new(),
-            event: DesktopInputEvent::Key { virtual_key: 65, down: false },
+            event: DesktopInputEvent::Key {
+                virtual_key: 65,
+                down: false,
+            },
         },
     ];
     for request in requests {
-        let error = service.handle_request(account(9), request).await.unwrap_err();
+        let error = service
+            .handle_request(account(9), request)
+            .await
+            .unwrap_err();
         assert!(matches!(error, TaskServiceError::DesktopUnsupported));
         assert!(matches!(error_response(&error), DeviceTaskResponse::Error {
             code: DeviceTaskErrorCode::Unsupported, message
@@ -39,9 +105,18 @@ async fn headless_desktop_requests_are_unsupported_before_helper_dispatch() {
     let query = pab_protocol::SystemQuery::Desktop {
         query: pab_protocol::DesktopQuery::Windows {},
     };
-    let result = service.system_query(account(9), id, query.clone()).await.unwrap();
+    let result = service
+        .system_query(account(9), id, query.clone())
+        .await
+        .unwrap();
     assert_eq!(result.state, "failed");
-    assert!(result.error.as_deref().unwrap().starts_with("unsupported_platform:"));
+    assert!(
+        result
+            .error
+            .as_deref()
+            .unwrap()
+            .starts_with("unsupported_platform:")
+    );
     let duplicate = service.system_query(account(9), id, query).await.unwrap();
     assert_eq!(duplicate, result);
 }

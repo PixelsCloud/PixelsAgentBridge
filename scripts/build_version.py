@@ -1,4 +1,4 @@
-"""Product version allocation, manifest synchronization and build provenance."""
+"""Installer version allocation and build provenance; component versions stay unchanged."""
 from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
@@ -78,53 +78,11 @@ def build_lock(root):
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def synchronize(root, version):
-    """Only own package versions change; registry/vendor dependencies stay pinned."""
-    parse_version(version)
-    manifests = sorted((root / 'crates').glob('*/Cargo.toml'))
-    manifests.append(root / 'apps/desktop/src-tauri/Cargo.toml')
-    names = set()
-    changes = {}
-    for path in manifests:
-        text = path.read_text(encoding='utf-8')
-        package = tomllib.loads(text)['package']
-        names.add(package['name'])
-        text, count = re.subn(r'(?m)^(version\s*=\s*)"[^"]+"', lambda m: m[1] + f'"{version}"', text, count=1)
-        if count != 1:
-            raise ValueError(f'Package version missing in {path}')
-        changes[path] = text
-    for path in (root / 'Cargo.lock', root / 'apps/desktop/src-tauri/Cargo.lock'):
-        text = path.read_text(encoding='utf-8')
-        blocks = text.split('[[package]]')
-        for index, block in enumerate(blocks[1:], 1):
-            data = tomllib.loads(block)
-            if data['name'] in names and 'source' not in data:
-                blocks[index] = re.sub(r'(?m)^version = "[^"]+"', f'version = "{version}"', block, count=1)
-        changes[path] = '[[package]]'.join(blocks)
-    for app in ('desktop', 'web'):
-        folder = root / 'apps' / app
-        for name in ('package.json', 'package-lock.json'):
-            path = folder / name
-            data = json.loads(path.read_text(encoding='utf-8'))
-            data['version'] = version
-            if name == 'package-lock.json':
-                data['packages']['']['version'] = version
-            changes[path] = json.dumps(data, indent=2, ensure_ascii=False) + '\n'
-    path = root / 'apps/desktop/src-tauri/tauri.conf.json'
-    data = json.loads(path.read_text(encoding='utf-8'))
-    data['version'] = version
-    changes[path] = json.dumps(data, indent=2, ensure_ascii=False) + '\n'
-    # Validate all inputs before writing any manifests. A retry repairs partial writes.
-    for path, text in changes.items():
-        write_text(path, text)
-
-
 def reserve_version(root):
     state = read_state(root)
     version = next_version(state['version']) if state['build_count'] else state['version']
     # Reserve first: a failed or interrupted build never reuses a number.
     write_json(root / 'build-version.json', {'version': version, 'build_count': state['build_count'] + 1})
-    synchronize(root, version)
     return version
 
 
@@ -139,8 +97,16 @@ def digest(path):
 def record_artifacts(root, target, profile, version, files):
     folder = root / '.build/builds'
     folder.mkdir(parents=True, exist_ok=True)
+    components = {}
+    for name, relative in {'pab-executor': 'crates/executor', 'pab-mcp': 'crates/bridge',
+                           'pab-desktop': 'apps/desktop/src-tauri', 'pab-server': 'crates/server',
+                           'pab-relay-server': 'crates/relay'}.items():
+        manifest = root / relative / 'Cargo.toml'
+        if manifest.is_file() and any(Path(key).stem == name for key in files):
+            components[name] = tomllib.loads(manifest.read_text(encoding='utf-8'))['package']['version']
     write_json(folder / f'{target}-{profile}.json', {
         'version': version,
+        'components': components,
         'files': {name: digest(path) for name, path in files.items()},
     })
 

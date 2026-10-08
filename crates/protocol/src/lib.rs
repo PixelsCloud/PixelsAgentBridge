@@ -39,7 +39,7 @@ mod window;
 pub use control::{
     ControlClientMessage, ControlErrorCode, ControlServerMessage, DeviceClaimEntry,
     EndpointAuthenticationResult, EndpointRegistration, EndpointRegistrationResult,
-    TeamTrafficScope, TrafficScopeOptions,
+    TrafficScopeOptions,
 };
 pub use device::{
     DEVICE_SESSION_SCHEMA_VERSION, DeviceDirectoryEntry, DeviceHello, DeviceHelloResult,
@@ -85,8 +85,8 @@ pub use relay_control::{
 };
 pub use relay_policy::{
     LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot,
-    TeamRelayLimits, TrafficScope, mbps_to_bytes_per_second,
+    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot, TrafficScope,
+    UserRelayLimit, mbps_to_bytes_per_second,
 };
 pub use screenshot::*;
 pub use task::{
@@ -108,3 +108,8 @@ mod git;
 pub use git::*;
 
 pub use filesystem::{FileSearchOptions, LogReadState, PatchPreview, SearchContextLine};
+mod user_context;
+pub use user_context::{
+    EndpointUserContext, EndpointUserContextReceipt, EndpointUserContextUpdate,
+    RelayUserContextReceipt, UserAttribution,
+};

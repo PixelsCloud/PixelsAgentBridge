@@ -1,4 +1,4 @@
-"""Build product components with one shared, automatically incremented version."""
+"""Build components with stable internal versions and an incrementing installer version."""
 from argparse import ArgumentParser
 from pathlib import Path
 import os
@@ -46,8 +46,7 @@ def build_macos(version, profile, architectures, package):
              '--bundles', 'app', *(['--debug'] if profile == 'debug' else [])], ROOT / 'apps/desktop')
         binaries = ROOT / 'target' / target / profile
         app = ROOT / 'apps/desktop/src-tauri/target' / target / profile / 'bundle/macos/Pixels Agent Bridge.app'
-        if macos_app_version(app) != version:
-            raise ValueError(f'Built macOS app version does not match {version}')
+        macos_app_version(app)  # Validate the independent, stable app version.
         for name in ('executor', 'mcp'):
             sign(binaries / f'pab-{name}', IDENTIFIERS[name])
         sign(app, IDENTIFIERS['desktop'])
@@ -103,6 +102,8 @@ def main():
     with build_lock(ROOT):
         version = reserve_version(ROOT)
         print(f'Building Pixels Agent Bridge {version}', flush=True)
+        print('Only the installer release version increments; Rust, npm and Tauri versions stay unchanged.', flush=True)
+        print('Cargo reuses cached artifacts and rebuilds only changed inputs.', flush=True)
         npm = shutil.which('npm')
         profile_flags = ['--release'] if args.profile == 'release' else []
         built_frontends = set()

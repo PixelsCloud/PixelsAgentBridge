@@ -32,6 +32,11 @@ test('real registration, refresh, device list, preferences, password and logout'
   await page.getByLabel('New password', { exact: true }).fill('updated password long enough');
   await page.getByLabel('Confirm password', { exact: true }).fill('updated password long enough');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Password updated.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await page.getByLabel('Username', { exact: true }).fill(username);
   await page.getByLabel('Password', { exact: true }).fill('updated password long enough');

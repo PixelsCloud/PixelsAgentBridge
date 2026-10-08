@@ -154,9 +154,9 @@ pub(crate) async fn overview(
     let mut result = json!({"total":row.try_get::<i64,_>("total")?,"online":row.try_get::<i64,_>("online")?,
         "offline":row.try_get::<i64,_>("offline")?});
     if me.server_admin {
-        let counts = sqlx::query("SELECT (SELECT count(*) FROM users) accounts,(SELECT count(*) FROM teams JOIN tenants ON tenants.id=teams.tenant_id WHERE tenants.status='active') teams,(SELECT count(*) FROM relay_nodes WHERE server_instance=$1 AND last_seen_at>now()-interval '120 seconds') relays")
+        let counts = sqlx::query("SELECT (SELECT count(*) FROM users) accounts,(SELECT count(*) FROM relay_nodes WHERE server_instance=$1 AND last_seen_at>now()-interval '120 seconds') relays")
             .bind(state.server_instance).fetch_one(state.control.store().pool()).await?;
-        for key in ["accounts", "teams", "relays"] {
+        for key in ["accounts", "relays"] {
             result[key] = json!(counts.try_get::<i64, _>(key)?);
         }
     }

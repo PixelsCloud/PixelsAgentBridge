@@ -4,7 +4,7 @@ use std::{
 };
 
 use pab_protocol::{
-    DeviceId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TenantId, TrafficScope,
+    DeviceId, EndpointKey, RelayEndpointOwner, RelayPolicySnapshot, TrafficScope,
     mbps_to_bytes_per_second,
 };
 use thiserror::Error;
@@ -59,18 +59,12 @@ impl RelayPolicyState {
             return Err(PolicyStateError::StalePolicyVersion);
         }
 
-        let team_limits = snapshot
-            .team_limits
+        let user_limits = snapshot
+            .user_limits
             .iter()
-            .map(|limits| (limits.tenant_id, *limits))
+            .map(|limit| (limit.user_id, limit.mbps))
             .collect::<HashMap<_, _>>();
         let mut rates = HashMap::new();
-        for limits in &snapshot.team_limits {
-            rates.insert(
-                LimitKey::Team(limits.tenant_id),
-                rate(limits.total_mbps, self.burst)?,
-            );
-        }
 
         let mut endpoints = HashMap::with_capacity(snapshot.endpoints.len());
         for endpoint in &snapshot.endpoints {
@@ -78,23 +72,18 @@ impl RelayPolicyState {
             match endpoint.owner {
                 RelayEndpointOwner::Device { .. } => {}
                 RelayEndpointOwner::Guest => {
-                    rates.insert(LimitKey::Guest(endpoint.endpoint_key), rate(1, self.burst)?);
+                    rates.insert(
+                        LimitKey::Guest(endpoint.endpoint_key),
+                        rate(snapshot.defaults.guest_mbps, self.burst)?,
+                    );
                 }
                 RelayEndpointOwner::User { scope } => match scope {
-                    TrafficScope::Team { tenant_id, user_id } => {
-                        let limits = team_limits
-                            .get(&tenant_id)
-                            .ok_or(PolicyStateError::MissingTeamLimits(tenant_id))?;
-                        rates.insert(
-                            LimitKey::Member { tenant_id, user_id },
-                            rate(limits.member_mbps, self.burst)?,
-                        );
-                    }
-                    TrafficScope::Personal { tenant_id, .. } => {
-                        rates.insert(
-                            LimitKey::Personal(tenant_id),
-                            rate(snapshot.defaults.personal_mbps, self.burst)?,
-                        );
+                    TrafficScope::User { user_id } => {
+                        let mbps = user_limits
+                            .get(&user_id)
+                            .copied()
+                            .unwrap_or(snapshot.defaults.user_mbps);
+                        rates.insert(LimitKey::User(user_id), rate(mbps, self.burst)?);
                     }
                     TrafficScope::Guest { .. } => return Err(PolicyStateError::InvalidRate),
                 },
@@ -105,7 +94,7 @@ impl RelayPolicyState {
         for (key, rate) in rates {
             self.limiter.set_rate(key, rate, now);
         }
-        self.limiter.retain(|key| retained.contains(&key));
+        self.limiter.retain(now, |key| retained.contains(&key));
         self.endpoints = endpoints;
         self.connection_intents = snapshot
             .connection_intents
@@ -218,8 +207,6 @@ pub enum PolicyStateError {
     StalePolicyVersion,
     #[error("Relay policy refresh does not match the applied version")]
     UnexpectedPolicyVersion,
-    #[error("Relay policy has no limits for Team {0}")]
-    MissingTeamLimits(TenantId),
     #[error("Relay policy contains an invalid rate")]
     InvalidRate,
 }
