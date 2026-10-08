@@ -518,7 +518,14 @@ pub fn act(
             return Ok(());
         }
         if Instant::now() >= deadline {
-            return Err("window action accepted; requested state not observed (application may constrain geometry)".into());
+            return Err(match action {
+                Some(WindowControlAction::Close) =>
+                    "close requested but the window is still present; inspect its save/confirmation dialog or application state; do not replay close",
+                None =>
+                    "focus requested but foreground was not observed; inspect the selected desktop and re-list windows",
+                _ =>
+                    "window action accepted; requested state not observed (application may constrain geometry)",
+            }.into());
         }
         // Observation waits stay on the caller's worker thread so AppKit can
         // process animations and deferred close/minimize events between checks.

@@ -497,8 +497,9 @@ impl UiBackend for MacUi {
                     && settable(node, "AXSelectedText")
                 {
                     // NSTextView AXValue can replace display text without marking
-                    // a NEW document edited. Use the editable selection API so
-                    // AppKit records a real text edit. Do not synthesize keys or
+                    // a NEW document edited. Prefer the editable selection API,
+                    // but a matching AX value still does not prove document
+                    // dirty state or persistence. Do not synthesize keys or
                     // retry with AXValue after a partially dispatched edit.
                     let current = text(node, "AXValue")?;
                     let range = CFRange {
