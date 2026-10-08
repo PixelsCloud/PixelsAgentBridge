@@ -1,0 +1,1440 @@
+[
+  {
+    "tool": "pab_connect",
+    "device_code": "211399447"
+  },
+  {
+    "tool": "pab_connect",
+    "device_code": "565893930"
+  },
+  {
+    "tool": "pab_list_execution_contexts",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "execution_contexts",
+      "operation_id": "782a08ff-4c7d-49a2-bb6d-d8ecaa25b455"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "task_id": "a7c210e4-98d3-4672-9c09-1de282ffd978"
+  },
+  {
+    "tool": "pab_list_execution_contexts",
+    "device_code": "211399447",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "execution_contexts",
+      "operation_id": "4fc5c4d1-650f-4766-9764-34c12adfc2c2"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "6c0662f7-d8d8-410e-85e1-8ae1c89b15f2"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_launch_app",
+    "device_code": "211399447",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "app_launch",
+      "operation_id": "c87274b2-dfef-46e9-b403-a8568b78a21b"
+    },
+    "state": "failed",
+    "error": "remote_operation_failed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "211399447",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "command",
+      "operation_id": "a3000d41-9e56-40f4-8395-4d87ed779469",
+      "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658"
+    },
+    "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "operation_ref": null,
+    "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658",
+    "error": "invalid_arguments"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "operation_ref": null,
+    "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658",
+    "error": "invalid_arguments"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "6858e007-7b12-4430-bb27-8886e7ca1458",
+      "task_id": "a1fe4aa7-0761-4a15-927d-4f948b18ae30"
+    },
+    "task_id": "a1fe4aa7-0761-4a15-927d-4f948b18ae30",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "task_id": "fcb9e12e-7dc2-4e2f-bb78-d7b6517c9658"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "86a923f5-0f9a-486d-a4db-1634ff726b02"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "8b10dd31-9ac4-4c17-8ae5-39f8401d8e32"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_launch_app",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_launch",
+      "operation_id": "9596f049-0215-4c1c-9c15-6562804a3b8a"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_launch_app",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_launch",
+      "operation_id": "87d55fd3-3588-4c96-9fce-6c401a9d857a"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "5838745d-16c7-4802-b5cd-76ea265bd334"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "76053d63-6ee2-4f5d-8460-659e2b7b4a8e"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "8aec1112-0851-44be-aa26-11426f6fb70e"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "76053d63-6ee2-4f5d-8460-659e2b7b4a8e"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "746209fc-62a5-4d47-951c-3e1ff607df4a"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "746209fc-62a5-4d47-951c-3e1ff607df4a"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "15deb6bc-b4db-45ca-b0fb-b4039f1e9f88"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "15deb6bc-b4db-45ca-b0fb-b4039f1e9f88"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "88d450e5-3d0a-4145-931e-089ffb20e16f"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "88d450e5-3d0a-4145-931e-089ffb20e16f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "60e06929-5674-450b-b146-d67c79ada2aa"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "565893930",
+    "operation_ref": {
+      "device_code": "565893930",
+      "kind": "command",
+      "operation_id": "5eed5f83-7b9c-49fe-b421-968e18e522b5",
+      "task_id": "fccaabde-afc5-4486-bf78-27195f665ed1"
+    },
+    "task_id": "fccaabde-afc5-4486-bf78-27195f665ed1",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "8274c769-d383-40d2-95fa-eab34d466b85"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "565893930",
+    "operation_ref": {
+      "device_code": "565893930",
+      "kind": "command",
+      "operation_id": "f1b906e8-25ca-42e8-b1e4-a833a9024d0c",
+      "task_id": "58684090-5021-427a-b302-d514498963cd"
+    },
+    "task_id": "58684090-5021-427a-b302-d514498963cd",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "565893930",
+    "task_id": "58684090-5021-427a-b302-d514498963cd"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "4aad74f1-ef35-43d9-b994-b8734035a33f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "565893930",
+    "task_id": "58684090-5021-427a-b302-d514498963cd"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "565893930",
+    "task_id": "58684090-5021-427a-b302-d514498963cd"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "565893930",
+    "task_id": "58684090-5021-427a-b302-d514498963cd"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "operation_id": "689e7763-7a62-4a6a-916d-c9843a279ddf"
+    },
+    "error": "invalid_arguments"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "c6b4f547-6eda-49e1-a9ea-15d5cc7ad78a"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "c6b4f547-6eda-49e1-a9ea-15d5cc7ad78a"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "c6b4f547-6eda-49e1-a9ea-15d5cc7ad78a"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "c6b4f547-6eda-49e1-a9ea-15d5cc7ad78a"
+    },
+    "state": "failed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "5d70d5cf-4a0d-404f-ba4e-8c657c84378a"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "4f51e963-7a02-48aa-bba7-c8c0b862a415"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "ac75f512-e93a-4c61-9013-21946b075423"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "3862af51-e26f-4df1-acec-4d25c251ff0d",
+      "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685"
+    },
+    "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "9521c8e1-40ab-4147-8ee5-d395e9fce2b8"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "1fde050b-78db-4152-b9b0-bdf9db54d44f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "fc978ac5-194b-4f2b-bac5-3cbfd81e521d"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "operation_ref": null,
+    "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685",
+    "error": "operation_error"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "079aa407-2a9f-4d5d-89d0-de4a4f09d840"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "dd7b32bb-b418-4bef-93ca-016d392aff5a"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "dd7b32bb-b418-4bef-93ca-016d392aff5a"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "5b6f58f5-6947-43b8-8ff4-97af169fba28",
+      "task_id": "69813ac9-3157-4a8d-8a30-5658d503994f"
+    },
+    "task_id": "69813ac9-3157-4a8d-8a30-5658d503994f",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "edd7ac5c-7403-41ac-b6f2-bbfde2fb09de"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_launch_app",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_launch",
+      "operation_id": "67a77f19-7fae-4c42-8c61-f3fcf67d816e"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "a006a329-d3e7-4b54-8042-6fcaccd4ba77"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "7d1c0502-cf21-4557-80bc-fcf329ebba02"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "fda04c02-400c-4e73-b078-f7b860e0c595"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "fda04c02-400c-4e73-b078-f7b860e0c595"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "b8128697-b712-40b7-a7d5-7e5036281422"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "b8128697-b712-40b7-a7d5-7e5036281422"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "feb28a9d-6815-44ea-bcd3-864bb464958d"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "7ce57fad-bf4f-4bde-a61a-4af8cb0c7ca2"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "005c80db-854f-4ad7-8484-b41641cd336f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "d9aaa833-e2bf-4e5a-9585-b501313fb8c3"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "f08b5da2-6d0f-4449-ae92-bca7e2322c6b"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "f08b5da2-6d0f-4449-ae92-bca7e2322c6b"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "f08b5da2-6d0f-4449-ae92-bca7e2322c6b"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "f08b5da2-6d0f-4449-ae92-bca7e2322c6b"
+    },
+    "state": "failed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "700182d4-7cda-4ad6-84e4-883996240e3d"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "918e81b3-98f8-49aa-8e0e-e8590aaba954"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "4f0677a2-f971-41e1-92cf-e8db2ed11685"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "845a17b6-d79c-4ae4-a0d9-66e1fba62bf1"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "52d28706-4f29-411e-ba8f-5d431271a763"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "52d28706-4f29-411e-ba8f-5d431271a763"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "83d97014-a1b2-46b6-ac11-f5b603563c64",
+      "task_id": "2609c3bb-55e5-49fb-9f5f-36ecf1400c6c"
+    },
+    "task_id": "2609c3bb-55e5-49fb-9f5f-36ecf1400c6c",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "86993e8e-570b-474c-92b9-4d7a78a414b7",
+      "task_id": "831542c9-fbca-4868-958e-038b35ac044d"
+    },
+    "task_id": "831542c9-fbca-4868-958e-038b35ac044d",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "211399447",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "command",
+      "operation_id": "538edb9d-32c4-4850-92c0-4847fcd9a3e5",
+      "task_id": "016ae585-bf1b-4a02-b631-ee024bd7d43c"
+    },
+    "task_id": "016ae585-bf1b-4a02-b631-ee024bd7d43c",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "565893930",
+    "operation_ref": {
+      "device_code": "565893930",
+      "kind": "command",
+      "operation_id": "fa233a70-cb93-4501-b64a-77f7d85e55dd",
+      "task_id": "ac958e24-2c45-45e1-9bef-4054494ff41e"
+    },
+    "task_id": "ac958e24-2c45-45e1-9bef-4054494ff41e",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "5bb877f7-0cf4-4fee-a949-020574301c52",
+      "task_id": "290baf44-f753-4461-bef5-8f8548e1bb19"
+    },
+    "task_id": "290baf44-f753-4461-bef5-8f8548e1bb19",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "290baf44-f753-4461-bef5-8f8548e1bb19",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "290baf44-f753-4461-bef5-8f8548e1bb19"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "290baf44-f753-4461-bef5-8f8548e1bb19"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "c6477d50-1fa5-47fd-9611-0114bf3473e8",
+      "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+    },
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_file_delete",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_delete",
+      "operation_id": "d56c587b-b836-48d4-8916-c9ce8745eeaa"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_file_delete",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_delete",
+      "operation_id": "1fc9ac2a-e3d4-41c9-9cc3-be446a6301b0"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_delete",
+      "operation_id": "d56c587b-b836-48d4-8916-c9ce8745eeaa"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "file_delete",
+      "operation_id": "1fc9ac2a-e3d4-41c9-9cc3-be446a6301b0"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "211399447",
+    "operation_ref": {
+      "device_code": "211399447",
+      "kind": "command",
+      "operation_id": "3cb2a44d-a52b-44c7-b5fb-db3462a6e38f",
+      "task_id": "92e2f4fd-8d81-43d6-8255-0bb79ab008f3"
+    },
+    "task_id": "92e2f4fd-8d81-43d6-8255-0bb79ab008f3",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "211399447",
+    "task_id": "92e2f4fd-8d81-43d6-8255-0bb79ab008f3"
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_upload_file",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "0e4cc97c-c79c-4a23-a41c-594cc34e656f"
+    },
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "0e4cc97c-c79c-4a23-a41c-594cc34e656f"
+    },
+    "state": "failed",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "97ac692a-f91e-47d8-85e6-3a3c97f5bd05",
+      "task_id": "912bf267-6fe2-47bb-97cd-9c1f3bcbc45d"
+    },
+    "task_id": "912bf267-6fe2-47bb-97cd-9c1f3bcbc45d",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_upload_file",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "a35a6b32-b718-47a9-9824-5aec2e950c90"
+    },
+    "state": "completed",
+    "complete": true
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "b0889428-567e-4719-89f9-f6ea227d86d2",
+      "task_id": "dc53e01f-8798-449e-8e32-4889bbc79962"
+    },
+    "task_id": "dc53e01f-8798-449e-8e32-4889bbc79962",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "c4ce259c-6e3a-4f99-9aee-4efc8a74fa1a",
+      "task_id": "61d5a0f9-9f6d-4aac-bb5d-6a6221e4b991"
+    },
+    "task_id": "61d5a0f9-9f6d-4aac-bb5d-6a6221e4b991",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_download_file",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "60433f23-f25a-4680-b9f6-338dc2f4da73"
+    },
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "bd9188a2-9c93-4f48-9e85-ff32bb3d62be",
+      "task_id": "d0e64b7b-cf35-4823-a3a1-d3d3beb5f166"
+    },
+    "task_id": "d0e64b7b-cf35-4823-a3a1-d3d3beb5f166",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "60433f23-f25a-4680-b9f6-338dc2f4da73"
+    },
+    "state": "completed",
+    "complete": true
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "92bf4493-a040-4836-9c1d-c0d3e6f58ce9",
+      "task_id": "ab14669f-5725-425f-bbdd-f8296d818d52"
+    },
+    "task_id": "ab14669f-5725-425f-bbdd-f8296d818d52",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7"
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "b9c40cb0-2035-4e11-bfb5-7b79d93646d7",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "e511d263-97b0-458a-b131-9ae452df94ab",
+      "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5"
+    },
+    "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5",
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_download_file",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "b277f09b-9ee2-4f57-b055-b3d6efaae95a"
+    },
+    "state": "running",
+    "complete": false
+  },
+  {
+    "tool": "pab_get_task",
+    "device_code": "603527578",
+    "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5"
+  },
+  {
+    "tool": "pab_read_output",
+    "device_code": "603527578",
+    "task_id": "8c77a281-9e5b-461e-994b-51a4dd608ff5"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "device_ref": {
+        "device_id": "5b91b30e-43c1-4a49-9914-e7c5d0e599f5",
+        "tenant_id": "44a01d85-5908-4f57-ae73-3140375dfa21"
+      },
+      "kind": "file_transfer",
+      "operation_id": "b277f09b-9ee2-4f57-b055-b3d6efaae95a"
+    },
+    "state": "completed",
+    "complete": true
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "6cfd66d1-3782-4a69-b228-6c0bbc67c095",
+      "task_id": "0af70cca-e321-4cd0-b516-7bcbd712ca5e"
+    },
+    "task_id": "0af70cca-e321-4cd0-b516-7bcbd712ca5e",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_connect",
+    "device_code": "603527578"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "83e88df2-8851-40b1-8d52-45d312b32273",
+      "task_id": "d68c7b30-93b7-4268-9970-e4b5044b9ee8"
+    },
+    "task_id": "d68c7b30-93b7-4268-9970-e4b5044b9ee8",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_list_execution_contexts",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "execution_contexts",
+      "operation_id": "d66893b2-0bad-486a-b0b3-5012785d234f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_launch_app",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "app_launch",
+      "operation_id": "2b8a8938-e0d0-4ce2-b51c-333aefd49848"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "3f193012-9b9d-439b-abed-f029f4139f46"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "7c86e75b-a500-462b-9b6e-e80cd2d699a0"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "ad32e501-16b0-4dbd-bede-8f707bc47306"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "ad32e501-16b0-4dbd-bede-8f707bc47306"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "86c2e9a0-1633-4ec8-8f5e-af717804bb6c"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "86c2e9a0-1633-4ec8-8f5e-af717804bb6c"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "5a5345dc-c4de-44f8-8337-dd0ece5e1d3c"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "3c54adcc-2d62-4114-bc33-7c71ef06075f"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_desktop_input",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "8b7db0e1-8042-44c3-b68c-dcbd10cd8fdd"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "8b7db0e1-8042-44c3-b68c-dcbd10cd8fdd"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "8b7db0e1-8042-44c3-b68c-dcbd10cd8fdd"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_batch",
+      "operation_id": "8b7db0e1-8042-44c3-b68c-dcbd10cd8fdd"
+    },
+    "state": "failed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "fd73ac92-c3cb-4d5a-9984-b8956a81a4aa"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_query",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_query",
+      "operation_id": "feb0fd1d-1afe-4ac6-b854-70a287dfd7ae"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_ui_action",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "5a7951e4-1271-4508-9741-607fa2d91cf5"
+    },
+    "state": "running"
+  },
+  {
+    "tool": "pab_get_operation",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "ui_action",
+      "operation_id": "5a7951e4-1271-4508-9741-607fa2d91cf5"
+    },
+    "state": "completed"
+  },
+  {
+    "tool": "pab_run_command",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "command",
+      "operation_id": "af051214-ae02-4d7b-a7a0-4e974c1749cd",
+      "task_id": "903cdfc1-04ac-41eb-b655-434325f9febd"
+    },
+    "task_id": "903cdfc1-04ac-41eb-b655-434325f9febd",
+    "state": "succeeded",
+    "complete": true
+  },
+  {
+    "tool": "pab_list_windows",
+    "device_code": "603527578",
+    "operation_ref": {
+      "device_code": "603527578",
+      "kind": "desktop_windows",
+      "operation_id": "a8a3176a-e081-49ff-b161-9bb235774761"
+    },
+    "state": "completed"
+  }
+]

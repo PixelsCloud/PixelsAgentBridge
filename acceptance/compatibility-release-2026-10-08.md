@@ -1,5 +1,8 @@
 # 编码与桌面兼容 Release 交付记录
 
+本文保留首次交付时的事实；重载后新增参数已验收，Mac 包已更新到 1.2.43，
+当前结果和产物哈希见 [后续复验记录](compatibility-session-resume-2026-10-08.md)。
+
 本轮计划：[COMPATIBILITY_RELEASE_PLAN.md](../COMPATIBILITY_RELEASE_PLAN.md)。
 Windows/Linux Release 1.2.41；macOS 双架构 Release 1.2.42。
 Mac 的 1.2.40 是首次候选构建，随后补入输出末段刷新修复，按规则再次编译为 1.2.42。

@@ -338,6 +338,9 @@ Known macOS TextEdit issue, reproduced on installed 1.2.42: closing an unsaved d
 after an AX edit may omit the save prompt or save an empty file from the close dialog.
 Explicit Save, file readback, then Close has been verified; the unsaved-close issue remains
 unresolved. See the [compatibility acceptance record](acceptance/compatibility-release-2026-10-08.md).
+The subsequent [session retest](acceptance/compatibility-session-resume-2026-10-08.md)
+successfully saved both rich-text and plain-text documents from the close dialog.
+The earlier failure was not reproduced in that retest; its root cause remains unconfirmed.
 
 The result reports native execution identity and an observed instance when available.
 OS acceptance does not prove a new process, a ready window or changed document content.

@@ -50,16 +50,20 @@
   已确认需共享显式解码与边界处理。Mac NSWorkspace 默认复用实例，window_ready 当前为未知。
 - C1：共享解码、MCP/历史界面已实现；Windows 解码 4 项、MCP 40 项、浏览器 21 项、
   TypeScript 及 Desktop Rust 检查通过。见 [源码回归](acceptance/compatibility-c1-source-2026-10-07.md)。
-  跨平台源码回归及安装升级已通过；当前宿主尚未加载新增参数，正式 MCP 参数验收仍待重载。
+  跨平台源码回归、安装升级、重载后的正式 MCP 参数验收均已通过，包含六种编码、
+  原字节重读、字符分块、EOF 坏字节、UTF-16 偏移拒绝。见 [重载验收](acceptance/compatibility-session-resume-2026-10-08.md)。
 - C2：实例选项与版本门槛、Mac 原生文本编辑候选、Windows focus 指导已提交；
   见 [源码与待验收项](acceptance/compatibility-c2-source-2026-10-08.md)。Mac 1.2.42 安装版明确保存、回读、再关闭通过。
-  未保存文稿直接关闭仍有空文件/不提示问题，C2 未全部完成，不能把 AX 值匹配当保存成功。
+  重载后正式 MCP 默认复用/新建实例、Windows 不支持拒绝均通过。Mac 新实例富文本与旧实例纯文本
+  的“AX 编辑→关闭→原生 Sheet 保存→文件回读”均通过。上轮空文件/不提示本轮未复现，根因仍未定位，
+  保留已知问题；不能把 AX 值匹配当保存成功。关闭等待确认的误导提示已修正。
 - C3：已有普通用户命令/文件/PTY 与拒绝边界通过，见 [安装态基线](acceptance/compatibility-c3-user-2026-10-08.md)；
   当前缺少该账户可用交互桌面，应用交互未通过验收，不能借用管理员会话替代。
 - C4：Windows/Linux 1.2.41、Mac ARM/Intel 1.2.42 Release 包已完成；90、Mac、Linux、本机已安装，
   身份/历史保留及程序哈希通过。Linux 最终包手动与 systemd 安装生命周期通过。
   Windows/Mac 全新系统安装/卸载、Intel 原生运行及缺失硬件的测试尚未验收。
+  后续 macOS 提示修正已交付 1.2.43 双架构包，ARM 实机升级、签名/身份/历史保留、截图与 AX 及关闭提示均通过。
 - C5：源码已提交推送，远端先装、本机最后的交付完成，现场证据见
   [Release 验收记录](acceptance/compatibility-release-2026-10-08.md)。
-  宿主重载后继续新增 encoding/include_base64/new_instance 参数验收，并处理 C2 未保存关闭问题。
-  本长任务仍未全部完成。
+  宿主重载后的新增参数验收、Mac 关闭提示修正的 1.2.43 安装验证均已完成。
+  当前可用环境内的上述验收完成；剩余为本轮未复现的历史 Mac 文稿异常及缺失实机的测试，未标作已修复/通过。
