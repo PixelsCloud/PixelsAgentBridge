@@ -1,0 +1,15 @@
+Host github-egress
+    HostName egress.example
+    User pab-github-egress
+    IdentityFile /etc/pab-github-egress/id_ed25519
+    UserKnownHostsFile /etc/pab-github-egress/known_hosts
+    StrictHostKeyChecking yes
+    IdentitiesOnly yes
+    BatchMode yes
+    ConnectTimeout 10
+    ServerAliveInterval 15
+    ServerAliveCountMax 3
+    ExitOnForwardFailure yes
+    # Replace loopback only with a private interface reachable from Backend.
+    DynamicForward 127.0.0.1:39081
+    LogLevel ERROR

@@ -1,0 +1,22 @@
+[Unit]
+Description=GitHub HTTPS egress over managed OpenSSH SOCKS
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=pab-github-egress
+Group=pab-github-egress
+ExecStart=/usr/bin/ssh -NT -F /etc/pab-github-egress/ssh_config github-egress
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -38,6 +38,8 @@ Capabilities depend on the target OS and permissions. macOS screen capture and i
 
 Account sign-in is optional for password-based device access. Register or sign in through Desktop or the Web console to use your account identity. Sign-in is retained until you sign out; already running MCPs pick up account changes automatically. Signing in does not replace the target device's password.
 
+When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in without a separate registration form or password. Your first authorization creates an ordinary account automatically. Existing users can link GitHub from their account page. Self-hosted instances configure their own [GitHub App](GITHUB_LOGIN_SETUP.md).
+
 ## How it works
 
 ![Pixels Agent Bridge workflow](diagram/workflow/agent-workflow.svg)

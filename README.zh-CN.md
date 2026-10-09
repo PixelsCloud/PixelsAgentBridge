@@ -38,6 +38,8 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用
 
 使用设备密码连接不强制登录账号。需要使用账号身份时，可在 Desktop 或 Web 后台注册、登录；登录后保持登录状态，主动退出才注销。已经运行的 MCP 会自动同步账号变化。用户登录不能代替目标设备密码。
 
+启用 GitHub 登录的服务可直接点击**「使用 GitHub 登录」**，无需另填注册表或设置密码，首次授权会自动创建普通账号。已有账号可以在「我的」中绑定 GitHub。自部署请配置自己的 [GitHub App](GITHUB_LOGIN_SETUP.md)。
+
 ## 工作方式
 
 ![Pixels Agent Bridge 工作流程](diagram/workflow/agent-workflow.svg)

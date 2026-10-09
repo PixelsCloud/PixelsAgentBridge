@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically check GitHub HTTPS egress
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+RandomizedDelaySec=10
+Unit=pab-github-egress-health.service
+
+[Install]
+WantedBy=timers.target

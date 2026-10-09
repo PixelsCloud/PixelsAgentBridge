@@ -1,0 +1,14 @@
+[Unit]
+Description=Check GitHub HTTPS egress
+After=pab-github-egress.service
+
+[Service]
+Type=oneshot
+User=pab-github-egress
+Group=pab-github-egress
+EnvironmentFile=/etc/pab-github-egress/health.env
+ExecStart=/usr/local/libexec/pab-github-egress-health
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

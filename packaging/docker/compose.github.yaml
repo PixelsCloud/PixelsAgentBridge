@@ -1,0 +1,13 @@
+# Optional: load after compose.yaml when enabling GitHub sign-in.
+# Keep the JSON file outside the repository and container image.
+services:
+  backend:
+    environment:
+      PAB_GITHUB_CONFIG_FILE: /run/secrets/pab_github_app
+      PAB_GITHUB_PROXY_URL: ${PAB_GITHUB_PROXY_URL:-}
+    secrets:
+      - pab_github_app
+
+secrets:
+  pab_github_app:
+    file: ${PAB_GITHUB_CONFIG_PATH:?set PAB_GITHUB_CONFIG_PATH to your private JSON file}

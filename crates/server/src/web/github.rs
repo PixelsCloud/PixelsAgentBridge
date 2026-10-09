@@ -63,15 +63,23 @@ impl GithubConfig {
         {
             return Err("GitHub configuration requires Client ID and text Client Secret");
         }
-        Self::new(
+        let mut config = Self::new(
             secret.client_id,
             secret.client_secret,
             parsed.origin().ascii_serialization(),
             "https://github.com/login/oauth/authorize",
             "https://github.com/login/oauth/access_token",
             "https://api.github.com/user",
-        )
-        .map(Some)
+        )?;
+        // A deployment may route only GitHub through its managed egress.
+        // Keep normal DNS/SNI/certificate verification; never pin provider IPs.
+        let proxy = std::env::var("PAB_GITHUB_PROXY_URL").ok();
+        config.http = github_http(proxy.as_deref())?;
+        tracing::info!(
+            managed_proxy = proxy.as_deref().is_some_and(|v| !v.trim().is_empty()),
+            "GitHub HTTP transport configured"
+        );
+        Ok(Some(config))
     }
 
     fn new(
@@ -91,12 +99,7 @@ impl GithubConfig {
                 RedirectUrl::new(format!("{origin}{CALLBACK}"))
                     .map_err(|_| "invalid callback URL")?,
             );
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(15))
-            .redirect(reqwest::redirect::Policy::none())
-            .user_agent("PixelsAgentBridge")
-            .build()
-            .map_err(|_| "cannot create GitHub HTTP client")?;
+        let http = github_http(None)?;
         Ok(Self {
             client,
             http,
@@ -126,25 +129,115 @@ impl GithubConfig {
             .set_pkce_verifier(PkceCodeVerifier::new(verifier))
             .request_async(&transport)
             .await
-            .map_err(|_| upstream())?;
-        let response = self
+            .map_err(|error| match error {
+                oauth2::RequestTokenError::Request(error) => error,
+                oauth2::RequestTokenError::ServerResponse(error) => {
+                    // Never log descriptions, URLs, codes, credentials or token bodies.
+                    let class = match error.error().to_string().as_str() {
+                        "incorrect_client_credentials"
+                        | "invalid_client"
+                        | "redirect_uri_mismatch" => "configuration",
+                        "bad_verification_code" | "invalid_grant" => "authorization_code",
+                        "application_suspended" => "application_suspended",
+                        _ => "provider_rejected",
+                    };
+                    tracing::warn!(stage = "token", class, "GitHub authorization failed");
+                    upstream()
+                }
+                _ => {
+                    tracing::warn!(
+                        stage = "token",
+                        class = "invalid_response",
+                        "GitHub authorization failed"
+                    );
+                    upstream()
+                }
+            })?;
+        let request = self
             .http
             .get(&self.user_url)
             .bearer_auth(token.access_token().secret())
             .header("Accept", "application/vnd.github+json")
-            .send()
-            .await
+            .build()
             .map_err(|_| upstream())?;
+        let response = send_github(&self.http, request, "profile").await?;
         if !response.status().is_success() {
+            tracing::warn!(
+                stage = "profile",
+                status = response.status().as_u16(),
+                "GitHub HTTP response rejected"
+            );
             return Err(upstream());
         }
         let profile: Profile =
-            serde_json::from_slice(&bounded_body(response).await?).map_err(|_| upstream())?;
+            serde_json::from_slice(&bounded_body(response).await?).map_err(|_| {
+                tracing::warn!(
+                    stage = "profile",
+                    class = "invalid_response",
+                    "GitHub authorization failed"
+                );
+                upstream()
+            })?;
         if profile.id == 0 || profile.login.is_empty() || profile.login.len() > 100 {
             return Err(upstream());
         }
         Ok(profile)
     }
+}
+
+fn github_http(proxy: Option<&str>) -> Result<reqwest::Client, &'static str> {
+    let mut builder = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none())
+        .user_agent("PixelsAgentBridge");
+    if let Some(proxy) = proxy.filter(|v| !v.trim().is_empty()) {
+        let url = url::Url::parse(proxy).map_err(|_| "invalid PAB_GITHUB_PROXY_URL")?;
+        if !matches!(url.scheme(), "http" | "https" | "socks5h")
+            || url.host_str().is_none()
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || url.path() != "/" && !url.path().is_empty()
+        {
+            return Err("PAB_GITHUB_PROXY_URL requires HTTP, HTTPS or SOCKS5H proxy");
+        }
+        builder =
+            builder.proxy(reqwest::Proxy::all(proxy).map_err(|_| "invalid PAB_GITHUB_PROXY_URL")?);
+    }
+    builder
+        .build()
+        .map_err(|_| "cannot create GitHub HTTP client")
+}
+
+async fn send_github(
+    client: &reqwest::Client,
+    request: reqwest::Request,
+    stage: &'static str,
+) -> Result<reqwest::Response, WebError> {
+    // A code is single-use. Only retry failures while establishing a connection,
+    // before sending HTTP. Never replay a POST after a response/read timeout.
+    for attempt in 1..=2 {
+        let next = request.try_clone().ok_or_else(upstream)?;
+        match client.execute(next).await {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                let retry = error.is_connect() && attempt == 1;
+                let class = if error.is_timeout() {
+                    "timeout"
+                } else if error.is_connect() {
+                    "connection"
+                } else {
+                    "transport"
+                };
+                tracing::warn!(stage, class, attempt, retry, "GitHub HTTP request failed");
+                if !retry {
+                    return Err(upstream());
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+        }
+    }
+    Err(upstream())
 }
 
 struct BoundedTransport(reqwest::Client);
@@ -155,14 +248,33 @@ impl<'c> oauth2::AsyncHttpClient<'c> for BoundedTransport {
     >;
     fn call(&'c self, request: oauth2::HttpRequest) -> Self::Future {
         Box::pin(async move {
-            let response = self
-                .0
-                .execute(request.try_into().map_err(|_| upstream())?)
-                .await
-                .map_err(|_| upstream())?;
-            let status = response.status();
+            let response = send_github(
+                &self.0,
+                request.try_into().map_err(|_| upstream())?,
+                "token",
+            )
+            .await?;
+            let mut status = response.status();
+            if !status.is_success() {
+                tracing::warn!(
+                    stage = "token",
+                    status = status.as_u16(),
+                    "GitHub HTTP response rejected"
+                );
+            }
             let headers = response.headers().clone();
-            let mut result = oauth2::HttpResponse::new(bounded_body(response).await?);
+            let body = bounded_body(response).await?;
+            // GitHub can return an OAuth error with HTTP 200. Normalize it for
+            // oauth2's standard error parser; otherwise a bad secret is reported
+            // as an unreadable success response instead of a configuration error.
+            if status.is_success()
+                && serde_json::from_slice::<Value>(&body)
+                    .ok()
+                    .is_some_and(|value| value.get("error").is_some_and(Value::is_string))
+            {
+                status = StatusCode::BAD_REQUEST;
+            }
+            let mut result = oauth2::HttpResponse::new(body);
             *result.status_mut() = status;
             *result.headers_mut() = headers;
             Ok(result)
@@ -172,8 +284,12 @@ impl<'c> oauth2::AsyncHttpClient<'c> for BoundedTransport {
 
 async fn bounded_body(mut response: reqwest::Response) -> Result<Vec<u8>, WebError> {
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| upstream())? {
+    while let Some(chunk) = response.chunk().await.map_err(|_| {
+        tracing::warn!(class = "body_read", "GitHub response failed");
+        upstream()
+    })? {
         if bytes.len() + chunk.len() > 1024 * 1024 {
+            tracing::warn!(class = "body_too_large", "GitHub response failed");
             return Err(upstream());
         }
         bytes.extend_from_slice(&chunk);
@@ -666,3 +782,5 @@ pub(super) async fn native_unlink(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod transport_tests;
