@@ -21,7 +21,8 @@ metadata uses the verified build record's release version independently of the a
 Unpack the complete archive and, from a desktop user account, run
 `sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL`.
 Open the app from Applications and grant Screen Recording and Accessibility as
-needed. Quit Desktop/MCP clients before upgrading with another complete archive.
+needed. Upgrading automatically stops the installed PAB processes; finish active
+tasks first. Agent hosts remain open and may need to reconnect Pixels MCP.
 Uninstallation preserves machine and user data. See [MACOS.md](../../MACOS.md)
 for exact paths, permissions, account semantics and verification limitations.
 Windows/Linux use their existing scripts unchanged.
@@ -45,11 +46,18 @@ The default control/relay addresses match `build_nsis.py`:
 Each `*-setup.pkg` embeds all binaries and installation scripts, requires admin
 authorization, checks the native CPU architecture, installs only on the running
 system volume, and grants local access to the active desktop user. No Terminal
-commands or deployment inputs are needed on the target Mac. Quit Desktop/MCP
-clients first. Screen Recording and Accessibility still require manual consent.
+commands or deployment inputs are needed on the target Mac. The welcome page
+explains that upgrading interrupts active tasks and connections. The installer
+stages the new files, stops launchd jobs, retires the old executable paths to
+prevent client respawn, then stops old PAB processes and publishes the new files.
+It does not terminate Codex or other Agent hosts. Screen Recording and
+Accessibility still require manual consent.
 The package reuses `macos/install.sh` in a scripts-only component; its receipt is
 not a file inventory. Use the installed `uninstall.sh` to uninstall; existing
-data is retained. Installer failures do not provide automatic rollback.
+data is retained. Failed upgrades attempt to restore the previous program files
+and launchd jobs, retaining the backup if recovery fails. This does not roll back
+database changes. A failure dialog shows the underlying error and directs users
+to Window > Installer Log; stderr alone is not the user-facing error message.
 
 Pass `--sign 'Developer ID Installer: ...'` to sign the package if that identity
 is available. App signing and notarization are separate; an unsigned package
@@ -59,6 +67,8 @@ records the package hash and deployment settings. Building never installs PAB.
 Run `python3.13 packaging/desktop/test_macos_pkg.py` for validation tests; set
 `PAB_PKG_TEST_ARCHIVE` to an existing macOS archive to additionally build and
 expand a temporary fixture installer without running its installation scripts.
+Run `python3.13 packaging/desktop/test_macos_upgrade.py` on a Mac to test process
+retirement, client respawn and file restoration in temporary directories.
 
 ## Windows and Linux
 

@@ -8,6 +8,8 @@ mod agent_integrations;
 mod desktop_input;
 mod macos_permissions;
 #[cfg(target_os = "macos")]
+mod macos_launch;
+#[cfg(target_os = "macos")]
 pub fn macos_diagnostics() -> serde_json::Value {
     serde_json::json!({
         "platform": "macos", "architecture": std::env::consts::ARCH,
@@ -276,18 +278,32 @@ pub fn run() {
         eprintln!("Could not apply saved operator server settings: {error}");
     }
     let paths = DataPaths::for_scope(DataScope::User).expect("could not find user data directory");
+    #[cfg(target_os = "macos")]
+    let gui_instance = match macos_launch::GuiInstance::acquire(paths.root()) {
+        Ok(Some(instance)) => instance,
+        Ok(None) => return,
+        Err(error) => {
+            eprintln!("Could not open desktop window: {error}");
+            return;
+        }
+    };
     pab_logging::init("desktop", paths.root()).expect("could not initialize desktop log file");
     tauri::Builder::default()
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
         .on_window_event(tray::on_window_event)
-        .setup(|app| {
+        .setup(move |app| {
             let device_accounts = device_account::DeviceAccountService::default();
             app.manage(device_accounts.clone());
             tauri::async_runtime::spawn(device_accounts.run());
             tauri::async_runtime::spawn(device_account::run_catalog());
             tray::setup(app)?;
+            #[cfg(target_os = "macos")]
+            {
+                gui_instance.listen(app.handle().clone())?;
+                app.manage(gui_instance);
+            }
             let reporting = app
                 .state::<mcp_reporting::McpReportingState>()
                 .inner()

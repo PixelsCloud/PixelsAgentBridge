@@ -70,7 +70,7 @@ def package_unix(platform, architecture, binaries):
     files = [
         *(binaries / name for name in ("pab-mcp", "pab-executor")),
         *(scripts / ("macos" if platform == "macos" else "unix") / name for name in (
-            ("install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh")
+            ("install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh")
             if platform == "macos" else
             ("install.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh", "INSTALL-LINUX.txt")
         )),

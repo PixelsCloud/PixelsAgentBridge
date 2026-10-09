@@ -39,6 +39,13 @@ pub fn run() -> Result<(), String> {
         if !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited) {
             return Err("unable to configure background session helper".into());
         }
+        // Finder can send the shared bundle's open event to this helper. Keep
+        // LoginWindow headless; only an Aqua helper may forward to the GUI.
+        let delegate = (expected_desktop.as_deref() != Some("LoginWindow"))
+            .then(|| crate::macos_launch::HelperDelegate::new(main));
+        if let Some(delegate) = delegate.as_ref() {
+            app.setDelegate(Some(objc2::runtime::ProtocolObject::from_ref(&**delegate)));
+        }
         let task = tauri::async_runtime::spawn(async move {
             use tokio::signal::unix::{SignalKind, signal};
             let Ok(mut termination) = signal(SignalKind::terminate()) else {
@@ -57,6 +64,8 @@ pub fn run() -> Result<(), String> {
             std::process::exit(0);
         });
         app.run();
+        app.setDelegate(None);
+        drop(delegate);
         task.abort();
         return Ok(());
     }

@@ -30,7 +30,7 @@ IDENTIFIER = "vip.rgaa.pab.desktop.installer"
 CONTROL_URL = "wss://pab.rgaa.vip/control"
 RELAY_URL = "https://pab-relay.rgaa.vip"
 REQUIRED = {
-    "pab-executor", "pab-mcp", "install.sh", "uninstall.sh", "run-app.sh",
+    "pab-executor", "pab-mcp", "install.sh", "uninstall.sh", "run-app.sh", "lifecycle.sh",
     "run-mcp.sh", "run-executor.sh", "com.pixelsagentbridge.executor.plist",
     "com.pixelsagentbridge.session-helper.plist",
     "com.pixelsagentbridge.login-helper.plist",
@@ -104,10 +104,11 @@ def verify_binaries(payload, architecture):
 
 
 def prepare_scripts(destination, arch, control_url, relay_url):
-    for name in ("preinstall", "postinstall"):
+    for name in ("preinstall", "postinstall", "failure-dialog.sh"):
         (destination / name).write_bytes((SCRIPTS / "pkg" / name).read_bytes().replace(b"\r\n", b"\n"))
         (destination / name).chmod(0o755)
         subprocess.run(["/bin/bash", "-n", str(destination / name)], check=True)
+    shutil.copyfile(SCRIPTS / "pkg/failure-dialog.applescript", destination / "failure-dialog.applescript")
     values = {"PAB_PKG_ARCH": arch,
               "PAB_CONTROL_URL": control_url, "PAB_RELAY_URL": relay_url}
     (destination / "package.env").write_text("".join(f"{k}={shlex.quote(v)}\n" for k, v in values.items()))
@@ -165,13 +166,16 @@ def main():
         resources.mkdir()
         (resources / "Welcome.html").write_text(
             "<html><meta charset='utf-8'><body><h2>Pixels Agent Bridge</h2>"
-            f"<p>{arch} · macOS 12+</p><p>安装前请退出 Pixels Agent Bridge 和 MCP 客户端。"
+            f"<p>{arch} · macOS 12+</p><p>升级将覆盖原来的 Pixels Agent Bridge，自动关闭旧版主程序、MCP 和后台服务。"
+            "进行中的远程连接和任务会中断，请先完成工作。Codex 等客户端本身不会被关闭；升级后可能需要重新连接 Pixels MCP。"
             "安装器将安装应用、机器后台服务和当前登录用户的桌面辅助进程；需要管理员密码。</p>"
-            "<p>Quit Desktop and MCP clients first. Installs the app, a system service and a user helper. "
+            "<p>Upgrades replace the existing app and automatically stop old PAB processes. "
+            "Active connections and tasks will be interrupted. Finish your work first. "
+            "Agent hosts stay open; reconnect Pixels MCP after upgrading if needed. "
             "Administrator authorization is required.</p>"
             f"<p>Control: {html.escape(control)}<br>Relay: {html.escape(relay)}</p>"
             "<p>既有数据保留。不自动授予屏幕录制或辅助功能权限。"
-            "此脚本安装器不提供失败自动回滚；升级前请备份数据。</p></body></html>")
+            "文件替换失败时会尝试恢复原程序，并显示具体错误。升级前请备份重要数据。</p></body></html>")
         (resources / "Conclusion.html").write_text(
             "<html><meta charset='utf-8'><body><h2>安装完成 / Installed</h2>"
             "<p>从 Applications 打开 Pixels Agent Bridge，在设置中授予屏幕录制和辅助功能权限。"

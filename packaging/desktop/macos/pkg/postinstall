@@ -5,9 +5,24 @@ package_dir=$(cd "$(dirname "$0")" && pwd)
 # Revalidate immediately before mutation (the active user may have logged out).
 /bin/bash "$package_dir/preinstall" "$@"
 source "$package_dir/package.env"
+source "$package_dir/failure-dialog.sh"
 desktop_user=$(stat -f '%Su' /dev/console)
 # Installer runs as root and does not set SUDO_USER. The active console account,
 # not the account authorizing Installer, owns the per-user local access token.
 export SUDO_USER="$desktop_user"
-exec /bin/bash "$package_dir/payload/install.sh" \
-    "$PAB_CONTROL_URL" "$PAB_RELAY_URL"
+log_file=$(mktemp "$package_dir/upgrade-log.XXXXXX")
+if /bin/bash "$package_dir/payload/install.sh" \
+    "$PAB_CONTROL_URL" "$PAB_RELAY_URL" >"$log_file" 2>&1; then
+    cat "$log_file"
+    rm -f "$log_file"
+else
+    status=$?
+    cat "$log_file" >&2
+    details=$(tail -n 12 "$log_file")
+    pab_report_failure "安装未完成，请根据以下原因处理后重试。详细日志可在安装器的“窗口 → 安装器日志”查看。
+Installation did not complete. Resolve the error below and retry. Full details: Window → Installer Log.
+
+$details"
+    rm -f "$log_file"
+    exit "$status"
+fi

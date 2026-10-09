@@ -81,6 +81,29 @@ class Installer(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pkg.extract_verified(archive, manifest, root / "unpacked")
 
+    @unittest.skipUnless(sys.platform == 'darwin', 'macOS installer scripts')
+    def test_postinstall_surfaces_the_actual_failure_and_keeps_exit_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'payload').mkdir()
+            shutil.copyfile(pkg.SCRIPTS / 'pkg/postinstall', root / 'postinstall')
+            (root / 'preinstall').write_text('#!/bin/bash\nexit 0\n')
+            (root / 'package.env').write_text('PAB_CONTROL_URL=wss://example.test\nPAB_RELAY_URL=https://example.test\n')
+            # Capture the GUI boundary instead of opening a real alert in a test.
+            (root / 'failure-dialog.sh').write_text('pab_report_failure() { printf "%s" "$1" > "$package_dir/displayed-message"; }\n')
+            (root / 'payload/install.sh').write_text('#!/bin/bash\necho "Could not replace test application: permission denied" >&2\nexit 23\n')
+            result = subprocess.run(['/bin/bash', str(root / 'postinstall')], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 23)
+            displayed = (root / 'displayed-message').read_text()
+            self.assertIn('Could not replace test application: permission denied', displayed)
+            self.assertIn('安装器日志', displayed)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'AppleScript compiler')
+    def test_failure_dialog_compiles(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            subprocess.run(['/usr/bin/osacompile', '-o', str(Path(temporary) / 'dialog.scpt'),
+                            str(pkg.SCRIPTS / 'pkg/failure-dialog.applescript')], check=True, capture_output=True)
+
     @unittest.skipUnless(os.environ.get("PAB_PKG_TEST_ARCHIVE"), "set PAB_PKG_TEST_ARCHIVE to build/expand a temporary fixture installer")
     def test_real_product_build_and_expand_without_installing(self):
         archive = Path(os.environ["PAB_PKG_TEST_ARCHIVE"]).resolve()
@@ -106,6 +129,11 @@ class Installer(unittest.TestCase):
             configs = list(expanded.rglob("package.env"))
             self.assertEqual(len(configs), 1)
             self.assertNotIn("DEPLOYMENT", configs[0].read_text())
+            self.assertTrue((configs[0].parent / 'failure-dialog.applescript').is_file())
+            self.assertIn('pab_report_failure', (configs[0].parent / 'postinstall').read_text())
+            welcome = next(expanded.rglob('Welcome.html')).read_text()
+            self.assertIn('自动关闭旧版', welcome)
+            self.assertNotIn('Quit Desktop and MCP clients first', welcome)
             self.assertIn(pkg.CONTROL_URL, configs[0].read_text())
             self.assertTrue((configs[0].parent / "payload" / pkg.APP / "Contents/MacOS/pab-desktop").is_file())
             pkg.verify_binaries(configs[0].parent / "payload", "arm64" if arch == "aarch64" else "x86_64")
@@ -114,12 +142,16 @@ class Installer(unittest.TestCase):
             self.assertEqual((app_payload / "Contents/Info.plist").stat().st_mode & 0o777, 0o644)
             with (configs[0].parent / "payload" / pkg.APP / "Contents/Info.plist").open("rb") as source:
                 built_version = plistlib.load(source)["CFBundleShortVersionString"]
+            pkg.parse_version(built_version)
+            # Installer releases now advance independently of the app's version.
+            release_version = source_manifest[archive.name]['version']
             package_info = ET.parse(next(expanded.rglob("PackageInfo"))).getroot()
-            self.assertEqual(package_info.attrib["version"], source_manifest[archive.name]['version'])
-            self.assertEqual(built_version, json.loads((pkg.ROOT / 'apps/desktop/src-tauri/tauri.conf.json').read_text())['version'])
+            self.assertEqual(package_info.attrib["version"], release_version)
             metadata = json.loads(next(root.glob("SHA256-macos-*-setup-*.json")).read_text())
             self.assertEqual(pkg.digest(installers[0]), metadata["sha256"])
-            self.assertEqual(metadata['version'], source_manifest[archive.name]['version'])
+            self.assertEqual(metadata['version'], release_version)
+            self.assertIn(f'-{release_version}-setup.pkg', installers[0].name)
+            self.assertEqual(built_version, json.loads((pkg.ROOT / 'apps/desktop/src-tauri/tauri.conf.json').read_text())['version'])
             self.assertFalse(metadata["installer_signed"])
             self.assertNotIn("deployment_id", metadata)
 
