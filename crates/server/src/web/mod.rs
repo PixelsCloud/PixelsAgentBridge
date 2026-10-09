@@ -14,6 +14,8 @@ use crate::{ControlApiState, ControlPlane};
 mod device_accounts;
 mod devices;
 mod events;
+mod github;
+pub use github::GithubConfig;
 mod management;
 mod saved_devices;
 mod session;
@@ -31,6 +33,7 @@ struct WebState {
     login_budget: Arc<Mutex<(Instant, u32)>>,
     subscriptions: Arc<Semaphore>,
     server_instance: uuid::Uuid,
+    github: Option<Arc<GithubConfig>>,
 }
 
 pub fn router(control: ControlApiState) -> Router {
@@ -41,6 +44,7 @@ pub fn router(control: ControlApiState) -> Router {
         login_budget: Arc::new(Mutex::new((Instant::now(), 0))),
         subscriptions: Arc::new(Semaphore::new(256)),
         server_instance: control.server_instance,
+        github: control.github,
     };
     let browser = Router::new()
         .route("/api/web/config", get(session::config))
@@ -50,6 +54,8 @@ pub fn router(control: ControlApiState) -> Router {
         )
         .route("/api/web/logout", post(session::logout))
         .route("/api/web/register", post(session::register))
+        .route("/api/web/github/start", post(github::web_start))
+        .route("/api/web/github", get(github::web_status).delete(github::web_unlink))
         .route("/api/web/password", post(session::change_password))
         .route("/api/web/devices", get(devices::list))
         .route(
@@ -117,6 +123,9 @@ pub fn router(control: ControlApiState) -> Router {
             axum::routing::put(user_context::update),
         )
         .route("/api/account/config", get(session::config))
+        .route("/api/account/github/start", post(github::native_start))
+        .route("/api/account/github/redeem", post(github::redeem))
+        .route("/api/account/github", get(github::native_status).delete(github::native_unlink))
         .route(
             "/api/account/session",
             get(session::native_current).post(session::native_login),
@@ -125,8 +134,14 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/account/logout", post(session::native_logout))
         .layer(DefaultBodyLimit::max(16 * 1024))
         .layer(middleware::from_fn(support::native_boundary))
+        .with_state(state.clone());
+    // OAuth navigation is cross-site by design. These GETs use their own
+    // one-time state + Lax cookie boundary, never the native Origin middleware.
+    let oauth = Router::new()
+        .route("/api/account/github/authorize", get(github::authorize))
+        .route("/api/account/github/callback", get(github::callback))
         .with_state(state);
-    browser.merge(native)
+    browser.merge(native).merge(oauth)
 }
 
 pub fn assets() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {

@@ -23,6 +23,7 @@ mod device_account;
 mod mcp_reporting;
 mod mcp_tool_settings;
 mod operator;
+mod github_login;
 mod screenshot_session;
 mod server_settings;
 mod session_helper;
@@ -292,6 +293,7 @@ pub fn run() {
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
+        .manage(github_login::GithubLoginState::default())
         .on_window_event(tray::on_window_event)
         .setup(move |app| {
             let device_accounts = device_account::DeviceAccountService::default();
@@ -366,6 +368,11 @@ pub fn run() {
             operator::operator_task,
             operator::operator_current_traffic_scope,
             operator::operator_login_account,
+            github_login::github_enabled,
+            github_login::github_login,
+            github_login::github_cancel,
+            github_login::github_status,
+            github_login::github_unlink,
             operator::operator_register_account,
             operator::operator_use_guest_scope,
         ])

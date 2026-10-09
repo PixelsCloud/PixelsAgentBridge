@@ -3,12 +3,13 @@ import { Alert, Button, Card, Form, Input, Space, Typography } from 'antd';
 import { ApiError, post, type Viewer } from './api';
 import { useText } from './i18n';
 import brand from './brand.svg';
+import { GithubButton } from './GithubAccount';
 
-export function AuthPage({ registration, onLogin }: { registration: boolean; onLogin: (me: Viewer) => void }) {
+export function AuthPage({ registration, github, onLogin }: { registration: boolean; github?:boolean; onLogin: (me: Viewer) => void }) {
   const t = useText();
   const [register, setRegister] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string|undefined>(()=>new URLSearchParams(window.location.search).get('github_error')??undefined);
   const [form] = Form.useForm();
   async function submit(values: { username: string; password: string }) {
     setBusy(true); setError(undefined);
@@ -27,5 +28,6 @@ export function AuthPage({ registration, onLogin }: { registration: boolean; onL
         <Button type="primary" htmlType="submit" block size="large" loading={busy}>{t(register ? 'register' : 'login')}</Button>
       </Form>
       {registration && <Button type="link" disabled={busy} onClick={() => { setRegister(!register); setError(undefined); form.resetFields(); }}>{t(register ? 'alreadyAccount' : 'createAccount')}</Button>}
+      {github && <GithubButton disabled={busy}/>}
     </Space></Card></div>;
 }

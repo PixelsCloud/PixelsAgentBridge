@@ -224,7 +224,7 @@ function App() {
       >
         <div className="titlebar-identity">
           <img className="brand-mark" src={brand} alt="" />
-          <span>Pixels Agent Bridge</span>
+          <span>Pixels Agent Bridge (v {__PAB_RELEASE_VERSION__})</span>
         </div>
         <div className="window-controls">
           <button

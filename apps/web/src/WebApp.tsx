@@ -7,6 +7,7 @@ import { Activity, LayoutDashboard, LogOut, Monitor, Moon, Settings, Sun, User, 
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, ApiError, post, type Viewer, type WebConfig } from './api';
 import { AuthPage } from './AuthPage';
+import { GithubAccount, type GithubStatus } from './GithubAccount';
 import { detectLanguage, LanguageContext, useText, type Language } from './i18n';
 import { DeviceDetail, DeviceListPage, Overview } from './DevicePages';
 import { useLiveUpdates } from './useLiveUpdates';
@@ -54,7 +55,7 @@ function Console(props: Preferences) {
   const preferences = <Space><Select aria-label={t('language')} value={props.language} onChange={props.setLanguage} options={[{ value: 'zh-CN', label: '简体中文' }, { value: 'zh-TW', label: '繁體中文' }, { value: 'en', label: 'English' }]} style={{ width: 120 }}/><Button aria-label={t(props.dark ? 'light' : 'dark')} icon={props.dark ? <Sun size={18}/> : <Moon size={18}/>} onClick={() => props.setDark(!props.dark)}/></Space>;
   if (error) return <div className="full-center"><Result status="error" title={t(error)} extra={<Button onClick={() => setRevision(v => v + 1)}>{t('retry')}</Button>}/></div>;
   if (me === undefined || !config) return <div className="full-center"><Spin size="large"/></div>;
-  if (!me) return <><div className="auth-preferences">{preferences}</div><AuthPage registration={config.registration_enabled} onLogin={value => { setMe(value); navigate('/'); }}/></>;
+  if (!me) return <><div className="auth-preferences">{preferences}</div><AuthPage registration={config.registration_enabled} github={config.github_enabled} onLogin={value => { setMe(value); navigate('/'); }}/></>;
   const management = me.server_admin && !personal;
   const viewMe = { ...me, server_admin: management };
   const items = [
@@ -75,7 +76,7 @@ function Console(props: Preferences) {
     {me.server_admin && <Select aria-label={t('serviceManagement')} value={personal ? 'personal' : 'service'} onChange={value => { setPersonal(value === 'personal'); navigate('/'); }} style={{ margin: 12, width: 'calc(100% - 24px)' }} options={[{ value: 'personal', label: t('personalCenter') }, { value: 'service', label: t('serviceManagement') }]} />}
     <Menu mode="inline" theme={props.dark ? 'dark' : 'light'} items={items} selectedKeys={[location.pathname.startsWith('/devices/') ? '/devices' : location.pathname]} onClick={({ key }) => navigate(key)}/>
   </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t(management ? 'serviceManagement' : 'personalCenter')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
-    <Layout.Content className="console-content">{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes key={`${me.id}:${management}`}>
+    <Layout.Content className="console-content">{new URLSearchParams(location.search).get("github_error") && <Alert type="error" title={t(new URLSearchParams(location.search).get("github_error")!)} showIcon style={{ marginBottom: 16 }}/>}{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes key={`${me.id}:${management}`}>
       <Route path="/" element={<Overview all={management} liveRevision={liveRevision}/>}/>
       <Route path="/devices" element={<DeviceListPage key="list" me={viewMe} mode="list" liveRevision={liveRevision}/>}/>
       <Route path="/online" element={<DeviceListPage key="online" me={viewMe} mode="online" liveRevision={liveRevision}/>}/>
@@ -102,6 +103,7 @@ function PreferencesPanel(props: Preferences & { version: string; admin: boolean
 }
 
 function Account({ me }: { me: Viewer }) {
+  const [github,setGithub]=useState<GithubStatus>();
   const t = useText(); const { message } = App.useApp(); const [busy, setBusy] = useState(false); const [error, setError] = useState<string>();
   async function submit(values: { current_password: string; new_password: string }) {
     setBusy(true); setError(undefined);
@@ -110,12 +112,13 @@ function Account({ me }: { me: Viewer }) {
   }
   return <Space orientation="vertical" size={20} style={{ width: '100%' }}><Typography.Title level={2}>{t('account')}</Typography.Title>
     <Card><Descriptions items={[{ key: 'user', label: t('username'), children: me.username }, { key: 'role', label: t('account'), children: t(me.server_admin ? 'admin' : 'user') }]}/></Card>
-    <Card title={t('changePassword')}><Form layout="vertical" onFinish={submit} style={{ maxWidth: 440 }} requiredMark={false}>
+    <GithubAccount onStatus={setGithub}/>
+    {github?.password_enabled && <Card title={t('changePassword')}><Form layout="vertical" onFinish={submit} style={{ maxWidth: 440 }} requiredMark={false}>
       {error && <Alert type="error" title={t(error)} showIcon style={{ marginBottom: 20 }}/>}
       <Form.Item name="current_password" label={t('currentPassword')} rules={[{ required: true, message: t('required') }]}><Input.Password autoComplete="current-password" maxLength={1024}/></Form.Item>
       <Form.Item name="new_password" label={t('newPassword')} extra={t('passwordMin')} rules={[{ required: true, message: t('required') }, { min: 8, message: t('passwordMin') }]}><Input.Password autoComplete="new-password" maxLength={1024}/></Form.Item>
       <Form.Item name="confirm" label={t('confirmPassword')} dependencies={['new_password']} rules={[{ required: true, message: t('required') }, ({ getFieldValue }) => ({ validator: (_, value) => value === getFieldValue('new_password') ? Promise.resolve() : Promise.reject(new Error(t('passwordMismatch'))) })]}><Input.Password autoComplete="new-password"/></Form.Item>
       <Button type="primary" htmlType="submit" loading={busy}>{t('save')}</Button>
-    </Form></Card>
+    </Form></Card>}
   </Space>;
 }

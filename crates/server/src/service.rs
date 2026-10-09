@@ -121,7 +121,7 @@ impl ControlPlane {
         let credential = self.store.account_credential(&username_key).await?;
         let encoded_hash = credential
             .as_ref()
-            .map(|credential| credential.password_hash.clone())
+            .and_then(|credential| credential.password_hash.clone())
             .unwrap_or_else(|| self.dummy_password_hash.clone());
         let passwords = self.passwords.clone();
         let password = password.to_owned();
@@ -130,7 +130,7 @@ impl ControlPlane {
                 .await
                 .map_err(ServiceError::PasswordTask)?;
         match (verified, credential) {
-            (true, Some(credential)) => Ok(credential.account),
+            (true, Some(credential)) if credential.password_hash.is_some() => Ok(credential.account),
             _ => Err(ServiceError::InvalidCredentials),
         }
     }

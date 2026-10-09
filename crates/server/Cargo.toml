@@ -34,6 +34,8 @@ tokio.workspace = true
 unicode-normalization = "0.1"
 uuid.workspace = true
 url = "2"
+oauth2 = { version = "=5.0.0", default-features = false, features = ["reqwest", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tower-http = { version = "0.6", features = ["fs"] }
 
 [dev-dependencies]

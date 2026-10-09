@@ -144,7 +144,7 @@ pub async fn response_headers(request: Request, next: Next) -> Response {
     }
     let headers = response.headers_mut();
     headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-    headers.insert(header::REFERRER_POLICY, "same-origin".parse().unwrap());
+    headers.entry(header::REFERRER_POLICY).or_insert("same-origin".parse().unwrap());
     headers.insert(header::X_FRAME_OPTIONS, "DENY".parse().unwrap());
     if html && !asset {
         headers.insert(header::CONTENT_SECURITY_POLICY, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'".parse().unwrap());

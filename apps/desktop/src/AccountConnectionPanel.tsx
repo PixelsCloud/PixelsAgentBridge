@@ -5,6 +5,7 @@ import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
 import { DeviceAccountPanel } from "./DeviceAccountPanel";
 import { AccountCatalogPanel } from "./AccountCatalogPanel";
+import { GithubAccount } from "./GithubAccount";
 
 export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
   language: Language;
@@ -43,6 +44,7 @@ export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
       <DeviceAccountPanel key={activeScope.revision} language={language} accountRevision={activeScope.revision} />
       <AccountCatalogPanel key={`catalog-${activeScope.revision}`} language={language} accountRevision={activeScope.revision} />
       <Button className="home-account-disconnect" loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
+      <GithubAccount key={activeScope.userId} language={language} signedIn disabled={busy} onBusy={setBusy}/>
       {error && <Alert className="account-error" type="error" showIcon title={error} />}
     </section>
   );
@@ -119,5 +121,6 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
     {error && <Alert type="error" showIcon title={error} />}
     <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || !password || (register && password !== confirmPassword)} block>{register ? t.accountRegister : t.accountConnect}</Button>
     <Button type="link" disabled={busy} onClick={() => { setRegister(!register); setError(""); setPassword(""); setConfirmPassword(""); }}>{register ? t.accountAlreadyRegistered : t.accountRegister}</Button>
+    <GithubAccount language={language} disabled={busy} onBusy={setBusy} onSignedIn={onSignedIn}/>
   </form>;
 }

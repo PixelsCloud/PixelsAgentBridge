@@ -946,7 +946,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
 
       <Modal open={Boolean(renameTarget)} title={t.renameDevice} width={400}
         onCancel={() => { if (!renaming) setRenameTarget(null); }}
-        onOk={() => void renameSavedDevice()} okText={t.saveName} okButtonProps={{ disabled: !renameTarget || aliasDraft.trim() === renameTarget.alias }}
+        onOk={() => void renameSavedDevice()} okText={t.saveName} okButtonProps={{ disabled: !renameTarget || renameDraft.trim() === renameTarget.alias }}
         confirmLoading={renaming} cancelText={t.cancel} maskClosable={false} keyboard={false}>
         {renameTarget && <>
           <strong>{formatDeviceCode(renameTarget.deviceCode)}</strong>

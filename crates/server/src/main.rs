@@ -87,6 +87,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let relay_control_secret = required_secret("PAB_RELAY_CONTROL_SECRET")?;
             let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
             let presence_control = control_plane.clone();
+            let github = pab_server::web::GithubConfig::from_env()?;
             let state = ControlApiState::new(
                 control_plane,
                 ControlApiConfig {
@@ -94,7 +95,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     ..ControlApiConfig::default()
                 },
                 relay_auth,
-            );
+            ).with_github(github);
             println!("TLS control service listening on {address}");
             tracing::info!(%address, "TLS control service listening");
             let maintenance = tokio::spawn(async move {

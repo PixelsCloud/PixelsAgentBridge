@@ -4881,6 +4881,7 @@ dependencies = [
  "toml_edit 0.25.15+spec-1.1.0",
  "tracing",
  "url",
+ "webbrowser",
  "windows-sys 0.61.2",
  "xcap",
  "zeroize",
@@ -8223,6 +8224,22 @@ dependencies = [
  "phf_codegen",
  "string_cache",
  "string_cache_codegen",
+]
+
+[[package]]
+name = "webbrowser"
+version = "1.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62c35be770821a214dbc362fc26908c853e776c0004294d0b10b8a6bad582f94"
+dependencies = [
+ "jni 0.22.4",
+ "log",
+ "ndk-context",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "url",
+ "web-sys",
 ]
 
 [[package]]

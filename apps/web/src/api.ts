@@ -1,5 +1,5 @@
 export interface Viewer { id: string; username: string; personal_tenant_id: string; server_admin: boolean }
-export interface WebConfig { registration_enabled: boolean; version: string }
+export interface WebConfig { registration_enabled: boolean; github_enabled?:boolean; version: string }
 export class ApiError extends Error {
   constructor(public status: number, public code: string) { super(code); }
 }

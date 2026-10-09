@@ -43,11 +43,11 @@ fn cookie_token(headers: &HeaderMap) -> Option<&str> {
     Some(value)
 }
 
-fn token_hash(headers: &HeaderMap) -> Option<String> {
+pub(super) fn token_hash(headers: &HeaderMap) -> Option<String> {
     cookie_token(headers).map(hash_token)
 }
 
-fn hash_token(token: &str) -> String {
+pub(super) fn hash_token(token: &str) -> String {
     blake3::hash(token.as_bytes()).to_hex().to_string()
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn native_token_hash(headers: &HeaderMap) -> Option<String> {
     bearer_token(headers).map(hash_token)
 }
 
-fn cookie(token: &str) -> String {
+pub(super) fn cookie(token: &str) -> String {
     format!("{COOKIE}={token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age={MAX_AGE}")
 }
 
@@ -82,7 +82,7 @@ pub(crate) async fn native_viewer(
     viewer_by_hash(state, &hash_token(token)).await
 }
 
-async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewer, WebError> {
+pub(super) async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewer, WebError> {
     let row = sqlx::query("SELECT u.id, u.username, u.server_admin, u.auth_revision, p.tenant_id FROM web_sessions s JOIN users u ON u.id=s.user_id JOIN personal_tenants p ON p.user_id=u.id WHERE s.token_hash=$1 AND u.status='active'")
         .bind(hash).fetch_optional(state.control.store().pool()).await?.ok_or_else(WebError::unauthorized)?;
     Ok(Viewer {
@@ -96,7 +96,7 @@ async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewer, WebError
 
 pub(crate) async fn config(State(state): State<WebState>) -> Json<Value> {
     Json(
-        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION")}),
+        json!({"registration_enabled":state.registration_enabled,"github_enabled":state.github.is_some(),"version":env!("CARGO_PKG_VERSION")}),
     )
 }
 pub(crate) async fn current(
@@ -115,7 +115,7 @@ pub(crate) struct Credentials {
     password: String,
 }
 
-async fn login_permit(state: &WebState) -> Result<tokio::sync::SemaphorePermit<'_>, WebError> {
+pub(super) async fn login_permit(state: &WebState) -> Result<tokio::sync::SemaphorePermit<'_>, WebError> {
     let limited = || WebError::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
     let permit = state.login_slots.try_acquire().map_err(|_| limited())?;
     let mut budget = state.login_budget.lock().await;
@@ -164,6 +164,17 @@ async fn establish(
         .control
         .authenticate(&input.username, &input.password)
         .await?;
+    let token = issue_token(state, account.id.as_uuid(), revision.ok_or_else(WebError::unauthorized)?).await?;
+    let me = viewer_by_hash(state, &hash_token(&token)).await?;
+    Ok(match channel {
+        SessionChannel::Browser => {
+            ([(header::SET_COOKIE, cookie(&token))], Json(me)).into_response()
+        }
+        SessionChannel::Native => Json(json!({"user":me,"access_token":token})).into_response(),
+    })
+}
+
+pub(super) async fn issue_token(state: &WebState, user_id: Uuid, revision: i64) -> Result<String, WebError> {
     let mut random = [0u8; 32];
     OsRng.fill_bytes(&mut random);
     let token: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
@@ -171,22 +182,16 @@ async fn establish(
     let mut tx = state.control.store().pool().begin().await?;
     // Serialize session creation with password changes without expiring other sessions.
     sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
-        .bind(account.id.as_uuid())
+        .bind(user_id)
         .execute(&mut *tx)
         .await?;
     let inserted = sqlx::query("INSERT INTO web_sessions (token_hash,user_id) SELECT $1,id FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
-        .bind(&hash).bind(account.id.as_uuid()).bind(revision).execute(&mut *tx).await?;
+        .bind(&hash).bind(user_id).bind(revision).execute(&mut *tx).await?;
     if inserted.rows_affected() != 1 {
         return Err(WebError::unauthorized());
     }
     tx.commit().await?;
-    let me = viewer_by_hash(state, &hash).await?;
-    Ok(match channel {
-        SessionChannel::Browser => {
-            ([(header::SET_COOKIE, cookie(&token))], Json(me)).into_response()
-        }
-        SessionChannel::Native => Json(json!({"user":me,"access_token":token})).into_response(),
-    })
+    Ok(token)
 }
 
 pub(crate) async fn register(

@@ -10,7 +10,7 @@ pub struct Account {
 #[derive(Debug, Clone)]
 pub(crate) struct AccountCredential {
     pub account: Account,
-    pub password_hash: String,
+    pub password_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -4,6 +4,8 @@ use std::{path::Path, time::Duration};
 use zeroize::Zeroizing;
 
 pub mod local_device;
+mod github;
+pub use github::{GithubStatus, GithubStart};
 #[cfg(target_os = "macos")]
 mod macos_credentials;
 mod store;
@@ -59,6 +61,8 @@ pub enum AccountError {
     Network,
     #[error("account service returned HTTP {0}")]
     Http(u16),
+    #[error("{0}")]
+    Github(&'static str),
     #[error("account service returned an invalid response")]
     InvalidResponse,
     #[error("could not access the current user's account store")]

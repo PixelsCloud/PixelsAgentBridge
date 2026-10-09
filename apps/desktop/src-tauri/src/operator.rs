@@ -23,7 +23,7 @@ pub(crate) mod windows;
 
 pub struct OperatorState {
     runtimes: Mutex<RuntimeSelection>,
-    account_changes: Mutex<()>,
+    pub(crate) account_changes: Mutex<()>,
     passwords: Arc<MemoryDevicePasswordProvider>,
     tasks: Mutex<HashMap<TaskId, (TaskRef, Arc<BridgeRuntime>)>>,
     terminal_runtimes: Mutex<HashMap<RequestId, Arc<BridgeRuntime>>>,
@@ -229,7 +229,7 @@ pub struct ScopeStatus {
     revision: u64,
 }
 
-fn account_status(state: &pab_agent_core::account::AccountState) -> Option<ScopeStatus> {
+pub(crate) fn account_status(state: &pab_agent_core::account::AccountState) -> Option<ScopeStatus> {
     state.user.as_ref().map(|user| ScopeStatus {
         user_id: user.id.to_string(),
         username: user.username.clone(),

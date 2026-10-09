@@ -33,6 +33,7 @@ pub struct ControlApiState {
     pub(crate) config: ControlApiConfig,
     pub(super) relay_auth: RelayControlAuth,
     pub(crate) server_instance: uuid::Uuid,
+    pub(crate) github: Option<Arc<crate::web::GithubConfig>>,
 }
 
 impl ControlApiState {
@@ -46,6 +47,12 @@ impl ControlApiState {
             config,
             relay_auth,
             server_instance: uuid::Uuid::new_v4(),
+            github: None,
         }
+    }
+
+    pub fn with_github(mut self, config: Option<crate::web::GithubConfig>) -> Self {
+        self.github = config.map(Arc::new);
+        self
     }
 }

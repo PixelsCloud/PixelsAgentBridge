@@ -36,7 +36,6 @@ unsafe extern "C" {
     static kAXTrustedCheckOptionPrompt: Ref;
     fn getuid() -> u32;
     fn AXUIElementCreateApplication(pid: i32) -> Ref;
-    fn AXUIElementCreateSystemWide() -> Ref;
     fn AXUIElementCopyAttributeValue(element: Ref, name: Ref, value: *mut Ref) -> i32;
     fn AXUIElementSetAttributeValue(element: Ref, name: Ref, value: Ref) -> i32;
     fn AXUIElementPerformAction(element: Ref, action: Ref) -> i32;
@@ -45,7 +44,6 @@ unsafe extern "C" {
     fn AXValueCreate(kind: i32, value: *const c_void) -> Ref;
     fn AXValueGetTypeID() -> usize;
     fn AXUIElementGetTypeID() -> usize;
-    fn AXUIElementCopyElementAtPosition(element: Ref, x: f32, y: f32, value: *mut Ref) -> i32;
 }
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
@@ -113,16 +111,28 @@ impl Owned {
         .expect("CFString allocation")
     }
     fn attribute(&self, name: &str) -> Result<Self, String> {
+        self.optional_attribute(name)?
+            .ok_or_else(|| format!("read {name}: accessibility attribute has no value"))
+    }
+    fn optional_attribute(&self, name: &str) -> Result<Option<Self>, String> {
         let mut value = std::ptr::null();
         let key = Self::string(name);
-        ax(unsafe { AXUIElementCopyAttributeValue(self.0, key.0, &mut value) })?;
-        Self::new(value)
+        let status = unsafe { AXUIElementCopyAttributeValue(self.0, key.0, &mut value) };
+        // No focused window is a normal observation during activation. Other
+        // AX errors remain errors; they must never authorize input.
+        if status == -25212 {
+            return Ok(None);
+        }
+        ax(status).map_err(|error| format!("read {name}: {error}"))?;
+        Self::new(value).map(Some)
     }
     fn set(&self, name: &str, value: Ref) -> Result<(), String> {
         ax(unsafe { AXUIElementSetAttributeValue(self.0, Self::string(name).0, value) })
+            .map_err(|error| format!("set {name}: {error}"))
     }
     fn action(&self, name: &str) -> Result<(), String> {
         ax(unsafe { AXUIElementPerformAction(self.0, Self::string(name).0) })
+            .map_err(|error| format!("perform {name}: {error}"))
     }
     fn text(&self) -> Result<String, String> {
         if unsafe { CFGetTypeID(self.0) != CFStringGetTypeID() } {
@@ -160,9 +170,17 @@ fn ax(code: i32) -> Result<(), String> {
     if code == 0 {
         Ok(())
     } else {
-        Err(format!(
-            "macOS Accessibility error {code}: permission denied, window unavailable or operation unsupported by application"
-        ))
+        let reason = match code {
+            -25202 => "window or accessibility element is no longer valid",
+            -25204 => "application did not complete the accessibility request",
+            -25205 => "application does not support this accessibility attribute",
+            -25206 => "application does not support this accessibility action",
+            -25208 => "application has not implemented this accessibility operation",
+            -25211 => "accessibility API is disabled or permission is unavailable",
+            -25212 => "accessibility attribute has no value",
+            _ => "accessibility operation failed",
+        };
+        Err(format!("macOS Accessibility error {code}: {reason}"))
     }
 }
 pub fn accessibility_allowed() -> bool {
@@ -375,9 +393,20 @@ pub fn unmark(_: u32, _: u32, key: &str, marker: u32) {
 }
 fn is_focused(w: &Window) -> Result<bool, String> {
     present(w)?;
-    let system = Owned::new(unsafe { AXUIElementCreateSystemWide() })?;
-    let app = system.attribute("AXFocusedApplication")?;
-    let focused = app.attribute("AXFocusedWindow")?;
+    // Query the frontmost process through AppKit, then its exact retained AX
+    // window. The system-wide AXFocusedApplication lookup can time out while
+    // servicing AX requests for our own GUI on its main thread.
+    let frontmost = objc2_app_kit::NSWorkspace::sharedWorkspace().frontmostApplication();
+    if frontmost
+        .as_ref()
+        .and_then(|app| u32::try_from(app.processIdentifier()).ok())
+        != Some(w.pid)
+    {
+        return Ok(false);
+    }
+    let Some(focused) = application(w.pid)?.optional_attribute("AXFocusedWindow")? else {
+        return Ok(false);
+    };
     Ok(unsafe { CFEqual(focused.0, w.element.0) })
 }
 pub fn focused(id: u32) -> Result<bool, String> {
@@ -398,25 +427,24 @@ pub fn pointer_targets_window(id: u32) -> Result<bool, String> {
 
 fn pointer_targets_window_on_main(id: u32) -> Result<bool, String> {
     require_accessibility()?;
-    use enigo::Mouse;
-    let engine = enigo::Enigo::new(&enigo::Settings {
-        open_prompt_to_get_permissions: false,
-        ..Default::default()
-    })
-    .map_err(|e| e.to_string())?;
-    let (x, y) = engine.location().map_err(|e| e.to_string())?;
-    let system = Owned::new(unsafe { AXUIElementCreateSystemWide() })?;
-    let mut hit = std::ptr::null();
-    ax(unsafe { AXUIElementCopyElementAtPosition(system.0, x as f32, y as f32, &mut hit) })?;
-    let hit = Owned::new(hit)?;
-    let target = hit.attribute("AXWindow").unwrap_or(hit);
     let windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
     let w = windows
         .values()
         .find(|w| w.id == id)
         .ok_or("stale window reference")?;
     present(w)?;
-    Ok(unsafe { CFEqual(target.0, w.element.0) })
+    // Use AppKit's actual mouse-down hit test, not a control-tree lookup. Some
+    // WebViews/custom views return AXErrorNotImplemented even with permission.
+    // Both APIs use AppKit screen points, avoiding pixel/point and Y-axis
+    // conversions. The hit test respects z-order, transparency and ignoresMouseEvents.
+    let hit = dispatch2::run_on_main(|mtm| {
+        objc2_app_kit::NSWindow::windowNumberAtPoint_belowWindowWithWindowNumber(
+            objc2_app_kit::NSEvent::mouseLocation(),
+            0,
+            mtm,
+        )
+    });
+    Ok(u32::try_from(hit).ok() == Some(w.id))
 }
 pub fn act(
     id: u32,
