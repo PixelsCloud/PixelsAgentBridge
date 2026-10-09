@@ -22,7 +22,7 @@ export function AuthPage({ registration, onLogin }: { registration: boolean; onL
       {error && <Alert type="error" title={t(error)} showIcon/>}
       <Form form={form} layout="vertical" onFinish={submit} requiredMark={false}>
         <Form.Item name="username" label={t('username')} rules={[{ required: true, message: t('required') }, ...(register ? [{ min: 3, max: 64, message: t('usernameHint') }] : [])]}><Input autoComplete="username" size="large" maxLength={64}/></Form.Item>
-        <Form.Item name="password" label={t('password')} rules={[{ required: true, message: t('required') }, ...(register ? [{ min: 10, message: t('passwordMin') }] : [])]}><Input.Password autoComplete={register ? 'new-password' : 'current-password'} size="large" maxLength={1024}/></Form.Item>
+        <Form.Item name="password" label={t('password')} extra={register ? t('passwordMin') : undefined} rules={[{ required: true, message: t('required') }, ...(register ? [{ min: 8, message: t('passwordMin') }] : [])]}><Input.Password autoComplete={register ? 'new-password' : 'current-password'} size="large" maxLength={1024}/></Form.Item>
         {register && <Form.Item name="confirm" label={t('confirmPassword')} dependencies={['password']} rules={[{ required: true, message: t('required') }, ({ getFieldValue }) => ({ validator: (_, value) => !value || value === getFieldValue('password') ? Promise.resolve() : Promise.reject(new Error(t('passwordMismatch'))) })]}><Input.Password autoComplete="new-password" size="large"/></Form.Item>}
         <Button type="primary" htmlType="submit" block size="large" loading={busy}>{t(register ? 'register' : 'login')}</Button>
       </Form>

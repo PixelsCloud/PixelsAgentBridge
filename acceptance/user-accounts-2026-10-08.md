@@ -119,3 +119,21 @@ cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml real_mcp_s
 - 验收账号及其会话/个人命名空间已删除。最终保留 Pixels 管理员，设备数为 0（清库后的预期状态），验收会话数为 0。
 - 证据：`.build/account-rollout/{staged,initialized,deployed,public-http-smoke,public-browser-smoke,final}.json`，截图 `.build/account-rollout/public-relay.png`。操作脚本 `.build/account-rollout.py` 的初始化/清理步骤为一次性操作，不应直接重复运行。
 - 本次没有安装或重启本机/远端客户端。旧客户端数据及设备身份不能继续使用；应安装同批次客户端并重新注册。真实远端设备控制和公网 Relay 吞吐尚未进行更新后的安装验收，不能用本次 HTTP/Web 验收代替。
+
+## 注册界面修复包（2026-10-09）
+
+- Windows Release 安装包：`pixels-agent-bridge-windows-x86_64-release-1.2.55-setup.exe`，23,400,676 bytes。
+- SHA-256：`44b831f8685cd9751a4a7ebecc3ac2ffb9cf9d2ca7a4dff7a2c8d32e5f631cb4`。
+- 注册模式同步弹窗标题；两次密码不一致时两个输入框显示错误状态；登录与注册失败文案分开。注册页明确提示至少 8 个字符，并在提交前校验长度。
+- Server 密码策略、Web 注册和修改密码校验均已改为至少 8 个字符；中文、繁体、英文提示同步。服务器端 8/7 个字符边界及既有认证单元测试通过，两个前端类型检查通过，亮暗模式注册界面验证通过。
+- 增量构建只更新 Desktop；MCP 和 Executor 与 1.2.54 的二进制哈希一致。安装器版本、ZIP CRC、脚本和三组件哈希均已核验。日志 `.build/registration-fix-package.log`。
+- 此次仅按要求生成安装包，没有安装客户端或部署 Server/Web；现网仍需部署密码策略改动后才能接受 8 位密码注册。GitHub 登录仅完成调研，不在此安装包中。
+
+## 8 位密码策略公网部署（2026-10-09）
+
+- 用户安装 1.2.55 后仍遇到注册 HTTP 400；使用独立随机测试账号复现，原因是现网 Server 1.2.53 仍要求至少 10 个字符。
+- 增量构建并部署 Server/Web 镜像 `pixels-agent-bridge:1.2.56`，仅更新 backend；Relay 保持 1.2.53。没有重置数据库，既有用户及四台设备的 ID、设备码逐项核对保持不变。
+- 公网 HTTPS 实测：7 个字符注册返回 400；8 个字符注册成功，native 会话查询和退出成功；同一账号通过 Web 登录及退出成功。临时测试账号及其关联记录已清除，没有使用用户截图中的账号或密码测试。
+- backend、Relay、PostgreSQL 均健康；Relay `cn-primary` offered/applied policy 均为 234。健康接口按代码约定返回 204；首次部署检查误判为必须返回 200，自动回滚后修正检查并成功重新部署。
+- 现有 Windows 1.2.55 无需重新安装，重新提交注册即可。此节完成上一节尚未部署的服务端密码策略变更；GitHub 登录仍仅完成调研。
+- 构建日志 `.build/password-eight-server-build.log`；部署及验收证据 `.build/password-eight-rollout/{preflight,reproduced,staged,deployed,verified}.json`。

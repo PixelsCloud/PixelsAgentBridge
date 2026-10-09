@@ -306,3 +306,56 @@ Windows 本机与测试设备 `211399447`、macOS `603527578` 在执行时先确
 - 本机排队历史保存提交时账户，不用作远端授权；远端保存接收时验证的账户。实时二进制 Relay 测试中两条流共享 4 Mbps 得到 3.929 Mbps，降为 2 Mbps 后得到 1.921 Mbps，全程保持连接。
 
 U0–U6 业务实现及 U7 本次隔离自动化验收完成；U8 已生成 Windows 1.2.52 Release 安装包，并按后续部署请求将 Server/Web/Relay 镜像 1.2.53 部署到公网。旧运行数据库已删除，新库已初始化，Pixels 管理员已重建；公网注册、登录、重启保留会话、退出、管理页面、事件 WebSocket 及 Relay 策略确认通过。客户端尚未安装更新，设备需使用同批次客户端重新注册。10 个真实 MCP 的登录切换、漏通知补偿和独立退出隔离测试通过。完整证据、可重复测试命令以及未执行的安装/公网全链路/Intel 验收范围见 [验收记录](acceptance/user-accounts-2026-10-08.md)。
+
+## 14. GitHub 登录调研（2026-10-09，尚未实现）
+
+本节是基于当前代码与 GitHub 官方文档的建议方案。没有创建 GitHub 应用、配置密钥或启用第三方登录。
+
+### 选型
+
+建议使用 **GitHub App 的 OAuth 网页授权流程，由 PAB Server 统一接入**。
+GitHub 官方优先推荐 GitHub App，也提供了登录按钮的示例；OAuth App 同样可以完成登录，但第一版不必同时维护两种应用类型。[官方登录示例](https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-login-with-github-button-with-a-github-app)、[应用选型说明](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/differences-between-github-apps-and-oauth-apps)。
+
+仅获取认证用户的 ID、用户名和头像。`GET /user` 支持 GitHub App 用户令牌且不要求额外权限；第一版不申请仓库、组织或邮箱权限。用户授权应用与安装应用到仓库是两件事，登录不要求安装到仓库。[用户 API](https://docs.github.com/en/rest/users/users#get-the-authenticated-user)、[授权与安装的区别](https://docs.github.com/en/apps/using-github-apps/installing-a-github-app-from-github-marketplace-for-your-personal-account)。
+
+优先复用 Rust [`oauth2`](https://docs.rs/oauth2/latest/oauth2/) 库及现有 `reqwest`，处理授权码交换、随机 state 和 PKCE；GitHub 用户资料用 REST API 获取，不引入完整 GitHub SDK。GitHub 当前的网页授权接口支持 S256 PKCE，使用前应以所选 GitHub.com/Enterprise 版本的文档为准。[GitHub 授权参数](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app)。
+
+### 用户体验与会话
+
+1. Web、Windows Desktop、macOS Desktop 的登录/注册弹窗增加「使用 GitHub 登录」。
+2. 首次授权后创建普通 PAB 用户；已有关联则直接登录。关闭注册时，已有绑定仍可登录，新用户不创建。
+3. 已登录用户可在「我的」中主动绑定 GitHub。用户名或邮箱相同不自动合并账号。解绑时必须保留至少一种可用的登录方式。
+4. GitHub 仅负责这次身份确认；之后由 PAB 签发自身的持久会话，继续遵循主动退出、账号停用等现有规则。
+5. Desktop 保存 PAB 凭据后走现有 `account_changed` 通知和轮询补偿，已运行 MCP 无需重启；Relay 继续按 PAB user ID 限速。
+6. 不将 GitHub token 下发给 MCP 或远端 Executor，也不将 GitHub token 用作设备密码或 Git 工具的凭据。
+
+### 两端流程
+
+**Web：** Server 创建短期授权事务 → 跳转 GitHub → 固定 HTTPS 回调 → 验证 state/PKCE 并读取 `/user` → 查找或创建 PAB 用户 → 写入现有 HttpOnly 登录 Cookie → 返回后台。
+
+**Desktop：** 开启仅监听 `127.0.0.1` 随机端口的临时回调 → Server 创建绑定该次本机请求的授权事务 → 系统浏览器打开授权页 → GitHub 回调 Server → 浏览器带一次性兑换码回到本机 → Desktop 凭自己持有的校验值向 Server 换取 PAB 会话，存入现有凭据库后关闭临时监听。
+
+Desktop 返回地址限定为本次登记的回环端口，兑换码短期有效、单次消费且绑定发起端。浏览器地址和回调页面不包含长期登录令牌。GitHub client secret 只存在 Server，不打入客户端包。不复用当前监听 `0.0.0.0:26035`、无认证的 MCP 状态服务接收登录凭据。
+
+Linux 无界面版可作为后续范围，通过 Device Flow 完成授权；第一版保留现有账号密码 CLI。Device Flow 需要在 GitHub App 中显式启用，不应在没有使用需求时启用。[设备授权流程](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token)。
+
+### 当前代码需要改动的地方
+
+- **Server 数据层：** 新增外部身份表，唯一键为 `(provider, provider_user_id)`，关联现有 `users.id`；GitHub `id` 是身份依据，用户名、头像只是可更新资料。纯 GitHub 用户允许没有本地密码，密码登录路径需明确拒绝此类用户。[固定用户 ID 的官方建议](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app#use-the-durable-unique-id-to-store-the-user)。
+- **会话签发：** 将 `web/session.rs` 中的密码校验与会话签发分开，让两种登录方式共用签发、停用检查和退出撤销逻辑。已有 PAB 用户绑定 GitHub 时不改变其用户 ID 或限速设置。
+- **授权事务：** 保存 state、PKCE、有效期、目标渠道及 Desktop 兑换信息；并发回调需要事务和唯一约束，避免创建重复用户或重复兑换。
+- **Cookie：** GitHub 跨站返回时不能依赖现有 Strict 登录 Cookie；使用独立、短期、Secure/HttpOnly、SameSite=Lax 的授权事务 Cookie，绑定成功后清理。现有长期登录 Cookie 不放宽。
+- **Desktop/Web：** 增加按钮、授权中/取消/超时状态、已绑定信息及头像展示。头像来源需与现有 Web CSP 一并调整。
+- **配置：** 增加 GitHub client ID、服务端 secret 文件路径、固定 callback URL；未配置时隐藏入口。独立部署配置自己的 GitHub App。
+
+建议回调地址为 `https://pab.rgaa.vip/api/account/github/callback`；这是待实现地址。
+GitHub 应用需由项目维护者注册并提供 client ID/client secret，公开实例和本地测试分别配置回调；不需要用户提供 GitHub 密码或个人访问令牌。[注册 GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)。
+
+### 开发顺序与验收
+
+1. 外部身份表、无密码账户、共用会话签发，以及可替换的 GitHub HTTP 客户端。
+2. Web 授权、回调与绑定；用模拟 GitHub 响应验证正常与异常流程。
+3. Windows/macOS 系统浏览器与本机回调，复用原有凭据存储和 MCP 同步。
+4. 配置真实测试 GitHub App，测试公开部署；在通过前不宣称已完成接入。
+
+必须覆盖：首次创建/再次登录、GitHub 改名后仍是同一账号、隐藏邮箱、重名不合并、绑定冲突、最后一种登录方式不可解绑、取消/拒绝授权、state 错误、回调过期/重放、重复兑换、端口占用、应用退出、GitHub 网络失败/限流、账号停用、注册关闭、多 MCP 实时同步，以及登录后重启仍保持会话。测试日志不记录授权码、GitHub token、PAB token 或 client secret。

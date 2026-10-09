@@ -14,7 +14,7 @@ pub struct PasswordPolicy {
 impl Default for PasswordPolicy {
     fn default() -> Self {
         Self {
-            min_characters: 10,
+            min_characters: 8,
             max_bytes: 1024,
         }
     }
@@ -106,5 +106,20 @@ mod tests {
         assert!(!encoded.contains("correct horse"));
         assert!(engine.verify("correct horse battery staple", &encoded));
         assert!(!engine.verify("wrong password", &encoded));
+    }
+
+    #[test]
+    fn accepts_eight_characters_and_rejects_seven() {
+        let engine = PasswordEngine::new(PasswordPolicy::default());
+        for password in ["abcdefgh", "一二三四五六七八"] {
+            let encoded = engine.hash(password).unwrap();
+            assert!(engine.verify(password, &encoded));
+        }
+        for password in ["abcdefg", "一二三四五六七"] {
+            assert_eq!(
+                engine.hash(password).unwrap_err(),
+                CredentialError::PasswordTooShort
+            );
+        }
     }
 }

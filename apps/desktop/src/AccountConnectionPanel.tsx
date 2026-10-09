@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Alert, Avatar, Button, Descriptions, Input, Modal } from "antd";
+import { Alert, Avatar, Button, Descriptions, Input, Modal, Typography } from "antd";
 import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
 
@@ -52,28 +52,36 @@ export function AccountLoginDialog({ language, open, onClose, onSignedIn }: {
 }) {
   const t = messages[language];
   const [busy, setBusy] = useState(false);
-  return <Modal title={t.accountConnect} open={open} footer={null} width={400}
+  const [register, setRegister] = useState(false);
+  useEffect(() => { if (!open) setRegister(false); }, [open]);
+  return <Modal title={register ? t.accountRegister : t.accountConnect} open={open} footer={null} width={400}
     mask={{ closable: false }} keyboard={false} closable={!busy} onCancel={onClose} destroyOnHidden>
-    {open && <AccountLoginForm language={language} busy={busy} setBusy={setBusy} onSignedIn={onSignedIn} />}
+    {open && <AccountLoginForm language={language} busy={busy} setBusy={setBusy} register={register} setRegister={setRegister} onSignedIn={onSignedIn} />}
   </Modal>;
 }
 
-function AccountLoginForm({ language, busy, setBusy, onSignedIn }: {
+function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSignedIn }: {
   language: Language;
   busy: boolean;
   setBusy: (busy: boolean) => void;
+  register: boolean;
+  setRegister: (register: boolean) => void;
   onSignedIn: (scope: ScopeStatus) => void;
 }) {
   const t = messages[language];
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [register, setRegister] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const passwordMismatch = register && confirmPassword.length > 0 && password !== confirmPassword;
 
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!username.trim() || !password || busy || (register && password !== confirmPassword)) return;
+    if (register && Array.from(password).length < 8) {
+      setError(`${t.accountRegisterFailed}: ${t.accountPasswordTooShort}`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -82,7 +90,7 @@ function AccountLoginForm({ language, busy, setBusy, onSignedIn }: {
       setConfirmPassword("");
       onSignedIn(status);
     } catch (cause) {
-      setError(`${t.accountConnectFailed}: ${String(cause)}`);
+      setError(`${register ? t.accountRegisterFailed : t.accountConnectFailed}: ${String(cause)}`);
     } finally {
       setBusy(false);
     }
@@ -94,10 +102,16 @@ function AccountLoginForm({ language, busy, setBusy, onSignedIn }: {
       value={username} onChange={(event) => setUsername(event.target.value)} />
     <label htmlFor="account-login-password">{t.accountPassword}</label>
     <Input.Password id="account-login-password" autoComplete={register ? "new-password" : "current-password"} disabled={busy}
+      status={passwordMismatch ? "error" : undefined} aria-invalid={passwordMismatch || undefined}
+      aria-describedby={register ? `account-password-hint${passwordMismatch ? " account-password-error" : ""}` : undefined}
       value={password} onChange={(event) => setPassword(event.target.value)} />
+    {register && <Typography.Text id="account-password-hint" type="secondary">{t.accountPasswordTooShort}</Typography.Text>}
     {register && <><label htmlFor="account-confirm-password">{t.accountConfirmPassword}</label>
       <Input.Password id="account-confirm-password" autoComplete="new-password" disabled={busy}
+        status={passwordMismatch ? "error" : undefined} aria-invalid={passwordMismatch || undefined}
+        aria-describedby={passwordMismatch ? "account-password-error" : undefined}
         value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></>}
+    {passwordMismatch && <Typography.Text id="account-password-error" type="danger" role="alert">{t.accountPasswordMismatch}</Typography.Text>}
     {error && <Alert type="error" showIcon title={error} />}
     <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || !password || (register && password !== confirmPassword)} block>{register ? t.accountRegister : t.accountConnect}</Button>
     <Button type="link" disabled={busy} onClick={() => { setRegister(!register); setError(""); setPassword(""); setConfirmPassword(""); }}>{register ? t.accountAlreadyRegistered : t.accountRegister}</Button>

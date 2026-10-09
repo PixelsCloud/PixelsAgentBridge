@@ -104,7 +104,7 @@ function Account({ me }: { me: Viewer }) {
     <Card title={t('changePassword')}><Form layout="vertical" onFinish={submit} style={{ maxWidth: 440 }} requiredMark={false}>
       {error && <Alert type="error" title={t(error)} showIcon style={{ marginBottom: 20 }}/>}
       <Form.Item name="current_password" label={t('currentPassword')} rules={[{ required: true, message: t('required') }]}><Input.Password autoComplete="current-password" maxLength={1024}/></Form.Item>
-      <Form.Item name="new_password" label={t('newPassword')} rules={[{ required: true, message: t('required') }, { min: 10, message: t('passwordMin') }]}><Input.Password autoComplete="new-password" maxLength={1024}/></Form.Item>
+      <Form.Item name="new_password" label={t('newPassword')} extra={t('passwordMin')} rules={[{ required: true, message: t('required') }, { min: 8, message: t('passwordMin') }]}><Input.Password autoComplete="new-password" maxLength={1024}/></Form.Item>
       <Form.Item name="confirm" label={t('confirmPassword')} dependencies={['new_password']} rules={[{ required: true, message: t('required') }, ({ getFieldValue }) => ({ validator: (_, value) => value === getFieldValue('new_password') ? Promise.resolve() : Promise.reject(new Error(t('passwordMismatch'))) })]}><Input.Password autoComplete="new-password"/></Form.Item>
       <Button type="primary" htmlType="submit" loading={busy}>{t('save')}</Button>
     </Form></Card>
