@@ -4,6 +4,9 @@ version = "1.2.48"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+test-utils = []
+
 [dependencies]
 futures-util = "0.3"
 hex = "0.4"
@@ -32,5 +35,5 @@ webpki-roots = "1"
 rcgen = "0.14"
 tempfile = "3"
 iroh-relay = { version = "=1.2.0", features = ["test-utils"] }
-pab-transport = { path = "../transport" }
+pab-transport = { path = "../transport", features = ["test-utils"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }

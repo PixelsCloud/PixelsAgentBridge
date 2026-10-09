@@ -4,6 +4,10 @@ version = "1.2.48"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+# Explicit test harness support; absent from shipped binaries.
+test-utils = []
+
 [dependencies]
 iroh = { version = "=1.2.0", default-features = false, features = ["tls-ring"] }
 iroh-relay = "=1.2.0"

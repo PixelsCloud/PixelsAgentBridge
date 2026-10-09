@@ -78,6 +78,35 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
     let (id, secret) = fixture(&pool).await;
     let (a, _, cookie_a) = account(&app, "personal-a").await;
     let (b, _, cookie_b) = account(&app, "personal-b").await;
+    // A second physical device belongs to the same account independently.
+    let second_id = Uuid::new_v4();
+    let second_tenant = Uuid::new_v4();
+    let second_secret = SecretKey::generate();
+    sqlx::query("INSERT INTO tenants(id,kind) VALUES($1,'unclaimed_device')")
+        .bind(second_tenant)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'Second device',345678902)",
+    )
+    .bind(second_id)
+    .bind(second_tenant)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,device_id) VALUES($1,$2,'device',$3)")
+        .bind(second_secret.public().as_bytes().as_slice()).bind(second_tenant).bind(second_id)
+        .execute(&pool).await.unwrap();
+    let second_path = format!("/api/account/devices/{second_id}/association");
+    let second_proof =
+        signed_challenge(&app, &a, &second_path, &second_secret, "automatic", None).await;
+    assert_eq!(
+        native_call(&app, "PUT", &second_path, &a, second_proof)
+            .await
+            .0,
+        StatusCode::OK
+    );
     let path = format!("/api/account/devices/{id}/association");
     let proof = signed_challenge(&app, &a, &path, &secret, "automatic", None).await;
     let mut invalid = proof.clone();
@@ -101,7 +130,7 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
         call(&app, "GET", "/api/web/devices", &cookie_a, Value::Null)
             .await
             .2["total"],
-        1
+        2
     );
     assert_eq!(
         call(&app, "GET", "/api/web/devices", &cookie_b, Value::Null)
@@ -142,8 +171,8 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
     )
     .await;
     assert_eq!(other.1["status"], "other_account");
-    assert!(other.1.get("challenge").is_none());
-    let replaced = signed_challenge(&app, &b, &path, &secret, "replace", Some(1)).await;
+    assert!(other.1.get("challenge").is_some());
+    let replaced = signed_challenge(&app, &b, &path, &secret, "automatic", None).await;
     assert_eq!(
         native_call(&app, "PUT", &path, &b, replaced).await.1["revision"],
         2
@@ -156,8 +185,31 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
         call(&app, "GET", "/api/web/devices", &cookie_a, Value::Null)
             .await
             .2["total"],
-        0
+        1
     );
+    let remaining = call(&app, "GET", "/api/web/devices", &cookie_a, Value::Null)
+        .await
+        .2;
+    assert!(remaining.to_string().contains(&second_id.to_string()));
+    assert!(!remaining.to_string().contains(&id.to_string()));
+    assert_eq!(
+        call(&app, "GET", "/api/web/devices", &cookie_b, Value::Null)
+            .await
+            .2["total"],
+        1
+    );
+    // Periodic sync for the same owner neither changes revision nor creates another device.
+    let repeated = native_call(
+        &app,
+        "POST",
+        &format!("{path}-challenge"),
+        &b,
+        json!({"action":"automatic"}),
+    )
+    .await;
+    assert_eq!(repeated.1["status"], "associated");
+    assert_eq!(repeated.1["revision"], 2);
+    assert!(repeated.1.get("challenge").is_none());
     let identity: (i32, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
         "SELECT code,owner_tenant_id,registered_by_user_id FROM devices WHERE id=$1",
     )
@@ -169,7 +221,7 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn unlink_blocks_automatic_rebinding_and_stale_proofs(pool: PgPool) {
+async fn unlink_blocks_existing_sessions_but_new_login_associates_automatically(pool: PgPool) {
     let (app, _) = app(pool.clone(), true).await;
     let (id, secret) = fixture(&pool).await;
     let (a, _, cookie) = account(&app, "unlink-a").await;
@@ -214,9 +266,19 @@ async fn unlink_blocks_automatic_rebinding_and_stale_proofs(pool: PgPool) {
         .0,
         StatusCode::CONFLICT
     );
-    let proof = signed_challenge(&app, &a, &path, &secret, "associate", Some(2)).await;
+    let (login_status, login) = native_call(
+        &app,
+        "POST",
+        "/api/account/session",
+        "",
+        json!({"username":"unlink-a","password":"personal-device-test"}),
+    )
+    .await;
+    assert_eq!(login_status, StatusCode::OK);
+    let new_token = login["access_token"].as_str().unwrap();
+    let proof = signed_challenge(&app, new_token, &path, &secret, "automatic", None).await;
     assert_eq!(
-        native_call(&app, "PUT", &path, &a, proof).await.1["revision"],
+        native_call(&app, "PUT", &path, new_token, proof).await.1["revision"],
         3
     );
 }

@@ -144,22 +144,21 @@ try:
     cli('logout')
     assert http('GET', '/api/web/devices', cookie=cookie_a)[0]['total'] == 1
     b = cli('register', accounts[1], '--password-stdin', password_input=True)
-    assert b['device_association']['status'] == 'other_account', b
-    changed = cli('associate', '--replace')
+    changed = b['device_association']
     assert changed['status'] == 'associated' and changed['revision'] == 2, changed
     assert http('GET', '/api/web/devices', cookie=cookie_a)[0]['total'] == 0
     assert identity() == original
-    report['cases'].append('sign-out retains association; explicit account replacement preserves identity')
+    report['cases'].append('sign-out retains association; login automatically changes only this device account and preserves identity')
     native, _ = http('POST', '/api/account/session', {'username': accounts[1], 'password': password})
     unlink, _ = http('DELETE', f'/api/account/devices/{original[0]}/association', {'revision': 2}, native['access_token'])
     assert unlink['status'] == 'unlinked'
     stop()
     start()
     b = cli('login', accounts[1], '--password-stdin', password_input=True)
-    assert b['device_association']['status'] == 'unlinked', b
+    assert b['device_association']['status'] == 'associated', b
     assert identity() == original
     assert cli('associate')['revision'] == 4
-    report['cases'].append('restart and repeated login do not undo Web unlink; explicit reassociation works')
+    report['cases'].append('new login automatically restores Web-unlinked device; repeated association is idempotent')
     cli('devices', 'status')  # Initialize only this test's Bridge store.
     with sqlite3.connect(root / 'executor.sqlite3') as database:
         device_id, code, device_password = database.execute('SELECT device_id,device_code,temporary_password FROM device_access').fetchone()

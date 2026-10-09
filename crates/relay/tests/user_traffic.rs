@@ -1,5 +1,5 @@
 //! Real TLS Relay and two live QUIC connections; no direct transport fallback.
-#![cfg(debug_assertions)]
+#![cfg(any(debug_assertions, feature = "test-utils"))]
 use iroh_base::SecretKey;
 use iroh_relay::server::{CertConfig, RelayConfig, Server, ServerConfig, TlsConfig};
 use pab_protocol::*;

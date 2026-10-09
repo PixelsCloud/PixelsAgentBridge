@@ -2,7 +2,8 @@ use crate::{DeviceId, EndpointKey, EndpointSignature, UserId};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Automatic never reverses a previous unlink. Replace requires an explicit local action.
+/// Automatic follows the local login, including moving this device from another account.
+/// An unlink suppresses automatic association until a new login session is created.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceAccountAction {

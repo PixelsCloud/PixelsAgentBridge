@@ -79,13 +79,28 @@ pub(crate) async fn challenge(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    let row = sqlx::query("SELECT user_id,revision FROM device_accounts WHERE device_id=$1")
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let row =
+        sqlx::query("SELECT user_id,revision,updated_at FROM device_accounts WHERE device_id=$1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     let mut result = status(row.try_get("user_id")?, row.try_get("revision")?, me.id);
     let allowed = match input.action {
-        DeviceAccountAction::Automatic => result.status == DeviceAccountStatus::Available,
+        DeviceAccountAction::Automatic => match result.status {
+            DeviceAccountStatus::Associated => false,
+            DeviceAccountStatus::Available | DeviceAccountStatus::OtherAccount => true,
+            DeviceAccountStatus::Unlinked => {
+                // Keep a Web unlink effective for existing sessions/background retries.
+                // A subsequent explicit login creates a new session and associates again.
+                sqlx::query_scalar::<_, bool>(
+                    "SELECT created_at > $1 FROM web_sessions WHERE token_hash=$2",
+                )
+                .bind(row.try_get::<time::OffsetDateTime, _>("updated_at")?)
+                .bind(&hash)
+                .fetch_one(&mut *tx)
+                .await?
+            }
+        },
         DeviceAccountAction::Associate => {
             if input.expected_revision != Some(result.revision) {
                 return Err(conflict());

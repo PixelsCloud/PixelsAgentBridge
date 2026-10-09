@@ -29,7 +29,7 @@ pub struct RelayPolicyRuntime {
 }
 
 impl RelayPolicyRuntime {
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "test-utils"))]
     #[doc(hidden)]
     pub fn usage_for_testing(
         &self,

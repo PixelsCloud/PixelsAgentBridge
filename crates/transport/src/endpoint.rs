@@ -17,7 +17,7 @@ pub const PAB_ALPN: &[u8] = b"pixels-agent-bridge/1";
 pub struct PabEndpointConfig {
     relay_urls: Vec<RelayUrl>,
     tls: CaTlsConfig,
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "test-utils"))]
     relay_only_for_testing: bool,
 }
 
@@ -34,7 +34,7 @@ impl PabEndpointConfig {
         Ok(Self {
             relay_urls,
             tls: CaTlsConfig::embedded(),
-            #[cfg(debug_assertions)]
+            #[cfg(any(debug_assertions, feature = "test-utils"))]
             relay_only_for_testing: false,
         })
     }
@@ -57,7 +57,7 @@ impl PabEndpointConfig {
         self
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "test-utils"))]
     pub fn relay_only_for_testing(mut self) -> Self {
         self.relay_only_for_testing = true;
         self
@@ -86,7 +86,7 @@ impl PabEndpoint {
             .alpns(vec![PAB_ALPN.to_vec()])
             .relay_mode(RelayMode::Custom(relay_map))
             .ca_tls_config(config.tls);
-        #[cfg(debug_assertions)]
+        #[cfg(any(debug_assertions, feature = "test-utils"))]
         let builder = if config.relay_only_for_testing {
             builder.clear_ip_transports()
         } else {
