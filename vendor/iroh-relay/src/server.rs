@@ -183,6 +183,8 @@ pub enum ForwardingDecision {
 /// Implementations must return quickly and must not block the async runtime. Shared
 /// rate limiters can update a short critical section and return [`ForwardingDecision::Wait`].
 pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
+    /// Called once after a datagram is successfully written, never for rate-limit retries/drops.
+    fn on_forwarded(&self, _src: EndpointId, _dst: EndpointId, _bytes: usize) {}
     /// Checks whether a datagram can be forwarded now.
     fn check(
         &self,
@@ -194,6 +196,8 @@ pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
 
 /// Dynamic form of [`ForwardingControl`].
 pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
+    /// See [`ForwardingControl::on_forwarded`].
+    fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize);
     /// See [`ForwardingControl::check`].
     fn check(
         &self,
@@ -204,6 +208,9 @@ pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
 }
 
 impl<T: ForwardingControl> DynForwardingControl for T {
+    fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize) {
+        <Self as ForwardingControl>::on_forwarded(self, src, dst, bytes)
+    }
     fn check(
         &self,
         src: EndpointId,

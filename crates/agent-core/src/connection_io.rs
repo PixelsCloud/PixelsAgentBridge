@@ -50,14 +50,22 @@ impl AuthenticatedControlConnection {
     pub(crate) async fn send_authorize_device_peer(
         &mut self,
         peer_endpoint_key: EndpointKey,
+        authenticated: bool,
         timeout: Duration,
     ) -> Result<RequestId, EndpointControlError> {
         let request_id = RequestId::new();
         send(
             &mut self.socket,
-            &ControlClientMessage::AuthorizeDevicePeer {
-                request_id,
-                peer_endpoint_key,
+            &if authenticated {
+                ControlClientMessage::ReportAuthenticatedDevicePeer {
+                    request_id,
+                    peer_endpoint_key,
+                }
+            } else {
+                ControlClientMessage::AuthorizeDevicePeer {
+                    request_id,
+                    peer_endpoint_key,
+                }
             },
             timeout,
         )

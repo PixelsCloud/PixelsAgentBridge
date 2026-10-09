@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { Alert, Avatar, Button, Descriptions, Input, Modal, Typography } from "antd";
 import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
+import { DeviceAccountPanel } from "./DeviceAccountPanel";
+import { AccountCatalogPanel } from "./AccountCatalogPanel";
 
 export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
   language: Language;
@@ -38,6 +40,8 @@ export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
         { key: "username", label: t.accountName, children: activeScope.username },
         { key: "id", label: t.accountId, children: activeScope.userId },
       ]} />
+      <DeviceAccountPanel key={activeScope.revision} language={language} accountRevision={activeScope.revision} />
+      <AccountCatalogPanel key={`catalog-${activeScope.revision}`} language={language} accountRevision={activeScope.revision} />
       <Button className="home-account-disconnect" loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
       {error && <Alert className="account-error" type="error" showIcon title={error} />}
     </section>

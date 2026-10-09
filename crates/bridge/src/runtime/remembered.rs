@@ -8,7 +8,7 @@ pub struct RememberedDevice {
     pub device_ref: DeviceRef,
     pub code: DeviceCode,
     pub alias: String,
-    pub os_family: OsFamily,
+    pub os_family: Option<OsFamily>,
     pub os_reminder: String,
 }
 
@@ -17,6 +17,9 @@ impl RuntimeStore {
         &self,
         device: &RememberedDevice,
     ) -> Result<(), RuntimeStoreError> {
+        if let Some(scope) = super::catalog::scope(self)? {
+            return self.catalog_remember(&scope, device).await;
+        }
         let device_ref_json = serde_json::to_string(&device.device_ref)?;
         let mut transaction = self.pool.begin().await?;
         let existing_alias: Option<String> =
@@ -53,6 +56,10 @@ impl RuntimeStore {
         code: DeviceCode,
         alias: &str,
     ) -> Result<(), RuntimeStoreError> {
+        if let Some(scope) = super::catalog::scope(self)? {
+            self.catalog_edit(&scope, code, Some(alias), None).await?;
+            return Ok(());
+        }
         let result = sqlx::query("UPDATE remembered_devices SET alias = ? WHERE device_code = ?")
             .bind(alias)
             .bind(code.to_string())
@@ -68,6 +75,9 @@ impl RuntimeStore {
         &self,
         code: DeviceCode,
     ) -> Result<pab_protocol::DeviceId, RuntimeStoreError> {
+        if let Some(scope) = super::catalog::scope(self)? {
+            return self.catalog_edit(&scope, code, None, Some(true)).await;
+        }
         let mut transaction = self.pool.begin().await?;
         let stored: Option<String> = sqlx::query_scalar(
             "SELECT device_ref_json FROM remembered_devices WHERE device_code = ?",
@@ -91,6 +101,9 @@ impl RuntimeStore {
     }
 
     pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeStoreError> {
+        if let Some(scope) = super::catalog::scope(self)? {
+            return self.catalog_list(&scope).await;
+        }
         let rows = sqlx::query(
             "SELECT device_ref_json, device_code, alias, os_family_json, os_reminder FROM remembered_devices ORDER BY rowid DESC",
         )

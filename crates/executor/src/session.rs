@@ -217,6 +217,13 @@ async fn authenticate(
 
     let _session_lease = active_sessions.enter(peer_endpoint_key);
 
+    // The authenticated target reports success. Operator self-reports cannot add arbitrary devices.
+    // A temporary control outage must not undo an otherwise successful device authentication.
+    let reporter = authorizer.clone();
+    tokio::spawn(async move {
+        let _ = reporter.report_authenticated(peer_endpoint_key).await;
+    });
+
     stream
         .send_json(
             &DeviceSessionAuthenticationResult::Accepted {
@@ -239,7 +246,7 @@ async fn authenticate(
             tokio::select! {
                 _ = recheck.tick() => {
                     let still_authorized = matches!(
-                        authorizer.authorize(peer_endpoint_key).await,
+                        authorizer.report_authenticated(peer_endpoint_key).await,
                         Ok(current)
                             if current.device_ref == device_ref
                                 && current.peer_endpoint_key == peer_endpoint_key

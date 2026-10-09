@@ -4223,6 +4223,8 @@ version = "1.2.48"
 dependencies = [
  "blake3",
  "futures-util",
+ "hex",
+ "hmac",
  "iroh-base",
  "keyring",
  "pab-protocol",
@@ -4231,6 +4233,8 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
  "tempfile",
  "thiserror 2.0.20",
  "time",
@@ -4419,6 +4423,7 @@ dependencies = [
  "iroh-relay",
  "n0-future",
  "noq",
+ "pab-agent-core",
  "pab-logging",
  "pab-protocol",
  "pab-transport",
@@ -4432,6 +4437,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-tungstenite",
  "tracing",
+ "uuid",
  "webpki-roots 1.0.9",
 ]
 

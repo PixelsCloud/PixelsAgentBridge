@@ -13,6 +13,11 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
 
+#[path = "web_cases/personal_catalog_usage.rs"]
+mod personal_catalog_usage;
+#[path = "web_cases/personal_devices.rs"]
+mod personal_devices;
+
 async fn unclaimed_fixture(pool: &PgPool) -> pab_server::RegisteredEndpoint {
     let tenant = uuid::Uuid::new_v4();
     let device = uuid::Uuid::new_v4();
@@ -197,6 +202,12 @@ async fn removed_unbind_preserves_existing_access(pool: PgPool) {
     // Seed ownership that predates removal of the claim feature.
     sqlx::query("UPDATE devices SET owner_tenant_id=(SELECT tenant_id FROM personal_tenants WHERE user_id=$1) WHERE id=$2")
         .bind(user).bind(device_id.as_uuid()).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO device_accounts(device_id,user_id,revision) VALUES($1,$2,1)")
+        .bind(device_id.as_uuid())
+        .bind(user)
+        .execute(&pool)
+        .await
+        .unwrap();
     let path = format!("/api/web/devices/{device_id}");
     let detail = call(&app, "GET", &path, &cookie, Value::Null).await;
     assert_eq!(detail.0, StatusCode::OK);
@@ -825,6 +836,12 @@ async fn device_lists_use_current_ownership_and_exact_filtered_totals(pool: PgPo
         }
         sqlx::query("INSERT INTO devices(id,tenant_id,owner_tenant_id,registered_by_user_id,code,name) VALUES($1,$2,$2,$3,$4,$5)")
             .bind(id).bind(tenant).bind(user).bind(123456700+index).bind(format!("Fixture {index:02}")).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO device_accounts(device_id,user_id,revision) VALUES($1,$2,1)")
+            .bind(id)
+            .bind(user)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
     let listed = call(&app, "GET", "/api/web/devices", &cookie, Value::Null).await;
     assert_eq!(listed.0, StatusCode::OK, "{}", listed.2);
@@ -884,8 +901,8 @@ async fn device_lists_use_current_ownership_and_exact_filtered_totals(pool: PgPo
         .0,
         StatusCode::FORBIDDEN
     );
-    sqlx::query("UPDATE devices SET owner_tenant_id=$1 WHERE id=$2")
-        .bind(other.personal_tenant_id.as_uuid())
+    sqlx::query("UPDATE device_accounts SET user_id=$1,revision=revision+1 WHERE device_id=$2")
+        .bind(other.id.as_uuid())
         .bind(first)
         .execute(&pool)
         .await
@@ -1072,6 +1089,8 @@ async fn relay_expiry_restart_and_thousand_device_pagination(pool: PgPool) {
         .unwrap();
     let tenant = uuid::Uuid::parse_str(user["personal_tenant_id"].as_str().unwrap()).unwrap();
     sqlx::query("INSERT INTO devices(id,tenant_id,owner_tenant_id,code,name) SELECT gen_random_uuid(),$1,$1,700000000+i,'Load device '||lpad(i::text,4,'0') FROM generate_series(1,1000) i").bind(tenant).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO device_accounts(device_id,user_id,revision) SELECT d.id,p.user_id,1 FROM devices d JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id")
+        .execute(&pool).await.unwrap();
     let start = std::time::Instant::now();
     let mut ids = std::collections::HashSet::new();
     for page in 1..=50 {

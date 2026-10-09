@@ -26,7 +26,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system pab \
     && useradd --system --gid pab --home-dir /nonexistent --shell /usr/sbin/nologin pab \
-    && install -d -m 0700 -o pab -g pab /var/log/pab
+    && install -d -m 0700 -o pab -g pab /var/log/pab /var/lib/pab/usage
 
 COPY --from=builder /out/pab-server /usr/local/bin/pab-server
 COPY --from=builder /out/pab-relay-server /usr/local/bin/pab-relay-server

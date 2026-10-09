@@ -5,6 +5,11 @@ use crate::{RelayPolicySnapshot, RequestId};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlClientMessage {
+    ReportUsage {
+        request_id: RequestId,
+        node_id: String,
+        batch: crate::UsageBatch,
+    },
     GetPolicy {
         request_id: RequestId,
         known_policy_version: Option<u64>,
@@ -18,7 +23,9 @@ pub enum RelayControlClientMessage {
 impl RelayControlClientMessage {
     pub const fn request_id(&self) -> RequestId {
         match self {
-            Self::GetPolicy { request_id, .. } => *request_id,
+            Self::GetPolicy { request_id, .. } | Self::ReportUsage { request_id, .. } => {
+                *request_id
+            }
         }
     }
 }
@@ -26,6 +33,9 @@ impl RelayControlClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlServerMessage {
+    UsageAccepted {
+        request_id: RequestId,
+    },
     PolicyChanged,
     PolicySnapshot {
         request_id: RequestId,

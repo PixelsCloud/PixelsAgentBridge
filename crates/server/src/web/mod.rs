@@ -11,11 +11,14 @@ use tokio::sync::{Mutex, Semaphore};
 
 use crate::{ControlApiState, ControlPlane};
 
+mod device_accounts;
 mod devices;
 mod events;
 mod management;
+mod saved_devices;
 mod session;
 mod support;
+mod usage;
 mod user_context;
 pub use support::WebError;
 pub use support::response_headers;
@@ -50,6 +53,15 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/password", post(session::change_password))
         .route("/api/web/devices", get(devices::list))
         .route(
+            "/api/web/saved-devices",
+            get(saved_devices::web_changes).post(saved_devices::web_mutate),
+        )
+        .route("/api/web/usage", get(usage::summary))
+        .route(
+            "/api/web/devices/{id}/association",
+            axum::routing::delete(device_accounts::web_unlink),
+        )
+        .route(
             "/api/web/devices/{id}",
             get(devices::detail).patch(devices::rename),
         )
@@ -83,6 +95,23 @@ pub fn router(control: ControlApiState) -> Router {
         .layer(middleware::from_fn(support::browser_boundary))
         .with_state(state.clone());
     let native = Router::new()
+        .route(
+            "/api/account/saved-devices",
+            get(saved_devices::native_changes).post(saved_devices::native_mutate),
+        )
+        .route(
+            "/api/account/saved-devices/import",
+            post(saved_devices::native_import),
+        )
+        .route("/api/account/usage", post(usage::report))
+        .route(
+            "/api/account/devices/{id}/association-challenge",
+            post(device_accounts::challenge),
+        )
+        .route(
+            "/api/account/devices/{id}/association",
+            axum::routing::put(device_accounts::associate).delete(device_accounts::native_unlink),
+        )
         .route(
             "/api/account/endpoint-context",
             axum::routing::put(user_context::update),

@@ -56,6 +56,8 @@ class Installer(unittest.TestCase):
             path = Path(temporary)
             value = "wss://example.test/control?a='x'&b=$(false)"
             pkg.prepare_scripts(path, "arm64", value, pkg.RELAY_URL)
+            for name in ("preinstall", "postinstall"):
+                self.assertNotIn(b"\r\n", (path / name).read_bytes())
             self.assertNotIn("DEPLOYMENT", (path / "package.env").read_text())
             result = subprocess.check_output(["/bin/bash", "-c", 'source "$1"; printf "%s" "$PAB_CONTROL_URL"', "test", str(path / "package.env")], text=True)
             self.assertEqual(result, value)
@@ -113,10 +115,11 @@ class Installer(unittest.TestCase):
             with (configs[0].parent / "payload" / pkg.APP / "Contents/Info.plist").open("rb") as source:
                 built_version = plistlib.load(source)["CFBundleShortVersionString"]
             package_info = ET.parse(next(expanded.rglob("PackageInfo"))).getroot()
-            self.assertEqual(package_info.attrib["version"], built_version)
+            self.assertEqual(package_info.attrib["version"], source_manifest[archive.name]['version'])
+            self.assertEqual(built_version, json.loads((pkg.ROOT / 'apps/desktop/src-tauri/tauri.conf.json').read_text())['version'])
             metadata = json.loads(next(root.glob("SHA256-macos-*-setup-*.json")).read_text())
             self.assertEqual(pkg.digest(installers[0]), metadata["sha256"])
-            self.assertEqual(metadata['version'], built_version)
+            self.assertEqual(metadata['version'], source_manifest[archive.name]['version'])
             self.assertFalse(metadata["installer_signed"])
             self.assertNotIn("deployment_id", metadata)
 

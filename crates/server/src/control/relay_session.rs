@@ -58,6 +58,43 @@ async fn handle_message(
     message: RelayControlClientMessage,
 ) -> RelayControlServerMessage {
     match message {
+        RelayControlClientMessage::ReportUsage {
+            request_id,
+            node_id,
+            batch,
+        } => {
+            if node_id.is_empty()
+                || node_id.len() > 64
+                || !node_id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+                || batch.counters.values()[2..].iter().any(|v| *v != 0)
+            {
+                return error(
+                    Some(request_id),
+                    RelayControlErrorCode::InvalidMessage,
+                    "invalid Relay usage",
+                );
+            }
+            match state
+                .control
+                .store()
+                .record_usage("relay", &node_id, &batch)
+                .await
+            {
+                Ok(()) => RelayControlServerMessage::UsageAccepted { request_id },
+                Err(crate::StoreError::InvalidInput(_) | crate::StoreError::Conflict(_)) => error(
+                    Some(request_id),
+                    RelayControlErrorCode::InvalidMessage,
+                    "invalid or conflicting usage batch",
+                ),
+                Err(_) => error(
+                    Some(request_id),
+                    RelayControlErrorCode::Internal,
+                    "usage storage unavailable",
+                ),
+            }
+        }
         RelayControlClientMessage::GetPolicy {
             request_id,
             known_policy_version,

@@ -17,6 +17,7 @@ pub fn macos_diagnostics() -> serde_json::Value {
         "localAccessConfigured": pab_executor::local_ipc::user_token_path().is_ok_and(|p| p.is_file()),
     })
 }
+mod device_account;
 mod mcp_reporting;
 mod mcp_tool_settings;
 mod operator;
@@ -282,6 +283,10 @@ pub fn run() {
         .manage(operator::OperatorState::new())
         .on_window_event(tray::on_window_event)
         .setup(|app| {
+            let device_accounts = device_account::DeviceAccountService::default();
+            app.manage(device_accounts.clone());
+            tauri::async_runtime::spawn(device_accounts.run());
+            tauri::async_runtime::spawn(device_account::run_catalog());
             tray::setup(app)?;
             let reporting = app
                 .state::<mcp_reporting::McpReportingState>()
@@ -300,6 +305,10 @@ pub fn run() {
             macos_permissions::open_macos_permission_settings,
             macos_permissions::restart_macos_permission_processes,
             device_status,
+            device_account::device_account_status,
+            device_account::device_account_associate,
+            device_account::account_catalog_status,
+            device_account::account_catalog_action,
             mcp_reporting::mcp_reporting_status,
             mcp_tool_settings::get_mcp_tool_settings,
             mcp_tool_settings::save_mcp_tool_settings,

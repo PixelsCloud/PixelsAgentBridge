@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{path::Path, time::Duration};
 use zeroize::Zeroizing;
 
+pub mod local_device;
 #[cfg(target_os = "macos")]
 mod macos_credentials;
 mod store;
@@ -140,6 +141,129 @@ impl AccountClient {
             self.client
                 .get(format!("{}/api/account/session", self.origin))
                 .bearer_auth(token)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?
+        .json()
+        .await
+        .map_err(|_| AccountError::InvalidResponse)
+    }
+
+    pub async fn device_association_challenge(
+        &self,
+        token: &str,
+        device: pab_protocol::DeviceId,
+        input: &pab_protocol::DeviceAccountChallengeRequest,
+    ) -> Result<pab_protocol::DeviceAccountState, AccountError> {
+        checked(
+            self.client
+                .post(format!(
+                    "{}/api/account/devices/{device}/association-challenge",
+                    self.origin
+                ))
+                .bearer_auth(token)
+                .json(input)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?
+        .json()
+        .await
+        .map_err(|_| AccountError::InvalidResponse)
+    }
+
+    pub async fn saved_devices(
+        &self,
+        token: &str,
+        after: i64,
+    ) -> Result<pab_protocol::SavedDeviceChanges, AccountError> {
+        checked(
+            self.client
+                .get(format!(
+                    "{}/api/account/saved-devices?after={after}",
+                    self.origin
+                ))
+                .bearer_auth(token)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?
+        .json()
+        .await
+        .map_err(|_| AccountError::InvalidResponse)
+    }
+
+    pub async fn update_saved_device(
+        &self,
+        token: &str,
+        input: &pab_protocol::SavedDeviceMutation,
+    ) -> Result<i64, AccountError> {
+        let value: serde_json::Value = checked(
+            self.client
+                .post(format!("{}/api/account/saved-devices", self.origin))
+                .bearer_auth(token)
+                .json(input)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?
+        .json()
+        .await
+        .map_err(|_| AccountError::InvalidResponse)?;
+        value["revision"]
+            .as_i64()
+            .filter(|v| *v > 0)
+            .ok_or(AccountError::InvalidResponse)
+    }
+    pub async fn import_saved_device(
+        &self,
+        token: &str,
+        input: &pab_protocol::SavedDeviceImport,
+    ) -> Result<(), AccountError> {
+        checked(
+            self.client
+                .post(format!("{}/api/account/saved-devices/import", self.origin))
+                .bearer_auth(token)
+                .json(input)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?;
+        Ok(())
+    }
+
+    pub async fn report_usage(
+        &self,
+        token: &str,
+        batch: &pab_protocol::UsageBatch,
+    ) -> Result<(), AccountError> {
+        checked(
+            self.client
+                .post(format!("{}/api/account/usage", self.origin))
+                .bearer_auth(token)
+                .json(batch)
+                .send()
+                .await
+                .map_err(|_| AccountError::Network)?,
+        )?;
+        Ok(())
+    }
+
+    pub async fn associate_device(
+        &self,
+        token: &str,
+        device: pab_protocol::DeviceId,
+        proof: &pab_protocol::DeviceAccountProof,
+    ) -> Result<pab_protocol::DeviceAccountState, AccountError> {
+        checked(
+            self.client
+                .put(format!(
+                    "{}/api/account/devices/{device}/association",
+                    self.origin
+                ))
+                .bearer_auth(token)
+                .json(proof)
                 .send()
                 .await
                 .map_err(|_| AccountError::Network)?,

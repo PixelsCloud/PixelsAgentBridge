@@ -125,6 +125,11 @@ impl PostgresStore {
                 break candidate;
             }
         };
+        sqlx::query("INSERT INTO device_accounts(device_id,user_id,revision) VALUES($1,$2,1)")
+            .bind(device_id.as_uuid())
+            .bind(actor.as_uuid())
+            .execute(&mut *tx)
+            .await?;
         let endpoint_result = sqlx::query(
             r#"
             INSERT INTO endpoints (endpoint_key, tenant_id, owner_kind, device_id)

@@ -8,6 +8,7 @@ use crate::EndpointControlError;
 
 pub(crate) struct PeerAuthorizationRequest {
     pub peer_endpoint_key: EndpointKey,
+    pub authenticated: bool,
     pub response: oneshot::Sender<Result<AuthorizedDevicePeer, EndpointControlError>>,
 }
 
@@ -26,11 +27,28 @@ impl DevicePeerAuthorizer {
         &self,
         peer_endpoint_key: EndpointKey,
     ) -> Result<AuthorizedDevicePeer, PeerAuthorizationError> {
+        self.request(peer_endpoint_key, false).await
+    }
+
+    /// Only the target Executor invokes this after verifying its device password.
+    pub async fn report_authenticated(
+        &self,
+        peer_endpoint_key: EndpointKey,
+    ) -> Result<AuthorizedDevicePeer, PeerAuthorizationError> {
+        self.request(peer_endpoint_key, true).await
+    }
+
+    async fn request(
+        &self,
+        peer_endpoint_key: EndpointKey,
+        authenticated: bool,
+    ) -> Result<AuthorizedDevicePeer, PeerAuthorizationError> {
         let (response, receiver) = oneshot::channel();
         tokio::time::timeout(
             self.timeout,
             self.sender.send(PeerAuthorizationRequest {
                 peer_endpoint_key,
+                authenticated,
                 response,
             }),
         )

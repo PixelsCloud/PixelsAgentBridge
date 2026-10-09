@@ -92,10 +92,12 @@ services:
       PAB_RELAY_QUIC_ADDR: 0.0.0.0:7842
       PAB_RELAY_TLS_NAME: ${PAB_RELAY_TLS_NAME:-pab-relay.rgaa.vip}
       PAB_RELAY_NODE_ID: ${PAB_RELAY_NODE_ID:-primary}
+      PAB_RELAY_USAGE_DIR: /var/lib/pab/usage
     secrets:
       - pab_relay_control_secret
     volumes:
       - relay-logs:/var/log/pab
+      - relay-usage:/var/lib/pab/usage
       - type: bind
         source: ${PAB_CERT_DIR:-./certs}
         target: /run/pab-certs
@@ -127,6 +129,7 @@ volumes:
   postgres-data:
   backend-logs:
   relay-logs:
+  relay-usage:
 
 secrets:
   pab_relay_control_secret:

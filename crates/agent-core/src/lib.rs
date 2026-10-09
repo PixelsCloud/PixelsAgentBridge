@@ -13,6 +13,7 @@ mod peer_authorizer;
 mod storage_paths;
 mod supervisor;
 mod tls;
+pub mod usage_spool;
 
 pub use account_scope::{
     AccountScopeError, AccountScopeRegistration, login_traffic_scopes,

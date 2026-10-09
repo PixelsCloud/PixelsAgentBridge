@@ -71,7 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .publish_device_hello(&hello, Duration::from_secs(10))
         .await?;
-    emit(json!({"ready":true,"device_id":device_id,"device_code":device_code}));
+    emit(
+        json!({"ready":true,"tenant_id":tenant_id,"device_id":device_id,"device_code":device_code}),
+    );
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     let mut interval = tokio::time::interval(Duration::from_secs(10));
     loop {
@@ -87,6 +89,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some("drop_second")=>{secondary=None;},
                     Some("disconnect")=>{primary=None;secondary=None;},
                     Some("reconnect")=>{primary=Some(AuthenticatedControlConnection::connect(&config,&secret,connector.clone()).await?);},
+                    Some("sign_association")=>{
+                        let challenge:pab_protocol::DeviceAccountChallenge=serde_json::from_value(input["challenge"].clone())?;
+                        if challenge.device_id!=device_id{return Err("wrong fixture device".into());}
+                        let proof=pab_protocol::DeviceAccountProof{challenge_id:challenge.id,signature:pab_protocol::EndpointSignature::from_bytes(secret.sign(&challenge.signing_message()).to_bytes())};
+                        emit(json!({"done":"sign_association","proof":proof}));continue;
+                    },
                     Some("quit")=>break,
                     _=>return Err("unknown fixture action".into()),
                 }

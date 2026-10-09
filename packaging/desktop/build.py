@@ -107,7 +107,7 @@ def package_unix(platform, architecture, binaries):
         for file in files:
             info = archive.gettarinfo(str(file), arcname=file.name)
             info.mode = 0o644 if file.suffix in (".plist", ".txt") else 0o755
-            if file.suffix == ".sh":
+            if file.suffix in (".sh", ".plist", ".txt"):
                 content = file.read_bytes().replace(b"\r\n", b"\n")
                 info.size = len(content)
                 archive.addfile(info, BytesIO(content))

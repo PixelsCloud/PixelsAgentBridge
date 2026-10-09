@@ -443,7 +443,7 @@ async fn commands_and_transfers_share_listing_but_not_another_sessions_controls(
             device_ref: spec.device_ref,
             code: spec.device_code,
             alias: "fixture".into(),
-            os_family: OsFamily::Linux,
+            os_family: Some(OsFamily::Linux),
             os_reminder: "Linux".into(),
         })
         .await

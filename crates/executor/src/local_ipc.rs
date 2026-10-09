@@ -37,6 +37,8 @@ type HmacSha256 = Hmac<Sha256>;
 pub type LocalSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 #[path = "local_ipc_applications.rs"]
 pub(crate) mod applications;
+#[path = "local_ipc_device_account.rs"]
+mod device_account;
 #[path = "local_ipc_helper_identity.rs"]
 mod helper_identity;
 
@@ -802,6 +804,16 @@ async fn handle_connection(
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
+                    Some("sign_device_account") => {
+                        let result=match serde_json::from_value(frame["challenge"].clone()) {
+                            Ok(challenge)=>device_account::sign(root,challenge).await,
+                            Err(_)=>Err(LocalIpcError::Protocol),
+                        };
+                        match result {
+                            Ok(proof)=>send_json(&mut socket,&json!({"type":"device_account_proof","proof":proof})).await?,
+                            Err(_)=>send_json(&mut socket,&json!({"type":"error","message":"device association proof rejected"})).await?,
+                        }
+                    },
                     Some("register_window_helper") if registration.0.is_none() => {
                         let identity=helper_identity::verify(&mut socket,&frame).await?;
                         let applications_only = frame["applications_only"].as_bool().unwrap_or(false);

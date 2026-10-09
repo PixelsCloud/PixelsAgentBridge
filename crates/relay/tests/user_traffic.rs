@@ -181,6 +181,11 @@ async fn live_account_switch_and_user_limit_share_budget_without_reconnecting() 
         )),
     ];
     let guest = rate("guest 1 Mbps per endpoint", &count).await;
+    assert!(runtime.usage_for_testing(None).relay_upload_bytes > 0);
+    assert_eq!(
+        runtime.usage_for_testing(Some(user_id)).relay_upload_bytes,
+        0
+    );
     policy.policy_version += 1;
     for item in &mut policy.endpoints[1..] {
         item.owner = RelayEndpointOwner::User {
@@ -193,12 +198,19 @@ async fn live_account_switch_and_user_limit_share_budget_without_reconnecting() 
     policy.user_limits = vec![UserRelayLimit { user_id, mbps: 2 }];
     runtime.apply_snapshot(policy.clone()).unwrap();
     let limited = rate("same user override 2 Mbps aggregate", &count).await;
+    let recorded = runtime.usage_for_testing(Some(user_id));
+    assert!(recorded.relay_upload_bytes > 0);
+    assert!(recorded.relay_download_bytes > 0);
+    assert!(!recorded.incomplete);
     policy.policy_version += 1;
     for item in &mut policy.endpoints[1..] {
         item.owner = RelayEndpointOwner::Guest;
     }
     runtime.apply_snapshot(policy).unwrap();
+    let recorded = runtime.usage_for_testing(Some(user_id));
     let logged_out = rate("logout to guest", &count).await;
+    // Policy switch cuts attribution without relabelling old counters.
+    assert_eq!(runtime.usage_for_testing(Some(user_id)), recorded);
     for worker in workers {
         worker.abort();
         let _ = worker.await;

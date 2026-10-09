@@ -117,7 +117,10 @@ pub async fn operator_bootstrap(
             device_id: device.device_ref.device_id.to_string(),
             device_code: device.code.to_string(),
             alias: device.alias.clone(),
-            os_family: format!("{:?}", device.os_family).to_lowercase(),
+            os_family: device
+                .os_family
+                .map(|os| format!("{os:?}").to_lowercase())
+                .unwrap_or_else(|| "unknown".into()),
             os_reminder: device.os_reminder.clone(),
             connected: false,
         })
@@ -428,10 +431,18 @@ async fn history_task(
         )
         .await
         .map_err(|error| error.to_string())?;
-    let stdout_text = pab_bridge::output_text::decode_output(&stdout.bytes, Default::default(),
-        stdout_range.complete && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to);
-    let stderr_text = pab_bridge::output_text::decode_output(&stderr.bytes, Default::default(),
-        stderr_range.complete && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to);
+    let stdout_text = pab_bridge::output_text::decode_output(
+        &stdout.bytes,
+        Default::default(),
+        stdout_range.complete
+            && stdout.offset + stdout.bytes.len() as u64 >= stdout_range.available_to,
+    );
+    let stderr_text = pab_bridge::output_text::decode_output(
+        &stderr.bytes,
+        Default::default(),
+        stderr_range.complete
+            && stderr.offset + stderr.bytes.len() as u64 >= stderr_range.available_to,
+    );
     let stdout_offset = stdout.offset + stdout_text.consumed as u64;
     let stderr_offset = stderr.offset + stderr_text.consumed as u64;
     Ok(HistoryTask {

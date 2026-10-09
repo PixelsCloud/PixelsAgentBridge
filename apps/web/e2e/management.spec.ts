@@ -136,7 +136,7 @@ test('responsive languages, URL state, transient failure, reconnect and revoked 
     await page.screenshot({path:resolve(root,`.build/web-test/devices-${width}.png`),animations:'disabled'});
   }
   await page.setViewportSize({width:1280,height:900});
-  for(const [language,heading] of [['繁體中文','裝置清單'],['简体中文','设备列表'],['English','Device list']]) {
+  for(const [language,heading] of [['繁體中文','我的裝置'],['简体中文','我的设备'],['English','My devices']]) {
     await page.locator('.console-header .ant-select').click();await page.locator('.ant-select-item-option-content').getByText(language,{exact:true}).click();
     await expect(page.getByRole('heading',{name:heading,exact:true})).toBeVisible();
   }

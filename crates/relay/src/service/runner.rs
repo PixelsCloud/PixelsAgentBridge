@@ -14,6 +14,7 @@ type ServiceResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 pub struct RunningRelayService {
     server: Server,
     refresh: tokio::task::JoinHandle<()>,
+    usage: crate::usage::UsageWorker,
 }
 
 impl RunningRelayService {
@@ -33,6 +34,7 @@ impl RunningRelayService {
         self.refresh.abort();
         let _ = self.refresh.await;
         self.server.shutdown().await?;
+        self.usage.shutdown().await;
         Ok(())
     }
 }
@@ -74,11 +76,21 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
         .ok_or("iroh captive-portal listener is missing")?;
     let quic_addr = server.quic_addr().ok_or("Relay QUIC listener is missing")?;
 
+    let usage = crate::usage::spawn(
+        runtime.clone(),
+        sync_settings.control_url.clone(),
+        sync_settings.control_secret.clone(),
+        connector.clone(),
+    );
     let refresh = spawn_refresh_loop(client, sync_settings, connector, runtime);
     println!(
         "PAB Relay ready: https={https_addr} quic={quic_addr} captive_loopback={captive_addr}"
     );
-    Ok(RunningRelayService { server, refresh })
+    Ok(RunningRelayService {
+        server,
+        refresh,
+        usage,
+    })
 }
 
 pub async fn run_relay_service(config: RelayServiceConfig) -> ServiceResult<()> {
@@ -101,5 +113,6 @@ pub async fn run_relay_service(config: RelayServiceConfig) -> ServiceResult<()> 
         Stop::Signal => running.server.shutdown().await?,
         Stop::Server(result) => result??,
     }
+    running.usage.shutdown().await;
     Ok(())
 }

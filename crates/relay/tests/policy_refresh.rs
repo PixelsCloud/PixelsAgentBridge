@@ -120,7 +120,10 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
                 request_id,
                 known_policy_version,
                 ..
-            } = serde_json::from_str(text.as_str()).unwrap();
+            } = serde_json::from_str(text.as_str()).unwrap()
+            else {
+                panic!("policy test received unexpected message");
+            };
             let mut snapshot = server_policy.lock().unwrap().clone();
             snapshot.issued_at_unix_ms = now_ms() - 1;
             snapshot.expires_at_unix_ms = now_ms() + 60_000;

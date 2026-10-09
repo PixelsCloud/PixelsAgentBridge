@@ -156,8 +156,12 @@ pub async fn operator_start_transfer(
         .remembered_device(code)
         .await
         .map_err(|e| rejected(e.to_string()))?;
-    spec.validate_paths(remembered.os_family)
-        .map_err(|e| rejected(e.into()))?;
+    spec.validate_paths(
+        remembered
+            .os_family
+            .ok_or_else(|| rejected("Connect to verify the device platform first".into()))?,
+    )
+    .map_err(|e| rejected(e.into()))?;
     let mut owners = state.transfers.lock().await;
     if let Some(owner) = owners.get(&request_id) {
         if owner.code != code || !Arc::ptr_eq(&owner.runtime, &runtime) {

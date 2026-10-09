@@ -227,6 +227,7 @@ impl RuntimeStore {
         .execute(&mut *tx)
         .await?;
         if result.rows_affected() == 1 {
+            super::usage::finished_transfer(&mut tx, id, state).await?;
             sqlx::query("DELETE FROM runtime_download_claims WHERE operation_id = ?")
                 .bind(id.to_string())
                 .execute(&mut *tx)

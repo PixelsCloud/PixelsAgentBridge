@@ -459,6 +459,7 @@ where
     async fn send_raw(&mut self, packet: Packet) -> Result<(), WriteFrameError> {
         let remote_endpoint_id = packet.src;
         let datagrams = packet.data;
+        let forwarded_bytes=datagrams.contents.len();
 
         if let Ok(len) = datagrams.contents.len().try_into() {
             self.metrics.bytes_sent.inc_by(len);
@@ -467,7 +468,9 @@ where
             remote_endpoint_id,
             datagrams,
         })
-        .await
+        .await?;
+        self.clients.forwarded(remote_endpoint_id,self.guard.endpoint_id(),forwarded_bytes);
+        Ok(())
     }
 
     async fn send_packet(&mut self, packet: Packet) -> Result<(), WriteFrameError> {

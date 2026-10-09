@@ -6,13 +6,13 @@ import { api, ApiError, type Viewer } from './api';
 import { useResource } from './useResource';
 import { useText, useDate } from './i18n';
 
-export interface Device { id: string; code: string; name: string; revision: number; status: string; system: string | null; os_name: string | null; os_version: string | null; architecture: string | null; agent_version: string | null; created_at: number; last_online_at: number | null; online: boolean }
+export interface Device { id: string; code: string; name: string; revision: number; status: string; system: string | null; os_name: string | null; os_version: string | null; architecture: string | null; agent_version: string | null; created_at: number; last_online_at: number | null; online: boolean; association_revision?: number; associated_with_me?: boolean }
 interface DeviceList { items: Device[]; total: number; page: number; page_size: number }
 export const formatCode = (code: string) => code.replace(/(\d{3})(?=\d)/g, '$1 ');
 
-export function Overview({ liveRevision }: { liveRevision: number }) {
+export function Overview({ liveRevision, all = false }: { liveRevision: number; all?: boolean }) {
   const t = useText(); const navigate = useNavigate();
-  const resource = useResource<Record<string, number>>('/overview');
+  const resource = useResource<Record<string, number>>(`/overview?scope=${all ? 'all' : 'mine'}`);
   useEffect(resource.refresh, [liveRevision]);
   return <Space orientation="vertical" size={24} style={{ width: '100%' }}>
     <Typography.Title level={2}>{t('overview')}</Typography.Title>
@@ -43,7 +43,7 @@ export function DeviceListPage({ me, mode, liveRevision }: { me: Viewer; mode: '
   const update = (key: string, value?: string) => { const next = new URLSearchParams(params); value ? next.set(key, value) : next.delete(key); next.delete('page'); setParams(next); };
   const copy = async (item: Device) => { try { await navigator.clipboard.writeText(`${t('deviceCode')}: ${item.code.replace(/\s/g, '')}\n${t('name')}: ${item.name}`); message.success(t('copied')); } catch { message.error(t('networkError')); } };
   return <Space orientation="vertical" size={20} style={{ width: '100%' }}>
-    <div className="page-heading"><div><Typography.Title level={2}>{t(mode === 'online' ? 'onlineDevices' : 'devices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text></div><Button icon={<RefreshCw size={16}/>} onClick={resource.refresh} loading={resource.loading}>{t('refresh')}</Button></div>
+    <div className="page-heading"><div><Typography.Title level={2}>{t(mode === 'online' ? 'onlineDevices' : me.server_admin ? 'devices' : 'myDevices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text></div><Button icon={<RefreshCw size={16}/>} onClick={resource.refresh} loading={resource.loading}>{t('refresh')}</Button></div>
     <Card><Space wrap style={{ marginBottom: 20 }}><Input.Search placeholder={t('search')} value={search} onChange={e => setSearch(e.target.value)} onSearch={value => update('q', value.trim())} allowClear style={{ width: 280 }} maxLength={128}/>
       {mode !== 'online' && <Select aria-label={t('online')} value={params.get('status') ?? ''} style={{ width: 130 }} onChange={value => update('status', value)} options={['', 'online', 'offline'].map(value => ({ value, label: t(value || 'all') }))}/>}
       <Select aria-label={t('system')} value={params.get('system') ?? ''} style={{ width: 140 }} onChange={value => update('system', value)} options={[{ value: '', label: t('system') }, ...['windows', 'linux', 'macos'].map(value => ({ value, label: value === 'macos' ? 'macOS' : value === 'windows' ? 'Windows' : 'Linux' }))]}/>
@@ -67,7 +67,8 @@ export function DeviceDetail({ liveRevision }: { liveRevision: number }) {
   const resource = useResource<Device>(`/devices/${id}`); const item = resource.data;
   const [open, setOpen] = useState(false); const [busy, setBusy] = useState(false); const [form] = Form.useForm();
   const [editing, setEditing] = useState<Device>();
-  useEffect(() => { setOpen(false); setEditing(undefined); }, [id]);
+  const [unlinking, setUnlinking] = useState<Device>();
+  useEffect(() => { setOpen(false); setEditing(undefined); setUnlinking(undefined); }, [id]);
   useEffect(resource.refresh, [liveRevision]);
   async function rename(values: { name: string }) {
     if (!editing) return; setBusy(true);
@@ -83,6 +84,12 @@ export function DeviceDetail({ liveRevision }: { liveRevision: number }) {
         { key: 'created', label: t('created'), children: date(item.created_at) }, { key: 'seen', label: t('lastOnline'), children: item.online ? t('online') : item.last_online_at ? date(item.last_online_at) : '—' },
       ]}/>}
     </Card>}
+    {item?.associated_with_me && <Button danger onClick={() => setUnlinking(item)}>{t('unlinkDevice')}</Button>}
+    <Modal title={t('unlinkDevice')} open={!!unlinking} maskClosable={false} keyboard={false} closable={!busy} onCancel={() => !busy && setUnlinking(undefined)} confirmLoading={busy} onOk={async () => {
+      if (!unlinking) return; setBusy(true);
+      try { await api(`/devices/${unlinking.id}/association`, { method: 'DELETE', body: JSON.stringify({ revision: unlinking.association_revision }) }); setUnlinking(undefined); navigate('/devices'); }
+      catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); resource.refresh(); } finally { setBusy(false); }
+    }}>{t('unlinkDeviceHint')}</Modal>
     <Modal title={t('rename')} open={open} maskClosable={false} keyboard={false} onCancel={() => !busy && setOpen(false)} onOk={() => form.submit()} confirmLoading={busy} okText={t('save')} cancelText={t('cancel')}>
       <Typography.Paragraph type="secondary">{t('nameHint')}</Typography.Paragraph><Form form={form} layout="vertical" onFinish={rename}><Form.Item name="name" label={t('name')} rules={[{ required: true, whitespace: true, max: 128, message: t('invalid_input') }]}><Input maxLength={128}/></Form.Item></Form>
     </Modal>

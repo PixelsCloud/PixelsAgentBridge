@@ -309,6 +309,7 @@ async fn maintain_connection(
                 let request_id = connection
                     .send_authorize_device_peer(
                         request.peer_endpoint_key,
+                        request.authenticated,
                         operation_timeout,
                     )
                     .await?;

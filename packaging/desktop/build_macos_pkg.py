@@ -105,7 +105,7 @@ def verify_binaries(payload, architecture):
 
 def prepare_scripts(destination, arch, control_url, relay_url):
     for name in ("preinstall", "postinstall"):
-        shutil.copyfile(SCRIPTS / "pkg" / name, destination / name)
+        (destination / name).write_bytes((SCRIPTS / "pkg" / name).read_bytes().replace(b"\r\n", b"\n"))
         (destination / name).chmod(0o755)
         subprocess.run(["/bin/bash", "-n", str(destination / name)], check=True)
     values = {"PAB_PKG_ARCH": arch,

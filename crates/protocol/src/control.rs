@@ -77,6 +77,10 @@ pub enum ControlClientMessage {
         request_id: RequestId,
         peer_endpoint_key: EndpointKey,
     },
+    ReportAuthenticatedDevicePeer {
+        request_id: RequestId,
+        peer_endpoint_key: EndpointKey,
+    },
     // Legacy wire messages: retained for decoding only. The server rejects all claims.
     BeginDeviceClaim {
         request_id: RequestId,
@@ -114,7 +118,8 @@ impl ControlClientMessage {
             | Self::GetDevicePresence { request_id, .. }
             | Self::ListDevices { request_id }
             | Self::ListTrafficScopes { request_id }
-            | Self::AuthorizeDevicePeer { request_id, .. } => *request_id,
+            | Self::AuthorizeDevicePeer { request_id, .. }
+            | Self::ReportAuthenticatedDevicePeer { request_id, .. } => *request_id,
             Self::BeginDeviceClaim { request_id, .. }
             | Self::ListDeviceClaims { request_id }
             | Self::RejectDeviceClaim { request_id, .. }

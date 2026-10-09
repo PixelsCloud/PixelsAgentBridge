@@ -11,6 +11,7 @@ import { detectLanguage, LanguageContext, useText, type Language } from './i18n'
 import { DeviceDetail, DeviceListPage, Overview } from './DevicePages';
 import { useLiveUpdates } from './useLiveUpdates';
 import brand from './brand.svg';
+import { SavedDevicesPage, UsagePage } from './PersonalPages';
 const AccountsPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AccountsPage })));
 const AuditPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.AuditPage })));
 const TrafficPage = lazy(() => import('./ManagementPages').then(m => ({ default: m.TrafficPage })));
@@ -34,6 +35,7 @@ export function WebApp() {
 
 interface Preferences { language: Language; dark: boolean; setLanguage: (value: Language) => void; setDark: (value: boolean) => void }
 function Console(props: Preferences) {
+  const [personal, setPersonal] = useState(false);
   const t = useText(); const { message } = App.useApp(); const navigate = useNavigate(); const location = useLocation();
   const [me, setMe] = useState<Viewer | null>(); const [config, setConfig] = useState<WebConfig>(); const [error, setError] = useState<string>(); const [revision, setRevision] = useState(0);
   const { revision: liveRevision, connected } = useLiveUpdates(!!me);
@@ -53,30 +55,37 @@ function Console(props: Preferences) {
   if (error) return <div className="full-center"><Result status="error" title={t(error)} extra={<Button onClick={() => setRevision(v => v + 1)}>{t('retry')}</Button>}/></div>;
   if (me === undefined || !config) return <div className="full-center"><Spin size="large"/></div>;
   if (!me) return <><div className="auth-preferences">{preferences}</div><AuthPage registration={config.registration_enabled} onLogin={value => { setMe(value); navigate('/'); }}/></>;
+  const management = me.server_admin && !personal;
+  const viewMe = { ...me, server_admin: management };
   const items = [
     { key: '/', icon: <LayoutDashboard size={18}/>, label: t('overview') },
-    { key: '/devices', icon: <Monitor size={18}/>, label: t('devices') },
+    { key: '/devices', icon: <Monitor size={18}/>, label: t(management ? 'devices' : 'myDevices') },
+    ...(!management ? [{ key: '/saved-devices', icon: <List size={18}/>, label: t('savedDevices') }] : []),
+    { key: '/usage', icon: <Activity size={18}/>, label: t(management ? 'serviceUsage' : 'myUsage') },
     { key: '/online', icon: <Activity size={18}/>, label: t('onlineDevices') },
-    ...(me.server_admin ? [{ key: '/accounts', icon: <Users size={18}/>, label: t('accounts') }] : []),
-    { key: '/relay', icon: <Network size={18}/>, label: t('relay') },
-    ...(me.server_admin ? [{ key: '/audit', icon: <List size={18}/>, label: t('events') }] : []),
+    ...(management ? [{ key: '/accounts', icon: <Users size={18}/>, label: t('accounts') }] : []),
+    ...(management ? [{ key: '/relay', icon: <Network size={18}/>, label: t('relay') }] : []),
+    ...(management ? [{ key: '/audit', icon: <List size={18}/>, label: t('events') }] : []),
     { key: '/account', icon: <User size={18}/>, label: t('account') },
     { key: '/settings', icon: <Settings size={18}/>, label: t('settings') },
   ];
   async function logout() { try { await post('/logout'); setMe(null); navigate('/'); } catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); } }
   return <Layout className="console-layout"><Layout.Sider width={224} breakpoint="lg" collapsedWidth={64} className="console-sidebar" theme={props.dark ? 'dark' : 'light'}>
     <div className="console-brand"><img className="brand-mark small" src={brand} alt=""/><div><strong>Pixels</strong><span>Agent Bridge</span></div></div>
+    {me.server_admin && <Select aria-label={t('serviceManagement')} value={personal ? 'personal' : 'service'} onChange={value => { setPersonal(value === 'personal'); navigate('/'); }} style={{ margin: 12, width: 'calc(100% - 24px)' }} options={[{ value: 'personal', label: t('personalCenter') }, { value: 'service', label: t('serviceManagement') }]} />}
     <Menu mode="inline" theme={props.dark ? 'dark' : 'light'} items={items} selectedKeys={[location.pathname.startsWith('/devices/') ? '/devices' : location.pathname]} onClick={({ key }) => navigate(key)}/>
-  </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t('console')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
-    <Layout.Content className="console-content">{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes>
-      <Route path="/" element={<Overview liveRevision={liveRevision}/>}/>
-      <Route path="/devices" element={<DeviceListPage key="list" me={me} mode="list" liveRevision={liveRevision}/>}/>
-      <Route path="/online" element={<DeviceListPage key="online" me={me} mode="online" liveRevision={liveRevision}/>}/>
+  </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t(management ? 'serviceManagement' : 'personalCenter')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
+    <Layout.Content className="console-content">{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes key={`${me.id}:${management}`}>
+      <Route path="/" element={<Overview all={management} liveRevision={liveRevision}/>}/>
+      <Route path="/devices" element={<DeviceListPage key="list" me={viewMe} mode="list" liveRevision={liveRevision}/>}/>
+      <Route path="/online" element={<DeviceListPage key="online" me={viewMe} mode="online" liveRevision={liveRevision}/>}/>
+      <Route path="/saved-devices" element={<SavedDevicesPage liveRevision={liveRevision} />} />
+      <Route path="/usage" element={<UsagePage all={management} liveRevision={liveRevision} />} />
       <Route path="/all-devices" element={<Navigate to={{ pathname: '/devices', search: location.search, hash: location.hash }} replace/>}/>
       <Route path="/devices/:id" element={<DeviceDetail liveRevision={liveRevision}/>}/>
       <Route path="/accounts" element={me.server_admin ? <AccountsPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
       <Route path="/audit" element={me.server_admin ? <AuditPage liveRevision={liveRevision}/> : <Result status="403" title={t('forbidden')}/>}/>
-      <Route path="/relay" element={<TrafficPage liveRevision={liveRevision} me={me}/>}/>
+      <Route path="/relay" element={me.server_admin ? <TrafficPage liveRevision={liveRevision} me={me}/> : <Navigate to="/usage" replace/>}/>
       <Route path="/account" element={<Account me={me}/>}/>
       <Route path="/settings" element={<PreferencesPanel {...props} version={config.version} admin={me.server_admin}/>}/>
       <Route path="*" element={<Navigate to="/" replace/>}/>

@@ -14,10 +14,10 @@ pub use connection::{
 };
 pub use pab_transport::ConnectionPath;
 pub use runtime::{
-    BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, DeviceConnectionPhase,
+    BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, CatalogStatus, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
     LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, QueuedTransfer,
     RememberedDevice, RuntimeCredentialError, RuntimeError, RuntimeEvent, RuntimeEventKind,
-    RuntimePresenceSource, RuntimeStoreError, SqliteDevicePasswordProvider, TerminalAuditEvent, TransferQueue,
-    TransferRequest,
+    RuntimePresenceSource, RuntimeStoreError, SqliteDevicePasswordProvider, TerminalAuditEvent,
+    TransferQueue, TransferRequest,
 };

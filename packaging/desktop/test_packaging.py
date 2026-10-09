@@ -85,6 +85,8 @@ class Packages(unittest.TestCase):
                                 self.assertNotIn("pab-desktop", package.getnames())
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.executor.plist").mode, 0o644)
                                 self.assertEqual(package.getmember("com.pixelsagentbridge.login-helper.plist").mode, 0o644)
+                                for name in ("com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist", "com.pixelsagentbridge.login-helper.plist"):
+                                    self.assertEqual(package.extractfile(name).read(), (SCRIPTS / "macos" / name).read_bytes().replace(b"\r\n", b"\n"))
                             else:
                                 self.assertNotIn("pab-desktop", package.getnames())
                                 self.assertNotIn("run-app.sh", package.getnames())

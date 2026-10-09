@@ -1,4 +1,5 @@
 mod account;
+mod catalog;
 mod credential;
 mod device;
 mod directory;
@@ -20,6 +21,7 @@ mod transfer;
 mod transfer_identity;
 mod transfer_queue;
 mod transfer_runner;
+mod usage;
 mod windows;
 mod worker;
 
@@ -51,6 +53,7 @@ use reconciliation::run_reconciliation;
 use session::run_session_heartbeat;
 use worker::run_record;
 
+pub use catalog::CatalogStatus;
 pub use credential::{
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
     MemoryDevicePasswordProvider, RuntimeCredentialError, SqliteDevicePasswordProvider,
@@ -72,6 +75,38 @@ pub struct BridgeLocalStore {
 }
 
 impl BridgeLocalStore {
+    pub async fn catalog_status(&self) -> Result<CatalogStatus, RuntimeStoreError> {
+        self.store.catalog_status().await
+    }
+    pub async fn import_local_devices(&self) -> Result<usize, RuntimeStoreError> {
+        self.store.catalog_import_local(None).await
+    }
+    pub async fn import_local_devices_at(&self, revision: u64) -> Result<usize, RuntimeStoreError> {
+        self.store.catalog_import_local(Some(revision)).await
+    }
+    pub async fn resolve_catalog_conflict(
+        &self,
+        device: pab_protocol::DeviceId,
+        keep_local: bool,
+    ) -> Result<(), RuntimeStoreError> {
+        self.store.catalog_resolve(device, keep_local, None).await
+    }
+    pub async fn resolve_catalog_conflict_at(
+        &self,
+        device: pab_protocol::DeviceId,
+        keep_local: bool,
+        revision: u64,
+    ) -> Result<(), RuntimeStoreError> {
+        self.store
+            .catalog_resolve(device, keep_local, Some(revision))
+            .await
+    }
+    pub async fn sync_account_catalog(&self) -> Result<(), pab_agent_core::account::AccountError> {
+        let client = pab_agent_core::account::AccountClient::from_env()?;
+        let store = pab_agent_core::account::AccountStore::from_env()?;
+        self.store.sync_catalog(&client, &store).await
+    }
+
     pub async fn open(path: &std::path::Path) -> Result<Self, RuntimeStoreError> {
         Ok(Self {
             store: RuntimeStore::open(path).await?,
@@ -330,12 +365,27 @@ impl BridgeRuntime {
     ) -> Result<Self, RuntimeError> {
         bridge_config.validate()?;
         runtime_config.validate()?;
-        let store = RuntimeStore::open(&runtime_config.database_path).await?;
+        let mut store = RuntimeStore::open(&runtime_config.database_path).await?;
+        store.account_origin = Some(
+            pab_agent_core::account::account_origin(&bridge_config.control_url)
+                .map_err(|_| RuntimeStoreError::AccountStorage)?,
+        );
         let session_id = runtime_config
             .session_id
             .clone()
             .unwrap_or_else(|| RequestId::new().to_string());
         store.start_session(&session_id).await?;
+        sqlx::query(
+            "INSERT OR REPLACE INTO runtime_session_servers(session_id,origin) VALUES(?,?)",
+        )
+        .bind(&session_id)
+        .bind(
+            pab_agent_core::account::account_origin(&bridge_config.control_url)
+                .map_err(|_| RuntimeStoreError::AccountStorage)?,
+        )
+        .execute(&store.pool)
+        .await
+        .map_err(RuntimeStoreError::from)?;
         let (events, _) = broadcast::channel(runtime_config.event_buffer);
         let (availability_sender, availability) = watch::channel(BridgeAvailability::Connecting);
         let (shutdown, shutdown_receiver) = watch::channel(false);

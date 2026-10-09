@@ -25,6 +25,26 @@ pub(super) struct DeviceSession {
 }
 
 impl DeviceSession {
+    pub(super) async fn sample_usage(&self, scope: Option<&str>) {
+        let connection = self.connection.read().await;
+        let id = connection
+            .as_ref()
+            .filter(|c| c.connection().selected_path().is_some())
+            .map(|c| c.authenticated_at_unix_ms());
+        if let Err(error) = self
+            .runtime
+            .store
+            .sample_connection(
+                &self.runtime.session_id,
+                self.device_ref.device_id,
+                id,
+                scope,
+            )
+            .await
+        {
+            tracing::warn!(%error,"connection usage sample unavailable");
+        }
+    }
     pub(super) async fn cached_connection(&self) -> Option<Arc<AuthenticatedDeviceConnection>> {
         self.connection.read().await.clone()
     }
@@ -60,6 +80,16 @@ impl DeviceSession {
     }
 
     pub(super) async fn disconnect(&self) {
+        let _ = self
+            .runtime
+            .store
+            .sample_connection(
+                &self.runtime.session_id,
+                self.device_ref.device_id,
+                None,
+                None,
+            )
+            .await;
         self.manually_disconnected.store(true, Ordering::Release);
         if let Some(connection) = self.connection.write().await.take() {
             connection.as_ref().clone().close();
@@ -148,6 +178,25 @@ impl DeviceSession {
                     }
                     let connection = Arc::new(connection);
                     *self.connection.write().await = Some(Arc::clone(&connection));
+                    let scope = {
+                        let presence = self
+                            .runtime
+                            .presence
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
+                        presence
+                            .account
+                            .as_ref()
+                            .and_then(|account| account.user.as_ref())
+                            .and_then(|user| {
+                                self.runtime
+                                    .store
+                                    .account_origin
+                                    .as_ref()
+                                    .map(|origin| format!("{origin}\n{}", user.user_id))
+                            })
+                    };
+                    self.sample_usage(scope.as_deref()).await;
                     self.runtime.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Connected,

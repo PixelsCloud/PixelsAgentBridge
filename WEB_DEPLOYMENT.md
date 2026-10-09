@@ -2,6 +2,12 @@
 
 ## Scope / 范围
 
+**P1 更新（2026-10-09）：** 个人设备、远程列表、用量统计使用新增的 `0002`—`0004` 数据库结构。对已运行的 HTTP 账号版本执行普通 `pab-server init`，保留账户、会话、设备身份及设备码。下文 2026-10-08 的一次性开发清库记录不适用于 P1，不能再次照着清空现网。
+
+先备份数据库与部署配置，更新 Server，再更新 Relay，最后更新 Desktop/Executor/MCP。Relay 新增 `PAB_RELAY_USAGE_DIR` 持久化目录；Docker 镜像与挂载目录必须可由 `pab` 用户写入。每个 Relay 使用独立、稳定的节点 ID 和自己的队列。回退保留新增表和队列，不运行降级删表或设备重注册。
+
+**P1 回退边界：** 旧 Server 二进制不包含 `0002`—`0004`，SQLx 会拒绝带有这些迁移记录的数据库，不能只换回旧镜像。需要回退时，在维护窗口将升级前备份恢复到另一个数据库，再让旧镜像指向该恢复库；保留当前数据库和 Relay 队列，单独核对升级后的新增写入。不得删除迁移记录来强行启动旧版本，也不得覆盖当前生产库。
+
 The React + Ant Design console is served by `pab-server` on its existing HTTPS listener. No Node runtime is required in production. Server stores account, device, user bandwidth and Relay management data only; remote task history, command output, files and screenshots remain local to Bridge/Executor. Device **online** means an authenticated device control connection is alive. This release supports one active control Server per deployment.
 
 Web 与现有 `/control`、`/relay-control` 共用 HTTPS 端口，不新增公开端口。任务记录只保存在本地，不上传 Server，也不在 Web 展示。多条设备控制连接使用引用计数，全部断开后才显示离线。Relay 根据当前已验证的用户聚合限速；未登录端点使用游客限速。用户登录不授予设备访问权。

@@ -279,7 +279,7 @@ async fn remembers_device_name_across_reconnect_and_reopen() {
         device_ref: device_ref(),
         code: DeviceCode::new(123_456_789).unwrap(),
         alias: String::new(),
-        os_family: OsFamily::Linux,
+        os_family: Some(OsFamily::Linux),
         os_reminder: "Linux shell".to_owned(),
     };
     store.remember_device(&device).await.unwrap();
@@ -291,7 +291,7 @@ async fn remembers_device_name_across_reconnect_and_reopen() {
         },
         code: DeviceCode::new(987_654_321).unwrap(),
         alias: "Windows 90".to_owned(),
-        os_family: OsFamily::Windows,
+        os_family: Some(OsFamily::Windows),
         os_reminder: "Windows PowerShell".to_owned(),
     };
     store.remember_device(&other).await.unwrap();
@@ -318,7 +318,7 @@ async fn forgetting_device_removes_saved_password() {
         device_ref: device_ref(),
         code,
         alias: "Test device".to_owned(),
-        os_family: OsFamily::Linux,
+        os_family: Some(OsFamily::Linux),
         os_reminder: "Linux shell".to_owned(),
     };
     local.store.remember_device(&device).await.unwrap();

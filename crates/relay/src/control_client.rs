@@ -20,6 +20,51 @@ pub struct RelayControlClient {
 }
 
 impl RelayControlClient {
+    pub(crate) async fn report_usage(
+        &mut self,
+        node_id: &str,
+        batch: &pab_protocol::UsageBatch,
+    ) -> Result<(), RelayControlClientError> {
+        let request_id = RequestId::new();
+        let request = RelayControlClientMessage::ReportUsage {
+            request_id,
+            node_id: node_id.into(),
+            batch: batch.clone(),
+        };
+        tokio::time::timeout(CONTROL_OPERATION_TIMEOUT, async {
+            self.socket
+                .send(Message::Text(serde_json::to_string(&request)?.into()))
+                .await?;
+            loop {
+                match self
+                    .socket
+                    .next()
+                    .await
+                    .ok_or(RelayControlClientError::Closed)??
+                {
+                    Message::Text(text) => {
+                        match serde_json::from_str::<RelayControlServerMessage>(&text)? {
+                            RelayControlServerMessage::PolicyChanged => {}
+                            RelayControlServerMessage::UsageAccepted { request_id: id }
+                                if id == request_id =>
+                            {
+                                return Ok(());
+                            }
+                            RelayControlServerMessage::Error { code, message, .. } => {
+                                return Err(RelayControlClientError::Server { code, message });
+                            }
+                            _ => return Err(RelayControlClientError::MismatchedResponse),
+                        }
+                    }
+                    Message::Ping(bytes) => self.socket.send(Message::Pong(bytes)).await?,
+                    Message::Pong(_) => {}
+                    _ => return Err(RelayControlClientError::Closed),
+                }
+            }
+        })
+        .await
+        .map_err(|_| RelayControlClientError::Timeout)?
+    }
     pub async fn wait_for_policy_change(&mut self) -> Result<(), RelayControlClientError> {
         loop {
             let message = self

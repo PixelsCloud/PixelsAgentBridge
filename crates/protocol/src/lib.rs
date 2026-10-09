@@ -108,7 +108,13 @@ mod git;
 pub use git::*;
 
 pub use filesystem::{FileSearchOptions, LogReadState, PatchPreview, SearchContextLine};
+mod device_account;
 mod user_context;
+pub use device_account::*;
+mod saved_device;
+pub use saved_device::*;
+mod usage;
+pub use usage::*;
 pub use user_context::{
     EndpointUserContext, EndpointUserContextReceipt, EndpointUserContextUpdate,
     RelayUserContextReceipt, UserAttribution,

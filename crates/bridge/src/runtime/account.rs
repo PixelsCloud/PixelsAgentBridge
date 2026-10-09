@@ -12,11 +12,25 @@ pub(super) async fn run(
     let mut notifications = pab_agent_core::account::account_changes();
     let mut interval = tokio::time::interval(Duration::from_secs(3));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut next_association = tokio::time::Instant::now();
+    let mut association: Option<tokio::task::JoinHandle<()>> = None;
     loop {
         tokio::select! {
             _ = shutdown.changed() => break,
             _ = interval.tick() => {},
-            _ = notifications.changed() => {},
+            _ = notifications.changed() => {next_association=tokio::time::Instant::now();},
+        }
+        if tokio::time::Instant::now() >= next_association
+            && association.as_ref().is_none_or(|task| task.is_finished())
+        {
+            next_association = tokio::time::Instant::now() + Duration::from_secs(30);
+            association = Some(tokio::spawn(async {
+                let _ = pab_agent_core::account::local_device::associate(
+                    pab_protocol::DeviceAccountAction::Automatic,
+                    None,
+                )
+                .await;
+            }));
         }
         let result = tokio::select! {
             _ = shutdown.changed() => break,
@@ -33,6 +47,9 @@ pub(super) async fn run(
                 account.error = Some(error.to_string());
             }
         }
+    }
+    if let Some(task) = association {
+        task.abort();
     }
 }
 
@@ -118,6 +135,11 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
         .collect::<Vec<_>>();
     let mut checks = tokio::task::JoinSet::new();
     for device in devices {
+        let scope = context
+            .user
+            .as_ref()
+            .map(|user| format!("{}\n{}", client.origin(), user.user_id));
+        device.sample_usage(scope.as_deref()).await;
         if let Some(connection) = device.cached_connection().await {
             let expected = context.clone();
             checks.spawn(async move {
@@ -142,6 +164,10 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
         }
     }
     let _ = client.flush_logouts(&store).await;
+    let catalog = inner.store.clone();
+    tokio::spawn(async move {
+        let _ = catalog.sync_catalog(&client, &store).await;
+    });
     Ok(())
 }
 

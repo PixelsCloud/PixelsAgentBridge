@@ -349,8 +349,12 @@ impl OperationManager {
             destination: args.destination,
             overwrite: args.overwrite,
         };
-        spec.validate_paths(device.os_family)
-            .map_err(str::to_owned)?;
+        spec.validate_paths(
+            device
+                .os_family
+                .ok_or("Connect to verify the device platform first")?,
+        )
+        .map_err(str::to_owned)?;
         let mut jobs = self.jobs.lock().await;
         if self.closed.load(Ordering::Acquire) {
             return Err("MCP is shutting down".to_owned());

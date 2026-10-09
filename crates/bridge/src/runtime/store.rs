@@ -38,6 +38,7 @@ impl LocalTaskRecord {
 #[derive(Clone)]
 pub(super) struct RuntimeStore {
     pub(super) pool: SqlitePool,
+    pub(super) account_origin: Option<String>,
 }
 
 pub(super) struct OutputGap {
@@ -76,8 +77,18 @@ impl RuntimeStore {
             .await?;
         let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS runtime_session_servers(session_id TEXT PRIMARY KEY,origin TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS client_usage_accumulators(scope TEXT NOT NULL,hour INTEGER NOT NULL,counters TEXT NOT NULL,PRIMARY KEY(scope,hour))",
+            "CREATE TABLE IF NOT EXISTS client_usage_outbox(id TEXT PRIMARY KEY,scope TEXT NOT NULL,payload TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS connection_usage(session_id TEXT NOT NULL,device_id TEXT NOT NULL,connection_id INTEGER NOT NULL,scope TEXT,last_ms INTEGER NOT NULL,PRIMARY KEY(session_id,device_id))",
+            "CREATE TABLE IF NOT EXISTS account_catalog(scope TEXT NOT NULL,device_id TEXT NOT NULL,code TEXT NOT NULL,item_json TEXT NOT NULL,revision INTEGER NOT NULL,dirty INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(scope,device_id),UNIQUE(scope,code))",
+            "CREATE TABLE IF NOT EXISTS catalog_sync(scope TEXT PRIMARY KEY,cursor INTEGER NOT NULL DEFAULT 0,lease TEXT,lease_until INTEGER NOT NULL DEFAULT 0,error TEXT,failures INTEGER NOT NULL DEFAULT 0)",
+            "CREATE TABLE IF NOT EXISTS catalog_outbox(scope TEXT NOT NULL,device_id TEXT NOT NULL,mutation_json TEXT NOT NULL,PRIMARY KEY(scope,device_id))",
+            "CREATE TABLE IF NOT EXISTS catalog_imports(scope TEXT NOT NULL,device_id TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(scope,device_id))",
+            "CREATE TABLE IF NOT EXISTS catalog_conflicts(scope TEXT NOT NULL,device_id TEXT NOT NULL,desired_json TEXT NOT NULL,PRIMARY KEY(scope,device_id))",
             "CREATE TABLE IF NOT EXISTS runtime_session_users (session_id TEXT PRIMARY KEY, user_json TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS runtime_operation_users (operation_id TEXT PRIMARY KEY REFERENCES runtime_operations(id) ON DELETE CASCADE, user_json TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS runtime_operation_origins (operation_id TEXT PRIMARY KEY REFERENCES runtime_operations(id) ON DELETE CASCADE, origin TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS runtime_screenshot_results (id TEXT PRIMARY KEY, meta_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             "CREATE TABLE IF NOT EXISTS runtime_system_results (id TEXT PRIMARY KEY, query_json TEXT NOT NULL, reply_json TEXT NOT NULL, FOREIGN KEY(id) REFERENCES runtime_operations(id) ON DELETE CASCADE)",
             r#"
@@ -175,12 +186,21 @@ impl RuntimeStore {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
         sqlx::query("CREATE TRIGGER IF NOT EXISTS freeze_operation_user AFTER INSERT ON runtime_operations BEGIN INSERT INTO runtime_operation_users(operation_id,user_json) VALUES(NEW.id,COALESCE((SELECT user_json FROM runtime_session_users WHERE session_id=NEW.owner_session_id),'null')); END").execute(&mut *tx).await?;
+        sqlx::query("CREATE TRIGGER IF NOT EXISTS freeze_operation_origin AFTER INSERT ON runtime_operations BEGIN INSERT INTO runtime_operation_origins(operation_id,origin) SELECT NEW.id,origin FROM runtime_session_servers WHERE session_id=NEW.owner_session_id; END").execute(&mut *tx).await?;
         // Project observed results only. A requested username or context_ref
         // must never appear as the identity that actually executed an operation.
         sqlx::query("CREATE VIEW IF NOT EXISTS runtime_operation_identity AS SELECT o.id, CASE WHEN o.kind = 'terminal' THEN t.identity_json WHEN o.kind = 'file_transfer' THEN json_extract(c.context_json, '$.identity') WHEN f.id IS NOT NULL THEN json_extract(f.reply_json, '$.execution_context.identity') ELSE json_extract(q.reply_json, '$.execution_context.identity') END AS identity_json FROM runtime_operations o LEFT JOIN runtime_terminal_identity t ON t.id=o.id LEFT JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_filesystem_results f ON f.id=o.id LEFT JOIN runtime_system_results q ON q.id=o.id")
             .execute(&mut *tx).await?;
         tx.commit().await?;
-        Ok(Self { pool })
+        let account_origin = std::env::var("PAB_CONTROL_URL")
+            .ok()
+            .map(|url| pab_agent_core::account::account_origin(&url))
+            .transpose()
+            .map_err(|_| RuntimeStoreError::AccountStorage)?;
+        Ok(Self {
+            pool,
+            account_origin,
+        })
     }
 
     #[cfg(test)]
@@ -690,6 +710,10 @@ fn from_i64(value: i64) -> Result<u64, RuntimeStoreError> {
 
 #[derive(Debug, Error)]
 pub enum RuntimeStoreError {
+    #[error("account storage is unavailable")]
+    AccountStorage,
+    #[error("this device has a pending change; wait for synchronization before editing again")]
+    CatalogPending,
     #[error("Bridge Runtime data directory could not be created: {0}")]
     Io(std::io::Error),
     #[error(transparent)]

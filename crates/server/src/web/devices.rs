@@ -48,15 +48,15 @@ impl DeviceQuery {
     }
 }
 
-// Every row is authorized by CURRENT personal ownership, never claim history.
+// Personal management is authorized by the current association, never control credentials.
 const BASE: &str = r#"FROM devices d
- LEFT JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id
+ LEFT JOIN device_accounts p ON p.device_id=d.id
  LEFT JOIN device_runtime r ON r.device_id=d.id AND r.tenant_id=d.tenant_id
  WHERE ($1 OR p.user_id=$2)
  AND (position(lower($3) in lower(d.name))>0 OR position(replace($3,' ','') in d.code::text)>0)
  AND ($4::text IS NULL OR ($4='online')=EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($5::bytea[])))
  AND ($6::text IS NULL OR r.execution_context->>'os_family'=$6)"#;
-const FIELDS: &str = r#"d.id,d.code,d.name,d.revision,d.status,
+const FIELDS: &str = r#"d.id,d.code,d.name,d.revision,d.status,p.revision AS association_revision,COALESCE(p.user_id=$2,false) AS associated_with_me,
  r.execution_context->>'os_family' AS system,r.execution_context->>'os_name' AS os_name,
  r.execution_context->>'os_version' AS os_version,r.execution_context->>'architecture' AS architecture,
  r.agent_version, (extract(epoch from d.created_at)*1000)::bigint AS created_at,
@@ -65,7 +65,7 @@ const FIELDS: &str = r#"d.id,d.code,d.name,d.revision,d.status,
 
 fn device(row: sqlx::postgres::PgRow) -> Result<Value, sqlx::Error> {
     Ok(
-        json!({"id":row.try_get::<Uuid,_>("id")?,"code":format!("{:09}",row.try_get::<i32,_>("code")?),
+        json!({"id":row.try_get::<Uuid,_>("id")?,"associated_with_me":row.try_get::<bool,_>("associated_with_me")?,"association_revision":row.try_get::<Option<i64>,_>("association_revision")?,"code":format!("{:09}",row.try_get::<i32,_>("code")?),
       "name":row.try_get::<String,_>("name")?,"revision":row.try_get::<i64,_>("revision")?,
       "status":row.try_get::<String,_>("status")?,"system":row.try_get::<Option<String>,_>("system")?,
       "os_name":row.try_get::<Option<String>,_>("os_name")?,"os_version":row.try_get::<Option<String>,_>("os_version")?,
@@ -144,16 +144,19 @@ pub(crate) async fn detail(
 pub(crate) async fn overview(
     State(state): State<WebState>,
     headers: HeaderMap,
+    Query(query): Query<DeviceQuery>,
 ) -> Result<Json<Value>, WebError> {
     let me = viewer(&state, &headers).await?;
+    let (_, _, requested_all) = query.validate(&me)?;
+    let all = requested_all || (query.scope.is_none() && me.server_admin);
     let row=sqlx::query(r#"WITH visible AS (SELECT d.*,
       EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($3::bytea[])) online
-      FROM devices d LEFT JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id WHERE ($1 OR p.user_id=$2))
+      FROM devices d LEFT JOIN device_accounts p ON p.device_id=d.id WHERE ($1 OR p.user_id=$2))
       SELECT count(*) total,count(*) FILTER (WHERE online) online,count(*) FILTER (WHERE NOT online) offline FROM visible"#)
-        .bind(me.server_admin).bind(me.id).bind(state.control.online_endpoint_keys()).fetch_one(state.control.store().pool()).await?;
+        .bind(all).bind(me.id).bind(state.control.online_endpoint_keys()).fetch_one(state.control.store().pool()).await?;
     let mut result = json!({"total":row.try_get::<i64,_>("total")?,"online":row.try_get::<i64,_>("online")?,
         "offline":row.try_get::<i64,_>("offline")?});
-    if me.server_admin {
+    if all {
         let counts = sqlx::query("SELECT (SELECT count(*) FROM users) accounts,(SELECT count(*) FROM relay_nodes WHERE server_instance=$1 AND last_seen_at>now()-interval '120 seconds') relays")
             .bind(state.server_instance).fetch_one(state.control.store().pool()).await?;
         for key in ["accounts", "relays"] {
@@ -181,7 +184,12 @@ pub(crate) async fn rename(
         return Err(WebError::invalid());
     }
     let mut tx = state.control.store().pool().begin().await?;
-    let row=sqlx::query("SELECT d.revision FROM devices d LEFT JOIN personal_tenants p ON p.tenant_id=d.owner_tenant_id WHERE d.id=$1 AND ($2 OR p.user_id=$3) FOR UPDATE OF d")
+    // Serialize with unlink/reassociation, then authorize from a fresh READ COMMITTED snapshot.
+    sqlx::query("SELECT id FROM devices WHERE id=$1 FOR UPDATE")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let row=sqlx::query("SELECT d.revision FROM devices d LEFT JOIN device_accounts p ON p.device_id=d.id WHERE d.id=$1 AND ($2 OR p.user_id=$3)")
         .bind(id).bind(me.server_admin).bind(me.id).fetch_one(&mut *tx).await?;
     if row.try_get::<i64, _>("revision")? != input.revision {
         return Err(WebError::new(StatusCode::CONFLICT, "conflict"));

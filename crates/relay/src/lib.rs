@@ -7,6 +7,7 @@ mod runtime;
 #[cfg(test)]
 mod runtime_tests;
 mod service;
+mod usage;
 
 pub use control_client::{PolicySync, RelayControlClient, RelayControlClientError};
 pub use limiter::{Acquire, AggregateLimiter, LimitKey, Rate};

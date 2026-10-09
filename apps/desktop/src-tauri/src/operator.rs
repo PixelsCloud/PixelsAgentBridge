@@ -356,7 +356,7 @@ pub async fn operator_connect(
         device_ref,
         code,
         alias: String::new(),
-        os_family: target.execution.os_family,
+        os_family: Some(target.execution.os_family),
         os_reminder: target.compact_reminder(),
     };
     runtime

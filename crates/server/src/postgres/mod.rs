@@ -20,8 +20,10 @@ mod endpoints;
 mod guest_access;
 mod guest_registration;
 mod peer_authorization;
+mod saved_devices;
 mod support;
 mod traffic;
+mod usage;
 
 #[derive(Debug, Clone)]
 pub struct PostgresStore {

@@ -177,6 +177,25 @@ impl ControlSession {
                 .authorize_device_peer(peer_endpoint_key)
                 .await
                 .map(|result| ControlServerMessage::DevicePeerAuthorized { request_id, result }),
+            ControlClientMessage::ReportAuthenticatedDevicePeer {
+                peer_endpoint_key, ..
+            } => match self.authorize_device_peer(peer_endpoint_key).await {
+                Ok(result) => match self
+                    .control
+                    .store()
+                    .record_authenticated_device(&result)
+                    .await
+                {
+                    Ok(changed) => {
+                        if changed {
+                            self.control.web_changed();
+                        }
+                        Ok(ControlServerMessage::DevicePeerAuthorized { request_id, result })
+                    }
+                    Err(error) => Err(crate::ServiceError::from(error).into()),
+                },
+                Err(error) => Err(error),
+            },
         };
         match result {
             Ok(response) => response,

@@ -213,6 +213,11 @@ impl Clients {
     }
 
     /// Attempt to send a packet to client with [`EndpointId`] `dst`.
+    pub(super) fn forwarded(&self,src:EndpointId,dst:EndpointId,bytes:usize) {
+        self.0.forwarding.on_forwarded(src,dst,bytes);
+    }
+
+    /// Attempt to send a packet to client with [`EndpointId`] `dst`.
     pub(super) async fn send_packet(
         &self,
         dst: EndpointId,
