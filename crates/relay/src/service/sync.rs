@@ -8,6 +8,7 @@ use crate::{PolicySync, RelayControlClient, RelayControlClientError, RelayPolicy
 const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
 pub struct PolicySyncSettings {
+    pub node_id: String,
     pub control_url: String,
     pub control_secret: String,
     pub refresh_interval: Duration,
@@ -21,7 +22,8 @@ pub async fn connect_and_sync(
 ) -> Result<RelayControlClient, RelayControlClientError> {
     let mut client =
         RelayControlClient::connect(&settings.control_url, &settings.control_secret, connector)
-            .await?;
+            .await?
+            .with_node_id(settings.node_id.clone());
     client.sync_policy(runtime).await?;
     // Report the version actually applied, so Server can distinguish offered/applied.
     client.sync_policy(runtime).await?;

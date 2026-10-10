@@ -1,11 +1,13 @@
 import type { FormEvent } from "react";
 import { Button, Input } from "antd";
-import { ArrowRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import { formatDeviceCode, normalizeDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
 type Props = {
   language: Language;
+  signedIn: boolean;
+  onSignIn: () => void;
   code: string;
   password: string;
   connecting: boolean;
@@ -16,6 +18,8 @@ type Props = {
 
 export function HomeDeviceConnectionPanel({
   language,
+  signedIn,
+  onSignIn,
   code,
   password,
   connecting,
@@ -27,12 +31,15 @@ export function HomeDeviceConnectionPanel({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!signedIn) { onSignIn(); return; }
     onConnect();
   }
 
   return (
     <section className="surface home-connect">
-      <h2>{t.connect}</h2>
+      <h2>{t.addDevice}</h2>
+      <p>{signedIn ? t.addDeviceHint : t.addDeviceLoginRequired}</p>
+      {!signedIn && <Button type="primary" onClick={onSignIn}>{t.addDeviceSignIn}</Button> }
       <form className="home-connect-form" onSubmit={submit}>
         <label>
           <span className="field-label">{t.remoteCode}</span>
@@ -55,8 +62,8 @@ export function HomeDeviceConnectionPanel({
             />
           </span>
         </div>
-        <Button type="primary" htmlType="submit" loading={connecting} disabled={code.length !== 9 || !password}
-          icon={<ArrowRight size={16} />} iconPlacement="end">{t.connect}</Button>
+        <Button type="primary" htmlType="submit" loading={connecting} disabled={!signedIn || code.length !== 9 || !password}
+          icon={<Plus size={16} />} iconPlacement="end">{t.addDevice}</Button>
       </form>
     </section>
   );

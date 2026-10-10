@@ -1,6 +1,6 @@
 use super::{RuntimeError, RuntimeInner};
 use crate::{BridgeConfig, desktop_presence::AccountSyncReport};
-use pab_agent_core::account::{AccountClient, AccountError, AccountStore};
+use pab_agent_core::account::{AccountClient, AccountError};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::watch;
 
@@ -54,10 +54,12 @@ pub(super) async fn run(
 }
 
 async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result<(), AccountError> {
-    let paths = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::User)
-        .map_err(|_| AccountError::Storage)?;
-    let store = AccountStore::new(paths.root(), &config.control_url)?;
+    let store = &inner.account_store;
     let state = store.read()?;
+    // Close locally as soon as logout is observed, even if the server is unreachable.
+    if state.user.is_none() {
+        close_device_connections(inner).await;
+    }
     {
         let mut presence = inner.presence.lock().unwrap_or_else(|e| e.into_inner());
         let status = presence
@@ -100,16 +102,29 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
             let unavailable = state.user.is_some() && receipt.context.user.is_none();
             (receipt, unavailable)
         }
-        Err(AccountError::Http(401)) => (
-            client.bind_endpoint(&secret, state.revision, None).await?,
-            true,
-        ),
+        Err(AccountError::Http(401)) => {
+            close_device_connections(inner).await;
+            if let Some(status) = inner
+                .presence
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .account
+                .as_mut()
+            {
+                status.user = None;
+                status.server_revision = Some(state.revision);
+            }
+            return Err(AccountError::Http(401));
+        }
         Err(error) => return Err(error),
     };
     let context = receipt.context;
     // An in-flight login response may never overwrite a newer local account.
     if store.read()?.revision != state.revision {
         return Ok(());
+    }
+    if context.user.is_none() {
+        close_device_connections(inner).await;
     }
     sqlx::query("INSERT INTO runtime_session_users(session_id,user_json) VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET user_json=excluded.user_json")
         .bind(&inner.session_id).bind(serde_json::to_string(&context.user).map_err(|_|AccountError::InvalidResponse)?).execute(&inner.store.pool).await.map_err(|_|AccountError::Storage)?;
@@ -122,8 +137,9 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
             remote_revision: None,
             policy_version: Some(context.policy_version),
             user: context.user.clone(),
-            error: unavailable
-                .then(|| "account unavailable; device control uses guest privileges".to_owned()),
+            error: unavailable.then(|| {
+                "account unavailable; sign in again before controlling devices".to_owned()
+            }),
         });
     }
     let devices = inner
@@ -165,10 +181,24 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
     }
     let _ = client.flush_logouts(&store).await;
     let catalog = inner.store.clone();
+    let store = inner.account_store.clone();
     tokio::spawn(async move {
         let _ = catalog.sync_catalog(&client, &store).await;
     });
     Ok(())
+}
+
+async fn close_device_connections(inner: &RuntimeInner) {
+    let devices = inner
+        .devices
+        .lock()
+        .await
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    for device in devices {
+        device.close_for_account_change().await;
+    }
 }
 
 impl RuntimeInner {
@@ -181,25 +211,26 @@ impl RuntimeInner {
                 .unwrap_or_else(|e| e.into_inner())
                 .account
                 .clone();
-            let Some(status) = status else {
-                return Ok(());
-            };
-            let origin = self
-                .presence
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .control_url
-                .clone();
-            let paths = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::User)
-                .map_err(|_| {
-                    RuntimeError::BridgeUnavailable("account storage unavailable".into())
-                })?;
-            let latest = AccountStore::new(paths.root(), &origin)
-                .and_then(|store| store.read())
-                .map_err(|_| RuntimeError::BridgeUnavailable("account storage unavailable".into()))?
-                .revision;
-            if status.server_revision == Some(latest) {
-                return Ok(());
+            let latest = self.account_store.read().map_err(|_| {
+                RuntimeError::BridgeUnavailable("account storage unavailable".into())
+            })?;
+            if latest.user.is_none() {
+                return Err(RuntimeError::BridgeUnavailable(
+                    "login required: register or sign in to Pixels Agent Bridge before adding or controlling devices".into(),
+                ));
+            }
+            if let Some(status) = status {
+                if status.server_revision == Some(latest.revision) {
+                    if status.user.as_ref().map(|user| user.user_id)
+                        == latest.user.as_ref().map(|user| user.id)
+                        && status.user.is_some()
+                    {
+                        return Ok(());
+                    }
+                    return Err(RuntimeError::BridgeUnavailable(
+                        "account unavailable; sign in again before controlling devices".into(),
+                    ));
+                }
             }
             if tokio::time::Instant::now() >= deadline {
                 return Err(RuntimeError::BridgeUnavailable(

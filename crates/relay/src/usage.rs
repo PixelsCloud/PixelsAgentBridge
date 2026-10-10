@@ -24,13 +24,11 @@ pub(crate) fn spawn(
     url: String,
     secret: String,
     connector: tokio_tungstenite::Connector,
+    node: String,
+    root: PathBuf,
 ) -> UsageWorker {
     let (stop, mut stopped) = tokio::sync::watch::channel(false);
     let task = tokio::spawn(async move {
-        let node = std::env::var("PAB_RELAY_NODE_ID").unwrap_or_else(|_| "primary".into());
-        let root = std::env::var_os("PAB_RELAY_USAGE_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("relay-usage"));
         let scope = format!("{url}\n{node}");
         let mut client = None;
         let mut backlog = Vec::<UsageBatch>::new();

@@ -52,17 +52,12 @@ impl PostgresStore {
         Ok(())
     }
 
-    pub async fn initialize_settings(
-        &self,
-        defaults: RelayLimitDefaults,
-    ) -> Result<(), StoreError> {
-        defaults
-            .validate()
-            .map_err(|error| StoreError::InvalidInput(error.to_string()))?;
-        sqlx::query("INSERT INTO server_settings (default_user_mbps, default_guest_mbps) VALUES ($1, $2) ON CONFLICT (singleton) DO NOTHING")
-            .bind(i32::try_from(defaults.user_mbps).map_err(support::invalid_number)?)
-            .bind(i32::try_from(defaults.guest_mbps).map_err(support::invalid_number)?)
-            .execute(&self.pool).await?;
+    pub async fn initialize_settings(&self) -> Result<(), StoreError> {
+        sqlx::query(
+            "INSERT INTO server_settings DEFAULT VALUES ON CONFLICT (singleton) DO NOTHING",
+        )
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 }

@@ -161,16 +161,18 @@ pub(crate) async fn service_config(
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     administrator(&state, &headers).await?;
-    let row = sqlx::query("SELECT default_user_mbps,default_guest_mbps,policy_revision FROM server_settings WHERE singleton").fetch_one(state.control.store().pool()).await?;
+    let row = sqlx::query("SELECT policy_revision FROM server_settings WHERE singleton")
+        .fetch_one(state.control.store().pool())
+        .await?;
     Ok(Json(
-        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"default_user_mbps":row.try_get::<i32,_>("default_user_mbps")?,"default_guest_mbps":row.try_get::<i32,_>("default_guest_mbps")?,"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_expires":false}),
+        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_expires":false}),
     ))
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct UserLimitUpdate {
-    mbps: Option<i32>,
+    mbps: i32,
 }
 
 pub(crate) async fn update_user_limit(
@@ -180,7 +182,7 @@ pub(crate) async fn update_user_limit(
     Json(input): Json<UserLimitUpdate>,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
-    if input.mbps.is_some_and(|value| value <= 0) {
+    if !pab_protocol::RELAY_MBPS_OPTIONS.contains(&input.mbps) {
         return Err(WebError::invalid());
     }
     let mut tx = state.control.store().pool().begin().await?;
@@ -201,37 +203,6 @@ pub(crate) async fn update_user_limit(
     Ok(Json(json!({"mbps":input.mbps})))
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct DefaultLimitsUpdate {
-    user_mbps: i32,
-    guest_mbps: i32,
-}
-
-pub(crate) async fn update_defaults(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Json(input): Json<DefaultLimitsUpdate>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    if input.user_mbps <= 0 || input.guest_mbps <= 0 {
-        return Err(WebError::invalid());
-    }
-    let mut tx = state.control.store().pool().begin().await?;
-    sqlx::query("UPDATE server_settings SET default_user_mbps=$1,default_guest_mbps=$2,policy_revision=policy_revision+1 WHERE singleton").bind(input.user_mbps).bind(input.guest_mbps).execute(&mut *tx).await?;
-    sqlx::query(
-        "INSERT INTO web_admin_events(actor_id,action) VALUES($1,'relay.defaults_updated')",
-    )
-    .bind(me.id)
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
-    state.control.web_changed();
-    Ok(Json(
-        json!({"user_mbps":input.user_mbps,"guest_mbps":input.guest_mbps}),
-    ))
-}
-
 pub(crate) async fn audit(
     State(state): State<WebState>,
     headers: HeaderMap,
@@ -248,10 +219,10 @@ pub(crate) async fn traffic(
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     let me = viewer(&state, &headers).await?;
-    let row = sqlx::query("SELECT COALESCE(u.relay_limit_mbps,s.default_user_mbps) AS user_mbps,s.default_guest_mbps FROM users u CROSS JOIN server_settings s WHERE u.id=$1 AND s.singleton")
+    let row = sqlx::query("SELECT u.relay_limit_mbps AS user_mbps FROM users u CROSS JOIN server_settings s WHERE u.id=$1 AND s.singleton")
         .bind(me.id).fetch_one(state.control.store().pool()).await?;
     Ok(Json(
-        json!({"user_mbps":row.try_get::<i32,_>("user_mbps")?,"guest_mbps":row.try_get::<i32,_>("default_guest_mbps")?}),
+        json!({"user_mbps":row.try_get::<i32,_>("user_mbps")?}),
     ))
 }
 

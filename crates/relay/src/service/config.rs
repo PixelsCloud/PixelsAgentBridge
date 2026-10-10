@@ -1,9 +1,17 @@
-use std::{env, fs, net::SocketAddr, path::PathBuf, str::FromStr, time::Duration};
+use pab_service_config::{ConfigError, LogConfig, TlsConfig, load, resolve};
+use serde::Deserialize;
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use thiserror::Error;
 
 const MIN_CONTROL_SECRET_BYTES: usize = 32;
 
 pub struct RelayServiceConfig {
+    pub node_id: String,
+    pub usage_dir: PathBuf,
     pub control_url: String,
     pub control_secret: String,
     pub control_ca_cert: Option<PathBuf>,
@@ -18,24 +26,6 @@ pub struct RelayServiceConfig {
 }
 
 impl RelayServiceConfig {
-    pub fn from_env() -> Result<Self, RelayServiceConfigError> {
-        let config = Self {
-            control_url: required("PAB_CONTROL_URL")?,
-            control_secret: required_secret("PAB_RELAY_CONTROL_SECRET")?,
-            control_ca_cert: env::var_os("PAB_CONTROL_CA_CERT").map(PathBuf::from),
-            tls_cert: required_path("PAB_RELAY_TLS_CERT")?,
-            tls_key: required_path("PAB_RELAY_TLS_KEY")?,
-            https_bind: optional("PAB_RELAY_HTTPS_ADDR", "127.0.0.1:31443")?,
-            captive_bind: "127.0.0.1:0".parse().expect("valid captive address"),
-            quic_bind: optional("PAB_RELAY_QUIC_ADDR", "0.0.0.0:7842")?,
-            policy_refresh_interval: Duration::from_secs(20),
-            reconnect_interval: Duration::from_secs(3),
-            limiter_burst: Duration::from_millis(100),
-        };
-        config.validate()?;
-        Ok(config)
-    }
-
     pub fn validate(&self) -> Result<(), RelayServiceConfigError> {
         if !self.control_url.starts_with("wss://") {
             return Err(RelayServiceConfigError::ControlUrlMustUseTls);
@@ -58,79 +48,125 @@ impl RelayServiceConfig {
         Ok(())
     }
 }
-
-fn required(name: &'static str) -> Result<String, RelayServiceConfigError> {
-    env::var(name).map_err(|_| RelayServiceConfigError::Missing(name))
-}
-
-fn required_path(name: &'static str) -> Result<PathBuf, RelayServiceConfigError> {
-    env::var_os(name)
-        .map(PathBuf::from)
-        .ok_or(RelayServiceConfigError::Missing(name))
-}
-
-fn required_secret(name: &'static str) -> Result<String, RelayServiceConfigError> {
-    if let Ok(value) = env::var(name) {
-        return Ok(value);
-    }
-    let file_name = format!("{name}_FILE");
-    let path = env::var_os(&file_name).map(PathBuf::from).ok_or_else(|| {
-        RelayServiceConfigError::MissingSecretFile {
-            name,
-            file_name: file_name.clone(),
-        }
-    })?;
-    let value = fs::read_to_string(path).map_err(|error| RelayServiceConfigError::SecretFile {
-        file_name: file_name.clone(),
-        message: error.to_string(),
-    })?;
-    let value = value.trim_end_matches(['\r', '\n']).to_owned();
-    if value.is_empty() {
-        return Err(RelayServiceConfigError::SecretFile {
-            file_name,
-            message: "file is empty".to_owned(),
-        });
-    }
-    Ok(value)
-}
-
-fn optional<T>(name: &'static str, default: &str) -> Result<T, RelayServiceConfigError>
-where
-    T: FromStr,
-    T::Err: std::fmt::Display,
-{
-    env::var(name)
-        .unwrap_or_else(|_| default.to_owned())
-        .parse()
-        .map_err(|error| invalid(name, error))
-}
-
-fn invalid(name: &'static str, error: impl std::fmt::Display) -> RelayServiceConfigError {
-    RelayServiceConfigError::Invalid {
-        name,
-        message: error.to_string(),
-    }
-}
-
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum RelayServiceConfigError {
-    #[error("{0} must be set")]
-    Missing(&'static str),
-    #[error("{name} or {file_name} must be set")]
-    MissingSecretFile {
-        name: &'static str,
-        file_name: String,
-    },
-    #[error("{file_name} could not be read: {message}")]
-    SecretFile { file_name: String, message: String },
-    #[error("{name} is invalid: {message}")]
-    Invalid { name: &'static str, message: String },
-    #[error("PAB_CONTROL_URL must use wss://")]
+    #[error("control.url must use wss://")]
     ControlUrlMustUseTls,
-    #[error("PAB_RELAY_CONTROL_SECRET must contain at least 32 bytes")]
+    #[error("control.secret must contain at least 32 bytes")]
     ControlSecretTooShort,
     #[error("the iroh captive portal must remain bound to a loopback address")]
     CaptivePortalMustBeLoopback,
     #[error("{0} must be greater than zero")]
     ZeroDuration(&'static str),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelayFileConfig {
+    pub node_id: String,
+    pub usage_dir: PathBuf,
+    pub https_bind: SocketAddr,
+    pub quic_bind: SocketAddr,
+    pub tls: TlsConfig,
+    pub control: ControlConfig,
+    #[serde(default)]
+    pub log: LogConfig,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ControlConfig {
+    pub url: String,
+    pub secret: String,
+    pub ca_cert: Option<PathBuf>,
+}
+impl RelayFileConfig {
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        let mut config: Self = load(path)?;
+        let valid_url = config
+            .control
+            .url
+            .parse::<tokio_tungstenite::tungstenite::http::Uri>()
+            .ok()
+            .is_some_and(|u| {
+                u.scheme_str() == Some("wss")
+                    && u.host().is_some()
+                    && !u.authority().is_some_and(|a| a.as_str().contains('@'))
+            });
+        if !valid_url {
+            return Err(ConfigError::Invalid(
+                "control.url requires a wss:// URL without credentials",
+            ));
+        }
+        if config.control.secret.len() < MIN_CONTROL_SECRET_BYTES
+            || !config.control.secret.bytes().all(|b| b.is_ascii_graphic())
+        {
+            return Err(ConfigError::Invalid(
+                "control.secret requires at least 32 printable ASCII bytes",
+            ));
+        }
+        if config.node_id.is_empty()
+            || config.node_id.len() > 64
+            || !config
+                .node_id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        {
+            return Err(ConfigError::Invalid(
+                "node_id requires 1-64 letters, digits, dots, underscores or hyphens",
+            ));
+        }
+        let base = path.parent().unwrap_or(Path::new("."));
+        config.tls.resolve(base);
+        resolve(base, &mut config.usage_dir);
+        resolve(base, &mut config.log.directory);
+        if let Some(ca) = &mut config.control.ca_cert {
+            resolve(base, ca);
+        }
+        Ok(config)
+    }
+    pub fn into_service(self) -> RelayServiceConfig {
+        RelayServiceConfig {
+            node_id: self.node_id,
+            usage_dir: self.usage_dir,
+            control_url: self.control.url,
+            control_secret: self.control.secret,
+            control_ca_cert: self.control.ca_cert,
+            tls_cert: self.tls.cert,
+            tls_key: self.tls.key,
+            https_bind: self.https_bind,
+            quic_bind: self.quic_bind,
+            captive_bind: "127.0.0.1:0".parse().expect("fixed loopback address"),
+            policy_refresh_interval: Duration::from_secs(20),
+            reconnect_interval: Duration::from_secs(3),
+            limiter_burst: Duration::from_millis(100),
+        }
+    }
+}
+#[cfg(test)]
+mod file_tests {
+    use super::*;
+    #[test]
+    fn relay_file_passes_node_and_storage_and_validates_secrets() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("relay.toml");
+        let valid = include_str!("../../../../packaging/docker/pab-relay-server.example.toml")
+            .replace("/var/lib/pab/usage", "usage");
+        std::fs::write(&path, &valid).unwrap();
+        let runtime = RelayFileConfig::load(&path).unwrap().into_service();
+        runtime.validate().unwrap();
+        assert_eq!(runtime.node_id, "primary");
+        assert_eq!(runtime.usage_dir, root.path().join("usage"));
+        for invalid in [
+            valid.replace("wss://", "ws://"),
+            valid.replace("primary", "bad node"),
+            valid.replace(
+                "replace-with-a-random-secret-at-least-32-bytes",
+                "private-secret",
+            ),
+        ] {
+            std::fs::write(&path, invalid).unwrap();
+            let err = RelayFileConfig::load(&path).err().unwrap().to_string();
+            assert!(!err.contains("private-secret"));
+        }
+    }
 }

@@ -84,15 +84,16 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         policy_version: 1,
         issued_at_unix_ms: now_ms() - 1,
         expires_at_unix_ms: now_ms() + 60_000,
-        defaults: RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        },
+        defaults: RelayLimitDefaults { user_mbps: 5 },
         user_limits: vec![],
         endpoints: vec![
             RelayEndpointPolicy {
                 endpoint_key: EndpointKey::new(*operator.public().as_bytes()),
-                owner: RelayEndpointOwner::Guest,
+                owner: RelayEndpointOwner::User {
+                    scope: pab_protocol::TrafficScope::User {
+                        user_id: pab_protocol::UserId::from_u128(42),
+                    },
+                },
             },
             RelayEndpointPolicy {
                 endpoint_key: EndpointKey::new(*device.public().as_bytes()),
@@ -119,11 +120,13 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
             let RelayControlClientMessage::GetPolicy {
                 request_id,
                 known_policy_version,
+                node_id,
                 ..
             } = serde_json::from_str(text.as_str()).unwrap()
             else {
                 panic!("policy test received unexpected message");
             };
+            assert_eq!(node_id.as_deref(), Some("configured-relay-node"));
             let mut snapshot = server_policy.lock().unwrap().clone();
             snapshot.issued_at_unix_ms = now_ms() - 1;
             snapshot.expires_at_unix_ms = now_ms() + 60_000;
@@ -150,6 +153,8 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         }
     });
     let relay = start_relay_service(RelayServiceConfig {
+        node_id: "configured-relay-node".into(),
+        usage_dir: directory.path().join("usage"),
         control_url,
         control_secret: CONTROL_SECRET.to_owned(),
         control_ca_cert: Some(cert_path.clone()),
@@ -213,6 +218,7 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
             client.close().await;
             peer.close().await;
             relay.shutdown().await.unwrap();
+            assert!(directory.path().join("usage/usage.sqlite3").is_file());
             control_server.abort();
             panic!(
                 "first Relay connection timed out on a stale policy: {}",
@@ -251,7 +257,11 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         snapshot.policy_version = 3;
         snapshot.endpoints.push(RelayEndpointPolicy {
             endpoint_key: EndpointKey::new(*new_operator.public().as_bytes()),
-            owner: RelayEndpointOwner::Guest,
+            owner: RelayEndpointOwner::User {
+                scope: pab_protocol::TrafficScope::User {
+                    user_id: pab_protocol::UserId::from_u128(42),
+                },
+            },
         });
     }
     let fresh = PabEndpoint::bind(config, new_operator).await.unwrap();
@@ -266,6 +276,7 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
     client.close().await;
     peer.close().await;
     relay.shutdown().await.unwrap();
+    assert!(directory.path().join("usage/usage.sqlite3").is_file());
     control_server.abort();
     let _ = control_server.await;
 }

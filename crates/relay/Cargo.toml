@@ -8,6 +8,7 @@ rust-version.workspace = true
 test-utils = []
 
 [dependencies]
+pab-service-config = { path = "../service-config" }
 futures-util = "0.3"
 hex = "0.4"
 iroh-base = "=1.2.0"
@@ -22,6 +23,7 @@ uuid.workspace = true
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-pemfile = "2"
 serde_json.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true

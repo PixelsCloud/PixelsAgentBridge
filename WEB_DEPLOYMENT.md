@@ -4,7 +4,7 @@
 
 **P1 更新（2026-10-09）：** 个人设备、远程列表、用量统计使用新增的 `0002`—`0004` 数据库结构。对已运行的 HTTP 账号版本执行普通 `pab-server init`，保留账户、会话、设备身份及设备码。下文 2026-10-08 的一次性开发清库记录不适用于 P1，不能再次照着清空现网。
 
-先备份数据库与部署配置，更新 Server，再更新 Relay，最后更新 Desktop/Executor/MCP。Relay 新增 `PAB_RELAY_USAGE_DIR` 持久化目录；Docker 镜像与挂载目录必须可由 `pab` 用户写入。每个 Relay 使用独立、稳定的节点 ID 和自己的队列。回退保留新增表和队列，不运行降级删表或设备重注册。
+先备份数据库与部署配置，更新 Server，再更新 Relay，最后更新 Desktop/Executor/MCP。Relay 新增 Relay TOML `usage_dir` 持久化目录；Docker 镜像与挂载目录必须可由 `pab` 用户写入。每个 Relay 使用独立、稳定的节点 ID 和自己的队列。回退保留新增表和队列，不运行降级删表或设备重注册。
 
 **P1 回退边界：** 旧 Server 二进制不包含 `0002`—`0004`，SQLx 会拒绝带有这些迁移记录的数据库，不能只换回旧镜像。需要回退时，在维护窗口将升级前备份恢复到另一个数据库，再让旧镜像指向该恢复库；保留当前数据库和 Relay 队列，单独核对升级后的新增写入。不得删除迁移记录来强行启动旧版本，也不得覆盖当前生产库。
 
@@ -26,11 +26,11 @@ The independent archive contains both binaries, `web/`, this guide and an adjace
 
 The unified build allocates one product version for Server, Relay and Web; see [BUILDING.md](BUILDING.md). Repackaging existing verified artifacts keeps their original version.
 
-Docker builds the same production Web sources in a Node 22 build stage and places the assets beside the Server executable. See [Docker guide](packaging/docker/README.md). Configure a distinct stable `PAB_RELAY_NODE_ID` for each Relay; the default is `primary`. Legacy Relay versions that do not report a node ID do not appear in the node table.
+Docker builds the same production Web sources in a Node 22 build stage and places the assets beside the Server executable. See [Docker guide](packaging/docker/README.md). Configure a distinct stable `node_id` in Relay TOML for each Relay; the default is `primary`. Legacy Relay versions that do not report a node ID do not appear in the node table.
 
 ## Configure / 配置
 
-Configure the database, TLS and Relay control secret. `pab-server init` applies migrations and initializes the singleton server settings. `pab-server serve` also applies outstanding migrations before serving. Server URLs select the environment; no deployment UUID is configured or transmitted.
+Each server executable reads its own TOML; see [configuration templates and Compose setup](packaging/docker/README.md). Use `--config <path>` for all Server commands. Configure the database, TLS and Relay control secret. `pab-server init` applies migrations and initializes the singleton server settings. `pab-server serve` also applies outstanding migrations before serving. Server URLs select the environment; no deployment UUID is configured or transmitted.
 
 ### Current schema / 当前结构
 
@@ -43,14 +43,14 @@ Use matching Server, Relay, Desktop, MCP and Executor builds. For this developme
 | Setting | Behavior |
 |---|---|
 | `PAB_DB_NAME` | Compose database name; defaults to `pab`. Create a fresh database before initializing the new development baseline when reusing an existing PostgreSQL volume. Delete the explicitly identified old development database after the switch; legacy data migration is not supported. |
-| `PAB_WEB_DIR` | Optional absolute directory of built Web assets; defaults to `web` beside the executable |
-| `PAB_WEB_ORIGIN` | Optional **public HTTPS origin**, e.g. `https://bridge.example.com`; set explicitly behind a reverse proxy |
-| `PAB_REGISTRATION_ENABLED` | Existing registration switch; reflected by the Web login page |
-| `PAB_RELAY_NODE_ID` | Relay process setting; stable ASCII letters, digits, `_`, `-`, `.`; at most64 characters |
+| `web.assets` | Built Web assets path in Server TOML; relative paths resolve against the TOML directory |
+| `web.origin` | Required **public HTTPS origin**, e.g. `https://bridge.example.com` |
+| `web.registration_enabled` | Existing registration switch; reflected by the Web login page |
+| `node_id` in Relay TOML | Relay process setting; stable ASCII letters, digits, `_`, `-`, `.`; at most64 characters |
 
 Origin must contain only scheme, host and optional port. Proxy HTTPS and WebSocket upgrades on the same public origin, preserve `Host`, and do not cache `/api/`. Never expose the application through plain HTTP: its session cookie is Secure + HttpOnly + SameSite=Strict. No browser credentials are stored in localStorage. Server sessions do not expire; explicit logout revokes the current session. Password changes preserve sessions, and disabling an account blocks access without deleting them. Browser cookies have a 400-day retention period refreshed by the current-session endpoint. Reverse proxies must allow the `/api/web/events` WebSocket and the existing device/Relay control paths.
 
-An [Nginx configuration example](packaging/server/nginx.conf.example) keeps upstream certificate verification enabled and forwards Web and control WebSockets. Replace the public domain, certificate paths and backend certificate name; set `PAB_WEB_ORIGIN` to that exact public HTTPS origin. Run `nginx -t` before reload. This handles the Server HTTPS endpoint; keep the existing separate Relay HTTPS and UDP configuration.
+An [Nginx configuration example](packaging/server/nginx.conf.example) keeps upstream certificate verification enabled and forwards Web and control WebSockets. Replace the public domain, certificate paths and backend certificate name; set `web.origin` to that exact public HTTPS origin. Run `nginx -t` before reload. This handles the Server HTTPS endpoint; keep the existing separate Relay HTTPS and UDP configuration.
 
 已在隔离 Nginx 容器中验证 HTTPS → HTTPS、Secure/HttpOnly/SameSite Cookie、页面刷新、静态缓存、`/api/web/events` 和 `/control` Upgrade。此结果不等同于正式域名证书、生产网络和现网代理配置已经验收。
 
@@ -101,7 +101,7 @@ npm run test:e2e
 
 Build Web first using the earlier commands. Set `DATABASE_URL=postgres://postgres@127.0.0.1:55435/pab_account_test` for Rust tests; SQLx creates separate test databases. The launcher ignores production Relay secret-file settings and copies the executable to `.build/` so Windows rebuilds can continue. Stop the launcher with Ctrl+C. These fixed test container names and ports are deliberate safeguards; do not substitute a production instance.
 
-For Vite development use locally supplied `PAB_WEB_DEV_CERT`, `PAB_WEB_DEV_KEY`, optional `PAB_WEB_BACKEND` and matching backend `PAB_WEB_ORIGIN=https://localhost:1440`. Explicit `PAB_WEB_DEV_SELF_SIGNED=1` is allowed for isolated development only. Production TLS validation must remain enabled.
+For Vite development use locally supplied `PAB_WEB_DEV_CERT`, `PAB_WEB_DEV_KEY`, optional `PAB_WEB_BACKEND` and matching Server TOML `web.origin = "https://localhost:1440"`. Explicit `PAB_WEB_DEV_SELF_SIGNED=1` is allowed for isolated development only. Production TLS validation must remain enabled.
 
 ## HTTP accounts and fresh database (2026-10-08)
 

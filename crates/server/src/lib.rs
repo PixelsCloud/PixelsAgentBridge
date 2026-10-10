@@ -18,3 +18,5 @@ pub use domain::{Account, Device, RegisteredEndpoint};
 pub use endpoint_proof::{EndpointProofError, EndpointProofSession, VerifiedEndpointProof};
 pub use postgres::{PostgresStore, StoreError};
 pub use service::{ControlPlane, ServiceError};
+
+pub mod config;

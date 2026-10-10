@@ -15,6 +15,8 @@ pub use transport::{control_router, serve_tls};
 #[derive(Debug, Clone)]
 pub struct ControlApiConfig {
     pub registration_enabled: bool,
+    pub web_origin: Option<String>,
+    pub web_assets: Option<std::path::PathBuf>,
     pub relay_policy_validity: Duration,
 }
 
@@ -22,6 +24,8 @@ impl Default for ControlApiConfig {
     fn default() -> Self {
         Self {
             registration_enabled: true,
+            web_origin: None,
+            web_assets: None,
             relay_policy_validity: Duration::from_secs(60),
         }
     }

@@ -17,13 +17,13 @@ export function Overview({ liveRevision, all = false }: { liveRevision: number; 
   return <Space orientation="vertical" size={24} style={{ width: '100%' }}>
     <Typography.Title level={2}>{t('overview')}</Typography.Title>
     {resource.error && <Alert type="error" title={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/>}
-    <Row gutter={[20, 20]}>{(['total', 'online', 'offline'] as const).map(key => <Col xs={24} sm={8} xl={8} key={key}><Card loading={resource.loading}><Statistic title={t(key === 'total' ? 'totalDevices' : key)} value={resource.data?.[key] ?? '—'}/></Card></Col>)}</Row>
+    <Row gutter={[20, 20]}>{(['total', 'online', 'offline'] as const).map(key => <Col xs={24} sm={8} xl={8} key={key}><Card loading={resource.loading}><Statistic title={t(key === 'total' ? 'totalDevices' : key)} value={resource.data?.[key] ?? '—'} valueRender={value => <Button type="link" style={{ fontSize: 'inherit', height: 'auto', padding: 0 }} aria-label={t(key === 'total' ? 'totalDevices' : key)} onClick={() => navigate(key === 'total' ? '/devices' : `/devices?status=${key}`)}>{value}</Button>}/></Card></Col>)}</Row>
     <Row gutter={[20, 20]}>{['accounts', 'relays'].filter(key => resource.data?.[key] !== undefined).map(key => <Col xs={24} sm={12} xl={6} key={key}><Card><Statistic title={t(key === 'relays' ? 'nodes' : key)} value={resource.data?.[key] ?? 0}/><Button type="link" onClick={() => navigate(key === 'relays' ? '/relay' : `/${key}`)}>{t('details')}</Button></Card></Col>)}</Row>
     <Card><Space orientation="vertical" size={16}><Monitor size={32}/><Typography.Title level={4}>{t('devices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text><Button type="primary" onClick={() => navigate('/devices')}>{t('devices')}</Button></Space></Card>
   </Space>;
 }
 
-export function DeviceListPage({ me, mode, liveRevision }: { me: Viewer; mode: 'list' | 'online'; liveRevision: number }) {
+export function DeviceListPage({ me, liveRevision }: { me: Viewer; liveRevision: number }) {
   const t = useText(); const date = useDate(); const navigate = useNavigate(); const { message } = App.useApp();
   const [params, setParams] = useSearchParams();
   useEffect(() => {
@@ -35,7 +35,6 @@ export function DeviceListPage({ me, mode, liveRevision }: { me: Viewer; mode: '
   const query = new URLSearchParams();
   for (const key of ['q', 'page', 'page_size', 'system', 'status']) { const value = params.get(key); if (value) query.set(key, value); }
   query.set('scope', me.server_admin ? 'all' : 'mine');
-  if (mode === 'online') query.set('status', 'online');
   const resource = useResource<DeviceList>(`/devices?${query}`);
   const [search, setSearch] = useState(params.get('q') ?? '');
   useEffect(() => setSearch(params.get('q') ?? ''), [params]);
@@ -43,9 +42,9 @@ export function DeviceListPage({ me, mode, liveRevision }: { me: Viewer; mode: '
   const update = (key: string, value?: string) => { const next = new URLSearchParams(params); value ? next.set(key, value) : next.delete(key); next.delete('page'); setParams(next); };
   const copy = async (item: Device) => { try { await navigator.clipboard.writeText(`${t('deviceCode')}: ${item.code.replace(/\s/g, '')}\n${t('name')}: ${item.name}`); message.success(t('copied')); } catch { message.error(t('networkError')); } };
   return <Space orientation="vertical" size={20} style={{ width: '100%' }}>
-    <div className="page-heading"><div><Typography.Title level={2}>{t(mode === 'online' ? 'onlineDevices' : me.server_admin ? 'devices' : 'myDevices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text></div><Button icon={<RefreshCw size={16}/>} onClick={resource.refresh} loading={resource.loading}>{t('refresh')}</Button></div>
+    <div className="page-heading"><div><Typography.Title level={2}>{t(me.server_admin ? 'devices' : 'myDevices')}</Typography.Title><Typography.Text type="secondary">{t('deviceOnlineHint')}</Typography.Text></div><Button icon={<RefreshCw size={16}/>} onClick={resource.refresh} loading={resource.loading}>{t('refresh')}</Button></div>
     <Card><Space wrap style={{ marginBottom: 20 }}><Input.Search placeholder={t('search')} value={search} onChange={e => setSearch(e.target.value)} onSearch={value => update('q', value.trim())} allowClear style={{ width: 280 }} maxLength={128}/>
-      {mode !== 'online' && <Select aria-label={t('online')} value={params.get('status') ?? ''} style={{ width: 130 }} onChange={value => update('status', value)} options={['', 'online', 'offline'].map(value => ({ value, label: t(value || 'all') }))}/>}
+      <Select aria-label={t('online')} value={params.get('status') ?? ''} style={{ width: 130 }} onChange={value => update('status', value)} options={['', 'online', 'offline'].map(value => ({ value, label: t(value || 'all') }))}/>
       <Select aria-label={t('system')} value={params.get('system') ?? ''} style={{ width: 140 }} onChange={value => update('system', value)} options={[{ value: '', label: t('system') }, ...['windows', 'linux', 'macos'].map(value => ({ value, label: value === 'macos' ? 'macOS' : value === 'windows' ? 'Windows' : 'Linux' }))]}/>
     </Space>
       {resource.error && <Alert type="error" title={t(resource.error)} showIcon style={{ marginBottom: 16 }}/>}

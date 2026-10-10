@@ -54,10 +54,7 @@ async fn fixture(pool: PgPool, registration: bool) -> Fixture {
     let control =
         ControlPlane::new(PostgresStore::from_pool(pool), PasswordPolicy::default()).unwrap();
     control
-        .initialize_settings(pab_protocol::RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        })
+        .initialize_settings()
         .await
         .unwrap();
     let api = ControlApiState::new(
@@ -70,6 +67,7 @@ async fn fixture(pool: PgPool, registration: bool) -> Fixture {
     )
     .with_github(Some(cfg));
     let state = WebState {
+        origin: None,
         control: Arc::new(control),
         registration_enabled: registration,
         github: api.github.clone(),

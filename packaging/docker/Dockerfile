@@ -33,7 +33,6 @@ COPY --from=builder /out/pab-relay-server /usr/local/bin/pab-relay-server
 COPY --from=web-builder /web/dist /usr/local/bin/web
 
 USER pab:pab
-ENV PAB_LOG_DIR=/var/log/pab
 EXPOSE 8443/tcp 31443/tcp 7842/udp
 ENTRYPOINT []
-CMD ["pab-server", "serve"]
+CMD ["pab-server", "serve", "--config", "/etc/pab/pab-server.toml"]

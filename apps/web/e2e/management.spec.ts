@@ -55,7 +55,9 @@ test('administrator manages an unassigned device without claiming', async ({ pag
     await device.command('reconnect');
     await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Online');
     await page.goto('/online?q=' + code);
-    await expect(page.getByRole('heading', { name: 'Online devices', exact: true })).toBeVisible();
+    await expect(page).toHaveURL('/devices?q=' + code + '&status=online');
+    await expect(page.getByRole('heading', { name: 'Device list', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Online devices', exact: true })).toHaveCount(0);
     await expect(page.locator('.ant-table-tbody .ant-badge-status-text')).toHaveText('Online');
     await device.command('disconnect');
     await expect(page.getByText('No data', { exact: true })).toBeVisible();
@@ -108,11 +110,13 @@ test('administrator user bandwidth and all management pages', async ({ page, req
   const row = page.getByRole('row').filter({ hasText: username });
   await expect(row).toBeVisible();
   await row.getByRole('button', { name: 'Bandwidth limits', exact: true }).click();
-  await page.getByRole('dialog').getByRole('spinbutton').fill('30');
+  await page.getByRole('dialog').getByRole('combobox').click();
+  await page.locator('.ant-select-item-option-content').getByText('30 Mbps', { exact: true }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(row.getByText('30 Mbps', { exact: true })).toBeVisible();
   await row.getByRole('button', { name: 'Bandwidth limits', exact: true }).click();
-  await page.getByRole('dialog').getByRole('spinbutton').fill('');
+  await page.getByRole('dialog').getByRole('combobox').click();
+  await page.locator('.ant-select-item-option-content').getByText('10 Mbps', { exact: true }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(row.getByText('30 Mbps', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: resolve(root, '.build/web-test/admin-light.png'), fullPage: true, animations: 'disabled' });

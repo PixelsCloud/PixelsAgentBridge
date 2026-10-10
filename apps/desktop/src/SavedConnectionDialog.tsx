@@ -24,20 +24,21 @@ type Props = {
 
 export function SavedConnectionDialog({ language, connection, onClose, onRetry, onOpen }: Props) {
   const t = messages[language];
+  const adding = connection.mode === "manual";
   const stage = {
     preparing: t.savedConnectPreparing,
     waiting: t.savedConnectWaiting,
     connecting: t.savedConnectConnecting,
     retrying: t.savedConnectRetrying,
     checking: t.savedConnectChecking,
-    connected: t.savedConnectConnected,
-    failed: t.savedConnectFailed,
+    connected: adding ? t.addDeviceSucceeded : t.savedConnectConnected,
+    failed: adding ? t.addDeviceFailed : t.savedConnectFailed,
   }[connection.phase];
   const steps = [t.savedConnectStepInfo, t.savedConnectStepNetwork, t.savedConnectStepVerify];
   const isPending = connection.phase !== "connected" && connection.phase !== "failed";
 
   return (
-    <Modal open title={t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
+    <Modal open title={adding ? t.addDevice : t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
       onCancel={onClose} footer={[
         <Button key="close" onClick={onClose}>{t.savedConnectClose}</Button>,
         connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} onClick={onRetry}>{t.savedConnectRetry}</Button>,
@@ -48,13 +49,13 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
         {isPending && <Spin size="small" />}
         <span>{stage}</span>
       </div>
-      <div className="saved-connect-progress-title">{t.savedConnectProgress}</div>
+      <div className="saved-connect-progress-title">{adding ? t.addDeviceProgress : t.savedConnectProgress}</div>
       <Steps direction="vertical" size="small" current={connection.step}
         status={connection.phase === "failed" ? "error" : "process"}
         items={steps.map((title) => ({ title }))} />
       {connection.phase === "failed" && connection.message &&
         <Alert className="saved-connect-error" type="error" showIcon message={connectionErrorMessage(connection.message, language)} />}
-      {isPending && <p className="saved-connect-note">{t.savedConnectBackground}</p>}
+      {isPending && <p className="saved-connect-note">{adding ? t.addDeviceBackground : t.savedConnectBackground}</p>}
     </Modal>
   );
 }

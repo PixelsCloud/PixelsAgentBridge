@@ -10,6 +10,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 
 root = Path(__file__).resolve().parents[3]
 out = root / '.build/web-test'
@@ -30,21 +31,21 @@ cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_ke
         .sign(key, hashes.SHA256()))
 (out / 'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 (out / 'key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
-environment.update(PAB_DATABASE_URL='postgres://postgres@127.0.0.1:55435/pab_account_test',
-                   PAB_LISTEN_ADDR='127.0.0.1:38443', PAB_TLS_CERT=str(out/'cert.pem'), PAB_TLS_KEY=str(out/'key.pem'),
-                   PAB_WEB_DIR=str(root/'apps/web/dist'), PAB_WEB_ORIGIN='https://localhost:38443',
-                   PAB_LOG_DIR=str(out/'logs'),
-                   PAB_RELAY_CONTROL_SECRET='isolated-web-test-relay-secret-not-a-production-key',
-                   PAB_REGISTRATION_ENABLED='true')
-# Never inherit a developer's production Relay secret file.
-for setting in ['PAB_RELAY_CONTROL_SECRET_FILE']:
-    environment.pop(setting, None)
+sys.path.insert(0, str(root / 'scripts'))
+from service_config import write_config
+config = write_config(out / 'pab-server.toml', {
+    'listen': '127.0.0.1:38443', 'database': {'url': 'postgres://postgres@127.0.0.1:55435/pab_account_test'},
+    'tls': {'cert': out / 'cert.pem', 'key': out / 'key.pem'},
+    'web': {'assets': root / 'apps/web/dist', 'origin': 'https://localhost:38443'},
+    'relay': {'control_secret': 'isolated-web-test-relay-secret-not-a-production-key'},
+    'log': {'directory': out / 'logs'},
+})
 executable = 'pab-server.exe' if os.name == 'nt' else 'pab-server'
 server = out / executable
 shutil.copy2(root/'target/debug'/executable, server)
-subprocess.run([str(server), 'init'], env=environment, check=True)
+subprocess.run([str(server), 'init', '--config', str(config)], env=environment, check=True)
 print('Isolated Web tests: https://localhost:38443 — leave this terminal running.', flush=True)
 try:
-    subprocess.run([str(server), 'serve'], env=environment, check=True)
+    subprocess.run([str(server), 'serve', '--config', str(config)], env=environment, check=True)
 except KeyboardInterrupt:
     pass

@@ -14,10 +14,7 @@ fn snapshot(version: u64, endpoints: Vec<RelayEndpointPolicy>) -> RelayPolicySna
         policy_version: version,
         issued_at_unix_ms: 1_000,
         expires_at_unix_ms: 10_000,
-        defaults: RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        },
+        defaults: RelayLimitDefaults { user_mbps: 5 },
         user_limits: vec![UserRelayLimit {
             user_id: UserId::from_u128(2),
             mbps: 4,
@@ -120,7 +117,7 @@ fn logout_and_login_do_not_reset_user_burst() {
 }
 
 #[test]
-fn guest_relay_requires_an_unexpired_grant_for_that_device() {
+fn anonymous_relay_is_denied_even_with_an_unexpired_grant() {
     let guest_key = EndpointKey::new([10; 32]);
     let first_key = EndpointKey::new([11; 32]);
     let second_key = EndpointKey::new([12; 32]);
@@ -155,12 +152,9 @@ fn guest_relay_requires_an_unexpired_grant_for_that_device() {
     state
         .apply_snapshot(snapshot, 2_000, Instant::now())
         .unwrap();
-    assert_eq!(
-        state.traffic_scope(guest_key, first_key, 2_000),
-        Some(TrafficScope::Guest {
-            endpoint_key: guest_key
-        })
-    );
+    assert_eq!(state.traffic_scope(guest_key, first_key, 2_000), None);
+    assert_eq!(state.endpoint_owner(guest_key, 2_000), None);
+    assert!(state.endpoint_owner(first_key, 2_000).is_some());
     assert_eq!(state.traffic_scope(guest_key, second_key, 2_000), None);
     assert_eq!(state.traffic_scope(guest_key, first_key, 5_000), None);
 }

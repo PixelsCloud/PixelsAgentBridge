@@ -1,0 +1,30 @@
+# Copy to config/pab-server.toml. Never commit real credentials.
+# Relative paths are resolved against this file's directory.
+listen = "0.0.0.0:8443"
+
+[database]
+# Match the Postgres bootstrap credentials in the deployment environment.
+url = "postgres://pab:change-me@postgres:5432/pab"
+
+[tls]
+cert = "/run/pab-certs/backend-cert.pem"
+key = "/run/pab-certs/backend-key.pem"
+
+[web]
+origin = "https://bridge.example.com"
+registration_enabled = true
+assets = "/usr/local/bin/web"
+
+[relay]
+control_secret = "replace-with-a-random-secret-at-least-32-bytes"
+# Account bandwidth is selected in Web administration; new accounts receive 10 Mbps.
+
+# Optional. Omit the entire section to disable GitHub login.
+# [github]
+# client_id = "your-client-id"
+# client_secret = "your-text-client-secret"
+# proxy_url = "socks5h://private-proxy.example:1080"
+
+[log]
+directory = "/var/log/pab"
+level = "info"

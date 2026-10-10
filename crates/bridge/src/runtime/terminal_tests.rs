@@ -10,10 +10,38 @@ async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
         .unwrap();
     store.start_session("fixture").await.unwrap();
     let (shutdown, receiver) = watch::channel(false);
+    let account_store = pab_agent_core::account::AccountStore::new(
+        path,
+        &format!("https://{}.invalid", RequestId::new()),
+    )
+    .unwrap();
+    let user = pab_agent_core::account::AccountUser {
+        id: pab_protocol::UserId::new(),
+        username: "fixture".into(),
+        server_admin: false,
+    };
+    let account = account_store
+        .login(pab_agent_core::account::AccountSession {
+            user: user.clone(),
+            access_token: "fixture-token".into(),
+        })
+        .unwrap();
     Arc::new(BridgeRuntime {
         account_task: tokio::spawn(async {}),
         inner: Arc::new(RuntimeInner {
-            presence: std::sync::Mutex::new(Default::default()),
+            account_store,
+            presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
+                account: Some(crate::desktop_presence::AccountSyncReport {
+                    local_revision: account.revision,
+                    server_revision: Some(account.revision),
+                    user: Some(pab_protocol::UserAttribution {
+                        user_id: user.id,
+                        username: user.username,
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
             store,
             screenshot_dir: path.join("screenshots"),
             terminal_dir: path.to_owned(),
@@ -169,5 +197,58 @@ async fn close_archives_large_tail_serializes_polling_and_records_missing_output
             if missing { "failed" } else { "completed" }
         );
         runtime.inner.devices.lock().await.clear(); // release test connection/runtime references
+        clear_account(&runtime);
     }
+}
+
+fn clear_account(runtime: &BridgeRuntime) {
+    let state = runtime.inner.account_store.logout().unwrap();
+    for slot in state.pending_logouts {
+        runtime.inner.account_store.finish_logout(&slot).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn account_readiness_requires_current_confirmed_login() {
+    let dir = tempfile::tempdir().unwrap();
+    let runtime = runtime(dir.path()).await;
+    assert!(runtime.inner.wait_account_ready().await.is_ok());
+    let status = runtime.inner.presence.lock().unwrap().account.take();
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(30),
+            runtime.inner.wait_account_ready()
+        )
+        .await
+        .is_err()
+    );
+    runtime.inner.presence.lock().unwrap().account = status;
+    runtime
+        .inner
+        .presence
+        .lock()
+        .unwrap()
+        .account
+        .as_mut()
+        .unwrap()
+        .user = None;
+    assert!(
+        runtime
+            .inner
+            .wait_account_ready()
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("sign in again")
+    );
+    clear_account(&runtime);
+    assert!(
+        runtime
+            .inner
+            .wait_account_ready()
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("login required")
+    );
 }

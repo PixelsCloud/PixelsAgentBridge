@@ -1,10 +1,11 @@
 use std::time::Duration;
+include!("login_fixture.inc");
 
 use iroh_base::SecretKey;
 use pab_protocol::{
     DEVICE_NETWORK_SCHEMA_VERSION, DeviceNetworkUpdate, DeviceRef, EndpointInstanceId, EndpointKey,
     EndpointProofChallenge, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
-    EndpointSignature, RelayEndpointOwner, RelayLimitDefaults, TenantId, TrafficScope, UserId,
+    EndpointSignature, RelayEndpointOwner, TenantId, TrafficScope, UserId,
 };
 use pab_server::{ControlPlane, PasswordPolicy, PostgresStore, ServiceError, StoreError};
 use sqlx::PgPool;
@@ -63,13 +64,7 @@ fn signed_response(
 async fn account_device_and_user_policy_flow(pool: PgPool) {
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
-    control
-        .initialize_settings(RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        })
-        .await
-        .unwrap();
+    control.initialize_settings().await.unwrap();
 
     let alice = control
         .register_account("Alice", "correct horse battery staple")
@@ -93,7 +88,7 @@ async fn account_device_and_user_policy_flow(pool: PgPool) {
 
     let alice_scopes = control.list_traffic_scopes(&alice).await.unwrap();
     assert_eq!(alice_scopes.personal_tenant_id, alice.personal_tenant_id);
-    assert_eq!(alice_scopes.personal_mbps, 5);
+    assert_eq!(alice_scopes.personal_mbps, 10);
 
     let alice_key = SecretKey::generate();
     let bob_key = SecretKey::generate();
@@ -154,12 +149,24 @@ async fn account_device_and_user_policy_flow(pool: PgPool) {
         Err(ServiceError::Store(StoreError::PermissionDenied))
     ));
 
+    for (user, key) in [
+        (alice.id, &alice_key),
+        (bob.id, &bob_key),
+        (alice.id, &alice_personal_key),
+    ] {
+        bind_test_login(
+            control.store().pool(),
+            user,
+            EndpointKey::new(*key.public().as_bytes()),
+        )
+        .await;
+    }
     let snapshot = control
         .relay_policy_snapshot(Duration::from_secs(60))
         .await
         .unwrap();
-    assert_eq!(snapshot.defaults.user_mbps, 5);
-    assert!(snapshot.user_limits.is_empty());
+    assert_eq!(snapshot.defaults.user_mbps, 10);
+    assert_eq!(snapshot.user_limits.len(), 2);
     assert_eq!(snapshot.endpoints.len(), 4);
     assert!(snapshot.endpoints.iter().any(|endpoint| {
         endpoint.owner

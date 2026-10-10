@@ -13,6 +13,7 @@ import sys
 import time
 from urllib.parse import urlsplit
 import uuid
+from service_config import write_config
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--binaries', type=Path, required=True)
@@ -39,15 +40,19 @@ with socket.socket() as listener:
     listener.bind(('127.0.0.1', 0))
     relay_port = listener.getsockname()[1]
 env = {k: v for k, v in os.environ.items() if not k.startswith('PAB_')}
-env.update(PAB_DATABASE_URL=database, PAB_LISTEN_ADDR=f'127.0.0.1:{port}',
-           PAB_TLS_CERT=str(cert), PAB_TLS_KEY=str(key), PAB_WEB_ORIGIN=origin,
-           PAB_RELAY_CONTROL_SECRET=uuid.uuid4().hex, PAB_WEB_DIR=str(root / 'no-web-assets'))
+secret = uuid.uuid4().hex
+server_config = write_config(root / 'pab-server.toml', {
+    'listen': f'127.0.0.1:{port}', 'database': {'url': database},
+    'tls': {'cert': cert, 'key': key},
+    'web': {'origin': origin, 'assets': root / 'no-web-assets'},
+    'relay': {'control_secret': secret}, 'log': {'directory': root / 'logs'},
+})
 server = str((args.binaries / ('pab-server.exe' if os.name == 'nt' else 'pab-server')).resolve())
 relay = str((args.binaries / ('pab-relay-server.exe' if os.name == 'nt' else 'pab-relay-server')).resolve())
 relay_process = None
 with (root / 'server.log').open('w', encoding='utf-8') as log:
-    subprocess.run([server, 'init'], env=env, stdout=log, stderr=log, check=True)
-    process = subprocess.Popen([server, 'serve'], env=env, stdout=log, stderr=log,
+    subprocess.run([server, 'init', '--config', str(server_config)], env=env, stdout=log, stderr=log, check=True)
+    process = subprocess.Popen([server, 'serve', '--config', str(server_config)], env=env, stdout=log, stderr=log,
                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     try:
         for _ in range(100):
@@ -57,11 +62,14 @@ with (root / 'server.log').open('w', encoding='utf-8') as log:
                     break
             except OSError:
                 time.sleep(.1)
-        relay_env = dict(env, PAB_CONTROL_URL=origin.replace('https:', 'wss:') + '/relay-control',
-                         PAB_CONTROL_CA_CERT=str(cert), PAB_RELAY_TLS_CERT=str(cert), PAB_RELAY_TLS_KEY=str(key),
-                         PAB_RELAY_HTTPS_ADDR=f'127.0.0.1:{relay_port}', PAB_RELAY_QUIC_ADDR='127.0.0.1:0',
-                         PAB_RELAY_USAGE_DIR=str(root / 'relay-usage'), PAB_RELAY_NODE_ID='isolated-acceptance')
-        relay_process = subprocess.Popen([relay], env=relay_env, cwd=root, stdout=log, stderr=log,
+        relay_config = write_config(root / 'pab-relay-server.toml', {
+            'node_id': 'isolated-acceptance', 'usage_dir': str(root / 'relay-usage'),
+            'https_bind': f'127.0.0.1:{relay_port}', 'quic_bind': '127.0.0.1:0',
+            'tls': {'cert': cert, 'key': key},
+            'control': {'url': origin.replace('https:', 'wss:') + '/relay-control', 'ca_cert': cert, 'secret': secret},
+            'log': {'directory': root / 'logs'},
+        })
+        relay_process = subprocess.Popen([relay, "--config", str(relay_config)], env=env, cwd=root, stdout=log, stderr=log,
                                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         for _ in range(100):
             assert relay_process.poll() is None, f'isolated Relay exited: {root / "server.log"}'

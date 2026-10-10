@@ -23,10 +23,16 @@ services:
       context: ../..
       dockerfile: packaging/docker/Dockerfile
     image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
-    command: ["pab-server", "init"]
+    command: ["pab-server", "init", "--config", "/etc/pab/pab-server.toml"]
     restart: "no"
-    environment:
-      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/${PAB_DB_NAME:-pab}
+    volumes:
+      - type: bind
+        source: ${PAB_SERVER_CONFIG:-./config/pab-server.toml}
+        target: /etc/pab/pab-server.toml
+        bind:
+          create_host_path: false
+        read_only: true
+      - backend-logs:/var/log/pab
     depends_on:
       postgres:
         condition: service_healthy
@@ -35,21 +41,16 @@ services:
 
   backend:
     image: ${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}
-    command: ["pab-server", "serve"]
+    command: ["pab-server", "serve", "--config", "/etc/pab/pab-server.toml"]
     restart: unless-stopped
     init: true
-    environment:
-      PAB_DATABASE_URL: postgres://pab:${PAB_DB_PASSWORD}@postgres:5432/${PAB_DB_NAME:-pab}
-      PAB_LISTEN_ADDR: 0.0.0.0:8443
-      PAB_TLS_CERT: /run/pab-certs/backend-cert.pem
-      PAB_TLS_KEY: /run/pab-certs/backend-key.pem
-      PAB_REGISTRATION_ENABLED: ${PAB_REGISTRATION_ENABLED:-true}
-      PAB_WEB_ORIGIN: ${PAB_WEB_ORIGIN:-https://pab.rgaa.vip}
-      PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret
-      PAB_BACKEND_TLS_NAME: ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
-    secrets:
-      - pab_relay_control_secret
     volumes:
+      - type: bind
+        source: ${PAB_SERVER_CONFIG:-./config/pab-server.toml}
+        target: /etc/pab/pab-server.toml
+        bind:
+          create_host_path: false
+        read_only: true
       - backend-logs:/var/log/pab
       - type: bind
         source: ${PAB_CERT_DIR:-./certs}
@@ -58,13 +59,7 @@ services:
     ports:
       - "${PAB_BACKEND_HOST_IP:-127.0.0.1}:${PAB_BACKEND_HOST_PORT:-31400}:8443"
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          curl --fail --silent --show-error
-          --cacert /run/pab-certs/backend-ca.pem
-          --resolve "$${PAB_BACKEND_TLS_NAME}:8443:127.0.0.1"
-          "https://$${PAB_BACKEND_TLS_NAME}:8443/health" >/dev/null
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--cacert", "/run/pab-certs/backend-ca.pem", "--resolve", "${PAB_BACKEND_DNS_ALIAS:-backend}:8443:127.0.0.1", "https://${PAB_BACKEND_DNS_ALIAS:-backend}:8443/health"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -74,28 +69,21 @@ services:
     networks:
       pab-internal:
         aliases:
-          - ${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}
+          - ${PAB_BACKEND_DNS_ALIAS:-backend}
 
   relay:
     # Multiple Relay instances must each set a distinct persistent node ID.
     image: ${PAB_RELAY_IMAGE:-${PAB_SERVER_IMAGE:-pixels-agent-bridge:release}}
-    command: ["pab-relay-server"]
+    command: ["pab-relay-server", "--config", "/etc/pab/pab-relay-server.toml"]
     restart: unless-stopped
     init: true
-    environment:
-      PAB_CONTROL_URL: wss://${PAB_BACKEND_TLS_NAME:-pab.rgaa.vip}:8443/relay-control
-      PAB_CONTROL_CA_CERT: /run/pab-certs/backend-ca.pem
-      PAB_RELAY_CONTROL_SECRET_FILE: /run/secrets/pab_relay_control_secret
-      PAB_RELAY_TLS_CERT: /run/pab-certs/relay-cert.pem
-      PAB_RELAY_TLS_KEY: /run/pab-certs/relay-key.pem
-      PAB_RELAY_HTTPS_ADDR: 0.0.0.0:31443
-      PAB_RELAY_QUIC_ADDR: 0.0.0.0:7842
-      PAB_RELAY_TLS_NAME: ${PAB_RELAY_TLS_NAME:-pab-relay.rgaa.vip}
-      PAB_RELAY_NODE_ID: ${PAB_RELAY_NODE_ID:-primary}
-      PAB_RELAY_USAGE_DIR: /var/lib/pab/usage
-    secrets:
-      - pab_relay_control_secret
     volumes:
+      - type: bind
+        source: ${PAB_RELAY_CONFIG:-./config/pab-relay-server.toml}
+        target: /etc/pab/pab-relay-server.toml
+        bind:
+          create_host_path: false
+        read_only: true
       - relay-logs:/var/log/pab
       - relay-usage:/var/lib/pab/usage
       - type: bind
@@ -106,13 +94,7 @@ services:
       - "${PAB_RELAY_HTTPS_HOST_IP:-127.0.0.1}:${PAB_RELAY_HTTPS_HOST_PORT:-31443}:31443/tcp"
       - "${PAB_RELAY_QUIC_HOST_IP:-0.0.0.0}:${PAB_RELAY_QUIC_HOST_PORT:-7842}:7842/udp"
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          curl --fail --silent --show-error
-          --cacert /run/pab-certs/relay-ca.pem
-          --resolve "$${PAB_RELAY_TLS_NAME}:31443:127.0.0.1"
-          "https://$${PAB_RELAY_TLS_NAME}:31443/healthz" >/dev/null
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--cacert", "/run/pab-certs/relay-ca.pem", "--resolve", "${PAB_RELAY_DNS_ALIAS:-relay}:31443:127.0.0.1", "https://${PAB_RELAY_DNS_ALIAS:-relay}:31443/healthz"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -120,7 +102,9 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - pab-internal
+      pab-internal:
+        aliases:
+          - ${PAB_RELAY_DNS_ALIAS:-relay}
 
 networks:
   pab-internal:
@@ -130,7 +114,3 @@ volumes:
   backend-logs:
   relay-logs:
   relay-usage:
-
-secrets:
-  pab_relay_control_secret:
-    file: ${PAB_RELAY_CONTROL_SECRET_PATH:-./secrets/relay-control-secret}

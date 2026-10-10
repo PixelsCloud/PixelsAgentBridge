@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, App, Button, Card, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Descriptions, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError, type Viewer } from './api';
@@ -40,21 +40,26 @@ export function AccountsPage({ liveRevision }: { liveRevision: number }) {
     try { await api(`/accounts/${editing.id}`, { method: 'PATCH', body: JSON.stringify({ ...values, revision: editing.revision }) }); setEditing(undefined); resource.refresh(); message.success(t('saved')); }
     catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); } finally { setBusy(false); }
   }
-  async function assign(values: { mbps?: number }) {
+  async function assign(values: { mbps: number }) {
     if (!assigning) return; setBusy(true);
-    try { await api(`/accounts/${assigning.id}/traffic`, { method: 'PUT', body: JSON.stringify({ mbps: values.mbps ?? null }) }); setAssigning(undefined); resource.refresh(); message.success(t('saved')); }
+    try { await api(`/accounts/${assigning.id}/traffic`, { method: 'PUT', body: JSON.stringify({ mbps: values.mbps }) }); setAssigning(undefined); resource.refresh(); message.success(t('saved')); }
     catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); } finally { setBusy(false); }
   }
   return <><DataPage title={t('accounts')} resource={resource} columns={[
     { title: t('username'), dataIndex: 'username' }, { title: t('role'), render: (_, item) => <Tag>{t(item.server_admin ? 'admin' : 'user')}</Tag> },
     { title: t('account'), render: (_, item) => <Tag color={item.status === 'active' ? 'success' : 'default'}>{t(item.status === 'active' ? 'enabled' : 'disabled')}</Tag> },
-    { title: t('userBandwidth'), render: (_, item) => item.relay_limit_mbps == null ? t('defaultLimit') : `${item.relay_limit_mbps} Mbps` },
-    { title: t('actions'), render: (_, item) => <Space><Button onClick={() => { form.setFieldsValue(item); setEditing(item); }}>{t('edit')}</Button><Button onClick={() => { assignment.setFieldsValue({ mbps: item.relay_limit_mbps }); setAssigning(item); }}>{t('limits')}</Button></Space> },
+    { title: t('userBandwidth'), render: (_, item) => `${item.relay_limit_mbps ?? 10} Mbps` },
+    { title: t('actions'), render: (_, item) => <Space><Button onClick={() => { form.setFieldsValue(item); setEditing(item); }}>{t('edit')}</Button><Button onClick={() => { assignment.setFieldsValue({ mbps: item.relay_limit_mbps ?? 10 }); setAssigning(item); }}>{t('limits')}</Button></Space> },
   ]}/>
     <Modal title={editing?.username} open={!!editing} maskClosable={false} keyboard={false} onCancel={() => !busy && setEditing(undefined)} onOk={() => form.submit()} confirmLoading={busy} okText={t('save')} cancelText={t('cancel')}><Alert type="info" title={t('accountUpdateHint')} style={{ marginBottom: 20 }}/><Form form={form} layout="vertical" onFinish={submit}>
       <Form.Item name="status" label={t('account')}><Select options={[{ value: 'active', label: t('enabled') }, { value: 'disabled', label: t('disabled') }]}/></Form.Item><Form.Item name="server_admin" label={t('admin')} valuePropName="checked"><Switch/></Form.Item>
     </Form></Modal>
-    <Modal title={t('userBandwidth')} open={!!assigning} maskClosable={false} keyboard={false} onCancel={() => !busy && setAssigning(undefined)} onOk={() => assignment.submit()} confirmLoading={busy} okText={t('save')} cancelText={t('cancel')}><Typography.Paragraph>{t('userLimitHint')}</Typography.Paragraph><Form form={assignment} onFinish={assign}><Form.Item name="mbps" label="Mbps"><InputNumber min={1} max={2147483647} precision={0} placeholder={t('defaultLimit')}/></Form.Item></Form></Modal>
+    <Modal title={t('userBandwidth')} open={!!assigning} maskClosable={false} keyboard={false} onCancel={() => !busy && setAssigning(undefined)} onOk={() => assignment.submit()} confirmLoading={busy} okText={t('save')} cancelText={t('cancel')}>
+      <Typography.Paragraph>{t('userLimitHint')}</Typography.Paragraph>
+      <Form form={assignment} layout="vertical" onFinish={assign} disabled={busy}>
+        <Form.Item name="mbps" label="Mbps" rules={[{ required: true, message: t('required') }]}><Select virtual={false} options={[5,10,20,30,40,50,60,70,80,90,100].map(value => ({ value, label: `${value} Mbps` }))}/></Form.Item>
+      </Form>
+    </Modal>
   </>;
 }
 
@@ -65,11 +70,11 @@ export function AuditPage({ liveRevision }: { liveRevision: number }) {
 
 export function TrafficPage({ liveRevision, me }: { liveRevision: number; me: Viewer }) {
   const t = useText();
-  const resource = useResource<{ user_mbps: number; guest_mbps: number }>('/traffic');
+  const resource = useResource<{ user_mbps: number }>('/traffic');
   useEffect(resource.refresh, [liveRevision]);
   return <Space orientation="vertical" size={20} style={{ width: '100%' }}><Typography.Title level={2}>{t('relay')}</Typography.Title><Typography.Paragraph type="secondary">{t('relayHint')}</Typography.Paragraph>
     {resource.error && <Alert type="error" title={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/>}
-    <Card title={t('limits')} loading={resource.loading}><Descriptions items={[{ key: 'user', label: t('userBandwidth'), children: resource.data ? `${resource.data.user_mbps} Mbps` : '—' }, { key: 'guest', label: t('guestBandwidth'), children: resource.data ? `${resource.data.guest_mbps} Mbps` : '—' }]}/></Card>
+    <Card title={t('limits')} loading={resource.loading}><Descriptions items={[{ key: 'user', label: t('userBandwidth'), children: resource.data ? `${resource.data.user_mbps} Mbps` : '—' }]}/></Card>
     {me.server_admin && <RelayNodes liveRevision={liveRevision}/>}
   </Space>;
 }
@@ -89,25 +94,14 @@ function RelayNodes({ liveRevision }: { liveRevision: number }) {
 }
 
 export function ServiceSettings() {
-  const t = useText(); const { message } = App.useApp(); const [busy, setBusy] = useState(false); const [form] = Form.useForm();
-  const resource = useResource<{ registration_enabled: boolean; default_user_mbps: number; default_guest_mbps: number; policy_revision: number }>('/service');
+  const t = useText();
+  const resource = useResource<{ registration_enabled: boolean; policy_revision: number }>('/service');
   const value = resource.data;
-  useEffect(() => { if (value) form.setFieldsValue({ user_mbps: value.default_user_mbps, guest_mbps: value.default_guest_mbps }); }, [value, form]);
-  async function save(limits: { user_mbps: number; guest_mbps: number }) {
-    setBusy(true);
-    try { await api('/service', { method: 'PUT', body: JSON.stringify(limits) }); resource.refresh(); message.success(t('saved')); }
-    catch (e) { message.error(t(e instanceof ApiError ? e.code : 'networkError')); } finally { setBusy(false); }
-  }
-  return <Card title={t('service')} loading={resource.loading}>{resource.error ? <Alert type="error" title={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/> : value && <>
+  return <Card title={t('service')} loading={resource.loading}>{resource.error ? <Alert type="error" title={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/> : value &&
     <Descriptions column={1} items={[
       { key:'register', label:t('registration'), children:t(value.registration_enabled ? 'enabled' : 'disabled') },
       { key:'policy', label:t('policyOffered'), children:value.policy_revision },
       { key:'session', label:t('sessionDuration'), children:t('permanentSession') },
     ]}/>
-    <Form form={form} layout="vertical" onFinish={save} disabled={busy}>
-      <Form.Item name="user_mbps" label={`${t('userBandwidth')} (Mbps)`} rules={[{ required: true, message: t('required') }]}><InputNumber min={1} max={2147483647} precision={0}/></Form.Item>
-      <Form.Item name="guest_mbps" label={`${t('guestBandwidth')} (Mbps)`} rules={[{ required: true, message: t('required') }]}><InputNumber min={1} max={2147483647} precision={0}/></Form.Item>
-      <Button type="primary" htmlType="submit" loading={busy}>{t('save')}</Button>
-    </Form>
-  </>}</Card>;
+  }</Card>;
 }

@@ -36,7 +36,7 @@ Capabilities depend on the target OS and permissions. macOS screen capture and i
 
    > Use Pixels to connect to device 123456789, check its operating system and free disk space, and summarize the result.
 
-Account sign-in is optional for password-based device access. Register or sign in through Desktop or the Web console to use your account identity. Sign-in is retained until you sign out; already running MCPs pick up account changes automatically. Signing in does not replace the target device's password.
+The initiating Desktop or MCP must be signed in to add or control devices. Register or sign in through Desktop; the receiving device can run unattended without account login. Sign-in is retained until you sign out; already running MCPs pick up account changes automatically. Signing in does not replace the target device's password.
 
 When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in without a separate registration form or password. Your first authorization creates an ordinary account automatically. Existing users can link GitHub from their account page. Self-hosted instances configure their own [GitHub App](GITHUB_LOGIN_SETUP.md).
 

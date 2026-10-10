@@ -60,7 +60,7 @@ impl From<ServiceError> for WebError {
     }
 }
 
-pub(crate) fn same_origin(headers: &HeaderMap) -> bool {
+pub(crate) fn same_origin(headers: &HeaderMap, configured: Option<&str>) -> bool {
     let Some(origin) = headers.get(header::ORIGIN).and_then(|s| s.to_str().ok()) else {
         return false;
     };
@@ -76,7 +76,7 @@ pub(crate) fn same_origin(headers: &HeaderMap) -> bool {
     {
         return false;
     }
-    let expected = std::env::var("PAB_WEB_ORIGIN").ok().unwrap_or_else(|| {
+    let expected = configured.map(str::to_owned).unwrap_or_else(|| {
         format!(
             "https://{}",
             headers
@@ -88,8 +88,14 @@ pub(crate) fn same_origin(headers: &HeaderMap) -> bool {
     url::Url::parse(&expected).is_ok_and(|expected| expected.origin() == origin.origin())
 }
 
-pub(crate) async fn browser_boundary(request: Request, next: Next) -> Response {
-    if !matches!(*request.method(), Method::GET | Method::HEAD) && !same_origin(request.headers()) {
+pub(crate) async fn browser_boundary(
+    axum::extract::State(state): axum::extract::State<super::WebState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if !matches!(*request.method(), Method::GET | Method::HEAD)
+        && !same_origin(request.headers(), state.origin.as_deref())
+    {
         return WebError::new(StatusCode::FORBIDDEN, "origin_rejected").into_response();
     }
     let mut response = next.run(request).await;
@@ -118,8 +124,14 @@ pub(crate) async fn browser_boundary(request: Request, next: Next) -> Response {
 
 // Native account calls never accept cookie authentication. Cross-origin browser
 // writes are rejected separately from native requests, which have no Origin.
-pub(crate) async fn native_boundary(request: Request, next: Next) -> Response {
-    if request.headers().contains_key(header::ORIGIN) && !same_origin(request.headers()) {
+pub(crate) async fn native_boundary(
+    axum::extract::State(state): axum::extract::State<super::WebState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if request.headers().contains_key(header::ORIGIN)
+        && !same_origin(request.headers(), state.origin.as_deref())
+    {
         return WebError::new(StatusCode::FORBIDDEN, "origin_rejected").into_response();
     }
     let mut response = next.run(request).await;
@@ -144,7 +156,9 @@ pub async fn response_headers(request: Request, next: Next) -> Response {
     }
     let headers = response.headers_mut();
     headers.insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
-    headers.entry(header::REFERRER_POLICY).or_insert("same-origin".parse().unwrap());
+    headers
+        .entry(header::REFERRER_POLICY)
+        .or_insert("same-origin".parse().unwrap());
     headers.insert(header::X_FRAME_OPTIONS, "DENY".parse().unwrap());
     if html && !asset {
         headers.insert(header::CONTENT_SECURITY_POLICY, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'".parse().unwrap());
@@ -169,7 +183,7 @@ mod tests {
     fn rejects_cross_site_missing_and_malformed_origins() {
         let mut headers = HeaderMap::new();
         headers.insert(header::HOST, "web.example:8443".parse().unwrap());
-        assert!(!same_origin(&headers));
+        assert!(!same_origin(&headers, None));
         for bad in [
             "null",
             "http://web.example:8443",
@@ -178,9 +192,18 @@ mod tests {
             "https://user@web.example:8443",
         ] {
             headers.insert(header::ORIGIN, bad.parse().unwrap());
-            assert!(!same_origin(&headers), "{bad}");
+            assert!(!same_origin(&headers, None), "{bad}");
         }
         headers.insert(header::ORIGIN, "https://web.example:8443".parse().unwrap());
-        assert!(same_origin(&headers));
+        assert!(same_origin(&headers, None));
+    }
+    #[test]
+    fn configured_origin_takes_precedence_over_proxy_host() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::HOST, "backend:8443".parse().unwrap());
+        headers.insert(header::ORIGIN, "https://public.example".parse().unwrap());
+        assert!(same_origin(&headers, Some("https://public.example")));
+        assert!(!same_origin(&headers, None));
+        assert!(!same_origin(&headers, Some("https://another.example")));
     }
 }

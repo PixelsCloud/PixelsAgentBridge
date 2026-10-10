@@ -20,6 +20,7 @@ const LOGIN_MESSAGE_TIMEOUT: Duration = Duration::from_secs(20);
 const AUTHENTICATED_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub fn control_router(state: ControlApiState) -> Router {
+    let assets = crate::web::assets(state.config.web_assets.clone());
     let web = crate::web::router(state.clone());
     Router::new()
         .route("/health", get(health))
@@ -27,7 +28,7 @@ pub fn control_router(state: ControlApiState) -> Router {
         .route("/relay-control", get(relay_control_upgrade))
         .with_state(state)
         .merge(web)
-        .fallback_service(crate::web::assets())
+        .fallback_service(assets)
         .layer(axum::middleware::from_fn(crate::web::response_headers))
 }
 

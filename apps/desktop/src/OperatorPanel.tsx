@@ -20,7 +20,7 @@ const ActivityPanel = lazy(() => import("./ActivityPanel").then(({ ActivityPanel
 const DeviceHistoryPanel = lazy(() => import("./DeviceHistoryPanel").then(({ DeviceHistoryPanel }) => ({ default: DeviceHistoryPanel })));
 const RemoteOperationsPanel = lazy(() => import("./RemoteOperationsPanel").then(({ RemoteOperationsPanel }) => ({ default: RemoteOperationsPanel })));
 
-export function OperatorPanel({ language, view, onOpenRemote }: { language: Language; view: View; onOpenRemote: () => void }) {
+export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn }: { language: Language; view: View; onOpenRemote: () => void; signedIn: boolean; onSignIn: () => void }) {
   const t = messages[language];
   const { notification } = AntdApp.useApp();
   const [code, setCode] = useState("");
@@ -83,7 +83,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }, [view, devices, selectedCode]);
 
   useEffect(() => {
-    if ((view !== "home" && view !== "remote") || !savedCodes) return;
+    if (!signedIn || (view !== "home" && view !== "remote") || !savedCodes) return;
     let closed = false;
     let refreshing = false;
     const codes = savedCodes.split(",");
@@ -125,10 +125,10 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       closed = true;
       window.clearInterval(interval);
     };
-  }, [view, savedCodes]);
+  }, [view, savedCodes, signedIn]);
 
   useEffect(() => {
-    if ((view !== "home" && view !== "remote") || !savedCodes) return;
+    if (!signedIn || (view !== "home" && view !== "remote") || !savedCodes) return;
     let closed = false;
     let refreshing = false;
     const refresh = async () => {
@@ -163,7 +163,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       closed = true;
       window.clearInterval(interval);
     };
-  }, [view, savedCodes]);
+  }, [view, savedCodes, signedIn]);
 
   useEffect(() => {
     if (!deleteTarget) return;
@@ -216,6 +216,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }
 
   async function connectSaved(device: ConnectedDevice) {
+    if (!signedIn) { onSignIn(); return; }
     const attempt = ++savedConnectionAttemptRef.current;
     setSavedConnection({
       mode: "saved",
@@ -241,6 +242,11 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
         ? { ...current, phase: "connected", step: 3, message: "" }
         : current);
     } catch (cause) {
+      if (/login required|account unavailable/i.test(String(cause))) {
+        setSavedConnection(null);
+        onSignIn();
+        return;
+      }
       if (savedConnectionAttemptRef.current === attempt) {
         setDevices((current) => current.map((item) => item.deviceId === device.deviceId
           ? { ...item, connected: false }
@@ -628,6 +634,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
   }, [view, devices]);
 
   async function connect() {
+    if (!signedIn) { onSignIn(); return; }
     if (connecting || code.length !== 9 || !password) return;
     const attempt = ++savedConnectionAttemptRef.current;
     const deviceCode = code;
@@ -657,8 +664,12 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
         : current);
     } catch (cause) {
       setSavedConnection((current) => current?.attempt === attempt
-        ? { ...current, phase: "failed", message: `${t.connectFailed}: ${String(cause)}` }
+        ? { ...current, phase: "failed", message: `${t.addDeviceFailed}: ${String(cause)}` }
         : current);
+      if (/login required|account unavailable/i.test(String(cause))) {
+        setSavedConnection(null);
+        onSignIn();
+      }
     } finally {
       setConnecting(false);
     }
@@ -783,6 +794,8 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
     <>
       {view === "home" && (
         <HomeDeviceConnectionPanel
+          signedIn={signedIn}
+          onSignIn={onSignIn}
           language={language}
           code={code}
           password={password}
@@ -794,7 +807,7 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
       )}
       {view === "home" && (
         <section className="surface home-recent">
-          <h2>{t.previouslyConnectedDevices}</h2>
+          <h2>{t.addedDevices}</h2>
           {!devicesLoaded ? (
             <div className="empty-device">{t.loading}</div>
           ) : devices.length === 0 ? (
@@ -837,11 +850,8 @@ export function OperatorPanel({ language, view, onOpenRemote }: { language: Lang
                       <small>{deviceName}</small>
                     </span>
                     <span className={`home-recent-presence ${status}`} aria-label={statusLabel} />
-                    <span className={`home-recent-connection ${device.connected ? "connected" : "disconnected"}`}>
-                      {device.connected ? t.connected : t.disconnected}
-                      {device.connected && device.connectionPath && (
-                        <> · {device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.connectionPathUnknown}</>
-                      )}
+                    <span className={`home-recent-connection ${status === "online" ? "connected" : "disconnected"}`}>
+                      {statusLabel}
                     </span>
                   </button>
                   </Dropdown>

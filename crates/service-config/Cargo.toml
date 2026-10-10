@@ -1,0 +1,13 @@
+[package]
+name = "pab-service-config"
+version = "1.2.48"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+toml = "1.1.6"
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

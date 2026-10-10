@@ -87,6 +87,10 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidState,
             "an authenticated user endpoint is required".to_owned(),
         ),
+        ControlSessionError::Service(ServiceError::LoginRequired) => (
+            ControlErrorCode::PermissionDenied,
+            "login required: register or sign in before adding or controlling devices".to_owned(),
+        ),
         ControlSessionError::Service(ServiceError::PeerEndpointOffline) => (
             ControlErrorCode::NotFound,
             "peer endpoint is unavailable".to_owned(),

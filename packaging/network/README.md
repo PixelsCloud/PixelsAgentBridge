@@ -4,7 +4,7 @@ The account backend needs HTTPS access to `github.com:443` and `api.github.com:4
 Use normal DNS and verified TLS. Do not add static GitHub addresses to `/etc/hosts`,
 Docker `extra_hosts`, or application code.
 
-Set the optional `PAB_GITHUB_PROXY_URL` only for the GitHub HTTP client. An existing
+Set the optional `github.proxy_url` in Server TOML only for the GitHub HTTP client. An existing
 managed HTTP/HTTPS CONNECT or SOCKS5H proxy is suitable. With SOCKS5H, the egress
 host resolves the destination; the backend still verifies GitHub's TLS certificate.
 No TLS interception, custom CA or forwarding of the GitHub secret to a proxy API
@@ -27,8 +27,7 @@ deployment-specific addresses and a dedicated key; never commit those values.
    only from the application's Docker bridge/subnet, never from the Internet.
    Revalidate the address/rule if recreating the Docker network.
 4. Install the service example and enable it with systemd. Set
-   `PAB_GITHUB_PROXY_URL=socks5h://<private-interface>:39081` in the private Compose
-   environment, then recreate only Backend. No GitHub IP mappings are required.
+   `proxy_url = "socks5h://<private-interface>:39081"` in Server TOML `[github]`, then recreate only Backend. No GitHub IP mappings are required.
 5. From Backend, check HTTPS access to both domains with `curl --proxy` and TLS
    verification enabled. Test that other destinations are rejected. Kill only the
    egress service's main process and verify systemd restarts it and HTTPS recovers.
@@ -46,3 +45,7 @@ Backend, then disable the egress service/timer and remove its scoped firewall ru
 
 References: [OpenSSH dynamic forwarding](https://man.openbsd.org/ssh#D),
 [reqwest proxy support](https://docs.rs/reqwest/0.12.28/reqwest/struct.Proxy.html).
+
+The separate systemd health probe still takes `PAB_GITHUB_PROXY_URL` in its
+private `health.env`; this is the probe configuration, not a PAB service input.
+Keep it consistent with Server TOML when changing the managed egress.

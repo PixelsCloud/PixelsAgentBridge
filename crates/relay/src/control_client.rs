@@ -17,6 +17,7 @@ const CONTROL_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct RelayControlClient {
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    node_id: String,
 }
 
 impl RelayControlClient {
@@ -105,7 +106,15 @@ impl RelayControlClient {
         )
         .await
         .map_err(|_| RelayControlClientError::Timeout)??;
-        Ok(Self { socket })
+        Ok(Self {
+            socket,
+            node_id: "primary".into(),
+        })
+    }
+
+    pub(crate) fn with_node_id(mut self, node_id: String) -> Self {
+        self.node_id = node_id;
+        self
     }
 
     pub async fn sync_policy(
@@ -116,9 +125,7 @@ impl RelayControlClient {
         let request = RelayControlClientMessage::GetPolicy {
             request_id,
             known_policy_version: runtime.policy_version()?,
-            node_id: Some(
-                std::env::var("PAB_RELAY_NODE_ID").unwrap_or_else(|_| "primary".to_owned()),
-            ),
+            node_id: Some(self.node_id.clone()),
             agent_version: Some(env!("CARGO_PKG_VERSION").to_owned()),
         };
         let encoded = serde_json::to_string(&request)?;

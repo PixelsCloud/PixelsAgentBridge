@@ -34,6 +34,7 @@ struct WebState {
     subscriptions: Arc<Semaphore>,
     server_instance: uuid::Uuid,
     github: Option<Arc<GithubConfig>>,
+    origin: Option<String>,
 }
 
 pub fn router(control: ControlApiState) -> Router {
@@ -45,6 +46,7 @@ pub fn router(control: ControlApiState) -> Router {
         subscriptions: Arc::new(Semaphore::new(256)),
         server_instance: control.server_instance,
         github: control.github,
+        origin: control.config.web_origin,
     };
     let browser = Router::new()
         .route("/api/web/config", get(session::config))
@@ -55,7 +57,10 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/logout", post(session::logout))
         .route("/api/web/register", post(session::register))
         .route("/api/web/github/start", post(github::web_start))
-        .route("/api/web/github", get(github::web_status).delete(github::web_unlink))
+        .route(
+            "/api/web/github",
+            get(github::web_status).delete(github::web_unlink),
+        )
         .route("/api/web/password", post(session::change_password))
         .route("/api/web/devices", get(devices::list))
         .route(
@@ -87,7 +92,7 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/relays", get(management::relays))
         .route(
             "/api/web/service",
-            get(management::service_config).put(management::update_defaults),
+            get(management::service_config),
         )
         .route(
             "/api",
@@ -98,7 +103,10 @@ pub fn router(control: ControlApiState) -> Router {
             any(|| async { WebError::new(axum::http::StatusCode::NOT_FOUND, "not_found") }),
         )
         .layer(DefaultBodyLimit::max(16 * 1024))
-        .layer(middleware::from_fn(support::browser_boundary))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            support::browser_boundary,
+        ))
         .with_state(state.clone());
     let native = Router::new()
         .route(
@@ -125,7 +133,10 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/account/config", get(session::config))
         .route("/api/account/github/start", post(github::native_start))
         .route("/api/account/github/redeem", post(github::redeem))
-        .route("/api/account/github", get(github::native_status).delete(github::native_unlink))
+        .route(
+            "/api/account/github",
+            get(github::native_status).delete(github::native_unlink),
+        )
         .route(
             "/api/account/session",
             get(session::native_current).post(session::native_login),
@@ -133,7 +144,10 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/account/register", post(session::native_register))
         .route("/api/account/logout", post(session::native_logout))
         .layer(DefaultBodyLimit::max(16 * 1024))
-        .layer(middleware::from_fn(support::native_boundary))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            support::native_boundary,
+        ))
         .with_state(state.clone());
     // OAuth navigation is cross-site by design. These GETs use their own
     // one-time state + Lax cookie boundary, never the native Origin middleware.
@@ -144,15 +158,15 @@ pub fn router(control: ControlApiState) -> Router {
     browser.merge(native).merge(oauth)
 }
 
-pub fn assets() -> tower_http::services::ServeDir<tower_http::services::ServeFile> {
-    let root = std::env::var_os("PAB_WEB_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|path| path.parent().map(|p| p.join("web")))
-                .unwrap_or_else(|| "web".into())
-        });
+pub fn assets(
+    root: Option<std::path::PathBuf>,
+) -> tower_http::services::ServeDir<tower_http::services::ServeFile> {
+    let root = root.unwrap_or_else(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|p| p.join("web")))
+            .unwrap_or_else(|| "web".into())
+    });
     tower_http::services::ServeDir::new(&root).fallback(tower_http::services::ServeFile::new(
         root.join("index.html"),
     ))

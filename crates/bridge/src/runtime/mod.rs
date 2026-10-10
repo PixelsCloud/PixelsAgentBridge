@@ -319,6 +319,7 @@ impl BridgeRuntime {
         &self,
         code: DeviceCode,
     ) -> Result<pab_protocol::DevicePresence, RuntimeError> {
+        self.inner.wait_account_ready().await?;
         let mut availability = self.inner.availability.clone();
         loop {
             let state = availability.borrow().clone();
@@ -394,6 +395,13 @@ impl BridgeRuntime {
             crate::BridgeIdentity::Guest => "guest".to_owned(),
         };
         let inner = Arc::new(RuntimeInner {
+            account_store: pab_agent_core::account::AccountStore::new(
+                pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::User)
+                    .map_err(|_| RuntimeStoreError::AccountStorage)?
+                    .root(),
+                &bridge_config.control_url,
+            )
+            .map_err(|_| RuntimeStoreError::AccountStorage)?,
             presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
                 account: Some(crate::desktop_presence::AccountSyncReport::default()),
                 session_id: session_id.clone(),
@@ -472,6 +480,7 @@ impl BridgeRuntime {
     }
 
     pub async fn resolve_device_code(&self, code: DeviceCode) -> Result<DeviceRef, RuntimeError> {
+        self.inner.wait_account_ready().await?;
         let mut availability = self.inner.availability.clone();
         loop {
             let state = availability.borrow().clone();
@@ -969,6 +978,7 @@ impl BridgeRuntime {
 }
 
 struct RuntimeInner {
+    account_store: pab_agent_core::account::AccountStore,
     presence: std::sync::Mutex<crate::desktop_presence::RuntimeReport>,
     store: RuntimeStore,
     screenshot_dir: PathBuf,

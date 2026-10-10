@@ -30,23 +30,13 @@ pub struct GithubConfig {
 }
 
 impl GithubConfig {
-    pub fn from_env() -> Result<Option<Self>, &'static str> {
-        let Some(path) = std::env::var_os("PAB_GITHUB_CONFIG_FILE") else {
-            return Ok(None);
-        };
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Secret {
-            client_id: String,
-            client_secret: String,
-        }
-        let raw = std::fs::read(path).map_err(|_| "cannot read GitHub configuration")?;
-        let raw = raw.strip_prefix(&[239, 187, 191]).unwrap_or(&raw);
-        let secret: Secret =
-            serde_json::from_slice(raw).map_err(|_| "invalid GitHub configuration")?;
-        let origin =
-            std::env::var("PAB_WEB_ORIGIN").map_err(|_| "GitHub login requires PAB_WEB_ORIGIN")?;
-        let parsed = url::Url::parse(&origin).map_err(|_| "invalid PAB_WEB_ORIGIN")?;
+    pub fn configured(
+        client_id: String,
+        client_secret: String,
+        origin: &str,
+        proxy: Option<&str>,
+    ) -> Result<Self, &'static str> {
+        let parsed = url::Url::parse(&origin).map_err(|_| "invalid web.origin")?;
         if parsed.scheme() != "https"
             || parsed.host_str().is_none()
             || parsed.path() != "/"
@@ -57,15 +47,15 @@ impl GithubConfig {
         {
             return Err("GitHub login requires an HTTPS origin without a path");
         }
-        if secret.client_id.trim().is_empty()
-            || secret.client_secret.trim().is_empty()
-            || secret.client_secret.contains("-----BEGIN")
+        if client_id.trim().is_empty()
+            || client_secret.trim().is_empty()
+            || client_secret.contains("-----BEGIN")
         {
             return Err("GitHub configuration requires Client ID and text Client Secret");
         }
         let mut config = Self::new(
-            secret.client_id,
-            secret.client_secret,
+            client_id,
+            client_secret,
             parsed.origin().ascii_serialization(),
             "https://github.com/login/oauth/authorize",
             "https://github.com/login/oauth/access_token",
@@ -73,13 +63,12 @@ impl GithubConfig {
         )?;
         // A deployment may route only GitHub through its managed egress.
         // Keep normal DNS/SNI/certificate verification; never pin provider IPs.
-        let proxy = std::env::var("PAB_GITHUB_PROXY_URL").ok();
-        config.http = github_http(proxy.as_deref())?;
+        config.http = github_http(proxy)?;
         tracing::info!(
-            managed_proxy = proxy.as_deref().is_some_and(|v| !v.trim().is_empty()),
+            managed_proxy = proxy.is_some_and(|v| !v.trim().is_empty()),
             "GitHub HTTP transport configured"
         );
-        Ok(Some(config))
+        Ok(config)
     }
 
     fn new(
@@ -187,22 +176,23 @@ impl GithubConfig {
 
 fn github_http(proxy: Option<&str>) -> Result<reqwest::Client, &'static str> {
     let mut builder = reqwest::Client::builder()
+        .no_proxy()
         .connect_timeout(Duration::from_secs(5))
         .timeout(Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::none())
         .user_agent("PixelsAgentBridge");
     if let Some(proxy) = proxy.filter(|v| !v.trim().is_empty()) {
-        let url = url::Url::parse(proxy).map_err(|_| "invalid PAB_GITHUB_PROXY_URL")?;
+        let url = url::Url::parse(proxy).map_err(|_| "invalid github.proxy_url")?;
         if !matches!(url.scheme(), "http" | "https" | "socks5h")
             || url.host_str().is_none()
             || url.query().is_some()
             || url.fragment().is_some()
             || url.path() != "/" && !url.path().is_empty()
         {
-            return Err("PAB_GITHUB_PROXY_URL requires HTTP, HTTPS or SOCKS5H proxy");
+            return Err("github.proxy_url requires HTTP, HTTPS or SOCKS5H proxy");
         }
         builder =
-            builder.proxy(reqwest::Proxy::all(proxy).map_err(|_| "invalid PAB_GITHUB_PROXY_URL")?);
+            builder.proxy(reqwest::Proxy::all(proxy).map_err(|_| "invalid github.proxy_url")?);
     }
     builder
         .build()

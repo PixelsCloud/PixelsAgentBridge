@@ -16,16 +16,25 @@ pub fn init(role: &str, default_root: &Path) -> Result<(), LoggingError> {
     let root = env::var_os("PAB_LOG_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| default_root.join("logs"));
+    let level = env::var("PAB_LOG_LEVEL").unwrap_or_else(|_| "info".into());
+    let level = if EnvFilter::try_new(&level).is_ok() {
+        level
+    } else {
+        "info".into()
+    };
+    init_configured(role, &root, &level)
+}
+
+/// Explicit service settings; client init() retains its existing behavior.
+pub fn init_configured(role: &str, root: &Path, level: &str) -> Result<(), LoggingError> {
+    let filter = EnvFilter::try_new(level)
+        .map_err(|_| LoggingError::Subscriber("invalid log.level".into()))?;
     let writer = Arc::new(RotatingFile::open(
-        &root,
+        root,
         role,
         MAX_LOG_BYTES,
         MAX_LOG_FILES,
     )?);
-    let filter = env::var("PAB_LOG_LEVEL")
-        .ok()
-        .and_then(|value| EnvFilter::try_new(value).ok())
-        .unwrap_or_else(|| EnvFilter::new("info"));
     fmt()
         .with_env_filter(filter)
         .with_ansi(false)

@@ -308,7 +308,7 @@ function App() {
             {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} section={settingsSection} onSectionChange={setSettingsSection} />
               : view === "mcp" ? <section className="surface mcp-connections-page"><McpConnectionsPanel language={language} /></section>
                 : view === "me" && activeScope ? <AccountConnectionPanel language={language} activeScope={activeScope} onSignOut={() => { setActiveScope(null); setView("home"); }} />
-                  : <OperatorPanel language={language} view={view} onOpenRemote={() => setView("remote")} />}
+                  : <OperatorPanel language={language} view={view} signedIn={!!activeScope} onSignIn={() => setLoginOpen(true)} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
       </div>

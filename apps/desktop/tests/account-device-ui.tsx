@@ -11,6 +11,7 @@ const fixture=(window as any).fixture={calls:[] as any[],cancel:null as null|(()
 (window as any).__TAURI_INTERNALS__={transformCallback:()=>1,unregisterCallback:()=>{},invoke:async(command:string,args:any)=>{
   fixture.calls.push({command,args});
   if(command==='operator_bootstrap')return {...history,devices};
+  if(command==='operator_connect' && location.search.includes('expired'))throw 'account unavailable; sign in again before controlling devices';
   if(command==='operator_history_page')return history;
   if(command==='operator_rename_device'){devices[0].alias=args.alias.trim();return devices[0].alias;}
   if(command==='github_enabled')return true;
@@ -20,5 +21,5 @@ const fixture=(window as any).fixture={calls:[] as any[],cancel:null as null|(()
   return [];
 }};
 createRoot(document.getElementById('root')!).render(<ConfigProvider><App>
-  {location.search.includes('github')?<GithubAccount language="en" onSignedIn={()=>{fixture.signedIn=true;}}/>:<OperatorPanel language="en" view="remote" onOpenRemote={()=>{}}/>}
+  {location.search.includes('github')?<GithubAccount language="en" onSignedIn={()=>{fixture.signedIn=true;}}/>:<OperatorPanel signedIn={!location.search.includes("logged-out")} onSignIn={()=>{fixture.signedIn=true;}} language="en" view={/logged-out|expired/.test(location.search) ? "home" : "remote"} onOpenRemote={()=>{}}/>}
 </App></ConfigProvider>);

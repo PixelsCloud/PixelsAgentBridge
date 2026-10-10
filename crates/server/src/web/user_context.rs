@@ -23,7 +23,7 @@ pub(crate) async fn update(
     } else {
         None
     };
-    let origin = std::env::var("PAB_WEB_ORIGIN").unwrap_or_else(|_| {
+    let origin = state.origin.clone().unwrap_or_else(|| {
         format!(
             "https://{}",
             headers

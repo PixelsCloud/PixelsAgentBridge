@@ -21,4 +21,10 @@
 /packaging/docker/private.env
 *.pdb
 *.log
+*.tsbuildinfo
 __pycache__/
+
+# Private service configuration (examples remain tracked)
+**/pab-server.toml
+**/pab-relay-server.toml
+/packaging/docker/config/

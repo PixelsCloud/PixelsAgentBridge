@@ -45,6 +45,7 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     let connector = control_connector(config.control_ca_cert.as_deref())?;
     let runtime = RelayPolicyRuntime::new(RelayPolicyState::new(config.limiter_burst)?);
     let sync_settings = PolicySyncSettings {
+        node_id: config.node_id.clone(),
         control_url: config.control_url,
         control_secret: config.control_secret,
         refresh_interval: config.policy_refresh_interval,
@@ -81,6 +82,8 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
         sync_settings.control_url.clone(),
         sync_settings.control_secret.clone(),
         connector.clone(),
+        config.node_id,
+        config.usage_dir,
     );
     let refresh = spawn_refresh_loop(client, sync_settings, connector, runtime);
     println!(

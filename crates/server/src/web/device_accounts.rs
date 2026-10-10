@@ -57,7 +57,7 @@ pub(crate) async fn challenge(
 ) -> Result<Json<DeviceAccountState>, WebError> {
     let me = session::native_viewer(&state, &headers).await?;
     let hash = session::native_token_hash(&headers).ok_or_else(WebError::unauthorized)?;
-    let origin = std::env::var("PAB_WEB_ORIGIN").unwrap_or_else(|_| {
+    let origin = state.origin.clone().unwrap_or_else(|| {
         format!(
             "https://{}",
             headers

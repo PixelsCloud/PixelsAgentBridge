@@ -27,7 +27,7 @@ impl PostgresStore {
         personal_tenant_id: TenantId,
     ) -> Result<pab_protocol::TrafficScopeOptions, StoreError> {
         let mbps: i32 = sqlx::query_scalar(
-            "SELECT COALESCE(u.relay_limit_mbps,s.default_user_mbps) FROM users u CROSS JOIN server_settings s WHERE u.id=$1 AND u.status='active' AND s.singleton",
+            "SELECT u.relay_limit_mbps FROM users u CROSS JOIN server_settings s WHERE u.id=$1 AND u.status='active' AND s.singleton",
         ).bind(user_id.as_uuid()).fetch_one(&self.pool).await?;
         Ok(pab_protocol::TrafficScopeOptions {
             personal_tenant_id,

@@ -4,6 +4,8 @@ use super::config::{RelayServiceConfig, RelayServiceConfigError};
 
 fn config() -> RelayServiceConfig {
     RelayServiceConfig {
+        node_id: "primary".into(),
+        usage_dir: "unused-test-usage".into(),
         control_url: "wss://localhost/control".to_owned(),
         control_secret: "a test Relay control secret with 32 bytes".to_owned(),
         control_ca_cert: None,

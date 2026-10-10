@@ -305,41 +305,28 @@ topology for this phase. Before active-active backend deployment, connection rou
 or shared presence coordination must replace this registry; Redis is optional and
 does not become a permission source.
 
-The `pab-server` crate owns the central PostgreSQL schema and control-plane services.
-It does not expose an insecure HTTP listener or issue bearer tokens. Set
-`PAB_DATABASE_URL` and use its initialization commands against an empty database:
+The `pab-server` crate owns PostgreSQL and the TLS control/Web APIs. Configure
+`pab-server.toml` and `pab-relay-server.toml` using the [service templates](packaging/docker/README.md).
+Only Server/Relay use this TOML configuration; client settings remain unchanged.
+No service application settings are read from legacy `PAB_*` environment variables.
 
 ```powershell
-cargo run -p pab-server -- check
-cargo run -p pab-server -- migrate
-cargo run -p pab-server -- init
+cargo run -p pab-server -- init --config path/to/pab-server.toml
+cargo run -p pab-server -- serve --config path/to/pab-server.toml
+cargo run -p pab-relay --bin pab-relay-server -- --config path/to/pab-relay-server.toml
 ```
 
-`init` is idempotent: it applies versioned schema files and creates the single
-singleton server settings with the current 20/4/5 Mbps defaults if it is absent. PostgreSQL
-integration tests use `DATABASE_URL`; SQLx creates and removes isolated test databases.
-Use a disposable PostgreSQL instance with database-creation privileges for those tests.
+`init` applies migrations and creates singleton defaults if absent (5 Mbps/user,
+1 Mbps/guest when omitted). Explicit TOML limits apply at every init/serve startup;
+per-user overrides remain intact. SQLx tests use `DATABASE_URL` and disposable
+PostgreSQL databases with database-creation privileges.
 
-Endpoint registration and reconnect authentication use a one-time proof signed by
-the same Ed25519 secret key that produces the iroh Endpoint ID. Proof schema v2 binds
-the connection, typed user-or-device principal, tenant, purpose, nonce,
-and short validity window. A TLS-only WSS control service owns each proof session and
-supports account registration, login, endpoint registration, and password-free
-reconnects for active registered endpoints. It rechecks PostgreSQL after signature
-verification so revoked endpoints and disabled owners fail authentication. Configure
-`PAB_TLS_CERT`, `PAB_TLS_KEY`, and optionally
-`PAB_LISTEN_ADDR` before running `cargo run -p pab-server -- serve`. The same
-TLS listener exposes the internal Relay policy WSS endpoint. Set a random
-`PAB_RELAY_CONTROL_SECRET` of at least 32 bytes on the server and provide the
-same secret to each trusted Relay node; it is never sent outside TLS or logged.
-
-The production Relay entry point is `cargo run -p pab-relay --bin pab-relay-server`.
-It requires `PAB_CONTROL_URL` (a `wss://` URL),
-`PAB_RELAY_CONTROL_SECRET`, `PAB_RELAY_TLS_CERT`, and `PAB_RELAY_TLS_KEY`.
-`PAB_CONTROL_CA_CERT` adds trust for a self-signed control certificate. The Relay
-defaults to HTTPS on `127.0.0.1:31443`, QUIC on `0.0.0.0:7842`, and keeps iroh's
-captive portal on an automatically assigned loopback port. Public HTTPS and QUIC
-bind addresses can be set with `PAB_RELAY_HTTPS_ADDR` and `PAB_RELAY_QUIC_ADDR`.
+Endpoint reconnect authentication uses a one-time proof signed by the same
+Ed25519 key as the iroh Endpoint ID. Account login/register use HTTPS separately.
+The internal Relay WSS endpoint requires matching Server `relay.control_secret`
+and Relay `control.secret`, at least 32 printable ASCII bytes. Relay `control.url`
+requires WSS; optional `control.ca_cert` trusts a private CA. Public listeners use
+TLS/QUIC; the internal captive portal stays on an automatic loopback port.
 
 Relay nodes request a versioned full policy snapshot over the authenticated WSS
 channel. An unchanged response extends the snapshot lifetime without resetting

@@ -1,6 +1,5 @@
-use std::{env, fs, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
+use std::{env, process::ExitCode, time::Duration};
 
-use pab_protocol::RelayLimitDefaults;
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth, serve_tls,
@@ -8,10 +7,6 @@ use pab_server::{
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    if let Err(error) = pab_logging::init("server", std::path::Path::new(".")) {
-        eprintln!("pab-server: {error}");
-        return ExitCode::FAILURE;
-    }
     match run().await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -23,15 +18,31 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let command = env::args().nth(1).unwrap_or_else(|| "check".to_owned());
-    let arguments = env::args().skip(2).collect::<Vec<_>>();
-    let database_url = env::var("PAB_DATABASE_URL")
-        .map_err(|_| "PAB_DATABASE_URL must be set; the value is never printed")?;
-    let store = PostgresStore::connect(&database_url, 5).await?;
+    let (path, arguments) =
+        pab_service_config::arguments("pab-server.toml", env::args_os().skip(1))?;
+    let (command, arguments) = arguments
+        .split_first()
+        .map(|(c, a)| (c.as_str(), a))
+        .unwrap_or(("check", &[]));
+    if !matches!(
+        command,
+        "check" | "migrate" | "init" | "serve" | "web-admin" | "account-id"
+    ) {
+        return Err(
+            "usage: pab-server [check|migrate|init|serve|web-admin|account-id] [--config path]"
+                .into(),
+        );
+    }
+    if !matches!(command, "web-admin" | "account-id") && !arguments.is_empty() {
+        return Err("unexpected command arguments".into());
+    }
+    let config = pab_server::config::ServerConfig::load(&path)?;
+    pab_logging::init_configured("server", &config.log.directory, &config.log.level)?;
+    let store = PostgresStore::connect(&config.database.url, 5).await?;
 
-    match command.as_str() {
+    match command {
         "web-admin" => {
-            let [username] = arguments.as_slice() else {
+            let [username] = arguments else {
                 return Err("usage: pab-server web-admin <existing-username>".into());
             };
             store.migrate().await?;
@@ -49,17 +60,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         "init" => {
             store.migrate().await?;
-            let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
-            control_plane
-                .initialize_settings(RelayLimitDefaults {
-                    user_mbps: 5,
-                    guest_mbps: 1,
-                })
-                .await?;
+            store.initialize_settings().await?;
             println!("PostgreSQL initialized");
         }
         "account-id" => {
-            let [username] = arguments.as_slice() else {
+            let [username] = arguments else {
                 return Err("usage: pab-server account-id <username>".into());
             };
             let control = ControlPlane::new(store, PasswordPolicy::default())?;
@@ -76,26 +81,24 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             let maintenance_store = store.clone();
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
-            let address = env::var("PAB_LISTEN_ADDR")
-                .unwrap_or_else(|_| "127.0.0.1:8443".to_owned())
-                .parse::<SocketAddr>()?;
-            let certificate_path = required_path("PAB_TLS_CERT")?;
-            let private_key_path = required_path("PAB_TLS_KEY")?;
-            let registration_enabled = env::var("PAB_REGISTRATION_ENABLED")
-                .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
-                .unwrap_or(true);
-            let relay_control_secret = required_secret("PAB_RELAY_CONTROL_SECRET")?;
-            let relay_auth = RelayControlAuth::new(&relay_control_secret)?;
+            let address = config.listen;
+            let certificate_path = config.tls.cert.clone();
+            let private_key_path = config.tls.key.clone();
+            let registration_enabled = config.web.registration_enabled;
+            let relay_auth = RelayControlAuth::new(&config.relay.control_secret)?;
             let presence_control = control_plane.clone();
-            let github = pab_server::web::GithubConfig::from_env()?;
+            let github = config.github_config()?;
             let state = ControlApiState::new(
                 control_plane,
                 ControlApiConfig {
                     registration_enabled,
+                    web_origin: Some(config.web.origin.clone()),
+                    web_assets: Some(config.web.assets.clone()),
                     ..ControlApiConfig::default()
                 },
                 relay_auth,
-            ).with_github(github);
+            )
+            .with_github(github);
             println!("TLS control service listening on {address}");
             tracing::info!(%address, "TLS control service listening");
             let maintenance = tokio::spawn(async move {
@@ -130,26 +133,4 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
-}
-
-fn required_path(name: &'static str) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    env::var_os(name)
-        .map(PathBuf::from)
-        .ok_or_else(|| format!("{name} must be set").into())
-}
-
-fn required_secret(name: &'static str) -> Result<String, Box<dyn std::error::Error>> {
-    if let Ok(value) = env::var(name) {
-        return Ok(value);
-    }
-    let file_name = format!("{name}_FILE");
-    let path = env::var_os(&file_name)
-        .map(PathBuf::from)
-        .ok_or_else(|| format!("{name} or {file_name} must be set; the value is never printed"))?;
-    let value = fs::read_to_string(path)?;
-    let value = value.trim_end_matches(['\r', '\n']).to_owned();
-    if value.is_empty() {
-        return Err(format!("{file_name} must not be empty").into());
-    }
-    Ok(value)
 }

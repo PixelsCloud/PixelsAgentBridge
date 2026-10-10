@@ -68,15 +68,20 @@ impl RelayPolicyState {
 
         let mut endpoints = HashMap::with_capacity(snapshot.endpoints.len());
         for endpoint in &snapshot.endpoints {
+            // Process registration alone never grants Relay access.
+            if matches!(
+                endpoint.owner,
+                RelayEndpointOwner::Guest
+                    | RelayEndpointOwner::User {
+                        scope: TrafficScope::Guest { .. }
+                    }
+            ) {
+                continue;
+            }
             endpoints.insert(endpoint.endpoint_key, endpoint.owner);
             match endpoint.owner {
                 RelayEndpointOwner::Device { .. } => {}
-                RelayEndpointOwner::Guest => {
-                    rates.insert(
-                        LimitKey::Guest(endpoint.endpoint_key),
-                        rate(snapshot.defaults.guest_mbps, self.burst)?,
-                    );
-                }
+                RelayEndpointOwner::Guest => {}
                 RelayEndpointOwner::User { scope } => match scope {
                     TrafficScope::User { user_id } => {
                         let mbps = user_limits
@@ -157,20 +162,6 @@ impl RelayPolicyState {
                 if self.has_intent(second_key, device_id, now_unix_ms) =>
             {
                 Some(scope)
-            }
-            (RelayEndpointOwner::Guest, RelayEndpointOwner::Device { device_id, .. })
-                if self.has_intent(first_key, device_id, now_unix_ms) =>
-            {
-                Some(TrafficScope::Guest {
-                    endpoint_key: first_key,
-                })
-            }
-            (RelayEndpointOwner::Device { device_id, .. }, RelayEndpointOwner::Guest)
-                if self.has_intent(second_key, device_id, now_unix_ms) =>
-            {
-                Some(TrafficScope::Guest {
-                    endpoint_key: second_key,
-                })
             }
             _ => None,
         }

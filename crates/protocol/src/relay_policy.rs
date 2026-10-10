@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{DeviceId, EndpointKey, TenantId, UserId};
-pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 5;
+pub const DEFAULT_RELAY_MBPS: u32 = 10;
+pub const RELAY_MBPS_OPTIONS: &[i32] = &[5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -25,12 +27,11 @@ impl TrafficScope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RelayLimitDefaults {
     pub user_mbps: u32,
-    pub guest_mbps: u32,
 }
 
 impl RelayLimitDefaults {
     pub fn validate(self) -> Result<Self, LimitConfigError> {
-        if self.user_mbps == 0 || self.guest_mbps == 0 {
+        if self.user_mbps == 0 {
             return Err(LimitConfigError::ZeroRate);
         }
         Ok(self)
@@ -172,10 +173,7 @@ mod tests {
     use super::*;
 
     fn defaults() -> RelayLimitDefaults {
-        RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        }
+        RelayLimitDefaults { user_mbps: 5 }
     }
 
     #[test]

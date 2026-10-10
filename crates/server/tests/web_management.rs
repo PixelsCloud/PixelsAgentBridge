@@ -4,7 +4,6 @@ use axum::{
     http::{Request, StatusCode, header},
 };
 use http_body_util::BodyExt;
-use pab_protocol::RelayLimitDefaults;
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
     RelayControlAuth,
@@ -287,13 +286,7 @@ async fn removed_unbind_preserves_existing_access(pool: PgPool) {
 async fn app(pool: PgPool, registration_enabled: bool) -> (Router, ControlPlane) {
     let control =
         ControlPlane::new(PostgresStore::from_pool(pool), PasswordPolicy::default()).unwrap();
-    control
-        .initialize_settings(RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        })
-        .await
-        .unwrap();
+    control.initialize_settings().await.unwrap();
     let state = ControlApiState::new(
         control.clone(),
         ControlApiConfig {
@@ -458,7 +451,7 @@ async fn user_relay_limits_replace_team_routes_and_validate_admin_access(pool: P
     .await;
     let path = format!("/api/web/accounts/{}/traffic", user["id"].as_str().unwrap());
     assert_eq!(
-        call(&app, "PUT", &path, &cookie, json!({"mbps":12}))
+        call(&app, "PUT", &path, &cookie, json!({"mbps":30}))
             .await
             .0,
         StatusCode::FORBIDDEN
@@ -471,7 +464,7 @@ async fn user_relay_limits_replace_team_routes_and_validate_admin_access(pool: P
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        call(&app, "PUT", &path, &cookie, json!({"mbps":12}))
+        call(&app, "PUT", &path, &cookie, json!({"mbps":30}))
             .await
             .0,
         StatusCode::OK
@@ -480,14 +473,14 @@ async fn user_relay_limits_replace_team_routes_and_validate_admin_access(pool: P
         call(&app, "GET", "/api/web/traffic", &cookie, Value::Null)
             .await
             .2["user_mbps"],
-        12
+        30
     );
     let snapshot = control
         .relay_policy_snapshot(std::time::Duration::from_secs(60))
         .await
         .unwrap();
     assert_eq!(snapshot.user_limits.len(), 1);
-    assert_eq!(snapshot.user_limits[0].mbps, 12);
+    assert_eq!(snapshot.user_limits[0].mbps, 30);
     assert_eq!(
         call(
             &app,
@@ -498,19 +491,35 @@ async fn user_relay_limits_replace_team_routes_and_validate_admin_access(pool: P
         )
         .await
         .0,
-        StatusCode::OK
+        StatusCode::METHOD_NOT_ALLOWED
     );
     assert_eq!(
         call(&app, "PUT", &path, &cookie, json!({"mbps":null}))
             .await
             .0,
-        StatusCode::OK
+        StatusCode::UNPROCESSABLE_ENTITY
     );
     let traffic = call(&app, "GET", "/api/web/traffic", &cookie, Value::Null)
         .await
         .2;
-    assert_eq!(traffic["user_mbps"], 8);
-    assert_eq!(traffic["guest_mbps"], 2);
+    assert_eq!(traffic["user_mbps"], 30);
+    assert!(traffic.get("guest_mbps").is_none());
+    for value in [12, -1, 101] {
+        assert_eq!(
+            call(&app, "PUT", &path, &cookie, json!({"mbps":value}))
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    for value in pab_protocol::RELAY_MBPS_OPTIONS {
+        assert_eq!(
+            call(&app, "PUT", &path, &cookie, json!({"mbps":value}))
+                .await
+                .0,
+            StatusCode::OK
+        );
+    }
     assert_eq!(
         call(&app, "GET", "/api/web/teams", &cookie, Value::Null)
             .await
@@ -587,14 +596,13 @@ async fn verified_user_context_switches_without_changing_device_endpoint_identit
         native_call(&app, "PUT", route, token, context_update(&secret, token, 1)).await;
     assert_eq!(unavailable.0, StatusCode::OK);
     assert!(unavailable.1["user"].is_null());
-    assert_eq!(
+    assert!(
         control
             .relay_policy_snapshot(std::time::Duration::from_secs(60))
             .await
             .unwrap()
-            .endpoints[0]
-            .owner,
-        RelayEndpointOwner::Guest
+            .endpoints
+            .is_empty()
     );
     sqlx::query("UPDATE users SET status='active' WHERE id=$1")
         .bind(user_id)
@@ -650,7 +658,7 @@ async fn verified_user_context_switches_without_changing_device_endpoint_identit
         .relay_policy_snapshot(std::time::Duration::from_secs(60))
         .await
         .unwrap();
-    assert_eq!(snapshot.endpoints[0].owner, RelayEndpointOwner::Guest);
+    assert!(snapshot.endpoints.is_empty());
     assert!(snapshot.policy_version > version.as_u64().unwrap());
     assert_eq!(
         native_call(&app, "PUT", route, token, context_update(&secret, token, 2))
@@ -1066,7 +1074,8 @@ async fn input_boundaries_privileged_configuration_and_no_task_routes(pool: PgPo
         .await
         .unwrap();
     let (_, _, config) = call(&app, "GET", "/api/web/service", &cookie, Value::Null).await;
-    assert_eq!(config["default_user_mbps"], 5);
+    assert!(config.get("default_user_mbps").is_none());
+    assert!(config.get("default_guest_mbps").is_none());
     assert_eq!(config["session_expires"], false);
     for forbidden in ["secret", "password", "database", "token"] {
         assert!(!config.to_string().contains(forbidden));

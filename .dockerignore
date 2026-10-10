@@ -21,3 +21,8 @@ packaging/docker/private.env
 **/*.key
 **/*.pdb
 **/*.log
+
+# Private service configuration (examples remain tracked)
+**/pab-server.toml
+**/pab-relay-server.toml
+/packaging/docker/config/

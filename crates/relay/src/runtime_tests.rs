@@ -30,10 +30,7 @@ fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
         policy_version: 1,
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
-        defaults: RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        },
+        defaults: RelayLimitDefaults { user_mbps: 5 },
         user_limits: Vec::new(),
         endpoints: vec![
             RelayEndpointPolicy {
@@ -115,10 +112,7 @@ fn forwarding_hook_shares_user_budget_across_connections() {
         policy_version: 1,
         issued_at_unix_ms: now - 1_000,
         expires_at_unix_ms: now + 60_000,
-        defaults: RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        },
+        defaults: RelayLimitDefaults { user_mbps: 5 },
         user_limits: vec![UserRelayLimit { user_id, mbps: 1 }],
         endpoints,
         connection_intents,

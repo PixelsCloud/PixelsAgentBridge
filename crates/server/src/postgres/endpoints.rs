@@ -171,11 +171,14 @@ impl PostgresStore {
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             .execute(&mut *tx)
             .await?;
-        let settings = sqlx::query("SELECT default_user_mbps, default_guest_mbps, policy_revision FROM server_settings WHERE singleton")
-            .fetch_optional(&mut *tx).await?.ok_or_else(|| StoreError::InvalidState("server settings are not initialized".into()))?;
+        let settings = sqlx::query("SELECT policy_revision FROM server_settings WHERE singleton")
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| {
+                StoreError::InvalidState("server settings are not initialized".into())
+            })?;
         let defaults = RelayLimitDefaults {
-            user_mbps: support::positive_u32(settings.try_get("default_user_mbps")?)?,
-            guest_mbps: support::positive_u32(settings.try_get("default_guest_mbps")?)?,
+            user_mbps: pab_protocol::DEFAULT_RELAY_MBPS,
         };
         let user_limits = sqlx::query("SELECT id, relay_limit_mbps FROM users WHERE status = 'active' AND relay_limit_mbps IS NOT NULL ORDER BY id")
             .fetch_all(&mut *tx).await?.into_iter().map(|row| {
@@ -188,8 +191,6 @@ impl PostgresStore {
         let endpoint_rows = sqlx::query(
             r#"
             SELECT e.endpoint_key, e.tenant_id, e.owner_kind, e.user_id, e.device_id,
-                   tenant.kind AS tenant_kind,
-                   context.endpoint_key IS NOT NULL AS has_user_context,
                    context_user.id AS context_user_id,
                    COALESCE(device.owner_tenant_id, e.tenant_id) AS relay_tenant_id
             FROM endpoints e
@@ -201,6 +202,7 @@ impl PostgresStore {
             LEFT JOIN devices device
                    ON device.tenant_id = e.tenant_id AND device.id = e.device_id
             WHERE e.status = 'active'
+              AND (e.owner_kind = 'device' OR context_user.id IS NOT NULL)
               AND (
                   (e.owner_kind = 'user' AND u.status = 'active')
                   OR
@@ -276,32 +278,16 @@ fn endpoint_policy_from_row(row: sqlx::postgres::PgRow) -> Result<RelayEndpointP
         .try_into()
         .map_err(|_| StoreError::InvalidData("endpoint key is not 32 bytes".to_owned()))?;
     let owner_kind: String = row.try_get("owner_kind")?;
-    let owner = if owner_kind != "device" && row.try_get::<bool, _>("has_user_context")? {
-        match row.try_get::<Option<uuid::Uuid>, _>("context_user_id")? {
-            Some(user_id) => RelayEndpointOwner::User {
-                scope: TrafficScope::User {
-                    user_id: UserId::from_uuid(user_id),
-                },
-            },
-            None => RelayEndpointOwner::Guest,
+    let owner = if owner_kind == "device" {
+        RelayEndpointOwner::Device {
+            tenant_id: TenantId::from_uuid(row.try_get("relay_tenant_id")?),
+            device_id: DeviceId::from_uuid(row.try_get("device_id")?),
         }
     } else {
-        match owner_kind.as_str() {
-            "user" => {
-                let user_id = UserId::from_uuid(row.try_get("user_id")?);
-                let scope = TrafficScope::User { user_id };
-                RelayEndpointOwner::User { scope }
-            }
-            "device" => RelayEndpointOwner::Device {
-                tenant_id: TenantId::from_uuid(row.try_get("relay_tenant_id")?),
-                device_id: DeviceId::from_uuid(row.try_get("device_id")?),
+        RelayEndpointOwner::User {
+            scope: TrafficScope::User {
+                user_id: UserId::from_uuid(row.try_get("context_user_id")?),
             },
-            "guest" => RelayEndpointOwner::Guest,
-            other => {
-                return Err(StoreError::InvalidData(format!(
-                    "unknown endpoint owner kind {other}"
-                )));
-            }
         }
     };
     Ok(RelayEndpointPolicy {

@@ -1,0 +1,20 @@
+# Copy to config/pab-relay-server.toml. Never commit real credentials.
+# Each Relay instance needs a distinct, stable node ID and persistent usage path.
+node_id = "primary"
+usage_dir = "/var/lib/pab/usage"
+https_bind = "0.0.0.0:31443"
+quic_bind = "0.0.0.0:7842"
+
+[tls]
+cert = "/run/pab-certs/relay-cert.pem"
+key = "/run/pab-certs/relay-key.pem"
+
+[control]
+# The certificate must include backend (or your chosen network DNS alias).
+url = "wss://backend:8443/relay-control"
+ca_cert = "/run/pab-certs/backend-ca.pem"
+secret = "replace-with-a-random-secret-at-least-32-bytes"
+
+[log]
+directory = "/var/log/pab"
+level = "info"

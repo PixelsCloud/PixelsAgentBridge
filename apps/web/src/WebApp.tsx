@@ -63,7 +63,6 @@ function Console(props: Preferences) {
     { key: '/devices', icon: <Monitor size={18}/>, label: t(management ? 'devices' : 'myDevices') },
     ...(!management ? [{ key: '/saved-devices', icon: <List size={18}/>, label: t('savedDevices') }] : []),
     { key: '/usage', icon: <Activity size={18}/>, label: t(management ? 'serviceUsage' : 'myUsage') },
-    { key: '/online', icon: <Activity size={18}/>, label: t('onlineDevices') },
     ...(management ? [{ key: '/accounts', icon: <Users size={18}/>, label: t('accounts') }] : []),
     ...(management ? [{ key: '/relay', icon: <Network size={18}/>, label: t('relay') }] : []),
     ...(management ? [{ key: '/audit', icon: <List size={18}/>, label: t('events') }] : []),
@@ -78,8 +77,8 @@ function Console(props: Preferences) {
   </Layout.Sider><Layout><Layout.Header className="console-header"><Typography.Text type="secondary">{t(management ? 'serviceManagement' : 'personalCenter')}</Typography.Text><Space size={16}>{preferences}<Tag>{me.username}</Tag><Button aria-label={t('logout')} icon={<LogOut size={16}/>} onClick={logout}/></Space></Layout.Header>
     <Layout.Content className="console-content">{new URLSearchParams(location.search).get("github_error") && <Alert type="error" title={t(new URLSearchParams(location.search).get("github_error")!)} showIcon style={{ marginBottom: 16 }}/>}{!connected && <Alert type="warning" title={t('disconnected')} showIcon style={{ marginBottom: 16 }}/>}<Suspense fallback={<Spin/>}><Routes key={`${me.id}:${management}`}>
       <Route path="/" element={<Overview all={management} liveRevision={liveRevision}/>}/>
-      <Route path="/devices" element={<DeviceListPage key="list" me={viewMe} mode="list" liveRevision={liveRevision}/>}/>
-      <Route path="/online" element={<DeviceListPage key="online" me={viewMe} mode="online" liveRevision={liveRevision}/>}/>
+      <Route path="/devices" element={<DeviceListPage me={viewMe} liveRevision={liveRevision}/>}/>
+      <Route path="/online" element={<Navigate to={`/devices?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(location.search)), status: 'online' })}`} replace/>}/>
       <Route path="/saved-devices" element={<SavedDevicesPage liveRevision={liveRevision} />} />
       <Route path="/usage" element={<UsagePage all={management} liveRevision={liveRevision} />} />
       <Route path="/all-devices" element={<Navigate to={{ pathname: '/devices', search: location.search, hash: location.hash }} replace/>}/>

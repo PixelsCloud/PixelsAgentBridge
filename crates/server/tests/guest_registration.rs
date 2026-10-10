@@ -1,10 +1,11 @@
 use std::time::Duration;
+include!("login_fixture.inc");
 
 use iroh_base::SecretKey;
 use pab_protocol::{
     DEVICE_NETWORK_SCHEMA_VERSION, DeviceId, DeviceNetworkUpdate, DeviceRef, EndpointInstanceId,
     EndpointKey, EndpointProofPrincipal, EndpointProofPurpose, EndpointProofResponse,
-    EndpointSignature, RelayLimitDefaults, TenantId,
+    EndpointSignature, TenantId,
 };
 use pab_server::{ControlPlane, EndpointProofSession, PasswordPolicy, PostgresStore};
 use sqlx::PgPool;
@@ -45,13 +46,7 @@ fn proof(
 async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: PgPool) {
     let store = PostgresStore::from_pool(pool);
     let control = ControlPlane::new(store.clone(), PasswordPolicy::default()).unwrap();
-    control
-        .initialize_settings(RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        })
-        .await
-        .unwrap();
+    control.initialize_settings().await.unwrap();
 
     let device_secret = SecretKey::generate();
     let first = control
@@ -126,6 +121,70 @@ async fn self_registration_is_idempotent_and_does_not_create_an_account(pool: Pg
     assert_eq!((users, devices, guests), (0, 1, 1));
 
     let guest_key = EndpointKey::new(*guest_secret.public().as_bytes());
+    let process = control.registered_endpoint(guest_key).await.unwrap();
+    assert!(matches!(
+        control.resolve_device_code(&process, first.code).await,
+        Err(pab_server::ServiceError::LoginRequired)
+    ));
+    let target = DeviceRef {
+        tenant_id: first.tenant_id,
+        device_id: first.id,
+    };
+    assert!(matches!(
+        control.device_network_snapshot(&process, target).await,
+        Err(pab_server::ServiceError::LoginRequired)
+    ));
+    let policy = control
+        .relay_policy_snapshot(Duration::from_secs(30))
+        .await
+        .unwrap();
+    assert!(!policy.endpoints.iter().any(|e| e.endpoint_key == guest_key));
+    assert!(
+        policy
+            .endpoints
+            .iter()
+            .any(|e| e.endpoint_key == EndpointKey::new(*device_secret.public().as_bytes()))
+    );
+    let operator = control
+        .register_account("signed-in-operator", "long enough test password")
+        .await
+        .unwrap();
+    bind_test_login(store.pool(), operator.id, guest_key).await;
+    assert!(
+        control
+            .resolve_device_code(&process, first.code)
+            .await
+            .is_ok()
+    );
+    sqlx::query("UPDATE users SET status='disabled' WHERE id=$1")
+        .bind(operator.id.as_uuid())
+        .execute(store.pool())
+        .await
+        .unwrap();
+    assert!(matches!(
+        control.resolve_device_code(&process, first.code).await,
+        Err(pab_server::ServiceError::LoginRequired)
+    ));
+    sqlx::query("UPDATE users SET status='active' WHERE id=$1")
+        .bind(operator.id.as_uuid())
+        .execute(store.pool())
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM web_sessions WHERE user_id=$1")
+        .bind(operator.id.as_uuid())
+        .execute(store.pool())
+        .await
+        .unwrap();
+    assert!(matches!(
+        control.resolve_device_code(&process, first.code).await,
+        Err(pab_server::ServiceError::LoginRequired)
+    ));
+    sqlx::query("DELETE FROM endpoint_user_contexts WHERE endpoint_key=$1")
+        .bind(guest_key.as_bytes().as_slice())
+        .execute(store.pool())
+        .await
+        .unwrap();
+    bind_test_login(store.pool(), operator.id, guest_key).await;
     let device_ref = store
         .guest_resolve_device_code(guest_key, first.code)
         .await

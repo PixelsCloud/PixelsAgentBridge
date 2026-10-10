@@ -21,8 +21,8 @@ use pab_protocol::{
     DeviceRef, DeviceTaskResponse, EndpointAuthenticationResult, EndpointInstanceId, EndpointKey,
     EndpointProofPrincipal, EndpointProofResponse, EndpointRegistration,
     EndpointRegistrationResult, EndpointSignature, ExecutionContext, ExecutionScope,
-    ExpectedEnvironment, InterpreterContext, OperatorRef, OsFamily, PathStyle, RelayLimitDefaults,
-    RequestId, TaskState,
+    ExpectedEnvironment, InterpreterContext, OperatorRef, OsFamily, PathStyle, RequestId,
+    TaskState,
 };
 use pab_relay::{
     PolicySync, RelayControlClient, RelayPolicyRuntime, RelayPolicyState, RelayServiceConfig,
@@ -52,9 +52,13 @@ async fn connect_device_over_bridge(
     Result<(), DeviceSessionError>,
 ) {
     let client = async {
-        let connection = bridge
+        let result = bridge
             .connect_device(device_ref, zeroize::Zeroizing::new(password.to_owned()))
-            .await?;
+            .await;
+        if let Err(error) = &result {
+            eprintln!("connection attempt failed: {error}");
+        }
+        let connection = result?;
         let result = (
             connection.device_ref(),
             connection.operator(),
@@ -68,7 +72,11 @@ async fn connect_device_over_bridge(
         let connection = device.accept().await.unwrap().unwrap();
         acceptor.handle(connection).await
     };
-    tokio::join!(client, server)
+    tokio::time::timeout(Duration::from_secs(30), async {
+        tokio::join!(client, server)
+    })
+    .await
+    .expect("device connection fixture did not finish")
 }
 
 fn endpoint_secret_text(secret: &SecretKey) -> String {
@@ -115,16 +123,16 @@ async fn receive(
 
 #[sqlx::test(migrations = "./migrations")]
 async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
+    // This end-to-end fixture keeps many QUIC clients alive concurrently. Box its
+    // future so Windows test threads do not copy it through every runtime layer.
+    Box::pin(tls_account_flow(pool)).await;
+}
+
+async fn tls_account_flow(pool: PgPool) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let store = PostgresStore::from_pool(pool.clone());
     let control = ControlPlane::new(store, PasswordPolicy::default()).unwrap();
-    control
-        .initialize_settings(RelayLimitDefaults {
-            user_mbps: 5,
-            guest_mbps: 1,
-        })
-        .await
-        .unwrap();
+    control.initialize_settings().await.unwrap();
     let inspection_control = control.clone();
     let state = ControlApiState::new(
         control,
@@ -498,6 +506,35 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     );
     drop(endpoint_socket);
 
+    let http_account = pab_agent_core::account::AccountClient::new(
+        &format!("https://localhost:{}", address.port()),
+        Some(certified.cert.pem().as_bytes()),
+    )
+    .unwrap();
+    let primary_login = http_account
+        .login(
+            "alice",
+            zeroize::Zeroizing::new("correct horse battery staple".into()),
+            false,
+        )
+        .await
+        .unwrap();
+    http_account
+        .bind_endpoint(&secret, 1, Some(&primary_login.access_token))
+        .await
+        .unwrap();
+    let secondary_login = http_account
+        .login(
+            "bob",
+            zeroize::Zeroizing::new("another correct test password".into()),
+            false,
+        )
+        .await
+        .unwrap();
+    http_account
+        .bind_endpoint(&second_user_secret, 1, Some(&secondary_login.access_token))
+        .await
+        .unwrap();
     let connector = tls_connector(Some(&std::fs::read(&certificate_path).unwrap())).unwrap();
     let agent_config = EndpointControlConfig {
         url: format!("wss://localhost:{}/control", address.port()),
@@ -847,7 +884,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         } => {
             assert_eq!(request_id, scopes_request_id);
             assert_eq!(options.personal_tenant_id, personal_tenant_id);
-            assert_eq!(options.personal_mbps, 5);
+            assert_eq!(options.personal_mbps, 10);
         }
         response => panic!("unexpected traffic scopes response: {response:?}"),
     }
@@ -919,6 +956,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         Err(pab_agent_core::AccountScopeError::ScopeUnavailable)
     ));
 
+    eprintln!("TLS fixture stage: let relay_url = format!");
     let relay_url = format!("wss://localhost:{}/relay-control", address.port());
     let unauthorized = tokio::time::timeout(
         Duration::from_secs(5),
@@ -958,6 +996,8 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let running_relay = tokio::time::timeout(
         Duration::from_secs(30),
         start_relay_service(RelayServiceConfig {
+            node_id: "primary".into(),
+            usage_dir: certificate_directory.path().join("usage"),
             control_url: format!("wss://localhost:{}/relay-control", address.port()),
             control_secret: RELAY_CONTROL_SECRET.to_owned(),
             control_ca_cert: Some(certificate_path.clone()),
@@ -1007,6 +1047,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     let bridge_directory = tempfile::tempdir().unwrap();
     let bridge_secret_path = bridge_directory.path().join("bridge-endpoint.key");
     std::fs::write(&bridge_secret_path, endpoint_secret_text(&secret)).unwrap();
+    eprintln!("TLS fixture stage: let mut bridge = BridgeClient::connect");
     let mut bridge = BridgeClient::connect(BridgeConfig {
         tenant_id: personal_tenant_id,
         identity: pab_bridge::BridgeIdentity::Account(user_id),
@@ -1121,6 +1162,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await
     .unwrap();
 
+    eprintln!("TLS fixture stage: let (accepted, accepted_server) = connect_device_over_bridge");
     let (accepted, accepted_server) = connect_device_over_bridge(
         &mut bridge,
         &device_endpoint,
@@ -1339,6 +1381,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     assert!(matches!(rejected, Err(BridgeError::AuthenticationRejected)));
     assert!(matches!(rejected_server, Err(DeviceSessionError::Rejected)));
 
+    eprintln!("TLS fixture stage: let guest_secret = SecretKey::generate");
     let guest_secret = SecretKey::generate();
     let guest_registration = register_open_endpoint(
         &format!("wss://localhost:{}/control", address.port()),
@@ -1358,6 +1401,40 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     };
     let guest_secret_path = bridge_directory.path().join("guest-endpoint.key");
     std::fs::write(&guest_secret_path, endpoint_secret_text(&guest_secret)).unwrap();
+    let mut anonymous = AuthenticatedControlConnection::connect(
+        &EndpointControlConfig {
+            url: format!("wss://localhost:{}/control", address.port()),
+            tenant_id: guest_tenant_id,
+            principal: EndpointProofPrincipal::Guest,
+            operation_timeout: Duration::from_secs(5),
+        },
+        &guest_secret,
+        tls_connector(Some(certified.cert.pem().as_bytes())).unwrap(),
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        anonymous
+            .get_device_network(device_ref, Duration::from_secs(5))
+            .await,
+        Err(pab_agent_core::EndpointControlError::Server {
+            code: ControlErrorCode::PermissionDenied,
+            ..
+        })
+    ));
+    anonymous.close().await.unwrap();
+    let logged_in = http_account
+        .login(
+            "http-live-user",
+            zeroize::Zeroizing::new("test password long enough".into()),
+            true,
+        )
+        .await
+        .unwrap();
+    http_account
+        .bind_endpoint(&guest_secret, 1, Some(&logged_in.access_token))
+        .await
+        .unwrap();
     let mut guest = BridgeClient::connect(BridgeConfig {
         tenant_id: guest_tenant_id,
         identity: pab_bridge::BridgeIdentity::Guest,
@@ -1378,6 +1455,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
     .await
     .unwrap();
     // Connect using a saved ref without looking up its code first.
+    eprintln!("TLS fixture stage: let (accepted, accepted_server) = connect_device_over_bridge");
     let (accepted, accepted_server) = connect_device_over_bridge(
         &mut guest,
         &device_endpoint,
@@ -1397,7 +1475,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
 
     let guest_acceptor = acceptor.clone();
     let guest_device = device_endpoint.clone();
-    let guest_server = tokio::spawn(async move {
+    let mut guest_server = tokio::spawn(async move {
         let connection = guest_device.accept().await.unwrap().unwrap();
         guest_acceptor.handle(connection).await
     });
@@ -1411,7 +1489,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             zeroize::Zeroizing::new(device_password.to_owned()),
         )
         .await;
-    let guest_connection = match guest_connection_result {
+    let mut guest_connection = match guest_connection_result {
         Ok(connection) => connection,
         Err(error) => {
             let device_result = tokio::time::timeout(Duration::from_secs(5), guest_server).await;
@@ -1502,14 +1580,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         http_account.current(&rejected_token).await,
         Err(pab_agent_core::account::AccountError::Http(401))
     ));
-    let logged_in = http_account
-        .login(
-            "http-live-user",
-            zeroize::Zeroizing::new("test password long enough".into()),
-            true,
-        )
-        .await
-        .unwrap();
     let receipt = http_account
         .bind_endpoint(&guest_secret, 1, Some(&logged_in.access_token))
         .await
@@ -1547,28 +1617,23 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(identity_task.initiating_user, remote_user.user);
+    eprintln!("TLS fixture stage: http_account.logout(&logged_in.access_token)");
     http_account.logout(&logged_in.access_token).await.unwrap();
     http_account
         .bind_endpoint(&guest_secret, 2, None)
         .await
         .unwrap();
+    assert!(guest_connection.user_context().await.is_err());
     assert!(
-        guest_connection
-            .user_context()
-            .await
-            .unwrap()
-            .user
-            .is_none()
-    );
-    assert_eq!(guest_connection.operator(), endpoint_operator);
-    assert_eq!(
         guest_connection
             .get_task(identity_task.task_ref)
             .await
-            .unwrap()
-            .initiating_user,
-        remote_user.user
+            .is_err()
     );
+    assert_eq!(guest_connection.operator(), endpoint_operator);
+    let _ = tokio::time::timeout(Duration::from_secs(10), &mut guest_server)
+        .await
+        .unwrap();
     assert!(
         account_connection
             .get_task(identity_task.task_ref)
@@ -1585,6 +1650,21 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         .unwrap();
     http_account
         .bind_endpoint(&guest_secret, 3, Some(&switched.access_token))
+        .await
+        .unwrap();
+    eprintln!("TLS fixture stage: let reconnect_acceptor = acceptor.clone()");
+    let reconnect_acceptor = acceptor.clone();
+    let reconnect_device = device_endpoint.clone();
+    guest_server = tokio::spawn(async move {
+        reconnect_acceptor
+            .handle(reconnect_device.accept().await.unwrap().unwrap())
+            .await
+    });
+    guest_connection = guest
+        .connect_device(
+            device_ref,
+            zeroize::Zeroizing::new(device_password.to_owned()),
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -1605,11 +1685,6 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
             .initiating_user,
         remote_user.user
     );
-    http_account.logout(&switched.access_token).await.unwrap();
-    http_account
-        .bind_endpoint(&guest_secret, 4, None)
-        .await
-        .unwrap();
     assert_eq!(
         account_connection
             .get_environment()
@@ -1819,6 +1894,7 @@ async fn tls_wss_account_endpoint_and_relay_policy_flow(pool: PgPool) {
         relay_nodes, 1,
         "real Relay policy polling must report its applied revision"
     );
+    eprintln!("TLS fixture stage: guest_connection.close();");
     guest_connection.close();
     tokio::time::timeout(Duration::from_secs(5), guest_server)
         .await

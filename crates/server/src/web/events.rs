@@ -16,7 +16,7 @@ pub(crate) async fn subscribe(
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Result<Response, WebError> {
-    if !same_origin(&headers) {
+    if !same_origin(&headers, state.origin.as_deref()) {
         return Err(WebError::new(StatusCode::FORBIDDEN, "origin_rejected"));
     }
     viewer(&state, &headers).await?;

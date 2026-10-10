@@ -48,6 +48,17 @@ impl DeviceSession {
     pub(super) async fn cached_connection(&self) -> Option<Arc<AuthenticatedDeviceConnection>> {
         self.connection.read().await.clone()
     }
+    pub(super) async fn close_for_account_change(&self) {
+        if let Some(connection) = self.connection.write().await.take() {
+            connection.as_ref().clone().close();
+            self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                device_ref: self.device_ref,
+                phase: DeviceConnectionPhase::Disconnected,
+                retry_in_ms: None,
+                message: Some("login required".into()),
+            });
+        }
+    }
     #[cfg(test)]
     pub(super) async fn set_test_connection(&self, connection: AuthenticatedDeviceConnection) {
         *self.connection.write().await = Some(Arc::new(connection));

@@ -4446,10 +4446,12 @@ dependencies = [
  "pab-agent-core",
  "pab-logging",
  "pab-protocol",
+ "pab-service-config",
  "pab-transport",
  "rcgen",
  "rustls",
  "rustls-pemfile",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
@@ -4488,6 +4490,7 @@ dependencies = [
  "pab-platform",
  "pab-protocol",
  "pab-relay",
+ "pab-service-config",
  "pab-task-runtime",
  "pab-transport",
  "rand_core 0.6.4",
@@ -4510,6 +4513,16 @@ dependencies = [
  "url",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "pab-service-config"
+version = "1.2.48"
+dependencies = [
+ "serde",
+ "tempfile",
+ "thiserror 2.0.20",
+ "toml",
 ]
 
 [[package]]

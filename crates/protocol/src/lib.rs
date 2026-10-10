@@ -84,9 +84,9 @@ pub use relay_control::{
     RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
 };
 pub use relay_policy::{
-    LimitConfigError, RELAY_POLICY_SCHEMA_VERSION, RelayConnectionIntent, RelayEndpointOwner,
-    RelayEndpointPolicy, RelayLimitDefaults, RelayPolicyError, RelayPolicySnapshot, TrafficScope,
-    UserRelayLimit, mbps_to_bytes_per_second,
+    DEFAULT_RELAY_MBPS, LimitConfigError, RELAY_MBPS_OPTIONS, RELAY_POLICY_SCHEMA_VERSION,
+    RelayConnectionIntent, RelayEndpointOwner, RelayEndpointPolicy, RelayLimitDefaults,
+    RelayPolicyError, RelayPolicySnapshot, TrafficScope, UserRelayLimit, mbps_to_bytes_per_second,
 };
 pub use screenshot::*;
 pub use task::{

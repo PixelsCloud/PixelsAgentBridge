@@ -4,8 +4,7 @@ use pab_protocol::{
     AuthorizedDevicePeer, DEVICE_NETWORK_SCHEMA_VERSION, DEVICE_SESSION_SCHEMA_VERSION,
     DeviceHello, DeviceHelloResult, DeviceNetworkResult, DeviceNetworkSnapshot,
     DeviceNetworkUpdate, DeviceRef, EndpointKey, EndpointProofPrincipal, EndpointProofPurpose,
-    MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayLimitDefaults, RelayPolicySnapshot,
-    TenantId, UserId,
+    MAX_DEVICE_DIRECT_ADDRESSES, MAX_DEVICE_RELAY_URLS, RelayPolicySnapshot, TenantId, UserId,
 };
 use pab_task_runtime::{TaskRuntimeError, validate_execution_context};
 use thiserror::Error;
@@ -59,6 +58,7 @@ impl ControlPlane {
         &self,
         endpoint: &RegisteredEndpoint,
     ) -> Result<Vec<pab_protocol::DeviceDirectoryEntry>, ServiceError> {
+        self.require_operator_login(endpoint.endpoint_key).await?;
         let EndpointProofPrincipal::User { user_id } = endpoint.principal else {
             return Err(ServiceError::UserEndpointRequired);
         };
@@ -87,11 +87,8 @@ impl ControlPlane {
         &self.store
     }
 
-    pub async fn initialize_settings(
-        &self,
-        defaults: RelayLimitDefaults,
-    ) -> Result<(), ServiceError> {
-        Ok(self.store.initialize_settings(defaults).await?)
+    pub async fn initialize_settings(&self) -> Result<(), ServiceError> {
+        Ok(self.store.initialize_settings().await?)
     }
 
     pub async fn register_account(
@@ -130,7 +127,9 @@ impl ControlPlane {
                 .await
                 .map_err(ServiceError::PasswordTask)?;
         match (verified, credential) {
-            (true, Some(credential)) if credential.password_hash.is_some() => Ok(credential.account),
+            (true, Some(credential)) if credential.password_hash.is_some() => {
+                Ok(credential.account)
+            }
             _ => Err(ServiceError::InvalidCredentials),
         }
     }
@@ -284,6 +283,9 @@ impl ControlPlane {
                 return Err(ServiceError::UserEndpointRequired);
             }
         };
+        if authorized.user_context.user.is_none() {
+            return Err(ServiceError::LoginRequired);
+        }
         self.store
             .renew_connection_intent(peer_endpoint_key, device_id)
             .await?;
@@ -378,6 +380,7 @@ impl ControlPlane {
         endpoint: &RegisteredEndpoint,
         device_ref: DeviceRef,
     ) -> Result<DeviceNetworkSnapshot, ServiceError> {
+        self.require_operator_login(endpoint.endpoint_key).await?;
         let snapshot = match endpoint.principal {
             EndpointProofPrincipal::User { user_id } => {
                 self.store
@@ -409,6 +412,7 @@ impl ControlPlane {
         endpoint: &RegisteredEndpoint,
         code: pab_protocol::DeviceCode,
     ) -> Result<DeviceRef, ServiceError> {
+        self.require_operator_login(endpoint.endpoint_key).await?;
         Ok(match endpoint.principal {
             EndpointProofPrincipal::User { user_id } => {
                 self.store
@@ -431,6 +435,7 @@ impl ControlPlane {
         endpoint: &RegisteredEndpoint,
         code: pab_protocol::DeviceCode,
     ) -> Result<pab_protocol::DevicePresence, ServiceError> {
+        self.require_operator_login(endpoint.endpoint_key).await?;
         if matches!(endpoint.principal, EndpointProofPrincipal::Device { .. }) {
             return Err(ServiceError::UserEndpointRequired);
         }
@@ -451,10 +456,19 @@ impl ControlPlane {
     ) -> Result<RelayPolicySnapshot, ServiceError> {
         Ok(self.store.relay_policy_snapshot(validity).await?)
     }
+
+    async fn require_operator_login(&self, key: EndpointKey) -> Result<(), ServiceError> {
+        if self.store.endpoint_user_context(key).await?.user.is_none() {
+            return Err(ServiceError::LoginRequired);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
+    #[error("login required: register or sign in before adding or controlling devices")]
+    LoginRequired,
     #[error("invalid username or password")]
     InvalidCredentials,
     #[error("endpoint proof was issued for a different operation")]
