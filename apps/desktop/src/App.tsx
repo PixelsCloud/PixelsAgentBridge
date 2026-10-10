@@ -260,6 +260,7 @@ function App() {
           </nav>
           <div className="sidebar-spacer" />
           <div className="sidebar-status-group">
+            <UpdateNotice language={language} onOpen={() => { setSettingsSection("about"); setView("settings"); setError(""); }} />
             <MacosPermissionStatus language={language} onOpenSettings={() => { setSettingsSection("preferences"); setView("settings"); setError(""); }} />
             <div className="sidebar-status">
               <span className={`status-dot ${device?.executor_running ? "online" : ""}`} />
@@ -274,7 +275,6 @@ function App() {
 
         <main className="workspace">
           {error && <div className="toast error" role="status">{error}</div>}
-          <UpdateNotice language={language} onOpen={() => { setSettingsSection("about"); setView("settings"); setError(""); }} />
 
           <div className={`page-content page-${view}`}>
             {view === "home" && (

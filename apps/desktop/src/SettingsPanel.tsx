@@ -7,7 +7,6 @@ import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { UpdatePanel } from "./UpdatePanel";
-import { version } from "../package.json";
 
 type ServerSettings = {
   controlUrl: string;
@@ -105,9 +104,11 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
       {section === "tools" && <McpToolSettingsPanel language={language} />}
       {section === "about" && <div className="settings-about">
         <div className="surface-kicker"><Info size={15} /> {t.settingsAbout}</div>
-        <h2>Pixels Agent Bridge</h2>
-        <p>v{version}</p>
-        <p>{t.iconAttribution}</p>
+        <div className="settings-about-product">
+          <h2>Pixels Agent Bridge</h2>
+          <span className="settings-about-version">V{__PAB_RELEASE_VERSION__}</span>
+        </div>
+        <p className="settings-about-intro">{t.settingsAboutIntro}</p>
         <UpdatePanel language={language} />
       </div>}
       </section>

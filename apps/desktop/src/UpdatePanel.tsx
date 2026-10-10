@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button, Modal, Progress } from "antd";
+import { ArrowDownToLine, CheckCircle2 } from "lucide-react";
 import type { Language } from "./i18n";
 
 export type UpdateInfo = {
@@ -62,16 +63,28 @@ export function UpdatePanel({ language }: { language: Language }) {
   }
 
   return <div className="settings-update">
-    <h3>{t("在线更新", "Updates")}</h3>
-    <p>{t("当前安装包版本", "Installed release")}：V{__PAB_RELEASE_VERSION__}</p>
-    {available ? <>
-      <p>{t("发现新版本", "New release")}：V{available.version} · {(available.size / 1024 / 1024).toFixed(1)} MB</p>
-      <p>{en ? available.notes_en : available.notes_zh}</p>
-      {downloading && <Progress percent={progress} />}
-      {downloaded ? <Button type="primary" onClick={install}>{t("安装更新", "Install update")}</Button>
-        : <Button type="primary" loading={downloading} onClick={() => void download()}>{t("下载更新", "Download update")}</Button>}
-    </> : <p>{t("没有待安装的更新。", "No update is available.")}</p>}
-    <Button loading={checking} onClick={() => void check()}>{t("检查更新", "Check for updates")}</Button>
+    <div className="settings-update-heading">
+      <div>
+        <h3>{t("在线更新", "Updates")}</h3>
+        <p>{t("检查并安装新版本", "Check for and install new releases")}</p>
+      </div>
+      <Button loading={checking} onClick={() => void check()}>{t("检查更新", "Check for updates")}</Button>
+    </div>
+    <div className="settings-update-status">
+      {available ? <>
+        <div className="settings-update-release">
+          <ArrowDownToLine size={18} strokeWidth={1.8} aria-hidden="true" />
+          <strong>{t("发现新版本", "New release")} V{available.version}</strong>
+          <span>{(available.size / 1024 / 1024).toFixed(1)} MB</span>
+        </div>
+        <p className="settings-update-notes">{en ? available.notes_en : available.notes_zh}</p>
+        {downloading && <Progress percent={progress} />}
+        <div className="settings-update-actions">
+          {downloaded ? <Button type="primary" onClick={install}>{t("安装更新", "Install update")}</Button>
+            : <Button type="primary" loading={downloading} onClick={() => void download()}>{t("下载更新", "Download update")}</Button>}
+        </div>
+      </> : <div className="settings-update-current"><CheckCircle2 size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("没有待安装的更新。", "No update is available.")}</span></div>}
+    </div>
     {error && <p className="settings-error" role="alert">{error}</p>}
   </div>;
 }

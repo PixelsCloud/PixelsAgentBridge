@@ -113,6 +113,21 @@
   border-color: var(--dark-border);
 }
 
+[data-theme="dark"] .settings-about-intro,
+[data-theme="dark"] .settings-update,
+[data-theme="dark"] .settings-update-status {
+  border-color: var(--dark-border);
+}
+
+[data-theme="dark"] .settings-about-version { border-color: #477e6f; color: var(--dark-accent); background: var(--dark-accent-soft); }
+[data-theme="dark"] .settings-update { background: var(--dark-raised); }
+[data-theme="dark"] .settings-update-status { background: var(--dark-surface); }
+[data-theme="dark"] .settings-update-heading h3,
+[data-theme="dark"] .settings-update-release strong { color: var(--dark-text); }
+[data-theme="dark"] .settings-update-release,
+[data-theme="dark"] .settings-update-current { color: var(--dark-accent); }
+[data-theme="dark"] .settings-update-release span { color: var(--dark-muted); }
+
 [data-theme="dark"] .section-separator {
   background: var(--dark-border);
 }

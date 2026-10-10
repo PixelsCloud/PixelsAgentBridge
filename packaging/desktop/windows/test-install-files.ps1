@@ -126,6 +126,28 @@ while (-not (Test-Path -LiteralPath $StopFile)) {
         }
     }
     Write-Output 'PASS: publication failure restores previous binaries'
+
+    # A running old image must not turn a successful rename and publication into
+    # a failed upgrade merely because process termination is delayed.
+    $stubborn = Start-Process -FilePath $binary -PassThru -WindowStyle Hidden
+    try {
+        $script:stubbornId = $stubborn.Id
+        function Stop-Process {
+            param([int]$Id, [switch]$Force, [string]$ErrorAction)
+            if ($Id -eq $script:stubbornId) { throw 'Simulated delayed process termination' }
+            Microsoft.PowerShell.Management\Stop-Process -Id $Id -Force -ErrorAction Stop
+        }
+        Install-PabBinaries -SourceRoot $sourceRoot -DestinationRoot $installedRoot
+        if ((Get-FileHash -LiteralPath $binary).Hash -ne (Get-FileHash -LiteralPath $fixture).Hash) {
+            throw 'Replacement was not published while old image remained in use'
+        }
+        $stubborn.Refresh()
+        if ($stubborn.HasExited) { throw 'The delayed-termination fixture unexpectedly exited' }
+        Write-Output 'PASS: delayed process termination does not roll back replacement'
+    } finally {
+        Remove-Item Function:\Stop-Process -ErrorAction SilentlyContinue
+        if ($stubborn) { Microsoft.PowerShell.Management\Stop-Process -Id $stubborn.Id -Force -ErrorAction SilentlyContinue }
+    }
 } finally {
     if ($watcher) { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }
     Get-CimInstance Win32_Process -Filter "Name LIKE 'pab-%'" |

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Button } from "antd";
-import { ArrowDownToLine } from "lucide-react";
+import { ArrowDownToLine, ChevronRight } from "lucide-react";
 import type { Language } from "./i18n";
 import type { UpdateInfo } from "./UpdatePanel";
 
@@ -28,17 +27,17 @@ export function UpdateNotice({ language, onOpen }: { language: Language; onOpen:
   if (!available) return null;
 
   const copy = language === "en"
-    ? { title: "Update available", detail: "A new release is ready to download.", action: "View update" }
+    ? { title: "Update", action: "View update" }
     : language === "zh-TW"
-      ? { title: "發現新版本", detail: "新版本已可下載。", action: "查看更新" }
-      : { title: "发现新版本", detail: "新版本已可下载。", action: "查看更新" };
+      ? { title: "新版本", action: "查看更新" }
+      : { title: "新版本", action: "查看更新" };
 
-  return <div className="update-notice" role="status" aria-live="polite">
-    <span className="update-notice-icon"><ArrowDownToLine size={19} strokeWidth={2} /></span>
-    <div className="update-notice-copy">
-      <strong>{copy.title} V{available.version}</strong>
-      <span>{copy.detail}</span>
-    </div>
-    <Button type="primary" onClick={onOpen}>{copy.action}</Button>
+  const label = `${copy.title} V${available.version}`;
+  return <div className="sidebar-update" role="status" aria-live="polite">
+    <button type="button" onClick={onOpen} aria-label={`${label}，${copy.action}`} title={`${label} · ${copy.action}`}>
+      <ArrowDownToLine size={15} strokeWidth={2} aria-hidden="true" />
+      <span>{label}</span>
+      <ChevronRight size={14} strokeWidth={1.8} aria-hidden="true" />
+    </button>
   </div>;
 }

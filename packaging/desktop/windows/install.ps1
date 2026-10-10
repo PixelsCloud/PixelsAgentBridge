@@ -11,22 +11,26 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Stop-PabInstalledBinary {
-    param([string[]]$Paths)
+    param([string[]]$Paths, [switch]$WarnIfRunning)
     # Compare full paths, never kill the Agent client or another installation.
     Get-CimInstance Win32_Process -Filter "Name LIKE 'pab-%'" |
         Where-Object { $_.ExecutablePath -and $Paths -icontains $_.ExecutablePath } |
         ForEach-Object {
             $processIdToStop = $_.ProcessId
+            $createdAt = $_.CreationDate
             try {
                 Stop-Process -Id $processIdToStop -Force -ErrorAction Stop
                 Wait-Process -Id $processIdToStop -Timeout 5 -ErrorAction SilentlyContinue
-                if (Get-Process -Id $processIdToStop -ErrorAction SilentlyContinue) {
-                    throw 'Process did not exit after forced termination'
-                }
             } catch {
-                if (Get-Process -Id $processIdToStop -ErrorAction SilentlyContinue) {
-                    throw "Could not stop installed program (PID ${processIdToStop}): $($_.Exception.Message)"
-                }
+                if ($WarnIfRunning) { Write-Warning "Could not stop old program (PID ${processIdToStop}): $($_.Exception.Message)" }
+            }
+            # A renamed image can remain in use without blocking publication of
+            # the replacement. Do not roll back merely because its process takes
+            # longer than five seconds to exit. Check creation time to avoid
+            # confusing a reused PID with the process we tried to stop.
+            $remaining = Get-CimInstance Win32_Process -Filter "ProcessId = $processIdToStop" -ErrorAction SilentlyContinue
+            if ($WarnIfRunning -and $remaining -and $remaining.CreationDate -eq $createdAt) {
+                Write-Warning "Old program (PID $processIdToStop) is still running from its retired image; replacement can continue"
             }
         }
 }
@@ -67,7 +71,7 @@ function Install-PabBinaries {
                 }
             }
             # Windows may report either the original or renamed executable path.
-            Stop-PabInstalledBinary -Paths @($binary, $old)
+            Stop-PabInstalledBinary -Paths @($binary, $old) -WarnIfRunning
         }
         foreach ($binary in $staged.Keys) {
             Move-Item -LiteralPath $staged[$binary] -Destination $binary -ErrorAction Stop
