@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Button, Modal, Progress } from "antd";
 import type { Language } from "./i18n";
 
-type UpdateInfo = {
+export type UpdateInfo = {
   version: string;
   size: number;
   notes_zh: string;
@@ -27,7 +27,7 @@ export function UpdatePanel({ language }: { language: Language }) {
     let closed = false;
     let offAvailable: (() => void) | undefined;
     let offProgress: (() => void) | undefined;
-    void listen<UpdateInfo>("update-available", event => {
+    void listen<UpdateInfo | null>("update-status-changed", event => {
       if (!closed) { setAvailable(event.payload); setDownloaded(false); }
     }).then(off => { if (closed) off(); else offAvailable = off; });
     void listen<DownloadProgress>("update-download-progress", event => {

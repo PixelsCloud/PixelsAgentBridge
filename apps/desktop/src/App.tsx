@@ -10,6 +10,7 @@ import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
+import { UpdateNotice } from "./UpdateNotice";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { AccountConnectionPanel, AccountLoginDialog } from "./AccountConnectionPanel";
 import type { ScopeStatus } from "./operatorTypes";
@@ -273,6 +274,7 @@ function App() {
 
         <main className="workspace">
           {error && <div className="toast error" role="status">{error}</div>}
+          <UpdateNotice language={language} onOpen={() => { setSettingsSection("about"); setView("settings"); setError(""); }} />
 
           <div className={`page-content page-${view}`}>
             {view === "home" && (

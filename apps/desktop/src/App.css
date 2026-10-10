@@ -58,6 +58,14 @@ button:not(.ant-btn):disabled { cursor: not-allowed; opacity: .55; }
 .language-switch button.active { color: #e9f7f2; background: #31556a; }
 
 .workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px; overflow: hidden; }
+.update-notice { display: flex; align-items: center; gap: 12px; flex: none; min-height: 64px; margin-bottom: 10px; padding: 10px 13px; border: 1px solid #9dd8c6; border-radius: 12px; color: #164b42; background: #e8f6f1; box-shadow: 0 3px 12px #126a5514; }
+.update-notice-icon { display: grid; place-items: center; flex: none; width: 37px; height: 37px; border-radius: 10px; color: #fff; background: #218574; }
+.update-notice-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.update-notice-copy strong { font-size: 13px; }
+.update-notice-copy span { color: #48756c; font-size: 11px; }
+.update-notice .ant-btn { flex: none; }
+[data-theme="dark"] .update-notice { border-color: #477e6f; color: #e8faf3; background: #29463d; box-shadow: none; }
+[data-theme="dark"] .update-notice-copy span { color: #b5d5c9; }
 .surface-kicker { color: #2b9582; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 h1, h2, h3, p { margin: 0; }
 .page-content { display: grid; gap: 17px; flex: 1; min-height: 0; }

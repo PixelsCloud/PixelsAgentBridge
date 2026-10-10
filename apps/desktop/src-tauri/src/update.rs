@@ -115,8 +115,10 @@ async fn query(state: &UpdateState) -> Result<Option<UpdateInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn check_for_update(state: State<'_, UpdateState>) -> Result<Option<UpdateInfo>, String> {
-    query(state.inner()).await
+pub async fn check_for_update(app: AppHandle, state: State<'_, UpdateState>) -> Result<Option<UpdateInfo>, String> {
+    let info = query(state.inner()).await?;
+    let _ = app.emit("update-status-changed", info.clone());
+    Ok(info)
 }
 
 #[tauri::command]
@@ -238,7 +240,7 @@ pub fn start_background_checks(app: AppHandle, state: UpdateState) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(15)).await;
         loop {
-            if let Ok(Some(info)) = query(&state).await { let _ = app.emit("update-available", info); }
+            if let Ok(info) = query(&state).await { let _ = app.emit("update-status-changed", info); }
             tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
         }
     });
