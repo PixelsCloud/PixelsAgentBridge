@@ -225,7 +225,7 @@ function App() {
       >
         <div className="titlebar-identity">
           <img className="brand-mark" src={brand} alt="" />
-          <span>Pixels Agent Bridge (v {__PAB_RELEASE_VERSION__})</span>
+          <span>Pixels Agent Bridge (V{__PAB_RELEASE_VERSION__})</span>
         </div>
         <div className="window-controls">
           <button
@@ -244,13 +244,13 @@ function App() {
       <div className="app-body">
         <aside className="sidebar">
           <Button type="text" className="sidebar-account" onClick={() => void openAccount()} disabled={accountLoading}
-            aria-label={activeScope ? `${t.nav.me}: ${activeScope.username}` : t.accountConnect}>
+            aria-label={activeScope ? `${t.nav.me}: ${activeScope.username}` : t.accountStartControl}>
             <Avatar size={38} icon={!activeScope ? <UserRound size={20} /> : undefined}>
               {activeScope ? Array.from(activeScope.username)[0]?.toUpperCase() : undefined}
             </Avatar>
             <span className="sidebar-account-info">
               <strong title={activeScope?.username}>{accountLoading ? t.loading : accountLoadFailed ? t.accountLoadFailed : activeScope?.username || t.accountNotSignedIn}</strong>
-              <small>{accountLoadFailed ? t.accountRetry : activeScope ? t.accountViewProfile : t.accountConnect}</small>
+              <small>{accountLoadFailed ? t.accountRetry : activeScope ? t.accountViewProfile : t.accountStartControl}</small>
             </span>
           </Button>
           <nav aria-label={t.navigation}>

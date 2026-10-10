@@ -1,13 +1,20 @@
 import { test, expect } from '@playwright/test';
 test('adding a device requires account login without disabling receiving service',async({page})=>{
   await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?logged-out');
-  await expect(page.getByText('Register or sign in before adding or controlling devices. Receiving devices do not need to sign in.')).toBeVisible();
+  await expect(page.getByText('Sign in to control a remote computer.')).not.toBeVisible();
+  await expect(page.getByRole('button',{name:'Register / Sign in',exact:true})).not.toBeVisible();
+  await page.getByRole('button',{name:'Add device',exact:true}).click();
+  await expect(page.getByRole('dialog')).toContainText('Sign in to control a remote computer.');
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).fixture.signedIn)).toBe(false);
   await page.getByPlaceholder('000 000 000').fill('123456789');
   await page.locator('#home-connect-password').fill('test-device-password');
-  await expect(page.getByRole('button',{name:'Add device',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Add device',exact:true}).click();
   await page.getByRole('button',{name:'Register / Sign in',exact:true}).click();
   expect(await page.evaluate(()=>(window as any).fixture.signedIn)).toBe(true);
   expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect'))).toEqual([]);
+  await expect(page.getByPlaceholder('000 000 000')).toHaveValue('123 456 789');
+  await expect(page.locator('#home-connect-password')).toHaveValue('test-device-password');
 });
 test('rename dialog enables save for its own changed draft and saves that name',async({page})=>{
   await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html');

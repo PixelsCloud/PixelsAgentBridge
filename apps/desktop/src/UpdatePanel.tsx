@@ -63,9 +63,9 @@ export function UpdatePanel({ language }: { language: Language }) {
 
   return <div className="settings-update">
     <h3>{t("在线更新", "Updates")}</h3>
-    <p>{t("当前安装包版本", "Installed release")}：v{__PAB_RELEASE_VERSION__}</p>
+    <p>{t("当前安装包版本", "Installed release")}：V{__PAB_RELEASE_VERSION__}</p>
     {available ? <>
-      <p>{t("发现新版本", "New release")}：v{available.version} · {(available.size / 1024 / 1024).toFixed(1)} MB</p>
+      <p>{t("发现新版本", "New release")}：V{available.version} · {(available.size / 1024 / 1024).toFixed(1)} MB</p>
       <p>{en ? available.notes_en : available.notes_zh}</p>
       {downloading && <Progress percent={progress} />}
       {downloaded ? <Button type="primary" onClick={install}>{t("安装更新", "Install update")}</Button>

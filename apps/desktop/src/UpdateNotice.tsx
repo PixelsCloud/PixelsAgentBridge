@@ -36,7 +36,7 @@ export function UpdateNotice({ language, onOpen }: { language: Language; onOpen:
   return <div className="update-notice" role="status" aria-live="polite">
     <span className="update-notice-icon"><ArrowDownToLine size={19} strokeWidth={2} /></span>
     <div className="update-notice-copy">
-      <strong>{copy.title} v{available.version}</strong>
+      <strong>{copy.title} V{available.version}</strong>
       <span>{copy.detail}</span>
     </div>
     <Button type="primary" onClick={onOpen}>{copy.action}</Button>
