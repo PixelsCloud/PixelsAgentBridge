@@ -136,15 +136,17 @@ New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
 $taskName = 'PixelsAgentBridgeExecutor'
 $supervisorTaskName = 'PixelsAgentBridgeSessionSupervisor'
 $existingSupervisorTask = Get-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
+$supervisorWasRunning = $existingSupervisorTask -and $existingSupervisorTask.State -eq 'Running'
 if ($existingSupervisorTask) {
     Stop-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
 }
 $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+$taskWasRunning = $existingTask -and $existingTask.State -eq 'Running'
 if ($existingTask) {
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 }
 $existingService = Get-Service -Name $taskName -ErrorAction SilentlyContinue
+$serviceWasRunning = $existingService -and $existingService.Status -eq 'Running'
 if ($existingService) {
     Stop-Service -Name $taskName -ErrorAction SilentlyContinue
     try {
@@ -177,7 +179,29 @@ if ($existingService) {
         }
     }
 }
-Install-PabBinaries -SourceRoot $source -DestinationRoot $InstallRoot
+try {
+    Install-PabBinaries -SourceRoot $source -DestinationRoot $InstallRoot
+} catch {
+    $installFailure = $_
+    # The binary transaction restored the previous files. Bring the old
+    # service and session helpers back before reporting the install failure.
+    if ($serviceWasRunning) {
+        try { Start-Service -Name $taskName -ErrorAction Stop }
+        catch { Write-Warning "Could not restart previous Executor service: $($_.Exception.Message)" }
+    }
+    if ($taskWasRunning) {
+        try { Start-ScheduledTask -TaskName $taskName -ErrorAction Stop }
+        catch { Write-Warning "Could not restart previous Executor task: $($_.Exception.Message)" }
+    }
+    if ($supervisorWasRunning) {
+        try { Start-ScheduledTask -TaskName $supervisorTaskName -ErrorAction Stop }
+        catch { Write-Warning "Could not restart previous session supervisor: $($_.Exception.Message)" }
+    }
+    throw $installFailure
+}
+if ($existingTask) {
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+}
 foreach ($obsolete in @('run-ui.ps1', 'run-device-ui.ps1', 'run-executor.ps1', 'pab-bridge.exe')) {
     $path = Join-Path $InstallRoot $obsolete
     if (Test-Path -LiteralPath $path) {

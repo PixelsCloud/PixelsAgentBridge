@@ -58,10 +58,26 @@ LangString SasPolicyPrompt ${LANG_SIMPCHINESE} "远程 Ctrl+Alt+Delete 需要允
 LangString SasPolicyPrompt ${LANG_ENGLISH} "Remote Ctrl+Alt+Delete requires Windows services to send the secure attention sequence. Setup will set SoftwareSASGeneration to 1. Continue?"
 LangString InstallFailed ${LANG_SIMPCHINESE} "安装服务失败。请查看上方安装日志。退出代码："
 LangString InstallFailed ${LANG_ENGLISH} "Service installation failed. Check the installation log above. Exit code:"
+LangString SetupAlreadyRunning ${LANG_SIMPCHINESE} "另一个 Pixels Agent Bridge 安装或卸载程序仍在运行。请先完成或关闭它，然后重试。"
+LangString SetupAlreadyRunning ${LANG_ENGLISH} "Another Pixels Agent Bridge setup or uninstaller is running. Close it before retrying."
 LangString UninstallFailed ${LANG_SIMPCHINESE} "卸载服务失败。请查看上方卸载日志。退出代码："
 LangString UninstallFailed ${LANG_ENGLISH} "Service removal failed. Check the uninstallation log above. Exit code:"
 
 Function .onInit
+    System::Call 'kernel32::CreateMutexW(p0,i0,w"Global\PixelsAgentBridgeSetup")p.r0?e'
+    Pop $1
+    ${If} $0 = 0
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
+    ${If} $1 = 183 ; ERROR_ALREADY_EXISTS
+        System::Call 'kernel32::CloseHandle(pr0)'
+        IfSilent setup_already_running
+        MessageBox MB_ICONSTOP "$(SetupAlreadyRunning)"
+    setup_already_running:
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
     ${IfNot} ${RunningX64}
         MessageBox MB_ICONSTOP "This package requires 64-bit Windows."
         Abort
@@ -71,6 +87,20 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
+    System::Call 'kernel32::CreateMutexW(p0,i0,w"Global\PixelsAgentBridgeSetup")p.r0?e'
+    Pop $1
+    ${If} $0 = 0
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
+    ${If} $1 = 183 ; ERROR_ALREADY_EXISTS
+        System::Call 'kernel32::CloseHandle(pr0)'
+        IfSilent uninstall_already_running
+        MessageBox MB_ICONSTOP "$(SetupAlreadyRunning)"
+    uninstall_already_running:
+        SetErrorLevel 2
+        Abort
+    ${EndIf}
     SetRegView 64
     SetShellVarContext all
 FunctionEnd
