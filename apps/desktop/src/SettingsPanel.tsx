@@ -6,6 +6,7 @@ import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
+import { UpdatePanel } from "./UpdatePanel";
 import { version } from "../package.json";
 
 type ServerSettings = {
@@ -107,6 +108,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <h2>Pixels Agent Bridge</h2>
         <p>v{version}</p>
         <p>{t.iconAttribution}</p>
+        <UpdatePanel language={language} />
       </div>}
       </section>
     </>

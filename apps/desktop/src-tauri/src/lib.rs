@@ -28,9 +28,12 @@ mod screenshot_session;
 mod server_settings;
 mod session_helper;
 mod tray;
+mod update;
 mod window_session;
 #[cfg(windows)]
 mod windows_session_supervisor;
+#[cfg(windows)]
+mod windows_gui;
 
 #[derive(Clone, Default)]
 struct LocalStatus(Arc<RwLock<Option<DeviceStatus>>>);
@@ -279,6 +282,15 @@ pub fn run() {
         eprintln!("Could not apply saved operator server settings: {error}");
     }
     let paths = DataPaths::for_scope(DataScope::User).expect("could not find user data directory");
+    #[cfg(windows)]
+    let gui_instance = match windows_gui::GuiInstance::acquire(paths.root()) {
+        Ok(Some(instance)) => instance,
+        Ok(None) => return,
+        Err(error) => {
+            eprintln!("Could not open desktop window: {error}");
+            return;
+        }
+    };
     #[cfg(target_os = "macos")]
     let gui_instance = match macos_launch::GuiInstance::acquire(paths.root()) {
         Ok(Some(instance)) => instance,
@@ -294,6 +306,7 @@ pub fn run() {
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
         .manage(github_login::GithubLoginState::default())
+        .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
         .setup(move |app| {
             let device_accounts = device_account::DeviceAccountService::default();
@@ -301,6 +314,13 @@ pub fn run() {
             tauri::async_runtime::spawn(device_accounts.run());
             tauri::async_runtime::spawn(device_account::run_catalog());
             tray::setup(app)?;
+            let update_state = app.state::<update::UpdateState>().inner().clone();
+            update::start_background_checks(app.handle().clone(), update_state);
+            #[cfg(windows)]
+            {
+                gui_instance.listen(app.handle().clone())?;
+                app.manage(gui_instance);
+            }
             #[cfg(target_os = "macos")]
             {
                 gui_instance.listen(app.handle().clone())?;
@@ -318,6 +338,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             tray::set_tray_language,
+            update::check_for_update,
+            update::update_status,
+            update::download_update,
+            update::install_update,
             macos_permissions::macos_permissions,
             macos_permissions::request_macos_permission,
             macos_permissions::open_macos_permission_settings,

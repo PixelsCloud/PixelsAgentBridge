@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from build_version import build_lock, reserve_version, record_artifacts, macos_artifacts, macos_app_version
+from build_version import build_lock, reserve_version, record_artifacts, macos_artifacts, macos_app_version, parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,7 +35,7 @@ def macos_architectures(selection):
     return [selection]
 
 
-def build_macos(version, profile, architectures, package):
+def build_macos(version, profile, architectures, package, installer_identity=None):
     from macos_signing import sign, IDENTIFIERS
     for architecture in architectures:
         target = f'{architecture}-apple-darwin'
@@ -54,7 +54,10 @@ def build_macos(version, profile, architectures, package):
         if package:
             run([sys.executable, 'packaging/desktop/build.py', '--platform', 'macos', '--profile', profile,
                  '--macos-arch', architecture, '--macos-bin-dir', binaries, '--macos-app', app])
-            run([sys.executable, 'packaging/desktop/build_macos_pkg.py', '--arch', architecture, '--profile', profile])
+            command = [sys.executable, 'packaging/desktop/build_macos_pkg.py', '--arch', architecture, '--profile', profile]
+            if installer_identity:
+                command += ['--sign', installer_identity]
+            run(command)
 
 
 def main():
@@ -64,7 +67,13 @@ def main():
     parser.add_argument('--package', action='store_true', help='Also package desktop/server artifacts; does not increment again')
     parser.add_argument('--image', help='Docker image tag (default: pixels-agent-bridge:<version>)')
     parser.add_argument('--macos-arch', choices=['native', 'arm64', 'aarch64', 'x86_64', 'all'], default=None)
+    parser.add_argument('--installer-version', help='Version reserved by the release service; does not change local build-version.json')
+    parser.add_argument('--macos-installer-identity', help='Developer ID Installer identity for the macOS PKG')
     args = parser.parse_args()
+    if args.installer_version:
+        parse_version(args.installer_version)
+        if len(args.targets) != 1 or args.targets[0] not in ('desktop', 'macos') or args.profile != 'release' or not args.package:
+            parser.error('--installer-version requires one release desktop/macos target with --package')
     targets = list(dict.fromkeys(args.targets))
     architectures = []
     if args.macos_arch and 'macos' not in targets:
@@ -100,7 +109,8 @@ def main():
         if missing:
             parser.error('Install required targets first: rustup target add ' + ' '.join(missing))
     with build_lock(ROOT):
-        version = reserve_version(ROOT)
+        version = args.installer_version or reserve_version(ROOT)
+        os.environ['PAB_INSTALLER_VERSION'] = version
         print(f'Building Pixels Agent Bridge {version}', flush=True)
         print('Only the installer release version increments; Rust, npm and Tauri versions stay unchanged.', flush=True)
         print('Cargo reuses cached artifacts and rebuilds only changed inputs.', flush=True)
@@ -117,7 +127,7 @@ def main():
             if target in ('web', 'desktop-web'):
                 frontend('web' if target == 'web' else 'desktop')
             elif target == 'macos':
-                build_macos(version, args.profile, architectures, args.package)
+                build_macos(version, args.profile, architectures, args.package, args.macos_installer_identity)
                 built_frontends.add('desktop')
             elif target == 'desktop':
                 run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp'])

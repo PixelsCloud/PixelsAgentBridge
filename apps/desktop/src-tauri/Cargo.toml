@@ -33,6 +33,9 @@ tracing = "0.1"
 tokio = { version = "1", features = ["io-util", "net", "process", "signal", "sync", "time"] }
 zeroize = "1"
 base64 = "0.22"
+ed25519-dalek = "2"
+sha2 = "0.10"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 url = "2"
 webbrowser = "1"
 encoding_rs = "0.8"
@@ -42,7 +45,7 @@ futures-util = "0.3"
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Environment", "Win32_System_RemoteDesktop", "Win32_System_StationsAndDesktops", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Environment", "Win32_System_RemoteDesktop", "Win32_System_StationsAndDesktops", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }

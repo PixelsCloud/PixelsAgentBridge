@@ -10,7 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [react()],
   define: {
-    __PAB_RELEASE_VERSION__: JSON.stringify(JSON.parse(readFileSync(new URL("../../build-version.json", import.meta.url), "utf8")).version),
+    __PAB_RELEASE_VERSION__: JSON.stringify(process.env.PAB_INSTALLER_VERSION || JSON.parse(readFileSync(new URL("../../build-version.json", import.meta.url), "utf8")).version),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
