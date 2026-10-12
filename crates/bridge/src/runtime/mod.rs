@@ -3,6 +3,7 @@ mod catalog;
 mod credential;
 mod device;
 mod directory;
+mod document;
 mod event;
 mod filesystem;
 mod operation;

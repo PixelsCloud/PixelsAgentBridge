@@ -25,8 +25,9 @@ fi
 rm -f -- /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
 rm -f -- /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
 rm -rf -- '/Applications/Pixels Agent Bridge.app'
-for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh settings.env operator-server.json; do
+for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh settings.env operator-server.json; do
     rm -f -- "$install_dir/$name"
 done
 rm -rf -- "$install_dir/browser-runtime"
+rm -rf -- "$install_dir/document-runtime"
 printf '%s\n' 'Application and launchd jobs removed. Machine and user data retained.'

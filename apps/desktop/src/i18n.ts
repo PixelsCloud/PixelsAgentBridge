@@ -66,6 +66,7 @@ export const messages = {
     toolGroups: {
       core: { name: "连接与任务", description: "连接设备、原生命令、交互终端，以及已有任务的查询和取消。" },
       file: { name: "文件", description: "目录、文本读写、搜索、哈希、复制移动、ZIP 和异步传输。" },
+      document: { name: "文档", description: "按页读取 PDF、Office 文档和图片，并支持离线中英 OCR、检索及页面预览。" },
       system: { name: "系统", description: "系统信息、磁盘、进程、网络、登录会话和服务控制。" },
       desktop: { name: "桌面", description: "显示器、窗口、原分辨率 JPEG 截图和键鼠输入。" },
       git: { name: "Git", description: "状态、差异、日志、指定文件提交、分支和远端操作。" },
@@ -454,6 +455,7 @@ export const messages = {
     toolGroups: {
       core: { name: "連線與任務", description: "連線裝置、原生命令、互動終端，以及既有任務的查詢和取消。" },
       file: { name: "檔案", description: "目錄、文字讀寫、搜尋、雜湊、複製移動、ZIP 和非同步傳輸。" },
+      document: { name: "文件解析", description: "按頁讀取 PDF、Office 文件和圖片，支援離線中英 OCR、搜尋及頁面預覽。" },
       system: { name: "系統", description: "系統資訊、磁碟、程序、網路、登入工作階段和服務控制。" },
       desktop: { name: "桌面", description: "顯示器、視窗、原解析度 JPEG 截圖和鍵鼠輸入。" },
       git: { name: "Git", description: "狀態、差異、記錄、指定檔案提交、分支和遠端操作。" },
@@ -842,6 +844,7 @@ export const messages = {
     toolGroups: {
       core: { name: "Connections and tasks", description: "Device connections, native commands, terminals, and querying or cancelling existing operations." },
       file: { name: "Files", description: "Directories, text editing, search, hashing, copy/move, ZIP, and asynchronous transfers." },
+      document: { name: "Documents", description: "Read PDF, Office files and images by page, with offline Chinese and English OCR, search, and page previews." },
       system: { name: "System", description: "System information, disks, processes, networking, login sessions, and service control." },
       desktop: { name: "Desktop", description: "Displays, windows, original-resolution JPEG screenshots, and keyboard/mouse input." },
       git: { name: "Git", description: "Status, diff, history, selected-file commits, branches, and remote operations." },

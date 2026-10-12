@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import os
+import plistlib
 import re
 import secrets
 import subprocess
@@ -16,7 +17,8 @@ import tempfile
 
 STATE = Path.home() / 'Library/Application Support/PixelsAgentBridgeBuildSigning'
 IDENTIFIERS = {'desktop': 'vip.rgaa.pab.desktop', 'executor': 'vip.rgaa.pab.executor',
-               'mcp': 'vip.rgaa.pab.mcp'}
+               'mcp': 'vip.rgaa.pab.mcp', 'document': 'vip.rgaa.pab.document',
+               'pdfium': 'vip.rgaa.pab.pdfium'}
 
 
 def run(args, **kwargs):
@@ -93,15 +95,31 @@ def sign(path, identifier, state=STATE):
     fingerprint = load_identity(state)
     keychain = state / 'signing.keychain-db'
     run(['/usr/bin/security', 'unlock-keychain', '-p', (state / 'keychain.password').read_text(), keychain])
-    run(['/usr/bin/codesign', '--force', '--sign', fingerprint, '--keychain', keychain,
-         '--timestamp=none', '--options', 'runtime', '--identifier', identifier,
-         '--requirements', '=designated => ' + requirement(identifier, fingerprint), path])
+    command = ['/usr/bin/codesign', '--force', '--sign', fingerprint, '--keychain', keychain,
+               '--timestamp=none', '--options', 'runtime', '--identifier', identifier,
+               '--requirements', '=designated => ' + requirement(identifier, fingerprint)]
+    if identifier == IDENTIFIERS['document']:
+        # A local self-signed identity has no Apple Team ID. Hardened Runtime
+        # would reject the bundled PDFium dylib even though both files use the
+        # same certificate. Scope this exception to the disposable parser.
+        with tempfile.TemporaryDirectory(prefix='pab-document-sign-') as folder:
+            entitlements = Path(folder) / 'entitlements.plist'
+            entitlements.write_bytes(plistlib.dumps({
+                'com.apple.security.cs.disable-library-validation': True,
+            }))
+            run([*command, '--entitlements', entitlements, path])
+    else:
+        run([*command, path])
     verify(path, identifier, fingerprint)
 
 
 def verify(path, identifier, fingerprint):
     run(['/usr/bin/codesign', '--verify', '--strict', '--deep',
          '--test-requirement', '=' + requirement(identifier, fingerprint), path])
+    if identifier == IDENTIFIERS['document']:
+        entitlements = run(['/usr/bin/codesign', '-d', '--entitlements', '-', path])
+        if b'com.apple.security.cs.disable-library-validation' not in entitlements or b'true' not in entitlements:
+            raise RuntimeError('Document worker lacks the PDFium library-validation entitlement')
     result = subprocess.run(['/usr/bin/codesign', '-d', '-r-', str(path)], capture_output=True, text=True, check=True)
     dr = result.stdout + result.stderr
     lines = [line.removeprefix('designated => ') for line in dr.splitlines() if line.startswith('designated => ')]

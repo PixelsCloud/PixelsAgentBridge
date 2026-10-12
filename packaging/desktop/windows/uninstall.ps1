@@ -93,7 +93,7 @@ if ($executorService) {
     $serviceRemoved = $true
 }
 
-foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor')) {
+foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor', 'pab-document-worker')) {
     Get-Process -Name $processName -ErrorAction SilentlyContinue |
         Where-Object { $_.Path -eq (Join-Path $InstallRoot "$processName.exe") } |
         Stop-Process -Force
@@ -103,7 +103,7 @@ foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor
 # running processes. Retire each launch path first so the helper cannot reopen
 # it, then wait for Windows to release the old image before removing it.
 $retirementId = [Guid]::NewGuid().ToString('N')
-foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-desktop.exe', 'pab-executor.exe')) {
+foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-desktop.exe', 'pab-executor.exe', 'pab-document-worker.exe')) {
     $binary = Join-Path $InstallRoot $name
     if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) { continue }
     $retired = "$binary.$retirementId.uninstall"
@@ -147,6 +147,11 @@ if (Test-Path -LiteralPath $runtime) {
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Remove-Item -LiteralPath $runtime -Recurse -Force
 }
+$documentRuntime = Join-Path $installFull 'document-runtime'
+if (-not [IO.Path]::GetFullPath($documentRuntime).StartsWith($installFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Document runtime path escaped installation directory'
+}
+if (Test-Path -LiteralPath $documentRuntime) { Remove-Item -LiteralPath $documentRuntime -Recurse -Force }
 
 foreach ($name in @(
     'settings.json',

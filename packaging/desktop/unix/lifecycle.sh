@@ -9,7 +9,7 @@ installed_processes() {
     for process in /proc/[0-9]*; do
         executable=$(readlink "$process/exe" 2>/dev/null || true)
         case $executable in
-            "$directory"/pab-mcp|"$directory"/pab-executor|"$directory"/pab-bridge|"$directory"/pab-desktop)
+            "$directory"/pab-mcp|"$directory"/pab-executor|"$directory"/pab-document-worker|"$directory"/pab-bridge|"$directory"/pab-desktop)
                 printf '%s\n' "${process##*/}" ;;
         esac
     done

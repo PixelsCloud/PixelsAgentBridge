@@ -31,7 +31,8 @@ CONTROL_URL = "wss://pab.rgaa.vip/control"
 RELAY_URL = "https://pab-relay.rgaa.vip"
 REQUIRED = {
     "browser-runtime-macos.tar.gz",
-    "pab-executor", "pab-mcp", "install.sh", "uninstall.sh", "run-app.sh", "lifecycle.sh",
+    "document-runtime-macos.tar.gz",
+    "pab-executor", "pab-mcp", "pab-document-worker", "install.sh", "uninstall.sh", "run-app.sh", "lifecycle.sh",
     "run-mcp.sh", "run-executor.sh", "com.pixelsagentbridge.executor.plist",
     "com.pixelsagentbridge.session-helper.plist",
     "com.pixelsagentbridge.login-helper.plist",
@@ -88,7 +89,7 @@ def verify_binaries(payload, architecture):
     with (payload / APP / "Contents/Info.plist").open("rb") as source:
         if plistlib.load(source).get("CFBundleIdentifier") != "vip.rgaa.pab.desktop":
             raise ValueError("unexpected app bundle identifier")
-    for relative in ("pab-executor", "pab-mcp", f"{APP}/Contents/MacOS/pab-desktop"):
+    for relative in ("pab-executor", "pab-mcp", "pab-document-worker", f"{APP}/Contents/MacOS/pab-desktop"):
         path = payload / relative
         actual = subprocess.check_output(["/usr/bin/lipo", "-archs", str(path)], text=True).split()
         if actual != [architecture]:
@@ -102,6 +103,13 @@ def verify_binaries(payload, architecture):
     verify(payload / APP, IDENTIFIERS['desktop'], fingerprint)
     for name in ('executor', 'mcp'):
         verify(payload / f'pab-{name}', IDENTIFIERS[name], fingerprint)
+    verify(payload / 'pab-document-worker', IDENTIFIERS['document'], fingerprint)
+    with tarfile.open(payload / 'document-runtime-macos.tar.gz') as runtime:
+        member = runtime.getmember('document-runtime/libpdfium.dylib')
+        with tempfile.TemporaryDirectory() as folder:
+            library = Path(folder) / 'libpdfium.dylib'
+            library.write_bytes(runtime.extractfile(member).read())
+            verify(library, IDENTIFIERS['pdfium'], fingerprint)
 
 
 def prepare_scripts(destination, arch, control_url, relay_url):

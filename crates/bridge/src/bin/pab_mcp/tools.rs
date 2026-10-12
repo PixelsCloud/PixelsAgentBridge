@@ -14,6 +14,8 @@ pub(super) async fn call_tool(
         return super::mcp_browser::call(runtime, name, arguments).await;
     }
     match name {
+        "pab_document_read" | "pab_document_search" | "pab_document_close" =>
+            super::mcp_document::call(runtime, name, arguments).await,
         "pab_list_containers"
         | "pab_get_container"
         | "pab_container_logs"

@@ -16,13 +16,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from build_version import parse_version, verify_artifacts
 PACKAGES = ROOT / ".build" / "packages"
+CARGO_TARGET = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")).resolve()
+TAURI_TARGET = CARGO_TARGET if "CARGO_TARGET_DIR" in os.environ else ROOT / "apps" / "desktop" / "src-tauri" / "target"
 BINARIES = {
-    "pab-desktop.exe": ROOT / "apps" / "desktop" / "src-tauri" / "target",
-    "pab-executor.exe": ROOT / "target",
-    "pab-mcp.exe": ROOT / "target",
+    "pab-desktop.exe": TAURI_TARGET,
+    "pab-executor.exe": CARGO_TARGET,
+    "pab-mcp.exe": CARGO_TARGET,
+    "pab-document-worker.exe": CARGO_TARGET,
 }
 CONTENTS = set(BINARIES) | {
     "browser-runtime.zip",
+    "document-runtime.zip",
     "install.ps1",
     "run-app.ps1",
     "launch-app.ps1",

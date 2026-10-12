@@ -53,7 +53,8 @@ pab_publish_upgrade() {
         "$app/Contents/MacOS/pab-desktop" \
         "$upgrade/previous.app/Contents/MacOS/pab-desktop" \
         "$install_dir/pab-mcp" "$upgrade/previous-support/pab-mcp" \
-        "$install_dir/pab-executor" "$upgrade/previous-support/pab-executor" || return
+        "$install_dir/pab-executor" "$upgrade/previous-support/pab-executor" \
+        "$install_dir/pab-document-worker" "$upgrade/previous-support/pab-document-worker" || return
     mv "$upgrade/new.app" "$app" || return
     published_app=1
     mv "$upgrade/new-support" "$install_dir" || return
@@ -72,7 +73,8 @@ pab_restore_upgrade() {
         pab_stop_binaries \
             "$app/Contents/MacOS/pab-desktop" "$upgrade/failed.app/Contents/MacOS/pab-desktop" \
             "$install_dir/pab-mcp" "$upgrade/failed-support/pab-mcp" \
-            "$install_dir/pab-executor" "$upgrade/failed-support/pab-executor" || return
+            "$install_dir/pab-executor" "$upgrade/failed-support/pab-executor" \
+            "$install_dir/pab-document-worker" "$upgrade/failed-support/pab-document-worker" || return
     fi
     if [[ -e $upgrade/previous.app ]]; then
         mv "$upgrade/previous.app" "$app" || return

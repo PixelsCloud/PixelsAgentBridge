@@ -21,6 +21,7 @@ use tokio::sync::{Mutex, watch};
 pub(crate) mod command;
 mod container;
 mod directory;
+mod document;
 mod execution;
 mod file_transfer;
 mod filesystem;
@@ -73,6 +74,7 @@ pub(crate) struct TaskService {
     terminals: Arc<Mutex<HashMap<pab_protocol::RequestId, Arc<terminal::ActiveTerminal>>>>,
     upload_locks: upload_lock::UploadPathLocks,
     filesystem_slots: Arc<tokio::sync::Semaphore>,
+    documents: document::DocumentCache,
     #[cfg(test)]
     hash_test_gate: Arc<Mutex<Option<Arc<filesystem_hash::HashTestGate>>>>,
     #[cfg(test)]
@@ -176,6 +178,7 @@ impl TaskService {
             terminals: Arc::new(Mutex::new(HashMap::new())),
             upload_locks: upload_lock::UploadPathLocks::default(),
             filesystem_slots: Arc::new(tokio::sync::Semaphore::new(8)),
+            documents: document::DocumentCache::default(),
             #[cfg(test)]
             hash_test_gate: Arc::new(Mutex::new(None)),
             #[cfg(test)]
@@ -513,6 +516,15 @@ impl TaskService {
                     reply: Box::new(self.lookup_filesystem(initiated_by, request_id).await?),
                 })
             }
+            DeviceTaskRequest::Document { request, .. } => Ok(DeviceTaskResponse::Document {
+                reply: Box::new(self.document_request(initiated_by, request).await),
+            }),
+            DeviceTaskRequest::GetDocument { request_id, .. } => Ok(DeviceTaskResponse::Document {
+                reply: Box::new(self.get_document(initiated_by, request_id).await),
+            }),
+            DeviceTaskRequest::CancelDocument { request_id, .. } => Ok(DeviceTaskResponse::Document {
+                reply: Box::new(self.cancel_document(initiated_by, request_id).await),
+            }),
             DeviceTaskRequest::FileSystem { .. } => Err(TaskServiceError::InvalidRequest(
                 "filesystem requests require their binary stream handler",
             )),
@@ -523,6 +535,7 @@ impl TaskService {
                 transfer_schema_version: Some(pab_protocol::FILE_TRANSFER_SCHEMA_VERSION),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
+                document_schema_version: Some(pab_protocol::DOCUMENT_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),

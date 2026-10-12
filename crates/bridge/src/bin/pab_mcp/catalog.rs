@@ -216,7 +216,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_get_operation",
-            "Read durable transfer or command status by original request ID and device code. Works offline for cached records; unconfirmed transfers are checked in the background. Cached OS context is explicitly marked.",
+            "Read operation status by original request ID and device code. For document_open, also pass kind=document_open from its operation_ref so a restarted MCP can ask the device directly. Document caches expire after one hour.",
             operation_schema(),
         ),
         tool(
@@ -246,6 +246,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
     ];
     tools.extend(super::mcp_filesystem::tools());
+    tools.extend(super::mcp_document::tools());
     tools.extend(super::mcp_system_query::tools());
     tools.extend(super::mcp_git::tools());
     tools.extend(super::mcp_container::tools());
@@ -400,7 +401,8 @@ fn file_tool_schema() -> Value {
 fn operation_schema() -> Value {
     json!({ "type": "object", "properties": {
         "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
-        "operation_id": { "type": "string", "format": "uuid" }
+        "operation_id": { "type": "string", "format": "uuid" },
+        "kind": { "type": "string", "enum": ["document_open"] }
     }, "required": ["device_code", "operation_id"], "additionalProperties": false })
 }
 
@@ -647,11 +649,11 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 99);
-        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 99);
+        assert_eq!(all.len(), 104);
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 104);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
-                version: 2,
+                version: 3,
                 enabled_groups: if group == ToolGroup::Core {
                     vec![group]
                 } else {

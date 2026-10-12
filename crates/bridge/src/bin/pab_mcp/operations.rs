@@ -47,12 +47,14 @@ pub(super) struct OperationManager {
     closed: AtomicBool,
     filesystem_rotation: AtomicU64,
     heartbeat: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    documents: Mutex<HashMap<RequestId, DeviceCode>>,
 }
 
 pub(super) fn handles(name: &str) -> bool {
     matches!(
         name,
         "pab_connect"
+            | "pab_document_open"
             | "pab_upload_file"
             | "pab_download_file"
             | "pab_get_operation"
@@ -184,6 +186,7 @@ impl OperationManager {
             closed: AtomicBool::new(false),
             filesystem_rotation: AtomicU64::new(0),
             heartbeat: Mutex::new(None),
+            documents: Mutex::new(HashMap::new()),
         });
         let weak = Arc::downgrade(&manager);
         let task = tokio::spawn(async move {
@@ -313,6 +316,18 @@ impl OperationManager {
     pub async fn call(self: &Arc<Self>, name: &str, args: &Value) -> Result<Value, String> {
         match name {
             "pab_connect" => self.connect(args).await,
+            "pab_document_open" => {
+                let runtime = self.runtime().await?;
+                let value = super::mcp_document::call(&runtime, name, args).await?;
+                if let (Some(id), Some(code)) = (
+                    value.pointer("/operation_ref/operation_id").and_then(Value::as_str),
+                    args["device_code"].as_str(),
+                ) {
+                    self.documents.lock().await.insert(id.parse().map_err(|_| "invalid document operation ID")?,
+                        code.parse().map_err(|_| "invalid device code")?);
+                }
+                Ok(value)
+            },
             "pab_upload_file" | "pab_download_file" => self.submit(name, args).await,
             "pab_get_operation" => self.get(args).await,
             "pab_list_operations" => self.list(args).await,
@@ -521,6 +536,13 @@ impl OperationManager {
         resume_observer: bool,
     ) -> Result<Value, String> {
         let (id, code) = reference(args)?;
+        if self.documents.lock().await.get(&id).copied() == Some(code)
+            || args["kind"] == "document_open" {
+            let device = self.queue.remembered_device(code).await.map_err(|e|e.to_string())?;
+            let reply = self.runtime().await?.get_document(device.device_ref,id).await.map_err(|e|e.to_string())?;
+            return Ok(json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},
+                "result":reply,"os_reminder":device.os_reminder}));
+        }
         if let Ok((device, cached)) = self.queue.system_record(id, code).await {
             let lookup = async {
                 self.runtime()
@@ -672,6 +694,12 @@ impl OperationManager {
 
     async fn cancel(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
+        if self.documents.lock().await.get(&id).copied() == Some(code)
+            || args["kind"] == "document_open" {
+            let device = self.queue.remembered_device(code).await.map_err(|e|e.to_string())?;
+            let reply = self.runtime().await?.cancel_document(device.device_ref,id).await.map_err(|e|e.to_string())?;
+            return Ok(json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},"result":reply}));
+        }
         if let Ok((device, reply)) = self.queue.system_record(id, code).await {
             if !reply.kind.starts_with("git_")
                 && !["ui_query", "ui_get", "ui_action", "ui_wait"].contains(&reply.kind.as_str())

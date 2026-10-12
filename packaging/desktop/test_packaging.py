@@ -31,7 +31,7 @@ class Packages(unittest.TestCase):
             shutil.copyfile(SCRIPTS.parents[1] / "scripts/build_version.py", root / "scripts/build_version.py")
             binaries = root / "bin"
             binaries.mkdir()
-            for name in ("pab-mcp", "pab-executor", "pab-desktop"):
+            for name in ("pab-mcp", "pab-executor", "pab-document-worker", "pab-desktop"):
                 (binaries / name).write_bytes(b"fixture")
                 (binaries / (name + ".exe")).write_bytes(b"fixture")
             app = root / "Pixels Agent Bridge.app"
@@ -48,12 +48,20 @@ class Packages(unittest.TestCase):
                 package.writestr('node.exe', b'fixture')
             with tarfile.open(runtime / 'browser-runtime-macos.tar.gz', 'w:gz') as package:
                 package.add(binaries / 'pab-executor', arcname='browser-runtime/node')
+            document_runtime = root / '.build/document-runtime'
+            document_runtime.mkdir(parents=True)
+            with zipfile.ZipFile(document_runtime / 'document-runtime-windows.zip', 'w') as package:
+                package.writestr('pdfium.dll', b'fixture')
+            with tarfile.open(document_runtime / 'document-runtime-macos.tar.gz', 'w:gz') as package:
+                package.add(binaries / 'pab-executor', arcname='document-runtime/libpdfium.dylib')
+            with tarfile.open(document_runtime / 'document-runtime-linux.tar.gz', 'w:gz') as package:
+                package.add(binaries / 'pab-executor', arcname='document-runtime/libpdfium.so')
             for platform in ("windows", "linux", "macos"):
                 with self.subTest(platform=platform):
                     out = root / platform
                     if platform != "macos":
                         suffix = ".exe" if platform == "windows" else ""
-                        components = ("pab-executor", "pab-mcp", "pab-desktop") if platform == "windows" else ("pab-executor", "pab-mcp")
+                        components = ("pab-executor", "pab-mcp", "pab-document-worker", "pab-desktop") if platform == "windows" else ("pab-executor", "pab-mcp", "pab-document-worker")
                         files = {name + suffix: binaries / (name + suffix) for name in components}
                         record_artifacts(root, "desktop" if platform == "windows" else platform, "debug", "1.2.0", files)
                     else:
@@ -76,16 +84,20 @@ class Packages(unittest.TestCase):
                     if platform == "windows":
                         with zipfile.ZipFile(archive) as package:
                             self.assertIn("pab-desktop.exe", package.namelist())
+                            self.assertIn("pab-document-worker.exe", package.namelist())
                             self.assertIn("browser-runtime.zip", package.namelist())
+                            self.assertIn("document-runtime.zip", package.namelist())
                             self.assertEqual(package.read("install.ps1"), (SCRIPTS / "windows/install.ps1").read_bytes())
                             self.assertNotIn("install.sh", package.namelist())
                     else:
                         with tarfile.open(archive) as package:
+                            self.assertIn("pab-document-worker", package.getnames())
                             script_dir = "macos" if platform == "macos" else "unix"
                             self.assertEqual(package.extractfile("install.sh").read(), (SCRIPTS / script_dir / "install.sh").read_bytes().replace(b"\r\n", b"\n"))
                             self.assertEqual(package.getmember("install.sh").mode, 0o755)
                             if platform == "macos":
                                 self.assertIn("browser-runtime-macos.tar.gz", package.getnames())
+                                self.assertIn("document-runtime-macos.tar.gz", package.getnames())
                                 self.assertIn("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop", package.getnames())
                                 self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop").mode, 0o755)
                                 self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS").mode, 0o755)

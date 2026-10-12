@@ -50,7 +50,7 @@ function Stop-PabInstalledBinary {
 
 function Install-PabBinaries {
     param([string]$SourceRoot, [string]$DestinationRoot)
-    $names = @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe')
+    $names = @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe')
     $transaction = [Guid]::NewGuid().ToString('N')
     $staged = @{}
     $retired = @{}
@@ -141,8 +141,8 @@ if ($sasPolicy -notin @(1, 3)) {
 
 $source = Split-Path -Parent $MyInvocation.MyCommand.Path
 $requiredFiles = @(
-    'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe',
-    'browser-runtime.zip',
+    'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe',
+    'browser-runtime.zip', 'document-runtime.zip',
     'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1'
 )
 foreach ($name in $requiredFiles) {
@@ -155,15 +155,24 @@ $installFull = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $runtimeCurrent = Join-Path $installFull 'browser-runtime'
 $runtimeNew = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.new')
 $runtimeOld = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.old')
-foreach ($path in @($runtimeCurrent, $runtimeNew, $runtimeOld)) {
+$documentCurrent = Join-Path $installFull 'document-runtime'
+$documentNew = Join-Path $installFull ("document-runtime." + [Guid]::NewGuid().ToString('N') + '.new')
+$documentOld = Join-Path $installFull ("document-runtime." + [Guid]::NewGuid().ToString('N') + '.old')
+foreach ($path in @($runtimeCurrent, $runtimeNew, $runtimeOld, $documentCurrent, $documentNew, $documentOld)) {
     if (-not [IO.Path]::GetFullPath($path).StartsWith($installFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Browser runtime path escaped the install directory'
     }
 }
 Expand-Archive -LiteralPath (Join-Path $source 'browser-runtime.zip') -DestinationPath $runtimeNew
+Expand-Archive -LiteralPath (Join-Path $source 'document-runtime.zip') -DestinationPath $documentNew
 foreach ($name in @('node.exe', 'node_modules\@playwright\mcp\cli.js', 'manifest.json')) {
     if (-not (Test-Path -LiteralPath (Join-Path $runtimeNew $name) -PathType Leaf)) {
         throw "Browser runtime archive is incomplete: $name"
+    }
+}
+foreach ($name in @('pdfium.dll', 'tessdata\eng.traineddata', 'tessdata\chi_sim.traineddata')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $documentNew $name) -PathType Leaf)) {
+        throw "Document runtime archive is incomplete: $name"
     }
 }
 $taskName = 'PixelsAgentBridgeExecutor'
@@ -224,6 +233,10 @@ try {
         }
         throw
     }
+    if (Test-Path -LiteralPath $documentCurrent) {
+        Move-Item -LiteralPath $documentCurrent -Destination $documentOld -ErrorAction Stop
+    }
+    Move-Item -LiteralPath $documentNew -Destination $documentCurrent -ErrorAction Stop
     Install-PabBinaries -SourceRoot $source -DestinationRoot $InstallRoot
 } catch {
     $installFailure = $_
@@ -236,6 +249,12 @@ try {
         } catch {
             Write-Warning "Could not restore previous browser runtime: $($_.Exception.Message)"
         }
+    }
+    if (Test-Path -LiteralPath $documentOld) {
+        try {
+            if (Test-Path -LiteralPath $documentCurrent) { Remove-Item -LiteralPath $documentCurrent -Recurse -Force -ErrorAction Stop }
+            Move-Item -LiteralPath $documentOld -Destination $documentCurrent -ErrorAction Stop
+        } catch { Write-Warning "Could not restore previous document runtime: $($_.Exception.Message)" }
     }
     # The binary transaction restored the previous files. Bring the old
     # service and session helpers back before reporting the install failure.
@@ -348,6 +367,10 @@ Start-ScheduledTask -TaskName $supervisorTaskName
 if (Test-Path -LiteralPath $runtimeOld) {
     try { Remove-Item -LiteralPath $runtimeOld -Recurse -Force -ErrorAction Stop }
     catch { Write-Warning "Previous browser runtime remains in use: $runtimeOld" }
+}
+if (Test-Path -LiteralPath $documentOld) {
+    try { Remove-Item -LiteralPath $documentOld -Recurse -Force -ErrorAction Stop }
+    catch { Write-Warning "Previous document runtime remains in use: $documentOld" }
 }
 
 Write-Output "Installed to $InstallRoot"

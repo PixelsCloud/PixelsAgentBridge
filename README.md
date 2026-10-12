@@ -69,6 +69,7 @@ For your own server, follow the [Web deployment guide](WEB_DEPLOYMENT.md) and [D
 
 - [Builds and versioning](BUILDING.md)
 - [Installer publishing and online updates](docs/RELEASE.md)
+- [Document parsing and OCR tools](docs/DOCUMENTS.md)
 - [Development guide](DEVELOPMENT.md)
 - [macOS setup and permissions](MACOS.md)
 - [Account implementation and verification](acceptance/user-accounts-2026-10-08.md)

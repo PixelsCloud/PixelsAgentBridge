@@ -46,12 +46,15 @@ def package_windows():
 
     archive_path = args.output_dir / f"pixels-agent-bridge-windows-x86_64-{args.profile}.zip"
     browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-windows.zip'
+    document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-windows.zip'
     if not browser_runtime.is_file():
         raise FileNotFoundError('Build the offline browser runtime with browser-runtime/build.py first')
+    if not document_runtime.is_file():
+        raise FileNotFoundError('Build the offline document runtime with document_runtime.py first')
     files = [
         args.windows_desktop_bin,
         *(args.windows_bin_dir / name for name in (
-            "pab-mcp.exe", "pab-executor.exe"
+            "pab-mcp.exe", "pab-executor.exe", "pab-document-worker.exe"
         )),
         *(scripts / "windows" / name for name in (
             "install.ps1", "run-app.ps1", "launch-app.ps1",
@@ -61,18 +64,19 @@ def package_windows():
     for file in files:
         if not file.is_file():
             raise FileNotFoundError(file)
-    versions[archive_path.name] = verify_artifacts(root, 'desktop', args.profile, {file.name: file for file in files[:3]})
+    versions[archive_path.name] = verify_artifacts(root, 'desktop', args.profile, {file.name: file for file in files[:4]})
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for file in files:
             archive.write(file, file.name)
         archive.write(browser_runtime, 'browser-runtime.zip')
+        archive.write(document_runtime, 'document-runtime.zip')
     return archive_path
 
 
 def package_unix(platform, architecture, binaries):
     archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-{args.profile}.tar.gz"
     files = [
-        *(binaries / name for name in ("pab-mcp", "pab-executor")),
+        *(binaries / name for name in ("pab-mcp", "pab-executor", "pab-document-worker")),
         *(scripts / ("macos" if platform == "macos" else "unix") / name for name in (
             ("install.sh", "run-app.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh")
             if platform == "macos" else
@@ -81,13 +85,22 @@ def package_unix(platform, architecture, binaries):
     ]
     if platform == "macos":
         browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-macos.tar.gz'
+        document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-macos.tar.gz'
         if not browser_runtime.is_file():
             raise FileNotFoundError('Build the offline browser runtime with browser-runtime/build.py on macOS first')
+        if not document_runtime.is_file():
+            raise FileNotFoundError('Build the offline document runtime with document_runtime.py on macOS first')
         files.append(browser_runtime)
+        files.append(document_runtime)
         files.extend(scripts / "macos" / name for name in (
             "com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist",
             "com.pixelsagentbridge.login-helper.plist",
         ))
+    else:
+        document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-linux.tar.gz'
+        if not document_runtime.is_file():
+            raise FileNotFoundError('Build the offline document runtime with document_runtime.py for Linux first')
+        files.append(document_runtime)
     for file in files:
         if not file.is_file():
             raise FileNotFoundError(file)
@@ -102,7 +115,7 @@ def package_unix(platform, architecture, binaries):
     else:
         from build_version import verify_artifacts
 
-        versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:2]})
+        versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:3]})
     with tarfile.open(archive_path, "w:gz") as archive:
         if platform == "macos":
             def app_permissions(info):

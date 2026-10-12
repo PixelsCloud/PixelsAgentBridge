@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Alert, App, Button, Spin, Switch, Tag } from "antd";
 import { messages, type Language } from "./i18n";
 
-type ToolGroup = "core" | "file" | "system" | "desktop" | "git" | "container" | "browser" | "browseradvanced";
+type ToolGroup = "core" | "file" | "document" | "system" | "desktop" | "git" | "container" | "browser" | "browseradvanced";
 type ToolSettings = { version: number; enabledGroups: ToolGroup[] };
 type ToolSettingsView = {
   settings: ToolSettings;

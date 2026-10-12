@@ -185,6 +185,18 @@ pub enum DeviceTaskRequest {
         schema_version: u16,
         request: crate::FileSystemRequest,
     },
+    Document {
+        schema_version: u16,
+        request: crate::DocumentRequest,
+    },
+    GetDocument {
+        schema_version: u16,
+        request_id: RequestId,
+    },
+    CancelDocument {
+        schema_version: u16,
+        request_id: RequestId,
+    },
     CancelFileSystem {
         schema_version: u16,
         request_id: RequestId,
@@ -325,6 +337,7 @@ impl DeviceTaskRequest {
             | Self::DownloadFile { request_id, .. } => Some(*request_id),
             Self::TransferFile { request, .. } => Some(request.request_id),
             Self::FileSystem { request, .. } => Some(request.request_id),
+            Self::Document { request, .. } => Some(request.request_id),
             _ => None,
         }
     }
@@ -336,6 +349,9 @@ impl DeviceTaskRequest {
             | Self::GetSystemQuery { schema_version, .. }
             | Self::CancelSystemQuery { schema_version, .. }
             | Self::FileSystem { schema_version, .. }
+            | Self::Document { schema_version, .. }
+            | Self::GetDocument { schema_version, .. }
+            | Self::CancelDocument { schema_version, .. }
             | Self::CancelFileSystem { schema_version, .. }
             | Self::GetFileSystem { schema_version, .. }
             | Self::GetEnvironment { schema_version }
@@ -391,6 +407,9 @@ pub enum DeviceTaskResponse {
     FileSystem {
         reply: Box<crate::FileSystemReply>,
     },
+    Document {
+        reply: Box<crate::DocumentReply>,
+    },
     Environment {
         context: Box<TargetContext>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -405,6 +424,8 @@ pub enum DeviceTaskResponse {
         system_query_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         screenshot_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        document_schema_version: Option<u16>,
     },
     Presence {
         active_operators: u16,

@@ -13,7 +13,7 @@ relay_url=$2
 source_dir=$(cd "$(dirname "$0")" && pwd)
 install_dir=/opt/pixels-agent-bridge
 unit=pixels-agent-bridge-executor.service
-for name in pab-mcp pab-executor run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh INSTALL-LINUX.txt; do
+for name in pab-mcp pab-executor pab-document-worker document-runtime-linux.tar.gz run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh INSTALL-LINUX.txt; do
     [[ -f $source_dir/$name ]] || { echo "Package file is missing: $name" >&2; exit 2; }
 done
 source "$source_dir/lifecycle.sh"
@@ -28,7 +28,9 @@ fi
 stop_installed_processes "$install_dir"
 install -d -m 755 "$install_dir"
 install -d -m 700 /var/lib/pixels-agent-bridge
-for name in pab-mcp pab-executor run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
+tar -tzf "$source_dir/document-runtime-linux.tar.gz" | grep -q '^document-runtime/libpdfium.so$' || { echo 'Incomplete document runtime' >&2; exit 2; }
+tar -xzf "$source_dir/document-runtime-linux.tar.gz" -C "$install_dir"
+for name in pab-mcp pab-executor pab-document-worker run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$install_dir/$name"
 done
 install -m 644 "$source_dir/INSTALL-LINUX.txt" "$install_dir/INSTALL-LINUX.txt"

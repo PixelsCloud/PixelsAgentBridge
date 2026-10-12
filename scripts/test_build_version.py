@@ -119,7 +119,7 @@ class Versions(TestCase):
             commands.append(command)
             folder = self.root / '.build/guest-desktop-linux-debug'
             folder.mkdir(parents=True, exist_ok=True)
-            for name in ('pab-mcp', 'pab-executor'):
+            for name in ('pab-mcp', 'pab-executor', 'pab-document-worker'):
                 (folder / name).write_bytes(b'fixture')
 
         with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: None if x in ('npm', 'node') else x), patch.object(sys, 'argv', ['build.py', 'linux']):
@@ -127,7 +127,7 @@ class Versions(TestCase):
         self.assertEqual(len(commands), 1)
         self.assertIn('-ComponentsOnly', commands[0])
         record = json.loads((self.root / '.build/builds/linux-debug.json').read_text())
-        self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor'})
+        self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor', 'pab-document-worker'})
         self.assertEqual(read_state(self.root)['build_count'], 1)
 
     def test_macos_both_architectures_share_one_reserved_version(self):
@@ -143,7 +143,7 @@ class Versions(TestCase):
                 target = command[command.index('--target') + 1]
                 folder = self.root / 'target' / target / 'debug'
                 folder.mkdir(parents=True)
-                for name in ('pab-executor', 'pab-mcp'):
+                for name in ('pab-executor', 'pab-mcp', 'pab-document-worker'):
                     (folder / name).write_bytes(b'fixture')
             elif command[0] == 'node':
                 target = command[command.index('--target') + 1]
@@ -153,15 +153,15 @@ class Versions(TestCase):
                 executable.write_bytes(b'fixture')
                 (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString': '0.1.0'}))
 
-        with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\nx86_64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all', '--package']):
+        with patch.object(build, 'ROOT', self.root), patch.object(build, 'CARGO_TARGET', self.root / 'target'), patch.object(build, 'TAURI_TARGET', self.root / 'apps/desktop/src-tauri/target'), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(build.subprocess, 'check_output', return_value='aarch64-apple-darwin\nx86_64-apple-darwin\n'), patch.object(sys, 'platform', 'darwin'), patch.object(sys, 'argv', ['build.py', 'macos', '--macos-arch', 'all', '--package']):
             with patch('macos_signing.load_identity', return_value='A' * 40), patch('macos_signing.sign') as signing:
                 build.main()
-                self.assertEqual(signing.call_count, 6)
+                self.assertEqual(signing.call_count, 8)
         self.assertEqual(read_state(self.root), {'version': '1.2.0', 'build_count': 1})
         for architecture in ('aarch64', 'x86_64'):
             record = json.loads((self.root / f'.build/builds/macos-{architecture}-debug.json').read_text())
             self.assertEqual(record['version'], '1.2.0')
-            self.assertEqual(len(record['files']), 4)
+            self.assertEqual(len(record['files']), 5)
         self.assertEqual(sum(cmd[0] == 'cargo' for cmd in commands), 2)
         self.assertEqual(sum('packaging/desktop/build_macos_pkg.py' in cmd for cmd in commands), 2)
         self.assertTrue(all('--debug' in cmd for cmd in commands if cmd[0] == 'node'))
@@ -200,7 +200,7 @@ class Versions(TestCase):
         executable.parent.mkdir(parents=True)
         executable.write_bytes(b'app')
         (app / 'Contents/Info.plist').write_bytes(b'plist fixture')
-        for name in ('pab-executor', 'pab-mcp'):
+        for name in ('pab-executor', 'pab-mcp', 'pab-document-worker'):
             (self.root / name).write_bytes(b'service')
         files = macos_artifacts(self.root, app)
         record_artifacts(self.root, 'macos-aarch64', 'debug', '1.2.0', files)

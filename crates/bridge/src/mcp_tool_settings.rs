@@ -12,6 +12,7 @@ use std::{
 pub enum ToolGroup {
     Core,
     File,
+    Document,
     System,
     Desktop,
     Git,
@@ -20,9 +21,10 @@ pub enum ToolGroup {
     BrowserAdvanced,
 }
 impl ToolGroup {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Core,
         Self::File,
+        Self::Document,
         Self::System,
         Self::Desktop,
         Self::Git,
@@ -65,6 +67,13 @@ impl ToolGroup {
                 "pab_file_delete",
                 "pab_archive_create",
                 "pab_archive_extract",
+            ],
+            Self::Document => &[
+                "pab_document_open",
+                "pab_document_read",
+                "pab_document_search",
+                "pab_document_render_page",
+                "pab_document_close",
             ],
             Self::System => &[
                 "pab_get_process",
@@ -165,14 +174,14 @@ pub struct McpToolSettings {
 impl Default for McpToolSettings {
     fn default() -> Self {
         Self {
-            version: 2,
+            version: 3,
             enabled_groups: ToolGroup::ALL.to_vec(),
         }
     }
 }
 impl McpToolSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 2 {
+        if self.version != 3 {
             return Err("Unsupported MCP tool settings version".into());
         }
         if !self.enabled_groups.contains(&ToolGroup::Core) {
@@ -223,6 +232,12 @@ impl McpToolSettings {
             }
             settings.version = 2;
         }
+        if settings.version == 2 {
+            // Newly introduced document tools are enabled for existing users.
+            // Preserve the opt-out state of every earlier group.
+            settings.enabled_groups.push(ToolGroup::Document);
+            settings.version = 3;
+        }
         settings.validate()?;
         Ok(settings)
     }
@@ -269,7 +284,7 @@ mod tests {
             vec![ToolGroup::Core, ToolGroup::File]
         );
         for data in [
-            r#"{"version":3,"enabledGroups":["core"]}"#,
+            r#"{"version":4,"enabledGroups":["core"]}"#,
             r#"{"version":1,"enabledGroups":["core","core"]}"#,
             r#"{"version":1,"enabledGroups":["core","invalid"]}"#,
             r#"{"version":1,"enabledGroups":["core"],"other":true}"#,
@@ -283,14 +298,15 @@ mod tests {
         assert!(McpToolSettings::load(&path).is_err());
     }
     #[test]
-    fn old_tool_selection_gains_both_browser_groups_and_v2_opt_out_is_kept() {
+    fn older_selections_gain_document_tools_and_keep_browser_opt_out() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mcp-tools.json");
         fs::write(&path, r#"{"version":1,"enabledGroups":["core","file"]}"#).unwrap();
         let migrated = McpToolSettings::load(&path).unwrap();
-        assert_eq!(migrated.version, 2);
+        assert_eq!(migrated.version, 3);
         assert!(migrated.enabled_groups.contains(&ToolGroup::Browser));
         assert!(migrated.enabled_groups.contains(&ToolGroup::BrowserAdvanced));
+        assert!(migrated.enabled_groups.contains(&ToolGroup::Document));
         assert!(!migrated.enabled_groups.contains(&ToolGroup::Git));
         let mut disabled = migrated;
         disabled
@@ -312,6 +328,11 @@ mod tests {
         assert!(!McpToolSettings::load(&path)
             .unwrap()
             .allows("pab_browser_pointer"));
+        fs::write(&path, r#"{"version":2,"enabledGroups":["core","file"]}"#).unwrap();
+        let migrated_v2 = McpToolSettings::load(&path).unwrap();
+        assert_eq!(migrated_v2.version, 3);
+        assert!(migrated_v2.allows("pab_document_open"));
+        assert!(!migrated_v2.allows("pab_browser_attach"));
     }
     #[test]
     fn inventories_are_unique_and_core_controls_are_mandatory() {
@@ -321,8 +342,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 99);
-        assert_eq!(unique.len(), 99);
+        assert_eq!(names.len(), 104);
+        assert_eq!(unique.len(), 104);
         for name in [
             "pab_connect",
             "pab_disconnect",

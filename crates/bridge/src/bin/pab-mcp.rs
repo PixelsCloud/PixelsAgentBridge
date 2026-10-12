@@ -19,6 +19,8 @@ mod mcp_browser;
 mod mcp_catalog;
 #[path = "pab_mcp/desktop.rs"]
 mod mcp_desktop;
+#[path = "pab_mcp/document.rs"]
+mod mcp_document;
 #[path = "pab_mcp/endpoint.rs"]
 mod mcp_endpoint;
 #[path = "pab_mcp/filesystem.rs"]
@@ -194,6 +196,7 @@ impl ServerHandler for McpServer {
         self.report_client(&context);
         let mut arguments = Value::Object(request.arguments.unwrap_or_default());
         if (request.name == "pab_run_command"
+            || request.name == "pab_document_open"
             || (request.name == "pab_desktop_input"
                 && ((arguments.get("actions").is_some()
                     || arguments.get("monitor_input").is_some())
@@ -237,6 +240,11 @@ impl ServerHandler for McpServer {
                                     metadata
                                 },
                             )
+                        } else if request.name == "pab_document_render_page" {
+                            mcp_document::render(&runtime, &arguments).await.map(|(metadata, image)| {
+                                image_content = image;
+                                metadata
+                            })
                         } else if mcp_desktop::handles(&request.name) {
                             mcp_desktop::call(&runtime, &request.name, &arguments).await
                         } else {
@@ -349,8 +357,11 @@ impl ServerHandler for McpServer {
                 let id = arguments
                     .get("operation_id")
                     .or_else(|| arguments.get("request_id"));
-                let operation_ref =
-                    id.map(|id| json!({"device_code":arguments["device_code"],"operation_id":id}));
+                let operation_ref = id.map(|id| if request.name == "pab_document_open" {
+                    json!({"device_code":arguments["device_code"],"operation_id":id,"kind":"document_open"})
+                } else {
+                    json!({"device_code":arguments["device_code"],"operation_id":id})
+                });
                 let mut response = CallToolResult::structured(
                     json!({"error":{"code":code,"phase":error_phase,"message":error,
                     "retry_action":if error_phase!="execution" {"correct_request"} else if id.is_some() {"query_original_operation"}else{"inspect_state_before_retry"}},"operation_ref":operation_ref}),
@@ -453,7 +464,7 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 68);
+        assert_eq!(catalog.tools.len(), 104);
         let names = catalog
             .tools
             .iter()

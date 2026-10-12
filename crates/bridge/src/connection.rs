@@ -23,6 +23,7 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::{BridgeConfig, BridgeConfigError};
 
 mod directory;
+mod document;
 mod file_transfer;
 mod filesystem;
 mod screenshot;

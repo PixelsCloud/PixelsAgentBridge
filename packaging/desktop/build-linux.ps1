@@ -22,9 +22,9 @@ if ($LASTEXITCODE -ne 0) {
 $cargoFlags = if ($Profile -eq 'release') { '--release' } else { '' }
 $buildScript = @"
 set -eu
-cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp
+cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp -p pab-document --bin pab-document-worker -j 18
 mkdir -p .build/guest-desktop-linux-$Profile
-cp .build/linux-target/$Profile/pab-executor .build/linux-target/$Profile/pab-mcp .build/guest-desktop-linux-$Profile/
+cp .build/linux-target/$Profile/pab-executor .build/linux-target/$Profile/pab-mcp .build/linux-target/$Profile/pab-document-worker .build/guest-desktop-linux-$Profile/
 "@
 $buildScript = $buildScript.Replace("`r`n", "`n")
 

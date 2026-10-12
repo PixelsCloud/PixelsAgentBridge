@@ -1,2 +1,8 @@
 *.patch -whitespace
 *.sh text eol=lf
+acceptance/fixtures/document/*.pdf binary
+acceptance/fixtures/document/*.png binary
+acceptance/fixtures/document/*.docx binary
+acceptance/fixtures/document/*.xlsx binary
+acceptance/fixtures/document/*.pptx binary
+assets/tessdata/*.traineddata binary

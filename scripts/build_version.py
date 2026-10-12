@@ -115,7 +115,7 @@ def macos_artifacts(binaries, app):
     """Bind both service binaries and the complete built app to one build record."""
     if not (app / 'Contents/MacOS/pab-desktop').is_file():
         raise ValueError(f'Missing built macOS app: {app}')
-    files = {name: binaries / name for name in ('pab-executor', 'pab-mcp')}
+    files = {name: binaries / name for name in ('pab-executor', 'pab-mcp', 'pab-document-worker')}
     files.update({'Pixels Agent Bridge.app/' + path.relative_to(app).as_posix(): path
                   for path in sorted(app.rglob('*')) if path.is_file()})
     return files

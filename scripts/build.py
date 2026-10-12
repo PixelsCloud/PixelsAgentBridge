@@ -10,6 +10,9 @@ import sys
 from build_version import build_lock, reserve_version, record_artifacts, macos_artifacts, macos_app_version, parse_version
 
 ROOT = Path(__file__).resolve().parents[1]
+CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve()
+TAURI_TARGET = CARGO_TARGET if 'CARGO_TARGET_DIR' in os.environ else ROOT / 'apps/desktop/src-tauri/target'
+CARGO_JOBS = max(1, min(18, int(os.environ.get('CARGO_BUILD_JOBS', '18'))))
 
 
 def run(command, cwd=ROOT):
@@ -43,17 +46,21 @@ def build_macos(version, profile, architectures, package, installer_identity=Non
         target = f'{architecture}-apple-darwin'
         flags = ['--release'] if profile == 'release' else []
         run(['cargo', 'build', '--locked', '--target', target, *flags,
-             '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp'])
+             '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp',
+             '-p', 'pab-document', '--bin', 'pab-document-worker', '-j', str(CARGO_JOBS)])
         run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--target', target,
              '--bundles', 'app', *(['--debug'] if profile == 'debug' else [])], ROOT / 'apps/desktop')
-        binaries = ROOT / 'target' / target / profile
-        app = ROOT / 'apps/desktop/src-tauri/target' / target / profile / 'bundle/macos/Pixels Agent Bridge.app'
+        binaries = CARGO_TARGET / target / profile
+        app = TAURI_TARGET / target / profile / 'bundle/macos/Pixels Agent Bridge.app'
         macos_app_version(app)  # Validate the independent, stable app version.
         for name in ('executor', 'mcp'):
             sign(binaries / f'pab-{name}', IDENTIFIERS[name])
+        sign(binaries / 'pab-document-worker', IDENTIFIERS['document'])
         sign(app, IDENTIFIERS['desktop'])
         record_artifacts(ROOT, f'macos-{architecture}', profile, version, macos_artifacts(binaries, app))
         if package:
+            run([sys.executable, 'packaging/desktop/document_runtime.py', '--platform',
+                 'macos-' + ('arm64' if architecture == 'aarch64' else 'x64')])
             run([sys.executable, 'packaging/desktop/build.py', '--platform', 'macos', '--profile', profile,
                  '--macos-arch', architecture, '--macos-bin-dir', binaries, '--macos-app', app])
             command = [sys.executable, 'packaging/desktop/build_macos_pkg.py', '--arch', architecture, '--profile', profile]
@@ -134,30 +141,35 @@ def main():
             elif target == 'desktop':
                 if args.package:
                     run([sys.executable, 'browser-runtime/build.py'])
-                run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp'])
+                    run([sys.executable, 'packaging/desktop/document_runtime.py', '--platform', 'windows'])
+                run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp',
+                     '-p', 'pab-document', '--bin', 'pab-document-worker', '-j', str(CARGO_JOBS)])
                 run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--no-bundle', *(['--debug'] if args.profile == 'debug' else [])], ROOT / 'apps/desktop')
                 built_frontends.add('desktop')
-                files = {name: ROOT / 'target' / args.profile / name for name in ['pab-executor.exe', 'pab-mcp.exe']}
-                files['pab-desktop.exe'] = ROOT / 'apps/desktop/src-tauri/target' / args.profile / 'pab-desktop.exe'
+                files = {name: CARGO_TARGET / args.profile / name for name in ['pab-executor.exe', 'pab-mcp.exe', 'pab-document-worker.exe']}
+                files['pab-desktop.exe'] = TAURI_TARGET / args.profile / 'pab-desktop.exe'
                 record_artifacts(ROOT, target, args.profile, version, files)
                 if args.package:
-                    run([sys.executable, 'packaging/desktop/build.py', '--platform', 'windows', '--profile', args.profile])
+                    run([sys.executable, 'packaging/desktop/build.py', '--platform', 'windows', '--profile', args.profile,
+                         '--windows-bin-dir', CARGO_TARGET / args.profile, '--windows-desktop-bin', files['pab-desktop.exe']])
                     run([sys.executable, 'packaging/desktop/build_nsis.py', '--profile', args.profile])
             elif target == 'server':
                 frontend('web')
                 run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-server', '--bin', 'pab-server', '-p', 'pab-relay', '--bin', 'pab-relay-server'])
                 suffix = '.exe' if os.name == 'nt' else ''
-                files = {name + suffix: ROOT / 'target' / args.profile / (name + suffix) for name in ['pab-server', 'pab-relay-server']}
+                files = {name + suffix: CARGO_TARGET / args.profile / (name + suffix) for name in ['pab-server', 'pab-relay-server']}
                 record_artifacts(ROOT, target, args.profile, version, files | web_files())
                 if args.package:
-                    run([sys.executable, 'packaging/server/build.py', '--platform', 'windows' if os.name == 'nt' else 'linux', '--profile', args.profile])
+                    run([sys.executable, 'packaging/server/build.py', '--platform', 'windows' if os.name == 'nt' else 'linux',
+                         '--profile', args.profile, '--binary-dir', CARGO_TARGET / args.profile])
             elif target == 'docker':
                 run(['docker', 'build', '-f', 'packaging/docker/Dockerfile', '-t', args.image or f'pixels-agent-bridge:{version}', '.'])
             elif target == 'linux':
                 run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
-                files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp']}
+                files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp', 'pab-document-worker']}
                 record_artifacts(ROOT, target, args.profile, version, files)
                 if args.package:
+                    run([sys.executable, 'packaging/desktop/document_runtime.py', '--platform', 'linux'])
                     run([sys.executable, 'packaging/desktop/build.py', '--platform', 'linux', '--profile', args.profile])
         print(f'Build complete: {version}', flush=True)
 
