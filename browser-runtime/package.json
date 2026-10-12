@@ -1,0 +1,9 @@
+{
+  "name": "pixels-browser-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned offline Playwright MCP runtime for Pixels interactive browser sessions",
+  "dependencies": {
+    "@playwright/mcp": "0.0.83"
+  }
+}

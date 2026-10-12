@@ -6,8 +6,28 @@ impl TaskService {
         &self,
         actor: OperatorRef,
         id: RequestId,
-        query: SystemQuery,
+        mut query: SystemQuery,
     ) -> Result<SystemQueryReply, TaskServiceError> {
+        if let SystemQuery::Applications {
+            query: pab_protocol::AppQuery::Browser { request },
+            ..
+        } = &mut query
+        {
+            if request.owner.is_some() || request.pixels_user.is_some() {
+                return Err(TaskServiceError::InvalidRequest(
+                    "browser owner is supplied by Executor",
+                ));
+            }
+            let user = self
+                .user_context
+                .user
+                .as_ref()
+                .ok_or(TaskServiceError::InvalidRequest(
+                    "pixels_login_required: sign in before browser access",
+                ))?;
+            request.owner = Some(actor);
+            request.pixels_user = Some(user.user_id);
+        }
         query.validate().map_err(TaskServiceError::InvalidRequest)?;
         // Serialize acceptance/registration to keep a duplicate from observing a missing worker.
         let mut jobs = self.system_jobs.lock().await;

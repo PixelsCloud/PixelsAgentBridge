@@ -51,6 +51,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
 objc2 = "=0.6.4"
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWorkspace"] }
 objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL"] }

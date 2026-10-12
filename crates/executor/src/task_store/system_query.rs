@@ -49,8 +49,16 @@ impl TaskStore {
         Ok(serde_json::from_str(&value)?)
     }
     pub async fn save_system_progress(&self, r: &SystemQueryReply) -> Result<(), TaskStoreError> {
+        let mut saved = r.clone();
+        if r.kind.starts_with("browser_") {
+            saved.data = None;
+            saved.error = r
+                .error
+                .as_ref()
+                .map(|_| "browser operation in progress".into());
+        }
         sqlx::query("UPDATE system_query_results SET reply_json=? WHERE request_id=? AND EXISTS (SELECT 1 FROM read_operations o WHERE o.request_id=system_query_results.request_id AND o.state='running')")
-            .bind(serde_json::to_string(r)?).bind(r.request_id.to_string()).execute(&self.pool).await?;
+            .bind(serde_json::to_string(&saved)?).bind(r.request_id.to_string()).execute(&self.pool).await?;
         Ok(())
     }
     #[cfg(test)]
@@ -112,6 +120,22 @@ impl TaskStore {
             return Err(TaskStoreError::NotFound);
         }
         let mut r: SystemQueryReply = serde_json::from_str(row.try_get("reply_json")?)?;
+        if r.kind.starts_with("browser_") {
+            let mut replies = self.browser_replies.lock().await;
+            replies
+                .retain(|_, (created, _)| created.elapsed() < std::time::Duration::from_secs(600));
+            if let Some((_, live)) = replies.get(&id) {
+                return Ok(live.clone());
+            }
+            if r.state == "completed" {
+                r.state = "interrupted".into();
+                r.error = Some(
+                    "browser_result_expired: browser page data is not stored in task history"
+                        .into(),
+                );
+                return Ok(r);
+            }
+        }
         r.state = row.try_get("state")?;
         if r.error.is_none() {
             r.error = row.try_get("message")?;
@@ -119,16 +143,39 @@ impl TaskStore {
         Ok(r)
     }
     pub async fn finish_system_query(&self, r: &SystemQueryReply) -> Result<(), TaskStoreError> {
+        let browser = r.kind.starts_with("browser_");
+        let mut saved = r.clone();
+        if browser {
+            saved.data = None;
+            saved.error = r.error.as_ref().map(|_| {
+                "browser operation failed; details available only in the live session".into()
+            });
+        }
         let mut tx = self.pool.begin().await?;
-        let result=sqlx::query("UPDATE read_operations SET state=?, result_count=?, finished_at_unix_ms=?, message=? WHERE request_id=? AND state IN ('running','unconfirmed')").bind(&r.state).bind(r.returned_count as i64).bind(super::operation::now_unix_ms()).bind(&r.error).bind(r.request_id.to_string()).execute(&mut *tx).await?;
+        let result=sqlx::query("UPDATE read_operations SET state=?, result_count=?, finished_at_unix_ms=?, message=? WHERE request_id=? AND state IN ('running','unconfirmed')").bind(&saved.state).bind(saved.returned_count as i64).bind(super::operation::now_unix_ms()).bind(&saved.error).bind(saved.request_id.to_string()).execute(&mut *tx).await?;
         if result.rows_affected() == 1 {
             sqlx::query("UPDATE system_query_results SET reply_json=? WHERE request_id=?")
-                .bind(serde_json::to_string(r)?)
+                .bind(serde_json::to_string(&saved)?)
                 .bind(r.request_id.to_string())
                 .execute(&mut *tx)
                 .await?;
         }
         tx.commit().await?;
+        if browser {
+            let mut replies = self.browser_replies.lock().await;
+            replies
+                .retain(|_, (created, _)| created.elapsed() < std::time::Duration::from_secs(600));
+            if replies.len() >= 128 {
+                if let Some(oldest) = replies
+                    .iter()
+                    .min_by_key(|(_, (created, _))| *created)
+                    .map(|(id, _)| *id)
+                {
+                    replies.remove(&oldest);
+                }
+            }
+            replies.insert(r.request_id, (std::time::Instant::now(), r.clone()));
+        }
         Ok(())
     }
 }
@@ -137,6 +184,69 @@ impl TaskStore {
 mod tests {
     use super::*;
     use pab_protocol::*;
+    #[tokio::test]
+    async fn browser_page_data_stays_out_of_sqlite_and_is_owned() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tasks.sqlite3");
+        let store = TaskStore::open(&path).await.unwrap();
+        let actor = crate::task_service::transfer_tests::actor();
+        let id = RequestId::new();
+        let query = SystemQuery::Applications {
+            execution: ExecutionSelection::DesktopUser {
+                context_ref: ExecutionContextRef::new(),
+            },
+            query: AppQuery::Browser {
+                request: BrowserRequest {
+                    action: BrowserAction::Fill,
+                    session_ref: Some(RequestId::new()),
+                    arguments: serde_json::json!({"target":"e1","text":"input-secret-123"}),
+                    owner: Some(actor),
+                    pixels_user: Some(UserId::from_u128(12)),
+                },
+            },
+        };
+        assert!(store.accept_system_query(actor, id, &query).await.unwrap());
+        let mut reply = SystemQueryReply::pending(id, &query);
+        reply.state = "completed".into();
+        reply.data = Some(SystemQueryData::Applications {
+            snapshot: AppSnapshot::Browser {
+                result: BrowserResult {
+                    session_ref: Some(RequestId::new()),
+                    status: "completed".into(),
+                    data: serde_json::json!({"content":"page-secret-456"}),
+                    execution_identity: ExecutionIdentity {
+                        mode: ExecutionMode::DesktopUser,
+                        account_id: "test".into(),
+                        account_name: "test".into(),
+                        home: "test".into(),
+                        primary_group: None,
+                        session_id: Some("1".into()),
+                        logon_id: None,
+                        environment_source: ExecutionEnvironmentSource::InteractiveSession,
+                    },
+                },
+            },
+        });
+        store.finish_system_query(&reply).await.unwrap();
+        assert_eq!(
+            store.get_system_query(actor, id).await.unwrap().data,
+            reply.data
+        );
+        let saved: String = sqlx::query_scalar(
+            "SELECT query_json || reply_json FROM system_query_results WHERE request_id=?",
+        )
+        .bind(id.to_string())
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+        assert!(!saved.contains("input-secret-123") && !saved.contains("page-secret-456"));
+        drop(store);
+        let store = TaskStore::open(&path).await.unwrap();
+        assert_eq!(
+            store.get_system_query(actor, id).await.unwrap().state,
+            "interrupted"
+        );
+    }
     #[tokio::test]
     async fn batch_deduplication_binds_all_steps_without_persisting_text_or_keys() {
         let dir = tempfile::tempdir().unwrap();

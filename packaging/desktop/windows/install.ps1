@@ -9,6 +9,19 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$errorLog = Join-Path $env:ProgramData 'PixelsAgentBridge\logs\install-error.log'
+trap {
+    $failure = $_
+    try {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $errorLog) | Out-Null
+        @(
+            (Get-Date).ToString('o')
+            $failure.ToString()
+            $failure.ScriptStackTrace
+        ) | Set-Content -LiteralPath $errorLog -Encoding UTF8
+    } catch { }
+    break
+}
 
 function Stop-PabInstalledBinary {
     param([string[]]$Paths, [switch]$WarnIfRunning)
@@ -129,6 +142,7 @@ if ($sasPolicy -notin @(1, 3)) {
 $source = Split-Path -Parent $MyInvocation.MyCommand.Path
 $requiredFiles = @(
     'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe',
+    'browser-runtime.zip',
     'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1'
 )
 foreach ($name in $requiredFiles) {
@@ -137,6 +151,21 @@ foreach ($name in $requiredFiles) {
     }
 }
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+$installFull = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+$runtimeCurrent = Join-Path $installFull 'browser-runtime'
+$runtimeNew = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.new')
+$runtimeOld = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.old')
+foreach ($path in @($runtimeCurrent, $runtimeNew, $runtimeOld)) {
+    if (-not [IO.Path]::GetFullPath($path).StartsWith($installFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Browser runtime path escaped the install directory'
+    }
+}
+Expand-Archive -LiteralPath (Join-Path $source 'browser-runtime.zip') -DestinationPath $runtimeNew
+foreach ($name in @('node.exe', 'node_modules\@playwright\mcp\cli.js', 'manifest.json')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $runtimeNew $name) -PathType Leaf)) {
+        throw "Browser runtime archive is incomplete: $name"
+    }
+}
 $taskName = 'PixelsAgentBridgeExecutor'
 $supervisorTaskName = 'PixelsAgentBridgeSessionSupervisor'
 $existingSupervisorTask = Get-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
@@ -184,9 +213,30 @@ if ($existingService) {
     }
 }
 try {
+    if (Test-Path -LiteralPath $runtimeCurrent) {
+        Move-Item -LiteralPath $runtimeCurrent -Destination $runtimeOld -ErrorAction Stop
+    }
+    try {
+        Move-Item -LiteralPath $runtimeNew -Destination $runtimeCurrent -ErrorAction Stop
+    } catch {
+        if (Test-Path -LiteralPath $runtimeOld) {
+            Move-Item -LiteralPath $runtimeOld -Destination $runtimeCurrent -ErrorAction SilentlyContinue
+        }
+        throw
+    }
     Install-PabBinaries -SourceRoot $source -DestinationRoot $InstallRoot
 } catch {
     $installFailure = $_
+    if (Test-Path -LiteralPath $runtimeOld) {
+        try {
+            if (Test-Path -LiteralPath $runtimeCurrent) {
+                Remove-Item -LiteralPath $runtimeCurrent -Recurse -Force -ErrorAction Stop
+            }
+            Move-Item -LiteralPath $runtimeOld -Destination $runtimeCurrent -ErrorAction Stop
+        } catch {
+            Write-Warning "Could not restore previous browser runtime: $($_.Exception.Message)"
+        }
+    }
     # The binary transaction restored the previous files. Bring the old
     # service and session helpers back before reporting the install failure.
     if ($serviceWasRunning) {
@@ -295,5 +345,11 @@ $supervisorTask = @{
 Register-ScheduledTask @supervisorTask | Out-Null
 Start-ScheduledTask -TaskName $supervisorTaskName
 
+if (Test-Path -LiteralPath $runtimeOld) {
+    try { Remove-Item -LiteralPath $runtimeOld -Recurse -Force -ErrorAction Stop }
+    catch { Write-Warning "Previous browser runtime remains in use: $runtimeOld" }
+}
+
 Write-Output "Installed to $InstallRoot"
 Write-Output "App: powershell.exe -File `"$(Join-Path $InstallRoot 'run-app.ps1')`""
+Remove-Item -LiteralPath $errorLog -Force -ErrorAction SilentlyContinue

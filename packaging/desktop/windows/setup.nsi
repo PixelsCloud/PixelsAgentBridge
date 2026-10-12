@@ -79,7 +79,10 @@ Function .onInit
         Abort
     ${EndIf}
     ${IfNot} ${RunningX64}
+        IfSilent unsupported_arch
         MessageBox MB_ICONSTOP "This package requires 64-bit Windows."
+    unsupported_arch:
+        SetErrorLevel 3
         Abort
     ${EndIf}
     SetRegView 64
@@ -109,7 +112,10 @@ Section "Install"
     ReadRegDWORD $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Policies\System" "SoftwareSASGeneration"
     ${If} $0 != 1
     ${AndIf} $0 != 3
+        IfSilent sas_policy_requires_interaction
         MessageBox MB_ICONQUESTION|MB_YESNO "$(SasPolicyPrompt)" IDYES allow_service_sas
+    sas_policy_requires_interaction:
+        SetErrorLevel 3
         Abort
     allow_service_sas:
         WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Policies\System" "SoftwareSASGeneration" 1
@@ -120,6 +126,7 @@ Section "Install"
     File "${PAYLOAD_DIR}\pab-desktop.exe"
     File "${PAYLOAD_DIR}\pab-executor.exe"
     File "${PAYLOAD_DIR}\pab-mcp.exe"
+    File "${PAYLOAD_DIR}\browser-runtime.zip"
     File "${PAYLOAD_DIR}\install.ps1"
     File "${PAYLOAD_DIR}\run-app.ps1"
     File "${PAYLOAD_DIR}\launch-app.ps1"
@@ -130,7 +137,11 @@ Section "Install"
     nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" -ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}" -InstallRoot "$INSTDIR"'
     Pop $0
     ${If} $0 != 0
+        DetailPrint "$(InstallFailed) $0"
+        IfSilent install_failed_silent
         MessageBox MB_ICONSTOP "$(InstallFailed) $0"
+    install_failed_silent:
+        SetErrorLevel 1
         Abort
     ${EndIf}
 
@@ -161,7 +172,11 @@ Section "Uninstall"
     nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\uninstall.ps1" -InstallRoot "$INSTDIR"'
     Pop $0
     ${If} $0 != 0
+        DetailPrint "$(UninstallFailed) $0"
+        IfSilent uninstall_failed_silent
         MessageBox MB_ICONSTOP "$(UninstallFailed) $0"
+    uninstall_failed_silent:
+        SetErrorLevel 1
         Abort
     ${EndIf}
 

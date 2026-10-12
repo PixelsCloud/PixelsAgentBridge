@@ -28,4 +28,5 @@ rm -rf -- '/Applications/Pixels Agent Bridge.app'
 for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh settings.env operator-server.json; do
     rm -f -- "$install_dir/$name"
 done
+rm -rf -- "$install_dir/browser-runtime"
 printf '%s\n' 'Application and launchd jobs removed. Machine and user data retained.'

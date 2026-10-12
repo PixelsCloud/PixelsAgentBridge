@@ -323,7 +323,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
     let database = root.join("bridge.sqlite3");
     let path = root.join("mcp-tools.json");
     let settings = McpToolSettings {
-        version: 1,
+        version: 2,
         enabled_groups: vec![ToolGroup::Core],
     };
     settings.save(&path).unwrap();
@@ -351,7 +351,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
         ToolGroup::Core.tools().len()
     );
     let (second, second_child) = start(root, &database, 1).await;
-    assert_eq!(second.list_all_tools().await.unwrap().len(), 68);
+    assert_eq!(second.list_all_tools().await.unwrap().len(), 99);
     stop(second, second_child).await;
     stop(first, first_child).await;
 }
@@ -360,7 +360,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
 async fn invalid_tool_settings_fail_startup_without_exposing_a_fallback_catalog() {
     for (content, expected) in [
         (
-            r#"{"version":2,"enabledGroups":["core"]}"#,
+            r#"{"version":3,"enabledGroups":["core"]}"#,
             "Unsupported MCP tool settings version",
         ),
         (

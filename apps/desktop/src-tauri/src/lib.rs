@@ -6,9 +6,9 @@ use tokio::sync::RwLock;
 
 mod agent_integrations;
 mod desktop_input;
-mod macos_permissions;
 #[cfg(target_os = "macos")]
 mod macos_launch;
+mod macos_permissions;
 #[cfg(target_os = "macos")]
 pub fn macos_diagnostics() -> serde_json::Value {
     serde_json::json!({
@@ -19,11 +19,13 @@ pub fn macos_diagnostics() -> serde_json::Value {
         "localAccessConfigured": pab_executor::local_ipc::user_token_path().is_ok_and(|p| p.is_file()),
     })
 }
+mod browser_helper;
+mod browser_setup;
 mod device_account;
+mod github_login;
 mod mcp_reporting;
 mod mcp_tool_settings;
 mod operator;
-mod github_login;
 mod screenshot_session;
 mod server_settings;
 mod session_helper;
@@ -31,12 +33,24 @@ mod tray;
 mod update;
 mod window_session;
 #[cfg(windows)]
-mod windows_session_supervisor;
-#[cfg(windows)]
 mod windows_gui;
+#[cfg(windows)]
+mod windows_session_supervisor;
 
 #[derive(Clone, Default)]
 struct LocalStatus(Arc<RwLock<Option<DeviceStatus>>>);
+
+async fn show_pending_browser_handoff(handle: tauri::AppHandle) {
+    let mut last_session = None;
+    loop {
+        let pending = browser_setup::pending_handoff_session_ref();
+        if pending.is_some() && pending != last_session {
+            tray::show_window(&handle);
+        }
+        last_session = pending;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
 
 #[tauri::command]
 async fn device_status(state: tauri::State<'_, LocalStatus>) -> Result<DeviceStatus, String> {
@@ -66,6 +80,7 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                     tracing::debug!(%error, "window helper registration failed");
                 }
                 let mut desktop_session = pab_desktop_control::DesktopSession::new();
+                let mut browser = browser_helper::BrowserManager::default();
                 loop {
                     #[cfg(target_os = "macos")]
                     pab_desktop_control::release_idle_input();
@@ -98,12 +113,21 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                             query,
                             identity,
                         ))) => {
-                            let reply = pab_desktop_control::apps::query_guarded(
-                                id,
-                                &query,
-                                &identity,
-                                || session_helper::desktop_is_active(Some("Default")),
-                            );
+                            let reply = if let pab_protocol::AppQuery::Browser { request } = &query
+                            {
+                                browser
+                                    .query(id, request, &identity, || {
+                                        session_helper::desktop_is_active(Some("Default"))
+                                    })
+                                    .await
+                            } else {
+                                pab_desktop_control::apps::query_guarded(
+                                    id,
+                                    &query,
+                                    &identity,
+                                    || session_helper::desktop_is_active(Some("Default")),
+                                )
+                            };
                             if let Err(error) =
                                 pab_executor::local_ipc::reply_desktop_query(&mut socket, &reply)
                                     .await
@@ -255,7 +279,10 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                         // This one-second wake-up checks whether Windows changed
                         // desktops. Status updates arrive every three seconds;
                         // an idle tick is not a disconnected local service.
-                        Err(_) => continue,
+                        Err(_) => {
+                            browser.expire_idle().await;
+                            continue;
+                        }
                     }
                 }
             }
@@ -314,6 +341,7 @@ pub fn run() {
             tauri::async_runtime::spawn(device_accounts.run());
             tauri::async_runtime::spawn(device_account::run_catalog());
             tray::setup(app)?;
+            tauri::async_runtime::spawn(show_pending_browser_handoff(app.handle().clone()));
             let update_state = app.state::<update::UpdateState>().inner().clone();
             update::start_background_checks(app.handle().clone(), update_state);
             #[cfg(windows)]
@@ -347,6 +375,12 @@ pub fn run() {
             macos_permissions::open_macos_permission_settings,
             macos_permissions::restart_macos_permission_processes,
             device_status,
+            browser_setup::browser_runtime_info,
+            browser_setup::browser_profile_status,
+            browser_setup::browser_profile_clear,
+            browser_setup::browser_handoff_status,
+            browser_setup::browser_handoff_complete,
+            browser_setup::browser_handoff_cancel,
             device_account::device_account_status,
             device_account::device_account_associate,
             device_account::account_catalog_status,

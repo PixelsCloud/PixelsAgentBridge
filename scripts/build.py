@@ -37,6 +37,8 @@ def macos_architectures(selection):
 
 def build_macos(version, profile, architectures, package, installer_identity=None):
     from macos_signing import sign, IDENTIFIERS
+    if package:
+        run([sys.executable, 'browser-runtime/build.py'])
     for architecture in architectures:
         target = f'{architecture}-apple-darwin'
         flags = ['--release'] if profile == 'release' else []
@@ -130,6 +132,8 @@ def main():
                 build_macos(version, args.profile, architectures, args.package, args.macos_installer_identity)
                 built_frontends.add('desktop')
             elif target == 'desktop':
+                if args.package:
+                    run([sys.executable, 'browser-runtime/build.py'])
                 run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp'])
                 run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--no-bundle', *(['--debug'] if args.profile == 'debug' else [])], ROOT / 'apps/desktop')
                 built_frontends.add('desktop')

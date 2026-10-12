@@ -10,6 +10,9 @@ pub(super) async fn call_tool(
     name: &str,
     arguments: &Value,
 ) -> Result<Value, String> {
+    if super::mcp_browser::handles(name) {
+        return super::mcp_browser::call(runtime, name, arguments).await;
+    }
     match name {
         "pab_list_containers"
         | "pab_get_container"

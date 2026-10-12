@@ -13,6 +13,8 @@ use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 #[path = "pab_mcp/account.rs"]
 mod mcp_account;
+#[path = "pab_mcp/browser.rs"]
+mod mcp_browser;
 #[path = "pab_mcp/catalog.rs"]
 mod mcp_catalog;
 #[path = "pab_mcp/desktop.rs"]

@@ -252,6 +252,7 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_desktop::tools());
     tools.extend(super::mcp_ui::tools());
     tools.extend(super::mcp_applications::tools());
+    tools.extend(super::mcp_browser::tools());
     super::mcp_desktop::enhance_input_tool(
         tools
             .iter_mut()
@@ -414,6 +415,9 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     }
     if super::mcp_ui::handles(name) {
         super::mcp_ui::parse(name, args)?;
+    }
+    if super::mcp_browser::handles(name) {
+        super::mcp_browser::parse(name, args)?;
     }
     if name == "pab_desktop_input" {
         if args.get("actions").is_some() || args.get("monitor_input").is_some() {
@@ -643,11 +647,11 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 68);
-        assert_eq!(enabled_tools(&McpToolSettings::default()), all);
+        assert_eq!(all.len(), 99);
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 99);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
-                version: 1,
+                version: 2,
                 enabled_groups: if group == ToolGroup::Core {
                     vec![group]
                 } else {

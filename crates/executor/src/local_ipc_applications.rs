@@ -7,6 +7,7 @@ use pab_protocol::{
 pub(crate) struct ApplicationRoute {
     sender: mpsc::Sender<HelperRequest>,
     helper: helper_identity::VerifiedHelper,
+    provider_id: u64,
 }
 impl ApplicationRoute {
     pub fn select(
@@ -25,22 +26,23 @@ impl ApplicationRoute {
                         p.sender.clone(),
                         i,
                         p.application_schema_version.unwrap_or(0),
+                        p.id,
                     )
                 })
             })
             .collect::<Vec<_>>();
         let mut upgrade_required = false;
-        for (sender, helper, version) in candidates {
+        for (sender, helper, version, provider_id) in candidates {
             if &helper.identity == expected && helper.current() && !sender.is_closed() {
                 if version < required_version {
                     upgrade_required = true;
                     continue;
                 }
-                return Ok(Self { sender, helper });
+                return Ok(Self { sender, helper, provider_id });
             }
         }
         if upgrade_required {
-            return Err(LocalIpcError::Remote("application_helper_upgrade_required: install the matching desktop helper before using new_instance; no action dispatched".into()));
+            return Err(LocalIpcError::Remote("application_helper_upgrade_required: install the matching desktop helper; no action dispatched".into()));
         }
         Err(LocalIpcError::WindowHelperUnavailable)
     }
@@ -54,6 +56,16 @@ impl ApplicationRoute {
         }
         let expected = self.helper.identity;
         let mutation = query.is_mutation();
+        let browser_action = if let AppQuery::Browser { request } = &query {
+            Some(request.action)
+        } else {
+            None
+        };
+        let timeout = if matches!(&query, AppQuery::Browser { .. }) {
+            Duration::from_secs(55)
+        } else {
+            Duration::from_secs(25)
+        };
         let (reply, receive) = oneshot::channel();
         // A failed queue reservation is known not to have dispatched anything.
         let permit = tokio::time::timeout(Duration::from_secs(5), self.sender.reserve())
@@ -66,7 +78,7 @@ impl ApplicationRoute {
             expected.clone(),
             reply,
         ));
-        let result = tokio::time::timeout(Duration::from_secs(25), receive)
+        let result = tokio::time::timeout(timeout, receive)
             .await
             .map_err(|_| LocalIpcError::Timeout)?
             .map_err(|_| {
@@ -81,12 +93,27 @@ impl ApplicationRoute {
             Some(SystemQueryData::Applications {
                 snapshot: AppSnapshot::Action { result },
             }) if mutation && result.request_accepted => Some(&result.execution_identity),
+            Some(SystemQueryData::Applications {
+                snapshot: AppSnapshot::Browser { result },
+            }) => Some(&result.execution_identity),
             _ => None,
         };
         if observed.is_some_and(|i| i != &expected)
             || ((result.state == "completed" || result.data.is_some()) && observed.is_none())
         {
             return Err(LocalIpcError::Protocol);
+        }
+        if let (
+            Some(action),
+            Some(SystemQueryData::Applications {
+                snapshot:
+                    AppSnapshot::Browser {
+                        result: browser_result,
+                    },
+            }),
+        ) = (browser_action, result.data.as_ref())
+        {
+            super::note_browser_handoff(self.provider_id, action, browser_result);
         }
         Ok(result)
     }

@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 pub enum AppQuery {
     List { request: AppListRequest },
     Execute { request: AppActionRequest },
+    Browser { request: crate::BrowserRequest },
 }
 impl AppQuery {
     pub fn validate(&self) -> Result<(), &'static str> {
         match self {
             Self::List { request } => request.validate(),
             Self::Execute { request } => request.validate(),
+            Self::Browser { request } => request.validate(),
         }
     }
     pub fn kind(&self) -> &'static str {
@@ -20,12 +22,20 @@ impl AppQuery {
                 request: AppActionRequest::Launch { .. },
             } => "app_launch",
             Self::Execute { .. } => "app_open_file",
+            Self::Browser { request } => request.action.name(),
         }
     }
     pub fn is_mutation(&self) -> bool {
-        matches!(self, Self::Execute { .. })
+        match self {
+            Self::Browser { request } => request.action.is_mutation(),
+            Self::Execute { .. } => true,
+            Self::List { .. } => false,
+        }
     }
     pub fn required_helper_version(&self) -> u16 {
+        if matches!(self, Self::Browser { .. }) {
+            return 3;
+        }
         if matches!(
             self,
             Self::Execute {
@@ -46,6 +56,7 @@ impl AppQuery {
 pub enum AppSnapshot {
     List { snapshot: AppListSnapshot },
     Action { result: AppActionResult },
+    Browser { result: crate::BrowserResult },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

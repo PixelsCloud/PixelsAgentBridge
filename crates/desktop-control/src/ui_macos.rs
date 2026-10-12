@@ -51,11 +51,13 @@ fn select_window<T>(
 
 fn error(code: i32) -> &'static str {
     match code {
-        -25211 => "accessibility_permission_required",
-        -25202 => "stale_element",
-        -25204 => "provider_unresponsive",
-        -25205 | -25206 | -25208 => "unsupported_attribute_or_action",
-        -25212 => "attribute_unavailable",
+        kAXErrorAPIDisabled => "accessibility_permission_required",
+        kAXErrorInvalidUIElement => "stale_element",
+        kAXErrorCannotComplete => "provider_unresponsive",
+        kAXErrorAttributeUnsupported | kAXErrorActionUnsupported | kAXErrorNotImplemented => {
+            "unsupported_attribute_or_action"
+        }
+        kAXErrorNoValue => "attribute_unavailable",
         _ => "provider_failed",
     }
 }

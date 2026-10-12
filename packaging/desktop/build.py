@@ -45,6 +45,9 @@ def package_windows():
     from build_version import verify_artifacts
 
     archive_path = args.output_dir / f"pixels-agent-bridge-windows-x86_64-{args.profile}.zip"
+    browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-windows.zip'
+    if not browser_runtime.is_file():
+        raise FileNotFoundError('Build the offline browser runtime with browser-runtime/build.py first')
     files = [
         args.windows_desktop_bin,
         *(args.windows_bin_dir / name for name in (
@@ -62,6 +65,7 @@ def package_windows():
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for file in files:
             archive.write(file, file.name)
+        archive.write(browser_runtime, 'browser-runtime.zip')
     return archive_path
 
 
@@ -76,6 +80,10 @@ def package_unix(platform, architecture, binaries):
         )),
     ]
     if platform == "macos":
+        browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-macos.tar.gz'
+        if not browser_runtime.is_file():
+            raise FileNotFoundError('Build the offline browser runtime with browser-runtime/build.py on macOS first')
+        files.append(browser_runtime)
         files.extend(scripts / "macos" / name for name in (
             "com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist",
             "com.pixelsagentbridge.login-helper.plist",

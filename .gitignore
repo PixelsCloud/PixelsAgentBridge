@@ -12,6 +12,9 @@
 /apps/desktop/src-tauri/icons/ios/
 /apps/desktop/test-results/
 /apps/desktop/playwright-report/
+/browser-runtime/node_modules/
+/browser-runtime/extension/
+/.playwright-mcp/
 /.build/
 /dist/
 /.idea/

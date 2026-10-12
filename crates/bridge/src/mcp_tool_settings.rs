@@ -16,15 +16,19 @@ pub enum ToolGroup {
     Desktop,
     Git,
     Container,
+    Browser,
+    BrowserAdvanced,
 }
 impl ToolGroup {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::Core,
         Self::File,
         Self::System,
         Self::Desktop,
         Self::Git,
         Self::Container,
+        Self::Browser,
+        Self::BrowserAdvanced,
     ];
     pub fn tools(self) -> &'static [&'static str] {
         match self {
@@ -108,6 +112,41 @@ impl ToolGroup {
                 "pab_get_container",
                 "pab_list_containers",
             ],
+            Self::Browser => &[
+                "pab_browser_setup_info",
+                "pab_browser_attach",
+                "pab_browser_get_session",
+                "pab_browser_close",
+                "pab_browser_open",
+                "pab_browser_navigate",
+                "pab_browser_tabs",
+                "pab_browser_snapshot",
+                "pab_browser_find",
+                "pab_browser_extract",
+                "pab_browser_screenshot",
+                "pab_browser_wait",
+                "pab_browser_click",
+                "pab_browser_fill",
+                "pab_browser_fill_form",
+                "pab_browser_press_key",
+                "pab_browser_select_option",
+                "pab_browser_set_checked",
+                "pab_browser_hover",
+                "pab_browser_scroll",
+                "pab_browser_drag",
+                "pab_browser_handle_dialog",
+                "pab_browser_file_upload",
+                "pab_browser_downloads",
+                "pab_browser_request_handoff",
+                "pab_browser_resume",
+            ],
+            Self::BrowserAdvanced => &[
+                "pab_browser_pointer",
+                "pab_browser_drop",
+                "pab_browser_console_messages",
+                "pab_browser_network_requests",
+                "pab_browser_pdf_save",
+            ],
         }
     }
     pub fn for_tool(name: &str) -> Option<Self> {
@@ -126,14 +165,14 @@ pub struct McpToolSettings {
 impl Default for McpToolSettings {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 2,
             enabled_groups: ToolGroup::ALL.to_vec(),
         }
     }
 }
 impl McpToolSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 1 {
+        if self.version != 2 {
             return Err("Unsupported MCP tool settings version".into());
         }
         if !self.enabled_groups.contains(&ToolGroup::Core) {
@@ -171,9 +210,19 @@ impl McpToolSettings {
         if bytes.len() > 4096 {
             return Err("MCP tool settings exceed 4096 bytes".into());
         }
-        let settings: Self =
+        let mut settings: Self =
             serde_json::from_slice(bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes))
                 .map_err(|e| e.to_string())?;
+        if settings.version == 1 {
+            // Version 1 predates both browser groups. Enable both on upgrade
+            // while preserving the user's choices for existing groups.
+            for group in [ToolGroup::Browser, ToolGroup::BrowserAdvanced] {
+                if !settings.enabled_groups.contains(&group) {
+                    settings.enabled_groups.push(group);
+                }
+            }
+            settings.version = 2;
+        }
         settings.validate()?;
         Ok(settings)
     }
@@ -220,7 +269,7 @@ mod tests {
             vec![ToolGroup::Core, ToolGroup::File]
         );
         for data in [
-            r#"{"version":2,"enabledGroups":["core"]}"#,
+            r#"{"version":3,"enabledGroups":["core"]}"#,
             r#"{"version":1,"enabledGroups":["core","core"]}"#,
             r#"{"version":1,"enabledGroups":["core","invalid"]}"#,
             r#"{"version":1,"enabledGroups":["core"],"other":true}"#,
@@ -234,6 +283,37 @@ mod tests {
         assert!(McpToolSettings::load(&path).is_err());
     }
     #[test]
+    fn old_tool_selection_gains_both_browser_groups_and_v2_opt_out_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mcp-tools.json");
+        fs::write(&path, r#"{"version":1,"enabledGroups":["core","file"]}"#).unwrap();
+        let migrated = McpToolSettings::load(&path).unwrap();
+        assert_eq!(migrated.version, 2);
+        assert!(migrated.enabled_groups.contains(&ToolGroup::Browser));
+        assert!(migrated.enabled_groups.contains(&ToolGroup::BrowserAdvanced));
+        assert!(!migrated.enabled_groups.contains(&ToolGroup::Git));
+        let mut disabled = migrated;
+        disabled
+            .enabled_groups
+            .retain(|group| *group != ToolGroup::Browser);
+        disabled.save(&path).unwrap();
+        assert!(
+            !McpToolSettings::load(&path)
+                .unwrap()
+                .allows("pab_browser_attach")
+        );
+        assert!(McpToolSettings::default().allows("pab_browser_pointer"));
+        assert!(McpToolSettings::default().allows("pab_browser_pdf_save"));
+        let mut v2_opt_out = McpToolSettings::default();
+        v2_opt_out
+            .enabled_groups
+            .retain(|group| *group != ToolGroup::BrowserAdvanced);
+        v2_opt_out.save(&path).unwrap();
+        assert!(!McpToolSettings::load(&path)
+            .unwrap()
+            .allows("pab_browser_pointer"));
+    }
+    #[test]
     fn inventories_are_unique_and_core_controls_are_mandatory() {
         let names: Vec<_> = ToolGroup::ALL
             .into_iter()
@@ -241,8 +321,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 68);
-        assert_eq!(unique.len(), 68);
+        assert_eq!(names.len(), 99);
+        assert_eq!(unique.len(), 99);
         for name in [
             "pab_connect",
             "pab_disconnect",

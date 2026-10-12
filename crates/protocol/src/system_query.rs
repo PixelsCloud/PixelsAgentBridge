@@ -2,7 +2,7 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 13;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 14;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
@@ -106,7 +106,9 @@ impl SystemQuery {
     }
     pub fn required_version(&self) -> u16 {
         if let Self::Applications { query, .. } = self {
-            return if query.required_helper_version() >= 2 {
+            return if query.required_helper_version() >= 3 {
+                14
+            } else if query.required_helper_version() >= 2 {
                 13
             } else {
                 12
@@ -195,6 +197,13 @@ impl SystemQuery {
         } = &mut value
         {
             *query = query.persistence_form();
+        }
+        if let Self::Applications {
+            query: crate::AppQuery::Browser { request },
+            ..
+        } = &mut value
+        {
+            *request = request.persistence_form();
         }
         if let Self::Git {
             query:

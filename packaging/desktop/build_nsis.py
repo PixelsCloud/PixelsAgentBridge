@@ -22,6 +22,7 @@ BINARIES = {
     "pab-mcp.exe": ROOT / "target",
 }
 CONTENTS = set(BINARIES) | {
+    "browser-runtime.zip",
     "install.ps1",
     "run-app.ps1",
     "launch-app.ps1",

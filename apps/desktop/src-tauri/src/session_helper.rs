@@ -130,17 +130,30 @@ async fn run_forever(
 
 async fn serve_application_requests(socket: &mut LocalSocket) -> Result<(), String> {
     // This helper never acquires input state or initializes UI automation.
+    let mut browser = crate::browser_helper::BrowserManager::default();
     while application_desktop_is_active() {
         let event =
             match tokio::time::timeout(Duration::from_secs(1), local_ipc::next_local_event(socket))
                 .await
             {
                 Ok(result) => result.map_err(|e| e.to_string())?,
-                Err(_) => continue,
+                Err(_) => {
+                    browser.expire_idle().await;
+                    continue;
+                }
             };
         match event {
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
             LocalEvent::ApplicationQuery(id, query, identity) => {
+                if let pab_protocol::AppQuery::Browser { request } = &query {
+                    let reply = browser
+                        .query(id, request, &identity, application_desktop_is_active)
+                        .await;
+                    local_ipc::reply_desktop_query(socket, &reply)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    continue;
+                }
                 // Shell extensions can block inside a native call indefinitely.
                 // This dedicated process owns no input state and its children
                 // are not in a kill-on-close job. Retire just this helper on a
@@ -181,6 +194,7 @@ async fn serve_requests(
     #[cfg(target_os = "macos")]
     let _input_guard = desktop_input::InputGuard;
     let mut desktop_session = pab_desktop_control::DesktopSession::new();
+    let mut browser = crate::browser_helper::BrowserManager::default();
     loop {
         #[cfg(target_os = "macos")]
         pab_desktop_control::release_idle_input();
@@ -193,7 +207,10 @@ async fn serve_requests(
                 .await
             {
                 Ok(result) => result.map_err(|error| error.to_string())?,
-                Err(_) => continue,
+                Err(_) => {
+                    browser.expire_idle().await;
+                    continue;
+                }
             };
         match event {
             LocalEvent::Status(_) | LocalEvent::StatusUnavailable(_) => {}
@@ -201,6 +218,17 @@ async fn serve_requests(
                 desktop_session.release_ui_connection(connection)
             }
             LocalEvent::ApplicationQuery(id, query, identity) => {
+                if let pab_protocol::AppQuery::Browser { request } = &query {
+                    let reply = browser
+                        .query(id, request, &identity, || {
+                            desktop_is_active(expected_desktop)
+                        })
+                        .await;
+                    local_ipc::reply_desktop_query(socket, &reply)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    continue;
+                }
                 let reply = pab_desktop_control::apps::query_guarded(id, &query, &identity, || {
                     desktop_is_active(expected_desktop)
                 });

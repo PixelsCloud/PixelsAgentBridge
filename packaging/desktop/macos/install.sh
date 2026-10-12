@@ -21,6 +21,7 @@ user_data="$user_home/Library/Application Support/PixelsAgentBridge"
 for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh com.pixelsagentbridge.executor.plist com.pixelsagentbridge.session-helper.plist com.pixelsagentbridge.login-helper.plist; do
     [[ -f $source_dir/$name ]] || { echo "Missing package file: $name" >&2; exit 2; }
 done
+[[ -f $source_dir/browser-runtime-macos.tar.gz ]] || { echo 'Missing offline browser runtime' >&2; exit 2; }
 [[ -f "$source_dir/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop" ]] || { echo 'Missing application bundle' >&2; exit 2; }
 bundle_id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$source_dir/Pixels Agent Bridge.app/Contents/Info.plist")
 [[ $bundle_id == vip.rgaa.pab.desktop ]] || { echo 'Unexpected application identifier' >&2; exit 2; }
@@ -78,6 +79,12 @@ chown -R root:wheel "$upgrade/new.app"
 chmod -R u=rwX,go=rX "$upgrade/new.app"
 codesign --verify --deep --strict "$upgrade/new.app"
 install -d -m 755 "$upgrade/new-support"
+tar -xzf "$source_dir/browser-runtime-macos.tar.gz" -C "$upgrade/new-support"
+[[ -x "$upgrade/new-support/browser-runtime/node" \
+    && -f "$upgrade/new-support/browser-runtime/node_modules/@playwright/mcp/cli.js" ]] \
+    || { echo 'Incomplete offline browser runtime' >&2; exit 2; }
+chmod -R u=rwX,go=rX "$upgrade/new-support/browser-runtime"
+chown -R root:wheel "$upgrade/new-support/browser-runtime"
 for name in pab-mcp pab-executor run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$upgrade/new-support/$name"
 done

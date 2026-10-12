@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path, sync::Arc, time::Instant};
 
 use pab_protocol::{
     CapabilityRef, CommandTaskSpec, DeviceRef, OperatorRef, OutputChunk, OutputRange, OutputStream,
@@ -10,7 +10,7 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::sync::{Mutex, broadcast};
 
 const CHANGE_BUFFER: usize = 1024;
 const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
@@ -45,6 +45,7 @@ pub(crate) struct TaskStore {
     initiating_user: Option<pab_protocol::UserAttribution>,
     pool: SqlitePool,
     changes: broadcast::Sender<TaskChange>,
+    browser_replies: Arc<Mutex<HashMap<RequestId, (Instant, pab_protocol::SystemQueryReply)>>>,
 }
 
 impl TaskStore {
@@ -154,6 +155,7 @@ impl TaskStore {
             pool,
             changes,
             initiating_user: None,
+            browser_replies: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 

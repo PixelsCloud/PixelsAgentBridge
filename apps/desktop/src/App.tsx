@@ -11,6 +11,7 @@ import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
 import { UpdateNotice } from "./UpdateNotice";
+import { BrowserHandoffNotice } from "./BrowserHandoffNotice";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { AccountConnectionPanel, AccountLoginDialog } from "./AccountConnectionPanel";
 import type { ScopeStatus } from "./operatorTypes";
@@ -214,6 +215,7 @@ function App() {
     >
     <AntdApp className="desktop-ant-app">
     <div className="window-frame">
+      <BrowserHandoffNotice language={language} />
       <div
         className="titlebar"
         onMouseDown={(event) => {

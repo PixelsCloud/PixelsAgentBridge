@@ -2,6 +2,31 @@
 //! substitute for the requested session. Public transport routing is separate.
 use pab_protocol::*;
 
+pub fn verify_interactive_identity(
+    expected: &ExecutionIdentity,
+    active: impl Fn() -> bool,
+) -> Result<(), String> {
+    expected.validate().map_err(str::to_owned)?;
+    if !active() {
+        return Err("desktop_session_unavailable: selected desktop is not active".into());
+    }
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        let observed = session_identity()?
+            .observation(
+                ExecutionMode::DesktopUser,
+                ExecutionEnvironmentSource::InteractiveSession,
+            )
+            .map_err(|e| e.to_string())?;
+        if &observed != expected {
+            return Err("desktop_identity_changed: query execution contexts again".into());
+        }
+        Ok(())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    Err("unsupported_platform: interactive browser is unavailable on the headless product".into())
+}
+
 /// Called only in the helper selected by the service. Recheck native identity
 /// and the active desktop immediately before dispatch and after the native call.
 pub fn query_guarded(
@@ -20,28 +45,7 @@ pub fn query_guarded(
     reply.sampled_from_unix_ms = Some(now());
     let verify = || -> Result<(), String> {
         query.validate().map_err(str::to_owned)?;
-        expected.validate().map_err(str::to_owned)?;
-        if !active() {
-            return Err("desktop_session_unavailable: selected desktop is not active".into());
-        }
-        #[cfg(any(windows, target_os = "macos"))]
-        {
-            let observed = session_identity()?
-                .observation(
-                    ExecutionMode::DesktopUser,
-                    ExecutionEnvironmentSource::InteractiveSession,
-                )
-                .map_err(|e| e.to_string())?;
-            if &observed != expected {
-                return Err("desktop_identity_changed: query execution contexts again".into());
-            }
-            Ok(())
-        }
-        #[cfg(not(any(windows, target_os = "macos")))]
-        Err(
-            "unsupported_platform: application management is unavailable on the headless product"
-                .into(),
-        )
+        verify_interactive_identity(expected, &active)
     };
     let result = verify()
         .map_err(|e| AppActionError::new(false, e))
@@ -52,6 +56,10 @@ pub fn query_guarded(
             AppQuery::Execute { request } => {
                 act(request).map(|result| AppSnapshot::Action { result })
             }
+            AppQuery::Browser { .. } => Err(AppActionError::new(
+                false,
+                "browser requests require the interactive browser helper",
+            )),
         });
     match result {
         Ok(snapshot) => {

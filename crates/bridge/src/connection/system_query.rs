@@ -84,7 +84,10 @@ fn require_capability(version: Option<u16>, query: &SystemQuery) -> Result<(), B
     Ok(())
 }
 fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
-    if ["app_list", "app_launch", "app_open_file"].contains(&r.kind.as_str())
+    let browser_kind = BrowserAction::ALL
+        .iter()
+        .any(|action| action.name() == r.kind);
+    if (["app_list", "app_launch", "app_open_file"].contains(&r.kind.as_str()) || browser_kind)
         && !valid_application(r)
     {
         return false;
@@ -118,52 +121,60 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "cancel_requested"
                 | "cancelled"
         )
-        && matches!(
-            r.kind.as_str(),
-            "containers"
-                | "container"
-                | "container_logs"
-                | "container_control"
-                | "git_status"
-                | "git_diff"
-                | "git_log"
-                | "git_commit"
-                | "git_checkout"
-                | "git_fetch"
-                | "git_pull"
-                | "git_push"
-                | "monitors"
-                | "desktop_windows"
-                | "window_focus"
-                | "window_control"
-                | "type_text"
-                | "desktop_batch"
-                | "monitor_input"
-                | "ui_query"
-                | "ui_get"
-                | "ui_action"
-                | "ui_wait"
-                | "system_info"
-                | "disks"
-                | "processes"
-                | "process"
-                | "network_interfaces"
-                | "network_connections"
-                | "dns"
-                | "os_sessions"
-                | "execution_contexts"
-                | "app_list"
-                | "app_launch"
-                | "app_open_file"
-                | "process_terminate"
-                | "services"
-                | "service"
-                | "service_control"
-        )
+        && (browser_kind
+            || matches!(
+                r.kind.as_str(),
+                "containers"
+                    | "container"
+                    | "container_logs"
+                    | "container_control"
+                    | "git_status"
+                    | "git_diff"
+                    | "git_log"
+                    | "git_commit"
+                    | "git_checkout"
+                    | "git_fetch"
+                    | "git_pull"
+                    | "git_push"
+                    | "monitors"
+                    | "desktop_windows"
+                    | "window_focus"
+                    | "window_control"
+                    | "type_text"
+                    | "desktop_batch"
+                    | "monitor_input"
+                    | "ui_query"
+                    | "ui_get"
+                    | "ui_action"
+                    | "ui_wait"
+                    | "system_info"
+                    | "disks"
+                    | "processes"
+                    | "process"
+                    | "network_interfaces"
+                    | "network_connections"
+                    | "dns"
+                    | "os_sessions"
+                    | "execution_contexts"
+                    | "app_list"
+                    | "app_launch"
+                    | "app_open_file"
+                    | "process_terminate"
+                    | "services"
+                    | "service"
+                    | "service_control"
+            ))
         && r.returned_count <= 1000
         && r.warnings.len() <= 8
         && serde_json::to_vec(r).is_ok_and(|b| b.len() <= MAX_SYSTEM_REPLY_BYTES)
         && (r.state != "completed"
+            || (browser_kind
+                && matches!(
+                    r.data,
+                    Some(SystemQueryData::Applications {
+                        snapshot: AppSnapshot::Browser { .. }
+                    })
+                ))
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
                 (
@@ -256,6 +267,17 @@ fn valid_application(reply: &SystemQueryReply) -> bool {
             result.instance.iter().collect(),
             1,
         ),
+        (
+            kind,
+            SystemQueryData::Applications {
+                snapshot: AppSnapshot::Browser { result },
+            },
+        ) if BrowserAction::ALL
+            .iter()
+            .any(|action| action.name() == kind) =>
+        {
+            (&result.execution_identity, Vec::new(), 1)
+        }
         _ => return false,
     };
     identity.mode == ExecutionMode::DesktopUser

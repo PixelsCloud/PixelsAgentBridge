@@ -30,6 +30,7 @@ IDENTIFIER = "vip.rgaa.pab.desktop.installer"
 CONTROL_URL = "wss://pab.rgaa.vip/control"
 RELAY_URL = "https://pab-relay.rgaa.vip"
 REQUIRED = {
+    "browser-runtime-macos.tar.gz",
     "pab-executor", "pab-mcp", "install.sh", "uninstall.sh", "run-app.sh", "lifecycle.sh",
     "run-mcp.sh", "run-executor.sh", "com.pixelsagentbridge.executor.plist",
     "com.pixelsagentbridge.session-helper.plist",

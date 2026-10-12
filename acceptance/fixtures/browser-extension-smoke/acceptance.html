@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Pixels browser acceptance</title>
+<style>
+body { font: 16px system-ui; max-width: 800px; margin: 30px auto; }
+label { display: block; margin: 12px 0; }
+#scrollbox { height: 90px; overflow: auto; border: 1px solid #777; }
+#drag, #drop { display: inline-block; padding: 15px; border: 1px solid #777; }
+#menu { display: none; }
+#hover:hover #menu { display: block; }
+</style>
+<h1>Pixels browser acceptance</h1>
+<a href="/second" id="second">Second page</a> · <a href="/account">Account</a>
+<p><button id="increment">Increment</button> <output id="count">Count: 0</output></p>
+<form id="form"><label>Name <input id="name" name="name"></label>
+<label><input id="agree" type="checkbox"> Agree</label>
+<label>Color <select id="color"><option value="red">Red</option><option value="blue">Blue</option></select></label>
+<button type="submit">Save</button></form><output id="saved">Not saved</output>
+<table id="items"><tr><th>Item</th><th>Value</th></tr><tr><td>alpha</td><td>1</td></tr><tr><td>beta</td><td>2</td></tr></table>
+<div id="hover">Hover here <span id="menu">Menu is visible</span></div>
+<div id="scrollbox"><div style="height:300px">Scroll content</div><div id="scroll-end">End of scroll</div></div>
+<div id="drag" draggable="true">Drag me</div><div id="drop">Drop here</div>
+<p><button id="dialog">Open alert</button></p>
+<p><input id="file" type="file"> <output id="uploaded">No file</output></p>
+<p><a id="download" href="/download">Download result</a></p>
+<script>
+document.querySelector('#increment').onclick = () => {
+  const output = document.querySelector('#count');
+  output.textContent = 'Count: ' + (Number(output.textContent.split(': ')[1]) + 1);
+};
+document.querySelector('#form').onsubmit = event => {
+  event.preventDefault();
+  document.querySelector('#saved').textContent = `Saved ${document.querySelector('#name').value}, ${document.querySelector('#agree').checked}, ${document.querySelector('#color').value}`;
+};
+document.querySelector('#drag').ondragstart = event => event.dataTransfer.setData('text/plain', 'fixture');
+document.querySelector('#drop').ondragover = event => event.preventDefault();
+document.querySelector('#drop').ondrop = event => { event.preventDefault(); event.target.textContent = event.dataTransfer.getData('text/plain'); };
+document.querySelector('#dialog').onclick = () => alert('Fixture alert');
+document.querySelector('#file').onchange = event => document.querySelector('#uploaded').textContent = event.target.files[0]?.name ?? 'No file';
+</script>
+</html>

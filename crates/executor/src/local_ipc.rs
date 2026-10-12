@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env, fs,
     io::Write,
     path::{Path, PathBuf},
@@ -6,7 +7,7 @@ use std::{
         Arc, Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use futures_util::{SinkExt, StreamExt};
@@ -45,10 +46,13 @@ mod helper_identity;
 struct HelperRegistration(Option<u64>);
 impl Drop for HelperRegistration {
     fn drop(&mut self) {
-        if let Some(id) = self.0
-            && let Ok(mut providers) = window_providers().lock()
-        {
-            providers.retain(|provider| provider.id != id);
+        if let Some(id) = self.0 {
+            if let Ok(mut providers) = window_providers().lock() {
+                providers.retain(|provider| provider.id != id);
+            }
+            if let Ok(mut handoffs) = handoff_guard().lock() {
+                handoffs.remove_provider(id);
+            }
         }
     }
 }
@@ -108,6 +112,110 @@ enum PendingRequest {
 
 static WINDOW_PROVIDERS: OnceLock<Mutex<Vec<WindowProvider>>> = OnceLock::new();
 static NEXT_PROVIDER_ID: AtomicU64 = AtomicU64::new(1);
+static BROWSER_HANDOFFS: OnceLock<Mutex<BrowserHandoffs>> = OnceLock::new();
+
+#[derive(Default)]
+struct BrowserHandoffs {
+    sessions: HashMap<String, BrowserHandoff>,
+}
+
+struct BrowserHandoff {
+    until: i64,
+    provider_id: u64,
+    marker_path: Option<PathBuf>,
+    missing_since: Option<Instant>,
+}
+
+impl BrowserHandoffs {
+    fn update(&mut self, session: String, handoff: Option<BrowserHandoff>) {
+        if let Some(handoff) = handoff {
+            self.sessions.insert(session, handoff);
+        } else {
+            self.sessions.remove(&session);
+        }
+    }
+
+    fn remove_provider(&mut self, provider_id: u64) {
+        self.sessions.retain(|_, handoff| handoff.provider_id != provider_id);
+    }
+
+    fn active(&mut self, now: i64) -> bool {
+        self.sessions.retain(|session, handoff| {
+            if handoff.until <= now { return false; }
+            let Some(path) = &handoff.marker_path else { return true; };
+            let bytes = match fs::read(path) {
+                Ok(bytes) => { handoff.missing_since = None; bytes }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    return handoff.missing_since.get_or_insert_with(Instant::now).elapsed() < Duration::from_secs(2);
+                }
+                Err(_) => return true,
+            };
+            if bytes.len() > 4096 { return true; }
+            let Ok(marker) = serde_json::from_slice::<Value>(&bytes) else { return true; };
+            marker["session_ref"] != session.as_str() || marker["cancelled"] != true
+        });
+        !self.sessions.is_empty()
+    }
+}
+
+fn unix_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
+}
+
+fn handoff_guard() -> &'static Mutex<BrowserHandoffs> {
+    BROWSER_HANDOFFS.get_or_init(|| Mutex::new(BrowserHandoffs::default()))
+}
+
+pub(crate) fn note_browser_handoff(
+    provider_id: u64,
+    action: pab_protocol::BrowserAction,
+    result: &pab_protocol::BrowserResult,
+) {
+    let Some(session) = result.session_ref else {
+        return;
+    };
+    let Ok(mut guard) = handoff_guard().lock() else {
+        return;
+    };
+    match action {
+        pab_protocol::BrowserAction::RequestHandoff if result.status == "awaiting_user" => {
+            guard.update(
+                session.to_string(),
+                result.data["expires_at_unix_ms"].as_i64().map(|until| BrowserHandoff {
+                    until,
+                    provider_id,
+                    marker_path: result.data["marker_path"].as_str().map(PathBuf::from),
+                    missing_since: None,
+                }),
+            );
+        }
+        pab_protocol::BrowserAction::Resume | pab_protocol::BrowserAction::Close => {
+            if result.status == "completed" || result.status == "closed" {
+                guard.update(session.to_string(), None);
+            }
+        }
+        pab_protocol::BrowserAction::GetSession
+            if matches!(result.status.as_str(), "cancelled" | "timed_out" | "expired") => {
+            guard.update(session.to_string(), None);
+        }
+        _ => {}
+    }
+}
+
+fn reject_during_browser_handoff() -> Result<(), LocalIpcError> {
+    if handoff_guard()
+        .lock()
+        .map_err(|_| LocalIpcError::Protocol)?
+        .active(unix_ms())
+    {
+        Err(LocalIpcError::Remote("browser_handoff_active: desktop capture and remote input are paused while the user signs in".into()))
+    } else {
+        Ok(())
+    }
+}
 
 fn window_providers() -> &'static Mutex<Vec<WindowProvider>> {
     WINDOW_PROVIDERS.get_or_init(|| Mutex::new(Vec::new()))
@@ -137,6 +245,7 @@ pub(crate) async fn request_window_list() -> Result<Vec<WindowEntry>, LocalIpcEr
 }
 
 pub(crate) async fn request_screenshot() -> Result<Vec<u8>, LocalIpcError> {
+    reject_during_browser_handoff()?;
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
@@ -161,6 +270,7 @@ pub(crate) async fn request_screenshot() -> Result<Vec<u8>, LocalIpcError> {
 pub(crate) async fn request_screenshot_v2(
     options: pab_protocol::ScreenshotOptions,
 ) -> Result<pab_screenshot::EncodedScreenshot, LocalIpcError> {
+    reject_during_browser_handoff()?;
     options
         .validate()
         .map_err(|_| LocalIpcError::InvalidScreenshot)?;
@@ -222,6 +332,7 @@ pub async fn reply_screenshot_v2(
 }
 
 pub(crate) async fn request_desktop_input(event: DesktopInputEvent) -> Result<(), LocalIpcError> {
+    reject_during_browser_handoff()?;
     let sender = window_providers()
         .lock()
         .map_err(|_| LocalIpcError::Protocol)?
@@ -282,7 +393,7 @@ async fn register_helper(
     applications_only: bool,
 ) -> Result<(), LocalIpcError> {
     let pid = cfg!(any(windows, target_os = "macos")).then(std::process::id);
-    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(2),"applications_only":applications_only,"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
+    send_json(socket, &json!({"type":"register_window_helper","process_id":pid,"application_schema_version":applications.then_some(3),"applications_only":applications_only,"screenshot_schema_version":pab_protocol::SCREENSHOT_SCHEMA_VERSION,"desktop_schema_version":pab_protocol::DESKTOP_HELPER_SCHEMA_VERSION})).await?;
     tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame = receive_json(socket).await?;
@@ -390,6 +501,7 @@ pub(crate) async fn request_desktop_query_with_context(
     query: pab_protocol::DesktopQuery,
     context: Option<pab_protocol::UiHelperContext>,
 ) -> Result<pab_protocol::SystemQueryReply, LocalIpcError> {
+    reject_during_browser_handoff()?;
     query.validate().map_err(|_| LocalIpcError::Protocol)?;
     let sender = window_providers()
         .lock()
@@ -890,8 +1002,13 @@ async fn handle_connection(
                         },
                         HelperRequest::ApplicationQuery(id,query,identity,reply)=>{
                             if reply.is_closed(){continue;}
+                            let reply_timeout = if matches!(&query, pab_protocol::AppQuery::Browser { .. }) {
+                                Duration::from_secs(50)
+                            } else {
+                                Duration::from_secs(30)
+                            };
                             send_json(&mut socket,&json!({"type":"application_query","request_id":id,"query":query,"identity":identity})).await?;
-                            screenshot_deadline=Some(tokio::time::Instant::now()+Duration::from_secs(30));
+                            screenshot_deadline=Some(tokio::time::Instant::now()+reply_timeout);
                             pending=Some(PendingRequest::DesktopQuery{id,kind:query.kind().into(),reply});
                         },
                         HelperRequest::DesktopQuery(id,query,context,reply)=>{
@@ -963,6 +1080,32 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static TEST_HELPER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[test]
+    fn handoff_guard_blocks_until_resume_or_expiry() {
+        let mut guard = BrowserHandoffs::default();
+        guard.update("session-a".into(), Some(BrowserHandoff { until: 1_000, provider_id: 1, marker_path: None, missing_since: None }));
+        guard.update("session-b".into(), Some(BrowserHandoff { until: 2_000, provider_id: 2, marker_path: None, missing_since: None }));
+        assert!(guard.active(500));
+        guard.update("session-a".into(), None);
+        assert!(guard.active(1_500));
+        assert!(!guard.active(2_000));
+    }
+
+    #[test]
+    fn handoff_guard_clears_cancelled_marker_and_disconnected_provider() {
+        let temp = tempfile::tempdir().unwrap();
+        let marker = temp.path().join("handoff.json");
+        fs::write(&marker, r#"{"session_ref":"session-a","cancelled":false}"#).unwrap();
+        let mut guard = BrowserHandoffs::default();
+        guard.update("session-a".into(), Some(BrowserHandoff { until: 2_000, provider_id: 7, marker_path: Some(marker.clone()), missing_since: None }));
+        assert!(guard.active(1_000));
+        fs::write(&marker, r#"{"session_ref":"session-a","cancelled":true}"#).unwrap();
+        assert!(!guard.active(1_000));
+        guard.update("session-b".into(), Some(BrowserHandoff { until: 2_000, provider_id: 8, marker_path: None, missing_since: None }));
+        guard.remove_provider(8);
+        assert!(!guard.active(1_000));
+    }
     #[cfg(any(windows, target_os = "macos"))]
     include!("local_ipc_application_tests.rs");
 

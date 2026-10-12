@@ -42,6 +42,12 @@ class Packages(unittest.TestCase):
             (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleShortVersionString": "0.1.0"}))
             (app / "Contents/Info.plist").chmod(0o600)
             executable.parent.chmod(0o700)
+            runtime = root / '.build/browser-runtime'
+            runtime.mkdir(parents=True)
+            with zipfile.ZipFile(runtime / 'browser-runtime-windows.zip', 'w') as package:
+                package.writestr('node.exe', b'fixture')
+            with tarfile.open(runtime / 'browser-runtime-macos.tar.gz', 'w:gz') as package:
+                package.add(binaries / 'pab-executor', arcname='browser-runtime/node')
             for platform in ("windows", "linux", "macos"):
                 with self.subTest(platform=platform):
                     out = root / platform
@@ -70,6 +76,7 @@ class Packages(unittest.TestCase):
                     if platform == "windows":
                         with zipfile.ZipFile(archive) as package:
                             self.assertIn("pab-desktop.exe", package.namelist())
+                            self.assertIn("browser-runtime.zip", package.namelist())
                             self.assertEqual(package.read("install.ps1"), (SCRIPTS / "windows/install.ps1").read_bytes())
                             self.assertNotIn("install.sh", package.namelist())
                     else:
@@ -78,6 +85,7 @@ class Packages(unittest.TestCase):
                             self.assertEqual(package.extractfile("install.sh").read(), (SCRIPTS / script_dir / "install.sh").read_bytes().replace(b"\r\n", b"\n"))
                             self.assertEqual(package.getmember("install.sh").mode, 0o755)
                             if platform == "macos":
+                                self.assertIn("browser-runtime-macos.tar.gz", package.getnames())
                                 self.assertIn("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop", package.getnames())
                                 self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS/pab-desktop").mode, 0o755)
                                 self.assertEqual(package.getmember("Pixels Agent Bridge.app/Contents/MacOS").mode, 0o755)

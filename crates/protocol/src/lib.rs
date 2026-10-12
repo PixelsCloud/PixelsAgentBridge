@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 mod app_management;
 pub use app_management::*;
+mod browser;
+pub use browser::*;
 mod container;
 pub use container::*;
 mod desktop_query;

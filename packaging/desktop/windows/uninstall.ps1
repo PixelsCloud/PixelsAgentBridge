@@ -1,6 +1,44 @@
 param([string]$InstallRoot)
 
 $ErrorActionPreference = 'Stop'
+$serviceRemoved = $false
+$retiredBinaries = [ordered]@{}
+$errorLog = Join-Path $env:ProgramData 'PixelsAgentBridge\logs\uninstall-error.log'
+trap {
+    $failure = $_
+    try {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $errorLog) | Out-Null
+        @(
+            (Get-Date).ToString('o')
+            $failure.ToString()
+            $failure.ScriptStackTrace
+        ) | Set-Content -LiteralPath $errorLog -Encoding UTF8
+    } catch { }
+    foreach ($binary in $retiredBinaries.Keys) {
+        $retired = $retiredBinaries[$binary]
+        if ((Test-Path -LiteralPath $retired -PathType Leaf) -and
+            -not (Test-Path -LiteralPath $binary -PathType Leaf)) {
+            try { Move-Item -LiteralPath $retired -Destination $binary -ErrorAction Stop }
+            catch {
+                Add-Content -LiteralPath $errorLog -Value "Could not restore $binary`: $($_.Exception.Message)" -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    # A failed removal must not strand a previously working remote device.
+    if ($serviceRemoved -and (Test-Path -LiteralPath (Join-Path $InstallRoot 'pab-executor.exe'))) {
+        try {
+            if (-not (Get-Service -Name 'PixelsAgentBridgeExecutor' -ErrorAction SilentlyContinue)) {
+                $serviceCommand = '"' + (Join-Path $InstallRoot 'pab-executor.exe') + '" --service'
+                New-Service -Name 'PixelsAgentBridgeExecutor' -BinaryPathName $serviceCommand `
+                    -DisplayName 'Pixels Agent Bridge Executor' -StartupType Automatic | Out-Null
+            }
+            Start-Service -Name 'PixelsAgentBridgeExecutor' -ErrorAction Stop
+        } catch {
+            Add-Content -LiteralPath $errorLog -Value "Service recovery failed: $($_.Exception.Message)" -ErrorAction SilentlyContinue
+        }
+    }
+    break
+}
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Uninstallation requires an elevated PowerShell window'
@@ -52,6 +90,7 @@ if ($executorService) {
     }
     & sc.exe delete 'PixelsAgentBridgeExecutor' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Could not remove the Executor Windows service' }
+    $serviceRemoved = $true
 }
 
 foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor')) {
@@ -60,11 +99,56 @@ foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor
         Stop-Process -Force
 }
 
+# A desktop helper can restart pab-mcp while the uninstaller is stopping the
+# running processes. Retire each launch path first so the helper cannot reopen
+# it, then wait for Windows to release the old image before removing it.
+$retirementId = [Guid]::NewGuid().ToString('N')
+foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-desktop.exe', 'pab-executor.exe')) {
+    $binary = Join-Path $InstallRoot $name
+    if (-not (Test-Path -LiteralPath $binary -PathType Leaf)) { continue }
+    $retired = "$binary.$retirementId.uninstall"
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while ($true) {
+        try {
+            Move-Item -LiteralPath $binary -Destination $retired -ErrorAction Stop
+            $retiredBinaries[$binary] = $retired
+            break
+        } catch {
+            if ([DateTime]::UtcNow -ge $deadline) { throw }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+}
+foreach ($binary in $retiredBinaries.Keys) {
+    $retired = $retiredBinaries[$binary]
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while (Test-Path -LiteralPath $retired -PathType Leaf) {
+        Get-CimInstance Win32_Process -Filter "Name LIKE 'pab-%'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.ExecutablePath -ieq $binary -or $_.ExecutablePath -ieq $retired } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        try {
+            Remove-Item -LiteralPath $retired -Force -ErrorAction Stop
+        } catch {
+            if ([DateTime]::UtcNow -ge $deadline) { throw }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+}
+
+$installFull = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+$runtime = Join-Path $installFull 'browser-runtime'
+if (-not [IO.Path]::GetFullPath($runtime).StartsWith($installFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Browser runtime path escaped installation directory'
+}
+if (Test-Path -LiteralPath $runtime) {
+    $runtimeNode = Join-Path $runtime 'node.exe'
+    Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ExecutablePath -ieq $runtimeNode } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath $runtime -Recurse -Force
+}
+
 foreach ($name in @(
-    'pab-mcp.exe',
-    'pab-bridge.exe',
-    'pab-executor.exe',
-    'pab-desktop.exe',
     'settings.json',
     'run-app.ps1',
     'run-ui.ps1',
@@ -79,3 +163,4 @@ foreach ($name in @(
     }
 }
 Write-Output 'Application files removed. Persistent user and machine data were retained.'
+Remove-Item -LiteralPath $errorLog -Force -ErrorAction SilentlyContinue

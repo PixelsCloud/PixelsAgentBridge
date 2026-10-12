@@ -1,4 +1,9 @@
 //! Public Accessibility APIs with retained window identity; no private WindowServer APIs.
+use accessibility_sys::{
+    kAXErrorAPIDisabled, kAXErrorActionUnsupported, kAXErrorAttributeUnsupported,
+    kAXErrorCannotComplete, kAXErrorInvalidUIElement, kAXErrorNoValue, kAXErrorNotImplemented,
+    kAXErrorSuccess,
+};
 use pab_protocol::WindowControlAction;
 use std::{
     collections::HashMap,
@@ -120,7 +125,7 @@ impl Owned {
         let status = unsafe { AXUIElementCopyAttributeValue(self.0, key.0, &mut value) };
         // No focused window is a normal observation during activation. Other
         // AX errors remain errors; they must never authorize input.
-        if status == -25212 {
+        if status == kAXErrorNoValue {
             return Ok(None);
         }
         ax(status).map_err(|error| format!("read {name}: {error}"))?;
@@ -167,17 +172,21 @@ impl Owned {
     }
 }
 fn ax(code: i32) -> Result<(), String> {
-    if code == 0 {
+    if code == kAXErrorSuccess {
         Ok(())
     } else {
         let reason = match code {
-            -25202 => "window or accessibility element is no longer valid",
-            -25204 => "application did not complete the accessibility request",
-            -25205 => "application does not support this accessibility attribute",
-            -25206 => "application does not support this accessibility action",
-            -25208 => "application has not implemented this accessibility operation",
-            -25211 => "accessibility API is disabled or permission is unavailable",
-            -25212 => "accessibility attribute has no value",
+            kAXErrorInvalidUIElement => "window or accessibility element is no longer valid",
+            kAXErrorCannotComplete => "application did not complete the accessibility request",
+            kAXErrorAttributeUnsupported => {
+                "application does not support this accessibility attribute"
+            }
+            kAXErrorActionUnsupported => "application does not support this accessibility action",
+            kAXErrorNotImplemented => {
+                "application has not implemented this accessibility operation"
+            }
+            kAXErrorAPIDisabled => "accessibility API is disabled or permission is unavailable",
+            kAXErrorNoValue => "accessibility attribute has no value",
             _ => "accessibility operation failed",
         };
         Err(format!("macOS Accessibility error {code}: {reason}"))

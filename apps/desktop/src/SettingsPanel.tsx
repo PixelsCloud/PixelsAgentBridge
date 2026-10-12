@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Input, Menu, Select } from "antd";
-import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "lucide-react";
+import { ArrowRight, Bot, Globe2, Info, Languages, RotateCw, Server, Wrench } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { UpdatePanel } from "./UpdatePanel";
+import { BrowserSetupPanel } from "./BrowserSetupPanel";
 
 type ServerSettings = {
   controlUrl: string;
@@ -20,7 +21,7 @@ type Props = {
   onSectionChange: (value: SettingsSection) => void;
 };
 
-export type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
+export type SettingsSection = "preferences" | "ai" | "browser" | "server" | "tools" | "about";
 
 export function SettingsPanel({ language, onLanguageChange, section, onSectionChange: setSection }: Props) {
   const t = messages[language];
@@ -58,6 +59,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
             { key: "preferences", icon: <Languages size={17} />, label: t.settingsPreferences },
             { key: "ai", icon: <Bot size={17} />, label: t.settingsAi },
             { key: "tools", icon: <Wrench size={17} />, label: t.settingsTools },
+            { key: "browser", icon: <Globe2 size={17} />, label: t.settingsBrowser },
             { key: "server", icon: <Server size={17} />, label: t.settingsConnection },
             { key: "about", icon: <Info size={17} />, label: t.settingsAbout },
           ]} />
@@ -102,6 +104,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         </div>
       </div>}
       {section === "tools" && <McpToolSettingsPanel language={language} />}
+      {section === "browser" && <BrowserSetupPanel language={language} />}
       {section === "about" && <div className="settings-about">
         <div className="surface-kicker"><Info size={15} /> {t.settingsAbout}</div>
         <div className="settings-about-product">
