@@ -57,6 +57,7 @@ async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
             initiated_by: "fixture".into(),
             operations: Mutex::new(HashMap::new()),
             terminals: Mutex::new(HashMap::new()),
+            port_forwards: Arc::new(crate::runtime::port_forward::PortForwardManager::default()),
             reconciliation_notify: Notify::new(),
         }),
         shutdown,

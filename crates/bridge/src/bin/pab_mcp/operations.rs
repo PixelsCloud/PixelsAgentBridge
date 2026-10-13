@@ -13,7 +13,7 @@ use pab_bridge::{
     TransferRequest,
     desktop_presence::{McpReporter, OperationReport, RuntimeReport},
 };
-use pab_protocol::{DeviceCode, RequestId};
+use pab_protocol::{DeviceCode, DeviceRef, RequestId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::{
@@ -320,14 +320,18 @@ impl OperationManager {
                 let runtime = self.runtime().await?;
                 let value = super::mcp_document::call(&runtime, name, args).await?;
                 if let (Some(id), Some(code)) = (
-                    value.pointer("/operation_ref/operation_id").and_then(Value::as_str),
+                    value
+                        .pointer("/operation_ref/operation_id")
+                        .and_then(Value::as_str),
                     args["device_code"].as_str(),
                 ) {
-                    self.documents.lock().await.insert(id.parse().map_err(|_| "invalid document operation ID")?,
-                        code.parse().map_err(|_| "invalid device code")?);
+                    self.documents.lock().await.insert(
+                        id.parse().map_err(|_| "invalid document operation ID")?,
+                        code.parse().map_err(|_| "invalid device code")?,
+                    );
                 }
                 Ok(value)
-            },
+            }
             "pab_upload_file" | "pab_download_file" => self.submit(name, args).await,
             "pab_get_operation" => self.get(args).await,
             "pab_list_operations" => self.list(args).await,
@@ -537,11 +541,23 @@ impl OperationManager {
     ) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if self.documents.lock().await.get(&id).copied() == Some(code)
-            || args["kind"] == "document_open" {
-            let device = self.queue.remembered_device(code).await.map_err(|e|e.to_string())?;
-            let reply = self.runtime().await?.get_document(device.device_ref,id).await.map_err(|e|e.to_string())?;
-            return Ok(json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},
-                "result":reply,"os_reminder":device.os_reminder}));
+            || args["kind"] == "document_open"
+        {
+            let device = self
+                .queue
+                .remembered_device(code)
+                .await
+                .map_err(|e| e.to_string())?;
+            let reply = self
+                .runtime()
+                .await?
+                .get_document(device.device_ref, id)
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(
+                json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},
+                "result":reply,"os_reminder":device.os_reminder}),
+            );
         }
         if let Ok((device, cached)) = self.queue.system_record(id, code).await {
             let lookup = async {
@@ -695,10 +711,22 @@ impl OperationManager {
     async fn cancel(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if self.documents.lock().await.get(&id).copied() == Some(code)
-            || args["kind"] == "document_open" {
-            let device = self.queue.remembered_device(code).await.map_err(|e|e.to_string())?;
-            let reply = self.runtime().await?.cancel_document(device.device_ref,id).await.map_err(|e|e.to_string())?;
-            return Ok(json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},"result":reply}));
+            || args["kind"] == "document_open"
+        {
+            let device = self
+                .queue
+                .remembered_device(code)
+                .await
+                .map_err(|e| e.to_string())?;
+            let reply = self
+                .runtime()
+                .await?
+                .cancel_document(device.device_ref, id)
+                .await
+                .map_err(|e| e.to_string())?;
+            return Ok(
+                json!({"operation_ref":{"device_code":code,"operation_id":id,"kind":reply.kind},"result":reply}),
+            );
         }
         if let Ok((device, reply)) = self.queue.system_record(id, code).await {
             if !reply.kind.starts_with("git_")
@@ -823,6 +851,14 @@ impl OperationManager {
         }
         let pending = self.connections.lock().await.remove(&code);
         let had_pending = pending.is_some();
+        let connected_device = pending.as_ref().and_then(|(receiver, _)| {
+            receiver
+                .borrow()
+                .as_ref()
+                .and_then(|result| result.as_ref().ok())
+                .and_then(|value| value.get("device_ref"))
+                .and_then(|value| serde_json::from_value::<DeviceRef>(value.clone()).ok())
+        });
         if let Some((_, job)) = pending {
             job.abort();
             let _ = job.await;
@@ -837,8 +873,15 @@ impl OperationManager {
             .try_lock()
             .map_err(|_| "MCP runtime is initializing; retry disconnect")?
             .clone();
-        if let (Some(runtime), Some(device)) = (runtime, &device) {
-            runtime.disconnect_device(device.device_ref).await;
+        if let Some(runtime) = runtime {
+            let mut device_ref =
+                connected_device.or_else(|| device.as_ref().map(|device| device.device_ref));
+            if device_ref.is_none() {
+                device_ref = runtime.resolve_cached_device_code(code).await.ok();
+            }
+            if let Some(device_ref) = device_ref {
+                runtime.disconnect_device(device_ref).await;
+            }
         }
         Ok(
             json!({ "device_code": code, "disconnected": true, "scope": "current_mcp_session", "os_reminder": device.map(|d|d.os_reminder) }),

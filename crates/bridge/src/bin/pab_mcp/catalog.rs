@@ -254,6 +254,7 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_ui::tools());
     tools.extend(super::mcp_applications::tools());
     tools.extend(super::mcp_browser::tools());
+    tools.extend(super::mcp_port_forward::tools());
     super::mcp_desktop::enhance_input_tool(
         tools
             .iter_mut()
@@ -649,8 +650,8 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 107);
-        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 107);
+        assert_eq!(all.len(), 110);
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 110);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
                 version: 3,

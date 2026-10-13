@@ -76,6 +76,9 @@ impl ToolGroup {
                 "pab_document_close",
             ],
             Self::System => &[
+                "pab_port_forward_open",
+                "pab_port_forward_status",
+                "pab_port_forward_close",
                 "pab_system_log_sources",
                 "pab_system_log_read",
                 "pab_system_log_event_read",
@@ -308,7 +311,11 @@ mod tests {
         let migrated = McpToolSettings::load(&path).unwrap();
         assert_eq!(migrated.version, 3);
         assert!(migrated.enabled_groups.contains(&ToolGroup::Browser));
-        assert!(migrated.enabled_groups.contains(&ToolGroup::BrowserAdvanced));
+        assert!(
+            migrated
+                .enabled_groups
+                .contains(&ToolGroup::BrowserAdvanced)
+        );
         assert!(migrated.enabled_groups.contains(&ToolGroup::Document));
         assert!(!migrated.enabled_groups.contains(&ToolGroup::Git));
         let mut disabled = migrated;
@@ -328,9 +335,11 @@ mod tests {
             .enabled_groups
             .retain(|group| *group != ToolGroup::BrowserAdvanced);
         v2_opt_out.save(&path).unwrap();
-        assert!(!McpToolSettings::load(&path)
-            .unwrap()
-            .allows("pab_browser_pointer"));
+        assert!(
+            !McpToolSettings::load(&path)
+                .unwrap()
+                .allows("pab_browser_pointer")
+        );
         fs::write(&path, r#"{"version":2,"enabledGroups":["core","file"]}"#).unwrap();
         let migrated_v2 = McpToolSettings::load(&path).unwrap();
         assert_eq!(migrated_v2.version, 3);

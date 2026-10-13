@@ -1,9 +1,18 @@
-use std::time::Duration;
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use iroh::endpoint::{Connection, PathEvent, RecvStream, SendStream};
 use n0_future::StreamExt;
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    sync::watch,
+    time::Instant,
+};
 use zeroize::Zeroizing;
 
 pub const MAX_PAB_MESSAGE_BYTES: usize = 64 * 1024;
@@ -110,6 +119,88 @@ pub struct PabBiStream {
 }
 
 impl PabBiStream {
+    /// After the framed request and reply, forward unframed bytes in both
+    /// directions. FIN is propagated independently; a reset or idle timeout
+    /// drops both halves. Counters include only bytes written to the peer.
+    pub async fn relay_tcp(
+        self,
+        tcp: TcpStream,
+        to_remote: &AtomicU64,
+        to_local: &AtomicU64,
+        idle_timeout: Duration,
+    ) -> Result<(), PabConnectionError> {
+        let (mut tcp_read, mut tcp_write) = tcp.into_split();
+        let mut quic_send = self.send;
+        let mut quic_receive = self.receive;
+        let (activity, mut last_activity) = watch::channel(Instant::now());
+        let upload_activity = activity.clone();
+        let upload = async move {
+            let mut buffer = [0_u8; 16 * 1024];
+            loop {
+                let count = tcp_read
+                    .read(&mut buffer)
+                    .await
+                    .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                if count == 0 {
+                    quic_send
+                        .finish()
+                        .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                    return Ok::<(), PabConnectionError>(());
+                }
+                quic_send
+                    .write_all(&buffer[..count])
+                    .await
+                    .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                to_remote.fetch_add(count as u64, Ordering::Relaxed);
+                upload_activity.send_replace(Instant::now());
+            }
+        };
+        let download = async move {
+            let mut buffer = [0_u8; 16 * 1024];
+            loop {
+                let count = quic_receive
+                    .read(&mut buffer)
+                    .await
+                    .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                let Some(count) = count else {
+                    tcp_write
+                        .shutdown()
+                        .await
+                        .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                    return Ok::<(), PabConnectionError>(());
+                };
+                tcp_write
+                    .write_all(&buffer[..count])
+                    .await
+                    .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
+                to_local.fetch_add(count as u64, Ordering::Relaxed);
+                activity.send_replace(Instant::now());
+            }
+        };
+        let pump = async { tokio::try_join!(upload, download).map(|_| ()) };
+        let idle = async {
+            loop {
+                let deadline = *last_activity.borrow() + idle_timeout;
+                tokio::select! {
+                    _ = tokio::time::sleep_until(deadline) => {
+                        if Instant::now() >= *last_activity.borrow() + idle_timeout {
+                            return PabConnectionError::Timeout;
+                        }
+                    }
+                    changed = last_activity.changed() => {
+                        if changed.is_err() {
+                            return PabConnectionError::Stream("relay activity ended".into());
+                        }
+                    }
+                }
+            }
+        };
+        tokio::select! {
+            result = pump => result,
+            error = idle => Err(error),
+        }
+    }
+
     /// Require the peer's FIN after an exact-size binary payload. An extra byte
     /// is a protocol error, including an incomplete trailing frame header.
     pub async fn expect_receive_end(

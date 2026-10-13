@@ -10,8 +10,9 @@ use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_SESSION_AUTH_SCHEMA_VERSION,
     DEVICE_TASK_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
     DeviceSessionAuthenticationResult, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
-    MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, RequestId,
-    TASK_SCHEMA_VERSION, TargetContext, TargetContextSource, TaskRef, TaskSnapshot,
+    MAX_DEVICE_PASSWORD_BYTES, MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream,
+    PORT_FORWARD_SCHEMA_VERSION, PortForwardErrorCode, RequestId, TASK_SCHEMA_VERSION,
+    TargetContext, TargetContextSource, TaskRef, TaskSnapshot,
 };
 use pab_transport::{
     PabConnection, PabConnectionError, PabEndpoint, PabEndpointAddress, PabEndpointConfig,
@@ -225,6 +226,62 @@ pub struct AuthenticatedDeviceConnection {
 }
 
 impl AuthenticatedDeviceConnection {
+    #[cfg(test)]
+    pub(crate) fn test_new(connection: PabConnection, device_ref: DeviceRef) -> Self {
+        Self {
+            connection,
+            device_ref,
+            operator: OperatorRef::guest(pab_protocol::EndpointKey::new([7; 32])),
+            password_version: 1,
+            authenticated_at_unix_ms: 0,
+            operation_timeout: std::time::Duration::from_secs(5),
+        }
+    }
+
+    pub async fn port_forward_supported(&self) -> Result<bool, BridgeError> {
+        match self
+            .task_request(DeviceTaskRequest::GetEnvironment {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            })
+            .await?
+        {
+            DeviceTaskResponse::Environment {
+                port_forward_schema_version,
+                ..
+            } => Ok(port_forward_schema_version == Some(PORT_FORWARD_SCHEMA_VERSION)),
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
+    pub async fn port_forward_connect(
+        &self,
+        host: &str,
+        port: u16,
+    ) -> Result<pab_transport::PabBiStream, BridgeError> {
+        let mut stream = self.connection.open_bi(self.operation_timeout()).await?;
+        stream
+            .send_frame_json(
+                &DeviceTaskRequest::PortForwardConnect {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    port_forward_schema_version: PORT_FORWARD_SCHEMA_VERSION,
+                    host: host.to_owned(),
+                    port,
+                },
+                self.operation_timeout(),
+            )
+            .await?;
+        match stream.receive_json(self.operation_timeout()).await? {
+            DeviceTaskResponse::PortForwardConnected => Ok(stream),
+            DeviceTaskResponse::PortForwardRejected { code, message } => {
+                Err(BridgeError::PortForwardRejected { code, message })
+            }
+            DeviceTaskResponse::Error { code, message } => {
+                Err(BridgeError::RemoteTask { code, message })
+            }
+            response => Err(unexpected_task_response(response)),
+        }
+    }
+
     pub async fn user_context(&self) -> Result<pab_protocol::EndpointUserContext, BridgeError> {
         match self
             .task_request(DeviceTaskRequest::GetUserContext {
@@ -649,6 +706,13 @@ pub enum BridgeError {
     UnsupportedFileSystem,
     #[error("target Executor does not support system-query capability v1")]
     UnsupportedSystemQuery,
+    #[error("target Executor does not support TCP port forwarding")]
+    UnsupportedPortForward,
+    #[error("remote TCP connection failed with {code:?}: {message}")]
+    PortForwardRejected {
+        code: PortForwardErrorCode,
+        message: String,
+    },
     #[error("file transfer failed: {0}")]
     FileTransfer(String),
     #[error("terminal operation failed: {0}")]

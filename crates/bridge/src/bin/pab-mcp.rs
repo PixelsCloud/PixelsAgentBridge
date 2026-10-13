@@ -29,6 +29,8 @@ mod mcp_filesystem;
 mod mcp_filesystem_bulk;
 #[path = "pab_mcp/operations.rs"]
 mod mcp_operations;
+#[path = "pab_mcp/port_forward.rs"]
+mod mcp_port_forward;
 #[path = "pab_mcp/screenshot.rs"]
 mod mcp_screenshot;
 #[path = "pab_mcp/settings.rs"]
@@ -241,10 +243,12 @@ impl ServerHandler for McpServer {
                                 },
                             )
                         } else if request.name == "pab_document_render_page" {
-                            mcp_document::render(&runtime, &arguments).await.map(|(metadata, image)| {
-                                image_content = image;
-                                metadata
-                            })
+                            mcp_document::render(&runtime, &arguments).await.map(
+                                |(metadata, image)| {
+                                    image_content = image;
+                                    metadata
+                                },
+                            )
                         } else if mcp_desktop::handles(&request.name) {
                             mcp_desktop::call(&runtime, &request.name, &arguments).await
                         } else {
@@ -464,7 +468,7 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 107);
+        assert_eq!(catalog.tools.len(), 110);
         let names = catalog
             .tools
             .iter()

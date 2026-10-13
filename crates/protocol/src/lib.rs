@@ -102,7 +102,8 @@ pub use task_session::{
     CommandOptions, CommandTaskSpec, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent,
     DesktopMouseButton, DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse,
     MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES,
-    MAX_OUTPUT_READ_BYTES, MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES, TransferSnapshot,
+    MAX_OUTPUT_READ_BYTES, MAX_TERMINAL_INPUT_BYTES, MAX_TERMINAL_READ_BYTES,
+    PORT_FORWARD_SCHEMA_VERSION, PortForwardErrorCode, TransferSnapshot, valid_port_forward_host,
 };
 pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, WindowList};
 

@@ -9,8 +9,9 @@ use pab_protocol::{
     CommandTaskSpec, ContextFreshness, DEVICE_TASK_SCHEMA_VERSION, DesktopInputEvent, DeviceRef,
     DeviceTaskErrorCode, DeviceTaskRequest, DeviceTaskResponse, ExecutionContext,
     MAX_COMMAND_ARGUMENT_BYTES, MAX_COMMAND_ARGUMENTS, MAX_COMMAND_PROGRAM_BYTES,
-    MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, ScreenshotMeta, TargetContext,
-    TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef, TaskSnapshot, WindowList,
+    MAX_OUTPUT_READ_BYTES, OperatorRef, OutputStream, PORT_FORWARD_SCHEMA_VERSION, ScreenshotMeta,
+    TargetContext, TargetContextSource, TaskError, TaskEventKind, TaskId, TaskRef, TaskSnapshot,
+    WindowList,
 };
 use pab_task_runtime::TaskRuntimeError;
 use pab_transport::{MAX_BINARY_FRAME_BYTES, PabBiStream, PabConnectionError};
@@ -40,9 +41,10 @@ mod filesystem_user;
 #[cfg(test)]
 mod filesystem_user_tests;
 pub(crate) mod git;
+mod port_forward;
 mod subscription;
-mod system_query;
 mod system_log;
+mod system_query;
 mod terminal;
 pub(crate) mod transfer_engine;
 mod transfer_user;
@@ -94,6 +96,8 @@ pub(crate) struct TaskService {
     system_jobs: Arc<Mutex<std::collections::HashSet<pab_protocol::RequestId>>>,
     cancellable_system_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, watch::Sender<bool>>>>,
     active_sessions: ActiveSessions,
+    port_forward_global_slots: Arc<tokio::sync::Semaphore>,
+    port_forward_session_slots: Arc<tokio::sync::Semaphore>,
 }
 
 struct UiConnection {
@@ -136,6 +140,7 @@ impl TaskService {
     pub(crate) fn for_ui_connection(&self) -> Self {
         let mut service = self.clone();
         service.ui_connection = Arc::new(UiConnection::new());
+        service.port_forward_session_slots = Arc::new(tokio::sync::Semaphore::new(64));
         service
     }
     pub async fn open(
@@ -145,12 +150,20 @@ impl TaskService {
     ) -> Result<Self, TaskServiceError> {
         let store = TaskStore::open(database_file).await?;
         let log_database = database_file.with_file_name("executor-system-logs.sqlite3");
-        let log_root = std::env::var_os("PAB_LOG_DIR").map(std::path::PathBuf::from)
-            .unwrap_or_else(|| database_file.parent().unwrap_or(Path::new(".")).join("logs"));
+        let log_root = std::env::var_os("PAB_LOG_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                database_file
+                    .parent()
+                    .unwrap_or(Path::new("."))
+                    .join("logs")
+            });
         let log_store = pab_system_log_store::LogStore::open(&log_database)
             .await
             .map_err(|e| TaskServiceError::ExecutionContext(format!("system log storage: {e}")))?;
-        log_store.cleanup_expired().await
+        log_store
+            .cleanup_expired()
+            .await
             .map_err(|e| TaskServiceError::ExecutionContext(format!("system log cleanup: {e}")))?;
         store.interrupt_transfers().await?;
         store.interrupt_read_operations().await?;
@@ -211,6 +224,8 @@ impl TaskService {
             system_jobs: Arc::new(Mutex::new(std::collections::HashSet::new())),
             cancellable_system_jobs: Arc::new(Mutex::new(HashMap::new())),
             active_sessions: ActiveSessions::default(),
+            port_forward_global_slots: Arc::new(tokio::sync::Semaphore::new(256)),
+            port_forward_session_slots: Arc::new(tokio::sync::Semaphore::new(64)),
         })
     }
 
@@ -250,6 +265,17 @@ impl TaskService {
             self.store
                 .record_user_attribution(initiated_by, request_id)
                 .await?;
+        }
+        if let DeviceTaskRequest::PortForwardConnect {
+            port_forward_schema_version,
+            host,
+            port,
+            ..
+        } = request
+        {
+            return self
+                .port_forward_stream(stream, port_forward_schema_version, &host, port, timeout)
+                .await;
         }
         if let DeviceTaskRequest::TransferFile { request, .. } = request {
             let result = self
@@ -537,9 +563,11 @@ impl TaskService {
             DeviceTaskRequest::GetDocument { request_id, .. } => Ok(DeviceTaskResponse::Document {
                 reply: Box::new(self.get_document(initiated_by, request_id).await),
             }),
-            DeviceTaskRequest::CancelDocument { request_id, .. } => Ok(DeviceTaskResponse::Document {
-                reply: Box::new(self.cancel_document(initiated_by, request_id).await),
-            }),
+            DeviceTaskRequest::CancelDocument { request_id, .. } => {
+                Ok(DeviceTaskResponse::Document {
+                    reply: Box::new(self.cancel_document(initiated_by, request_id).await),
+                })
+            }
             DeviceTaskRequest::FileSystem { .. } => Err(TaskServiceError::InvalidRequest(
                 "filesystem requests require their binary stream handler",
             )),
@@ -551,6 +579,7 @@ impl TaskService {
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 document_schema_version: Some(pab_protocol::DOCUMENT_SCHEMA_VERSION),
+                port_forward_schema_version: Some(PORT_FORWARD_SCHEMA_VERSION),
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),
@@ -714,6 +743,7 @@ impl TaskService {
                 })
             }
             DeviceTaskRequest::Subscribe { .. }
+            | DeviceTaskRequest::PortForwardConnect { .. }
             | DeviceTaskRequest::TransferFile { .. }
             | DeviceTaskRequest::UploadFile { .. }
             | DeviceTaskRequest::DownloadFile { .. } => unreachable!("handled before dispatch"),

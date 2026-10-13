@@ -6,6 +6,17 @@ use crate::{
 };
 
 pub const DEVICE_TASK_SCHEMA_VERSION: u16 = 2;
+pub const PORT_FORWARD_SCHEMA_VERSION: u16 = 1;
+pub fn valid_port_forward_host(host: &str) -> bool {
+    if host.is_empty() || host.len() > 253 {
+        return false;
+    }
+    host.parse::<std::net::IpAddr>().is_ok()
+        || (host
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+            && host.bytes().any(|byte| byte.is_ascii_alphanumeric()))
+}
 pub const MAX_COMMAND_PROGRAM_BYTES: usize = 4 * 1024;
 pub const MAX_COMMAND_ARGUMENTS: usize = 1024;
 pub const MAX_COMMAND_ARGUMENT_BYTES: usize = 16 * 1024;
@@ -208,6 +219,12 @@ pub enum DeviceTaskRequest {
     GetEnvironment {
         schema_version: u16,
     },
+    PortForwardConnect {
+        schema_version: u16,
+        port_forward_schema_version: u16,
+        host: String,
+        port: u16,
+    },
     GetPresence {
         schema_version: u16,
     },
@@ -355,6 +372,7 @@ impl DeviceTaskRequest {
             | Self::CancelFileSystem { schema_version, .. }
             | Self::GetFileSystem { schema_version, .. }
             | Self::GetEnvironment { schema_version }
+            | Self::PortForwardConnect { schema_version, .. }
             | Self::GetPresence { schema_version }
             | Self::SubmitCommand { schema_version, .. }
             | Self::GetTask { schema_version, .. }
@@ -392,6 +410,18 @@ pub enum DeviceTaskErrorCode {
     Unsupported,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PortForwardErrorCode {
+    InvalidTarget,
+    DnsFailed,
+    ConnectionRefused,
+    ConnectTimeout,
+    ConnectFailed,
+    ResourceLimit,
+    Unsupported,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
@@ -426,6 +456,13 @@ pub enum DeviceTaskResponse {
         screenshot_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         document_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        port_forward_schema_version: Option<u16>,
+    },
+    PortForwardConnected,
+    PortForwardRejected {
+        code: PortForwardErrorCode,
+        message: String,
     },
     Presence {
         active_operators: u16,
@@ -617,6 +654,31 @@ mod tests {
         let decoded: DeviceTaskRequest = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, request);
         assert_eq!(decoded.schema_version(), DEVICE_TASK_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn tcp_forward_request_and_reply_round_trip_without_changing_task_schema() {
+        let request = DeviceTaskRequest::PortForwardConnect {
+            schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            port_forward_schema_version: PORT_FORWARD_SCHEMA_VERSION,
+            host: "::1".into(),
+            port: 5432,
+        };
+        let bytes = serde_json::to_vec(&request).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<DeviceTaskRequest>(&bytes).unwrap(),
+            request
+        );
+        assert_eq!(request.schema_version(), DEVICE_TASK_SCHEMA_VERSION);
+        let reply = DeviceTaskResponse::PortForwardRejected {
+            code: PortForwardErrorCode::ConnectionRefused,
+            message: "refused".into(),
+        };
+        assert_eq!(
+            serde_json::from_slice::<DeviceTaskResponse>(&serde_json::to_vec(&reply).unwrap())
+                .unwrap(),
+            reply
+        );
     }
 
     #[test]

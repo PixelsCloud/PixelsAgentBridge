@@ -7,6 +7,7 @@ mod document;
 mod event;
 mod filesystem;
 mod operation;
+mod port_forward;
 mod presence;
 mod reconciliation;
 mod remembered;
@@ -61,6 +62,7 @@ pub use credential::{
 };
 pub use event::{DeviceConnectionPhase, RuntimeEvent, RuntimeEventKind};
 pub use operation::OperationRecord;
+pub use port_forward::PortForwardStatus;
 pub use presence::RuntimePresenceSource;
 pub use remembered::RememberedDevice;
 use store::RuntimeStore;
@@ -432,6 +434,7 @@ impl BridgeRuntime {
             initiated_by,
             operations: Mutex::new(HashMap::new()),
             terminals: Mutex::new(HashMap::new()),
+            port_forwards: Arc::new(port_forward::PortForwardManager::default()),
             reconciliation_notify: Notify::new(),
         });
         inner.publish(RuntimeEventKind::BridgeConnecting);
@@ -870,6 +873,7 @@ impl BridgeRuntime {
     }
 
     pub async fn shutdown(self) -> Result<(), RuntimeError> {
+        self.inner.port_forwards.close_all().await;
         let terminal_ids = self
             .inner
             .terminals
@@ -996,6 +1000,7 @@ struct RuntimeInner {
     initiated_by: String,
     operations: Mutex<HashMap<RequestId, AbortHandle>>,
     terminals: Mutex<HashMap<RequestId, Arc<Mutex<terminal::TerminalRuntimeSession>>>>,
+    port_forwards: Arc<port_forward::PortForwardManager>,
     reconciliation_notify: Notify,
 }
 
@@ -1080,6 +1085,8 @@ pub(super) fn duration_millis(duration: Duration) -> u64 {
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
+    #[error("TCP port forward: {0}")]
+    PortForward(String),
     #[error(transparent)]
     Config(#[from] BridgeConfigError),
     #[error(transparent)]
