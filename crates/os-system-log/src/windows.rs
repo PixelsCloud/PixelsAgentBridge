@@ -2,13 +2,15 @@ use std::ptr;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use pab_protocol::SystemLogSource;
-use quick_xml::{Reader, events::Event};
+use quick_xml::{events::Event, Reader};
 use windows_sys::Win32::{
-    Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_NO_MORE_ITEMS, GetLastError},
+    Foundation::{GetLastError, ERROR_INSUFFICIENT_BUFFER, ERROR_NO_MORE_ITEMS},
     System::EventLog::{
-        EVT_HANDLE, EvtClose, EvtCreateBookmark, EvtNext, EvtNextChannelPath, EvtOpenChannelEnum,
-        EvtQuery, EvtQueryChannelPath, EvtQueryForwardDirection, EvtRender, EvtRenderBookmark,
+        EvtChannelConfigEnabled, EvtClose, EvtCreateBookmark, EvtGetChannelConfigProperty, EvtNext,
+        EvtNextChannelPath, EvtOpenChannelConfig, EvtOpenChannelEnum, EvtQuery,
+        EvtQueryChannelPath, EvtQueryForwardDirection, EvtRender, EvtRenderBookmark,
         EvtRenderEventXml, EvtSeek, EvtSeekRelativeToBookmark, EvtSeekStrict, EvtUpdateBookmark,
+        EvtVarTypeBoolean, EVT_HANDLE, EVT_VARIANT,
     },
 };
 
@@ -39,6 +41,34 @@ fn last_error(operation: &str) -> LogError {
     } else {
         LogError::Native(format!("{operation}: Windows error {code}"))
     }
+}
+
+fn channel_enabled(path: &[u16]) -> Result<bool, LogError> {
+    let config = Handle(unsafe { EvtOpenChannelConfig(0, path.as_ptr(), 0) });
+    if config.0 == 0 {
+        return Err(last_error("EvtOpenChannelConfig"));
+    }
+    let mut property = EVT_VARIANT::default();
+    let mut used = 0;
+    if unsafe {
+        EvtGetChannelConfigProperty(
+            config.0,
+            EvtChannelConfigEnabled,
+            0,
+            std::mem::size_of::<EVT_VARIANT>() as u32,
+            &mut property,
+            &mut used,
+        )
+    } == 0
+    {
+        return Err(last_error("EvtGetChannelConfigProperty"));
+    }
+    if property.Type != EvtVarTypeBoolean as u32 {
+        return Err(LogError::Native(
+            "unexpected Event Log channel enabled type".into(),
+        ));
+    }
+    Ok(unsafe { property.Anonymous.BooleanVal != 0 })
 }
 
 fn render(handle: EVT_HANDLE, flags: u32) -> Result<String, LogError> {
@@ -165,26 +195,39 @@ pub(super) fn sources(identity: &str) -> Result<Vec<SystemLogSource>, LogError> 
         let channel = String::from_utf16(&buffer[..len])
             .map_err(|_| LogError::Native("invalid channel path UTF-16".into()))?;
         let channel_wide = wide(&channel);
-        let query = Handle(unsafe {
-            EvtQuery(
-                0,
-                channel_wide.as_ptr(),
-                ptr::null(),
-                EvtQueryChannelPath | EvtQueryForwardDirection,
-            )
-        });
-        let (availability, reason) = if query.0 == 0 {
-            let error = last_error("EvtQuery");
-            (
+        let (availability, reason) = match channel_enabled(&channel_wide) {
+            Ok(false) => ("disabled", Some("Event Log channel is disabled".into())),
+            Ok(true) => {
+                let query = Handle(unsafe {
+                    EvtQuery(
+                        0,
+                        channel_wide.as_ptr(),
+                        ptr::null(),
+                        EvtQueryChannelPath | EvtQueryForwardDirection,
+                    )
+                });
+                if query.0 == 0 {
+                    let error = last_error("EvtQuery");
+                    (
+                        if matches!(error, LogError::PermissionDenied(_)) {
+                            "permission_denied"
+                        } else {
+                            "unavailable"
+                        },
+                        Some(error.to_string()),
+                    )
+                } else {
+                    ("readable", None)
+                }
+            }
+            Err(error) => (
                 if matches!(error, LogError::PermissionDenied(_)) {
                     "permission_denied"
                 } else {
                     "unavailable"
                 },
                 Some(error.to_string()),
-            )
-        } else {
-            ("readable", None)
+            ),
         };
         sources.push(SystemLogSource {
             source_id: format!("{PREFIX}{channel}"),
@@ -352,11 +395,9 @@ mod tests {
     #[test]
     fn enumerates_native_channels_and_scans_application() {
         let inventory = sources("test").expect("enumerate Event Log channels");
-        assert!(
-            inventory
-                .iter()
-                .any(|entry| entry.source_id == "eventlog:Application")
-        );
+        assert!(inventory
+            .iter()
+            .any(|entry| entry.source_id == "eventlog:Application"));
         let end = chrono::Utc::now().timestamp_millis();
         let page = scan(
             "eventlog:Application",
@@ -368,11 +409,10 @@ mod tests {
         )
         .expect("read Application events");
         assert!(page.events.len() <= 4);
-        assert!(
-            page.events
-                .iter()
-                .all(|event| event.source_id == "eventlog:Application")
-        );
+        assert!(page
+            .events
+            .iter()
+            .all(|event| event.source_id == "eventlog:Application"));
         if let Some(cursor) = page.next_native_position {
             let resumed = scan(
                 "eventlog:Application",
