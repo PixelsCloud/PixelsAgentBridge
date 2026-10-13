@@ -198,6 +198,52 @@ def main() -> None:
         if burst_result["message_previews"] != [row["MESSAGE"] for row in burst_native]:
             raise AssertionError("MCP burst journal messages differ from independent journalctl")
 
+        large_marker = "PAB_LINUX_LARGE_" + uuid.uuid4().hex
+        send_large = (
+            "import ctypes,sys; "
+            "marker=sys.argv[1]; "
+            "lib=ctypes.CDLL('libsystemd.so.0'); "
+            "Iovec=type('Iovec',(ctypes.Structure,),{'_fields_':[('base',ctypes.c_void_p),('size',ctypes.c_size_t)]}); "
+            "payload=ctypes.create_string_buffer(b'MESSAGE='+marker.encode()+b'X'*70000); "
+            "entry=Iovec(ctypes.cast(payload,ctypes.c_void_p),len(payload.raw)-1); "
+            "lib.sd_journal_sendv.argtypes=[ctypes.POINTER(Iovec),ctypes.c_int]; "
+            "lib.sd_journal_sendv.restype=ctypes.c_int; "
+            "status=lib.sd_journal_sendv(ctypes.byref(entry),1); "
+            "assert status>=0,status"
+        )
+        docker("exec", CONTAINER, "python3", "-c", send_large, large_marker)
+        large_native = []
+        for _ in range(20):
+            large_native = [
+                json.loads(line) for line in docker(
+                    "exec", CONTAINER, "journalctl", "--all", "--output=json", "--no-pager",
+                ).splitlines() if large_marker in line
+            ]
+            if large_native:
+                break
+            time.sleep(.25)
+        if len(large_native) != 1 or large_native[0].get("MESSAGE") != large_marker + "X" * 70000:
+            lengths = [len(str(row.get("MESSAGE", ""))) for row in large_native]
+            raise AssertionError(f"independent journal reader large MESSAGE count={len(large_native)} lengths={lengths}")
+        large_ms = int(large_native[0]["__REALTIME_TIMESTAMP"]) // 1000
+        large_probe = subprocess.run(
+            [
+                sys.executable, str(ROOT / "acceptance/system_log_mcp_live.py"),
+                "--mcp", str(MCP), "--device-code", access["device_code"],
+                "--source", "journal:local", "--marker", large_marker,
+                "--start-ms", str(large_ms - 5000), "--end-ms", str(large_ms + 5000),
+                "--expected-count", "1", "--page-limit", "1",
+            ],
+            capture_output=True, text=True, timeout=90,
+        )
+        if large_probe.returncode:
+            raise RuntimeError(f"Linux large journal MCP probe failed: {large_probe.stderr[-2000:]}")
+        large_result = json.loads(large_probe.stdout)
+        if large_result["matched"] != 1 or large_result["native_position"] != large_native[0]["__CURSOR"]:
+            raise AssertionError("large journal record lost or native cursor changed")
+        if large_result["raw_bytes"] <= 70000:
+            raise AssertionError("large journal event was truncated")
+
         pixels_marker = "PAB_PIXELS_FILE_" + uuid.uuid4().hex
         pixels_path = "/var/lib/pixels-agent-bridge/logs/mcp.log"
         write_pixels = (
@@ -241,6 +287,9 @@ def main() -> None:
             "burst_full_raw": burst_full_raw,
             "burst_operation_timings_ms": burst_result["operation_timings_ms"],
             "burst_latency": burst_result["latency"],
+            "large_message_bytes": 70000,
+            "large_event_raw_bytes": large_result["raw_bytes"],
+            "large_event_sha256": large_result["sha256"],
             "pixels_file_sha256": pixels_hash,
             "pixels_file_rotation_gap": True,
             "service": "active",
