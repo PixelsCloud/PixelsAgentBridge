@@ -113,6 +113,8 @@ CI 中运行小规模确定性分页和状态机/故障注入测试；每日在�
 
 ## 第二项：端口转发
 
+一次性开发、测试和验收任务详见 [PORT_FORWARD_IMPLEMENTATION_PLAN.md](PORT_FORWARD_IMPLEMENTATION_PLAN.md)。以下保留功能概要；端口转发尚未实现。
+
 ### 第一版范围与数据路径
 
 操作端 Pixels 在 `127.0.0.1` 绑定自动分配或指定的 TCP 端口。每接受一条本地 TCP 连接，就在当前已认证的 PAB 设备会话中开一条新的双向 QUIC 流，发送目标地址/端口等控制头；远端 Executor 成功建立目标 TCP 连接后确认，然后双向转发原始字节。默认远端目标为 `127.0.0.1`；显式指定其他地址时把目标完整展示给调用方。一个端口转发会话可承载多个 TCP 连接。
@@ -135,7 +137,7 @@ CI 中运行小规模确定性分页和状态机/故障注入测试；每日在�
 4. 扩展传输层的持续双向字节接口，完成本地 TCP listener、远端 TCP dial、每连接 QUIC 流和生命周期/资源管理。
 5. 在直连与 Relay 两条路径完成端口转发验收，并用远端开发服务器做真实 Harness 访问测试。
 
-以上均为设计，尚未编译、部署或发布。
+系统日志已进入实现和阶段验收，状态详见 [SYSTEM_LOG_IMPLEMENTATION_PLAN.md](SYSTEM_LOG_IMPLEMENTATION_PLAN.md) 与 [验收报告](acceptance/system-log-2026-10-13.md)；端口转发目前仍处于设计阶段。
 
 ## 原生接口依据
 
