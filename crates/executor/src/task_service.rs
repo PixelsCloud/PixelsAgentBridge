@@ -42,6 +42,7 @@ mod filesystem_user_tests;
 pub(crate) mod git;
 mod subscription;
 mod system_query;
+mod system_log;
 mod terminal;
 pub(crate) mod transfer_engine;
 mod transfer_user;
@@ -68,6 +69,9 @@ pub(crate) struct TaskService {
     #[cfg(test)]
     container_client: Option<(bollard::Docker, String)>,
     store: TaskStore,
+    log_store: pab_system_log_store::LogStore,
+    log_scan_lock: Arc<Mutex<()>>,
+    log_root: std::path::PathBuf,
     device_ref: DeviceRef,
     execution_context: ExecutionContext,
     active: Arc<Mutex<HashMap<TaskId, watch::Sender<Option<String>>>>>,
@@ -140,6 +144,14 @@ impl TaskService {
         execution_context: ExecutionContext,
     ) -> Result<Self, TaskServiceError> {
         let store = TaskStore::open(database_file).await?;
+        let log_database = database_file.with_file_name("executor-system-logs.sqlite3");
+        let log_root = std::env::var_os("PAB_LOG_DIR").map(std::path::PathBuf::from)
+            .unwrap_or_else(|| database_file.parent().unwrap_or(Path::new(".")).join("logs"));
+        let log_store = pab_system_log_store::LogStore::open(&log_database)
+            .await
+            .map_err(|e| TaskServiceError::ExecutionContext(format!("system log storage: {e}")))?;
+        log_store.cleanup_expired().await
+            .map_err(|e| TaskServiceError::ExecutionContext(format!("system log cleanup: {e}")))?;
         store.interrupt_transfers().await?;
         store.interrupt_read_operations().await?;
         store.interrupt_terminals().await?;
@@ -172,6 +184,9 @@ impl TaskService {
             #[cfg(test)]
             container_client: None,
             store,
+            log_store,
+            log_scan_lock: Arc::new(Mutex::new(())),
+            log_root,
             device_ref,
             execution_context,
             active: Arc::new(Mutex::new(HashMap::new())),

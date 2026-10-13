@@ -110,6 +110,24 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             _ => return false,
         }
     }
+    if r.state == "completed" && r.kind.starts_with("system_log_") {
+        let valid_log = match (r.kind.as_str(), r.data.as_ref()) {
+            ("system_log_sources", Some(SystemQueryData::Logs { snapshot })) => {
+                matches!(snapshot.as_ref(), SystemLogData::Sources { sources, .. } if r.returned_count as usize == sources.len())
+            }
+            ("system_log_read", Some(SystemQueryData::Logs { snapshot })) => {
+                matches!(snapshot.as_ref(), SystemLogData::Page { events, .. } if r.returned_count as usize == events.len())
+            }
+            ("system_log_event_read", Some(SystemQueryData::Logs { snapshot })) => {
+                matches!(snapshot.as_ref(), SystemLogData::EventChunk { .. })
+                    && r.returned_count == 1
+            }
+            _ => false,
+        };
+        if !valid_log {
+            return false;
+        }
+    }
     r.request_id == id
         && matches!(
             r.state.as_str(),
@@ -163,6 +181,9 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                     | "services"
                     | "service"
                     | "service_control"
+                    | "system_log_sources"
+                    | "system_log_read"
+                    | "system_log_event_read"
             ))
         && r.returned_count <= 1000
         && r.warnings.len() <= 8
@@ -226,6 +247,10 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                         Some(SystemQueryData::ServiceControl { .. })
                     )
                     | ("system_info", Some(SystemQueryData::Info { .. }))
+                    | (
+                        "system_log_sources" | "system_log_read" | "system_log_event_read",
+                        Some(SystemQueryData::Logs { .. })
+                    )
                     | ("disks", Some(SystemQueryData::Disks { .. }))
                     | ("processes", Some(SystemQueryData::Processes { .. }))
                     | ("process", Some(SystemQueryData::Process { .. }))
@@ -436,5 +461,33 @@ mod tests {
         assert!(valid(&r, r.request_id));
         r.data = Some(SystemQueryData::Disks { entries: vec![] });
         assert!(!valid(&r, r.request_id));
+    }
+
+    #[test]
+    fn log_reply_accepts_matching_shape_and_rejects_mismatched_kind() {
+        let query = SystemQuery::Logs {
+            query: SystemLogQuery::Sources {
+                scan_cursor: None,
+                after: None,
+                limit: 1,
+            },
+        };
+        let mut reply = SystemQueryReply::pending(RequestId::new(), &query);
+        assert!(valid(&reply, reply.request_id));
+        reply.state = "completed".into();
+        reply.data = Some(SystemQueryData::Logs {
+            snapshot: Box::new(SystemLogData::Sources {
+                sources: vec![],
+                progress: None,
+                next_source: None,
+                total: 0,
+            }),
+        });
+        assert!(valid(&reply, reply.request_id));
+        reply.kind = "system_log_read".into();
+        assert!(!valid(&reply, reply.request_id));
+        reply.kind = "system_log_sources".into();
+        reply.returned_count = 1;
+        assert!(!valid(&reply, reply.request_id));
     }
 }

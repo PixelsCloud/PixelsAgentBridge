@@ -26,10 +26,13 @@ class LinuxPackage(TestCase):
             binaries = root / '.build/guest-desktop-linux-debug'
             binaries.mkdir(parents=True)
             files = {}
-            for name in ('pab-mcp', 'pab-executor'):
+            for name in ('pab-mcp', 'pab-executor', 'pab-document-worker'):
                 path = binaries / name
                 path.write_bytes(b'fixture-' + name.encode())
                 files[name] = path
+            document_runtime = root / '.build/document-runtime/document-runtime-linux.tar.gz'
+            document_runtime.parent.mkdir(parents=True)
+            document_runtime.write_bytes(b'fixture-document-runtime')
             # Stale desktop output must not leak into the new headless archive.
             (binaries / 'pab-desktop').write_bytes(b'old GUI')
             record_artifacts(root, 'linux', 'debug', '1.2.26', files)
@@ -39,7 +42,8 @@ class LinuxPackage(TestCase):
             archive = root / '.build/packages/pixels-agent-bridge-linux-x86_64-debug.tar.gz'
             with tarfile.open(archive) as tar:
                 self.assertEqual(set(tar.getnames()), {
-                    'pab-mcp', 'pab-executor', 'install.sh', 'uninstall.sh',
+                    'pab-mcp', 'pab-executor', 'pab-document-worker',
+                    'document-runtime-linux.tar.gz', 'install.sh', 'uninstall.sh',
                     'lifecycle.sh', 'run-mcp.sh', 'run-executor.sh', 'INSTALL-LINUX.txt',
                 })
                 for info in tar:

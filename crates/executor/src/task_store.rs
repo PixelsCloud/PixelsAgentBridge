@@ -149,6 +149,11 @@ impl TaskStore {
         sqlx::query("CREATE TABLE IF NOT EXISTS filesystem_results (request_id TEXT PRIMARY KEY REFERENCES read_operations(request_id), fingerprint TEXT NOT NULL, reply_json TEXT)").execute(&mut *tx).await?;
         sqlx::query("CREATE TABLE IF NOT EXISTS terminal_execution (session_id TEXT PRIMARY KEY REFERENCES terminal_sessions(id), connection_id TEXT NOT NULL, selection_json TEXT NOT NULL, identity_json TEXT, cols INTEGER NOT NULL, rows INTEGER NOT NULL)").execute(&mut *tx).await?;
         sqlx::query("CREATE TABLE IF NOT EXISTS transfer_execution (request_id TEXT PRIMARY KEY REFERENCES transfer_operations(request_id), fingerprint TEXT NOT NULL, request_json TEXT NOT NULL, context_json TEXT NOT NULL)").execute(&mut *tx).await?;
+        // Older builds persisted log previews and raw event chunks in the
+        // general task history. Keep only the operation metadata there;
+        // bounded log payloads live in the dedicated log store.
+        sqlx::query("UPDATE system_query_results SET reply_json=json_remove(reply_json,'$.data') WHERE request_id IN (SELECT request_id FROM read_operations WHERE kind LIKE 'system_log_%') AND json_type(reply_json,'$.data') IS NOT NULL")
+            .execute(&mut *tx).await?;
         tx.commit().await?;
         let (changes, _) = broadcast::channel(CHANGE_BUFFER);
         Ok(Self {

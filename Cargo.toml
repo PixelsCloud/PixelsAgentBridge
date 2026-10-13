@@ -7,6 +7,8 @@ members = [
     "crates/platform",
     "crates/os-sessions",
     "crates/os-control",
+    "crates/os-system-log",
+    "crates/system-log-store",
     "crates/screenshot",
     "crates/desktop-control",
     "crates/document",

@@ -98,7 +98,8 @@ impl SystemCollector {
                 reply.error = Some("desktop query requires the interactive helper".into());
                 return reply;
             }
-            SystemQuery::Container { .. }
+            SystemQuery::Logs { .. }
+            | SystemQuery::Container { .. }
             | SystemQuery::ExecutionContexts { .. }
             | SystemQuery::Git { .. }
             | SystemQuery::TerminateProcess { .. }
@@ -459,6 +460,11 @@ pub fn bound_reply(reply: &mut SystemQueryReply) {
     reply.warnings.truncate(8);
     loop {
         reply.returned_count = match &reply.data {
+            Some(SystemQueryData::Logs { snapshot }) => match snapshot.as_ref() {
+                pab_protocol::SystemLogData::Sources { sources, .. } => sources.len() as u32,
+                pab_protocol::SystemLogData::Page { events, .. } => events.len() as u32,
+                pab_protocol::SystemLogData::EventChunk { .. } => 1,
+            },
             Some(SystemQueryData::Applications {
                 snapshot: AppSnapshot::List { snapshot },
             }) => snapshot.apps.len() as u32,

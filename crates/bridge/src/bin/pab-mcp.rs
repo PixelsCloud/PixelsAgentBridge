@@ -464,7 +464,7 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 104);
+        assert_eq!(catalog.tools.len(), 107);
         let names = catalog
             .tools
             .iter()

@@ -223,7 +223,9 @@ impl TaskService {
             let async_result =
                 tokio::spawn(async move { pab_platform::query_async(id, &async_query).await })
                     .await;
-            let r = if matches!(query, SystemQuery::ExecutionContexts { .. }) {
+            let r = if let SystemQuery::Logs { query: log } = &query {
+                service.log_query(actor, id, log).await
+            } else if matches!(query, SystemQuery::ExecutionContexts { .. }) {
                 let mut reply = pab_platform::collect_execution_contexts(id, &query).await;
                 if let Some(pab_protocol::SystemQueryData::ExecutionContexts { entries, .. }) =
                     &mut reply.data

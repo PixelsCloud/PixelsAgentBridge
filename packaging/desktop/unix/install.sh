@@ -28,7 +28,7 @@ fi
 stop_installed_processes "$install_dir"
 install -d -m 755 "$install_dir"
 install -d -m 700 /var/lib/pixels-agent-bridge
-tar -tzf "$source_dir/document-runtime-linux.tar.gz" | grep -q '^document-runtime/libpdfium.so$' || { echo 'Incomplete document runtime' >&2; exit 2; }
+tar -tzf "$source_dir/document-runtime-linux.tar.gz" | grep -Fx 'document-runtime/libpdfium.so' >/dev/null || { echo 'Incomplete document runtime' >&2; exit 2; }
 tar -xzf "$source_dir/document-runtime-linux.tar.gz" -C "$install_dir"
 for name in pab-mcp pab-executor pab-document-worker run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$install_dir/$name"

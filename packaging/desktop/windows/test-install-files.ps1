@@ -40,10 +40,10 @@ class Fixture {
     $fixture = Join-Path $sourceRoot 'pab-mcp.exe'
     & $compiler /nologo /target:exe "/out:$fixture" $fixtureSource
     if ($LASTEXITCODE -ne 0) { throw 'Fixture compilation failed' }
-    foreach ($name in @('pab-executor.exe', 'pab-desktop.exe')) {
+    foreach ($name in @('pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe')) {
         Copy-Item -LiteralPath $fixture -Destination (Join-Path $sourceRoot $name)
     }
-    foreach ($name in @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe')) {
+    foreach ($name in @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe')) {
         Copy-Item -LiteralPath (Join-Path $sourceRoot $name) -Destination $installedRoot
     }
     Copy-Item -LiteralPath $fixture -Destination (Join-Path $otherRoot 'pab-mcp.exe')
@@ -100,7 +100,7 @@ while (-not (Test-Path -LiteralPath $StopFile)) {
     Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue
     Stop-PabInstalledBinary -Paths @($binary)
     $before = @{}
-    foreach ($name in @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe')) {
+    foreach ($name in @('pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe')) {
         $before[$name] = (Get-FileHash -LiteralPath (Join-Path $installedRoot $name)).Hash
         $append = [IO.File]::Open((Join-Path $sourceRoot $name), [IO.FileMode]::Append)
         $append.WriteByte(1)

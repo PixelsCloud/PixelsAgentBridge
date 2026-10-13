@@ -5485,6 +5485,7 @@ name = "pab-executor"
 version = "1.2.48"
 dependencies = [
  "argon2",
+ "base64 0.22.1",
  "bollard",
  "futures-util",
  "globset",
@@ -5495,9 +5496,11 @@ dependencies = [
  "pab-document",
  "pab-logging",
  "pab-os-control",
+ "pab-os-system-log",
  "pab-platform",
  "pab-protocol",
  "pab-screenshot",
+ "pab-system-log-store",
  "pab-task-runtime",
  "pab-terminal",
  "pab-transport",
@@ -5513,6 +5516,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
+ "uuid",
  "windows-service",
  "zeroize",
  "zip 8.6.0",
@@ -5555,6 +5559,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-os-system-log"
+version = "1.2.48"
+dependencies = [
+ "base64 0.22.1",
+ "cc",
+ "chrono",
+ "libc",
+ "libloading 0.8.9",
+ "pab-protocol",
+ "quick-xml 0.41.0",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "pab-platform"
 version = "1.2.48"
 dependencies = [
@@ -5590,6 +5612,21 @@ version = "1.2.48"
 dependencies = [
  "image",
  "pab-protocol",
+]
+
+[[package]]
+name = "pab-system-log-store"
+version = "1.2.48"
+dependencies = [
+ "base64 0.22.1",
+ "pab-os-system-log",
+ "pab-protocol",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.21",
+ "uuid",
 ]
 
 [[package]]

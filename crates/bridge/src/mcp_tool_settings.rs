@@ -76,6 +76,9 @@ impl ToolGroup {
                 "pab_document_close",
             ],
             Self::System => &[
+                "pab_system_log_sources",
+                "pab_system_log_read",
+                "pab_system_log_event_read",
                 "pab_get_process",
                 "pab_get_service",
                 "pab_list_disks",
@@ -342,8 +345,8 @@ mod tests {
             .copied()
             .collect();
         let unique: std::collections::HashSet<_> = names.iter().collect();
-        assert_eq!(names.len(), 104);
-        assert_eq!(unique.len(), 104);
+        assert!(!names.is_empty());
+        assert_eq!(unique.len(), names.len());
         for name in [
             "pab_connect",
             "pab_disconnect",

@@ -4852,6 +4852,7 @@ version = "1.2.48"
 dependencies = [
  "argon2",
  "axum",
+ "base64 0.22.1",
  "bollard",
  "futures-util",
  "globset",
@@ -4862,9 +4863,11 @@ dependencies = [
  "pab-document",
  "pab-logging",
  "pab-os-control",
+ "pab-os-system-log",
  "pab-platform",
  "pab-protocol",
  "pab-screenshot",
+ "pab-system-log-store",
  "pab-task-runtime",
  "pab-terminal",
  "pab-transport",
@@ -4881,6 +4884,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
+ "uuid",
  "windows-service",
  "zeroize",
  "zip 8.6.0",
@@ -4924,6 +4928,25 @@ dependencies = [
  "tokio",
  "windows-sys 0.61.2",
  "zbus_systemd",
+]
+
+[[package]]
+name = "pab-os-system-log"
+version = "1.2.48"
+dependencies = [
+ "base64 0.22.1",
+ "cc",
+ "chrono",
+ "libc",
+ "libloading",
+ "pab-protocol",
+ "quick-xml 0.41.0",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.21",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5048,6 +5071,24 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "toml",
+]
+
+[[package]]
+name = "pab-system-log-store"
+version = "1.2.48"
+dependencies = [
+ "base64 0.22.1",
+ "libc",
+ "pab-os-system-log",
+ "pab-protocol",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

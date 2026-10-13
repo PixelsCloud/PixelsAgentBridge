@@ -50,12 +50,9 @@ impl TaskStore {
     }
     pub async fn save_system_progress(&self, r: &SystemQueryReply) -> Result<(), TaskStoreError> {
         let mut saved = r.clone();
-        if r.kind.starts_with("browser_") {
+        if r.kind.starts_with("browser_") || r.kind.starts_with("system_log_") {
             saved.data = None;
-            saved.error = r
-                .error
-                .as_ref()
-                .map(|_| "browser operation in progress".into());
+            saved.error = r.error.as_ref().map(|_| "operation in progress".into());
         }
         sqlx::query("UPDATE system_query_results SET reply_json=? WHERE request_id=? AND EXISTS (SELECT 1 FROM read_operations o WHERE o.request_id=system_query_results.request_id AND o.state='running')")
             .bind(serde_json::to_string(&saved)?).bind(r.request_id.to_string()).execute(&self.pool).await?;
@@ -120,7 +117,7 @@ impl TaskStore {
             return Err(TaskStoreError::NotFound);
         }
         let mut r: SystemQueryReply = serde_json::from_str(row.try_get("reply_json")?)?;
-        if r.kind.starts_with("browser_") {
+        if r.kind.starts_with("browser_") || r.kind.starts_with("system_log_") {
             let mut replies = self.browser_replies.lock().await;
             replies
                 .retain(|_, (created, _)| created.elapsed() < std::time::Duration::from_secs(600));
@@ -130,8 +127,11 @@ impl TaskStore {
             if r.state == "completed" {
                 r.state = "interrupted".into();
                 r.error = Some(
-                    "browser_result_expired: browser page data is not stored in task history"
-                        .into(),
+                    if r.kind.starts_with("system_log_") {
+                        "log_result_expired: request the log page again with its cursor; log content is not stored in task history"
+                    } else {
+                        "browser_result_expired: browser page data is not stored in task history"
+                    }.into(),
                 );
                 return Ok(r);
             }
@@ -143,12 +143,12 @@ impl TaskStore {
         Ok(r)
     }
     pub async fn finish_system_query(&self, r: &SystemQueryReply) -> Result<(), TaskStoreError> {
-        let browser = r.kind.starts_with("browser_");
+        let ephemeral = r.kind.starts_with("browser_") || r.kind.starts_with("system_log_");
         let mut saved = r.clone();
-        if browser {
+        if ephemeral {
             saved.data = None;
             saved.error = r.error.as_ref().map(|_| {
-                "browser operation failed; details available only in the live session".into()
+                "operation failed; details available only in the live session".into()
             });
         }
         let mut tx = self.pool.begin().await?;
@@ -161,7 +161,7 @@ impl TaskStore {
                 .await?;
         }
         tx.commit().await?;
-        if browser {
+        if ephemeral {
             let mut replies = self.browser_replies.lock().await;
             replies
                 .retain(|_, (created, _)| created.elapsed() < std::time::Duration::from_secs(600));
@@ -184,6 +184,58 @@ impl TaskStore {
 mod tests {
     use super::*;
     use pab_protocol::*;
+    #[tokio::test]
+    async fn log_payload_is_ephemeral_and_legacy_payload_is_scrubbed() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tasks.sqlite3");
+        let store = TaskStore::open(&path).await.unwrap();
+        let actor = crate::task_service::transfer_tests::actor();
+        let id = RequestId::new();
+        let query = SystemQuery::Logs {
+            query: SystemLogQuery::Read {
+                cursor: None,
+                sources: Some(vec!["journal:local".into()]),
+                start_unix_ms: Some(1),
+                end_unix_ms: Some(2),
+                mode: SystemLogMode::Range,
+                filter: None,
+                limit: 1,
+            },
+        };
+        store.accept_system_query(actor, id, &query).await.unwrap();
+        let mut reply = SystemQueryReply::pending(id, &query);
+        reply.state = "completed".into();
+        reply.data = Some(SystemQueryData::Logs {
+            snapshot: Box::new(SystemLogData::Sources {
+                sources: vec![SystemLogSource {
+                    source_id: "journal:local".into(),
+                    source_kind: "secret-log-content".into(),
+                    source_locator: "test".into(),
+                    availability: "readable".into(),
+                    reason: None,
+                    execution_identity: "test".into(),
+                    coverage_limit: None,
+                }],
+                progress: None,
+                next_source: None,
+                total: 1,
+            }),
+        });
+        store.finish_system_query(&reply).await.unwrap();
+        assert_eq!(store.get_system_query(actor, id).await.unwrap().data, reply.data);
+        let saved: String = sqlx::query_scalar("SELECT reply_json FROM system_query_results WHERE request_id=?")
+            .bind(id.to_string()).fetch_one(&store.pool).await.unwrap();
+        assert!(!saved.contains("secret-log-content"));
+        sqlx::query("UPDATE system_query_results SET reply_json=? WHERE request_id=?")
+            .bind(serde_json::to_string(&reply).unwrap()).bind(id.to_string())
+            .execute(&store.pool).await.unwrap();
+        drop(store);
+        let reopened = TaskStore::open(&path).await.unwrap();
+        let scrubbed: String = sqlx::query_scalar("SELECT reply_json FROM system_query_results WHERE request_id=?")
+            .bind(id.to_string()).fetch_one(&reopened.pool).await.unwrap();
+        assert!(!scrubbed.contains("secret-log-content"));
+        assert_eq!(reopened.get_system_query(actor, id).await.unwrap().state, "interrupted");
+    }
     #[tokio::test]
     async fn browser_page_data_stays_out_of_sqlite_and_is_owned() {
         let dir = tempfile::tempdir().unwrap();

@@ -20,6 +20,8 @@ pab-document = { path = "../document" }
 pab-logging = { path = "../logging" }
 pab-platform = { path = "../platform" }
 pab-os-control = { path = "../os-control" }
+pab-os-system-log = { path = "../os-system-log" }
+pab-system-log-store = { path = "../system-log-store" }
 pab-protocol = { path = "../protocol" }
 pab-screenshot = { path = "../screenshot" }
 pab-task-runtime = { path = "../task-runtime" }
@@ -28,6 +30,8 @@ pab-transport = { path = "../transport" }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+base64 = "0.22"
+uuid.workspace = true
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite"] }
 thiserror.workspace = true
 tracing.workspace = true

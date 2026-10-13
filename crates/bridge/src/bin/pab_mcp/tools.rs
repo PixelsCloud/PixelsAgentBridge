@@ -29,6 +29,9 @@ pub(super) async fn call_tool(
         | "pab_git_pull"
         | "pab_git_push" => super::mcp_system_query::call(runtime, name, arguments).await,
         "pab_list_network_connections"
+        | "pab_system_log_sources"
+        | "pab_system_log_read"
+        | "pab_system_log_event_read"
         | "pab_resolve_dns"
         | "pab_list_sessions"
         | "pab_list_execution_contexts"

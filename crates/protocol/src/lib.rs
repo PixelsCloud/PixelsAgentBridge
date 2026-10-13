@@ -108,6 +108,8 @@ pub use window::{MAX_WINDOW_ENTRIES, MAX_WINDOW_TITLE_BYTES, WindowEntry, Window
 
 mod system_query;
 pub use system_query::*;
+mod system_log;
+pub use system_log::*;
 mod git;
 pub use git::*;
 

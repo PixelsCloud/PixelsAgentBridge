@@ -3,13 +3,18 @@ import hashlib,json,os,plistlib,signal,subprocess,sys,time
 from pathlib import Path
 
 pkg=Path(sys.argv[1]);expected=sys.argv[2];version=sys.argv[3];root=Path(sys.argv[4])
+app_version=sys.argv[5] if len(sys.argv)>5 else version
 (root/'started').open('x').close()
 report={'state':'starting','version':version,'identity_preserved':False}
 app=Path('/Applications/Pixels Agent Bridge.app')
 data=Path('/Library/Application Support/PixelsAgentBridgeData')
 install=Path('/Library/Application Support/PixelsAgentBridge')
 def digest(p):
-    with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+    hasher=hashlib.sha256()
+    with p.open('rb') as f:
+        for chunk in iter(lambda:f.read(1024*1024),b''):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 def requirement():
     r=subprocess.run(['/usr/bin/codesign','-d','-r-',str(app)],capture_output=True,text=True,check=True)
     return next(line for line in (r.stdout+r.stderr).splitlines() if line.startswith('designated =>'))
@@ -26,7 +31,9 @@ try:
         run=subprocess.run(['/usr/sbin/installer','-pkg',str(pkg),'-target','/'],stdout=log,stderr=subprocess.STDOUT)
     report['exit_code']=run.returncode
     assert run.returncode==0,'Installer failed; inspect installer.log'
-    assert plistlib.loads((app/'Contents/Info.plist').read_bytes())['CFBundleShortVersionString']==version
+    installed_app_version=plistlib.loads((app/'Contents/Info.plist').read_bytes())['CFBundleShortVersionString']
+    assert installed_app_version==app_version, f'App version {installed_app_version}, expected {app_version}'
+    report['app_version']=installed_app_version
     subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(app)],check=True)
     assert requirement()==signature,'Signing identity changed'
     report['signature_preserved']=True

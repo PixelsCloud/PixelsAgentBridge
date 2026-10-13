@@ -1,5 +1,5 @@
 use pab_bridge::BridgeRuntime;
-use pab_protocol::{ConnectionFilter, DnsRecordType, RequestId, ServiceControlAction, SystemQuery};
+use pab_protocol::{ConnectionFilter, DnsRecordType, RequestId, ServiceControlAction, SystemLogFilter, SystemLogMode, SystemLogQuery, SystemQuery};
 use serde_json::{Value, json};
 
 pub(super) fn tools() -> Vec<Value> {
@@ -21,11 +21,15 @@ pub(super) fn tools() -> Vec<Value> {
         ("pab_list_processes","Collect one target process list, then apply optional pid, case-insensitive literal name substring and exact user name/ID filters. No live pagination or atomic OS snapshot. sample_cpu=false default; true takes two samples. Output includes PID, parent, name, executable, user, start time, state, RAM and optional CPU; no command arguments/environment. New processes without two samples have null CPU.",json!({"pid":{"type":"integer","minimum":1,"maximum":4294967295u64},"name":filter,"user":filter,"limit":limit,"sample_cpu":cpu}),vec!["device_code"]),
         ("pab_get_process","Query one current PID through sysinfo; a missing/unobservable process fails. Returns termination_identity for pab_terminate_process on supported backends; null if identity is unavailable. Seconds-resolution start time must never substitute for this identity; process collection itself never terminates it. sample_cpu=false default.",json!({"pid":{"type":"integer","minimum":1,"maximum":4294967295u64},"sample_cpu":cpu}),vec!["device_code","pid"]),
         ("pab_list_network_interfaces","Query target interface name, IP/prefix, MAC, MTU, operational state and cumulative received/transmitted bytes through sysinfo. Optional case-insensitive literal name substring filter. Not a TCP/UDP connection table. At most 32 IP addresses/interface, 1000 entries; no paging.",json!({"name":filter,"limit":limit}),vec!["device_code"]),
+        ("pab_system_log_sources","List native system-log sources visible to the target Executor and their exact source IDs, availability, identity, and coverage limits. A platform source is not a promise that arbitrary file, container, or browser logs are included. Use after/limit to page inventory. scan_cursor from pab_system_log_read instead lists that scan's selected sources.",json!({"scan_cursor":{"type":"string","minLength":1},"after":{"type":"string","minLength":1},"limit":{"type":"integer","minimum":1,"maximum":128,"default":32}}),vec!["device_code"]),
+        ("pab_system_log_read","Read native logs from the target device. First call: list sources, choose exact source IDs, optionally set start_unix_ms/end_unix_ms (milliseconds; default last 24h), mode range or follow, and literal message_contains/native_level filters. Every selected source reports scanned/matched counts and integrity: scanning, complete, partial, gap, or unverified. Follow pages also report capture_state (following, catching_up, lagging, stopped); oldest_unread_age_ms covers only committed events beyond the returned cursor, not unseen native backlog. A completed MCP operation can still return a scanning page. Continue with cursor alone until has_more=false; follow mode keeps returning cursors, so poll as needed. Empty events do not imply no logs while scanning. Source position and full raw event are durable, and each event labels its source, identity, and hash. macOS OSLogStore and log-show records cannot prove complete continuity and report unverified; OSLogStore raw bytes are structured JSON from public entry fields, while unified:local yields log-show NDJSON. When a source is outside this inventory, use command/file/container tools.",json!({"cursor":{"type":"string","minLength":1},"sources":{"type":"array","items":{"type":"string","minLength":1},"minItems":1,"maxItems":256},"start_unix_ms":{"type":"integer"},"end_unix_ms":{"type":"integer"},"mode":{"type":"string","enum":["range","follow"],"default":"range"},"message_contains":{"type":"string","minLength":1,"maxLength":512},"native_level":{"type":"string","minLength":1,"maxLength":512},"limit":{"type":"integer","minimum":1,"maximum":128,"default":32}}),vec!["device_code"]),
+        ("pab_system_log_event_read","Read the exact raw bytes of an event_ref returned by pab_system_log_read, from byte offset. The bytes are base64 with total_bytes and SHA-256 so a large event can be reconstructed without truncation. References are bound to the authenticated caller and expire with the scan (24h).",json!({"event_ref":{"type":"string","minLength":1},"offset":{"type":"integer","minimum":0,"default":0},"max_bytes":{"type":"integer","minimum":1,"maximum":8192,"default":8192}}),vec!["device_code","event_ref"]),
     ].into_iter().map(|(name,description,extra,required)| {
         let mut properties=base.clone();properties.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         let mutation=["pab_terminate_process","pab_service_control"].contains(&name);
-        let version=if name=="pab_list_execution_contexts"{10}else if ["pab_terminate_process","pab_list_services","pab_get_service","pab_service_control"].contains(&name){3}else if ["pab_list_network_connections","pab_resolve_dns","pab_list_sessions"].contains(&name){2}else{1};
-        let behavior=if mutation {"Asynchronous lifecycle control: returns running after about 250 ms if still active. Keep request_id and poll pab_get_operation for the original operation; disconnect/caller cancellation does not cancel an accepted action. Same request ID is never replayed, even after restart; a different request ID is a new action. Cannot cancel/undo lifecycle actions."} else {"Read-only query. Keep request_id to retrieve the SAME sampled result using pab_get_operation; omit it for a new sample. Queries cannot be cancelled. OS/driver calls may delay completion; no hard interruption of blocking native calls. CPU basis points: 10000 = 100%, per-process CPU may exceed 10000."};
+        let logs=name.starts_with("pab_system_log_");
+        let version=if logs {15}else if name=="pab_list_execution_contexts"{10}else if ["pab_terminate_process","pab_list_services","pab_get_service","pab_service_control"].contains(&name){3}else if ["pab_list_network_connections","pab_resolve_dns","pab_list_sessions"].contains(&name){2}else{1};
+        let behavior=if logs {"Read-only; request_id is generated automatically. If the operation itself is running, query pab_get_operation with its operation_id. Scan cursors are separate opaque strings and can be reused after reconnect by the same caller until expiry. Native retention/permission limits are reported, not silently ignored."} else if mutation {"Asynchronous lifecycle control: returns running after about 250 ms if still active. Keep request_id and poll pab_get_operation for the original operation; disconnect/caller cancellation does not cancel an accepted action. Same request ID is never replayed, even after restart; a different request ID is a new action. Cannot cancel/undo lifecycle actions."} else {"Read-only query. Keep request_id to retrieve the SAME sampled result using pab_get_operation; omit it for a new sample. Queries cannot be cancelled. OS/driver calls may delay completion; no hard interruption of blocking native calls. CPU basis points: 10000 = 100%, per-process CPU may exceed 10000."};
         json!({"name":name,"description":format!("{description} Requires system-query capability v{version}. Bounded 32 KiB result with timestamps and explicit truncation; unavailable fields are null. {behavior}"),"inputSchema":{"type":"object","properties":properties,"required":required,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":name=="pab_resolve_dns"}})
     }).collect()
 }
@@ -85,6 +89,34 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
         .map_err(|_| "invalid timeout_ms".into())
     };
     let q = match name {
+        "pab_system_log_sources" => SystemQuery::Logs { query: SystemLogQuery::Sources {
+            scan_cursor: filter("scan_cursor"), after: filter("after"), limit: if args.get("limit").is_some() { limit } else { 32 },
+        } },
+        "pab_system_log_read" => {
+            let sources = args.get("sources").map(|value| serde_json::from_value::<Vec<String>>(value.clone())
+                .map_err(|_| "invalid log sources".to_owned())).transpose()?;
+            let integer = |key: &str| -> Result<Option<i64>, String> {
+                args.get(key).map(|v| v.as_i64().ok_or_else(|| format!("invalid {key}"))).transpose()
+            };
+            let mode = args.get("mode").map(|value| serde_json::from_value::<SystemLogMode>(value.clone())
+                .map_err(|_| "invalid log mode".to_owned())).transpose()?.unwrap_or_default();
+            let message_contains = filter("message_contains");
+            let native_level = filter("native_level");
+            let filter = if message_contains.is_some() || native_level.is_some() {
+                Some(SystemLogFilter { message_contains, native_level })
+            } else { None };
+            SystemQuery::Logs { query: SystemLogQuery::Read {
+                cursor: filter_string(args, "cursor")?, sources,
+                start_unix_ms: integer("start_unix_ms")?, end_unix_ms: integer("end_unix_ms")?,
+                mode, filter, limit: if args.get("limit").is_some() { limit } else { 32 },
+            } }
+        }
+        "pab_system_log_event_read" => SystemQuery::Logs { query: SystemLogQuery::EventRead {
+            event_ref: filter_string(args, "event_ref")?.ok_or("event_ref required")?,
+            offset: args.get("offset").map(|v| v.as_u64().ok_or("invalid offset")).transpose()?.unwrap_or(0),
+            max_bytes: u32::try_from(args.get("max_bytes").map(|v| v.as_u64().ok_or("invalid max_bytes")).transpose()?.unwrap_or(8192))
+                .map_err(|_| "invalid max_bytes")?,
+        } },
         "pab_terminate_process" => SystemQuery::TerminateProcess {
             pid: pid.ok_or("pid required")?,
             identity: filter("identity").ok_or("identity required")?,
@@ -195,6 +227,10 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
     q.validate().map_err(str::to_owned)?;
     Ok((id, q))
 }
+
+fn filter_string(args: &Value, key: &str) -> Result<Option<String>, String> {
+    args.get(key).map(|value| value.as_str().map(str::to_owned).ok_or_else(|| format!("invalid {key}"))).transpose()
+}
 pub(super) async fn call(
     runtime: &BridgeRuntime,
     name: &str,
@@ -218,6 +254,20 @@ pub(super) async fn call(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn log_tools_generate_request_ids_and_keep_cursor_separate() {
+        for name in ["pab_system_log_sources", "pab_system_log_read", "pab_system_log_event_read"] {
+            let tool = tools().into_iter().find(|tool| tool["name"] == name).unwrap();
+            assert_eq!(tool["inputSchema"]["properties"]["request_id"]["format"], "uuid");
+            assert!(!tool["inputSchema"]["required"].as_array().unwrap().iter().any(|value| value == "request_id"));
+            assert!(tool["description"].as_str().unwrap().contains("capability v15"));
+        }
+        let (id, query) = parse("pab_system_log_read", &json!({"device_code":"123456789","sources":["eventlog:Application"],"limit":2})).unwrap();
+        assert_ne!(id.to_string(), "");
+        assert!(matches!(query, SystemQuery::Logs { query: SystemLogQuery::Read { cursor: None, sources: Some(_), limit: 2, .. } }));
+        assert!(parse("pab_system_log_read", &json!({"cursor":"opaque","sources":["eventlog:System"]})).is_err());
+        assert!(parse("pab_system_log_event_read", &json!({"event_ref":"event","max_bytes":8193})).is_err());
+    }
     #[test]
     fn execution_context_discovery_is_strict_versioned_and_read_only() {
         let (_, query) = parse("pab_list_execution_contexts", &json!({})).unwrap();

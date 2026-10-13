@@ -6,6 +6,52 @@ use pab_protocol::{
 };
 use std::time::Duration;
 
+#[tokio::test]
+async fn pixels_log_flows_through_system_query_with_full_event_and_owner_binding() {
+    use pab_protocol::{SystemLogData, SystemLogMode, SystemLogQuery};
+    let dir = tempfile::tempdir().unwrap();
+    let svc = service(dir.path()).await;
+    std::fs::create_dir_all(&svc.log_root).unwrap();
+    let log = svc.log_root.join("executor.log");
+    std::fs::write(&log, b"2026-10-13T01:00:00Z INFO first\n2026-10-13T01:00:01Z ERROR second\n").unwrap();
+    let query = SystemQuery::Logs { query: SystemLogQuery::Read {
+        cursor: None, sources: Some(vec!["pixels-file:executor.log".into()]),
+        start_unix_ms: Some(0), end_unix_ms: Some(i64::MAX),
+        mode: SystemLogMode::Range, filter: None, limit: 1,
+    } };
+    let id = RequestId::new();
+    let mut reply = svc.system_query(actor(), id, query).await.unwrap();
+    for _ in 0..100 {
+        if reply.state != "running" { break; }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        reply = svc.get_system_query(actor(), id).await.unwrap();
+    }
+    assert_eq!(reply.state, "completed", "{:?}", reply.error);
+    let Some(SystemQueryData::Logs { snapshot }) = reply.data else { panic!("log page missing") };
+    let SystemLogData::Page { events, cursor: Some(next), has_more, .. } = *snapshot else { panic!("log page") };
+    assert!(has_more);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].source_id, "pixels-file:executor.log");
+    let event_ref = events[0].event_ref.clone();
+    let read = svc.log_query(actor(), RequestId::new(), &SystemLogQuery::EventRead {
+        event_ref: event_ref.clone(), offset: 0, max_bytes: 100,
+    }).await;
+    assert_eq!(read.state, "completed");
+    let other = pab_protocol::OperatorRef::guest(pab_protocol::EndpointKey::new([99; 32]));
+    let denied = svc.log_query(other, RequestId::new(), &SystemLogQuery::EventRead {
+        event_ref, offset: 0, max_bytes: 100,
+    }).await;
+    assert_eq!(denied.state, "failed");
+    let resumed = svc.log_query(actor(), RequestId::new(), &SystemLogQuery::Read {
+        cursor: Some(next), sources: None, start_unix_ms: None, end_unix_ms: None,
+        mode: SystemLogMode::Range, filter: None, limit: 1,
+    }).await;
+    let Some(SystemQueryData::Logs { snapshot }) = resumed.data else { panic!("resumed page missing") };
+    let SystemLogData::Page { events, integrity, .. } = *snapshot else { panic!("resumed page") };
+    assert_eq!(events[0].message_preview.trim_end(), "2026-10-13T01:00:01Z ERROR second");
+    assert_eq!(integrity, pab_protocol::SystemLogIntegrity::Unverified);
+}
+
 #[cfg(not(any(windows, target_os = "macos")))]
 #[tokio::test]
 async fn applications_are_explicitly_unsupported_on_headless_without_gui_probe() {
