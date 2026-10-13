@@ -502,7 +502,7 @@ impl LogStore {
                     "stopped"
                 } else if oldest_unread_age_ms.is_some_and(|age| age >= LAGGING_AGE_MS) {
                     "lagging"
-                } else if behind > 0 {
+                } else if behind > 0 || latest_seq > last_seq {
                     "catching_up"
                 } else {
                     "following"
@@ -951,6 +951,51 @@ mod tests {
         };
         assert_eq!(integrity, SystemLogIntegrity::Gap);
         assert_eq!(capture_state.as_deref(), Some("stopped"));
+    }
+
+    #[tokio::test]
+    async fn follow_does_not_claim_live_with_unread_committed_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LogStore::open(&dir.path().join("logs.db")).await.unwrap();
+        let owner = actor(9);
+        let (scan, cursor) = store
+            .create_scan(NewScan {
+                actor: owner,
+                device: device(),
+                identity: "test",
+                sources: &[source()],
+                start_unix_ms: 0,
+                end_unix_ms: i64::MAX,
+                mode: SystemLogMode::Follow,
+                filter: None,
+            })
+            .await
+            .unwrap();
+        let mut batch = page(1, 2, true);
+        for event in &mut batch.events {
+            event.timestamp_unix_ms = now_ms();
+        }
+        store
+            .append_page(owner, &scan, "synthetic:system", None, &batch)
+            .await
+            .unwrap();
+        let SystemLogData::Page {
+            cursor: Some(next),
+            capture_state,
+            oldest_unread_age_ms,
+            ..
+        } = store.read_page(owner, &cursor, 1).await.unwrap()
+        else {
+            panic!("first follow page")
+        };
+        assert_eq!(capture_state.as_deref(), Some("catching_up"));
+        assert!(oldest_unread_age_ms.is_some());
+        let SystemLogData::Page { capture_state, .. } =
+            store.read_page(owner, &next, 1).await.unwrap()
+        else {
+            panic!("second follow page")
+        };
+        assert_eq!(capture_state.as_deref(), Some("following"));
     }
 
     #[tokio::test]

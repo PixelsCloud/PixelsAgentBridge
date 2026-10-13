@@ -40,9 +40,12 @@ parser.add_argument("--follow-check", action="store_true", help="Write a native 
 parser.add_argument("--restart-check", action="store_true", help="Restart the Executor between two follow pages")
 parser.add_argument("--linux-container", help="Disposable systemd container for independent Linux event writes/restart")
 parser.add_argument("--pixels-rotation-check", action="store_true", help="Rotate a disposable Pixels log file and verify a gap")
+parser.add_argument("--unfiltered-follow-count", type=int, default=0, help="Generate and verify this many unfiltered Linux journal events through the follow cursor")
 args = parser.parse_args()
 if args.expected_count < 0:
     parser.error("--expected-count must be nonnegative")
+if args.unfiltered_follow_count and (args.source != "journal:local" or not args.linux_container or not 1 <= args.unfiltered_follow_count <= 2000):
+    parser.error("--unfiltered-follow-count requires a Linux container and 1..2000 events")
 if not 0 <= args.latency_samples <= 200:
     parser.error("--latency-samples must be 0..200")
 if args.latency_samples and args.source not in {"eventlog:Application", "unified:oslogstore", "journal:local"}:
@@ -279,6 +282,66 @@ try:
         completed("pab_system_info", {"device_code": args.device_code})
     event = found[0] if found else None
     manifest_sha256 = hashlib.sha256("\n".join(sorted(hashes)).encode()).hexdigest()
+    unfiltered_result = None
+    if args.unfiltered_follow_count:
+        prefix = "PAB_UNFILTERED_" + uuid.uuid4().hex + "_"
+        first = completed("pab_system_log_read", {
+            "device_code": args.device_code,
+            "sources": [args.source],
+            "start_unix_ms": int(time.time() * 1000) - 5000,
+            "mode": "follow",
+            "limit": 16,
+        })["data"]["snapshot"]
+        follow_cursor = first["cursor"]
+        assert follow_cursor and first["integrity"] == "scanning", first
+        # Drain the pre-existing journal before the measured burst.
+        for _ in range(100):
+            if first["capture_state"] == "following":
+                break
+            first = completed("pab_system_log_read", {
+                "device_code": args.device_code, "cursor": follow_cursor, "limit": 16,
+            })["data"]["snapshot"]
+            follow_cursor = first["cursor"]
+            assert first["integrity"] == "scanning", first
+        else:
+            raise TimeoutError("unfiltered follow did not reach the initial journal tail")
+        count = args.unfiltered_follow_count
+        subprocess.run([
+            "docker", "exec", args.linux_container, "bash", "-lc",
+            f"for i in $(seq 1 {count}); do logger -t PABLogAcceptance {prefix}$(printf '%04d' $i); done",
+        ], check=True, capture_output=True, timeout=90)
+        native = [json.loads(line) for line in subprocess.check_output([
+            "docker", "exec", args.linux_container, "journalctl", "-t", "PABLogAcceptance",
+            "--output=json", "--no-pager",
+        ], text=True).splitlines() if prefix in line]
+        expected = [f"{prefix}{index:04d}" for index in range(1, count + 1)]
+        assert [row["MESSAGE"] for row in native] == expected, "independent journal burst is incomplete"
+        seen = []
+        states = []
+        for _ in range(300):
+            page = completed("pab_system_log_read", {
+                "device_code": args.device_code, "cursor": follow_cursor, "limit": 16,
+            })["data"]["snapshot"]
+            follow_cursor = page["cursor"]
+            assert page["integrity"] == "scanning" and follow_cursor, page
+            markers = [event for event in page["events"] if prefix in event["message_preview"]]
+            seen.extend(markers)
+            states.append(page["capture_state"])
+            assert page["capture_state"] in {"catching_up", "lagging", "following"}, page
+            if markers and len(seen) < count:
+                assert page["capture_state"] != "following", "reported following with unread burst events"
+            if len(seen) == count and page["capture_state"] == "following":
+                break
+            if not page["events"]:
+                time.sleep(.05)
+        else:
+            raise TimeoutError(f"unfiltered follow did not catch up: {len(seen)}/{count}")
+        assert [event["message_preview"] for event in seen] == expected
+        assert [event["native_position"] for event in seen] == [row["__CURSOR"] for row in native]
+        assert "catching_up" in states or "lagging" in states, states
+        unfiltered_result = {"count": count, "native_positions_matched": True,
+                             "states": {state: states.count(state) for state in sorted(set(states))},
+                             "rounds": len(states), "final_state": states[-1]}
     latency_result = None
     if args.latency_samples:
         prefix = "PAB_LATENCY_" + uuid.uuid4().hex + "_"
@@ -527,6 +590,7 @@ try:
         "sha256": event["sha256"] if event else None,
         "manifest_sha256": manifest_sha256,
         "latency": latency_result,
+        "unfiltered_follow": unfiltered_result,
         "integrity": page["integrity"],
         "source_progress": progress,
         "follow": follow_result,

@@ -198,6 +198,23 @@ def main() -> None:
         if burst_result["message_previews"] != [row["MESSAGE"] for row in burst_native]:
             raise AssertionError("MCP burst journal messages differ from independent journalctl")
 
+        unfiltered_probe = subprocess.run(
+            [
+                sys.executable, str(ROOT / "acceptance/system_log_mcp_live.py"),
+                "--mcp", str(MCP), "--device-code", access["device_code"],
+                "--source", "journal:local", "--marker", "PAB_ABSENT_" + uuid.uuid4().hex,
+                "--start-ms", str(int(time.time() * 1000) - 1000),
+                "--end-ms", str(int(time.time() * 1000) + 1000),
+                "--expected-count", "0", "--skip-full-event-read",
+                "--unfiltered-follow-count", "500", "--linux-container", CONTAINER,
+            ], capture_output=True, text=True, timeout=300,
+        )
+        if unfiltered_probe.returncode:
+            raise RuntimeError(f"Linux unfiltered follow probe failed: {unfiltered_probe.stderr[-2000:]}")
+        unfiltered_result = json.loads(unfiltered_probe.stdout)["unfiltered_follow"]
+        if unfiltered_result["count"] != 500 or unfiltered_result["final_state"] != "following":
+            raise AssertionError("unfiltered follow did not finish cleanly")
+
         large_marker = "PAB_LINUX_LARGE_" + uuid.uuid4().hex
         send_large = (
             "import ctypes,sys; "
@@ -285,6 +302,7 @@ def main() -> None:
             "burst_positions_matched": True,
             "burst_manifest_sha256": burst_result["manifest_sha256"],
             "burst_full_raw": burst_full_raw,
+            "unfiltered_follow": unfiltered_result,
             "burst_operation_timings_ms": burst_result["operation_timings_ms"],
             "burst_latency": burst_result["latency"],
             "large_message_bytes": 70000,

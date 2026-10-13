@@ -137,8 +137,10 @@ def main():
     if notary_profile and not installer_identity:
         parser.error('PAB_MACOS_NOTARY_PROFILE requires PAB_MACOS_INSTALLER_IDENTITY')
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
-    if not args.allow_dirty and subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT).strip():
-        parser.error('Commit changes before publishing, or use --allow-dirty for a rehearsal')
+    if not args.allow_dirty and subprocess.check_output(
+        ['git', 'status', '--porcelain', '--untracked-files=no'], cwd=ROOT
+    ).strip():
+        parser.error('Commit tracked changes before publishing, or use --allow-dirty for a rehearsal')
     state_path = ROOT / '.build' / f'release-{args.platform}-{arch}.json'
     if args.resume:
         if not state_path.is_file():
