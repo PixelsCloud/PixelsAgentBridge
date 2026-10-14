@@ -1,0 +1,8 @@
+{
+  "productName":"Pixels Terminal Proof",
+  "version":"0.0.0",
+  "identifier":"vip.rgaa.pixels.terminal-proof",
+  "build":{"frontendDist":"dist"},
+  "app":{"windows":[{"label":"proof","title":"Pixels — isolated terminal proof","width":1000,"height":650,"resizable":true}],"security":{"csp":null}},
+  "bundle":{"active":false}
+}

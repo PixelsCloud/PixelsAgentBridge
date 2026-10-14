@@ -1,0 +1,60 @@
+{
+  "kind": "independent_pty_over_existing_connection",
+  "mode": "service",
+  "stages": [
+    {
+      "identity": "\u001b[?25l\u001b[93mW\u001b[?25h\u001b[?25l\u001b[m\u001b[4;44H> \u001b[93mWrite-Output \u001b[m(\u001b[36m'STATE:'\u001b[90m+\u001b[92m$env:PAB_TERM_PROOF\u001b[m); \u001b[93mWrite-Output \u001b[m(\u001b[36m'HOME:'\u001b[90m+\u001b[m(\u001b[93mGet-Location\u001b[m).\u001b[97mPath\u001b[m); \u001b[93mwhoami\u001b[m; \u001b[93mWrite-Output \u001b[m(\u001b[36m'__'\u001b[90m+\u001b[36m'IDENTITY__'\u001b[m)\r\nSTATE:kept\r\n\u001b[?25hHOME:C:\\Windows\\system32\\config\\systemprofile\r\nnt authority\\system\r\n__IDENTITY__\r\nPS C:\\Windows\\system32\\config\\systemprofile> "
+    },
+    {
+      "interrupt_recovered": true
+    }
+  ],
+  "launch_task": "3f2d72b8-8606-4c97-8e3d-2807900f7cf2",
+  "ready": {
+    "chunk": 16384,
+    "credit_window": 262144,
+    "home": "C:\\Windows\\system32\\config\\systemprofile",
+    "ports": [
+      39151,
+      39152,
+      39153
+    ],
+    "server_pid": 21432,
+    "shell_pid": 73236,
+    "user": "WIN-RASS8RC6V3H$"
+  },
+  "paths": [
+    "direct",
+    "direct",
+    "direct"
+  ],
+  "stable_terminal_id": "fab5174b-6228-4e28-8fe0-4e11efae726d",
+  "pause_stats": {
+    "acked": 847,
+    "ended": false,
+    "exit": null,
+    "max_inflight": 245763,
+    "produced": 246610,
+    "sha256": "1cece9ebbb4253c99a8f15a45d73639765cb1a0d62bb68d1d67cc3bd6c0da862",
+    "shell_pid": 73236
+  },
+  "stable_terminal_while_paused": true,
+  "stable_command_ms": 474.48410000652075,
+  "interrupt_ack_ms": 22.107400000095367,
+  "large_output_bytes": 17820606,
+  "output_sha256": "8b41eb963a7256a7eac2aa8150461d31bb540eb9aad3e5a14c5957ea67572c96",
+  "total_output_bytes": 18084090,
+  "kill_ms": 24.825099855661392,
+  "reader_eof_after_shell_kill": false,
+  "final_stats": {
+    "acked": 18084309,
+    "ended": false,
+    "exit": 1,
+    "max_inflight": 249876,
+    "produced": 18084309,
+    "sha256": "5803e9f81ba71b2fb1b04c3329bc335a55191b25967f2b2fc6bf6f9aebee0256",
+    "shell_pid": 73236
+  },
+  "reader_eof_after_worker_shutdown": true,
+  "success": true
+}

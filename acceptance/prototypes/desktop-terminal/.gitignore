@@ -1,0 +1,6 @@
+__pycache__/
+target/
+webview/target/
+webview/dist/
+webview/gen/
+webview/icons/
