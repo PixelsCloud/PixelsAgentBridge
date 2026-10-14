@@ -2,7 +2,7 @@
 
 Pixels 只操作自己启动的浏览器窗口，启动时默认最大化。目标设备已安装 Chrome 时使用 Chrome，否则使用 Edge；两者都没有时返回 `browser_missing`。不连接用户日常浏览器，也不安装或使用 Playwright 扩展。目标设备必须有可用的交互桌面用户；发起方必须登录 Pixels。
 
-每个目标系统用户、Pixels 账号和浏览器种类使用独立的持久资料目录，位于该系统用户的 Pixels 数据目录下。网站 Cookie 等浏览器资料留在目标设备，不上传 Pixels Server。关闭任务和升级应用不会主动删除资料；用户可在设置中清除当前账号选定浏览器的资料，使用中的资料会拒绝清除。部分网站只发浏览器关闭即失效的会话 Cookie，或会主动让登录状态过期，这些站点需要重新登录。Chrome 切换到 Edge 时使用另一份资料，不复制 Cookie。
+每个目标系统用户、Pixels 账号和浏览器种类使用独立的持久资料目录，位于该系统用户的 Pixels 数据目录下。网站 Cookie 等浏览器资料留在目标设备，不上传 Pixels Server。关闭任务和升级应用不会主动删除资料。部分网站只发浏览器关闭即失效的会话 Cookie，或会主动让登录状态过期，这些站点需要重新登录。Chrome 切换到 Edge 时使用另一份资料，不复制 Cookie。浏览器工具统一显示在桌面客户端“设置 → MCP 工具”页面，不设独立的浏览器设置页。
 
 Agent 连接目标设备后，调用 `pab_list_execution_contexts` 选择目标交互用户，并带 `execution.mode=desktop_user` 和 `context_ref` 调用 `pab_browser_attach`。无需传模式或配置目录。`pab_browser_setup_info` 仅检查运行时及 Chrome/Edge 是否可用。工具会话绑定目标设备、Pixels 账号、发起 MCP 操作者及目标系统用户。有副作用的调用可省略 `request_id`，MCP 会自动生成 UUID 并在 `operation_ref` 返回；需要安全重试时可显式传入稳定的 UUID。遇到 `unconfirmed` 时先用原 `operation_ref` 查询，不能用新 ID 重复提交。
 
