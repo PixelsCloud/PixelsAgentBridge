@@ -26,6 +26,7 @@ pab-protocol = { path = "../protocol" }
 pab-screenshot = { path = "../screenshot" }
 pab-task-runtime = { path = "../task-runtime" }
 pab-terminal = { path = "../terminal" }
+pab-interactive-terminal = { path = "../interactive-terminal" }
 pab-transport = { path = "../transport" }
 serde.workspace = true
 serde_json.workspace = true

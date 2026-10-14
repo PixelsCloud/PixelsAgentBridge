@@ -1,0 +1,43 @@
+{
+  "version": "1.2.98",
+  "source": "installed release Desktop and installed Executor",
+  "controller": "XRServer3 (947158375)",
+  "target": "Company (559038160)",
+  "checks": {
+    "device_context_menu_entry": true,
+    "service_account": "NT AUTHORITY\\SYSTEM",
+    "connection_path": "Relay",
+    "release_marker": "RELEASE_V1.2.98_READY",
+    "unicode_marker": "UNICODE_中文_🌍",
+    "state_marker": "STATE_kept",
+    "exit_code": 17,
+    "natural_exit_window_close": true,
+    "main_window_remains_available": true,
+    "debug_listener_present": false
+  },
+  "capture": {
+    "captured_at_unix_ms": 1791972162489,
+    "desktop_rect": {
+      "height": 720,
+      "width": 1100,
+      "x": 216,
+      "y": 239
+    },
+    "format": "jpeg",
+    "height": 720,
+    "mode": "jpeg",
+    "monitor_id": 65537,
+    "origin_x": 216,
+    "origin_y": 239,
+    "quality": 85,
+    "resized": false,
+    "source_height": 720,
+    "source_width": 1100,
+    "width": 1100,
+    "window_ref": "969f5417-317d-44d9-a810-645a8ac5dd98"
+  },
+  "capture_sha256": "5a8e98d1aa3d92ec4147e5866960c6524593f4a9f3292b33b94574b3bcd3fcfe",
+  "screenshot": "release-terminal-window.jpg",
+  "input_operation_id": "3db19d24-e5ea-47cd-a9f8-5eeadc33be0f",
+  "close_operation_id": "e35c4804-8a5a-4252-a6d0-b6ecc340bbe2"
+}

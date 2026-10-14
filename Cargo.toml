@@ -18,6 +18,7 @@ members = [
     "crates/service-config",
     "crates/task-runtime",
     "crates/terminal",
+    "crates/interactive-terminal",
     "crates/transport",
     "crates/windows-sas",
 ]

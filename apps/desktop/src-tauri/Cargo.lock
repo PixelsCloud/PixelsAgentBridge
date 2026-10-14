@@ -5494,6 +5494,7 @@ dependencies = [
  "iroh-base",
  "pab-agent-core",
  "pab-document",
+ "pab-interactive-terminal",
  "pab-logging",
  "pab-os-control",
  "pab-os-system-log",
@@ -5520,6 +5521,16 @@ dependencies = [
  "windows-service",
  "zeroize",
  "zip 8.6.0",
+]
+
+[[package]]
+name = "pab-interactive-terminal"
+version = "1.2.48"
+dependencies = [
+ "libc",
+ "pab-protocol",
+ "portable-pty",
+ "tokio",
 ]
 
 [[package]]

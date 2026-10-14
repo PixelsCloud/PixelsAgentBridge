@@ -1739,6 +1739,427 @@
       "live_suite": "live-basic",
       "live_status": "not_run",
       "scope": "group regression; individual behavior requires reported case evidence"
+    },
+    "pab_browser_attach": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_click": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_close": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_console_messages": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_downloads": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_drag": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_drop": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_extract": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_file_upload": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_fill": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_fill_form": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_find": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_get_session": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_handle_dialog": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_hover": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_navigate": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_network_requests": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_open": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_pdf_save": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_pointer": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_press_key": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_request_handoff": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_resume": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_screenshot": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_scroll": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_select_option": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_set_checked": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_setup_info": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_snapshot": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_tabs": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_browser_wait": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_document_close": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_document_open": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_document_read": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_document_render_page": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_document_search": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_port_forward_close": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_port_forward_open": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_port_forward_status": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_system_log_event_read": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_system_log_read": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
+    },
+    "pab_system_log_sources": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_status": "not_rerun",
+      "scope": "Previously shipped tool; catalog/schema coverage metadata restored against d22153e. This entry does not claim a new live acceptance run."
     }
-  }
+  },
+  "catalog_baseline": "d22153e"
 }

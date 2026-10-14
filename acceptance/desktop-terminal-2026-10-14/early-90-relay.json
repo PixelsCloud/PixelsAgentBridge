@@ -1,0 +1,39 @@
+{
+  "device": "428358431",
+  "source": "native debug acceptance Desktop with installed Executor",
+  "started": "2026-10-14T07:11:18.504Z",
+  "checks": {
+    "window_entry": true,
+    "service_shell": "NT AUTHORITY\\SYSTEM\npowershell.exe -NoLogo -NoExit\nC:\\Windows\\system32\\config\\systemprofile\nRelay",
+    "keyboard_submitted": true,
+    "state_marker": true,
+    "environment_and_unicode": true,
+    "ctrl_c_preserves_shell": true,
+    "pause_resume": {
+      "pending": 260113,
+      "max": 260113
+    },
+    "large_output": {
+      "bytes": 80438019,
+      "duration_ms": 205085
+    },
+    "cancel_close_keeps_shell": true,
+    "source_integrity": true,
+    "natural_exit": {
+      "exit_code": 7,
+      "output_bytes": 89665831,
+      "reason": "Shell exited",
+      "sha256": "e907ea1be436d9d1346f7823f16075cfdee6c7d5253d54ec05a81b8217852aed"
+    }
+  },
+  "output": {
+    "received": 89665831,
+    "digest": "e907ea1be436d9d1346f7823f16075cfdee6c7d5253d54ec05a81b8217852aed",
+    "sourceEnd": {
+      "exit_code": 7,
+      "output_bytes": 89665831,
+      "reason": "Shell exited",
+      "sha256": "e907ea1be436d9d1346f7823f16075cfdee6c7d5253d54ec05a81b8217852aed"
+    }
+  }
+}

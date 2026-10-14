@@ -12,7 +12,9 @@ from build_version import build_lock, reserve_version, record_artifacts, macos_a
 ROOT = Path(__file__).resolve().parents[1]
 CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve()
 TAURI_TARGET = CARGO_TARGET if 'CARGO_TARGET_DIR' in os.environ else ROOT / 'apps/desktop/src-tauri/target'
-CARGO_JOBS = max(1, min(18, int(os.environ.get('CARGO_BUILD_JOBS', '18'))))
+CARGO_JOBS = max(1, min(10, int(os.environ.get('CARGO_BUILD_JOBS', '10'))))
+os.environ['CARGO_BUILD_JOBS'] = str(CARGO_JOBS)
+os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = str(CARGO_JOBS)
 
 
 def run(command, cwd=ROOT):

@@ -23,7 +23,11 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::{BridgeConfig, BridgeConfigError};
 
+mod desktop_terminal;
+#[cfg(test)]
+mod desktop_terminal_tests;
 mod directory;
+pub use desktop_terminal::DesktopTerminalSession;
 mod document;
 mod file_transfer;
 mod filesystem;

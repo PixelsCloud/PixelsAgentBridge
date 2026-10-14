@@ -77,6 +77,24 @@ impl UserIdentity {
 pub struct PreparedUser(native::PreparedUser);
 
 impl PreparedUser {
+    /// Additive entry point for a dedicated service-identity worker. Existing
+    /// selected-user preparation and launch semantics remain unchanged.
+    pub fn for_current_service() -> io::Result<Self> {
+        #[cfg(windows)]
+        {
+            native::PreparedUser::for_current_service().map(Self)
+        }
+        #[cfg(unix)]
+        {
+            Self::for_uid(
+                current_identity()?
+                    .account_id
+                    .strip_prefix("uid:")
+                    .and_then(|id| id.parse().ok())
+                    .ok_or_else(|| io::Error::other("invalid service UID"))?,
+            )
+        }
+    }
     /// Refresh native facts rather than trusting a persisted account name or UID.
     pub fn from_observation(expected: &pab_protocol::ExecutionIdentity) -> io::Result<Self> {
         expected.validate().map_err(io::Error::other)?;

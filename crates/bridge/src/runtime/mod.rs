@@ -1,6 +1,7 @@
 mod account;
 mod catalog;
 mod credential;
+mod desktop_terminal;
 mod device;
 mod directory;
 mod document;

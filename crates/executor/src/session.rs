@@ -239,14 +239,19 @@ async fn authenticate(
     if let Some(tasks) = tasks {
         let tasks = tasks.for_ui_connection();
         let _terminals = tasks.terminal_connection_guard();
+        let _desktop_terminals = tasks.desktop_terminal_connection_guard();
         let mut recheck = tokio::time::interval(AUTHORIZATION_RECHECK_INTERVAL);
         recheck.set_missed_tick_behavior(MissedTickBehavior::Delay);
         recheck.tick().await;
         loop {
             tokio::select! {
                 _ = recheck.tick() => {
+                    let current_authorization = authorizer.report_authenticated(peer_endpoint_key).await;
+                    if let Ok(current) = &current_authorization {
+                        tasks.recheck_desktop_terminal_account(current.user_context.user.as_ref().map(|u| u.user_id));
+                    }
                     let still_authorized = matches!(
-                        authorizer.report_authenticated(peer_endpoint_key).await,
+                        current_authorization,
                         Ok(current)
                             if current.device_ref == device_ref
                                 && current.peer_endpoint_key == peer_endpoint_key

@@ -20,8 +20,8 @@ use windows_sys::Win32::{
         RemoteDesktop::WTSQueryUserToken,
         Threading::{
             CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessAsUserW,
-            GetCurrentProcess, GetExitCodeProcess, OpenProcessToken, PROCESS_INFORMATION,
-            ResumeThread, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
+            CreateProcessW, GetCurrentProcess, GetExitCodeProcess, OpenProcessToken,
+            PROCESS_INFORMATION, ResumeThread, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
         },
     },
     UI::Shell::GetUserProfileDirectoryW,
@@ -55,6 +55,21 @@ fn token(session: u32) -> io::Result<Handle> {
     // SAFETY: writable output, current local WTS server. This needs LocalSystem
     // privileges; failure is reported, never replaced with the service token.
     if unsafe { WTSQueryUserToken(session, &mut raw) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(Handle(raw))
+}
+fn service_token() -> io::Result<Handle> {
+    use windows_sys::Win32::Security::{TOKEN_ASSIGN_PRIMARY, TOKEN_DUPLICATE};
+    let mut raw = ptr::null_mut();
+    if unsafe {
+        OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE,
+            &mut raw,
+        )
+    } == 0
+    {
         return Err(io::Error::last_os_error());
     }
     Ok(Handle(raw))
@@ -199,15 +214,29 @@ impl Drop for Environment {
 pub(super) struct PreparedUser {
     identity: UserIdentity,
     token: Handle,
+    service: bool,
 }
 impl PreparedUser {
+    pub fn for_current_service() -> io::Result<Self> {
+        let token = service_token()?;
+        let identity = identity(&token)?;
+        Ok(Self {
+            identity,
+            token,
+            service: true,
+        })
+    }
     pub fn for_session(session: u32) -> io::Result<Self> {
         let token = token(session)?;
         let identity = identity(&token)?;
         if identity.session_id != Some(session) {
             return Err(io::Error::other("WTS token session mismatch"));
         }
-        Ok(Self { identity, token })
+        Ok(Self {
+            identity,
+            token,
+            service: false,
+        })
     }
     pub fn identity(&self) -> &UserIdentity {
         &self.identity
@@ -218,11 +247,15 @@ impl PreparedUser {
         args: &[OsString],
         cwd: &Path,
     ) -> io::Result<UserProcess> {
-        let fresh = token(
-            self.identity
-                .session_id
-                .ok_or_else(|| io::Error::other("missing session"))?,
-        )?;
+        let fresh = if self.service {
+            service_token()?
+        } else {
+            token(
+                self.identity
+                    .session_id
+                    .ok_or_else(|| io::Error::other("missing session"))?,
+            )?
+        };
         if identity(&fresh)? != self.identity {
             return Err(io::Error::other(
                 "execution logon changed; resolve a fresh context",
@@ -263,22 +296,41 @@ impl PreparedUser {
         // SAFETY: all pointers live for the synchronous call, mutable command line,
         // validated primary token. No parent handles inherited, no implicit shell,
         // and no request for the linked elevated token of an administrator.
-        if unsafe {
-            CreateProcessAsUserW(
-                self.token.0,
-                application.as_ptr(),
-                command.as_mut_ptr(),
-                ptr::null(),
-                ptr::null(),
-                0,
-                CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | CREATE_SUSPENDED,
-                env.0.cast_const(),
-                cwd.as_ptr(),
-                &startup,
-                &mut created,
-            )
-        } == 0
-        {
+        let created_ok = if self.service {
+            // Current service identity needs no token switch. This also works
+            // for an Executor running as an ordinary user without TCB privileges.
+            unsafe {
+                CreateProcessW(
+                    application.as_ptr(),
+                    command.as_mut_ptr(),
+                    ptr::null(),
+                    ptr::null(),
+                    0,
+                    CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | CREATE_SUSPENDED,
+                    env.0.cast_const(),
+                    cwd.as_ptr(),
+                    &startup,
+                    &mut created,
+                )
+            }
+        } else {
+            unsafe {
+                CreateProcessAsUserW(
+                    self.token.0,
+                    application.as_ptr(),
+                    command.as_mut_ptr(),
+                    ptr::null(),
+                    ptr::null(),
+                    0,
+                    CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW | CREATE_SUSPENDED,
+                    env.0.cast_const(),
+                    cwd.as_ptr(),
+                    &startup,
+                    &mut created,
+                )
+            }
+        };
+        if created_ok == 0 {
             return Err(io::Error::last_os_error());
         }
         let process = Handle(created.hProcess);

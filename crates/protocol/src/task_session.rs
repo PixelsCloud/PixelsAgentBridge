@@ -172,6 +172,10 @@ pub struct TransferSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskRequest {
+    DesktopTerminal {
+        schema_version: u16,
+        request: crate::DesktopTerminalRequest,
+    },
     GetUserContext {
         schema_version: u16,
     },
@@ -362,6 +366,7 @@ impl DeviceTaskRequest {
         match self {
             Self::GetUserContext { schema_version } => *schema_version,
             Self::TransferFile { schema_version, .. }
+            | Self::DesktopTerminal { schema_version, .. }
             | Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
             | Self::CancelSystemQuery { schema_version, .. }
@@ -425,6 +430,9 @@ pub enum PortForwardErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
+    DesktopTerminal {
+        reply: crate::DesktopTerminalReply,
+    },
     UserContext {
         context: crate::EndpointUserContext,
     },
@@ -446,6 +454,8 @@ pub enum DeviceTaskResponse {
         command_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         terminal_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        desktop_terminal_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

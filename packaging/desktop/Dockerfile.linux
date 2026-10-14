@@ -15,6 +15,7 @@ FROM dependencies AS builder
 WORKDIR /src
 COPY . .
 ENV CARGO_TARGET_DIR=/src/target
+ENV CARGO_BUILD_JOBS=10 CMAKE_BUILD_PARALLEL_LEVEL=10
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/src/target \
@@ -24,7 +25,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && cargo build --locked $cargo_flags \
         -p pab-executor --bin pab-executor \
         -p pab-bridge --bin pab-mcp \
-        -p pab-document --bin pab-document-worker -j 18 \
+        -p pab-document --bin pab-document-worker -j 10 \
     && mkdir -p /out \
     && cp /src/target/$build_dir/pab-executor /out/pab-executor \
     && cp /src/target/$build_dir/pab-mcp /out/pab-mcp \

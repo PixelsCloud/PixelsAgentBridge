@@ -18,6 +18,48 @@ use zeroize::Zeroizing;
 pub const MAX_PAB_MESSAGE_BYTES: usize = 64 * 1024;
 pub const MAX_BINARY_FRAME_BYTES: usize = 256 * 1024;
 
+pub struct PabFrameWriter(SendStream);
+pub struct PabFrameReader(RecvStream);
+impl PabFrameWriter {
+    pub async fn write(&mut self, bytes: &[u8], limit: usize) -> Result<(), PabConnectionError> {
+        if bytes.is_empty() || bytes.len() > limit.min(MAX_BINARY_FRAME_BYTES) {
+            return Err(PabConnectionError::InvalidBinaryFrame(bytes.len()));
+        }
+        self.0
+            .write_all(&(bytes.len() as u32).to_be_bytes())
+            .await
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+        self.0
+            .write_all(bytes)
+            .await
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))
+    }
+    pub fn finish(&mut self) -> Result<(), PabConnectionError> {
+        self.0
+            .finish()
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))
+    }
+}
+impl PabFrameReader {
+    pub async fn read(&mut self, limit: usize) -> Result<Vec<u8>, PabConnectionError> {
+        let mut header = [0; 4];
+        self.0
+            .read_exact(&mut header)
+            .await
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+        let len = u32::from_be_bytes(header) as usize;
+        if len == 0 || len > limit.min(MAX_BINARY_FRAME_BYTES) {
+            return Err(PabConnectionError::InvalidBinaryFrame(len));
+        }
+        let mut bytes = vec![0; len];
+        self.0
+            .read_exact(&mut bytes)
+            .await
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+        Ok(bytes)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnectionPath {
     Direct,
@@ -119,6 +161,11 @@ pub struct PabBiStream {
 }
 
 impl PabBiStream {
+    /// Independent owned directions for additive streaming protocols. Readers
+    /// must stay alive across idle periods: never cancel a partial frame read.
+    pub fn into_framed(self) -> (PabFrameWriter, PabFrameReader) {
+        (PabFrameWriter(self.send), PabFrameReader(self.receive))
+    }
     /// After the framed request and reply, forward unframed bytes in both
     /// directions. FIN is propagated independently; a reset or idle timeout
     /// drops both halves. Counters include only bytes written to the peer.

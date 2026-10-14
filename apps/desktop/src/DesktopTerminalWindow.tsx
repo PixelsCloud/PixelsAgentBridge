@@ -1,0 +1,262 @@
+import { useEffect, useRef, useState } from "react";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { Alert, App, Button, ConfigProvider, Select, Space, Tag, Typography, theme } from "antd";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import { Copy, Clipboard, Eraser, RefreshCw, Terminal as TerminalIcon, Square } from "lucide-react";
+import "@xterm/xterm/css/xterm.css";
+import "./desktopTerminal.css";
+import { desktopTerminalText } from "./desktopTerminalText";
+import type { ExecutionEntry, ExecutionReply, ExecutionSelection } from "./executionQueries";
+import type { ExecutionIdentity } from "./operatorTypes";
+
+type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string };
+const language = localStorage.getItem("pab.language");
+const text = desktopTerminalText[language === "zh-TW" ? "zh-TW" : language === "en" ? "en" : "zh-CN"];
+const dark = localStorage.getItem("pab.theme") === "dark";
+
+export default function DesktopTerminalWindow() {
+  return <ConfigProvider theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: "#218574", fontSize: 13, borderRadius: 7 } }}><App><TerminalContent /></App></ConfigProvider>;
+}
+function TerminalContent() {
+  const { modal, message } = App.useApp();
+  const host = useRef<HTMLDivElement>(null);
+  const terminal = useRef<Terminal | null>(null);
+  const fit = useRef<FitAddon | null>(null);
+  const live = useRef(false);
+  const mustEnd = useRef(false);
+  const generation = useRef(0);
+  const sessionId = useRef<string | null>(null);
+  const receivedOffset = useRef(0);
+  const closeBusy = useRef(false);
+  const queue = useRef<Uint8Array[]>([]);
+  const queuedBytes = useRef(0);
+  const draining = useRef(false);
+  const pendingAck = useRef(0);
+  const acked = useRef(0);
+  const ackBusy = useRef(false);
+  const pendingResize = useRef<{ cols: number; rows: number } | null>(null);
+  const resizeBusy = useRef(false);
+  const pasteBusy = useRef(false);
+  const [code, setCode] = useState("");
+  const [accounts, setAccounts] = useState<ExecutionEntry[]>([]);
+  const [selected, setSelected] = useState("");
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [phase, setPhase] = useState<"preparing" | "ready" | "starting" | "running" | "ended">("preparing");
+  const [opened, setOpened] = useState<Opened | null>(null);
+  const [error, setError] = useState("");
+  const [reason, setReason] = useState("");
+  const stateRef = useRef(phase); stateRef.current = phase;
+
+  async function refreshAccounts() {
+    setLoadingAccounts(true); setError(""); setSelected("");
+    try {
+      const reply = await invoke<ExecutionReply>("desktop_terminal_accounts");
+      if (reply.state !== "completed" || reply.data?.type !== "execution_contexts") throw new Error(reply.error || text.noAccounts);
+      setAccounts(reply.data.entries.filter((entry) => entry.mode === "user" || entry.mode === "service"));
+      const previous = localStorage.getItem(`pab.desktopTerminal.account.${code}`);
+      const account = reply.data.entries.find((entry) => entry.mode === "user" && entry.account_id === previous && entry.selection && "context_ref" in entry.selection);
+      if (previous === "service") setSelected("service");
+      else if (account?.selection && "context_ref" in account.selection) setSelected(account.selection.context_ref);
+      setPhase("ready");
+    } catch (cause) { setError(String(cause)); setPhase("ready"); }
+    finally { setLoadingAccounts(false); }
+  }
+  async function consume() {
+    if (ackBusy.current) return;
+    ackBusy.current = true;
+    const gen = generation.current;
+    const id = sessionId.current;
+    try {
+      while (gen === generation.current && pendingAck.current > acked.current) {
+        const offset = pendingAck.current;
+        await invoke("desktop_terminal_consume", { sessionId: id, offset });
+        if (gen !== generation.current) break;
+        acked.current = offset;
+      }
+    } catch (cause) { if (live.current && gen === generation.current) { setError(String(cause)); live.current = false; setPhase("ended"); } }
+    finally { ackBusy.current = false; if (live.current && pendingAck.current > acked.current && gen !== generation.current) void consume(); }
+  }
+  async function drainInput() {
+    if (draining.current) return;
+    draining.current = true;
+    const gen = generation.current;
+    const id = sessionId.current;
+    try {
+      while (live.current && gen === generation.current && queue.current.length) {
+        const bytes = queue.current.shift()!;
+        queuedBytes.current -= bytes.length;
+        await invoke("desktop_terminal_input", { sessionId: id, bytes: Array.from(bytes) });
+      }
+    } catch (cause) {
+      if (gen === generation.current) { setError(String(cause)); live.current = false; setPhase("ended"); queue.current = []; queuedBytes.current = 0; }
+    } finally { draining.current = false; if (live.current && queue.current.length && gen !== generation.current) void drainInput(); }
+  }
+  function input(data: string) {
+    if (!live.current) return;
+    (window as unknown as { __PIXELS_TERMINAL_ACCEPTANCE__?: { onInput?: (data: string) => void } }).__PIXELS_TERMINAL_ACCEPTANCE__?.onInput?.(data);
+    const bytes = new TextEncoder().encode(data);
+    if (queuedBytes.current + bytes.length > 64 * 1024) { void message.warning(text.queueFull); return; }
+    for (let offset = 0; offset < bytes.length; offset += 4096) queue.current.push(bytes.slice(offset, offset + 4096));
+    queuedBytes.current += bytes.length; void drainInput();
+  }
+  async function paste(data: string) {
+    const bytes = new TextEncoder().encode(data);
+    if (!live.current || pasteBusy.current) return;
+    if (bytes.length > 256 * 1024) { void message.warning(text.pasteLarge); return; }
+    if (/\r|\n/.test(data) && !terminal.current?.modes.bracketedPasteMode) {
+      const confirmed = await modal.confirm({ title: text.pasteTitle, content: text.pasteBody, okText: text.pasteConfirm, cancelText: text.cancel });
+      if (!confirmed) return;
+    }
+    pasteBusy.current = true;
+    const gen = generation.current;
+    try {
+      // Only one paste source (256 KiB) and a 64 KiB input queue are retained.
+      // Use xterm's paste path so bracketed-paste escape sequences are preserved.
+      for (let offset = 0; offset < bytes.length && live.current && gen === generation.current; ) {
+        // Leave room for xterm's bracketed-paste escape sequences too.
+        if (queuedBytes.current > 48 * 1024 - 64) { await new Promise((resolve) => setTimeout(resolve, 10)); continue; }
+        let end = Math.min(bytes.length, offset + 16 * 1024);
+        while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
+        terminal.current?.paste(new TextDecoder().decode(bytes.subarray(offset, end))); offset = end;
+      }
+    } finally { pasteBusy.current = false; }
+  }
+  async function resize() {
+    if (resizeBusy.current || !live.current) return;
+    resizeBusy.current = true;
+    try {
+      while (pendingResize.current && live.current) {
+        const size = pendingResize.current; pendingResize.current = null;
+        await invoke("desktop_terminal_resize", { sessionId: sessionId.current, ...size });
+      }
+    } catch (cause) { if (live.current) setError(String(cause)); }
+    finally { resizeBusy.current = false; }
+  }
+  async function endSession() {
+    await invoke("desktop_terminal_end", { sessionId: sessionId.current });
+    sessionId.current = null;
+    mustEnd.current = false;
+    live.current = false; generation.current++; queue.current = []; queuedBytes.current = 0;
+    setPhase("ended"); setReason(text.ended);
+  }
+  async function requestClose(closeWindow: boolean) {
+    if (closeBusy.current) return;
+    closeBusy.current = true;
+    try {
+      if (stateRef.current === "starting") return;
+      if (live.current || mustEnd.current) {
+        const confirmed = await modal.confirm({ title: text.closeTitle, content: text.closeBody, okText: text.confirm, cancelText: text.cancel, okButtonProps: { danger: true } });
+        if (!confirmed) return;
+      }
+      await endSession();
+      if (closeWindow) await invoke("desktop_terminal_destroy");
+    } catch (cause) { setError(String(cause)); }
+    finally { closeBusy.current = false; }
+  }
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    let disposed = false;
+    void invoke<string>("desktop_terminal_info").then((value) => { if (!disposed) setCode(value); }).catch((cause) => { if (!disposed) setError(String(cause)); });
+    const term = new Terminal({ scrollback: 10000, fontSize: 14, fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace', cursorBlink: true, theme: { background: "#142334", foreground: "#e7f3f1", cursor: "#8cd6c9", selectionBackground: "#21857470" } });
+    const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!); terminal.current = term; fit.current = addon;
+    const data = term.onData(input);
+    const observer = new ResizeObserver(() => {
+      addon.fit();
+      pendingResize.current = { cols: Math.max(20, Math.min(500, term.cols)), rows: Math.max(5, Math.min(200, term.rows)) }; void resize();
+    }); observer.observe(host.current!); addon.fit();
+    const capturePaste = (event: ClipboardEvent) => { event.preventDefault(); event.stopImmediatePropagation(); void paste(event.clipboardData?.getData("text/plain") || ""); };
+    host.current!.addEventListener("paste", capturePaste, true);
+    const unlisten = getCurrentWindow().onCloseRequested((event) => { event.preventDefault(); void requestClose(true); });
+    const unlistenAccount = listen<string>("desktop-terminal-account-ended", (event) => { live.current = false; setPhase("ended"); setError(event.payload); });
+    return () => { disposed = true; void unlisten.then((fn) => fn()); void unlistenAccount.then((fn) => fn()); observer.disconnect(); data.dispose(); host.current?.removeEventListener("paste", capturePaste, true); term.dispose(); terminal.current = null; };
+  }, []);
+  useEffect(() => { if (code) void refreshAccounts(); }, [code]);
+  async function start() {
+    const selection: ExecutionSelection | undefined = selected === "service" ? { mode: "service" } : accounts.find((entry) => entry.selection && "context_ref" in entry.selection && entry.selection.context_ref === selected)?.selection ?? undefined;
+    if (!selection || !terminal.current) return;
+    if (mustEnd.current && !live.current) {
+      const confirmed = await modal.confirm({ title: text.closeTitle, content: text.closeBody, okText: text.confirm, cancelText: text.cancel });
+      if (!confirmed) return;
+    }
+    setPhase("starting"); setError(""); setReason("");
+    const gen = ++generation.current; pendingAck.current = 0; acked.current = 0; receivedOffset.current = 0; queue.current = []; queuedBytes.current = 0;
+    terminal.current.reset(); fit.current?.fit();
+    const channel = new Channel<ArrayBuffer>();
+    channel.onmessage = (buffer) => {
+      if (gen !== generation.current) return;
+      const fail = (reason: string) => {
+        if (gen !== generation.current) return;
+        const failedGeneration = ++generation.current; live.current = false; queue.current = []; queuedBytes.current = 0;
+        setError(reason); setPhase("ended");
+        const id = sessionId.current;
+        void invoke("desktop_terminal_end", { sessionId: id }).then(() => {
+          if (generation.current === failedGeneration && sessionId.current === id) { sessionId.current = null; mustEnd.current = false; }
+        }).catch((cause) => { if (generation.current === failedGeneration) setError(`${reason}; ${String(cause)}`); });
+      };
+      const acceptance = (window as unknown as { __PIXELS_TERMINAL_ACCEPTANCE__?: { onFrame: ((frame: ArrayBuffer) => void) | null; paused: boolean; pending: (() => void)[]; pendingBytes: number; maxPendingBytes: number } }).__PIXELS_TERMINAL_ACCEPTANCE__;
+      acceptance?.onFrame?.(buffer);
+      const apply = () => {
+      if (gen !== generation.current) return;
+      const frame = new Uint8Array(buffer);
+      if (frame.length < 9) { fail("incomplete terminal IPC frame"); return; }
+      const rawOffset = new DataView(buffer).getBigUint64(1);
+      if (rawOffset > BigInt(Number.MAX_SAFE_INTEGER)) { fail("terminal offset exceeds supported precision"); return; }
+      const offset = Number(rawOffset);
+      if (frame[0] === 0) {
+        const bytes = frame.subarray(9);
+        if (offset !== receivedOffset.current) { fail("terminal output gap or duplicate detected; no data was silently skipped"); return; }
+        receivedOffset.current = offset + bytes.length;
+        live.current = true;
+        terminal.current?.write(bytes, () => { if (gen !== generation.current) return; pendingAck.current = offset + bytes.length; void consume(); });
+      } else if (frame[0] === 1) {
+        let event: { reason: string; exit_code: number | null };
+        try { event = JSON.parse(new TextDecoder().decode(frame.subarray(9))); }
+        catch { fail("invalid terminal ending frame"); return; }
+        if (typeof event.reason !== "string" || (event.exit_code !== null && !Number.isInteger(event.exit_code))) { fail("invalid terminal ending fields"); return; }
+        live.current = false; setPhase("ended");
+        if (event.exit_code !== null) mustEnd.current = false;
+        setReason(`${event.reason}${event.exit_code === null ? "" : ` · ${event.exit_code}`}`);
+      } else fail("invalid terminal IPC frame kind");
+      };
+      if (acceptance?.paused && new Uint8Array(buffer)[0] === 0) {
+        acceptance.pending.push(apply); acceptance.pendingBytes += buffer.byteLength - 9;
+        acceptance.maxPendingBytes = Math.max(acceptance.maxPendingBytes, acceptance.pendingBytes);
+      } else apply();
+    };
+    try {
+      await invoke("desktop_terminal_end", { sessionId: sessionId.current });
+      sessionId.current = null;
+      mustEnd.current = false;
+      const value = await invoke<Opened>("desktop_terminal_start", { execution: selection, cols: Math.max(20, Math.min(500, terminal.current.cols)), rows: Math.max(5, Math.min(200, terminal.current.rows)), events: channel });
+      if (gen !== generation.current) return;
+      sessionId.current = value.session_id;
+      const acceptance = (window as unknown as { __PIXELS_TERMINAL_ACCEPTANCE__?: { sessionId?: string } }).__PIXELS_TERMINAL_ACCEPTANCE__;
+      if (acceptance) acceptance.sessionId = value.session_id;
+      mustEnd.current = true;
+      setOpened(value); live.current = true; setPhase("running");
+      await invoke("desktop_terminal_watch", { sessionId: value.session_id });
+      terminal.current.focus();
+      localStorage.setItem(`pab.desktopTerminal.account.${code}`, selection.mode === "service" ? "service" : value.identity.account_id);
+    } catch (cause) { setError(String(cause)); live.current = false; setPhase("ended"); }
+  }
+  const options = [{ value: "service", label: text.service }, ...accounts.filter((entry) => entry.mode === "user").map((entry, index) => ({ value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${index}`, label: `${entry.account_name}${entry.session_id ? ` · ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${entry.unavailable_reason}` : ""}`, disabled: !entry.selection }))];
+  const shellArguments = opened?.arguments.slice(0, opened.arguments.includes("-Command") ? opened.arguments.indexOf("-Command") : undefined) ?? [];
+  return <div className={`desktop-terminal ${dark ? "desktop-terminal-dark" : ""}`}>
+    <header className="desktop-terminal-header"><div className="desktop-terminal-title"><TerminalIcon size={19} /><strong>{text.title}</strong><span>{code.replace(/(\d{3})(?=\d)/g, "$1 ")}</span><Tag color={phase === "running" ? "green" : "default"}>{phase === "preparing" ? text.preparing : phase === "starting" ? text.starting : phase === "running" ? text.running : phase === "ended" ? text.ended : text.choose}</Tag></div>
+      <Space size={6}><Button size="small" title={text.copy} icon={<Copy size={14} />} onClick={() => void navigator.clipboard.writeText(terminal.current?.getSelection() || "").catch((cause) => setError(String(cause)))} />
+        <Button size="small" title={text.paste} disabled={phase !== "running"} icon={<Clipboard size={14} />} onClick={() => void navigator.clipboard.readText().then(paste).catch((cause) => setError(String(cause)))} />
+        <Button size="small" title={text.localClear} icon={<Eraser size={14} />} onClick={() => terminal.current?.clear()}>{text.clear}</Button>
+        <Button size="small" danger disabled={phase !== "running"} icon={<Square size={13} />} onClick={() => void requestClose(false)}>{text.close}</Button></Space>
+    </header>
+    {opened && <div className="desktop-terminal-details"><span>{opened.identity.account_name}</span><span>{opened.shell} {shellArguments.join(" ")}</span><span title={opened.cwd}>{opened.cwd}</span><span>{opened.connection_path}</span></div>}
+    {(phase === "ready" || phase === "ended" || phase === "preparing") && <div className="desktop-terminal-setup"><Select aria-label={text.account} style={{ minWidth: 250, maxWidth: 520, flex: 1 }} placeholder={text.choose} value={selected || undefined} options={options} onChange={setSelected} showSearch optionFilterProp="label" loading={loadingAccounts} />
+      <Button icon={<RefreshCw size={14} />} onClick={() => void refreshAccounts()} loading={loadingAccounts}>{text.refresh}</Button><Button type="primary" disabled={!selected || loadingAccounts} onClick={() => void start()}>{opened ? text.reopen : text.open}</Button></div>}
+    {error && <Alert className="desktop-terminal-alert" type="error" showIcon title={text.error} description={error} closable onClose={() => setError("")} />}
+    {reason && <Alert className="desktop-terminal-alert" type="info" title={`${text.endedReason}: ${reason}`} />}
+    <div className="desktop-terminal-screen" ref={host} />
+    <footer className="desktop-terminal-footer"><Typography.Text type="secondary">{text.privacy}</Typography.Text></footer>
+  </div>;
+}

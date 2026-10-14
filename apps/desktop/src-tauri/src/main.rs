@@ -1,6 +1,9 @@
 // The desktop writes diagnostics to rotating files in every build profile.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod webview_runtime;
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
@@ -51,6 +54,10 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        _ => pab_desktop_lib::run(),
+        _ => {
+            #[cfg(windows)]
+            webview_runtime::prepare();
+            pab_desktop_lib::run();
+        }
     }
 }

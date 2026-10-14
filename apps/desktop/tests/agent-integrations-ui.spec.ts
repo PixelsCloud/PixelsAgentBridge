@@ -216,7 +216,7 @@ test("sidebar account restores existing identity, handles read and logout errors
   await expect(page.locator(".page-me")).toContainText("Pixels-very-long-account-name-for-layout");
   expect(await entry.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.locator(".page-me").getByRole("alert")).toContainText("Sign out failed");
+  await expect(page.locator(".page-me [role='alert'].account-error")).toContainText("Sign out failed");
   await expect(entry).toContainText("Pixels-very-long-account-name-for-layout");
   await page.evaluate(() => { (window as any).fixture.logoutError = false; });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();

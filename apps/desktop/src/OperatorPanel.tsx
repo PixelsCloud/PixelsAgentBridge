@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowUpRight, Copy, Pencil, Trash2, Unplug } from "lucide-react";
+import { ArrowUpRight, Copy, Pencil, Trash2, Unplug, Terminal as TerminalIcon } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { View } from "./App";
 import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, TaskEntry, TaskUpdate, TransferUpdate } from "./operatorTypes";
@@ -177,6 +177,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   function deviceMenu(device: ConnectedDevice): MenuProps {
     return {
       items: [
+        { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Open remote terminal" : language === "zh-TW" ? "開啟遠端終端" : "打开远程终端" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
         { key: "disconnect", icon: <Unplug size={16} />, label: t.disconnectDevice, disabled: !device.connected },
         { key: "rename", icon: <Pencil size={16} />, label: t.renameDevice },
@@ -185,6 +186,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         { key: "delete", icon: <Trash2 size={16} />, label: t.deleteDevice, danger: true },
       ],
       onClick: ({ key }) => {
+        if (key === "desktop-terminal") void openDesktopTerminal(device);
         if (key === "connect") void connectSaved(device);
         if (key === "disconnect") {
           setDisconnectError("");
@@ -202,6 +204,20 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         }
       },
     };
+  }
+
+  async function openDesktopTerminal(device: ConnectedDevice) {
+    if (!signedIn) { onSignIn(); return; }
+    try {
+      if (!device.connected) {
+        const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
+        setDevices((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
+      }
+      await invoke("desktop_terminal_window", { code: device.deviceCode });
+    } catch (cause) {
+      if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
+      notification.error({ message: language === "en" ? "Could not open remote terminal" : "无法打开远程终端", description: String(cause), placement: "bottomRight" });
+    }
   }
 
   async function copyDeviceInfo(device: ConnectedDevice) {

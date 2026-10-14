@@ -21,6 +21,7 @@ use tokio::sync::{Mutex, watch};
 
 pub(crate) mod command;
 mod container;
+mod desktop_terminal;
 mod directory;
 mod document;
 mod execution;
@@ -78,6 +79,7 @@ pub(crate) struct TaskService {
     execution_context: ExecutionContext,
     active: Arc<Mutex<HashMap<TaskId, watch::Sender<Option<String>>>>>,
     terminals: Arc<Mutex<HashMap<pab_protocol::RequestId, Arc<terminal::ActiveTerminal>>>>,
+    desktop_terminals: desktop_terminal::DesktopTerminals,
     upload_locks: upload_lock::UploadPathLocks,
     filesystem_slots: Arc<tokio::sync::Semaphore>,
     documents: document::DocumentCache,
@@ -140,6 +142,7 @@ impl TaskService {
     pub(crate) fn for_ui_connection(&self) -> Self {
         let mut service = self.clone();
         service.ui_connection = Arc::new(UiConnection::new());
+        service.desktop_terminals = self.desktop_terminals.for_connection();
         service.port_forward_session_slots = Arc::new(tokio::sync::Semaphore::new(64));
         service
     }
@@ -204,6 +207,7 @@ impl TaskService {
             execution_context,
             active: Arc::new(Mutex::new(HashMap::new())),
             terminals: Arc::new(Mutex::new(HashMap::new())),
+            desktop_terminals: desktop_terminal::DesktopTerminals::default(),
             upload_locks: upload_lock::UploadPathLocks::default(),
             filesystem_slots: Arc::new(tokio::sync::Semaphore::new(8)),
             documents: document::DocumentCache::default(),
@@ -260,6 +264,11 @@ impl TaskService {
                 )
                 .await?;
             return Ok(());
+        }
+        if let DeviceTaskRequest::DesktopTerminal { request, .. } = request {
+            return self
+                .desktop_terminal_stream(initiated_by, request, stream, timeout)
+                .await;
         }
         if let Some(request_id) = request.initiating_request_id() {
             self.store
@@ -529,6 +538,9 @@ impl TaskService {
         request: DeviceTaskRequest,
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
+            DeviceTaskRequest::DesktopTerminal { .. } => Err(TaskServiceError::InvalidRequest(
+                "Desktop terminal requires its streaming handler",
+            )),
             DeviceTaskRequest::GetUserContext { .. } => Ok(DeviceTaskResponse::UserContext {
                 context: self.user_context.clone(),
             }),
@@ -574,6 +586,9 @@ impl TaskService {
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
+                desktop_terminal_schema_version: Some(
+                    pab_protocol::DESKTOP_TERMINAL_SCHEMA_VERSION,
+                ),
                 filesystem_schema_version: Some(6),
                 transfer_schema_version: Some(pab_protocol::FILE_TRANSFER_SCHEMA_VERSION),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),

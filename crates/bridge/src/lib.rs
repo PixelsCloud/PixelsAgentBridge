@@ -9,8 +9,8 @@ mod runtime;
 
 pub use config::{BridgeConfig, BridgeConfigError, BridgeIdentity, GuestConfigError};
 pub use connection::{
-    AuthenticatedDeviceConnection, BridgeClient, BridgeConnector, BridgeError, FileSystemResult,
-    Screenshot, TaskSubscription, TransferControl,
+    AuthenticatedDeviceConnection, BridgeClient, BridgeConnector, BridgeError,
+    DesktopTerminalSession, FileSystemResult, Screenshot, TaskSubscription, TransferControl,
 };
 pub use pab_transport::ConnectionPath;
 pub use runtime::{

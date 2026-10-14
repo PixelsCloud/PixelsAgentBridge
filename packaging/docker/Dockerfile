@@ -6,6 +6,7 @@ COPY apps/web/ ./
 RUN npm run build:assets
 
 FROM rust:1.95-bookworm AS builder
+ENV CARGO_BUILD_JOBS=10 CMAKE_BUILD_PARALLEL_LEVEL=10
 
 WORKDIR /src
 COPY . .

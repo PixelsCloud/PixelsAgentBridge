@@ -8,6 +8,14 @@ use serde_json::{Value, json};
 use std::{path::Path, process::Stdio, time::Duration};
 use support::{Client, stop};
 
+// This frozen manifest covers the current stable catalog, independently of the
+// implementation. Adding a tool still requires an explicit coverage entry.
+fn expected_tool_count() -> usize {
+    let coverage: Value =
+        serde_json::from_str(include_str!("../../../acceptance/tool-coverage.json")).unwrap();
+    coverage["tools"].as_object().unwrap().len()
+}
+
 async fn start(root: &Path, database: &Path, port: u16) -> (Client, tokio::process::Child) {
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"));
     command
@@ -117,7 +125,7 @@ async fn catalog_supports_modern_metadata_and_legacy_handshake() {
         assert!(
             result["tools"]
                 .as_array()
-                .is_some_and(|tools| tools.len() == 68),
+                .is_some_and(|tools| tools.len() == expected_tool_count()),
             "{response}"
         );
         if modern {
@@ -212,7 +220,10 @@ async fn offline_submission_query_cancel_dedup_and_two_sessions_use_real_stdio()
     });
     let (first, first_child) = start(&directory.path().join("first"), &database, port).await;
     let (second, second_child) = start(&directory.path().join("second"), &database, port).await;
-    assert_eq!(first.list_all_tools().await.unwrap().len(), 68);
+    assert_eq!(
+        first.list_all_tools().await.unwrap().len(),
+        expected_tool_count()
+    );
     let request_id = RequestId::new().to_string();
     let args = json!({"device_code":"123456789","source":source,"destination":if cfg!(windows){"C:\\fixture\\remote.bin"}else{"/tmp/fixture-remote.bin"},"request_id":request_id});
     let submitted = result(call(&first, "pab_upload_file", args.clone()).await);
@@ -323,7 +334,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
     let database = root.join("bridge.sqlite3");
     let path = root.join("mcp-tools.json");
     let settings = McpToolSettings {
-        version: 2,
+        version: McpToolSettings::default().version,
         enabled_groups: vec![ToolGroup::Core],
     };
     settings.save(&path).unwrap();
@@ -351,7 +362,10 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
         ToolGroup::Core.tools().len()
     );
     let (second, second_child) = start(root, &database, 1).await;
-    assert_eq!(second.list_all_tools().await.unwrap().len(), 99);
+    assert_eq!(
+        second.list_all_tools().await.unwrap().len(),
+        expected_tool_count()
+    );
     stop(second, second_child).await;
     stop(first, first_child).await;
 }
@@ -360,7 +374,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
 async fn invalid_tool_settings_fail_startup_without_exposing_a_fallback_catalog() {
     for (content, expected) in [
         (
-            r#"{"version":3,"enabledGroups":["core"]}"#,
+            r#"{"version":4294967295,"enabledGroups":["core"]}"#,
             "Unsupported MCP tool settings version",
         ),
         (

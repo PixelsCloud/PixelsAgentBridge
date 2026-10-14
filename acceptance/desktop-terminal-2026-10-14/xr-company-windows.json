@@ -1,0 +1,55 @@
+{
+  "controller": "XRServer (947158375) -> Company (559038160)",
+  "device": "559038160",
+  "checks": {
+    "eight_window_limit": true,
+    "cross_window_destroy_denied": true,
+    "main_window_isolation": true,
+    "closed_window_releases_slot": true,
+    "quiet_input_latency": {
+      "samples_ms": [
+        135,
+        152,
+        104,
+        106,
+        113,
+        106,
+        111,
+        119,
+        118,
+        108,
+        119,
+        120,
+        115,
+        110,
+        105,
+        101,
+        104,
+        106,
+        108,
+        109,
+        108,
+        108,
+        101,
+        105,
+        145,
+        104,
+        107,
+        109,
+        111,
+        106
+      ],
+      "p95_ms": 145
+    },
+    "resize": true,
+    "other_window_close_keeps_shell": true
+  },
+  "started": "2026-10-14T08:14:24.300Z",
+  "connection_paths": [
+    {
+      "deviceCode": "559038160",
+      "path": "relay"
+    }
+  ],
+  "finished": "2026-10-14T08:14:39.355Z"
+}

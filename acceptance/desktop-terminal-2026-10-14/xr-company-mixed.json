@@ -1,0 +1,259 @@
+{
+  "controller": "XRServer (947158375) -> Company (559038160)",
+  "device": "559038160",
+  "started": "2026-10-14T07:37:47.328Z",
+  "checks": {
+    "native_user": true,
+    "window_permissions": true,
+    "stable_terminal_parallel": true,
+    "command_and_file_parallel": {
+      "count": 12,
+      "max_ms": 3586
+    },
+    "ten_minute_stream": {
+      "duration_ms": 600902,
+      "bytes": 234764979
+    },
+    "user_source_integrity": true,
+    "no_human_io_storage": true
+  },
+  "samples": [
+    {
+      "elapsed_ms": 1,
+      "bytes": 916,
+      "heap_used": 12002304
+    },
+    {
+      "elapsed_ms": 15003,
+      "bytes": 6004150,
+      "heap_used": 21998628
+    },
+    {
+      "elapsed_ms": 30004,
+      "bytes": 11852978,
+      "heap_used": 19866032
+    },
+    {
+      "elapsed_ms": 45005,
+      "bytes": 17689078,
+      "heap_used": 43475912
+    },
+    {
+      "elapsed_ms": 60005,
+      "bytes": 23584249,
+      "heap_used": 51562236
+    },
+    {
+      "elapsed_ms": 75005,
+      "bytes": 29491947,
+      "heap_used": 39791632
+    },
+    {
+      "elapsed_ms": 90007,
+      "bytes": 35329532,
+      "heap_used": 47540788
+    },
+    {
+      "elapsed_ms": 105007,
+      "bytes": 41151365,
+      "heap_used": 65217664
+    },
+    {
+      "elapsed_ms": 120007,
+      "bytes": 47082521,
+      "heap_used": 48715140
+    },
+    {
+      "elapsed_ms": 135006,
+      "bytes": 52985988,
+      "heap_used": 57163632
+    },
+    {
+      "elapsed_ms": 150007,
+      "bytes": 58818818,
+      "heap_used": 62775364
+    },
+    {
+      "elapsed_ms": 165007,
+      "bytes": 64681115,
+      "heap_used": 72565584
+    },
+    {
+      "elapsed_ms": 180006,
+      "bytes": 70627838,
+      "heap_used": 72059756
+    },
+    {
+      "elapsed_ms": 195007,
+      "bytes": 76566819,
+      "heap_used": 92408908
+    },
+    {
+      "elapsed_ms": 210009,
+      "bytes": 82484775,
+      "heap_used": 82770476
+    },
+    {
+      "elapsed_ms": 225007,
+      "bytes": 88436628,
+      "heap_used": 99268300
+    },
+    {
+      "elapsed_ms": 240006,
+      "bytes": 94273841,
+      "heap_used": 93604632
+    },
+    {
+      "elapsed_ms": 255007,
+      "bytes": 100130694,
+      "heap_used": 88665984
+    },
+    {
+      "elapsed_ms": 270010,
+      "bytes": 106089985,
+      "heap_used": 105720552
+    },
+    {
+      "elapsed_ms": 285009,
+      "bytes": 111943795,
+      "heap_used": 102797600
+    },
+    {
+      "elapsed_ms": 300007,
+      "bytes": 117858015,
+      "heap_used": 108898972
+    },
+    {
+      "elapsed_ms": 315007,
+      "bytes": 123687953,
+      "heap_used": 81079548
+    },
+    {
+      "elapsed_ms": 330007,
+      "bytes": 129567170,
+      "heap_used": 93792140
+    },
+    {
+      "elapsed_ms": 345014,
+      "bytes": 135413118,
+      "heap_used": 74879076
+    },
+    {
+      "elapsed_ms": 360009,
+      "bytes": 141386801,
+      "heap_used": 86277328
+    },
+    {
+      "elapsed_ms": 375010,
+      "bytes": 147205914,
+      "heap_used": 109850512
+    },
+    {
+      "elapsed_ms": 390009,
+      "bytes": 152924755,
+      "heap_used": 97447336
+    },
+    {
+      "elapsed_ms": 405011,
+      "bytes": 158655004,
+      "heap_used": 78155124
+    },
+    {
+      "elapsed_ms": 420010,
+      "bytes": 164218488,
+      "heap_used": 79455780
+    },
+    {
+      "elapsed_ms": 435009,
+      "bytes": 169976908,
+      "heap_used": 87206912
+    },
+    {
+      "elapsed_ms": 450010,
+      "bytes": 175826209,
+      "heap_used": 96495340
+    },
+    {
+      "elapsed_ms": 465011,
+      "bytes": 181579883,
+      "heap_used": 84301252
+    },
+    {
+      "elapsed_ms": 480010,
+      "bytes": 187345263,
+      "heap_used": 92856232
+    },
+    {
+      "elapsed_ms": 495011,
+      "bytes": 193183734,
+      "heap_used": 94175492
+    },
+    {
+      "elapsed_ms": 510011,
+      "bytes": 199064526,
+      "heap_used": 82810612
+    },
+    {
+      "elapsed_ms": 525011,
+      "bytes": 204990907,
+      "heap_used": 92297684
+    },
+    {
+      "elapsed_ms": 540011,
+      "bytes": 210898155,
+      "heap_used": 101146504
+    },
+    {
+      "elapsed_ms": 555012,
+      "bytes": 216851838,
+      "heap_used": 84929676
+    },
+    {
+      "elapsed_ms": 570013,
+      "bytes": 222747180,
+      "heap_used": 100663528
+    },
+    {
+      "elapsed_ms": 585013,
+      "bytes": 228528969,
+      "heap_used": 89414844
+    },
+    {
+      "elapsed_ms": 600011,
+      "bytes": 234426784,
+      "heap_used": 76093336
+    },
+    {
+      "elapsed_ms": 600902,
+      "bytes": 234764979,
+      "heap_used": 85353560
+    }
+  ],
+  "identity": {
+    "mode": "user",
+    "account_id": "S-1-5-21-2021636358-3602562422-2116939801-1001",
+    "account_name": "DESKTOP-N3GIEVQ\\hy",
+    "home": "C:\\Users\\hy",
+    "primary_group": null,
+    "session_id": "1",
+    "logon_id": "00000000:002898d0",
+    "environment_source": "native_account"
+  },
+  "output": {
+    "bytes": 234765124,
+    "sha256": "be21270b462e76577eb13f88bc8f61d8e66135fc4acc5e8edbc8a3b4519b442a",
+    "end": {
+      "exit_code": 9,
+      "output_bytes": 234765124,
+      "reason": "Shell exited",
+      "sha256": "be21270b462e76577eb13f88bc8f61d8e66135fc4acc5e8edbc8a3b4519b442a"
+    }
+  },
+  "connection_paths": [
+    {
+      "deviceCode": "559038160",
+      "path": "relay"
+    }
+  ],
+  "finished": "2026-10-14T07:47:52.763Z"
+}

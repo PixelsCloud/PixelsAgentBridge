@@ -328,10 +328,22 @@ pub fn run() {
         }
     };
     pab_logging::init("desktop", paths.root()).expect("could not initialize desktop log file");
+    let context = tauri::generate_context!();
+    #[cfg(all(windows, debug_assertions))]
+    let context = {
+        let mut context = context;
+        if let Some(arguments) = operator::desktop_terminal::acceptance_browser_arguments() {
+            for window in &mut context.config_mut().app.windows {
+                window.additional_browser_args = Some(arguments.into());
+            }
+        }
+        context
+    };
     tauri::Builder::default()
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
+        .manage(operator::desktop_terminal::DesktopTerminalState::default())
         .manage(github_login::GithubLoginState::default())
         .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
@@ -364,77 +376,104 @@ pub fn run() {
             tauri::async_runtime::spawn(watch_local_service(handle, status));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            tray::set_tray_language,
-            update::check_for_update,
-            update::update_status,
-            update::download_update,
-            update::install_update,
-            macos_permissions::macos_permissions,
-            macos_permissions::request_macos_permission,
-            macos_permissions::open_macos_permission_settings,
-            macos_permissions::restart_macos_permission_processes,
-            device_status,
-            browser_setup::browser_runtime_info,
-            browser_setup::browser_profile_status,
-            browser_setup::browser_profile_clear,
-            browser_setup::browser_handoff_status,
-            browser_setup::browser_handoff_complete,
-            browser_setup::browser_handoff_cancel,
-            device_account::device_account_status,
-            device_account::device_account_associate,
-            device_account::account_catalog_status,
-            device_account::account_catalog_action,
-            mcp_reporting::mcp_reporting_status,
-            mcp_tool_settings::get_mcp_tool_settings,
-            mcp_tool_settings::save_mcp_tool_settings,
-            server_settings::get_operator_server_settings,
-            server_settings::save_operator_server_settings,
-            server_settings::restart_desktop,
-            agent_integrations::agent_integration_status,
-            agent_integrations::set_agent_integration,
-            operator::operator_connect,
-            operator::operator_connect_saved,
-            operator::operator_disconnect_device,
-            operator::operator_forget_device,
-            operator::operator_saved_device_presence,
-            operator::operator_connection_paths,
-            operator::operator_presence,
-            operator::history::operator_bootstrap,
-            operator::history::operator_history_page,
-            operator::history::operator_device_history_page,
-            operator::history::operator_operations,
-            operator::history::operator_rename_device,
-            operator::operator_run_command,
-            operator::execution::operator_execution_query,
-            operator::execution::operator_execution_query_result,
-            operator::transfer::operator_start_transfer,
-            operator::transfer::operator_cancel_transfer,
-            operator::transfer::operator_transfer_result,
-            operator::directory::operator_list_directory,
-            operator::windows::operator_list_windows,
-            operator::windows::operator_desktop_input,
-            operator::screenshot::operator_capture_screenshot,
-            operator::screenshot::operator_preview_desktop,
-            operator::screenshot::operator_screenshot_from_history,
-            operator::terminal::operator_open_terminal,
-            operator::terminal::operator_terminal_input,
-            operator::terminal::operator_terminal_read,
-            operator::terminal::operator_terminal_resize,
-            operator::terminal::operator_terminal_close,
-            operator::terminal::operator_terminal_history,
-            operator::operator_task,
-            operator::operator_current_traffic_scope,
-            operator::operator_login_account,
-            github_login::github_enabled,
-            github_login::github_login,
-            github_login::github_cancel,
-            github_login::github_status,
-            github_login::github_unlink,
-            operator::operator_register_account,
-            operator::operator_use_guest_scope,
-        ])
-        .build(tauri::generate_context!())
+        .invoke_handler(|invoke| {
+            // A terminal WebView cannot call stable operator/account/task APIs.
+            // Every allowed terminal command additionally checks its native label.
+            if invoke
+                .message
+                .webview()
+                .label()
+                .starts_with("desktop-terminal-")
+                && !invoke.message.command().starts_with("desktop_terminal_")
+            {
+                invoke
+                    .resolver
+                    .reject("command is unavailable in a remote terminal window");
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                operator::desktop_terminal::desktop_terminal_window,
+                operator::desktop_terminal::desktop_terminal_info,
+                operator::desktop_terminal::desktop_terminal_accounts,
+                operator::desktop_terminal::desktop_terminal_start,
+                operator::desktop_terminal::desktop_terminal_watch,
+                operator::desktop_terminal::desktop_terminal_input,
+                operator::desktop_terminal::desktop_terminal_resize,
+                operator::desktop_terminal::desktop_terminal_consume,
+                operator::desktop_terminal::desktop_terminal_end,
+                operator::desktop_terminal::desktop_terminal_destroy,
+                tray::set_tray_language,
+                update::check_for_update,
+                update::update_status,
+                update::download_update,
+                update::install_update,
+                macos_permissions::macos_permissions,
+                macos_permissions::request_macos_permission,
+                macos_permissions::open_macos_permission_settings,
+                macos_permissions::restart_macos_permission_processes,
+                device_status,
+                browser_setup::browser_runtime_info,
+                browser_setup::browser_profile_status,
+                browser_setup::browser_profile_clear,
+                browser_setup::browser_handoff_status,
+                browser_setup::browser_handoff_complete,
+                browser_setup::browser_handoff_cancel,
+                device_account::device_account_status,
+                device_account::device_account_associate,
+                device_account::account_catalog_status,
+                device_account::account_catalog_action,
+                mcp_reporting::mcp_reporting_status,
+                mcp_tool_settings::get_mcp_tool_settings,
+                mcp_tool_settings::save_mcp_tool_settings,
+                server_settings::get_operator_server_settings,
+                server_settings::save_operator_server_settings,
+                server_settings::restart_desktop,
+                agent_integrations::agent_integration_status,
+                agent_integrations::set_agent_integration,
+                operator::operator_connect,
+                operator::operator_connect_saved,
+                operator::operator_disconnect_device,
+                operator::operator_forget_device,
+                operator::operator_saved_device_presence,
+                operator::operator_connection_paths,
+                operator::operator_presence,
+                operator::history::operator_bootstrap,
+                operator::history::operator_history_page,
+                operator::history::operator_device_history_page,
+                operator::history::operator_operations,
+                operator::history::operator_rename_device,
+                operator::operator_run_command,
+                operator::execution::operator_execution_query,
+                operator::execution::operator_execution_query_result,
+                operator::transfer::operator_start_transfer,
+                operator::transfer::operator_cancel_transfer,
+                operator::transfer::operator_transfer_result,
+                operator::directory::operator_list_directory,
+                operator::windows::operator_list_windows,
+                operator::windows::operator_desktop_input,
+                operator::screenshot::operator_capture_screenshot,
+                operator::screenshot::operator_preview_desktop,
+                operator::screenshot::operator_screenshot_from_history,
+                operator::terminal::operator_open_terminal,
+                operator::terminal::operator_terminal_input,
+                operator::terminal::operator_terminal_read,
+                operator::terminal::operator_terminal_resize,
+                operator::terminal::operator_terminal_close,
+                operator::terminal::operator_terminal_history,
+                operator::operator_task,
+                operator::operator_current_traffic_scope,
+                operator::operator_login_account,
+                github_login::github_enabled,
+                github_login::github_login,
+                github_login::github_cancel,
+                github_login::github_status,
+                github_login::github_unlink,
+                operator::operator_register_account,
+                operator::operator_use_guest_scope,
+            ];
+            handler(invoke)
+        })
+        .build(context)
         .expect("could not start Pixels Agent Bridge desktop application")
         .run(|handle, event| match event {
             tauri::RunEvent::ExitRequested { code, api, .. }
