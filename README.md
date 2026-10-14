@@ -67,6 +67,7 @@ For your own server, follow the [Web deployment guide](WEB_DEPLOYMENT.md) and [D
 
 ## More documentation
 
+- [Usage and self-hosting guide (Chinese)](docs/USAGE_AND_SELF_HOSTING.md) (kept in sync with the website documentation)
 - [Builds and versioning](BUILDING.md)
 - [Installer publishing and online updates](docs/RELEASE.md)
 - [Document parsing and OCR tools](docs/DOCUMENTS.md)

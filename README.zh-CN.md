@@ -67,6 +67,7 @@ python scripts/build.py desktop --profile release --package
 
 ## 更多文档
 
+- [使用指南与自我部署](docs/USAGE_AND_SELF_HOSTING.md)（与官网文档同步维护）
 - [构建与版本规则](BUILDING.md)
 - [开发说明](DEVELOPMENT.md)
 - [macOS 安装与权限](MACOS.md)
