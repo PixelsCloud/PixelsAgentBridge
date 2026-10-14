@@ -49,7 +49,6 @@ export function HomeDeviceConnectionPanel({
   return (
     <section className="surface home-connect">
       <h2>{t.addDevice}</h2>
-      <p>{t.addDeviceHint}</p>
       <form className="home-connect-form" onSubmit={submit}>
         <label>
           <span className="field-label">{t.remoteCode}</span>
