@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use pab_agent_core::{DataPaths, DataScope};
+use pab_agent_core::{DataPaths};
 use pab_bridge::{
     BridgeConfig, BridgeIdentity, BridgeRuntime, QueuedTransfer, TransferControl, TransferQueue,
     TransferRequest,
@@ -157,7 +157,7 @@ impl OperationManager {
         monitor: MonitorSlot,
         reporter: McpReporter,
     ) -> Result<Arc<Self>, String> {
-        let paths = DataPaths::for_scope(DataScope::User).map_err(|e| e.to_string())?;
+        let paths = DataPaths::for_operator().map_err(|e| e.to_string())?;
         let database = std::env::var_os("PAB_BRIDGE_DATABASE")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| paths.bridge_database());

@@ -67,7 +67,7 @@ impl DeviceAccountService {
 }
 
 async fn local_store() -> Result<pab_bridge::BridgeLocalStore, String> {
-    let paths = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::User)
+    let paths = pab_agent_core::DataPaths::for_operator()
         .map_err(|e| e.to_string())?;
     pab_bridge::BridgeLocalStore::open(&paths.bridge_database())
         .await

@@ -30,6 +30,41 @@ async fn call(client: &Client, name: &str, args: Value) -> CallToolResult {
 }
 
 #[tokio::test]
+async fn server_override_and_reset_isolate_devices_in_real_mcp_processes() {
+    use pab_agent_core::DataPaths;
+    use pab_service_config::operator::OperatorSettings;
+    let dir = tempfile::tempdir().unwrap();
+    let paths = DataPaths::from_root(dir.path().to_path_buf()).unwrap();
+    let a = "wss://default.invalid/control";
+    let b = "wss://custom.invalid/control";
+    let database = paths.operator_for_server(a).unwrap().bridge_database();
+    let _store = BridgeLocalStore::open(&database).await.unwrap();
+    let pool = sqlx::SqlitePool::connect_with(
+        sqlx::sqlite::SqliteConnectOptions::new().filename(&database),
+    ).await.unwrap();
+    let device = DeviceRef { tenant_id: TenantId::new(), device_id: DeviceId::new() };
+    sqlx::query("INSERT INTO remembered_devices (device_ref_json,device_code,alias,os_family_json,os_reminder) VALUES (?, '123456789', 'default-only', '\"linux\"', '')")
+        .bind(serde_json::to_string(&device).unwrap()).execute(&pool).await.unwrap();
+    let path = dir.path().join("operator-server.toml");
+    for (settings, expected_count) in [
+        (OperatorSettings::default(), 1),
+        (OperatorSettings { control_url: b.into(), relay_url: "https://custom-relay.invalid".into() }, 0),
+        (OperatorSettings::default(), 1),
+    ] {
+        pab_service_config::preferences::save(&path, &settings).unwrap();
+        let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"));
+        command.env("PAB_DATA_DIR", dir.path()).env_remove("PAB_BRIDGE_DATABASE")
+            .env("PAB_CONTROL_URL", a).env("PAB_RELAY_URLS", "https://default-relay.invalid");
+        let (client, child) = support::start(command).await;
+        let response = result(call(&client, "pab_list_devices", json!({})).await);
+        assert_eq!(response["devices"].as_array().unwrap().len(), expected_count);
+        stop(client, child).await;
+    }
+    assert!(!dir.path().join("bridge.sqlite3").exists());
+    pool.close().await;
+}
+
+#[tokio::test]
 async fn registered_catalog_has_coverage_and_exports_real_schemas() {
     let directory = tempfile::tempdir().unwrap();
     let (client, child) = start(
@@ -518,8 +553,10 @@ async fn same_user_mcp_processes_keep_distinct_keys_across_retries_and_crash() {
     let (first, mut first_child) = start(root, &database, port).await;
     let (second, second_child) = start(root, &database, port).await;
     tokio::join!(offline_connect(&first), offline_connect(&second));
-    let key0 = root.join("mcp-endpoints/guest-0.key");
-    let key1 = root.join("mcp-endpoints/guest-1.key");
+    let scoped = pab_agent_core::DataPaths::from_root(root.to_path_buf()).unwrap()
+        .operator_for_server(&format!("wss://127.0.0.1:{port}")).unwrap();
+    let key0 = scoped.root().join("mcp-endpoints/guest-0.key");
+    let key1 = scoped.root().join("mcp-endpoints/guest-1.key");
     let identities = [
         read_endpoint_secret(&key0).unwrap().public(),
         read_endpoint_secret(&key1).unwrap().public(),
@@ -532,7 +569,7 @@ async fn same_user_mcp_processes_keep_distinct_keys_across_retries_and_crash() {
     let _ = first.cancel().await;
     let (third, third_child) = start(root, &database, port).await;
     tokio::join!(offline_connect(&second), offline_connect(&third));
-    assert!(!root.join("mcp-endpoints/guest-2.key").exists());
+    assert!(!scoped.root().join("mcp-endpoints/guest-2.key").exists());
     assert_eq!(read_endpoint_secret(&key0).unwrap().public(), identities[0]);
     assert_eq!(read_endpoint_secret(&key1).unwrap().public(), identities[1]);
     assert_eq!(

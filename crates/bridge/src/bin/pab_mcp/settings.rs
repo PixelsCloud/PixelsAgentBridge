@@ -1,15 +1,13 @@
 use pab_agent_core::{DataPaths, DataScope};
-use serde::{Deserialize, Serialize};
+use pab_service_config::operator::OperatorSettings;
 use std::env;
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct OperatorSettings {
-    control_url: String,
-    relay_url: String,
-}
-
 pub fn apply_at_start() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    for (key, value) in pab_service_config::operator::launch_defaults(|key| env::var_os(key)) {
+        unsafe {
+            env::set_var(key, value);
+        }
+    }
     let explicit = env::args_os().any(|a| a == "--config");
     let (args, values) = pab_service_config::client::startup(
         pab_service_config::client::Role::Operator,
@@ -25,22 +23,9 @@ pub fn apply_at_start() -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let path = DataPaths::for_scope(DataScope::User)?
             .root()
             .join("operator-server.toml");
-        if let Some(settings) =
-            pab_service_config::preferences::load::<OperatorSettings>(&path, |s| {
-                let config = pab_service_config::client::ClientConfig {
-                    control_url: s.control_url.clone(),
-                    relay_urls: vec![s.relay_url.clone()],
-                    control_ca_cert: None,
-                    relay_ca_cert: None,
-                    executor: Default::default(),
-                    operator: Default::default(),
-                };
-                config.validate()
-            })?
-        {
+        for (key, value) in OperatorSettings::load(&path)?.environment() {
             unsafe {
-                env::set_var("PAB_CONTROL_URL", settings.control_url);
-                env::set_var("PAB_RELAY_URLS", settings.relay_url);
+                env::set_var(key, value);
             }
         }
     }

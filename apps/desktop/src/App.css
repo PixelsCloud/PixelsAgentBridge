@@ -104,6 +104,14 @@ h1, h2, h3, p { margin: 0; }
 .settings-update-current { color: #607b89; font-size: 12px; }
 .settings-fields { display: grid; gap: 14px; margin-top: 22px; }
 .settings-fields .field-label { margin-bottom: 6px; }
+.settings-server-input-row { display: flex; align-items: center; gap: 8px; }
+.settings-server-input-row .ant-input { min-width: 0; flex: 1; }
+.settings-server-input-row .ant-btn { flex: none; }
+.settings-server-result { margin-top: 6px; font-size: 12px; line-height: 1.5; color: #247d69; overflow-wrap: anywhere; }
+.settings-server-result:empty { display: none; }
+.settings-server-result.is-error { color: #b7494d; }
+[data-theme="dark"] .settings-server-result { color: var(--dark-accent); }
+[data-theme="dark"] .settings-server-result.is-error { color: #ffa6a6; }
 .settings-scope-note { margin-top: 16px !important; }
 .settings-error { color: #b7494d !important; }
 .settings-actions { display: flex; align-items: center; gap: 18px; margin-top: auto; padding-top: 16px; }

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-use pab_agent_core::{DataPaths, DataScope, read_endpoint_secret};
+use pab_agent_core::{DataPaths, read_endpoint_secret};
 use pab_bridge::{
     BridgeConfig, BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, ConnectionPath,
     MemoryDevicePasswordProvider, RememberedDevice, SqliteDevicePasswordProvider,
@@ -42,7 +42,7 @@ struct RuntimeSelection {
 
 impl OperatorState {
     pub fn new() -> Self {
-        let credential_database = DataPaths::for_scope(DataScope::User)
+        let credential_database = DataPaths::for_operator()
             .expect("could not find user credential database path")
             .bridge_database();
         Self {
@@ -79,7 +79,7 @@ impl OperatorState {
         let secret = read_endpoint_secret(&config.endpoint_secret_file)
             .map_err(|error| error.to_string())?;
         let endpoint_key = EndpointKey::new(*secret.public().as_bytes());
-        let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+        let paths = DataPaths::for_operator().map_err(|error| error.to_string())?;
         let mut runtime_config = BridgeRuntimeConfig::new(paths.bridge_database());
         runtime_config.resume_incomplete_on_start = false;
         let runtime = BridgeRuntime::start(config, runtime_config, self.passwords.clone())
@@ -100,7 +100,7 @@ impl OperatorState {
             .local
             .get_or_try_init(|| async {
                 let paths =
-                    DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+                    DataPaths::for_operator().map_err(|error| error.to_string())?;
                 BridgeLocalStore::open(&paths.bridge_database())
                     .await
                     .map(Arc::new)

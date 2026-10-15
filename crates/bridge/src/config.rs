@@ -45,7 +45,7 @@ impl BridgeIdentity {
 
 impl BridgeConfig {
     pub async fn register_guest_from_env() -> Result<Self, GuestConfigError> {
-        let paths = DataPaths::for_scope(DataScope::User)?;
+        let paths = DataPaths::for_operator()?;
         Self::register_guest_with_secret(paths.root().join("guest-endpoint.key")).await
     }
 

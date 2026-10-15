@@ -1,5 +1,6 @@
 //! TOML configuration shared by the services and installed applications.
 pub mod client;
+pub mod operator;
 pub mod preferences;
 use serde::{Deserialize, de::DeserializeOwned};
 use std::{

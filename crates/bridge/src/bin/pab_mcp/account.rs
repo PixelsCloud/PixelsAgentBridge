@@ -6,7 +6,7 @@ pub(super) async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error
     let store = AccountStore::from_env()?;
     match args.first().map(String::as_str) {
         Some("devices") if args.len()>=2 => {
-            let paths=pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::User)?;
+            let paths=pab_agent_core::DataPaths::for_operator()?;
             let local=pab_bridge::BridgeLocalStore::open(&paths.bridge_database()).await?;
             match args[1].as_str() {
                 "status" if args.len()==2=>println!("{}",serde_json::to_string(&local.catalog_status().await?)?),

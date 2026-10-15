@@ -1,5 +1,5 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use pab_agent_core::{DataPaths, DataScope};
+use pab_agent_core::{DataPaths};
 use pab_bridge::output_text::{OutputEncoding, decode_output};
 use pab_bridge::{BridgeLocalStore, BridgeRuntime};
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
@@ -341,7 +341,7 @@ pub(super) async fn call_tool(
 }
 
 pub(super) async fn list_local_devices() -> Result<Value, String> {
-    let database = DataPaths::for_scope(DataScope::User)
+    let database = DataPaths::for_operator()
         .map_err(|error| error.to_string())?
         .bridge_database();
     let store = BridgeLocalStore::open(&database)

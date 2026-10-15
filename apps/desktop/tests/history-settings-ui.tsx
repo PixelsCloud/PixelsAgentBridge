@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { App, ConfigProvider, theme } from "antd";
-import { SettingsPanel } from "../src/SettingsPanel";
+import { SettingsPanel, type SettingsSection } from "../src/SettingsPanel";
 import { ActivityPanel } from "../src/ActivityPanel";
 import type { Language } from "../src/i18n";
 import type { TaskEntry } from "../src/operatorTypes";
@@ -13,7 +13,7 @@ import "../src/theme.css";
 const params = new URLSearchParams(location.search);
 const dark = params.get("theme") === "dark";
 document.documentElement.dataset.theme = dark ? "dark" : "light";
-const fixture = (window as any).fixture = { calls: [] as any[], delayGbk: false, releaseGbk: null as null | (() => void), releaseInitial: null as null | (() => void), finishTask: () => {} };
+const fixture = (window as any).fixture = { releaseProbe: null as null | (() => void), calls: [] as any[], delayGbk: false, releaseGbk: null as null | (() => void), releaseInitial: null as null | (() => void), finishTask: () => {} };
 (window as any).__TAURI_INTERNALS__ = { invoke: async (command: string, args: any) => {
   fixture.calls.push({ command, args });
   if (command === "operator_task") {
@@ -29,7 +29,18 @@ const fixture = (window as any).fixture = { calls: [] as any[], delayGbk: false,
     return { state: "Succeeded", complete: true, stdout: text, stderr: "", stdoutOffset: 10, stderrOffset: 0,
       decodingReplacements: params.get("invalid") === "true" && args.encoding === "utf8", outputGap: false };
   }
-  if (command === "operator_server_settings") return { controlUrl: "", relayUrl: "" };
+  if (command === "validate_operator_server") {
+    if (params.get("delayProbe") === "true" && args.url.includes("old")) await new Promise<void>(resolve => { fixture.releaseProbe = resolve; });
+    if (args.url.includes("fail")) throw "tls";
+    return { elapsedMs: 42 };
+  }
+  if (command === "get_operator_server_settings") {
+    if (params.get("settingsError") === "true") throw Error("settings unavailable");
+    return JSON.parse(sessionStorage.getItem("fixture.server") ?? '{"controlUrl":"","relayUrl":""}');
+  }
+  if (command === "save_operator_server_settings") { sessionStorage.setItem("fixture.server", JSON.stringify(args.settings)); return; }
+  if (command === "restart_desktop") return;
+  if (command === "macos_permissions") return null;
   if (command === "codex_integration_status") return { available: true, enabled: true, occupied: false };
   throw Error(`unexpected fixture call: ${command}`);
 } };
@@ -45,7 +56,7 @@ function Fixture() {
   const [language, setLanguage] = useState<Language>((params.get("language") ?? "en") as Language);
   return <ConfigProvider theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm }}><App>
     {params.get("panel") === "settings" ? <div className="settings-layout">
-      <SettingsPanel language={language} section="preferences" onSectionChange={() => {}}
+      <SettingsPanel language={language} section={(params.get("section") ?? "preferences") as SettingsSection} onSectionChange={() => {}}
         onLanguageChange={value => { localStorage.setItem("pab.language", value); setLanguage(value); }} />
     </div> : <div style={{ width: 767, height: 650 }}>
       <ActivityPanel embedded={params.get("embedded") === "true"} language={language}

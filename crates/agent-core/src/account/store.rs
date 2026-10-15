@@ -96,6 +96,27 @@ mod tests {
         assert_eq!(b.read().unwrap().revision, 0);
         assert!(a.token("../../anything").is_err());
     }
+
+    #[test]
+    fn server_switch_discards_login_and_all_local_tokens_without_touching_other_servers() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = AccountStore::new(dir.path(), &format!("https://{}.invalid", pab_protocol::RequestId::new())).unwrap();
+        let b = AccountStore::new(dir.path(), &format!("https://{}.invalid", pab_protocol::RequestId::new())).unwrap();
+        let session = || AccountSession {
+            user: AccountUser { id: pab_protocol::UserId::new(), username: "switch-test".into(), server_admin: false },
+            access_token: "a".repeat(64),
+        };
+        let old = a.login(session()).unwrap().active_slot.unwrap();
+        let active = a.login(session()).unwrap().active_slot.unwrap();
+        let other = b.login(session()).unwrap().active_slot.unwrap();
+        let state = a.clear_local_session().unwrap();
+        assert!(state.user.is_none() && state.active_slot.is_none() && state.pending_logouts.is_empty());
+        assert!(a.token(&old).unwrap().is_none());
+        assert!(a.token(&active).unwrap().is_none());
+        assert!(b.token(&other).unwrap().is_some());
+        assert!(b.read().unwrap().user.is_some());
+        b.clear_local_session().unwrap();
+    }
 }
 
 #[derive(Clone)]
@@ -216,6 +237,16 @@ impl AccountStore {
             state.user = None;
             Ok(())
         })
+    }
+
+    /// A server switch must not restore a cached login when switching back.
+    /// Remove local credentials only; never send them to the destination server.
+    pub fn clear_local_session(&self) -> Result<AccountState, AccountError> {
+        let state = self.logout()?;
+        for slot in &state.pending_logouts {
+            self.finish_logout(slot)?;
+        }
+        self.read()
     }
 
     pub fn finish_logout(&self, slot: &str) -> Result<(), AccountError> {

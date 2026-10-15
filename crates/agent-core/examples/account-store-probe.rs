@@ -30,10 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             assert_eq!(token.as_str(), "a".repeat(64));
         }
         "delete" => {
-            let state = store.logout()?;
-            for slot in state.pending_logouts {
-                store.finish_logout(&slot)?;
-            }
+            store.clear_local_session()?;
         }
         _ => return Err("unknown action".into()),
     }

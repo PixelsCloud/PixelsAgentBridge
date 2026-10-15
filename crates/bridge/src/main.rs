@@ -107,7 +107,7 @@ async fn run(args: Vec<String>) -> Result<(), CliError> {
         };
     let database_file = match env::var_os("PAB_BRIDGE_DATABASE") {
         Some(path) => PathBuf::from(path),
-        None => DataPaths::for_scope(DataScope::User)?.bridge_database(),
+        None => DataPaths::for_operator()?.bridge_database(),
     };
     let runtime =
         BridgeRuntime::start(config, BridgeRuntimeConfig::new(database_file), passwords).await?;

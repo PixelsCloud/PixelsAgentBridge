@@ -7,7 +7,7 @@ use std::{
 };
 
 use pab_agent_core::{
-    DataPaths, DataScope, ensure_data_parent, load_or_create_endpoint_secret, read_endpoint_secret,
+    DataPaths, ensure_data_parent, load_or_create_endpoint_secret, read_endpoint_secret,
 };
 
 static PROCESS_ENDPOINT: Mutex<Option<EndpointLease>> = Mutex::new(None);
@@ -73,7 +73,7 @@ impl EndpointLease {
 pub(super) fn guest_secret_path() -> Result<PathBuf, String> {
     let mut slot = PROCESS_ENDPOINT.lock().map_err(|e| e.to_string())?;
     if slot.is_none() {
-        let paths = DataPaths::for_scope(DataScope::User).map_err(|e| e.to_string())?;
+        let paths = DataPaths::for_operator().map_err(|e| e.to_string())?;
         *slot = Some(EndpointLease::guest(paths.root())?);
     }
     Ok(slot.as_ref().unwrap().secret_path.clone())
@@ -84,7 +84,7 @@ pub(super) fn reserve_account_secret(path: &Path) -> Result<(), String> {
     if slot.is_none() {
         // Account keys are pre-registered. Do not replace one with an anonymous
         // guest key, or silently change the user's configured identity.
-        let paths = DataPaths::for_scope(DataScope::User).map_err(|e| e.to_string())?;
+        let paths = DataPaths::for_operator().map_err(|e| e.to_string())?;
         *slot = Some(EndpointLease::account(paths.root(), path)?);
     }
     Ok(())

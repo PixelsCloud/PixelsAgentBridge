@@ -44,6 +44,33 @@ impl DataPaths {
         &self.root
     }
 
+    /// Operator credentials, guest endpoints and task history belong to one
+    /// control service. Never open a different service's database or resume its
+    /// queued work. Settings, account stores and local service IPC stay at root.
+    pub fn for_operator() -> Result<Self, DataPathError> {
+        let paths = Self::for_scope(DataScope::User)?;
+        match env::var("PAB_CONTROL_URL") {
+            Ok(server) if !server.is_empty() => paths.operator_for_server(&server),
+            _ => Self::from_root(paths.root.join("operators").join("unconfigured")),
+        }
+    }
+
+    pub fn operator_for_server(&self, server: &str) -> Result<Self, DataPathError> {
+        let mut url = url::Url::parse(server).map_err(|_| DataPathError::InvalidServer)?;
+        if url.scheme() != "wss"
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(DataPathError::InvalidServer);
+        }
+        // URL parsing normalizes host casing and the default TLS port.
+        url.set_fragment(None);
+        let scope = blake3::hash(url.as_str().as_bytes()).to_hex().to_string();
+        Self::from_root(self.root.join("operators").join(scope))
+    }
+
     pub fn bridge_endpoint_secret(&self) -> PathBuf {
         self.root.join("bridge-endpoint.key")
     }
@@ -145,6 +172,8 @@ fn persistent_data_dir_for_os(
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum DataPathError {
+    #[error("operator server must be a valid WSS URL")]
+    InvalidServer,
     #[error("PAB_DATA_DIR must not be empty")]
     EmptyOverride,
     #[error("{0} is required to find the persistent data directory")]
@@ -156,6 +185,34 @@ pub enum DataPathError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn operator_servers_never_share_device_passwords_history_or_guest_keys() {
+        let root = DataPaths::from_root(PathBuf::from("user-data")).unwrap();
+        let a = root
+            .operator_for_server("wss://one.invalid/control")
+            .unwrap();
+        let b = root
+            .operator_for_server("wss://two.invalid/control")
+            .unwrap();
+        assert_ne!(a.bridge_database(), b.bridge_database());
+        assert_ne!(a.bridge_endpoint_secret(), b.bridge_endpoint_secret());
+        assert_ne!(a.bridge_database(), root.bridge_database());
+        assert_eq!(
+            a,
+            root.operator_for_server("wss://ONE.invalid:443/control")
+                .unwrap()
+        );
+        assert_ne!(
+            a,
+            root.operator_for_server("wss://one.invalid/other").unwrap()
+        );
+        assert!(root.operator_for_server("http://one.invalid").is_err());
+        assert!(
+            root.operator_for_server("wss://user:password@one.invalid")
+                .is_err()
+        );
+    }
 
     #[test]
     fn override_is_used_for_both_scopes() {

@@ -432,7 +432,7 @@ async fn ensure_runtime(
             mcp_endpoint::reserve_account_secret(&config.endpoint_secret_file)?;
             config
         };
-        let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
+        let paths = DataPaths::for_operator().map_err(|error| error.to_string())?;
         let database_path = env::var_os("PAB_BRIDGE_DATABASE")
             .map(PathBuf::from)
             .unwrap_or_else(|| paths.bridge_database());

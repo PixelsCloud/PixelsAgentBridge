@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button, Input, Menu, Select } from "antd";
+import { Button, Menu, Select } from "antd";
 import { ArrowRight, Bot, Info, Languages, RotateCw, Server, ShieldCheck, Wrench } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
@@ -8,6 +8,7 @@ import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
 import { macosPermissionText } from "./macosPermissionText";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { UpdatePanel } from "./UpdatePanel";
+import { ServerAddressField } from "./ServerAddressField";
 
 type ServerSettings = {
   controlUrl: string;
@@ -26,6 +27,7 @@ export type SettingsSection = "preferences" | "permissions" | "ai" | "server" | 
 export function SettingsPanel({ language, onLanguageChange, section, onSectionChange: setSection }: Props) {
   const t = messages[language];
   const [settings, setSettings] = useState<ServerSettings>({ controlUrl: "", relayUrl: "" });
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +44,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
 
   useEffect(() => {
     void invoke<ServerSettings>("get_operator_server_settings")
-      .then(setSettings)
+      .then(value => { setSettings(value); setLoaded(true); })
       .catch((reason) => setError(String(reason)));
 
   }, []);
@@ -51,7 +53,13 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
     setBusy(true);
     setError("");
     try {
-      await invoke("save_operator_server_settings", { settings });
+      const normalized = { controlUrl: settings.controlUrl.trim(), relayUrl: settings.relayUrl.trim() };
+      if (Boolean(normalized.controlUrl) !== Boolean(normalized.relayUrl)) {
+        setError(t.settingsServerPairRequired);
+        return;
+      }
+      await invoke("save_operator_server_settings", { settings: normalized });
+      setSettings(normalized);
       setSaved(true);
     } catch (reason) {
       setError(String(reason));
@@ -103,13 +111,15 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <h2>{t.settingsServerTitle}</h2>
         <p>{t.settingsServerHint}</p>
         <div className="settings-fields">
-          <label><span className="field-label">{t.settingsControl}</span><Input value={settings.controlUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, controlUrl: event.target.value }); setSaved(false); }} /></label>
-          <label><span className="field-label">{t.settingsRelay}</span><Input value={settings.relayUrl} spellCheck={false} onChange={(event) => { setSettings({ ...settings, relayUrl: event.target.value }); setSaved(false); }} /></label>
+          <ServerAddressField kind="control" language={language} label={t.settingsControl} disabled={!loaded || busy} value={settings.controlUrl}
+            onChange={value => { setSettings(current => ({ ...current, controlUrl: value })); setSaved(false); }} />
+          <ServerAddressField kind="relay" language={language} label={t.settingsRelay} disabled={!loaded || busy} value={settings.relayUrl}
+            onChange={value => { setSettings(current => ({ ...current, relayUrl: value })); setSaved(false); }} />
         </div>
         <p className="settings-scope-note">{t.settingsScopeNote}</p>
         {error && <p className="settings-error" role="alert">{error}</p>}
         <div className="settings-actions">
-          <Button type="primary" loading={busy} icon={<ArrowRight size={16} />} iconPlacement="end" onClick={() => void save()}>{t.settingsSave}</Button>
+          <Button type="primary" disabled={!loaded} loading={busy} icon={<ArrowRight size={16} />} iconPlacement="end" onClick={() => void save()}>{t.settingsSave}</Button>
           {saved && <Button type="link" icon={<RotateCw size={15} />} onClick={() => void invoke("restart_desktop")}>{t.settingsRestart}</Button>}
         </div>
       </div>}
