@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Button, Modal, Progress } from "antd";
+import { Button, Progress } from "antd";
 import { ArrowDownToLine, CheckCircle2 } from "lucide-react";
 import type { Language } from "./i18n";
 
@@ -19,6 +19,8 @@ export function UpdatePanel({ language }: { language: Language }) {
   const [available, setAvailable] = useState<UpdateInfo | null>(null);
   const [checking, setChecking] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const busy = useRef(false);
   const [downloaded, setDownloaded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -38,6 +40,7 @@ export function UpdatePanel({ language }: { language: Language }) {
   }, []);
 
   async function check() {
+    if (busy.current) return;
     setError(""); setChecking(true);
     try {
       const next = await invoke<UpdateInfo | null>("check_for_update");
@@ -46,20 +49,19 @@ export function UpdatePanel({ language }: { language: Language }) {
     finally { setChecking(false); }
   }
 
-  async function download() {
+  async function downloadAndInstall() {
+    if (busy.current || checking) return;
+    busy.current = true;
     setError(""); setDownloading(true);
-    try { await invoke("download_update"); setProgress(100); setDownloaded(true); }
-    catch (reason) { setError(String(reason)); }
-    finally { setDownloading(false); }
-  }
-
-  function install() {
-    Modal.confirm({
-      title: t("安装更新？", "Install update?"),
-      content: t("安装期间，当前远程控制、MCP 连接和任务可能中断。请先保存正在进行的工作。", "Remote control, MCP connections, and tasks may be interrupted. Save your work first."),
-      okText: t("安装", "Install"), cancelText: t("取消", "Cancel"),
-      onOk: async () => { try { await invoke("install_update"); } catch (reason) { setError(String(reason)); } },
-    });
+    try {
+      // Native download returns only after verification, including cached files.
+      await invoke("download_update");
+      setProgress(100); setDownloaded(true); setDownloading(false); setInstalling(true);
+      await invoke("install_update");
+      // A successful native launch exits the app. Keep actions locked until then.
+    } catch (reason) {
+      setError(String(reason)); setInstalling(false); busy.current = false;
+    } finally { setDownloading(false); }
   }
 
   return <div className="settings-update">
@@ -68,7 +70,7 @@ export function UpdatePanel({ language }: { language: Language }) {
         <h3>{t("在线更新", "Updates")}</h3>
         <p>{t("检查并安装新版本", "Check for and install new releases")}</p>
       </div>
-      <Button loading={checking} onClick={() => void check()}>{t("检查更新", "Check for updates")}</Button>
+      <Button loading={checking} disabled={downloading || installing} onClick={() => void check()}>{t("检查更新", "Check for updates")}</Button>
     </div>
     <div className="settings-update-status">
       {available ? <>
@@ -78,10 +80,15 @@ export function UpdatePanel({ language }: { language: Language }) {
           <span>{(available.size / 1024 / 1024).toFixed(1)} MB</span>
         </div>
         <p className="settings-update-notes">{en ? available.notes_en : available.notes_zh}</p>
+        <p>{t("下载并校验完成后将自动启动安装，请先保存正在进行的工作。", "Installation starts automatically after download and verification. Save your work first.")}</p>
         {downloading && <Progress percent={progress} />}
         <div className="settings-update-actions">
-          {downloaded ? <Button type="primary" onClick={install}>{t("安装更新", "Install update")}</Button>
-            : <Button type="primary" loading={downloading} onClick={() => void download()}>{t("下载更新", "Download update")}</Button>}
+          <Button type="primary" loading={downloading || installing} disabled={checking}
+            onClick={() => void downloadAndInstall()}>
+            {installing ? t("正在启动安装", "Starting installation")
+              : downloaded ? t("重试安装", "Retry installation")
+              : t("下载并安装", "Download and install")}
+          </Button>
         </div>
       </> : <div className="settings-update-current"><CheckCircle2 size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("没有待安装的更新。", "No update is available.")}</span></div>}
     </div>
