@@ -72,6 +72,15 @@ retirement, client respawn and file restoration in temporary directories.
 
 ## Windows and Linux
 
+The Windows EXE uses solid LZMA compression with a 64 MiB dictionary. During NSIS
+staging, the browser and document runtime ZIPs are rewritten with stored entries
+so the outer installer can compress their contents together. Shared runtime
+archives and standalone ZIP packages keep their original compression and checksums.
+Installed files and the PowerShell extraction flow remain the same. Run
+`python packaging/desktop/test_nsis_compression.py` on Windows after preparing the
+runtime archives to verify metadata, original archives and all files extracted by
+Windows PowerShell.
+
 During development, use `python scripts/build.py desktop --package` from the
 repository root after `npm ci` in `apps/desktop`. The unified entry point defaults
 to Debug, increments the product version once, and builds all three components

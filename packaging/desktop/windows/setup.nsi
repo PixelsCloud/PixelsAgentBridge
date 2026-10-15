@@ -34,6 +34,7 @@ RequestExecutionLevel admin
 ShowInstDetails show
 ShowUninstDetails show
 SetCompressor /SOLID lzma
+SetCompressorDictSize 64
 Icon "${APP_ICON}"
 UninstallIcon "${APP_ICON}"
 VIProductVersion "${APP_VERSION}.0"

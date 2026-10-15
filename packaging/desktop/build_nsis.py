@@ -1,7 +1,9 @@
 """Wrap a verified Windows desktop ZIP in an NSIS installer."""
 
 from argparse import ArgumentParser
+from copy import copy
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
@@ -51,6 +53,18 @@ def digest_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def write_stored_runtime(content: bytes, destination: Path) -> None:
+    # Let NSIS compress the runtime together with the other payload files.
+    # Keep ZIP containers so the installed PowerShell extraction stays unchanged.
+    # Repack only staging copies; shared runtime archives retain their checksums.
+    with zipfile.ZipFile(BytesIO(content)) as source, zipfile.ZipFile(
+        destination, 'w', compression=zipfile.ZIP_STORED
+    ) as target:
+        target.comment = source.comment
+        for member in source.infolist():
+            target.writestr(copy(member), source.read(member), compress_type=zipfile.ZIP_STORED)
+
+
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--control-url", default="wss://pab.rgaa.vip/control")
@@ -91,7 +105,11 @@ def main() -> None:
                 raise ValueError(f"Windows archive contains an outdated {name}")
         payload = Path(temporary)
         for name in sorted(CONTENTS):
-            (payload / name).write_bytes(package.read(name))
+            content = package.read(name)
+            if name in ('browser-runtime.zip', 'document-runtime.zip'):
+                write_stored_runtime(content, payload / name)
+            else:
+                (payload / name).write_bytes(content)
         command = [
             str(compiler),
             "/INPUTCHARSET",
