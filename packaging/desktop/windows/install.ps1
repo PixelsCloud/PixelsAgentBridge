@@ -23,6 +23,30 @@ trap {
     break
 }
 
+function Set-PabServiceConfiguration {
+    param([string]$Name, [string]$BinaryPath)
+    $service = Get-CimInstance Win32_Service -Filter "Name = '$Name'" -ErrorAction Stop
+    if ($null -eq $service) { throw "Windows service not found: $Name" }
+    if ($service.PathName -eq $BinaryPath -and $service.StartName -eq 'LocalSystem' -and $service.StartMode -eq 'Auto') {
+        return
+    }
+    # Windows PowerShell 5.1 strips embedded quotes when invoking sc.exe.
+    # Pass the complete command as a CIM string, preserving quoted paths.
+    $changed = Invoke-CimMethod -InputObject $service -MethodName Change -Arguments @{
+        PathName = $BinaryPath
+        StartName = 'LocalSystem'
+        StartPassword = ''
+        StartMode = 'Automatic'
+    } -ErrorAction Stop
+    if ($changed.ReturnValue -ne 0) {
+        throw "Could not update the Executor Windows service (Win32_Service.Change code $($changed.ReturnValue))"
+    }
+    $actual = Get-CimInstance Win32_Service -Filter "Name = '$Name'" -ErrorAction Stop
+    if ($actual.PathName -ne $BinaryPath -or $actual.StartName -ne 'LocalSystem' -or $actual.StartMode -ne 'Auto') {
+        throw 'Executor Windows service configuration did not match the requested settings'
+    }
+}
+
 function Stop-PabInstalledBinary {
     param([string[]]$Paths, [switch]$WarnIfRunning)
     # Compare full paths, never kill the Agent client or another installation.
@@ -310,19 +334,7 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Seco
     -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $serviceCommand = '"' + (Join-Path $InstallRoot 'pab-executor.exe') + '" --service --config "' + (Join-Path $InstallRoot 'config.toml') + '"'
 if ($existingService) {
-    $serviceConfiguration = Get-CimInstance Win32_Service -Filter "Name = '$taskName'"
-    $needsConfigurationUpdate = (
-        $null -eq $serviceConfiguration -or
-        $serviceConfiguration.PathName -ne $serviceCommand -or
-        $serviceConfiguration.StartName -ne 'LocalSystem' -or
-        $serviceConfiguration.StartMode -ne 'Auto'
-    )
-    if ($needsConfigurationUpdate) {
-        $configOutput = & sc.exe config $taskName binPath= $serviceCommand obj= LocalSystem start= auto 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Could not update the Executor Windows service: $($configOutput -join ' ')"
-        }
-    }
+    Set-PabServiceConfiguration -Name $taskName -BinaryPath $serviceCommand
 } else {
     New-Service -Name $taskName -BinaryPathName $serviceCommand `
         -DisplayName 'Pixels Agent Bridge Executor' -StartupType Automatic | Out-Null
