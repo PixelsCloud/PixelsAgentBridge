@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 pub mod account;
-pub mod server_probe;
 mod account_scope;
 mod connection_io;
 mod connection_state;
@@ -11,6 +10,8 @@ mod enrollment;
 mod identity;
 mod open_registration;
 mod peer_authorizer;
+mod relay_cache;
+pub mod server_probe;
 mod storage_paths;
 mod supervisor;
 mod tls;

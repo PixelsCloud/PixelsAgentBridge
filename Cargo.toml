@@ -16,6 +16,7 @@ members = [
     "crates/relay",
     "crates/server",
     "crates/service-config",
+    "crates/service-host",
     "crates/task-runtime",
     "crates/terminal",
     "crates/interactive-terminal",

@@ -1,0 +1,62 @@
+# Run from a machine that can reach the control API and SSH services.
+# python roll_relays.py --config private-rollout.toml          # read only
+# python roll_relays.py --config private-rollout.toml --apply  # apply / resume
+# Install Python 3.11+; SSH transport additionally needs Paramiko.
+[control]
+url = "https://control.example.com"
+token_file = "admin-token.private"
+probe_binary = "pab-relay-healthcheck.exe" # binary for the operator's OS
+# ca_cert = "private-ca.pem"
+# relay_ca_cert = "private-ca.pem"
+
+[rollout]
+state_file = "private-rollout-state.json" # runtime journal, not application configuration
+health_timeout_seconds = 60
+observation_seconds = 5
+allow_outage = false
+
+[[nodes]]
+node_id = "relay-linux-1"
+platform = "linux"
+transport = "ssh"
+ssh_host = "192.0.2.10"
+ssh_user = "root"
+identity_file = "deploy-key"
+known_hosts = "known_hosts"
+install_directory = "/opt/pixels-relay"
+service_name = "pixels-agent-bridge-relay"
+config_file = "/etc/pixels-relay/relay.toml"
+artifact = "pixels-agent-bridge-server-linux-x86_64-release.tar.gz"
+sha256 = "REPLACE_WITH_ARCHIVE_SHA256"
+
+# Container alternative: replace a native [[nodes]] entry with the following.
+# Only this existing Relay service is recreated; databases and volumes are retained.
+# [[nodes]]
+# node_id = "relay-container-1"
+# platform = "linux"
+# deployment = "docker"
+# transport = "ssh"
+# ssh_host = "192.0.2.30"
+# ssh_user = "root"
+# identity_file = "deploy-key"
+# known_hosts = "known_hosts"
+# install_directory = "/opt/pixels-relay-rollouts"
+# service_name = "relay"
+# config_file = "/opt/pixels/compose.yaml"
+# project_directory = "/opt/pixels"
+# project_name = "pixels"
+# image = "registry.example/pixels@sha256:REPLACE_WITH_64_HEX_DIGEST"
+
+[[nodes]]
+node_id = "relay-windows-1"
+platform = "windows"
+transport = "ssh"
+ssh_host = "192.0.2.20"
+ssh_user = "Administrator"
+identity_file = "deploy-key"
+known_hosts = "known_hosts"
+install_directory = 'C:\PixelsRelay'
+service_name = "PixelsAgentBridgeRelay"
+config_file = 'C:\PixelsRelay\relay.toml'
+artifact = "pixels-agent-bridge-server-windows-x86_64-release.zip"
+sha256 = "REPLACE_WITH_ARCHIVE_SHA256"

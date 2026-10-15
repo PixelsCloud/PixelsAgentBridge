@@ -1,0 +1,498 @@
+//! Real WSS control + policy-enforcing TLS Relays + Relay-only iroh endpoints.
+use axum_server::tls_rustls::RustlsConfig;
+use iroh_base::SecretKey;
+use pab_agent_core::{
+    EndpointControlConfig, EndpointControlSupervisor, ReconnectPolicy, tls_connector,
+};
+use pab_protocol::*;
+use pab_relay::{RelayServiceConfig, start_relay_service};
+use pab_server::{
+    ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
+    RelayControlAuth, control_router,
+    relay_cluster::{RelayClusterConfig, RelayNodeConfig},
+};
+use pab_transport::{ConnectionPath, PabEndpoint, PabEndpointAddress, PabEndpointConfig};
+use sqlx::PgPool;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+fn now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+fn reserve() -> std::net::TcpListener {
+    std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap()
+}
+async fn wait_home(endpoint: &PabEndpoint, url: &str) {
+    let mut addresses = endpoint.watch_address();
+    tokio::time::timeout(Duration::from_secs(25), async {
+        loop {
+            if addresses.borrow().relay_urls == [url.to_string()] {
+                break;
+            }
+            addresses.changed().await.unwrap();
+        }
+    })
+    .await
+    .expect("bounded directory propagation/home switch");
+}
+async fn echo(a: &PabEndpoint, b: &PabEndpoint) {
+    let address = PabEndpointAddress {
+        relay_urls: b.address().relay_urls().map(ToString::to_string).collect(),
+        direct_addresses: vec![],
+    };
+    tokio::time::timeout(Duration::from_secs(30), async {
+        let (client, server) = tokio::join!(
+            a.connect(*b.id().as_bytes(), &address, Duration::from_secs(25)),
+            b.accept()
+        );
+        let client = client.unwrap();
+        let server = server.unwrap().unwrap();
+        assert_eq!(client.selected_path(), Some(ConnectionPath::Relay));
+        let expected = vec![179u8; 12_000];
+        let send = async {
+            let mut stream = client.open_bi(Duration::from_secs(5)).await.unwrap();
+            stream
+                .send_json(&expected, Duration::from_secs(5))
+                .await
+                .unwrap();
+            let actual: Vec<u8> = stream.receive_json(Duration::from_secs(5)).await.unwrap();
+            assert_eq!(actual, expected);
+        };
+        let receive = async {
+            let mut stream = server.accept_bi(Duration::from_secs(5)).await.unwrap();
+            let bytes: Vec<u8> = stream.receive_json(Duration::from_secs(5)).await.unwrap();
+            assert_eq!(bytes, expected);
+            stream
+                .send_json(&bytes, Duration::from_secs(5))
+                .await
+                .unwrap();
+        };
+        tokio::join!(send, receive);
+        client.close(b"probe complete");
+        server.close(b"probe complete");
+    })
+    .await
+    .expect("authorized Relay echo after failover");
+}
+
+/// Bounded memory, large enough to cross multiple 15-second budget renewals.
+/// A returned hash is also an application-level receipt, not merely a successful write.
+async fn large_transfer(a: &PabEndpoint, b: &PabEndpoint, count: usize) {
+    const CHUNK: usize = 64 * 1024;
+    let address = PabEndpointAddress {
+        relay_urls: b.address().relay_urls().map(ToString::to_string).collect(),
+        direct_addresses: vec![],
+    };
+    tokio::time::timeout(Duration::from_secs(150), async {
+        let (client, server) = tokio::join!(
+            a.connect(*b.id().as_bytes(), &address, Duration::from_secs(25)),
+            b.accept()
+        );
+        let client = client.unwrap();
+        let server = server.unwrap().unwrap();
+        assert_eq!(client.selected_path(), Some(ConnectionPath::Relay));
+        let started = std::time::Instant::now();
+        let send = async {
+            let mut stream = client.open_bi(Duration::from_secs(10)).await.unwrap();
+            let mut expected = blake3::Hasher::new();
+            for index in 0..count {
+                let mut bytes = vec![0u8; CHUNK];
+                for (offset, byte) in bytes.iter_mut().enumerate() {
+                    *byte = (offset as u8).wrapping_mul(71) ^ (index as u8);
+                }
+                expected.update(&bytes);
+                stream
+                    .send_binary_frame(&bytes, Duration::from_secs(20))
+                    .await
+                    .unwrap();
+            }
+            let receipt: Vec<u8> = stream.receive_json(Duration::from_secs(20)).await.unwrap();
+            assert_eq!(receipt, expected.finalize().as_bytes());
+        };
+        let receive = async {
+            let mut stream = server.accept_bi(Duration::from_secs(10)).await.unwrap();
+            let mut actual = blake3::Hasher::new();
+            for _ in 0..count {
+                let bytes = stream
+                    .receive_binary_frame(Duration::from_secs(20))
+                    .await
+                    .unwrap();
+                assert_eq!(bytes.len(), CHUNK);
+                actual.update(&bytes);
+            }
+            stream
+                .send_json(
+                    &actual.finalize().as_bytes().to_vec(),
+                    Duration::from_secs(10),
+                )
+                .await
+                .unwrap();
+        };
+        tokio::join!(send, receive);
+        // Default account is 10 Mbps shared by all its endpoints/nodes. Even
+        // allowing the 100-ms initial burst, 64 MiB must not complete too early.
+        if count >= 1024 {
+            assert!(
+                started.elapsed() >= Duration::from_secs(50),
+                "aggregate account budget was exceeded"
+            );
+        }
+        eprintln!(
+            "Relay-only transfer, bytes={}, hash matched, elapsed_ms={}",
+            count * CHUNK,
+            started.elapsed().as_millis()
+        );
+        client.close(b"large transfer complete");
+        server.close(b"large transfer complete");
+    })
+    .await
+    .expect("64 MiB forwarding must make progress across budget renewals");
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let store = PostgresStore::from_pool(pool.clone());
+    store.initialize_settings().await.unwrap();
+    let base = ControlPlane::new(store.clone(), PasswordPolicy::default()).unwrap();
+    let account = base
+        .register_account("cluster-e2e", "isolated test password long enough")
+        .await
+        .unwrap();
+    let operator = SecretKey::from_bytes(&[211; 32]);
+    let device = SecretKey::from_bytes(&[212; 32]);
+    let device_id = DeviceId::new();
+    let device_ref = DeviceRef {
+        tenant_id: account.personal_tenant_id,
+        device_id,
+    };
+    sqlx::query(
+        "INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'cluster fixture',619438177)",
+    )
+    .bind(device_id.as_uuid())
+    .bind(account.personal_tenant_id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,user_id) VALUES($1,$2,'user',$3)",
+    )
+    .bind(operator.public().as_bytes().as_slice())
+    .bind(account.personal_tenant_id.as_uuid())
+    .bind(account.id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,device_id) VALUES($1,$2,'device',$3)")
+        .bind(device.public().as_bytes().as_slice()).bind(account.personal_tenant_id.as_uuid()).bind(device_id.as_uuid()).execute(&pool).await.unwrap();
+    let hash = "b".repeat(64);
+    sqlx::query("INSERT INTO web_sessions(token_hash,user_id) VALUES($1,$2)")
+        .bind(&hash)
+        .bind(account.id.as_uuid())
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO endpoint_user_contexts(endpoint_key,token_hash,revision) VALUES($1,$2,1)",
+    )
+    .bind(operator.public().as_bytes().as_slice())
+    .bind(&hash)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO device_connection_intents(operator_endpoint_key,device_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '5 minutes')")
+        .bind(operator.public().as_bytes().as_slice()).bind(device_id.as_uuid()).execute(&pool).await.unwrap();
+    let reserved_a = reserve();
+    let reserved_b = reserve();
+    let port_a = reserved_a.local_addr().unwrap().port();
+    let port_b = reserved_b.local_addr().unwrap().port();
+    let config = RelayClusterConfig {
+        heartbeat_seconds: 1,
+        offline_seconds: 3,
+        recovery_seconds: 0,
+        maintenance_seconds: 0,
+        nodes: vec![
+            RelayNodeConfig {
+                node_id: "a".into(),
+                url: format!("https://localhost:{port_a}/"),
+                region: "test".into(),
+                weight: 100,
+                capacity_mbps: 100,
+                control_secret: "isolated-cluster-node-a-01234567890123456789".into(),
+            },
+            RelayNodeConfig {
+                node_id: "b".into(),
+                url: format!("https://localhost:{port_b}/"),
+                region: "test".into(),
+                weight: 100,
+                capacity_mbps: 100,
+                control_secret: "isolated-cluster-node-b-01234567890123456789".into(),
+            },
+        ],
+    };
+    let control = base.with_relay_cluster(Some(config.clone())).await.unwrap();
+    // Start B in maintenance so initial traffic is provably carried by A.
+    sqlx::query("UPDATE relay_cluster_nodes SET admin_state='maintenance' WHERE node_id='b'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let auth = RelayControlAuth::new("isolated-legacy-control-01234567890123456789")
+        .unwrap()
+        .with_cluster(Some(&config));
+    let state = ControlApiState::new(control, ControlApiConfig::default(), auth);
+    let certified = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let cert = root.path().join("cert.pem");
+    let key = root.path().join("key.pem");
+    std::fs::write(&cert, certified.cert.pem()).unwrap();
+    std::fs::write(&key, certified.signing_key.serialize_pem()).unwrap();
+    let tls = RustlsConfig::from_der(
+        vec![certified.cert.der().to_vec()],
+        certified.signing_key.serialize_der(),
+    )
+    .await
+    .unwrap();
+    let listener = reserve();
+    listener.set_nonblocking(true).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let handle = axum_server::Handle::new();
+    let server_handle = handle.clone();
+    let server = tokio::spawn(async move {
+        axum_server::from_tcp_rustls(listener, tls)
+            .unwrap()
+            .handle(server_handle)
+            .serve(control_router(state).into_make_service())
+            .await
+            .unwrap()
+    });
+    let relay_config = |index: usize| RelayServiceConfig {
+        cluster_enabled: true,
+        node_id: config.nodes[index].node_id.clone(),
+        usage_dir: root.path().join(format!("usage-{index}")),
+        control_url: format!("wss://localhost:{port}/relay-control"),
+        control_secret: config.nodes[index].control_secret.clone(),
+        control_ca_cert: Some(cert.clone()),
+        tls_cert: cert.clone(),
+        tls_key: key.clone(),
+        https_bind: format!("127.0.0.1:{}", if index == 0 { port_a } else { port_b })
+            .parse()
+            .unwrap(),
+        captive_bind: "127.0.0.1:0".parse().unwrap(),
+        quic_bind: "127.0.0.1:0".parse().unwrap(),
+        policy_refresh_interval: Duration::from_secs(1),
+        reconnect_interval: Duration::from_millis(100),
+        limiter_burst: Duration::from_millis(100),
+    };
+    drop(reserved_a);
+    let relay_a = start_relay_service(relay_config(0)).await.unwrap();
+    drop(reserved_b);
+    let relay_b = start_relay_service(relay_config(1)).await.unwrap();
+    let seed: iroh_base::RelayUrl = config.nodes[0].url.parse().unwrap();
+    let ep_config = || {
+        PabEndpointConfig::new(vec![seed.clone()])
+            .unwrap()
+            .with_extra_ca_certificates(vec![certified.cert.der().clone()])
+            .relay_only_for_testing()
+    };
+    let a = PabEndpoint::bind(ep_config(), operator.clone())
+        .await
+        .unwrap();
+    let b = PabEndpoint::bind(ep_config(), device.clone())
+        .await
+        .unwrap();
+    let connector = tls_connector(Some(certified.cert.pem().as_bytes())).unwrap();
+    let supervisor = |secret: SecretKey, principal| {
+        EndpointControlSupervisor::new(
+            EndpointControlConfig {
+                url: format!("wss://localhost:{port}/control"),
+                tenant_id: account.personal_tenant_id,
+                principal,
+                operation_timeout: Duration::from_secs(10),
+            },
+            secret,
+            connector.clone(),
+            ReconnectPolicy {
+                heartbeat_interval: Duration::from_secs(1),
+                heartbeat_timeout: Duration::from_millis(800),
+                retry_interval: Duration::from_millis(100),
+            },
+        )
+        .unwrap()
+        .with_relay_directory()
+    };
+    let operator_control = supervisor(
+        operator,
+        EndpointProofPrincipal::User {
+            user_id: account.id,
+        },
+    )
+    .spawn();
+    a.follow_relay_updates(operator_control.relay_updates());
+    let mut addresses = b.watch_address();
+    let device_key = EndpointKey::new(*device.public().as_bytes());
+    let network = move |address: pab_transport::PabEndpointAddress, revision| DeviceNetworkUpdate {
+        schema_version: DEVICE_NETWORK_SCHEMA_VERSION,
+        device_ref,
+        endpoint_key: device_key,
+        endpoint_instance_id: EndpointInstanceId::from_u128(221),
+        address_revision: revision,
+        relay_urls: address.relay_urls,
+        direct_addresses: vec![],
+        observed_at_unix_ms: now(),
+    };
+    let (network_tx, network_rx) =
+        tokio::sync::watch::channel(network(addresses.borrow().clone(), 1));
+    let network_task = tokio::spawn(async move {
+        let mut revision = 1;
+        while addresses.changed().await.is_ok() {
+            revision += 1;
+            network_tx.send_replace(network(addresses.borrow_and_update().clone(), revision));
+        }
+    });
+    let device_control = supervisor(device.clone(), EndpointProofPrincipal::Device { device_id })
+        .with_device_network(network_rx)
+        .unwrap()
+        .spawn();
+    b.follow_relay_updates(device_control.relay_updates());
+    wait_home(&a, &config.nodes[0].url).await;
+    wait_home(&b, &config.nodes[0].url).await;
+    echo(&a, &b).await;
+    large_transfer(&a, &b, 1024).await;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let directory = store.relay_directory(3).await.unwrap();
+            if directory
+                .nodes
+                .iter()
+                .all(|n| n.health == RelayHealth::Healthy)
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .unwrap();
+    store
+        .set_relay_state(
+            "b",
+            RelayAdminState::Active,
+            uuid::Uuid::new_v4(),
+            account.id.as_uuid(),
+            false,
+            0,
+            3,
+        )
+        .await
+        .unwrap();
+    // Two independent endpoint pairs under the same account generate bulk
+    // traffic on both nodes simultaneously; single-node timing alone cannot
+    // prove the aggregate cluster limit.
+    let second_operator = SecretKey::from_bytes(&[213; 32]);
+    let second_device = SecretKey::from_bytes(&[214; 32]);
+    let second_device_id = DeviceId::new();
+    sqlx::query("INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'second cluster fixture',619438178)")
+        .bind(second_device_id.as_uuid()).bind(account.personal_tenant_id.as_uuid()).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,user_id) VALUES($1,$2,'user',$3)",
+    )
+    .bind(second_operator.public().as_bytes().as_slice())
+    .bind(account.personal_tenant_id.as_uuid())
+    .bind(account.id.as_uuid())
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,device_id) VALUES($1,$2,'device',$3)")
+        .bind(second_device.public().as_bytes().as_slice()).bind(account.personal_tenant_id.as_uuid()).bind(second_device_id.as_uuid()).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO endpoint_user_contexts(endpoint_key,token_hash,revision) VALUES($1,$2,1)",
+    )
+    .bind(second_operator.public().as_bytes().as_slice())
+    .bind(&hash)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO device_connection_intents(operator_endpoint_key,device_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '5 minutes')")
+        .bind(second_operator.public().as_bytes().as_slice()).bind(second_device_id.as_uuid()).execute(&pool).await.unwrap();
+    sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let second_config = || {
+        PabEndpointConfig::new(vec![config.nodes[1].url.parse().unwrap()])
+            .unwrap()
+            .with_extra_ca_certificates(vec![certified.cert.der().clone()])
+            .relay_only_for_testing()
+    };
+    let c = PabEndpoint::bind(second_config(), second_operator.clone())
+        .await
+        .unwrap();
+    let d = PabEndpoint::bind(second_config(), second_device.clone())
+        .await
+        .unwrap();
+    let c_control = supervisor(
+        second_operator,
+        EndpointProofPrincipal::User {
+            user_id: account.id,
+        },
+    )
+    .spawn();
+    let d_control = supervisor(
+        second_device,
+        EndpointProofPrincipal::Device {
+            device_id: second_device_id,
+        },
+    )
+    .spawn();
+    wait_home(&c, &config.nodes[1].url).await;
+    wait_home(&d, &config.nodes[1].url).await;
+    echo(&c, &d).await;
+    let concurrent_started = std::time::Instant::now();
+    tokio::join!(large_transfer(&a, &b, 512), large_transfer(&c, &d, 512));
+    assert!(
+        concurrent_started.elapsed() >= Duration::from_secs(50),
+        "two nodes must not double one account's 10 Mbps budget"
+    );
+    eprintln!(
+        "two-node concurrent 64 MiB, both application hashes matched, elapsed_ms={}",
+        concurrent_started.elapsed().as_millis()
+    );
+    c.close().await;
+    d.close().await;
+    c_control.shutdown().await.unwrap();
+    d_control.shutdown().await.unwrap();
+    store
+        .set_relay_state(
+            "a",
+            RelayAdminState::Maintenance,
+            uuid::Uuid::new_v4(),
+            account.id.as_uuid(),
+            false,
+            0,
+            3,
+        )
+        .await
+        .unwrap();
+    relay_a.shutdown().await.unwrap();
+    let switched = std::time::Instant::now();
+    wait_home(&a, &config.nodes[1].url).await;
+    wait_home(&b, &config.nodes[1].url).await;
+    echo(&a, &b).await;
+    assert!(switched.elapsed() < Duration::from_secs(30));
+    let resolved = operator_control
+        .device_network_resolver()
+        .resolve(device_ref)
+        .await
+        .unwrap();
+    assert_eq!(resolved.relay_urls, vec![config.nodes[1].url.clone()]);
+    a.close().await;
+    b.close().await;
+    operator_control.shutdown().await.unwrap();
+    device_control.shutdown().await.unwrap();
+    network_task.abort();
+    relay_b.shutdown().await.unwrap();
+    handle.shutdown();
+    server.await.unwrap();
+}

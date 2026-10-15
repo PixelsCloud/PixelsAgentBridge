@@ -26,6 +26,7 @@ pub(crate) fn spawn(
     connector: tokio_tungstenite::Connector,
     node: String,
     root: PathBuf,
+    boot_id: Option<uuid::Uuid>,
 ) -> UsageWorker {
     let (stop, mut stopped) = tokio::sync::watch::channel(false);
     let task = tokio::spawn(async move {
@@ -115,6 +116,11 @@ pub(crate) fn spawn(
                 client = RelayControlClient::connect(&url, &secret, connector.clone())
                     .await
                     .ok();
+                if let (Some(boot), Some(connection)) = (boot_id, client.as_mut()) {
+                    if connection.cluster_hello(&node, boot).await.is_err() {
+                        client = None;
+                    }
+                }
             }
             if let Some(connection) = client.as_mut() {
                 if let Ok(batches) = spool.pending(&scope).await {

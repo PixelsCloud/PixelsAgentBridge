@@ -72,7 +72,16 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
         EndpointControlSupervisor::new(control, secret, connector, ReconnectPolicy::default())?
             .with_device_hello(hello.clone())?
             .with_device_network(network_updates)?
+            .with_relay_directory()
+            .with_relay_directory_cache(
+                config
+                    .endpoint_secret_file
+                    .parent()
+                    .unwrap_or(std::path::Path::new(".")),
+                config.relay_urls.iter().map(ToString::to_string).collect(),
+            )
             .spawn();
+    endpoint.follow_relay_updates(supervisor.relay_updates());
     let peer_authorizer = supervisor.peer_authorizer();
     let task_service = TaskService::open(&config.task_database_file, device_ref, execution_context)
         .await

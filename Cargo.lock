@@ -4997,6 +4997,7 @@ dependencies = [
 name = "pab-relay"
 version = "1.2.48"
 dependencies = [
+ "blake3",
  "futures-util",
  "hex",
  "iroh-base",
@@ -5008,8 +5009,10 @@ dependencies = [
  "pab-logging",
  "pab-protocol",
  "pab-service-config",
+ "pab-service-host",
  "pab-transport",
  "rcgen",
+ "reqwest 0.12.28",
  "rustls",
  "rustls-pemfile",
  "serde",
@@ -5052,6 +5055,7 @@ dependencies = [
  "pab-protocol",
  "pab-relay",
  "pab-service-config",
+ "pab-service-host",
  "pab-task-runtime",
  "pab-transport",
  "rand_core 0.6.4",
@@ -5086,6 +5090,14 @@ dependencies = [
  "thiserror 2.0.21",
  "toml",
  "url",
+]
+
+[[package]]
+name = "pab-service-host"
+version = "1.2.48"
+dependencies = [
+ "tokio",
+ "windows-service",
 ]
 
 [[package]]

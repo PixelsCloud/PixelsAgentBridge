@@ -24,6 +24,12 @@ pub struct ControlPlane {
     dummy_password_hash: String,
     active_endpoints: Arc<ActiveEndpoints>,
     web_revision: tokio::sync::watch::Sender<u64>,
+    relay_cluster:
+        tokio::sync::watch::Sender<Option<Arc<crate::relay_cluster::RelayClusterConfig>>>,
+    relay_config_source: Option<(Arc<std::path::PathBuf>, [u8; 32])>,
+    relay_reload_lock: Arc<tokio::sync::Mutex<()>>,
+    pub(crate) relay_budget_clock: Arc<std::sync::Mutex<crate::relay_budget::BudgetClock>>,
+    pub(crate) relay_probes: Arc<std::sync::Mutex<crate::relay_probe::RelayProbes>>,
 }
 
 impl ControlPlane {
@@ -80,11 +86,84 @@ impl ControlPlane {
             dummy_password_hash,
             active_endpoints: Arc::new(ActiveEndpoints::default()),
             web_revision: tokio::sync::watch::channel(0).0,
+            relay_cluster: tokio::sync::watch::channel(None).0,
+            relay_config_source: None,
+            relay_reload_lock: Arc::new(tokio::sync::Mutex::new(())),
+            relay_budget_clock: Arc::new(std::sync::Mutex::new(
+                crate::relay_budget::BudgetClock::new(std::time::Instant::now()),
+            )),
+            relay_probes: Arc::new(std::sync::Mutex::new(
+                crate::relay_probe::RelayProbes::default(),
+            )),
         })
     }
 
     pub fn store(&self) -> &PostgresStore {
         &self.store
+    }
+
+    pub(crate) fn relay_config(&self) -> Option<Arc<crate::relay_cluster::RelayClusterConfig>> {
+        self.relay_cluster.borrow().clone()
+    }
+
+    pub fn with_relay_config_source(
+        mut self,
+        path: std::path::PathBuf,
+        legacy_secret: &str,
+    ) -> Self {
+        self.relay_config_source = Some((
+            Arc::new(path),
+            *blake3::hash(legacy_secret.as_bytes()).as_bytes(),
+        ));
+        self
+    }
+
+    pub async fn reload_relay_config(&self) -> Result<(), StoreError> {
+        let _guard = self.relay_reload_lock.lock().await;
+        let (path, secret) = self.relay_config_source.as_ref().ok_or_else(|| {
+            StoreError::InvalidState("configuration reload is not configured".into())
+        })?;
+        let path = path.clone();
+        let new = tokio::task::spawn_blocking(move || crate::config::ServerConfig::load(&path))
+            .await
+            .map_err(|_| StoreError::InvalidState("configuration reload worker failed".into()))?
+            .map_err(|_| {
+                StoreError::InvalidInput(
+                    "configuration validation failed; previous directory retained".into(),
+                )
+            })?;
+        if *blake3::hash(new.relay.control_secret.as_bytes()).as_bytes() != *secret {
+            return Err(StoreError::InvalidState(
+                "changing the legacy control credential requires a service restart".into(),
+            ));
+        }
+        if new.relay.cluster.is_some() != self.relay_config().is_some() {
+            return Err(StoreError::InvalidState(
+                "changing cluster mode requires a coordinated service restart".into(),
+            ));
+        }
+        if let Some(config) = new.relay.cluster {
+            self.store.configure_relay_cluster(&config).await?;
+            self.relay_cluster.send_replace(Some(Arc::new(config)));
+            self.web_changed();
+        }
+        Ok(())
+    }
+
+    pub async fn with_relay_cluster(
+        self,
+        config: Option<crate::relay_cluster::RelayClusterConfig>,
+    ) -> Result<Self, StoreError> {
+        if let Some(mut config) = config {
+            config
+                .validate()
+                .map_err(|e| StoreError::InvalidInput(e.into()))?;
+            self.store.configure_relay_cluster(&config).await?;
+            self.relay_cluster.send_replace(Some(Arc::new(config)));
+        } else {
+            self.store.disable_relay_cluster().await?;
+        }
+        Ok(self)
     }
 
     pub async fn initialize_settings(&self) -> Result<(), ServiceError> {

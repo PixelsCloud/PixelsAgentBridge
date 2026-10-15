@@ -66,6 +66,34 @@ impl ControlSession {
     pub async fn handle(&mut self, message: ControlClientMessage) -> ControlServerMessage {
         let request_id = message.request_id();
         let result = match message {
+            ControlClientMessage::GetRelayDirectory { schema_version, .. } => {
+                if self.endpoint.is_none() {
+                    return error_response(Some(request_id), ControlSessionError::NotAuthenticated);
+                }
+                if schema_version != pab_protocol::RELAY_CLUSTER_SCHEMA_VERSION {
+                    return ControlServerMessage::Error {
+                        request_id: Some(request_id),
+                        code: pab_protocol::ControlErrorCode::InvalidMessage,
+                        message: "unsupported Relay directory version".into(),
+                    };
+                }
+                match self.control.relay_config() {
+                    None => Ok(ControlServerMessage::RelayDirectory {
+                        request_id,
+                        directory: None,
+                    }),
+                    Some(config) => self
+                        .control
+                        .store()
+                        .relay_directory(config.offline_seconds)
+                        .await
+                        .map(|directory| ControlServerMessage::RelayDirectory {
+                            request_id,
+                            directory: Some(directory),
+                        })
+                        .map_err(|e| ControlSessionError::Service(e.into())),
+                }
+            }
             // Decode legacy requests, but never allow them to alter ownership.
             ControlClientMessage::BeginDeviceClaim { .. }
             | ControlClientMessage::ApproveDeviceClaim { .. }

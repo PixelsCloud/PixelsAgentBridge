@@ -1,0 +1,16 @@
+listen = "0.0.0.0:8443"
+[database]
+url = "postgres://pab:replace-password@database.example:5432/pab"
+[tls]
+cert = "../certs/server.pem"
+key = "../certs/server-key.pem"
+[web]
+origin = "https://server.example:8443"
+registration_enabled = true
+assets = "../web"
+[relay]
+control_secret = "replace-with-distinct-legacy-secret-at-least-32-bytes"
+# Add [relay.cluster] and [[relay.cluster.nodes]] as shown in the cluster example.
+[log]
+directory = "../logs/server"
+level = "info"

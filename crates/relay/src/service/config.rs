@@ -10,6 +10,7 @@ use thiserror::Error;
 const MIN_CONTROL_SECRET_BYTES: usize = 32;
 
 pub struct RelayServiceConfig {
+    pub cluster_enabled: bool,
     pub node_id: String,
     pub usage_dir: PathBuf,
     pub control_url: String,
@@ -63,6 +64,8 @@ pub enum RelayServiceConfigError {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RelayFileConfig {
+    #[serde(default)]
+    pub cluster_enabled: bool,
     pub node_id: String,
     pub usage_dir: PathBuf,
     pub https_bind: SocketAddr,
@@ -126,6 +129,7 @@ impl RelayFileConfig {
     }
     pub fn into_service(self) -> RelayServiceConfig {
         RelayServiceConfig {
+            cluster_enabled: self.cluster_enabled,
             node_id: self.node_id,
             usage_dir: self.usage_dir,
             control_url: self.control.url,
@@ -136,7 +140,7 @@ impl RelayFileConfig {
             https_bind: self.https_bind,
             quic_bind: self.quic_bind,
             captive_bind: "127.0.0.1:0".parse().expect("fixed loopback address"),
-            policy_refresh_interval: Duration::from_secs(20),
+            policy_refresh_interval: Duration::from_secs(if self.cluster_enabled { 5 } else { 20 }),
             reconnect_interval: Duration::from_secs(3),
             limiter_burst: Duration::from_millis(100),
         }

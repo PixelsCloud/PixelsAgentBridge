@@ -4,6 +4,7 @@
 !/docs/AGENTS.md
 !/docs/USAGE_AND_SELF_HOSTING.md
 !/docs/CONFIGURATION.md
+!/docs/RELAY_CLUSTER_OPERATIONS.md
 /diagram/*
 !/diagram/workflow/
 /diagram/workflow/*

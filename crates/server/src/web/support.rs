@@ -144,6 +144,18 @@ pub(crate) async fn native_boundary(
     response
 }
 
+pub(crate) async fn native_admin_boundary(
+    axum::extract::State(state): axum::extract::State<super::WebState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    match super::session::native_viewer(&state, request.headers()).await {
+        Ok(viewer) if viewer.server_admin => next.run(request).await,
+        Ok(_) => WebError::new(StatusCode::FORBIDDEN, "forbidden").into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
 pub async fn response_headers(request: Request, next: Next) -> Response {
     let asset = request.uri().path().starts_with("/assets/");
     let mut response = next.run(request).await;

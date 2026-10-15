@@ -1,7 +1,26 @@
 diff --git a/src/server/client.rs b/src/server/client.rs
 --- a/src/server/client.rs
 +++ b/src/server/client.rs
-@@ -502,7 +502,7 @@
+@@ -459,6 +459,7 @@
+     async fn send_raw(&mut self, packet: Packet) -> Result<(), WriteFrameError> {
+         let remote_endpoint_id = packet.src;
+         let datagrams = packet.data;
++        let forwarded_bytes=datagrams.contents.len();
+ 
+         if let Ok(len) = datagrams.contents.len().try_into() {
+             self.metrics.bytes_sent.inc_by(len);
+@@ -467,7 +468,9 @@
+             remote_endpoint_id,
+             datagrams,
+         })
+-        .await
++        .await?;
++        self.clients.forwarded(remote_endpoint_id,self.guard.endpoint_id(),forwarded_bytes);
++        Ok(())
+     }
+ 
+     async fn send_packet(&mut self, packet: Packet) -> Result<(), WriteFrameError> {
+@@ -502,7 +505,7 @@
              } => {
                  let packet_len = datagrams.contents.len();
                  if let Err(err @ ForwardPacketError { .. }) =
@@ -10,7 +29,7 @@ diff --git a/src/server/client.rs b/src/server/client.rs
                  {
                      warn!("failed to handle send packet frame: {err:#}");
                  }
-@@ -521,14 +521,15 @@
+@@ -521,14 +524,15 @@
          Ok(())
      }
  
@@ -82,11 +101,16 @@ diff --git a/src/server/clients.rs b/src/server/clients.rs
      /// Shuts down all connected clients.
      ///
      /// This method gracefully disconnects all active client connections managed by
-@@ -197,13 +213,26 @@
+@@ -197,13 +213,42 @@
      }
  
      /// Attempt to send a packet to client with [`EndpointId`] `dst`.
 -    pub(super) fn send_packet(
++    pub(super) fn forwarded(&self,src:EndpointId,dst:EndpointId,bytes:usize) {
++        self.0.forwarding.on_forwarded(src,dst,bytes);
++    }
++
++    /// Attempt to send a packet to client with [`EndpointId`] `dst`.
 +    pub(super) async fn send_packet(
          &self,
          dst: EndpointId,
@@ -94,6 +118,17 @@ diff --git a/src/server/clients.rs b/src/server/clients.rs
          src: EndpointId,
          metrics: &Metrics,
      ) -> Result<(), ForwardPacketError> {
++        if self.0.forwarding.split_datagram_batches() && data.segment_size.is_some() {
++            let mut remaining=data;
++            while !remaining.contents.is_empty() {
++                self.send_packet_part(dst,remaining.take_segments(1),src,metrics).await?;
++            }
++            return Ok(());
++        }
++        self.send_packet_part(dst,data,src,metrics).await
++    }
++
++    async fn send_packet_part(&self,dst:EndpointId,data:Datagrams,src:EndpointId,metrics:&Metrics)->Result<(),ForwardPacketError> {
 +        loop {
 +            match self.0.forwarding.check(src, dst, data.contents.len()) {
 +                ForwardingDecision::Allow => break,
@@ -241,7 +276,7 @@ diff --git a/src/server.rs b/src/server.rs
  }
  
  impl RelayConfig {
-@@ -159,7 +162,70 @@
+@@ -159,7 +162,85 @@
              limits: Limits::default(),
              key_cache_capacity: None,
              access: Arc::new(AllowAll),
@@ -267,6 +302,11 @@ diff --git a/src/server.rs b/src/server.rs
 +/// Implementations must return quickly and must not block the async runtime. Shared
 +/// rate limiters can update a short critical section and return [`ForwardingDecision::Wait`].
 +pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
++    /// Account individual packets rather than a GSO batch. Opt-in so existing
++    /// policies retain their original batching and accounting behavior.
++    fn split_datagram_batches(&self) -> bool { false }
++    /// Called once after a datagram is successfully written, never for rate-limit retries/drops.
++    fn on_forwarded(&self, _src: EndpointId, _dst: EndpointId, _bytes: usize) {}
 +    /// Checks whether a datagram can be forwarded now.
 +    fn check(
 +        &self,
@@ -278,6 +318,10 @@ diff --git a/src/server.rs b/src/server.rs
 +
 +/// Dynamic form of [`ForwardingControl`].
 +pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
++    /// See [`ForwardingControl::split_datagram_batches`].
++    fn split_datagram_batches(&self) -> bool;
++    /// See [`ForwardingControl::on_forwarded`].
++    fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize);
 +    /// See [`ForwardingControl::check`].
 +    fn check(
 +        &self,
@@ -288,6 +332,12 @@ diff --git a/src/server.rs b/src/server.rs
 +}
 +
 +impl<T: ForwardingControl> DynForwardingControl for T {
++    fn split_datagram_batches(&self) -> bool {
++        <Self as ForwardingControl>::split_datagram_batches(self)
++    }
++    fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize) {
++        <Self as ForwardingControl>::on_forwarded(self, src, dst, bytes)
++    }
 +    fn check(
 +        &self,
 +        src: EndpointId,
@@ -313,7 +363,7 @@ diff --git a/src/server.rs b/src/server.rs
      }
  }
  
-@@ -733,6 +799,7 @@
+@@ -733,6 +814,7 @@
                      .headers(headers)
                      .key_cache_capacity(key_cache_capacity)
                      .access(relay_config.access)

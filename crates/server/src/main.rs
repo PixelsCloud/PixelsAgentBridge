@@ -2,12 +2,12 @@ use std::{env, process::ExitCode, time::Duration};
 
 use pab_server::{
     ControlApiConfig, ControlApiState, ControlPlane, PasswordPolicy, PostgresStore,
-    RelayControlAuth, serve_tls,
+    RelayControlAuth, serve_tls_until,
 };
 
 #[tokio::main]
-async fn main() -> ExitCode {
-    match run().await {
+async fn console_main() -> ExitCode {
+    match run(None).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "server failed");
@@ -17,9 +17,47 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let (path, arguments) =
-        pab_service_config::arguments("pab-server.toml", env::args_os().skip(1))?;
+fn main() -> ExitCode {
+    match pab_service_host::arguments(env::args_os().skip(1), "PixelsAgentBridgeServer") {
+        Err(error) => {
+            eprintln!("pab-server: {error}");
+            ExitCode::FAILURE
+        }
+        Ok((Some(name), _)) => {
+            #[cfg(windows)]
+            {
+                match pab_service_host::run(name, service_entry) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(e) => {
+                        eprintln!("pab-server: {e}");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = name;
+                eprintln!("--service is Windows only");
+                ExitCode::FAILURE
+            }
+        }
+        Ok((None, _)) => console_main(),
+    }
+}
+#[cfg(windows)]
+fn service_entry(stop: tokio::sync::watch::Receiver<bool>) -> pab_service_host::ServiceFuture {
+    Box::pin(async move {
+        run(Some(stop)).await.map_err(|e| {
+            tracing::error!(error=%e,"Server service failed");
+            e.to_string()
+        })
+    })
+}
+async fn run(
+    stop: Option<tokio::sync::watch::Receiver<bool>>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let (_, raw) = pab_service_host::arguments(env::args_os().skip(1), "PixelsAgentBridgeServer")?;
+    let (path, arguments) = pab_service_config::arguments("pab-server.toml", raw)?;
     let (command, arguments) = arguments
         .split_first()
         .map(|(c, a)| (c.as_str(), a))
@@ -80,12 +118,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("server settings are not initialized; run pab-server init".into());
             }
             let maintenance_store = store.clone();
-            let control_plane = ControlPlane::new(store, PasswordPolicy::default())?;
+            let control_plane = ControlPlane::new(store, PasswordPolicy::default())?
+                .with_relay_cluster(config.relay.cluster.clone())
+                .await?
+                .with_relay_config_source(path.clone(), &config.relay.control_secret);
             let address = config.listen;
             let certificate_path = config.tls.cert.clone();
             let private_key_path = config.tls.key.clone();
             let registration_enabled = config.web.registration_enabled;
-            let relay_auth = RelayControlAuth::new(&config.relay.control_secret)?;
+            let relay_auth = RelayControlAuth::new(&config.relay.control_secret)?
+                .with_cluster(config.relay.cluster.as_ref());
             let presence_control = control_plane.clone();
             let github = config.github_config()?;
             let state = ControlApiState::new(
@@ -123,7 +165,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             });
-            let result = serve_tls(address, certificate_path, private_key_path, state).await;
+            let result = serve_tls_until(
+                address,
+                certificate_path,
+                private_key_path,
+                state,
+                pab_service_host::stop_requested(stop),
+            )
+            .await;
             maintenance.abort();
             presence.abort();
             result?;

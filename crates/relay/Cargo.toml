@@ -8,7 +8,10 @@ rust-version.workspace = true
 test-utils = []
 
 [dependencies]
+blake3 = "1"
 pab-service-config = { path = "../service-config" }
+pab-service-host = { path = "../service-host" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 futures-util = "0.3"
 hex = "0.4"
 iroh-base = "=1.2.0"

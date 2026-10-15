@@ -16,7 +16,11 @@ pub(crate) async fn administrator(
     state: &WebState,
     headers: &HeaderMap,
 ) -> Result<Viewer, WebError> {
-    let me = viewer(state, headers).await?;
+    let me = if headers.contains_key(axum::http::header::AUTHORIZATION) {
+        super::session::native_viewer(state, headers).await?
+    } else {
+        viewer(state, headers).await?
+    };
     if !me.server_admin {
         return Err(WebError::new(StatusCode::FORBIDDEN, "forbidden"));
     }
@@ -232,9 +236,104 @@ pub(crate) async fn relays(
     Query(query): Query<PageQuery>,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
+    if let Some(config) = state.control.relay_config() {
+        state
+            .control
+            .store()
+            .relay_directory(config.offline_seconds)
+            .await
+            .map_err(crate::ServiceError::from)?;
+        let sql = "SELECT jsonb_build_object('id',node_id,'url',public_url,'region',region,'weight',weight,'capacity_mbps',capacity_mbps,'admin_state',admin_state,'health',health,'agent_version',agent_version,'boot_id',boot_id,'operation_id',operation_id,'last_seen',(extract(epoch from last_seen_at)*1000)::bigint,'online',health='healthy','applied_policy_version',(SELECT applied_policy_version FROM relay_nodes r WHERE r.node_id=relay_cluster_nodes.node_id),'offered_policy_version',(SELECT offered_policy_version FROM relay_nodes r WHERE r.node_id=relay_cluster_nodes.node_id),'connections',connections,'uploaded_bytes',uploaded_bytes,'downloaded_bytes',downloaded_bytes)::text payload FROM relay_cluster_nodes WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(node_id))>0 ORDER BY node_id";
+        return paged(&state, &me, query, sql).await;
+    }
     let instance = state.server_instance;
     let sql = format!(
         "SELECT jsonb_build_object('id',node_id,'agent_version',agent_version,'applied_policy_version',applied_policy_version,'offered_policy_version',offered_policy_version,'last_seen',(extract(epoch from last_seen_at)*1000)::bigint,'online',server_instance='{instance}'::uuid AND last_seen_at>now()-interval '120 seconds')::text payload FROM relay_nodes WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(node_id))>0 ORDER BY node_id"
     );
     paged(&state, &me, query, &sql).await
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RelayStateInput {
+    pub state: pab_protocol::RelayAdminState,
+    pub operation_id: Option<Uuid>,
+    #[serde(default)]
+    pub allow_outage: bool,
+}
+pub(crate) async fn relay_state(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Path(node): Path<String>,
+    Json(input): Json<RelayStateInput>,
+) -> Result<Json<Value>, WebError> {
+    let me = administrator(&state, &headers).await?;
+    let config = state
+        .control
+        .relay_config()
+        .ok_or_else(|| WebError::new(StatusCode::CONFLICT, "relay_cluster_disabled"))?;
+    if !pab_protocol::valid_relay_node_id(&node) {
+        return Err(WebError::invalid());
+    }
+    let operation = state
+        .control
+        .store()
+        .set_relay_state(
+            &node,
+            input.state,
+            input.operation_id.unwrap_or_else(Uuid::new_v4),
+            me.id,
+            input.allow_outage,
+            config.maintenance_seconds,
+            config.offline_seconds,
+        )
+        .await
+        .map_err(|e| match e {
+            crate::StoreError::InvalidState(message)
+                if message.contains("no healthy Relay backup") =>
+            {
+                WebError::new(StatusCode::CONFLICT, "relay_no_backup")
+            }
+            crate::StoreError::InvalidState(_) => {
+                WebError::new(StatusCode::CONFLICT, "relay_not_ready")
+            }
+            other => WebError::from(crate::ServiceError::from(other)),
+        })?;
+    state.control.web_changed();
+    Ok(Json(
+        serde_json::to_value(operation).map_err(|_| WebError::invalid())?,
+    ))
+}
+pub(crate) async fn relay_operation(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, WebError> {
+    administrator(&state, &headers).await?;
+    let operation = state
+        .control
+        .store()
+        .relay_maintenance_operation(id)
+        .await
+        .map_err(crate::ServiceError::from)?;
+    Ok(Json(
+        serde_json::to_value(operation).map_err(|_| WebError::invalid())?,
+    ))
+}
+
+pub(crate) async fn reload_relays(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, WebError> {
+    let me = administrator(&state, &headers).await?;
+    state
+        .control
+        .reload_relay_config()
+        .await
+        .map_err(crate::ServiceError::from)?;
+    sqlx::query("INSERT INTO web_admin_events(actor_id,action) VALUES($1,'relay_config_reloaded')")
+        .bind(me.id)
+        .execute(state.control.store().pool())
+        .await?;
+    Ok(Json(json!({"reloaded":true})))
 }

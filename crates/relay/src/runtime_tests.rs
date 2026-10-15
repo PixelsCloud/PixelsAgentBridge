@@ -11,6 +11,63 @@ use pab_protocol::{
 use crate::{RelayPolicyRuntime, RelayPolicyState};
 
 #[test]
+fn cluster_policy_uses_server_time_and_delayed_responses_cannot_extend_validity() {
+    use std::time::Instant;
+    for issued in [1000, 4_000_000_000_000i64] {
+        let key = SecretKey::generate();
+        let user_id = UserId::new();
+        let make = |version| RelayPolicySnapshot {
+            schema_version: RELAY_POLICY_SCHEMA_VERSION,
+            policy_version: version,
+            issued_at_unix_ms: issued,
+            expires_at_unix_ms: issued + 60_000,
+            defaults: RelayLimitDefaults { user_mbps: 10 },
+            user_limits: vec![],
+            endpoints: vec![RelayEndpointPolicy {
+                endpoint_key: EndpointKey::new(*key.public().as_bytes()),
+                owner: RelayEndpointOwner::User {
+                    scope: TrafficScope::User { user_id },
+                },
+            }],
+            connection_intents: vec![],
+        };
+        let runtime =
+            RelayPolicyRuntime::new(RelayPolicyState::new(Duration::from_millis(100)).unwrap());
+        runtime.enable_cluster("clock-test".into(), uuid::Uuid::new_v4());
+        runtime
+            .apply_control_snapshot(make(1), Instant::now())
+            .unwrap();
+        assert!(runtime.endpoint_owner(key.public()).unwrap().is_some());
+        assert!(
+            runtime
+                .apply_control_snapshot(make(2), Instant::now() - Duration::from_secs(61))
+                .is_err()
+        );
+        // A signed/authenticated response issued before a server clock correction
+        // cannot keep an absolute expiry from after the correction.
+        runtime
+            .refresh_control_expiry(
+                1,
+                issued - 100_000 + 60_000,
+                Some(issued - 100_000),
+                Instant::now(),
+            )
+            .unwrap();
+        assert!(runtime.endpoint_owner(key.public()).unwrap().is_some());
+        assert!(
+            runtime
+                .refresh_control_expiry(
+                    1,
+                    issued,
+                    Some(issued),
+                    Instant::now() - Duration::from_secs(1)
+                )
+                .is_err()
+        );
+    }
+}
+
+#[test]
 fn forwarding_hook_uses_current_endpoint_scope_and_limits() {
     let tenant_id = TenantId::new();
     let user_id = UserId::new();

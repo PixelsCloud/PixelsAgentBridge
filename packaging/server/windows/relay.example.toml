@@ -1,0 +1,15 @@
+node_id = "win-90-test"
+cluster_enabled = true
+usage_dir = "../data/relay"
+https_bind = "0.0.0.0:31443"
+quic_bind = "0.0.0.0:7842"
+[tls]
+cert = "../certs/relay.pem"
+key = "../certs/relay-key.pem"
+[control]
+url = "wss://server.example:8443/relay-control"
+secret = "replace-with-this-nodes-own-control-secret-at-least-32-bytes"
+# ca_cert = "../certs/private-ca.pem"
+[log]
+directory = "../logs/relay"
+level = "info"

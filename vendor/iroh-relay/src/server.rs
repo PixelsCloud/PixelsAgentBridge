@@ -183,6 +183,9 @@ pub enum ForwardingDecision {
 /// Implementations must return quickly and must not block the async runtime. Shared
 /// rate limiters can update a short critical section and return [`ForwardingDecision::Wait`].
 pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
+    /// Account individual packets rather than a GSO batch. Opt-in so existing
+    /// policies retain their original batching and accounting behavior.
+    fn split_datagram_batches(&self) -> bool { false }
     /// Called once after a datagram is successfully written, never for rate-limit retries/drops.
     fn on_forwarded(&self, _src: EndpointId, _dst: EndpointId, _bytes: usize) {}
     /// Checks whether a datagram can be forwarded now.
@@ -196,6 +199,8 @@ pub trait ForwardingControl: std::fmt::Debug + Send + Sync + 'static {
 
 /// Dynamic form of [`ForwardingControl`].
 pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
+    /// See [`ForwardingControl::split_datagram_batches`].
+    fn split_datagram_batches(&self) -> bool;
     /// See [`ForwardingControl::on_forwarded`].
     fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize);
     /// See [`ForwardingControl::check`].
@@ -208,6 +213,9 @@ pub trait DynForwardingControl: std::fmt::Debug + Send + Sync + 'static {
 }
 
 impl<T: ForwardingControl> DynForwardingControl for T {
+    fn split_datagram_batches(&self) -> bool {
+        <Self as ForwardingControl>::split_datagram_batches(self)
+    }
     fn on_forwarded(&self, src: EndpointId, dst: EndpointId, bytes: usize) {
         <Self as ForwardingControl>::on_forwarded(self, src, dst, bytes)
     }

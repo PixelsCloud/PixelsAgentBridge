@@ -996,6 +996,7 @@ async fn tls_account_flow(pool: PgPool) {
     let running_relay = tokio::time::timeout(
         Duration::from_secs(30),
         start_relay_service(RelayServiceConfig {
+            cluster_enabled: false,
             node_id: "primary".into(),
             usage_dir: certificate_directory.path().join("usage"),
             control_url: format!("wss://localhost:{}/relay-control", address.port()),

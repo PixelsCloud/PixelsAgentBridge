@@ -7,6 +7,7 @@ use pab_protocol::{EndpointKey, TrafficScope, UserId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKey {
+    RelayNode,
     User(UserId),
     Guest(EndpointKey),
 }
@@ -15,6 +16,7 @@ pub enum LimitKey {
 pub struct Rate {
     bytes_per_second: u64,
     burst: Duration,
+    capacity_override: Option<u64>,
 }
 
 impl Rate {
@@ -22,13 +24,25 @@ impl Rate {
         (bytes_per_second > 0 && !burst.is_zero()).then_some(Self {
             bytes_per_second,
             burst,
+            capacity_override: None,
         })
     }
 
     fn capacity(self) -> u64 {
+        if let Some(capacity) = self.capacity_override {
+            return capacity;
+        }
         let bytes =
             u128::from(self.bytes_per_second).saturating_mul(self.burst.as_nanos()) / 1_000_000_000;
         bytes.clamp(1, u128::from(u64::MAX)) as u64
+    }
+
+    pub fn with_capacity(bytes_per_second: u64, capacity: u64) -> Option<Self> {
+        (bytes_per_second > 0 && capacity > 0).then_some(Self {
+            bytes_per_second,
+            burst: Duration::from_secs(1),
+            capacity_override: Some(capacity),
+        })
     }
 }
 
@@ -109,13 +123,16 @@ impl AggregateLimiter {
     }
 
     pub fn acquire(&mut self, scope: TrafficScope, bytes: u64, now: Instant) -> Acquire {
-        let keys: [Option<LimitKey>; 2] = match scope {
-            TrafficScope::User { user_id } => [Some(LimitKey::User(user_id)), None],
-            TrafficScope::Guest { endpoint_key } => [Some(LimitKey::Guest(endpoint_key)), None],
+        let key = match scope {
+            TrafficScope::User { user_id } => LimitKey::User(user_id),
+            TrafficScope::Guest { endpoint_key } => LimitKey::Guest(endpoint_key),
         };
+        self.acquire_keys(&[key], bytes, now)
+    }
 
+    pub fn acquire_keys(&mut self, keys: &[LimitKey], bytes: u64, now: Instant) -> Acquire {
         let mut wait = Duration::ZERO;
-        for key in keys.into_iter().flatten() {
+        for &key in keys {
             let Some(bucket) = self.buckets.get_mut(&key) else {
                 return Acquire::Missing(key);
             };
@@ -133,7 +150,7 @@ impl AggregateLimiter {
             return Acquire::Wait(wait);
         }
 
-        for key in keys.into_iter().flatten() {
+        for &key in keys {
             self.buckets
                 .get_mut(&key)
                 .expect("all buckets were checked")

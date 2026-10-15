@@ -225,6 +225,17 @@ impl Clients {
         src: EndpointId,
         metrics: &Metrics,
     ) -> Result<(), ForwardPacketError> {
+        if self.0.forwarding.split_datagram_batches() && data.segment_size.is_some() {
+            let mut remaining=data;
+            while !remaining.contents.is_empty() {
+                self.send_packet_part(dst,remaining.take_segments(1),src,metrics).await?;
+            }
+            return Ok(());
+        }
+        self.send_packet_part(dst,data,src,metrics).await
+    }
+
+    async fn send_packet_part(&self,dst:EndpointId,data:Datagrams,src:EndpointId,metrics:&Metrics)->Result<(),ForwardPacketError> {
         loop {
             match self.0.forwarding.check(src, dst, data.contents.len()) {
                 ForwardingDecision::Allow => break,

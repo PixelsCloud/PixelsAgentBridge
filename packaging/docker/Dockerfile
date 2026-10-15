@@ -6,7 +6,7 @@ COPY apps/web/ ./
 RUN npm run build:assets
 
 FROM rust:1.95-bookworm AS builder
-ENV CARGO_BUILD_JOBS=10 CMAKE_BUILD_PARALLEL_LEVEL=10
+ENV CARGO_BUILD_JOBS=8 CMAKE_BUILD_PARALLEL_LEVEL=2
 
 WORKDIR /src
 COPY . .
@@ -15,10 +15,11 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
     cargo build --locked --release \
         -p pab-server --bin pab-server \
-        -p pab-relay --bin pab-relay-server \
+        -p pab-relay --bin pab-relay-server --bin pab-relay-healthcheck \
     && mkdir -p /out \
     && cp /src/target/release/pab-server /out/pab-server \
-    && cp /src/target/release/pab-relay-server /out/pab-relay-server
+    && cp /src/target/release/pab-relay-server /out/pab-relay-server \
+    && cp /src/target/release/pab-relay-healthcheck /out/pab-relay-healthcheck
 
 FROM debian:bookworm-slim AS runtime
 
@@ -31,6 +32,7 @@ RUN apt-get update \
 
 COPY --from=builder /out/pab-server /usr/local/bin/pab-server
 COPY --from=builder /out/pab-relay-server /usr/local/bin/pab-relay-server
+COPY --from=builder /out/pab-relay-healthcheck /usr/local/bin/pab-relay-healthcheck
 COPY --from=web-builder /web/dist /usr/local/bin/web
 
 USER pab:pab

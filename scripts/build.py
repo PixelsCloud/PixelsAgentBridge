@@ -157,9 +157,9 @@ def main():
                     run([sys.executable, 'packaging/desktop/build_nsis.py', '--profile', args.profile])
             elif target == 'server':
                 frontend('web')
-                run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-server', '--bin', 'pab-server', '-p', 'pab-relay', '--bin', 'pab-relay-server'])
+                run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-server', '--bin', 'pab-server', '-p', 'pab-relay', '--bin', 'pab-relay-server', '--bin', 'pab-relay-healthcheck'])
                 suffix = '.exe' if os.name == 'nt' else ''
-                files = {name + suffix: CARGO_TARGET / args.profile / (name + suffix) for name in ['pab-server', 'pab-relay-server']}
+                files = {name + suffix: CARGO_TARGET / args.profile / (name + suffix) for name in ['pab-server', 'pab-relay-server', 'pab-relay-healthcheck']}
                 record_artifacts(ROOT, target, args.profile, version, files | web_files())
                 if args.package:
                     run([sys.executable, 'packaging/server/build.py', '--platform', 'windows' if os.name == 'nt' else 'linux',

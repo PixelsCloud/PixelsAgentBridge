@@ -16,6 +16,7 @@
 - [准备配置与证书](#deploy-config)
 - [构建、启动与初始化](#deploy-start)
 - [让两端连接您的服务](#deploy-clients)
+- [Relay 多节点与滚动升级](#relay-cluster)
 - [备份、升级与维护](#maintenance)
 - [常见问题](#questions)
 
@@ -60,6 +61,8 @@ relay_urls = ["https://pab-relay.rgaa.vip"]
 修改安装配置后重启后台服务，并重新启动 Desktop/MCP。Desktop 设置页保存的服务器地址为用户数据目录下的 operator-server.toml，MCP 工具开关为 mcp-tools.toml。用户服务器设置覆盖安装默认值；显式 --config PATH 使用指定 TOML，并跳过用户服务器覆盖。安装参数只用于首次安装，已有配置请直接编辑 TOML。
 
 旧 settings.json/settings.env 由安装器迁移；旧 operator-server.json 和 mcp-tools.json 在首次读取时迁移。已有 TOML 优先，格式错误会报错，不回退到旧配置。设备身份、登录凭据、数据库和发布清单属于运行数据，保留原格式。
+
+自部署的中继可按需增加 Windows 或 Linux 节点；服务端分发节点目录，客户端自动选择及故障切换，账号总带宽额度保持不变。配置和升级步骤见下方自我部署说明。
 
 <a id="linux-install"></a>
 
@@ -145,6 +148,10 @@ curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://br
 ### PostgreSQL
 
 持久保存账号、设备和管理数据。任务与文件仍留在本地。
+
+也可在原生 Windows 上直接运行 pab-server.exe 和 pab-relay-server.exe，不需要 WSL；PostgreSQL 可放在其他机器。原生服务安装、版本替换及回退见专项指南。
+
+[原生服务与 Relay 集群运维指南 ↗](../docs/RELAY_CLUSTER_OPERATIONS.md)
 
 ### 准备环境
 
@@ -406,6 +413,16 @@ Relay:   https://relay.example.com
 
 - [返回第一个任务 ↑](#first-task)
 - [平台安装配置说明 ↗](../packaging/desktop/README.md)
+
+<a id="relay-cluster"></a>
+
+## Relay 多节点与滚动升级
+
+需要更多中继容量时，在 Server TOML 的 relay.cluster 节点清单中为每台 Relay 配置独立 HTTPS 地址、节点 ID、密钥及容量。Windows 与 Linux 节点可混用，账号的上传和下载额度由全部节点共享。中央 Server 仍保持单活。
+
+升级脚本先暂存并校验版本，逐节点维护；默认等待 30 秒后继续替换，不被长连接阻塞。新版本必须通过双向转发校验才恢复服务；失败时恢复原版本并停止后续升级。既有账号、设备、配置与数据保留。首次由单节点切换到集群模式前，需按运维指南停止旧 Relay 并等待原策略到期。
+
+[配置、自动升级和回滚步骤 ↗](../docs/RELAY_CLUSTER_OPERATIONS.md)
 
 <a id="maintenance"></a>
 

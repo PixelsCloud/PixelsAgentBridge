@@ -18,9 +18,173 @@ const CONTROL_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct RelayControlClient {
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
     node_id: String,
+    heartbeat_interval: Option<Duration>,
 }
 
 impl RelayControlClient {
+    pub(crate) async fn retire(
+        &mut self,
+        boot_id: uuid::Uuid,
+    ) -> Result<(), RelayControlClientError> {
+        let request_id = RequestId::new();
+        let request = RelayControlClientMessage::Goodbye {
+            request_id,
+            node_id: self.node_id.clone(),
+            boot_id,
+        };
+        match self.exchange(&request).await? {
+            RelayControlServerMessage::GoodbyeAccepted { request_id: id } if id == request_id => {
+                Ok(())
+            }
+            _ => Err(RelayControlClientError::UnexpectedMessage),
+        }
+    }
+    pub(crate) fn heartbeat_interval(&self) -> Option<Duration> {
+        self.heartbeat_interval
+    }
+    pub(crate) async fn sync_probe(
+        &mut self,
+        boot_id: uuid::Uuid,
+        runtime: &RelayPolicyRuntime,
+    ) -> Result<(), RelayControlClientError> {
+        let request_id = RequestId::new();
+        let started = std::time::Instant::now();
+        let request = RelayControlClientMessage::GetProbe {
+            request_id,
+            node_id: self.node_id.clone(),
+            boot_id,
+            applied: runtime.applied_probe(),
+        };
+        match self.exchange(&request).await? {
+            RelayControlServerMessage::Probe {
+                request_id: id,
+                snapshot,
+            } if id == request_id => runtime
+                .apply_probe(snapshot, started)
+                .map_err(|_| RelayControlClientError::UnexpectedMessage),
+            _ => Err(RelayControlClientError::UnexpectedMessage),
+        }
+    }
+    pub(crate) async fn heartbeat(
+        &mut self,
+        boot_id: uuid::Uuid,
+        metrics: &iroh_relay::server::Metrics,
+    ) -> Result<(), RelayControlClientError> {
+        let request_id = RequestId::new();
+        let request = RelayControlClientMessage::Heartbeat {
+            request_id,
+            node_id: self.node_id.clone(),
+            boot_id,
+            connections: metrics
+                .accepts
+                .get()
+                .saturating_sub(metrics.disconnects.get()),
+            received_bytes: metrics.bytes_recv.get(),
+            sent_bytes: metrics.bytes_sent.get(),
+        };
+        match self.exchange(&request).await? {
+            RelayControlServerMessage::HeartbeatAccepted { request_id: id } if id == request_id => {
+                Ok(())
+            }
+            _ => Err(RelayControlClientError::UnexpectedMessage),
+        }
+    }
+    pub(crate) async fn sync_budgets(
+        &mut self,
+        boot_id: uuid::Uuid,
+        runtime: &RelayPolicyRuntime,
+    ) -> Result<(), RelayControlClientError> {
+        let users = runtime.budget_users();
+        if users.is_empty() {
+            return Ok(());
+        }
+        let request_id = RequestId::new();
+        let started = std::time::Instant::now();
+        let request = RelayControlClientMessage::GetBudgets {
+            request_id,
+            node_id: self.node_id.clone(),
+            boot_id,
+            users,
+        };
+        match self.exchange(&request).await? {
+            RelayControlServerMessage::Budgets {
+                request_id: id,
+                snapshot,
+            } if id == request_id => runtime
+                .apply_budgets(snapshot, started)
+                .map_err(|_| RelayControlClientError::UnexpectedMessage),
+            RelayControlServerMessage::Error { code, message, .. } => {
+                Err(RelayControlClientError::Server { code, message })
+            }
+            _ => Err(RelayControlClientError::MismatchedResponse),
+        }
+    }
+    pub async fn cluster_hello(
+        &mut self,
+        node_id: &str,
+        boot_id: uuid::Uuid,
+    ) -> Result<(Duration, u64), RelayControlClientError> {
+        self.node_id = node_id.to_owned();
+        let request_id = RequestId::new();
+        let request = RelayControlClientMessage::Hello {
+            request_id,
+            node_id: node_id.into(),
+            boot_id,
+            cluster_schema: pab_protocol::RELAY_CLUSTER_SCHEMA_VERSION,
+            policy_schema: pab_protocol::RELAY_POLICY_SCHEMA_VERSION,
+            agent_version: env!("CARGO_PKG_VERSION").into(),
+        };
+        let reply = self.exchange(&request).await?;
+        match reply {
+            RelayControlServerMessage::HelloAccepted {
+                request_id: id,
+                heartbeat_seconds,
+                capacity_bytes_per_second,
+            } if id == request_id
+                && (1..=30).contains(&heartbeat_seconds)
+                && capacity_bytes_per_second > 0 =>
+            {
+                self.heartbeat_interval = Some(Duration::from_secs(heartbeat_seconds));
+                Ok((
+                    Duration::from_secs(heartbeat_seconds),
+                    capacity_bytes_per_second,
+                ))
+            }
+            RelayControlServerMessage::Error { code, message, .. } => {
+                Err(RelayControlClientError::Server { code, message })
+            }
+            _ => Err(RelayControlClientError::MismatchedResponse),
+        }
+    }
+
+    async fn exchange(
+        &mut self,
+        request: &RelayControlClientMessage,
+    ) -> Result<RelayControlServerMessage, RelayControlClientError> {
+        tokio::time::timeout(CONTROL_OPERATION_TIMEOUT, async {
+            self.socket
+                .send(Message::Text(serde_json::to_string(request)?.into()))
+                .await?;
+            loop {
+                match self
+                    .socket
+                    .next()
+                    .await
+                    .ok_or(RelayControlClientError::Closed)??
+                {
+                    Message::Text(text) => match serde_json::from_str(&text)? {
+                        RelayControlServerMessage::PolicyChanged => {}
+                        response => return Ok(response),
+                    },
+                    Message::Ping(data) => self.socket.send(Message::Pong(data)).await?,
+                    Message::Pong(_) => {}
+                    _ => return Err(RelayControlClientError::UnexpectedMessage),
+                }
+            }
+        })
+        .await
+        .map_err(|_| RelayControlClientError::Timeout)?
+    }
     pub(crate) async fn report_usage(
         &mut self,
         node_id: &str,
@@ -109,6 +273,7 @@ impl RelayControlClient {
         Ok(Self {
             socket,
             node_id: "primary".into(),
+            heartbeat_interval: None,
         })
     }
 
@@ -121,6 +286,7 @@ impl RelayControlClient {
         &mut self,
         runtime: &RelayPolicyRuntime,
     ) -> Result<PolicySync, RelayControlClientError> {
+        let started = std::time::Instant::now();
         let request_id = RequestId::new();
         let request = RelayControlClientMessage::GetPolicy {
             request_id,
@@ -163,7 +329,7 @@ impl RelayControlClient {
                 snapshot,
             } if response_id == request_id => {
                 let version = snapshot.policy_version;
-                runtime.apply_snapshot(snapshot)?;
+                runtime.apply_control_snapshot(snapshot, started)?;
                 Ok(PolicySync::Updated {
                     policy_version: version,
                 })
@@ -172,8 +338,14 @@ impl RelayControlClient {
                 request_id: response_id,
                 policy_version,
                 expires_at_unix_ms,
+                issued_at_unix_ms,
             } if response_id == request_id => {
-                runtime.refresh_expiry(policy_version, expires_at_unix_ms)?;
+                runtime.refresh_control_expiry(
+                    policy_version,
+                    expires_at_unix_ms,
+                    issued_at_unix_ms,
+                    started,
+                )?;
                 Ok(PolicySync::Unchanged { policy_version })
             }
             RelayControlServerMessage::Error {

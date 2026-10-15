@@ -142,6 +142,19 @@ impl RelayPolicyState {
             .flatten()
     }
 
+    pub(crate) fn refresh_cluster_expiry(
+        &mut self,
+        version: u64,
+        expires: i64,
+        now: i64,
+    ) -> Result<(), PolicyStateError> {
+        self.refresh_expiry(version, expires, now)?;
+        // Cluster acknowledgments carry a fresh server clock anchor. Do not
+        // retain a later absolute expiry from before a server clock correction.
+        self.expires_at_unix_ms = expires;
+        Ok(())
+    }
+
     pub fn traffic_scope(
         &self,
         first: EndpointKey,

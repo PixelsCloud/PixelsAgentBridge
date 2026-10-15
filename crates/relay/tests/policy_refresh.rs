@@ -136,6 +136,7 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
                     request_id,
                     policy_version,
                     expires_at_unix_ms: snapshot.expires_at_unix_ms,
+                    issued_at_unix_ms: None,
                 }
             } else {
                 RelayControlServerMessage::PolicySnapshot {
@@ -153,6 +154,7 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         }
     });
     let relay = start_relay_service(RelayServiceConfig {
+        cluster_enabled: false,
         node_id: "configured-relay-node".into(),
         usage_dir: directory.path().join("usage"),
         control_url,

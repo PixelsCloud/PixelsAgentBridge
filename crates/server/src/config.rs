@@ -35,6 +35,8 @@ fn enabled() -> bool {
 #[serde(deny_unknown_fields)]
 pub struct RelayConfig {
     pub control_secret: String,
+    /// Absent keeps legacy single-node operation and its wire contract unchanged.
+    pub cluster: Option<crate::relay_cluster::RelayClusterConfig>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -88,6 +90,18 @@ impl ServerConfig {
         }
         crate::RelayControlAuth::new(&self.relay.control_secret)
             .map_err(|_| Invalid("relay.control_secret requires at least 32 bytes"))?;
+        if let Some(cluster) = &mut self.relay.cluster {
+            cluster.validate().map_err(Invalid)?;
+            if cluster
+                .nodes
+                .iter()
+                .any(|node| node.control_secret == self.relay.control_secret)
+            {
+                return Err(Invalid(
+                    "cluster node secret must differ from legacy control_secret",
+                ));
+            }
+        }
         // Validate optional OAuth credentials and proxy before connecting to the database.
         self.github_config().map_err(Invalid)?;
         Ok(())

@@ -1,0 +1,7 @@
+# Use a private file. Credentials are never passed as command line arguments.
+control_url = "https://control.example.com"
+node_id = "relay-linux-1"
+# ca_cert = "private-ca.pem"
+# relay_ca_cert = "private-ca.pem"
+[auth]
+access_token_file = "admin-token.private"

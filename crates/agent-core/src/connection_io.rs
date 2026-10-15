@@ -15,6 +15,22 @@ pub(crate) enum IncomingControlFrame {
 }
 
 impl AuthenticatedControlConnection {
+    pub(crate) async fn send_relay_directory(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<RequestId, EndpointControlError> {
+        let request_id = RequestId::new();
+        send(
+            &mut self.socket,
+            &ControlClientMessage::GetRelayDirectory {
+                request_id,
+                schema_version: pab_protocol::RELAY_CLUSTER_SCHEMA_VERSION,
+            },
+            timeout,
+        )
+        .await?;
+        Ok(request_id)
+    }
     pub(crate) async fn send_ping(
         &mut self,
         payload: Vec<u8>,

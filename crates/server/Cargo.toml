@@ -6,6 +6,7 @@ rust-version.workspace = true
 
 [dependencies]
 pab-service-config = { path = "../service-config" }
+pab-service-host = { path = "../service-host" }
 argon2 = "0.5"
 axum = { version = "0.8", features = ["ws"] }
 axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }

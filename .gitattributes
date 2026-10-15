@@ -1,4 +1,5 @@
 *.patch -whitespace
+vendor/iroh-relay/**/*.rs text eol=lf
 *.sh text eol=lf
 acceptance/fixtures/document/*.pdf binary
 acceptance/fixtures/document/*.png binary

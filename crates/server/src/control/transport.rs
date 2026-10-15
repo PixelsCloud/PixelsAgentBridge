@@ -38,13 +38,40 @@ pub async fn serve_tls(
     private_key_path: PathBuf,
     state: ControlApiState,
 ) -> std::io::Result<()> {
+    serve_tls_until(
+        address,
+        certificate_path,
+        private_key_path,
+        state,
+        std::future::pending::<()>(),
+    )
+    .await
+}
+
+pub async fn serve_tls_until(
+    address: SocketAddr,
+    certificate_path: PathBuf,
+    private_key_path: PathBuf,
+    state: ControlApiState,
+    stop: impl std::future::Future<Output = ()>,
+) -> std::io::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let tls =
         axum_server::tls_rustls::RustlsConfig::from_pem_file(certificate_path, private_key_path)
             .await?;
-    axum_server::bind_rustls(address, tls)
-        .serve(control_router(state).into_make_service())
-        .await
+    let handle = axum_server::Handle::new();
+    let server = axum_server::bind_rustls(address, tls)
+        .handle(handle.clone())
+        .serve(control_router(state).into_make_service());
+    tokio::pin!(server);
+    tokio::select! {
+        result=&mut server=>result,
+        _=stop=>{
+            handle.graceful_shutdown(Some(Duration::from_secs(5)));
+            tokio::time::timeout(Duration::from_secs(7),server).await
+                .unwrap_or_else(|_|Err(std::io::Error::new(std::io::ErrorKind::TimedOut,"server stop deadline exceeded")))
+        }
+    }
 }
 
 async fn health(State(state): State<ControlApiState>) -> StatusCode {
@@ -75,13 +102,26 @@ async fn relay_control_upgrade(
     let authorization = headers
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok());
-    if !state.relay_auth.authorizes(authorization) {
+    let identity = if let Some(config) = state.control.relay_config() {
+        super::RelayControlAuth::cluster_identity(authorization, &config).map(Some)
+    } else {
+        state.relay_auth.identity(authorization)
+    };
+    let Some(identity) = identity else {
         return StatusCode::UNAUTHORIZED.into_response();
-    }
+    };
+    let binding = *blake3::hash(
+        authorization
+            .unwrap_or_default()
+            .strip_prefix("Bearer ")
+            .unwrap_or_default()
+            .as_bytes(),
+    )
+    .as_bytes();
     websocket
         .max_message_size(MAX_CONTROL_MESSAGE_BYTES)
         .max_frame_size(MAX_CONTROL_MESSAGE_BYTES)
-        .on_upgrade(move |socket| run_relay_socket(socket, state))
+        .on_upgrade(move |socket| run_relay_socket(socket, state, identity, binding))
 }
 
 async fn run_socket(socket: WebSocket, state: ControlApiState) {

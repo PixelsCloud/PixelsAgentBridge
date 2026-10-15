@@ -10,7 +10,7 @@ mod transport;
 
 pub use relay_auth::{RelayControlAuth, RelayControlAuthError};
 pub use session::ControlSession;
-pub use transport::{control_router, serve_tls};
+pub use transport::{control_router, serve_tls, serve_tls_until};
 
 #[derive(Debug, Clone)]
 pub struct ControlApiConfig {

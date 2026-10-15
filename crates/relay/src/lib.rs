@@ -1,8 +1,10 @@
 #![forbid(unsafe_code)]
 
+mod budgets;
 mod control_client;
 mod limiter;
 mod policy;
+mod probes;
 mod runtime;
 #[cfg(test)]
 mod runtime_tests;
@@ -15,5 +17,5 @@ pub use policy::{PolicyStateError, RelayPolicyState};
 pub use runtime::{PolicyRuntimeError, RelayPolicyRuntime};
 pub use service::{
     RelayFileConfig, RelayServiceConfig, RelayServiceConfigError, RunningRelayService,
-    run_relay_service, start_relay_service,
+    check_relay_config, run_relay_service, run_relay_service_until, start_relay_service,
 };

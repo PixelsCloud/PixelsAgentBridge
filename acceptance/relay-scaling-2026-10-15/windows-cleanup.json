@@ -1,0 +1,8 @@
+{
+  "temporary_firewall_rule_removed": true,
+  "temporary_windows_account_removed": true,
+  "temporary_scheduled_task_absent": true,
+  "test_ports_closed": true,
+  "test_services_removed": true,
+  "original_executor_running": true
+}

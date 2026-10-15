@@ -18,7 +18,7 @@ parser.add_argument('--output-dir', type=Path, default=root / '.build/packages')
 args = parser.parse_args()
 binary_dir = args.binary_dir or root / 'target' / args.profile
 suffix = '.exe' if args.platform == 'windows' else ''
-files = [(binary_dir / (name + suffix), name + suffix) for name in ['pab-server', 'pab-relay-server']]
+files = [(binary_dir / (name + suffix), name + suffix) for name in ['pab-server', 'pab-relay-server', 'pab-relay-healthcheck']]
 web = root / 'apps/web/dist'
 if not (web / 'index.html').is_file():
     raise SystemExit('Build apps/web first: npm ci && npm run build')
@@ -32,6 +32,17 @@ version = verify_artifacts(root, 'server', args.profile, {member: path for path,
 files.append((root / 'WEB_DEPLOYMENT.md', 'WEB_DEPLOYMENT.md'))
 files.append((root / 'WEB_DEVELOPMENT.md', 'WEB_DEVELOPMENT.md'))
 files.append((root / 'BUILDING.md', 'BUILDING.md'))
+files.append((root / 'packaging/server/cluster.example.toml', 'cluster.example.toml'))
+files.append((root / 'scripts/roll_relays.py', 'roll_relays.py'))
+files.append((root / 'packaging/server/rollout.example.toml', 'rollout.example.toml'))
+files.append((root / 'packaging/server/healthcheck.example.toml', 'healthcheck.example.toml'))
+files.append((root / 'packaging/server/docker/install.py', 'docker/install.py'))
+files.append((root / 'docs/RELAY_CLUSTER_OPERATIONS.md', 'RELAY_CLUSTER_OPERATIONS.md'))
+if args.platform == 'windows':
+    for name in ['install.ps1','server.example.toml','relay.example.toml']:
+        files.append((root / 'packaging/server/windows' / name, 'windows/' + name))
+else:
+    files.append((root / 'packaging/server/linux/install.py', 'linux/install.py'))
 for path, _ in files:
     if not path.is_file():
         raise SystemExit(f'Missing required build artifact: {path}')
@@ -46,7 +57,7 @@ else:
     with tarfile.open(archive, 'w:gz') as out:
         for path, member in files:
             def permissions(info):
-                info.mode = 0o755 if member in ['pab-server', 'pab-relay-server'] else 0o644
+                info.mode = 0o755 if member in ['pab-server', 'pab-relay-server', 'pab-relay-healthcheck'] else 0o644
                 return info
             out.add(path, arcname=member, recursive=False, filter=permissions)
 manifest = {'archive': archive.name, 'version': version, 'sha256': sha256(archive.read_bytes()).hexdigest(), 'files': {member: sha256(path.read_bytes()).hexdigest() for path, member in files}}

@@ -1,4 +1,4 @@
-use std::{io::Cursor, net::SocketAddr, time::Duration};
+use std::{io::Cursor, net::SocketAddr, sync::Arc, time::Duration};
 
 use iroh::{
     Endpoint, EndpointAddr, EndpointId, RelayMap, RelayMode, RelayUrl, SecretKey, Watcher as _,
@@ -67,6 +67,8 @@ impl PabEndpointConfig {
 #[derive(Clone)]
 pub struct PabEndpoint {
     inner: Endpoint,
+    relay_map: RelayMap,
+    relay_revision: Arc<tokio::sync::Mutex<u64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,7 +86,7 @@ impl PabEndpoint {
         let builder = Endpoint::builder(presets::Minimal)
             .secret_key(secret)
             .alpns(vec![PAB_ALPN.to_vec()])
-            .relay_mode(RelayMode::Custom(relay_map))
+            .relay_mode(RelayMode::Custom(relay_map.clone()))
             .ca_tls_config(config.tls);
         #[cfg(any(debug_assertions, feature = "test-utils"))]
         let builder = if config.relay_only_for_testing {
@@ -96,7 +98,11 @@ impl PabEndpoint {
             .bind()
             .await
             .map_err(|error| PabEndpointError::Bind(error.to_string()))?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            relay_map,
+            relay_revision: Arc::new(tokio::sync::Mutex::new(0)),
+        })
     }
 
     pub fn id(&self) -> EndpointId {
@@ -123,6 +129,131 @@ impl PabEndpoint {
 
     pub fn endpoint(&self) -> &Endpoint {
         &self.inner
+    }
+
+    /// Follows an authenticated control supervisor. The task dies with either
+    /// the endpoint or the producer; it never owns a second control connection.
+    pub fn follow_relay_updates(&self, mut updates: watch::Receiver<(u64, Vec<String>)>) {
+        let endpoint = self.clone();
+        let closed = self.inner.closed();
+        tokio::spawn(closed.run_until(async move {
+            let mut catalog_revision = 0;
+            let mut mutation_revision = *endpoint.relay_revision.lock().await;
+            let mut candidates = Vec::<String>::new();
+            let mut selected = None::<String>;
+            let mut failing_since = None::<tokio::time::Instant>;
+            let mut tick = tokio::time::interval(Duration::from_secs(1));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut first = true;
+            loop {
+                if !first {
+                    tokio::select! {
+                        changed=updates.changed()=>if changed.is_err(){break;},
+                        _=tick.tick(),if catalog_revision>0=>{},
+                    }
+                }
+                first = false;
+                let (revision, urls) = updates.borrow_and_update().clone();
+                if revision > catalog_revision {
+                    // Validate the complete candidate set before considering a switch.
+                    if validate_relay_urls(&urls).is_err() {
+                        continue;
+                    }
+                    // TOML commonly omits the trailing slash; iroh exposes a
+                    // canonical RelayUrl. Compare canonical values, otherwise
+                    // a healthy node appears disconnected and rotates forever.
+                    candidates = urls
+                        .into_iter()
+                        .filter_map(|value| value.parse::<RelayUrl>().ok())
+                        .map(|url| url.to_string())
+                        .collect();
+                    catalog_revision = revision;
+                }
+                if catalog_revision == 0 {
+                    continue;
+                }
+                let mut next = selected
+                    .clone()
+                    .filter(|url| candidates.contains(url))
+                    .or_else(|| candidates.first().cloned());
+                let healthy = endpoint
+                    .inner
+                    .home_relay_status()
+                    .get()
+                    .iter()
+                    .any(|status| {
+                        status.is_connected() && next.as_deref() == Some(status.url().as_str())
+                    });
+                if healthy {
+                    failing_since = None;
+                } else if let Some(url) = &next {
+                    let since = failing_since.get_or_insert_with(tokio::time::Instant::now);
+                    let jitter = u64::from(endpoint.id().as_bytes()[0]) * 4;
+                    if since.elapsed() >= Duration::from_millis(3000 + jitter)
+                        && candidates.len() > 1
+                    {
+                        let index = candidates
+                            .iter()
+                            .position(|candidate| candidate == url)
+                            .unwrap_or(0);
+                        next = Some(candidates[(index + 1) % candidates.len()].clone());
+                        failing_since = None;
+                    }
+                }
+                if next != selected || mutation_revision == 0 {
+                    mutation_revision = mutation_revision.saturating_add(1);
+                    let desired: Vec<_> = next.clone().into_iter().collect();
+                    if let Err(error) = endpoint.update_relays(mutation_revision, &desired).await {
+                        tracing::warn!(%error, revision, "Relay directory could not be applied");
+                    } else {
+                        selected = next;
+                        failing_since = None;
+                    }
+                }
+            }
+        }));
+    }
+
+    /// Apply a complete authenticated directory's eligible URL set. Validate
+    /// everything before mutation; serialize revisions and add before removing.
+    /// An empty set is legitimate during an outage and does not close P2P.
+    pub async fn update_relays(
+        &self,
+        revision: u64,
+        urls: &[String],
+    ) -> Result<bool, PabEndpointError> {
+        if revision == 0 {
+            return Err(PabEndpointError::InvalidRelayDirectory);
+        }
+        let desired = validate_relay_urls(urls)?;
+        let mut current = self.relay_revision.lock().await;
+        if revision <= *current {
+            return Ok(false);
+        }
+        if self.inner.is_closed() {
+            return Err(PabEndpointError::EndpointClosed);
+        }
+        let previous = self.relay_map.urls::<Vec<_>>();
+        for url in &desired {
+            if !previous.contains(url) {
+                self.inner
+                    .insert_relay(
+                        url.clone(),
+                        Arc::new(iroh_relay::RelayConfig::from(url.clone())),
+                    )
+                    .await;
+            }
+        }
+        for url in previous {
+            if !desired.contains(&url) {
+                self.inner.remove_relay(&url).await;
+            }
+        }
+        if self.inner.is_closed() {
+            return Err(PabEndpointError::EndpointClosed);
+        }
+        *current = revision;
+        Ok(true)
     }
 
     pub async fn connect(
@@ -182,6 +313,33 @@ impl PabEndpoint {
     }
 }
 
+fn validate_relay_urls(
+    urls: &[String],
+) -> Result<std::collections::BTreeSet<RelayUrl>, PabEndpointError> {
+    if urls.len() > 64 {
+        return Err(PabEndpointError::InvalidRelayDirectory);
+    }
+    let mut desired = std::collections::BTreeSet::new();
+    for value in urls {
+        let url = value
+            .parse::<RelayUrl>()
+            .map_err(|_| PabEndpointError::InvalidRelayDirectory)?;
+        if url.scheme() != "https"
+            || url.host_str().is_none()
+            || url.path() != "/"
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || value.len() > 2048
+            || !desired.insert(url)
+        {
+            return Err(PabEndpointError::InvalidRelayDirectory);
+        }
+    }
+    Ok(desired)
+}
+
 fn convert_address(address: &EndpointAddr) -> PabEndpointAddress {
     PabEndpointAddress {
         relay_urls: address.relay_urls().map(ToString::to_string).collect(),
@@ -191,6 +349,10 @@ fn convert_address(address: &EndpointAddr) -> PabEndpointAddress {
 
 #[derive(Debug, Error)]
 pub enum PabEndpointError {
+    #[error("invalid Relay directory")]
+    InvalidRelayDirectory,
+    #[error("endpoint is closed")]
+    EndpointClosed,
     #[error("at least one self-hosted Relay URL must be configured")]
     NoRelayUrls,
     #[error("Relay URL must use HTTPS: {0}")]

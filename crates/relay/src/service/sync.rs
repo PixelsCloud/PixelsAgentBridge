@@ -7,7 +7,10 @@ use crate::{PolicySync, RelayControlClient, RelayControlClientError, RelayPolicy
 
 const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
+#[derive(Clone)]
 pub struct PolicySyncSettings {
+    pub metrics: Option<std::sync::Arc<iroh_relay::server::Metrics>>,
+    pub boot_id: Option<uuid::Uuid>,
     pub node_id: String,
     pub control_url: String,
     pub control_secret: String,
@@ -24,6 +27,10 @@ pub async fn connect_and_sync(
         RelayControlClient::connect(&settings.control_url, &settings.control_secret, connector)
             .await?
             .with_node_id(settings.node_id.clone());
+    if let Some(boot) = settings.boot_id {
+        let (_, capacity) = client.cluster_hello(&settings.node_id, boot).await?;
+        runtime.set_node_capacity(capacity);
+    }
     client.sync_policy(runtime).await?;
     // Report the version actually applied, so Server can distinguish offered/applied.
     client.sync_policy(runtime).await?;
@@ -38,9 +45,30 @@ pub fn spawn_refresh_loop(
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut last_refresh = tokio::time::Instant::now();
+        let mut refresh = tokio::time::interval(
+            client
+                .heartbeat_interval()
+                .unwrap_or(settings.refresh_interval),
+        );
+        refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut budgets = tokio::time::interval(Duration::from_secs(1));
+        budgets.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             let on_demand = tokio::select! {
-                _ = tokio::time::sleep(settings.refresh_interval) => false,
+                _ = budgets.tick(), if settings.boot_id.is_some()=>{
+                    if let Err(error)=client.sync_budgets(settings.boot_id.unwrap(),&runtime).await {
+                        tracing::debug!(%error,"Relay budget not available yet");
+                        if !matches!(error,RelayControlClientError::Server{..}){
+                            client=reconnect(&settings,connector.clone(),&runtime).await;continue;
+                        }
+                    }
+                    if let Err(error)=client.sync_probe(settings.boot_id.unwrap(),&runtime).await{
+                        tracing::debug!(%error,"Relay probe synchronization failed");
+                        client=reconnect(&settings,connector.clone(),&runtime).await;
+                    }
+                    continue;
+                }
+                _ = refresh.tick() => false,
                 _ = runtime.wait_for_refresh_request() => true,
                 _ = client.wait_for_policy_change() => true,
             };
@@ -62,6 +90,18 @@ pub fn spawn_refresh_loop(
                 }
             }
             last_refresh = tokio::time::Instant::now();
+            let desired = client
+                .heartbeat_interval()
+                .unwrap_or(settings.refresh_interval);
+            if refresh.period() != desired {
+                refresh = tokio::time::interval(desired);
+                refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            }
+            if let (Some(boot), Some(metrics)) = (settings.boot_id, settings.metrics.as_ref()) {
+                if let Err(error) = client.heartbeat(boot, metrics).await {
+                    tracing::debug!(%error,"Relay telemetry report failed");
+                }
+            }
         }
     })
 }

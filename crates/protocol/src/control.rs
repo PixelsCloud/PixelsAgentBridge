@@ -10,6 +10,10 @@ use crate::{
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ControlClientMessage {
+    GetRelayDirectory {
+        request_id: RequestId,
+        schema_version: u16,
+    },
     RegisterAccount {
         request_id: RequestId,
         username: String,
@@ -103,6 +107,7 @@ pub enum ControlClientMessage {
 impl ControlClientMessage {
     pub const fn request_id(&self) -> RequestId {
         match self {
+            Self::GetRelayDirectory { request_id, .. } => *request_id,
             Self::RegisterAccount { request_id, .. }
             | Self::Login { request_id, .. }
             | Self::BeginUnclaimedDeviceRegistration { request_id, .. }
@@ -138,6 +143,11 @@ pub enum EndpointRegistration {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ControlServerMessage {
+    RelayDirectory {
+        request_id: RequestId,
+        /// None means legacy single-node mode, not an empty active cluster.
+        directory: Option<crate::RelayDirectory>,
+    },
     AccountAuthenticated {
         request_id: RequestId,
         user_id: UserId,

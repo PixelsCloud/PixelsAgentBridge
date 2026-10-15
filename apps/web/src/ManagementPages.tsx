@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, App, Button, Card, Descriptions, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Checkbox, Descriptions, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError, type Viewer } from './api';
@@ -80,16 +80,45 @@ export function TrafficPage({ liveRevision, me }: { liveRevision: number; me: Vi
 }
 
 function RelayNodes({ liveRevision }: { liveRevision: number }) {
-  const t = useText(); const date = useDate();
-  type Node = { id: string; online: boolean; agent_version: string | null; applied_policy_version: number | null; offered_policy_version: number; last_seen: number };
+  const t = useText(); const date = useDate(); const { message } = App.useApp();
+  type Node = { id: string; online: boolean; agent_version: string | null; applied_policy_version?: number | null; offered_policy_version?: number; last_seen: number | null;
+    url?:string; region?:string; capacity_mbps?:number; admin_state?:'active'|'maintenance'|'disabled'; health?:string; connections?:number; uploaded_bytes?:number; downloaded_bytes?:number };
+  const [editing,setEditing] = useState<{node:Node; state:'active'|'maintenance'|'disabled'; operationId:string}>();
+  const [busy,setBusy] = useState(false); const [allowOutage,setAllowOutage] = useState(false); const [error,setError] = useState<string>();
   const resource = usePage<Node>('/relays', liveRevision);
-  return <Card title={t('nodes')} extra={<Button onClick={resource.refresh}>{t('refresh')}</Button>}><Typography.Paragraph type="secondary">{t('relayStatusHint')}</Typography.Paragraph>
+  useEffect(() => { const timer=window.setInterval(resource.refresh,5000); return () => window.clearInterval(timer); },[resource.refresh]);
+  const choose = (node:Node,state:'active'|'maintenance'|'disabled') => { setEditing({node,state,operationId:crypto.randomUUID()});setAllowOutage(false);setError(undefined); };
+  async function changeState() {
+    if (!editing) return; setBusy(true);setError(undefined);
+    try { await api(`/relays/${encodeURIComponent(editing.node.id)}/state`,{method:'PATCH',body:JSON.stringify({state:editing.state,operation_id:editing.operationId,allow_outage:allowOutage})});
+      setEditing(undefined);resource.refresh();message.success(t('saved')); }
+    catch(e) { setError(e instanceof ApiError ? e.code : 'networkError'); }
+    finally { setBusy(false); }
+  }
+  async function reload() {
+    setBusy(true);
+    try {await api('/relays/reload',{method:'POST'});resource.refresh();message.success(t('saved'));}
+    catch(e){message.error(t(e instanceof ApiError?e.code:'networkError'));}
+    finally {setBusy(false);}
+  }
+  return <Card title={t('nodes')} extra={<Space>{resource.data?.items.some(item=>item.admin_state) && <Button loading={busy} onClick={reload}>{t('relayReload')}</Button>}<Button onClick={resource.refresh}>{t('refresh')}</Button></Space>}><Typography.Paragraph type="secondary">{t('relayStatusHint')}</Typography.Paragraph>
     {resource.error && <Alert type="error" title={t(resource.error)}/>}
     <Table<Node> rowKey="id" dataSource={resource.data?.items ?? []} loading={resource.loading} pagination={{ current: resource.data?.page ?? 1, pageSize: resource.data?.page_size ?? 20, total: resource.data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20,50,100], onChange: resource.paginate }} scroll={{ x: 700 }} columns={[
-      { title: t('name'), dataIndex: 'id' }, { title: t('controlStatus'), render: (_, item) => <Tag color={item.online ? 'success' : 'default'}>{t(item.online ? 'online' : 'offline')}</Tag> },
-      { title: t('version'), render: (_, item) => item.agent_version ?? t('unknown') }, { title: t('policyApplied'), render: (_, item) => item.applied_policy_version ?? t('unknown') },
-      { title: t('policyOffered'), dataIndex: 'offered_policy_version' }, { title: t('lastSeen'), render: (_, item) => date(item.last_seen) },
+      { title: t('name'), render:(_,item)=><Space orientation="vertical" size={0}><Typography.Text strong>{item.id}</Typography.Text>{item.url && <Typography.Text type="secondary" copyable style={{fontSize:12,overflowWrap:'anywhere'}}>{item.url}</Typography.Text>}{item.region && <Typography.Text type="secondary">{item.region}</Typography.Text>}</Space> },
+      { title: t('controlStatus'), render: (_, item) => <Space orientation="vertical" size={4}><Tag color={item.online ? 'success' : 'default'}>{item.health ? t(`relayHealth.${item.health}`) : t(item.online ? 'online' : 'offline')}</Tag>{item.admin_state && <Tag color={item.admin_state==='maintenance'?'warning':undefined}>{t(`relayState.${item.admin_state}`)}</Tag>}</Space> },
+      { title: t('version'), render: (_, item) => item.agent_version ?? t('unknown') },
+      { title: t('policyApplied'), render:(_,item)=>item.applied_policy_version ?? '—' },
+      { title: t('policyOffered'), render:(_,item)=>item.offered_policy_version ?? '—' },
+      { title: t('relayCapacity'), render:(_,item)=>item.capacity_mbps ? `${item.capacity_mbps} Mbps` : '—' },
+      { title:t('relayLiveConnections'),render:(_,item)=>item.connections ?? '—' },
+      { title: t('lastSeen'), render: (_, item) => item.last_seen ? date(item.last_seen) : '—' },
+      { title:t('actions'),render:(_,item)=>item.admin_state && <Space wrap>{item.admin_state!=='maintenance' && <Button size="small" onClick={()=>choose(item,'maintenance')}>{t('relayMaintain')}</Button>}{item.admin_state!=='active' && <Button size="small" disabled={item.health!=='healthy'} onClick={()=>choose(item,'active')}>{t('relayActivate')}</Button>}{item.admin_state!=='disabled' && <Button size="small" danger onClick={()=>choose(item,'disabled')}>{t('relayDisable')}</Button>}</Space> },
     ]}/>
+    <Modal title={`${t(editing?.state==='active'?'relayActivate':editing?.state==='disabled'?'relayDisable':'relayMaintain')} · ${editing?.node.id ?? ''}`} open={!!editing} maskClosable={false} keyboard={false} onCancel={()=>!busy && setEditing(undefined)} onOk={changeState} confirmLoading={busy} okText={t('confirm')} cancelText={t('cancel')}>
+      <Typography.Paragraph>{t(editing?.state==='active'?'relayActivateHint':'relayMaintenanceHint')}</Typography.Paragraph>
+      {error && <Alert type="error" showIcon title={t(error)} style={{marginBottom:16}}/>}
+      {editing?.state!=='active' && <Checkbox checked={allowOutage} disabled={busy} onChange={event=>{setAllowOutage(event.target.checked);setEditing(current=>current && {...current,operationId:crypto.randomUUID()});}}>{t('relayAllowOutage')}</Checkbox>}
+    </Modal>
   </Card>;
 }
 

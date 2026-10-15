@@ -17,6 +17,7 @@ mod events;
 mod github;
 pub use github::GithubConfig;
 mod management;
+mod relay_probe;
 mod saved_devices;
 mod session;
 mod support;
@@ -90,10 +91,16 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/audit", get(management::audit))
         .route("/api/web/traffic", get(management::traffic))
         .route("/api/web/relays", get(management::relays))
+        .route("/api/web/relays/reload", post(management::reload_relays))
         .route(
-            "/api/web/service",
-            get(management::service_config),
+            "/api/web/relays/{node}/state",
+            axum::routing::patch(management::relay_state),
         )
+        .route(
+            "/api/web/relay-operations/{id}",
+            get(management::relay_operation),
+        )
+        .route("/api/web/service", get(management::service_config))
         .route(
             "/api",
             any(|| async { WebError::new(axum::http::StatusCode::NOT_FOUND, "not_found") }),
@@ -108,7 +115,28 @@ pub fn router(control: ControlApiState) -> Router {
             support::browser_boundary,
         ))
         .with_state(state.clone());
+    let native_admin = Router::new()
+        .route("/api/admin/relays/{node}/probe", post(relay_probe::create))
+        .route(
+            "/api/admin/relay-probes/{id}",
+            get(relay_probe::status).delete(relay_probe::remove),
+        )
+        .route("/api/admin/relays/reload", post(management::reload_relays))
+        .route("/api/admin/relays", get(management::relays))
+        .route(
+            "/api/admin/relays/{node}/state",
+            axum::routing::patch(management::relay_state),
+        )
+        .route(
+            "/api/admin/relay-operations/{id}",
+            get(management::relay_operation),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            support::native_admin_boundary,
+        ));
     let native = Router::new()
+        .merge(native_admin)
         .route(
             "/api/account/saved-devices",
             get(saved_devices::native_changes).post(saved_devices::native_mutate),

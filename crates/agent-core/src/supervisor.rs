@@ -31,6 +31,9 @@ pub struct EndpointControlSupervisor {
     policy: ReconnectPolicy,
     device_hello: Option<DeviceHello>,
     device_network: Option<watch::Receiver<DeviceNetworkUpdate>>,
+    relay_directory_enabled: bool,
+    relay_cache: Option<crate::relay_cache::RelayCache>,
+    relay_seeds: Vec<String>,
 }
 
 impl EndpointControlSupervisor {
@@ -47,6 +50,9 @@ impl EndpointControlSupervisor {
             policy: policy.validate()?,
             device_hello: None,
             device_network: None,
+            relay_directory_enabled: false,
+            relay_cache: None,
+            relay_seeds: Vec::new(),
         })
     }
 
@@ -84,9 +90,36 @@ impl EndpointControlSupervisor {
         Ok(self)
     }
 
+    pub fn with_relay_directory(mut self) -> Self {
+        self.relay_directory_enabled = true;
+        self
+    }
+
+    /// Cache is bound to the exact control origin and endpoint key. It only
+    /// supplies reconnect candidates; authorization still comes from Server.
+    pub fn with_relay_directory_cache(
+        mut self,
+        directory: &std::path::Path,
+        seeds: Vec<String>,
+    ) -> Self {
+        let scope =
+            blake3::hash(format!("{}:{}", self.config.url, self.secret.public()).as_bytes())
+                .to_hex()
+                .to_string();
+        self.relay_cache = Some(crate::relay_cache::RelayCache {
+            path: directory.join(format!("relay-directory-{scope}.json")),
+            scope,
+        });
+        self.relay_seeds = seeds;
+        self.relay_directory_enabled = true;
+        self
+    }
+
     pub fn spawn(self) -> EndpointControlSupervisorHandle {
         let (status_sender, status) = watch::channel(ControlConnectionStatus::initial());
         let (shutdown, shutdown_receiver) = watch::channel(false);
+        let (relay_updates, relay_receiver) = watch::channel((0, Vec::new()));
+        let relay_updates = self.relay_directory_enabled.then_some(relay_updates);
         let (peer_requests, peer_request_receiver) = mpsc::channel(32);
         let peer_authorizer =
             DevicePeerAuthorizer::new(peer_requests, self.config.operation_timeout);
@@ -98,12 +131,14 @@ impl EndpointControlSupervisor {
             shutdown_receiver,
             peer_request_receiver,
             network_request_receiver,
+            relay_updates,
         ));
         EndpointControlSupervisorHandle {
             status,
             shutdown,
             peer_authorizer,
             device_network_resolver,
+            relay_updates: relay_receiver,
             task,
         }
     }
@@ -114,9 +149,18 @@ impl EndpointControlSupervisor {
         mut shutdown: watch::Receiver<bool>,
         mut peer_requests: mpsc::Receiver<PeerAuthorizationRequest>,
         mut network_requests: mpsc::Receiver<DeviceNetworkRequest>,
+        relay_updates: Option<watch::Sender<(u64, Vec<String>)>>,
     ) {
         let mut generation = 0_u64;
         let mut consecutive_failures = 0_u32;
+        if let (Some(cache), Some(sender)) = (&self.relay_cache, &relay_updates) {
+            let cache = cache.clone();
+            if let Ok(Some(urls)) = tokio::task::spawn_blocking(move || cache.load()).await {
+                sender.send_replace((1, urls));
+            }
+        }
+        let cache_writer = self.relay_cache.clone().map(|cache| cache.writer());
+        let mut directory_revision = 0;
         loop {
             if *shutdown.borrow() {
                 publish_stopped(&status, generation, consecutive_failures, None);
@@ -181,6 +225,11 @@ impl EndpointControlSupervisor {
                                 &mut self.device_network,
                                 &mut requests,
                                 self.config.operation_timeout,
+                                relay_updates.as_ref(),
+                                *self.secret.public().as_bytes(),
+                                &mut directory_revision,
+                                cache_writer.as_ref(),
+                                &self.relay_seeds,
                             )
                             .await
                             {
@@ -228,9 +277,13 @@ pub struct EndpointControlSupervisorHandle {
     peer_authorizer: DevicePeerAuthorizer,
     device_network_resolver: DeviceNetworkResolver,
     task: JoinHandle<()>,
+    relay_updates: watch::Receiver<(u64, Vec<String>)>,
 }
 
 impl EndpointControlSupervisorHandle {
+    pub fn relay_updates(&self) -> watch::Receiver<(u64, Vec<String>)> {
+        self.relay_updates.clone()
+    }
     pub fn status(&self) -> watch::Receiver<ControlConnectionStatus> {
         self.status.clone()
     }
@@ -257,6 +310,11 @@ async fn maintain_connection(
     device_network: &mut Option<watch::Receiver<DeviceNetworkUpdate>>,
     requests: &mut ControlRequestReceivers<'_>,
     operation_timeout: std::time::Duration,
+    relay_updates: Option<&watch::Sender<(u64, Vec<String>)>>,
+    relay_identity: [u8; 32],
+    directory_revision: &mut u64,
+    cache_writer: Option<&watch::Sender<Option<Vec<String>>>>,
+    relay_seeds: &[String],
 ) -> Result<(), EndpointControlError> {
     let start = Instant::now() + policy.heartbeat_interval;
     let mut heartbeat = tokio::time::interval_at(start, policy.heartbeat_interval);
@@ -266,8 +324,19 @@ async fn maintain_connection(
     let mut pending_network: Option<PendingNetworkUpdate> = None;
     let mut pending_peer: Option<PendingPeerAuthorization> = None;
     let mut pending_resolution: Option<PendingDeviceNetworkResolution> = None;
+    let mut directory_poll = tokio::time::interval(std::time::Duration::from_secs(5));
+    directory_poll.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    let mut directory_supported = relay_updates.is_some();
+    let mut pending_directory: Option<(RequestId, Instant)> = None;
     loop {
         tokio::select! {
+            _ = directory_poll.tick(), if directory_supported && pending_directory.is_none() => {
+                let id = connection.send_relay_directory(operation_timeout).await?;
+                pending_directory = Some((id, Instant::now()+operation_timeout));
+            }
+            _ = wait_for_deadline(pending_directory.as_ref().map(|(_,deadline)| *deadline)) => {
+                return Err(EndpointControlError::Timeout);
+            }
             _ = heartbeat.tick() => {
                 if pending_heartbeat.is_none() {
                     sequence = sequence.saturating_add(1);
@@ -293,6 +362,45 @@ async fn maintain_connection(
                         }
                     }
                     IncomingControlFrame::Server(message) => {
+                        match &message {
+                            ControlServerMessage::RelayDirectory { request_id, directory }
+                                if pending_directory.as_ref().is_some_and(|(id,_)| id==request_id) => {
+                                pending_directory = None;
+                                if let (Some(directory),Some(sender)) = (directory,relay_updates) {
+                                    directory.validate().map_err(|_| EndpointControlError::UnexpectedMessage)?;
+                                    let urls=ranked_relay_urls(directory,&relay_identity);
+                                    if directory.revision>*directory_revision{
+                                        *directory_revision=directory.revision;
+                                        sender.send_modify(|current|*current=(current.0.saturating_add(1),urls.clone()));
+                                    }
+                                    // Refresh age even when the catalog is unchanged; a
+                                    // long-lived healthy process must not leave an expired
+                                    // on-disk cache for the next restart.
+                                    if directory.revision==*directory_revision{
+                                        if let Some(cache)=cache_writer{cache.send_replace(Some(urls));}
+                                    }
+                                }else if let Some(sender)=relay_updates{
+                                    // A deliberate rollback to single-node mode restores configured seeds.
+                                    *directory_revision=0;
+                                    if !relay_seeds.is_empty(){sender.send_modify(|current|*current=(current.0.saturating_add(1),relay_seeds.to_vec()));}
+                                    if let Some(cache)=cache_writer{cache.send_replace(Some(relay_seeds.to_vec()));}
+                                }
+                                continue;
+                            }
+                            ControlServerMessage::Error { request_id,code:ControlErrorCode::InvalidMessage,.. }
+                                if pending_directory.as_ref().is_some_and(|(id,_)| request_id.is_none_or(|received| received==*id)) => {
+                                // Old servers reject the optional message and remain usable.
+                                pending_directory = None;
+                                directory_supported = false;
+                                *directory_revision=0;
+                                if !relay_seeds.is_empty(){
+                                    if let Some(sender)=relay_updates{sender.send_modify(|current|*current=(current.0.saturating_add(1),relay_seeds.to_vec()));}
+                                    if let Some(cache)=cache_writer{cache.send_replace(Some(relay_seeds.to_vec()));}
+                                }
+                                continue;
+                            }
+                            _ => {}
+                        }
                         handle_server_message(
                             message,
                             &mut pending_network,
@@ -532,6 +640,26 @@ async fn network_changed(
     }
 }
 
+fn ranked_relay_urls(directory: &pab_protocol::RelayDirectory, identity: &[u8; 32]) -> Vec<String> {
+    let mut nodes: Vec<_> = directory
+        .nodes
+        .iter()
+        .filter(|node| node.accepts_new_connections())
+        .map(|node| {
+            let mut hash = blake3::Hasher::new();
+            hash.update(identity);
+            hash.update(node.node_id.as_bytes());
+            let bytes = hash.finalize();
+            let score = u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap());
+            let uniform = (score as f64 + 1.0) / (u64::MAX as f64 + 1.0);
+            let rank = -uniform.ln() / (f64::from(node.weight) * f64::from(node.capacity_mbps));
+            (rank, node.url.clone())
+        })
+        .collect();
+    nodes.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    nodes.into_iter().map(|(_, url)| url).collect()
+}
+
 fn heartbeat_deadline(pending: &Option<(Vec<u8>, Instant)>) -> Option<Instant> {
     pending.as_ref().map(|(_, deadline)| *deadline)
 }
@@ -582,6 +710,46 @@ mod tests {
     use pab_protocol::{EndpointProofPrincipal, TenantId, UserId};
 
     use super::*;
+
+    #[test]
+    fn node_ranking_is_stable_weighted_and_excludes_maintenance() {
+        use pab_protocol::{RelayAdminState, RelayDirectory, RelayDirectoryNode, RelayHealth};
+        let node = |id: &str, weight| RelayDirectoryNode {
+            node_id: id.into(),
+            url: format!("https://{id}.test/"),
+            region: "test".into(),
+            weight,
+            capacity_mbps: 100,
+            admin_state: RelayAdminState::Active,
+            health: RelayHealth::Healthy,
+        };
+        let mut directory = RelayDirectory {
+            schema_version: 1,
+            revision: 1,
+            nodes: vec![node("a", 1), node("b", 3)],
+        };
+        let mut b_count = 0;
+        for i in 0u64..2000 {
+            let identity = *blake3::hash(&i.to_le_bytes()).as_bytes();
+            let ranked = ranked_relay_urls(&directory, &identity);
+            directory.nodes.reverse();
+            assert_eq!(ranked, ranked_relay_urls(&directory, &identity));
+            if ranked[0] == "https://b.test/" {
+                b_count += 1;
+            }
+        }
+        assert!(
+            (1350..1650).contains(&b_count),
+            "weighted distribution: {b_count}"
+        );
+        directory
+            .nodes
+            .iter_mut()
+            .find(|n| n.node_id == "b")
+            .unwrap()
+            .admin_state = RelayAdminState::Maintenance;
+        assert_eq!(ranked_relay_urls(&directory, &[0; 32]), ["https://a.test/"]);
+    }
 
     #[tokio::test]
     async fn retries_forever_at_the_same_interval() {

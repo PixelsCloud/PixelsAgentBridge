@@ -78,6 +78,14 @@ impl BridgeClient {
             connector,
             ReconnectPolicy::default(),
         )?
+        .with_relay_directory()
+        .with_relay_directory_cache(
+            config
+                .endpoint_secret_file
+                .parent()
+                .unwrap_or(std::path::Path::new(".")),
+            config.relay_urls.iter().map(ToString::to_string).collect(),
+        )
         .spawn();
         let network_resolver = control.device_network_resolver();
 
@@ -90,6 +98,7 @@ impl BridgeClient {
             endpoint_config = endpoint_config.relay_only_for_testing();
         }
         let endpoint = PabEndpoint::bind(endpoint_config, secret).await?;
+        endpoint.follow_relay_updates(control.relay_updates());
         endpoint.wait_online(config.operation_timeout).await?;
         Ok(Self {
             connector: BridgeConnector {

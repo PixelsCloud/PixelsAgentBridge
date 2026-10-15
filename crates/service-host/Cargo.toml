@@ -1,0 +1,11 @@
+[package]
+name = "pab-service-host"
+version = "1.2.48"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.8"
