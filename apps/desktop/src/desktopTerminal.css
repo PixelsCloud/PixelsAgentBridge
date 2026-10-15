@@ -1,11 +1,17 @@
 html:has(.desktop-terminal), body:has(.desktop-terminal), #root:has(.desktop-terminal) { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-.desktop-terminal { height: 100vh; display: flex; flex-direction: column; min-width: 0; font-family: system-ui, "Microsoft YaHei", sans-serif; background: #fff; color: #162637; }
-.desktop-terminal-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #dce6e6; background: #f5faf9; }
-.desktop-terminal-title { display: flex; align-items: center; gap: 10px; color: #218574; }
-.desktop-terminal-title strong { font-size: 15px; }
-.desktop-terminal-title > span { color: #536575; font-size: 13px; }
-.desktop-terminal-details { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 9px 16px; border-bottom: 1px solid #e6eeed; color: #536575; font-size: 12px; }
-.desktop-terminal-details > span { max-width: 45%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.desktop-terminal { height: 100vh; display: flex; flex-direction: column; min-width: 0; font-family: Inter, "Segoe UI", "Noto Sans CJK SC", system-ui, sans-serif; background: #fff; color: #162637; }
+.desktop-terminal-header { gap: 8px; user-select: none; }
+.desktop-terminal-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+.desktop-terminal-title strong { flex-shrink: 0; font-size: 12px; }
+.desktop-terminal-title > span { color: #536575; font-size: 12px; font-weight: 400; }
+.desktop-terminal-title .brand-mark, .desktop-terminal-title .ant-tag { flex-shrink: 0; }
+.desktop-terminal-title .ant-tag { margin: 0; }
+.desktop-terminal-path { flex-shrink: 0; }
+.desktop-terminal-actions, .desktop-terminal-header .window-controls { flex-shrink: 0; }
+.desktop-terminal-actions .ant-btn { height: 26px; }
+.desktop-terminal-header .window-controls button { box-sizing: border-box; }
+@media (max-width: 850px) { .desktop-terminal-action-label { display: none; } .desktop-terminal-actions .ant-btn { width: 28px; padding-inline: 0; } }
+@media (max-width: 700px) { .desktop-terminal-title { gap: 6px; padding-left: 10px; } .desktop-terminal-header { gap: 6px; } .desktop-terminal-header .window-controls button { width: 36px; } }
 .desktop-terminal-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; }
 .desktop-terminal-screen { flex: 1; min-height: 0; overflow: hidden; padding: 10px 12px 0; background: #142334; }
 .desktop-terminal-screen .xterm { height: 100%; }
@@ -14,6 +20,5 @@ html:has(.desktop-terminal), body:has(.desktop-terminal), #root:has(.desktop-ter
 .desktop-terminal-footer { flex-shrink: 0; border-top: 1px solid #e6eeed; padding: 7px 16px; font-size: 11px; }
 .desktop-terminal-footer .ant-typography { font-size: 11px; }
 .desktop-terminal-dark { color: #e8eef1; background: #202329; }
-.desktop-terminal-dark .desktop-terminal-header { background: #2b3038; border-color: #434b55; }
-.desktop-terminal-dark .desktop-terminal-details, .desktop-terminal-dark .desktop-terminal-footer { border-color: #434b55; color: #afb9c2; }
+.desktop-terminal-dark .desktop-terminal-footer { border-color: #434b55; color: #afb9c2; }
 .desktop-terminal-dark .desktop-terminal-title > span { color: #afb9c2; }

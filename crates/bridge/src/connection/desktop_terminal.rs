@@ -16,6 +16,8 @@ use tokio::sync::Mutex;
 /// implicit reconnection, or dependency on the stable MCP terminal machinery.
 pub struct DesktopTerminalSession {
     pub opened: DesktopTerminalOpened,
+    /// OS reported by the authenticated target, never inferred from its Shell.
+    pub os_family: pab_protocol::OsFamily,
     connection: AuthenticatedDeviceConnection,
     control: Mutex<(PabFrameWriter, PabFrameReader, u64)>,
     output: Mutex<PabFrameReader>,
@@ -59,7 +61,7 @@ impl AuthenticatedDeviceConnection {
         rows: u16,
     ) -> Result<Arc<DesktopTerminalSession>, BridgeError> {
         pab_protocol::validate_desktop_terminal_size(cols, rows).map_err(failed)?;
-        match self
+        let os_family = match self
             .task_request(DeviceTaskRequest::GetEnvironment {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
             })
@@ -69,13 +71,13 @@ impl AuthenticatedDeviceConnection {
                 context,
                 desktop_terminal_schema_version: Some(DESKTOP_TERMINAL_SCHEMA_VERSION),
                 ..
-            } if context.device_ref == self.device_ref => {}
+            } if context.device_ref == self.device_ref => context.execution.os_family,
             _ => {
                 return Err(failed(
                     "this device needs an update to support Desktop remote terminals",
                 ));
             }
-        }
+        };
         let session_id = RequestId::new();
         let mut opening = self
             .desktop_stream(DesktopTerminalRequest::Open {
@@ -147,6 +149,7 @@ impl AuthenticatedDeviceConnection {
         };
         Ok(Arc::new(DesktopTerminalSession {
             opened,
+            os_family,
             connection: self.clone(),
             control: Mutex::new((control_writer, control_reader, 1)),
             output: Mutex::new(output),

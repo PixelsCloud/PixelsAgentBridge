@@ -1,0 +1,24 @@
+{
+  "state": "succeeded",
+  "version": "1.2.99",
+  "identity_preserved": true,
+  "exit_code": 0,
+  "app_version": "1.2.49",
+  "signature_preserved": true,
+  "hashes": {
+    "pab-executor": "dc08c12997a0eac1c85392c21f7ebd72c41ed80cc30ae42f777122cf6dfa5cb8",
+    "pab-mcp": "e544a76ae286a5cb5532c6bac008ff65b774ad9b69788bfd091af8cb07b8a1ee",
+    "pab-desktop": "57c37b480db88210ecdf863c0b20939905f0722995f3e8c411a398871c89f49d"
+  },
+  "finished_at": 1792030451.0670469,
+  "files_match": {
+    "pab-executor": true,
+    "pab-mcp": true,
+    "pab-document-worker": true,
+    "Pixels Agent Bridge.app/Contents/Info.plist": true,
+    "Pixels Agent Bridge.app/Contents/MacOS/pab-desktop": true,
+    "Pixels Agent Bridge.app/Contents/Resources/icon.icns": true,
+    "Pixels Agent Bridge.app/Contents/_CodeSignature/CodeResources": true
+  },
+  "service_running": true
+}

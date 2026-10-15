@@ -109,6 +109,7 @@ fn groups(account: &Account) -> io::Result<Vec<libc::gid_t>> {
 pub(super) struct PreparedUser {
     account: Account,
     groups: Vec<libc::gid_t>,
+    inherit_service_groups: bool,
 }
 impl PreparedUser {
     pub fn for_uid(uid: u32) -> io::Result<Self> {
@@ -122,7 +123,20 @@ impl PreparedUser {
         }
         let account = lookup(uid)?;
         let groups = groups(&account)?;
-        Ok(Self { account, groups })
+        Ok(Self {
+            account,
+            groups,
+            inherit_service_groups: false,
+        })
+    }
+    /// Keep the service's existing kernel credentials. Darwin can report more
+    /// directory-service groups than setgroups accepts; no account switch is
+    /// requested for this separate service-worker entry point.
+    pub fn for_current_service() -> io::Result<Self> {
+        // SAFETY: pure identity read; the parent never changes credentials.
+        let mut prepared = Self::for_uid(unsafe { libc::geteuid() })?;
+        prepared.inherit_service_groups = true;
+        Ok(prepared)
     }
     pub fn identity(&self) -> &UserIdentity {
         &self.account.identity
@@ -188,11 +202,12 @@ impl PreparedUser {
             // groups and identity must all be changed inside the one hook.
             let gid = self.account.gid;
             let uid = self.account.uid;
+            let switch_credentials = privileged && !self.inherit_service_groups;
             // SAFETY: only async-signal-safe syscalls and error construction in
             // this child-only hook. The multithreaded parent never changes identity.
             unsafe {
                 command.pre_exec(move || {
-                    if privileged
+                    if switch_credentials
                         && (libc::setgroups(supplementary.len() as _, supplementary.as_ptr()) != 0
                             || libc::setgid(gid) != 0
                             || libc::setuid(uid) != 0)
@@ -412,6 +427,27 @@ mod tests {
                 .spawn(Path::new("/bin/true"), &[], Path::new("/"))
                 .is_err()
         );
+    }
+    #[test]
+    fn service_worker_keeps_native_credentials_without_resetting_groups() {
+        let prepared = PreparedUser::for_current_service().unwrap();
+        assert!(prepared.inherit_service_groups);
+        let mut child = prepared
+            .spawn(
+                Path::new("/bin/sh"),
+                &[OsString::from("-c"), OsString::from("exit 0")],
+                Path::new("/"),
+            )
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if let Some(code) = child.try_wait().unwrap() {
+                assert_eq!(code, 0);
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
     }
     #[test]
     fn explicit_terminate_reaps_an_already_exited_group_leader() {

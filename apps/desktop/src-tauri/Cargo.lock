@@ -5370,6 +5370,7 @@ dependencies = [
  "pab-logging",
  "pab-protocol",
  "pab-screenshot",
+ "pab-service-config",
  "pab-transport",
  "rand_core 0.6.4",
  "rmcp",
@@ -5408,6 +5409,7 @@ dependencies = [
  "pab-logging",
  "pab-protocol",
  "pab-screenshot",
+ "pab-service-config",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -5501,6 +5503,7 @@ dependencies = [
  "pab-platform",
  "pab-protocol",
  "pab-screenshot",
+ "pab-service-config",
  "pab-system-log-store",
  "pab-task-runtime",
  "pab-terminal",
@@ -5623,6 +5626,18 @@ version = "1.2.48"
 dependencies = [
  "image",
  "pab-protocol",
+]
+
+[[package]]
+name = "pab-service-config"
+version = "1.2.48"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 1.1.6+spec-1.1.0",
+ "url",
 ]
 
 [[package]]

@@ -23,18 +23,20 @@ def main():
         r'pixels-agent-bridge-(windows-x86_64|macos-aarch64)-release-(\d+\.\d+\.\d+)-setup\.(exe|pkg)',
         args.installer.name,
     )
-    if not match or (match.group(1).startswith('windows') and match.group(3) != 'exe') or (
+    linux = re.fullmatch(r'pixels-agent-bridge-linux-x86_64-release-(\d+\.\d+\.\d+)\.tar\.gz', args.installer.name)
+    if not linux and (not match or (match.group(1).startswith('windows') and match.group(3) != 'exe') or (
         match.group(1).startswith('macos') and match.group(3) != 'pkg'
-    ):
-        parser.error('Expected the versioned Windows EXE or macOS PKG filename')
+    )):
+        parser.error('Expected a versioned Windows EXE, macOS PKG or Linux tar.gz filename')
     if not args.installer.is_file():
         parser.error('Installer file does not exist')
     key_path = os.environ.get('PAB_RELEASE_PRIVATE_KEY_FILE')
     if not key_path:
         parser.error('Set PAB_RELEASE_PRIVATE_KEY_FILE to the private Ed25519 key path')
-    platform, arch = ('windows', 'x86_64') if match.group(1).startswith('windows') else ('macos', 'aarch64')
+    platform, arch = ('linux', 'x86_64') if linux else (('windows', 'x86_64') if match.group(1).startswith('windows') else ('macos', 'aarch64'))
+    version = linux.group(1) if linux else match.group(2)
     key = Ed25519PrivateKey.from_private_bytes(Path(key_path).read_bytes())
-    signature = key.sign(canonical(platform, arch, match.group(2), args.installer.name,
+    signature = key.sign(canonical(platform, arch, version, args.installer.name,
                                    args.installer.stat().st_size, digest(args.installer)))
     print(b64encode(signature).decode('ascii'))
 

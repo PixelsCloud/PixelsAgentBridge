@@ -1,3 +1,5 @@
+@import "./windowChrome.css";
+
 :root {
   --app-background: #f5f7f9;
   font-family: Inter, "Segoe UI", "Noto Sans CJK SC", system-ui, sans-serif;
@@ -17,14 +19,6 @@ button { cursor: pointer; }
 button:not(.ant-btn):disabled { cursor: not-allowed; opacity: .55; }
 
 .window-frame { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; background: var(--app-background); }
-.titlebar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 42px; height: 42px; border-bottom: 1px solid #e1e8ed; background: var(--app-background); color: #203b4d; }
-.titlebar-identity { display: flex; align-items: center; gap: 9px; height: 100%; padding-left: 18px; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
-.brand-mark { display: block; width: 24px; height: 24px; border-radius: 6px; }
-.window-controls { display: flex; height: 100%; }
-.window-controls button { display: grid; place-items: center; width: 46px; height: 100%; padding: 0; border: 0; color: #5d7482; background: transparent; }
-.window-controls button:hover { background: #e6eeef; }
-.window-controls button.close:hover { color: #fff; background: #d4474d; }
-.window-controls svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; }
 
 .app-body { display: grid; grid-template-columns: 204px minmax(0, 1fr); flex: 1; min-height: 0; }
 .sidebar { display: flex; flex-direction: column; min-height: 0; padding: 32px 13px 12px; border-right: 1px solid #e1e8ed; background: var(--app-background); color: #6f8593; }
@@ -253,9 +247,16 @@ input::placeholder, textarea::placeholder { color: #a7b5be; }
 .list-heading { display: flex; align-items: center; justify-content: space-between; }
 .list-heading h3 { color: #304a5a; font-size: 12px; }
 .list-heading span, .count-badge { display: grid; place-items: center; min-width: 23px; height: 23px; border-radius: 99px; color: #438976; background: #e6f3ee; font-size: 11px; font-weight: 800; }
-.device-list { display: grid; align-content: start; gap: 6px; min-height: 0; margin-top: 11px; overflow: auto; scrollbar-width: none; }
+.device-list { display: grid; align-content: start; gap: 6px; min-height: 0; margin-top: 11px; padding-right: 4px; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
 .device-list .home-recent-device { width: 100%; min-height: 64px; }
-.device-list::-webkit-scrollbar, .task-list::-webkit-scrollbar, .task-output::-webkit-scrollbar, pre::-webkit-scrollbar { display: none; }
+.device-list::-webkit-scrollbar { width: 8px; }
+.device-list::-webkit-scrollbar-track { border-radius: 4px; background: #edf3f1; }
+.device-list::-webkit-scrollbar-thumb { min-height: 24px; border: 1px solid #edf3f1; border-radius: 4px; background: #9cbeb3; }
+.device-list::-webkit-scrollbar-thumb:hover { background: #6aa998; }
+[data-theme="dark"] .device-list::-webkit-scrollbar-track { background: #2b3038; }
+[data-theme="dark"] .device-list::-webkit-scrollbar-thumb { border-color: #2b3038; background: #5a766c; }
+[data-theme="dark"] .device-list::-webkit-scrollbar-thumb:hover { background: #82aa9a; }
+.task-list::-webkit-scrollbar, .task-output::-webkit-scrollbar, pre::-webkit-scrollbar { display: none; }
 .empty-list { padding: 23px 0; color: #95a5ad; font-size: 12px; }
 .device-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 55px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
 .device-row:hover, .device-row.active { border-color: #c7e6d9; background: #eff8f4; }

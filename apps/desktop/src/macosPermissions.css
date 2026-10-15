@@ -1,0 +1,20 @@
+.settings-detail:has(.macos-permissions-panel) { overflow-y: auto; scrollbar-gutter: stable; }
+.macos-permissions-panel { display: grid; align-content: start; gap: 18px; min-width: 0; }
+.macos-permission-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.macos-permission-header h2 { margin: 0; font-size: 20px; }
+.macos-permission-program { min-width: 0; border: 1px solid var(--permission-border); border-radius: 10px; overflow: hidden; }
+.macos-permission-program h3 { display: flex; align-items: center; gap: 9px; margin: 0; padding: 16px 18px 12px; font-size: 14px; }
+.macos-permission-program h3 svg { color: #218574; flex-shrink: 0; }
+.macos-permission-program h3 > .ant-btn { margin-left: auto; }
+.macos-permission-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 10px 18px; box-sizing: border-box; border-top: 1px solid var(--permission-border); font-size: 13px; }
+.macos-permission-row-status { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.macos-permission-row-status .ant-tag { margin: 0; }
+.macos-permission-note { margin: 0; color: var(--permission-text-secondary); font-size: 12px; line-height: 1.6; }
+.macos-permission-program > .macos-permission-note { padding: 0 18px 12px; }
+.macos-permission-help { display: grid; gap: 14px; }
+.macos-permission-help p { margin: 0; line-height: 1.7; }
+.macos-permission-help code { display: block; padding: 10px 12px; border-radius: 6px; background: var(--surface-soft, #f1f5f4); color: #183f3c; font-size: 12px; overflow-wrap: anywhere; user-select: text; }
+.macos-permission-help > .ant-btn { justify-self: start; }
+.macos-permission-help summary { cursor: pointer; font-size: 12px; opacity: .7; }
+.macos-permission-help details[open] { display: grid; gap: 12px; }
+.macos-permission-help details p { font-size: 12px; margin: 10px 0; }

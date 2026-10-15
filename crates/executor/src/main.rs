@@ -6,10 +6,82 @@ use pab_executor::{bootstrapped_config, rotate_temporary_password, run_executor,
 #[cfg(windows)]
 mod windows_service;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    if std::env::args().nth(1).as_deref() == Some("--user-worker") {
-        let args = std::env::args().skip(2).collect::<Vec<_>>();
+fn main() -> ExitCode {
+    let raw: Vec<_> = std::env::args_os().skip(1).collect();
+    if raw.first().is_some_and(|a| a == "configure") {
+        let args: Result<Vec<_>, _> = raw.into_iter().skip(1).map(|a| a.into_string()).collect();
+        return match args
+            .map_err(|_| "Invalid configuration argument".to_owned())
+            .and_then(|args| pab_service_config::client::configure(&args))
+        {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("pab-executor: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    let worker = raw
+        .first()
+        .is_some_and(|a| a == "--user-worker" || a == "--file-access-probe");
+    let args = if worker {
+        std::env::args().skip(1).collect()
+    } else {
+        match pab_service_config::client::startup(pab_service_config::client::Role::Executor, raw) {
+            Ok((args, values)) => {
+                // Main is still single-threaded, before logging, Tokio or the service dispatcher.
+                for (key, value) in values {
+                    unsafe {
+                        std::env::set_var(key, value);
+                    }
+                }
+                args
+            }
+            Err(error) => {
+                eprintln!("pab-executor: {error}");
+                return ExitCode::FAILURE;
+            }
+        }
+    };
+    #[cfg(windows)]
+    if args.first().is_some_and(|a| a == "--service") {
+        let result = DataPaths::for_scope(DataScope::Machine)
+            .map_err(|e| e.to_string())
+            .and_then(|paths| {
+                pab_logging::init("executor", paths.root()).map_err(|e| e.to_string())
+            })
+            .and_then(|_| windows_service::run());
+        return match result {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("pab-executor: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime.block_on(run_main(args)),
+        Err(error) => {
+            eprintln!("pab-executor: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn run_main(args: Vec<String>) -> ExitCode {
+    #[cfg(target_os = "macos")]
+    if args.first().map(String::as_str) == Some("--file-access-probe") {
+        return if pab_executor::file_access::worker_main().is_ok() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+    if args.first().map(String::as_str) == Some("--user-worker") {
+        let args = &args[1..];
         if args.len() != 2 {
             return ExitCode::FAILURE;
         }
@@ -36,18 +108,8 @@ async fn main() -> ExitCode {
         eprintln!("pab-executor: {error}");
         return ExitCode::FAILURE;
     }
-    #[cfg(windows)]
-    if std::env::args().nth(1).as_deref() == Some("--service") {
-        return match windows_service::run() {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                tracing::error!(%error, "Windows Executor service failed");
-                ExitCode::FAILURE
-            }
-        };
-    }
-    if std::env::args().nth(1).as_deref() == Some("rotate-password") {
-        let mut args = std::env::args().skip(2);
+    if args.first().map(String::as_str) == Some("rotate-password") {
+        let mut args = args.iter().skip(1);
         let (database, None) = (args.next(), args.next()) else {
             eprintln!("usage: pab-executor rotate-password [device-database]");
             return ExitCode::FAILURE;
@@ -64,8 +126,8 @@ async fn main() -> ExitCode {
             }
         };
     }
-    if std::env::args().nth(1).as_deref() == Some("issue-local-access") {
-        let Some(destination) = std::env::args().nth(2) else {
+    if args.first().map(String::as_str) == Some("issue-local-access") {
+        let Some(destination) = args.get(1) else {
             eprintln!("usage: pab-executor issue-local-access <user-token-file>");
             return ExitCode::FAILURE;
         };
@@ -79,7 +141,7 @@ async fn main() -> ExitCode {
             }
         };
     }
-    if std::env::args().nth(1).as_deref() == Some("show-access") {
+    if args.first().map(String::as_str) == Some("show-access") {
         return match show_access().await {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
@@ -89,7 +151,7 @@ async fn main() -> ExitCode {
             }
         };
     }
-    if std::env::args().nth(1).is_some() {
+    if !args.is_empty() {
         eprintln!("unknown executor command");
         return ExitCode::FAILURE;
     }

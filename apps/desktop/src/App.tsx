@@ -263,7 +263,7 @@ function App() {
           <div className="sidebar-spacer" />
           <div className="sidebar-status-group">
             <UpdateNotice language={language} onOpen={() => { setSettingsSection("about"); setView("settings"); setError(""); }} />
-            <MacosPermissionStatus language={language} onOpenSettings={() => { setSettingsSection("preferences"); setView("settings"); setError(""); }} />
+            <MacosPermissionStatus language={language} onOpenSettings={() => { setSettingsSection("permissions"); setView("settings"); setError(""); }} />
             <div className="sidebar-status">
               <span className={`status-dot ${device?.executor_running ? "online" : ""}`} />
               <span>{loading ? t.localServiceLoading : !device ? t.localServiceUnknown : device.executor_running ? t.running : t.stopped}</span>

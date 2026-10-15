@@ -151,6 +151,10 @@ foreach ($name in $requiredFiles) {
     }
 }
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
+# Validate/create TOML with the new binary before stopping installed services.
+& (Join-Path $source 'pab-executor.exe') configure --config (Join-Path $InstallRoot 'config.toml') `
+    --previous $InstallRoot --control-url $ControlUrl --relay-url $RelayUrl
+if ($LASTEXITCODE -ne 0) { throw 'Could not prepare TOML configuration' }
 $installFull = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $runtimeCurrent = Join-Path $installFull 'browser-runtime'
 $runtimeNew = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.new')
@@ -285,10 +289,6 @@ foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 
-@{
-    control_url = $ControlUrl
-    relay_urls = $RelayUrl
-} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $InstallRoot 'settings.json') -Encoding UTF8
 
 $dataRoot = Join-Path $env:ProgramData 'PixelsAgentBridge'
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
@@ -308,7 +308,7 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Seco
     -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
     -StartWhenAvailable -MultipleInstances IgnoreNew `
     -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-$serviceCommand = '"' + (Join-Path $InstallRoot 'pab-executor.exe') + '" --service'
+$serviceCommand = '"' + (Join-Path $InstallRoot 'pab-executor.exe') + '" --service --config "' + (Join-Path $InstallRoot 'config.toml') + '"'
 if ($existingService) {
     $serviceConfiguration = Get-CimInstance Win32_Service -Filter "Name = '$taskName'"
     $needsConfigurationUpdate = (

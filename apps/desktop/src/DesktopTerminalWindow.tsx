@@ -5,14 +5,17 @@ import { listen } from "@tauri-apps/api/event";
 import { Alert, App, Button, ConfigProvider, Select, Space, Tag, Typography, theme } from "antd";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Copy, Clipboard, Eraser, RefreshCw, Terminal as TerminalIcon, Square } from "lucide-react";
+import { Copy, Clipboard, Eraser, RefreshCw, Square, Minus, Maximize2, X } from "lucide-react";
+import brand from "./assets/brand.svg";
 import "@xterm/xterm/css/xterm.css";
+import "./windowChrome.css";
 import "./desktopTerminal.css";
 import { desktopTerminalText } from "./desktopTerminalText";
 import type { ExecutionEntry, ExecutionReply, ExecutionSelection } from "./executionQueries";
 import type { ExecutionIdentity } from "./operatorTypes";
 
-type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string };
+type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string; os_family?: "windows" | "linux" | "macos" };
+type LaunchMode = "console" | "system" | null;
 const language = localStorage.getItem("pab.language");
 const text = desktopTerminalText[language === "zh-TW" ? "zh-TW" : language === "en" ? "en" : "zh-CN"];
 const dark = localStorage.getItem("pab.theme") === "dark";
@@ -22,6 +25,7 @@ export default function DesktopTerminalWindow() {
 }
 function TerminalContent() {
   const { modal, message } = App.useApp();
+  const appWindow = getCurrentWindow();
   const host = useRef<HTMLDivElement>(null);
   const terminal = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
@@ -41,11 +45,15 @@ function TerminalContent() {
   const resizeBusy = useRef(false);
   const pasteBusy = useRef(false);
   const [code, setCode] = useState("");
+  const [launchMode, setLaunchMode] = useState<LaunchMode>(null);
+  const automaticStarted = useRef(false);
+  const automaticBusy = useRef(false);
   const [accounts, setAccounts] = useState<ExecutionEntry[]>([]);
   const [selected, setSelected] = useState("");
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [phase, setPhase] = useState<"preparing" | "ready" | "starting" | "running" | "ended">("preparing");
   const [opened, setOpened] = useState<Opened | null>(null);
+  const [privacyHintDismissed, setPrivacyHintDismissed] = useState(false);
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const stateRef = useRef(phase); stateRef.current = phase;
@@ -159,7 +167,7 @@ function TerminalContent() {
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     let disposed = false;
-    void invoke<string>("desktop_terminal_info").then((value) => { if (!disposed) setCode(value); }).catch((cause) => { if (!disposed) setError(String(cause)); });
+    void invoke<{ code: string; launch_mode: LaunchMode }>("desktop_terminal_info").then((value) => { if (!disposed) { setCode(value.code); setLaunchMode(value.launch_mode); } }).catch((cause) => { if (!disposed) setError(String(cause)); });
     const term = new Terminal({ scrollback: 10000, fontSize: 14, fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace', cursorBlink: true, theme: { background: "#142334", foreground: "#e7f3f1", cursor: "#8cd6c9", selectionBackground: "#21857470" } });
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!); terminal.current = term; fit.current = addon;
     const data = term.onData(input);
@@ -173,13 +181,30 @@ function TerminalContent() {
     const unlistenAccount = listen<string>("desktop-terminal-account-ended", (event) => { live.current = false; setPhase("ended"); setError(event.payload); });
     return () => { disposed = true; void unlisten.then((fn) => fn()); void unlistenAccount.then((fn) => fn()); observer.disconnect(); data.dispose(); host.current?.removeEventListener("paste", capturePaste, true); term.dispose(); terminal.current = null; };
   }, []);
-  useEffect(() => { if (code) void refreshAccounts(); }, [code]);
-  async function start() {
-    const selection: ExecutionSelection | undefined = selected === "service" ? { mode: "service" } : accounts.find((entry) => entry.selection && "context_ref" in entry.selection && entry.selection.context_ref === selected)?.selection ?? undefined;
+  useEffect(() => {
+    if (!code) return;
+    if (launchMode) {
+      if (!automaticStarted.current) { automaticStarted.current = true; void automaticStart(); }
+    } else void refreshAccounts();
+  }, [code, launchMode]);
+  async function automaticStart() {
+    if (automaticBusy.current) return;
+    automaticBusy.current = true;
+    const gen = generation.current;
+    setPhase("preparing"); setError(""); setReason("");
+    try {
+      const selection = await invoke<ExecutionSelection>("desktop_terminal_selection");
+      if (generation.current !== gen) return;
+      await start(selection);
+    } catch (cause) { if (generation.current === gen) { setError(String(cause)); setPhase("ended"); } }
+    finally { automaticBusy.current = false; }
+  }
+  async function start(requestedSelection?: ExecutionSelection) {
+    const selection: ExecutionSelection | undefined = requestedSelection ?? (selected === "service" ? { mode: "service" } : accounts.find((entry) => entry.selection && "context_ref" in entry.selection && entry.selection.context_ref === selected)?.selection ?? undefined);
     if (!selection || !terminal.current) return;
     if (mustEnd.current && !live.current) {
       const confirmed = await modal.confirm({ title: text.closeTitle, content: text.closeBody, okText: text.confirm, cancelText: text.cancel });
-      if (!confirmed) return;
+      if (!confirmed) { setPhase("ended"); return; }
     }
     setPhase("starting"); setError(""); setReason("");
     const gen = ++generation.current; pendingAck.current = 0; acked.current = 0; receivedOffset.current = 0; queue.current = []; queuedBytes.current = 0;
@@ -237,25 +262,44 @@ function TerminalContent() {
       if (acceptance) acceptance.sessionId = value.session_id;
       mustEnd.current = true;
       setOpened(value); live.current = true; setPhase("running");
+      setPrivacyHintDismissed(false);
       await invoke("desktop_terminal_watch", { sessionId: value.session_id });
       terminal.current.focus();
       localStorage.setItem(`pab.desktopTerminal.account.${code}`, selection.mode === "service" ? "service" : value.identity.account_id);
     } catch (cause) { setError(String(cause)); live.current = false; setPhase("ended"); }
   }
   const options = [{ value: "service", label: text.service }, ...accounts.filter((entry) => entry.mode === "user").map((entry, index) => ({ value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${index}`, label: `${entry.account_name}${entry.session_id ? ` · ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${entry.unavailable_reason}` : ""}`, disabled: !entry.selection }))];
-  const shellArguments = opened?.arguments.slice(0, opened.arguments.includes("-Command") ? opened.arguments.indexOf("-Command") : undefined) ?? [];
   return <div className={`desktop-terminal ${dark ? "desktop-terminal-dark" : ""}`}>
-    <header className="desktop-terminal-header"><div className="desktop-terminal-title"><TerminalIcon size={19} /><strong>{text.title}</strong><span>{code.replace(/(\d{3})(?=\d)/g, "$1 ")}</span><Tag color={phase === "running" ? "green" : "default"}>{phase === "preparing" ? text.preparing : phase === "starting" ? text.starting : phase === "running" ? text.running : phase === "ended" ? text.ended : text.choose}</Tag></div>
-      <Space size={6}><Button size="small" title={text.copy} icon={<Copy size={14} />} onClick={() => void navigator.clipboard.writeText(terminal.current?.getSelection() || "").catch((cause) => setError(String(cause)))} />
-        <Button size="small" title={text.paste} disabled={phase !== "running"} icon={<Clipboard size={14} />} onClick={() => void navigator.clipboard.readText().then(paste).catch((cause) => setError(String(cause)))} />
-        <Button size="small" title={text.localClear} icon={<Eraser size={14} />} onClick={() => terminal.current?.clear()}>{text.clear}</Button>
-        <Button size="small" danger disabled={phase !== "running"} icon={<Square size={13} />} onClick={() => void requestClose(false)}>{text.close}</Button></Space>
+    <header className="titlebar desktop-terminal-header"
+      onMouseDown={(event) => {
+        if (event.button !== 0 || event.detail !== 1 || (event.target as HTMLElement).closest("button, .desktop-terminal-actions, .window-controls")) return;
+        event.preventDefault();
+        void appWindow.startDragging().catch((cause) => setError(String(cause)));
+      }}
+      onDoubleClick={(event) => {
+        if ((event.target as HTMLElement).closest("button, .desktop-terminal-actions, .window-controls")) return;
+        void appWindow.toggleMaximize().catch((cause) => setError(String(cause)));
+      }}>
+      <div className="titlebar-identity desktop-terminal-title"><img className="brand-mark" src={brand} alt="" /><strong>{text.title}</strong><span>{code.replace(/(\d{3})(?=\d)/g, "$1 ")}</span><Tag color={phase === "running" ? "green" : "default"}>{phase === "preparing" ? text.preparing : phase === "starting" ? text.starting : phase === "running" ? text.running : phase === "ended" ? text.ended : text.choose}</Tag>
+        {launchMode === "system" && <span className="desktop-terminal-path">System</span>}
+        {opened && <span className="desktop-terminal-path" title={text.path}>{opened.connection_path}</span>}
+      </div>
+      <Space className="desktop-terminal-actions" size={6}><Button size="small" aria-label={text.copy} title={text.copy} icon={<Copy size={14} />} onClick={() => void navigator.clipboard.writeText(terminal.current?.getSelection() || "").catch((cause) => setError(String(cause)))} />
+        <Button size="small" aria-label={text.paste} title={text.paste} disabled={phase !== "running"} icon={<Clipboard size={14} />} onClick={() => void navigator.clipboard.readText().then(paste).catch((cause) => setError(String(cause)))} />
+        <Button size="small" aria-label={text.clear} title={text.localClear} icon={<Eraser size={14} />} onClick={() => terminal.current?.clear()}><span className="desktop-terminal-action-label">{text.clear}</span></Button>
+        <Button size="small" aria-label={text.close} title={text.close} danger disabled={phase !== "running"} icon={<Square size={13} />} onClick={() => void requestClose(false)}><span className="desktop-terminal-action-label">{text.close}</span></Button></Space>
+      <div className="window-controls">
+        <button aria-label={text.minimize} title={text.minimize} onClick={() => void appWindow.minimize().catch((cause) => setError(String(cause)))}><Minus /></button>
+        <button aria-label={text.maximize} title={text.maximize} onClick={() => void appWindow.toggleMaximize().catch((cause) => setError(String(cause)))}><Maximize2 /></button>
+        <button className="close" aria-label={text.closeWindow} title={text.closeWindow} onClick={() => void requestClose(true)}><X /></button>
+      </div>
     </header>
-    {opened && <div className="desktop-terminal-details"><span>{opened.identity.account_name}</span><span>{opened.shell} {shellArguments.join(" ")}</span><span title={opened.cwd}>{opened.cwd}</span><span>{opened.connection_path}</span></div>}
-    {(phase === "ready" || phase === "ended" || phase === "preparing") && <div className="desktop-terminal-setup"><Select aria-label={text.account} style={{ minWidth: 250, maxWidth: 520, flex: 1 }} placeholder={text.choose} value={selected || undefined} options={options} onChange={setSelected} showSearch optionFilterProp="label" loading={loadingAccounts} />
+    {!launchMode && (phase === "ready" || phase === "ended" || phase === "preparing") && <div className="desktop-terminal-setup"><Select aria-label={text.account} style={{ minWidth: 250, maxWidth: 520, flex: 1 }} placeholder={text.choose} value={selected || undefined} options={options} onChange={setSelected} showSearch optionFilterProp="label" loading={loadingAccounts} />
       <Button icon={<RefreshCw size={14} />} onClick={() => void refreshAccounts()} loading={loadingAccounts}>{text.refresh}</Button><Button type="primary" disabled={!selected || loadingAccounts} onClick={() => void start()}>{opened ? text.reopen : text.open}</Button></div>}
+    {launchMode && phase === "ended" && <div className="desktop-terminal-setup"><Button type="primary" onClick={() => void automaticStart()}>{text.reopen}</Button></div>}
     {error && <Alert className="desktop-terminal-alert" type="error" showIcon title={text.error} description={error} closable onClose={() => setError("")} />}
     {reason && <Alert className="desktop-terminal-alert" type="info" title={`${text.endedReason}: ${reason}`} />}
+    {opened?.os_family === "macos" && phase === "running" && !privacyHintDismissed && <Alert className="desktop-terminal-alert" type="info" showIcon title={text.macosFilesTitle} description={text.macosFilesBody} closable onClose={() => setPrivacyHintDismissed(true)} />}
     <div className="desktop-terminal-screen" ref={host} />
     <footer className="desktop-terminal-footer"><Typography.Text type="secondary">{text.privacy}</Typography.Text></footer>
   </div>;

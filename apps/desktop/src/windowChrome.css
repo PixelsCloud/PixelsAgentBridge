@@ -1,0 +1,12 @@
+.titlebar { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; flex: 0 0 42px; height: 42px; border-bottom: 1px solid #e1e8ed; background: var(--app-background, #f5f7f9); color: #203b4d; }
+.titlebar-identity { display: flex; align-items: center; gap: 9px; height: 100%; padding-left: 18px; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.brand-mark { display: block; width: 24px; height: 24px; border-radius: 6px; }
+.window-controls { display: flex; height: 100%; }
+.window-controls button { display: grid; place-items: center; width: 46px; height: 100%; padding: 0; border: 0; color: #5d7482; background: transparent; cursor: pointer; }
+.window-controls button:hover { background: #e6eeef; }
+.window-controls button.close:hover { color: #fff; background: #d4474d; }
+.window-controls svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+[data-theme="dark"] .titlebar { border-color: #343a43; color: #f0f3f5; background: var(--app-background, #202329); }
+[data-theme="dark"] .window-controls button { color: #afb9c2; }
+[data-theme="dark"] .window-controls button:hover { background: #353b43; }
+[data-theme="dark"] .window-controls button.close:hover { color: #fff; background: #d4474d; }

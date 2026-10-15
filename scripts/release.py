@@ -62,6 +62,17 @@ def canonical(platform, arch, version, filename, size, hash_value):
 
 
 def package_info(platform, arch, version):
+    if platform == 'linux':
+        filename = f'pixels-agent-bridge-linux-{arch}-release-{version}.tar.gz'
+        path = PACKAGES / filename
+        manifest = PACKAGES / 'SHA256.json'
+        if not path.is_file() or not manifest.is_file():
+            raise RuntimeError('Build did not produce the expected Linux package and checksum manifest')
+        metadata = json.loads(manifest.read_text(encoding='utf-8')).get(filename, {})
+        size, hash_value = path.stat().st_size, digest(path)
+        if (metadata.get('version'), metadata.get('bytes'), metadata.get('sha256')) != (version, size, hash_value):
+            raise RuntimeError('Linux package does not match its build checksum manifest')
+        return path, size, hash_value
     extension = 'exe' if platform == 'windows' else 'pkg'
     filename = f'pixels-agent-bridge-{platform}-{arch}-release-{version}-setup.{extension}'
     manifest = PACKAGES / (f'SHA256-windows-setup-release.json' if platform == 'windows' else f'SHA256-macos-{arch}-setup-release.json')
@@ -113,7 +124,7 @@ def upload(url, path):
 
 def main():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('platform', choices=('windows', 'macos'))
+    parser.add_argument('platform', choices=('windows', 'macos', 'linux'))
     parser.add_argument('--arch', default=None, choices=('x86_64', 'aarch64'))
     parser.add_argument('--site', default='https://agent.rgaa.vip')
     parser.add_argument('--notes-zh', required=True)
@@ -121,9 +132,9 @@ def main():
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--allow-dirty', action='store_true', help='For release rehearsals only')
     args = parser.parse_args()
-    arch = args.arch or ('x86_64' if args.platform == 'windows' else 'aarch64')
-    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64')):
-        parser.error('Only Windows x86_64 and macOS aarch64 are published in stable')
+    arch = args.arch or ('aarch64' if args.platform == 'macos' else 'x86_64')
+    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64'), ('linux', 'x86_64')):
+        parser.error('Stable supports Windows/Linux x86_64 and macOS aarch64')
     base = args.site.rstrip('/')
     if not base.startswith('https://'):
         parser.error('--site must be HTTPS')
@@ -161,7 +172,7 @@ def main():
         write_state(state_path, state)
     version = state['version']
     if state['phase'] == 'reserved':
-        target = 'desktop' if args.platform == 'windows' else 'macos'
+        target = 'desktop' if args.platform == 'windows' else args.platform
         command = [sys.executable, 'scripts/build.py', target, '--profile', 'release', '--package', '--installer-version', version]
         if args.platform == 'macos':
             command += ['--macos-arch', arch]

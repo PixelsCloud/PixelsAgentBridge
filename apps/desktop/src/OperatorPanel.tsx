@@ -177,7 +177,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   function deviceMenu(device: ConnectedDevice): MenuProps {
     return {
       items: [
-        { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Open remote terminal" : language === "zh-TW" ? "開啟遠端終端" : "打开远程终端" },
+        { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : language === "zh-TW" ? "遠端終端" : "远程终端" },
+        { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : language === "zh-TW" ? "遠端終端（System）" : "远程终端（System）" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
         { key: "disconnect", icon: <Unplug size={16} />, label: t.disconnectDevice, disabled: !device.connected },
         { key: "rename", icon: <Pencil size={16} />, label: t.renameDevice },
@@ -186,7 +187,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         { key: "delete", icon: <Trash2 size={16} />, label: t.deleteDevice, danger: true },
       ],
       onClick: ({ key }) => {
-        if (key === "desktop-terminal") void openDesktopTerminal(device);
+        if (key === "desktop-terminal") void openDesktopTerminal(device, "console");
+        if (key === "desktop-terminal-system") void openDesktopTerminal(device, "system");
         if (key === "connect") void connectSaved(device);
         if (key === "disconnect") {
           setDisconnectError("");
@@ -206,14 +208,14 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     };
   }
 
-  async function openDesktopTerminal(device: ConnectedDevice) {
+  async function openDesktopTerminal(device: ConnectedDevice, mode: "console" | "system") {
     if (!signedIn) { onSignIn(); return; }
     try {
       if (!device.connected) {
         const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
         setDevices((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
       }
-      await invoke("desktop_terminal_window", { code: device.deviceCode });
+      await invoke("desktop_terminal_window", { code: device.deviceCode, mode });
     } catch (cause) {
       if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
       notification.error({ message: language === "en" ? "Could not open remote terminal" : "无法打开远程终端", description: String(cause), placement: "bottomRight" });

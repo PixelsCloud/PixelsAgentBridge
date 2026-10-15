@@ -83,8 +83,8 @@ def main():
     args = parser.parse_args()
     if args.installer_version:
         parse_version(args.installer_version)
-        if len(args.targets) != 1 or args.targets[0] not in ('desktop', 'macos') or args.profile != 'release' or not args.package:
-            parser.error('--installer-version requires one release desktop/macos target with --package')
+        if len(args.targets) != 1 or args.targets[0] not in ('desktop', 'macos', 'linux') or args.profile != 'release' or not args.package:
+            parser.error('--installer-version requires one release desktop/macos/linux target with --package')
     targets = list(dict.fromkeys(args.targets))
     architectures = []
     if args.macos_arch and 'macos' not in targets:

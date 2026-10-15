@@ -17,13 +17,41 @@ use tokio::sync::broadcast;
 
 const OUTPUT_READ_BYTES: u32 = 64 * 1024;
 
-#[tokio::main]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
+    let (args, values) = match pab_service_config::client::startup(
+        pab_service_config::client::Role::Operator,
+        env::args_os().skip(1),
+    ) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("pab-bridge: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    // Configuration is applied before any runtime threads exist.
+    for (key, value) in values {
+        unsafe {
+            env::set_var(key, value);
+        }
+    }
+    match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime.block_on(async_main(args)),
+        Err(error) => {
+            eprintln!("pab-bridge: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn async_main(args: Vec<String>) -> ExitCode {
     if let Err(error) = init_logging() {
         eprintln!("pab-bridge: {error}");
         return ExitCode::FAILURE;
     }
-    match run().await {
+    match run(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "bridge failed");
@@ -39,8 +67,8 @@ fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run() -> Result<(), CliError> {
-    let mut args = env::args().skip(1);
+async fn run(args: Vec<String>) -> Result<(), CliError> {
+    let mut args = args.into_iter();
     let Some(command) = args.next() else {
         return Err(CliError::Usage);
     };

@@ -10,7 +10,8 @@ if [[ $# -eq 1 ]]; then
 else
     cp /src/packaging/desktop/unix/{install,uninstall,lifecycle,run-mcp,run-executor}.sh "$payload/"
     cp /src/packaging/desktop/unix/INSTALL-LINUX.txt "$payload/"
-    cp /src/.build/linux-target/debug/{pab-executor,pab-mcp} "$payload/"
+    cp /src/.build/linux-target/debug/{pab-executor,pab-mcp,pab-document-worker} "$payload/"
+    cp /src/.build/document-runtime/document-runtime-linux.tar.gz "$payload/"
 fi
 sed -i 's/\r$//' "$payload/"*.sh
 unit=pixels-agent-bridge-executor.service

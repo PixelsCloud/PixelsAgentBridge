@@ -44,10 +44,10 @@ class LinuxPackage(TestCase):
                 self.assertEqual(set(tar.getnames()), {
                     'pab-mcp', 'pab-executor', 'pab-document-worker',
                     'document-runtime-linux.tar.gz', 'install.sh', 'uninstall.sh',
-                    'lifecycle.sh', 'run-mcp.sh', 'run-executor.sh', 'INSTALL-LINUX.txt',
+                    'lifecycle.sh', 'run-mcp.sh', 'run-executor.sh', 'INSTALL-LINUX.txt', 'release.json',
                 })
                 for info in tar:
-                    self.assertEqual(info.mode, 0o644 if info.name.endswith('.txt') else 0o755)
+                    self.assertEqual(info.mode, 0o644 if info.name.endswith(('.txt', '.json')) else 0o755)
                     if info.name.endswith('.sh'):
                         self.assertNotIn(b'\r\n', tar.extractfile(info).read())
             manifest = json.loads((archive.parent / 'SHA256-debug.json').read_text())
@@ -56,6 +56,18 @@ class LinuxPackage(TestCase):
             result = subprocess.run(command, capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('changed since', result.stderr)
+            # Release output must be immutable/versioned and describe the same target.
+            record_artifacts(root, 'linux', 'release', '1.3.0', files)
+            release_command = [sys.executable, str(package / 'build.py'), '--platform', 'linux',
+                               '--profile', 'release', '--linux-bin-dir', str(binaries)]
+            result = subprocess.run(release_command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            release_archive = archive.parent / 'pixels-agent-bridge-linux-x86_64-release-1.3.0.tar.gz'
+            with tarfile.open(release_archive) as tar:
+                metadata = json.load(tar.extractfile('release.json'))
+                self.assertEqual(metadata, dict(platform='linux', architecture='x86_64', version='1.3.0'))
+            manifest = json.loads((archive.parent / 'SHA256.json').read_text())
+            self.assertEqual(manifest[release_archive.name]['version'], '1.3.0')
 
 
 if __name__ == '__main__':

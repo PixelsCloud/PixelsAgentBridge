@@ -1,0 +1,28 @@
+{
+  "package": {
+    "version": "1.2.99",
+    "sha256": "708526539d2ee65f6984d1320cb00d1a9a7dd4eeb70f034c2b4d8c3fc19ccd57",
+    "bytes": 87190659,
+    "download": "/Users/huayang/Downloads/PixelsAgentBridge-1.2.99-setup.pkg"
+  },
+  "tests": {
+    "ui": 18,
+    "windows_module": 2,
+    "mac_module": 5,
+    "mac_permission_commands": 2,
+    "windows_desktop_check": "passed",
+    "native_fixture": "passed"
+  },
+  "native": {
+    "device_code": "419438177",
+    "executor_file_access": "normal",
+    "desktop_file_access": "normal",
+    "after_user_authorization_both_normal": true,
+    "fresh_refresh_both_normal": true,
+    "probe_workers_remaining_after_check": 0,
+    "executor_responsive": true,
+    "main_signature_preserved": true,
+    "executor_signature_preserved": true
+  },
+  "remaining": null
+}

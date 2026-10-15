@@ -6,6 +6,8 @@
 
 - [开始之前](#overview)
 - [安装 Pixels](#install)
+- [程序配置统一使用 TOML](#application-config)
+- [Linux 一行安装](#linux-install)
 - [登录账号](#account)
 - [添加设备](#devices)
 - [接入 AI Agent](#agents)
@@ -36,6 +38,53 @@ Pixels Agent Bridge 由操作端、目标设备和 AI Agent 组成。操作端�
 3. macOS 首次使用桌面截图或键鼠功能时，按系统提示授予屏幕录制与辅助功能权限。
 
 [前往下载](https://agent.rgaa.vip/#downloads)
+
+<a id="application-config"></a>
+
+## 程序配置统一使用 TOML
+
+Pixels 自定义的程序配置统一使用 TOML。安装器在首次安装时创建配置，升级保留已有配置及注释。Server、Relay 和官网服务也使用 TOML；第三方 Agent 客户端及系统要求的配置格式保持不变。
+
+- Windows: `C:\Program Files\PixelsAgentBridge\config.toml`
+- macOS: `/Library/Application Support/PixelsAgentBridge/config.toml`
+- Linux: `/etc/pixels-agent-bridge/config.toml`
+
+control_url = "wss://pab.rgaa.vip/control"
+relay_urls = ["https://pab-relay.rgaa.vip"]
+
+[executor]
+# device_name = "my-device"
+# log_level = "info"
+# data_dir = "/var/lib/pixels-agent-bridge"
+
+修改安装配置后重启后台服务，并重新启动 Desktop/MCP。Desktop 设置页保存的服务器地址为用户数据目录下的 operator-server.toml，MCP 工具开关为 mcp-tools.toml。用户服务器设置覆盖安装默认值；显式 --config PATH 使用指定 TOML，并跳过用户服务器覆盖。安装参数只用于首次安装，已有配置请直接编辑 TOML。
+
+旧 settings.json/settings.env 由安装器迁移；旧 operator-server.json 和 mcp-tools.json 在首次读取时迁移。已有 TOML 优先，格式错误会报错，不回退到旧配置。设备身份、登录凭据、数据库和发布清单属于运行数据，保留原格式。
+
+<a id="linux-install"></a>
+
+## Linux 一行安装
+
+Linux x86_64 服务器可用下面一行命令安装后台设备服务和 MCP。默认连接官方服务；需要 root 或 sudo 权限。脚本会下载正式版本并验证签名、校验和及运行库，再安装服务。
+
+curl -fsSL https://agent.rgaa.vip/install.sh | bash
+
+首次发布前会提示暂无 Linux 版本。安装成功后，运行下面的命令查看设备码和密码，再从 Windows 或 macOS Desktop 添加这台设备。
+
+sudo /opt/pixels-agent-bridge/run-executor.sh show-access
+
+以后再次运行安装命令即可升级，保留设备身份、数据和原有服务地址。升级会重启服务并中断正在运行的连接。
+
+后续修改配置并重启服务：
+
+sudo nano /etc/pixels-agent-bridge/config.toml
+sudo systemctl restart pixels-agent-bridge-executor.service
+
+### 自部署与无 systemd 环境
+
+curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://bridge.example.com/control --relay-url https://relay.example.com
+
+没有 systemd 的容器可在 bash -s -- 后添加 --no-service，然后由自己的进程管理器启动 /opt/pixels-agent-bridge/run-executor.sh，并持久化 /etc/pixels-agent-bridge 和 /var/lib/pixels-agent-bridge。Linux 版不包含桌面应用；Git 等工作负载程序按需另装。
 
 <a id="account"></a>
 

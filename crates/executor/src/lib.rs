@@ -5,6 +5,7 @@ mod config;
 mod credential;
 mod device_access;
 mod device_status;
+pub mod file_access;
 pub mod local_ipc;
 mod network;
 mod runtime;

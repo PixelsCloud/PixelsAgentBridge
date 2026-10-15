@@ -1,6 +1,5 @@
 use std::{
     ffi::OsString,
-    fs,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -8,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
 use windows_service::{
     define_windows_service,
     service::{
@@ -21,40 +19,8 @@ use windows_service::{
 
 const SERVICE_NAME: &str = "PixelsAgentBridgeExecutor";
 
-#[derive(Deserialize)]
-struct InstalledSettings {
-    control_url: String,
-    relay_urls: String,
-}
-
 pub fn run() -> Result<(), String> {
-    load_installed_settings()?;
     service_dispatcher::start(SERVICE_NAME, ffi_service_main).map_err(|error| error.to_string())
-}
-
-fn load_installed_settings() -> Result<(), String> {
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    let root = executable
-        .parent()
-        .ok_or("Executor has no installation directory")?;
-    let bytes = fs::read(root.join("settings.json")).map_err(|error| error.to_string())?;
-    let settings = parse_installed_settings(&bytes)?;
-    let data_root = std::env::var_os("PROGRAMDATA")
-        .ok_or("PROGRAMDATA is unavailable")
-        .map(std::path::PathBuf::from)?
-        .join("PixelsAgentBridge");
-    // SAFETY: This runs before the service dispatcher starts any application threads.
-    unsafe {
-        std::env::set_var("PAB_DATA_DIR", data_root);
-        std::env::set_var("PAB_CONTROL_URL", settings.control_url);
-        std::env::set_var("PAB_RELAY_URLS", settings.relay_urls);
-    }
-    Ok(())
-}
-
-fn parse_installed_settings(bytes: &[u8]) -> Result<InstalledSettings, String> {
-    let json = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
-    serde_json::from_slice(json).map_err(|error| error.to_string())
 }
 
 define_windows_service!(ffi_service_main, service_main);
@@ -135,14 +101,4 @@ fn run_service() -> Result<(), String> {
         ))
         .map_err(|error| error.to_string())?;
     result
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn accepts_settings_written_by_windows_powershell() {
-        let bytes = b"\xef\xbb\xbf{\"control_url\":\"wss://example.test\",\"relay_urls\":\"https://example.test\"}";
-        let settings = super::parse_installed_settings(bytes).unwrap();
-        assert_eq!(settings.control_url, "wss://example.test");
-    }
 }

@@ -11,6 +11,7 @@ encoding_rs = "0.8"
 argon2 = "0.5"
 iroh-base = { version = "=1.2.0", features = ["key"] }
 pab-agent-core = { path = "../agent-core" }
+pab-service-config = { path = "../service-config" }
 pab-logging = { path = "../logging" }
 pab-protocol = { path = "../protocol" }
 pab-screenshot = { path = "../screenshot" }

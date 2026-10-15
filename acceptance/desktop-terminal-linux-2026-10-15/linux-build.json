@@ -1,0 +1,12 @@
+{
+  "version": "1.2.99",
+  "components": {
+    "pab-executor": "1.2.48",
+    "pab-mcp": "1.2.48"
+  },
+  "files": {
+    "pab-executor": "2fdd997fc01da622b9f4217309b361d67dfbef4b1ec1f1a4bb8a02dd71342cf9",
+    "pab-mcp": "b0272cdd69597627106817f25ee8d8b32c2d9c3d12fa6c4d366389bdc95ae335",
+    "pab-document-worker": "7db544c4789fafc18206f6b711f327f5a21f393e86b1d1c0372782f5b238dbd2"
+  }
+}

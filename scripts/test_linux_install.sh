@@ -11,11 +11,12 @@ if [[ $# -eq 1 ]]; then
 else
     cp /src/packaging/desktop/unix/{install,uninstall,lifecycle,run-mcp,run-executor}.sh "$payload/"
     cp /src/packaging/desktop/unix/INSTALL-LINUX.txt "$payload/"
-    cp /src/.build/linux-target/debug/{pab-executor,pab-mcp} "$payload/"
+    cp /src/.build/linux-target/debug/{pab-executor,pab-mcp,pab-document-worker} "$payload/"
+    cp /src/.build/document-runtime/document-runtime-linux.tar.gz "$payload/"
 fi
 sed -i 's/\r$//' "$payload/"*.sh
 for script in "$payload/"*.sh; do bash -n "$script"; done
-control='wss://127.0.0.1:1/control?literal=$(touch /tmp/pab-injected)'
+control='wss://127.0.0.1:1/control?literal=$(touch${IFS}/tmp/pab-injected)'
 relay=https://127.0.0.1:1
 if bash "$payload/install.sh" "$control" "$relay"; then
     echo 'Default install must reject missing systemd' >&2; exit 1
@@ -24,11 +25,24 @@ fi
 if bash "$payload/install.sh" --no-service http://invalid "$relay"; then exit 1; fi
 bash "$payload/install.sh" --no-service "$control" "$relay"
 installed=/opt/pixels-agent-bridge
+# A no-argument upgrade keeps a self-hosted installation's original URLs.
+bash "$payload/install.sh" --no-service
+config=/etc/pixels-agent-bridge/config.toml
+python3 - "$control" "$relay" <<'PY'
+import sys, tomllib
+from pathlib import Path
+config=tomllib.loads(Path('/etc/pixels-agent-bridge/config.toml').read_text())
+assert config['control_url']==sys.argv[1] and config['relay_urls']==[sys.argv[2]]
+PY
+printf '\n# user comment\n' >> "$config"
+cp "$config" /tmp/original-config.toml
+bash "$payload/install.sh" --no-service
+cmp "$config" /tmp/original-config.toml
 [[ ! -e $installed/pab-desktop && ! -e $installed/run-app.sh ]]
 [[ ! -e /etc/xdg/autostart/pixels-agent-bridge-session-helper.desktop ]]
 [[ $(stat -c %a /var/lib/pixels-agent-bridge) == 700 ]]
-source "$installed/settings.env"
-[[ $PAB_CONTROL_URL == "$control" && ! -e /tmp/pab-injected ]]
+[[ ! -e $installed/settings.env ]]
+[[ ! -e /tmp/pab-injected ]]
 printf preserved > /var/lib/pixels-agent-bridge/test-identity
 # Forwarded CLI argument: must reject immediately instead of starting a service.
 if timeout 10 "$installed/run-executor.sh" invalid-test-command > /tmp/cli-result 2>&1; then exit 1; fi
@@ -46,10 +60,16 @@ cp /bin/sleep "$payload/pab-desktop"
 touch "$installed/run-app.sh"
 mkdir -p /etc/xdg/autostart
 touch /etc/xdg/autostart/pixels-agent-bridge-session-helper.desktop
+# Invalid TOML must stop an upgrade before it terminates an installed process.
+printf 'control_url = [\n' > "$config"
+if bash "$payload/install.sh" --no-service; then exit 1; fi
+kill -0 "$product_pid"
+cp /tmp/original-config.toml "$config"
 bash "$payload/install.sh" --no-service "$control" "$relay"
 ! kill -0 "$product_pid" 2>/dev/null
 kill -0 "$other_pid"
 [[ $(cat /var/lib/pixels-agent-bridge/test-identity) == preserved ]]
+cmp "$config" /tmp/original-config.toml
 [[ ! -e $installed/pab-desktop && ! -e $installed/run-app.sh ]]
 [[ ! -e /etc/xdg/autostart/pixels-agent-bridge-session-helper.desktop ]]
 # A product process ignoring SIGTERM must be forced down after the grace period.
@@ -61,6 +81,7 @@ for ((n=0; n<50; n++)); do [[ ! -f /tmp/pab-stubborn-ready ]] || break; sleep 0.
 ! kill -0 "$stuck_pid" 2>/dev/null
 [[ ! -e $installed/pab-executor && ! -e $installed/settings.env ]]
 [[ $(cat /var/lib/pixels-agent-bridge/test-identity) == preserved ]]
+cmp "$config" /tmp/original-config.toml
 kill "$other_pid"
 wait "$other_pid" 2>/dev/null || true
 printf 'PASS: Linux manual install, CLI, no GUI, upgrade, scoped stop, data preservation, uninstall\n'

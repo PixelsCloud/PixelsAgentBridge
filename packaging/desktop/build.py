@@ -5,6 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import json
+import re
 import platform as host_platform
 import tarfile
 import zipfile
@@ -115,8 +116,18 @@ def package_unix(platform, architecture, binaries):
     else:
         from build_version import verify_artifacts
 
-        versions[archive_path.name] = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:3]})
+        version = verify_artifacts(root, platform, args.profile, {file.name: file for file in files[:3]})
+        if args.profile == 'release':
+            archive_path = args.output_dir / f"pixels-agent-bridge-{platform}-{architecture}-{args.profile}-{version}.tar.gz"
+        versions[archive_path.name] = version
     with tarfile.open(archive_path, "w:gz") as archive:
+        if platform == 'linux':
+            metadata = json.dumps({'platform': platform, 'architecture': architecture,
+                'version': version}, indent=2).encode() + b'\n'
+            member = tarfile.TarInfo('release.json')
+            member.size = len(metadata)
+            member.mode = 0o644
+            archive.addfile(member, BytesIO(metadata))
         if platform == "macos":
             def app_permissions(info):
                 # A launchd build may inherit umask 077. Installed apps are root-owned
@@ -152,7 +163,7 @@ manifest = {}
 for archive in sorted(args.output_dir.iterdir()):
     if not archive.name.startswith("pixels-agent-bridge-"):
         continue
-    if not archive.name.endswith((f"-{args.profile}.zip", f"-{args.profile}.tar.gz")):
+    if not archive.name.endswith((f"-{args.profile}.zip", f"-{args.profile}.tar.gz")) and not re.search(rf'-{args.profile}-\d+\.\d+\.\d+\.tar\.gz$', archive.name):
         continue
     if not archive.is_file():
         continue

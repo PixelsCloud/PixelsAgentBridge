@@ -46,3 +46,12 @@ test('GitHub browser wait can be cancelled without signing in',async({page})=>{
   await expect(page.getByRole('button',{name:'Cancel',exact:true})).not.toBeVisible();
   expect(await page.evaluate(()=>(window as any).fixture.signedIn)).toBe(false);
 });
+
+test('the two remote terminal menu entries request their own explicit launch mode',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html');
+  for (const mode of ['console', 'system']) {
+    await page.getByText('Original',{exact:true}).first().click({button:'right'});
+    await page.getByRole('menuitem',{name:mode === 'system' ? 'Remote terminal (System)' : 'Remote terminal',exact:true}).click();
+    await expect.poll(()=>page.evaluate(()=>(window as any).fixture.calls.filter((call:any)=>call.command==='desktop_terminal_window').at(-1)?.args.mode)).toBe(mode);
+  }
+});

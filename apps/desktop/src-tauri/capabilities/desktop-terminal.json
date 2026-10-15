@@ -3,5 +3,10 @@
   "identifier": "desktop-terminal",
   "description": "Independent human remote terminal windows",
   "windows": ["desktop-terminal-*"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging"
+  ]
 }

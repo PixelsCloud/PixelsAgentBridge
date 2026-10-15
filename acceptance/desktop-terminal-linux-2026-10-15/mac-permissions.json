@@ -1,0 +1,13 @@
+{
+  "device_code": "419438177",
+  "checks": {
+    "native_permission_guidance_visible": true,
+    "downloads_documents_read": true,
+    "tail_exit_source_integrity": true
+  },
+  "output": {
+    "bytes": 644,
+    "sha256": "d84a30d17d60fddc11d57ce160c8ace4090978365eb41958952fe9ce2390e482"
+  },
+  "passed": true
+}

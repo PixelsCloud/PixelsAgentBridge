@@ -1,0 +1,14 @@
+{
+  "linux-worker-exceptions.log": {
+    "sha256": "3e961dfeb4cd753ce996b87426556297c2c003a9324e2a44c3144e219fa074c7",
+    "result": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 181 filtered out; finished in 3.79s"
+  },
+  "client-os-bridge-tests.log": {
+    "sha256": "436d2399d8094915b9fb6e38d58f54ecf56f3a499439f2cfa78436e00a974c79",
+    "result": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 0.30s"
+  },
+  "client-privacy-ui-tests.log": {
+    "sha256": "18440a16000e02f0ba3e25b095f0aa25cc306ff070dbb7f184f79d219883a5bb",
+    "result": "16 passed (35.6s)"
+  }
+}

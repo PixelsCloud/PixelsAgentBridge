@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-15",
+  "device_code": "419438177",
+  "platform": "macOS arm64",
+  "product_version": "1.2.99",
+  "package": {
+    "sha256": "8579fddb60f905307694d0561467938fea95294c9d1eb2eb45af0347daa71ab8",
+    "bytes": 87149793,
+    "path": "/Users/huayang/Downloads/PixelsAgentBridge-1.2.99-setup.pkg"
+  },
+  "validation": {
+    "compact_ui_tests": 14,
+    "mac_native_unit_tests": 2,
+    "typescript_build": "passed",
+    "windows_native_check": "passed",
+    "mac_native_build": "passed",
+    "installed_all_manifest_files_match": true,
+    "signature_and_device_identity_preserved": true,
+    "native_screen_and_accessibility_observed": "normal",
+    "native_disk_requests_open_correct_pane": true,
+    "native_executor_finder_selection": "pab-executor",
+    "native_both_program_paths_copy_exactly": true,
+    "native_restart_confirmation_cancelled": true,
+    "full_disk_status": "unconfirmed; OS switches authoritative; no guessed success",
+    "local_windows_installation_changed": false,
+    "native_request_opens_system_settings_without_finder_or_dialog": true,
+    "path_help_is_optional_more_menu": true
+  }
+}

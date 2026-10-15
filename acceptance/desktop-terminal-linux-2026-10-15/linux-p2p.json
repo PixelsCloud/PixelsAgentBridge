@@ -1,0 +1,73 @@
+{
+  "device_code": "595729769",
+  "route_requested": "direct",
+  "client": "isolated native debug Desktop",
+  "started": "2026-10-14T16:00:02.193Z",
+  "sessions": [
+    {
+      "account": "service",
+      "route": "P2P",
+      "checks": {
+        "identity": true,
+        "cwd_environment_unicode": true,
+        "resize": true,
+        "ctrl_c": true,
+        "backpressure": {
+          "pending": 255834
+        },
+        "large_output": {
+          "bytes": 67125399,
+          "elapsed_ms": 7908
+        },
+        "cancel_close": true,
+        "source_integrity": true
+      },
+      "shell_output": {},
+      "output": {
+        "bytes": 75515268,
+        "sha256": "f7ac723696bc465e2bb72c6c5f66b5898977f0de81ab0bda05cbd51337ab8a1d",
+        "source": {
+          "exit_code": 7,
+          "output_bytes": 75515268,
+          "reason": "Shell exited",
+          "sha256": "f7ac723696bc465e2bb72c6c5f66b5898977f0de81ab0bda05cbd51337ab8a1d"
+        }
+      }
+    },
+    {
+      "account": "pabuser1",
+      "route": "P2P",
+      "checks": {
+        "identity": true,
+        "cwd_environment_unicode": true,
+        "resize": true,
+        "ctrl_c": true,
+        "backpressure": {
+          "pending": 249689
+        },
+        "large_output": {
+          "bytes": 67125357,
+          "elapsed_ms": 7989
+        },
+        "cancel_close": true,
+        "source_integrity": true
+      },
+      "shell_output": {},
+      "output": {
+        "bytes": 75514878,
+        "sha256": "0f2fdc33cca3c3cd3947d2c20ba5eaecdaae84d4c7d1ecab6a24d3a383183044",
+        "source": {
+          "exit_code": 7,
+          "output_bytes": 75514878,
+          "reason": "Shell exited",
+          "sha256": "0f2fdc33cca3c3cd3947d2c20ba5eaecdaae84d4c7d1ecab6a24d3a383183044"
+        }
+      }
+    }
+  ],
+  "owned_test_account": {
+    "id": "f4aa0524-8e63-4a8a-9b4c-413e9673d60d",
+    "username": "linuxterm_d9c509f6e4231c58"
+  },
+  "passed": true
+}

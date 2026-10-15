@@ -32,6 +32,10 @@ fn main() {
         }
     }
     match std::env::args().nth(1).as_deref() {
+        #[cfg(target_os = "macos")]
+        Some("--file-access-probe") => {
+            if pab_executor::file_access::worker_main().is_err() { std::process::exit(1); }
+        }
         Some("--ui-worker") => {
             if pab_desktop_control::ui_worker_entry::run().is_err() {
                 std::process::exit(1);

@@ -1,0 +1,13 @@
+{
+  "device_code": "595729769",
+  "version": "1.2.99",
+  "installation_exit": 0,
+  "preserved_identity": true,
+  "files_match": {
+    "pab-executor": true,
+    "pab-mcp": true,
+    "pab-document-worker": true
+  },
+  "authenticated": true,
+  "platform": "Linux 6.18.40.1-microsoft-standard-WSL2"
+}

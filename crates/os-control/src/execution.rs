@@ -86,13 +86,7 @@ impl PreparedUser {
         }
         #[cfg(unix)]
         {
-            Self::for_uid(
-                current_identity()?
-                    .account_id
-                    .strip_prefix("uid:")
-                    .and_then(|id| id.parse().ok())
-                    .ok_or_else(|| io::Error::other("invalid service UID"))?,
-            )
+            native::PreparedUser::for_current_service().map(Self)
         }
     }
     /// Refresh native facts rather than trusting a persisted account name or UID.

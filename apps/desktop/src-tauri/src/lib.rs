@@ -307,6 +307,7 @@ pub fn run_session_helper() -> Result<(), String> {
 pub fn run() {
     if let Err(error) = server_settings::apply_saved_at_start() {
         eprintln!("Could not apply saved operator server settings: {error}");
+        return;
     }
     let paths = DataPaths::for_scope(DataScope::User).expect("could not find user data directory");
     #[cfg(windows)]
@@ -395,6 +396,7 @@ pub fn run() {
                 operator::desktop_terminal::desktop_terminal_window,
                 operator::desktop_terminal::desktop_terminal_info,
                 operator::desktop_terminal::desktop_terminal_accounts,
+                operator::desktop_terminal::desktop_terminal_selection,
                 operator::desktop_terminal::desktop_terminal_start,
                 operator::desktop_terminal::desktop_terminal_watch,
                 operator::desktop_terminal::desktop_terminal_input,
@@ -408,6 +410,10 @@ pub fn run() {
                 update::download_update,
                 update::install_update,
                 macos_permissions::macos_permissions,
+                macos_permissions::macos_permission_targets,
+                macos_permissions::macos_file_access_check,
+                macos_permissions::reveal_macos_permission_target,
+                macos_permissions::restart_macos_executor_for_permissions,
                 macos_permissions::request_macos_permission,
                 macos_permissions::open_macos_permission_settings,
                 macos_permissions::restart_macos_permission_processes,

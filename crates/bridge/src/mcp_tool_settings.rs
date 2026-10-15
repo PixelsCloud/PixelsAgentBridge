@@ -1,11 +1,7 @@
 //! Static MCP discovery preferences shared by Desktop and each MCP process.
 use pab_agent_core::{DataPaths, DataScope, ensure_data_dir};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -210,42 +206,34 @@ impl McpToolSettings {
         Ok(DataPaths::for_scope(DataScope::User)
             .map_err(|e| e.to_string())?
             .root()
-            .join("mcp-tools.json"))
+            .join("mcp-tools.toml"))
     }
     pub fn load(path: &Path) -> Result<Self, String> {
-        let file = match fs::File::open(path) {
-            Ok(file) => file,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Self::default()),
-            Err(e) => return Err(e.to_string()),
-        };
-        let mut bytes = Vec::new();
-        file.take(4097)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        if bytes.len() > 4096 {
-            return Err("MCP tool settings exceed 4096 bytes".into());
-        }
-        let mut settings: Self =
-            serde_json::from_slice(bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes))
-                .map_err(|e| e.to_string())?;
-        if settings.version == 1 {
-            // Version 1 predates both browser groups. Enable both on upgrade
-            // while preserving the user's choices for existing groups.
-            for group in [ToolGroup::Browser, ToolGroup::BrowserAdvanced] {
-                if !settings.enabled_groups.contains(&group) {
-                    settings.enabled_groups.push(group);
+        Ok(pab_service_config::preferences::load_with_limit(
+            path,
+            |settings: &mut Self| {
+                if settings.version == 1 {
+                    // Version 1 predates both browser groups. Enable both on upgrade
+                    // while preserving the user's choices for existing groups.
+                    for group in [ToolGroup::Browser, ToolGroup::BrowserAdvanced] {
+                        if !settings.enabled_groups.contains(&group) {
+                            settings.enabled_groups.push(group);
+                        }
+                    }
+                    settings.version = 2;
                 }
-            }
-            settings.version = 2;
-        }
-        if settings.version == 2 {
-            // Newly introduced document tools are enabled for existing users.
-            // Preserve the opt-out state of every earlier group.
-            settings.enabled_groups.push(ToolGroup::Document);
-            settings.version = 3;
-        }
-        settings.validate()?;
-        Ok(settings)
+                if settings.version == 2 {
+                    // Newly introduced document tools are enabled for existing users.
+                    // Preserve the opt-out state of every earlier group.
+                    settings.enabled_groups.push(ToolGroup::Document);
+                    settings.version = 3;
+                }
+                settings.validate()?;
+                Ok(())
+            },
+            4096,
+        )?
+        .unwrap_or_default())
     }
     pub fn save(&self, path: &Path) -> Result<(), String> {
         self.validate()?;
@@ -253,24 +241,18 @@ impl McpToolSettings {
         ensure_data_dir(parent).map_err(|e| e.to_string())?;
         let mut settings = self.clone();
         settings.enabled_groups.sort();
-        // tempfile persists with atomic replacement on Windows and Unix: a new
-        // MCP process sees either complete configuration, never partial JSON.
-        let mut file = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-        file.write_all(&serde_json::to_vec_pretty(&settings).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-        file.as_file().sync_all().map_err(|e| e.to_string())?;
-        file.persist(path).map_err(|e| e.to_string())?;
-        Ok(())
+        pab_service_config::preferences::save(path, &settings)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     #[test]
     fn strict_settings_roundtrip_atomic_replace_and_invalid_save_preserves_previous() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("mcp-tools.json");
+        let path = dir.path().join("mcp-tools.toml");
         assert_eq!(
             McpToolSettings::load(&path).unwrap(),
             McpToolSettings::default()
@@ -290,10 +272,10 @@ mod tests {
             vec![ToolGroup::Core, ToolGroup::File]
         );
         for data in [
-            r#"{"version":4,"enabledGroups":["core"]}"#,
-            r#"{"version":1,"enabledGroups":["core","core"]}"#,
-            r#"{"version":1,"enabledGroups":["core","invalid"]}"#,
-            r#"{"version":1,"enabledGroups":["core"],"other":true}"#,
+            "version = 4\nenabledGroups = ['core']",
+            "version = 3\nenabledGroups = ['core', 'core']",
+            "version = 3\nenabledGroups = ['core', 'invalid']",
+            "version = 3\nenabledGroups = ['core']\nother = true",
             "{",
             "",
         ] {
@@ -306,8 +288,12 @@ mod tests {
     #[test]
     fn older_selections_gain_document_tools_and_keep_browser_opt_out() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("mcp-tools.json");
-        fs::write(&path, r#"{"version":1,"enabledGroups":["core","file"]}"#).unwrap();
+        let path = dir.path().join("mcp-tools.toml");
+        fs::write(
+            path.with_extension("json"),
+            r#"{"version":1,"enabledGroups":["core","file"]}"#,
+        )
+        .unwrap();
         let migrated = McpToolSettings::load(&path).unwrap();
         assert_eq!(migrated.version, 3);
         assert!(migrated.enabled_groups.contains(&ToolGroup::Browser));
@@ -340,7 +326,12 @@ mod tests {
                 .unwrap()
                 .allows("pab_browser_pointer")
         );
-        fs::write(&path, r#"{"version":2,"enabledGroups":["core","file"]}"#).unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::write(
+            path.with_extension("json"),
+            r#"{"version":2,"enabledGroups":["core","file"]}"#,
+        )
+        .unwrap();
         let migrated_v2 = McpToolSettings::load(&path).unwrap();
         assert_eq!(migrated_v2.version, 3);
         assert!(migrated_v2.allows("pab_document_open"));

@@ -3,6 +3,7 @@
 /docs/*
 !/docs/AGENTS.md
 !/docs/USAGE_AND_SELF_HOSTING.md
+!/docs/CONFIGURATION.md
 /diagram/*
 !/diagram/workflow/
 /diagram/workflow/*

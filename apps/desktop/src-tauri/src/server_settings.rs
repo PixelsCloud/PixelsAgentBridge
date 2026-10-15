@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ServerSettings {
     control_url: String,
     relay_url: String,
@@ -32,28 +32,31 @@ fn validate_url(value: &str, scheme: &str) -> Result<(), String> {
 
 fn settings_path() -> Result<PathBuf, String> {
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
-    Ok(paths.root().join("operator-server.json"))
+    Ok(paths.root().join("operator-server.toml"))
 }
 
 fn read_saved() -> Result<Option<ServerSettings>, String> {
     let path = settings_path()?;
-    #[cfg(target_os = "macos")]
-    let path = if path.exists() {
-        path
-    } else {
-        PathBuf::from("/Library/Application Support/PixelsAgentBridge/operator-server.json")
-    };
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content = std::fs::read(path).map_err(|error| error.to_string())?;
-    let settings: ServerSettings =
-        serde_json::from_slice(&content).map_err(|error| error.to_string())?;
-    settings.validate()?;
-    Ok(Some(settings))
+    pab_service_config::preferences::load(&path, |settings: &mut ServerSettings| {
+        settings.validate()
+    })
 }
 
 pub fn apply_saved_at_start() -> Result<(), String> {
+    let explicit = std::env::args_os().any(|a| a == "--config");
+    let (_, values) = pab_service_config::client::startup(
+        pab_service_config::client::Role::Operator,
+        std::env::args_os().skip(1),
+    )?;
+    // Called before Tauri or Tokio creates application threads.
+    for (key, value) in values {
+        unsafe {
+            std::env::set_var(key, value);
+        }
+    }
+    if explicit {
+        return Ok(());
+    }
     let Some(settings) = read_saved()? else {
         return Ok(());
     };
@@ -80,9 +83,7 @@ pub fn save_operator_server_settings(settings: ServerSettings) -> Result<(), Str
     let path = settings_path()?;
     let parent = path.parent().ok_or("Settings path has no parent")?;
     ensure_data_dir(parent).map_err(|error| error.to_string())?;
-    let content = serde_json::to_vec_pretty(&settings).map_err(|error| error.to_string())?;
-    std::fs::write(&path, content).map_err(|error| error.to_string())?;
-    Ok(())
+    pab_service_config::preferences::save(&path, &settings)
 }
 
 #[tauri::command]

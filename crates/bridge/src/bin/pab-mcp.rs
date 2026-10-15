@@ -64,18 +64,21 @@ const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. Upload/download return an operation_ref immediately; file_hash and bulk file/ZIP operations return after remote acceptance and execute in the background. Cancellation does not roll back completed filesystem effects. Use the dedicated file tools before shell fallback, and preserve expected_hash when editing or continuing reads; query pab_get_operation with its device_code and operation_id. Reuse request_id for deduplication. An unconfirmed result is not failure: query the original request, never replay it with a new ID. cancel_requested is intent; only a terminal cancelled result confirms it stopped. pab_disconnect affects only this MCP session. The device password stays in the local Bridge database; never pass it as a tool argument.";
 
 fn main() {
-    if let Err(error) = mcp_settings::apply_at_start() {
-        eprintln!("pab-mcp: {error}");
-        std::process::exit(1);
-    }
+    let args = match mcp_settings::apply_at_start() {
+        Ok(args) => args,
+        Err(error) => {
+            eprintln!("pab-mcp: {error}");
+            std::process::exit(1);
+        }
+    };
     let tokio = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("could not start the MCP runtime");
-    tokio.block_on(async_main());
+    tokio.block_on(async_main(args));
 }
 
-async fn async_main() {
+async fn async_main(args: Vec<String>) {
     let log_root = match DataPaths::for_scope(DataScope::User) {
         Ok(paths) => paths.root().to_path_buf(),
         Err(error) => {
@@ -87,20 +90,19 @@ async fn async_main() {
         eprintln!("pab-mcp: {error}");
         std::process::exit(1);
     }
-    if let Err(error) = run().await {
+    if let Err(error) = run(args).await {
         tracing::error!(%error, "MCP process failed");
         eprintln!("pab-mcp: {error}");
         std::process::exit(1);
     }
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let args = env::args().skip(1).collect::<Vec<_>>();
+async fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     if args.first().is_some_and(|arg| arg == "account") {
         return mcp_account::run(&args[1..]).await;
     }
-    if env::args_os().len() != 1 {
-        return Err("pab-mcp accepts no command-line arguments".into());
+    if !args.is_empty() {
+        return Err("usage: pab-mcp [--config PATH] [account ...]".into());
     }
     let tool_settings = pab_bridge::mcp_tool_settings::McpToolSettings::load(
         &pab_bridge::mcp_tool_settings::McpToolSettings::path()?,

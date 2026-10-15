@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Input, Menu, Select } from "antd";
-import { ArrowRight, Bot, Info, Languages, RotateCw, Server, Wrench } from "lucide-react";
+import { ArrowRight, Bot, Info, Languages, RotateCw, Server, ShieldCheck, Wrench } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import { McpToolSettingsPanel } from "./McpToolSettingsPanel";
 import { MacosPermissionsPanel } from "./MacosPermissionsPanel";
+import { macosPermissionText } from "./macosPermissionText";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { UpdatePanel } from "./UpdatePanel";
 
@@ -20,7 +21,7 @@ type Props = {
   onSectionChange: (value: SettingsSection) => void;
 };
 
-export type SettingsSection = "preferences" | "ai" | "server" | "tools" | "about";
+export type SettingsSection = "preferences" | "permissions" | "ai" | "server" | "tools" | "about";
 
 export function SettingsPanel({ language, onLanguageChange, section, onSectionChange: setSection }: Props) {
   const t = messages[language];
@@ -28,7 +29,16 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [isMac, setIsMac] = useState(false);
 
+
+  useEffect(() => {
+    let active = true;
+    void invoke<{ screenRecording: boolean } | null>("macos_permissions").then(value => {
+      if (active) setIsMac(typeof value?.screenRecording === "boolean");
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     void invoke<ServerSettings>("get_operator_server_settings")
@@ -56,6 +66,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <Menu mode="inline" selectedKeys={[section]} onClick={({ key }) => setSection(key as SettingsSection)}
           items={[
             { key: "preferences", icon: <Languages size={17} />, label: t.settingsPreferences },
+            ...(isMac ? [{ key: "permissions", icon: <ShieldCheck size={17} />, label: macosPermissionText[language].title }] : []),
             { key: "ai", icon: <Bot size={17} />, label: t.settingsAi },
             { key: "tools", icon: <Wrench size={17} />, label: t.settingsTools },
             { key: "server", icon: <Server size={17} />, label: t.settingsConnection },
@@ -75,8 +86,9 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
             { value: "zh-TW", label: "繁體中文" },
             { value: "en", label: "English" },
           ]} />
-        <MacosPermissionsPanel language={language} />
       </div>}
+
+      {section === "permissions" && <MacosPermissionsPanel language={language} />}
 
       {section === "ai" && <div className="settings-ai">
         <div className="surface-kicker"><Bot size={15} /> {t.settingsAi}</div>

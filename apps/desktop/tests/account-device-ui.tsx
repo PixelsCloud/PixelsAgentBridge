@@ -7,10 +7,14 @@ import '../src/theme.css';
 
 const history={tasks:[],operations:[],totalCount:0,taskBefore:null,operationBeforeStartedAtUnixMs:null,operationBeforeId:null,hasMoreTasks:false,hasMoreOperations:false};
 const devices=[{deviceId:'fixture-one',deviceCode:'123456789',alias:'Original',osFamily:'windows',osReminder:'Windows fixture',connected:false}];
+if (new URLSearchParams(location.search).has('many-devices')) {
+  for (let index = 1; index < 33; index++) devices.push({deviceId:`fixture-${index}`,deviceCode:String(123456789+index),alias:`Device ${index+1}`,osFamily:'windows',osReminder:'Windows fixture',connected:false});
+}
 const fixture=(window as any).fixture={calls:[] as any[],cancel:null as null|(()=>void),signedIn:false};
 (window as any).__TAURI_INTERNALS__={transformCallback:()=>1,unregisterCallback:()=>{},invoke:async(command:string,args:any)=>{
   fixture.calls.push({command,args});
   if(command==='operator_bootstrap')return {...history,devices};
+  if(command==='operator_connect_saved')return {...devices[0],connected:true};
   if(command==='operator_connect' && location.search.includes('expired'))throw 'account unavailable; sign in again before controlling devices';
   if(command==='operator_history_page')return history;
   if(command==='operator_rename_device'){devices[0].alias=args.alias.trim();return devices[0].alias;}

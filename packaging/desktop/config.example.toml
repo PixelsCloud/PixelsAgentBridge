@@ -1,0 +1,17 @@
+# Installed application configuration (Windows, macOS and Linux).
+# Relative paths below are resolved from this file's directory.
+control_url = "wss://pab.rgaa.vip/control"
+relay_urls = ["https://pab-relay.rgaa.vip"]
+# control_ca_cert = "certificates/control-ca.pem"
+# relay_ca_cert = "certificates/relay-ca.pem"
+
+[executor]
+# device_name = "my-device"
+# log_level = "info"
+# log_dir = "/var/log/pixels-agent-bridge"
+# data_dir = "/var/lib/pixels-agent-bridge"
+
+[operator]
+# Desktop and MCP use the current user's data directory by default.
+# Keep it separate from the machine Executor's identity and database.
+# log_level = "info"

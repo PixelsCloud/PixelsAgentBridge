@@ -1,4 +1,6 @@
-//! File configuration helpers for Server and Relay only.
+//! TOML configuration shared by the services and installed applications.
+pub mod client;
+pub mod preferences;
 use serde::{Deserialize, de::DeserializeOwned};
 use std::{
     ffi::OsString,

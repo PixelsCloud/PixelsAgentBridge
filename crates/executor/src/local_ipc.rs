@@ -796,6 +796,26 @@ pub async fn connect_local() -> Result<LocalSocket, LocalIpcError> {
     connect_with_token(local_port()?, &token).await
 }
 
+/// A dedicated authenticated socket; never consumes a UI helper's event stream.
+/// The server challenges the actual caller PID before choosing its home folder.
+#[cfg(target_os = "macos")]
+pub async fn check_local_file_access() -> Result<crate::file_access::FileAccessReport, LocalIpcError> {
+    tokio::time::timeout(Duration::from_secs(15), async {
+        let mut socket = connect_local().await?;
+        send_json(&mut socket, &json!({"type":"check_file_access","process_id":std::process::id()})).await?;
+        loop {
+            let frame = receive_json(&mut socket).await?;
+            match frame["type"].as_str() {
+                Some("verify_helper_identity") => helper_identity::answer(&frame).await?,
+                Some("file_access_result") => return serde_json::from_value(frame["result"].clone()).map_err(Into::into),
+                Some("status") => {},
+                Some("error") => return Err(LocalIpcError::Remote(frame["message"].as_str().unwrap_or("file access check failed").into())),
+                _ => return Err(LocalIpcError::Protocol),
+            }
+        }
+    }).await.map_err(|_| LocalIpcError::Timeout)?
+}
+
 async fn connect_with_token(port: u16, token: &[u8; 32]) -> Result<LocalSocket, LocalIpcError> {
     let url = format!("ws://127.0.0.1:{port}/local");
     let (mut socket, _) = tokio::time::timeout(AUTH_TIMEOUT, connect_async(url))
@@ -916,6 +936,17 @@ async fn handle_connection(
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
+                    #[cfg(target_os = "macos")]
+                    Some("check_file_access") if registration.0.is_none() => {
+                        // Native PID/UID proof, not caller-supplied paths/accounts.
+                        let caller = helper_identity::verify(&mut socket, &frame).await?.ok_or(LocalIpcError::Authentication)?;
+                        let executable = std::env::current_exe()?;
+                        let result = crate::file_access::check(executable, PathBuf::from(caller.identity.home)).await;
+                        match result {
+                            Ok(result) => send_json(&mut socket, &json!({"type":"file_access_result","result":result})).await?,
+                            Err(_) => send_json(&mut socket, &json!({"type":"error","message":"file access check already running or unavailable"})).await?,
+                        }
+                    },
                     Some("sign_device_account") => {
                         let result=match serde_json::from_value(frame["challenge"].clone()) {
                             Ok(challenge)=>device_account::sign(root,challenge).await,

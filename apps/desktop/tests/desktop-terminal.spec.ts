@@ -86,3 +86,117 @@ test("confirmed native window closing uses the caller-bound backend command", as
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_terminal_destroy"))).toBe(true);
   expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "plugin:window|destroy"))).toBe(false);
 });
+
+test("compact titlebar shows the path and keeps window controls independent of dragging and session cancellation", async ({ page }) => {
+  await open(page);
+  const header = page.locator(".desktop-terminal-header");
+  await expect(header).toContainText("428 358 431");
+  await expect(header.getByText("P2P", { exact: true })).toBeVisible();
+  await expect(page.getByText("powershell.exe", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".desktop-terminal-details")).toHaveCount(0);
+  await expect(header).toHaveCSS("height", "42px");
+  await header.getByRole("button", { name: "Minimize", exact: true }).click();
+  await header.getByRole("button", { name: "Maximize / restore", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "plugin:window|toggle_maximize").length)).toBe(1);
+  expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "plugin:window|minimize"))).toBe(true);
+  expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "plugin:window|start_dragging"))).toBe(false);
+  await header.getByText("Remote terminal", { exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "plugin:window|start_dragging").length)).toBe(1);
+  await header.getByText("Remote terminal", { exact: true }).dblclick();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "plugin:window|toggle_maximize").length)).toBe(2);
+  await header.getByRole("button", { name: "Close window", exact: true }).click();
+  await page.getByRole("button", { name: "Keep using" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(header.getByText("Connected", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_terminal_destroy"))).toBe(false);
+  await page.evaluate(() => (window as any).fixture.output("PS C:\\Users\\Administrator> Write-Output 'Pixels remote terminal'\r\nPixels remote terminal\r\nPS C:\\Users\\Administrator> "));
+  await page.screenshot({ path: "../../.build/desktop-terminal-titlebar-1100.png" });
+  await page.setViewportSize({ width: 640, height: 400 });
+  await expect(header.getByText("P2P", { exact: true })).toBeVisible();
+  const controls = await header.locator(".window-controls").boundingBox();
+  const identity = await header.locator(".desktop-terminal-title").boundingBox();
+  expect(controls!.x + controls!.width).toBeLessThanOrEqual(640);
+  expect(identity!.x + identity!.width).toBeLessThanOrEqual(controls!.x);
+  expect(await header.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  expect(await header.locator(".desktop-terminal-title").evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await page.screenshot({ path: "../../.build/desktop-terminal-titlebar-640.png" });
+  await header.getByRole("button", { name: "Close window", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "End session", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_terminal_destroy"))).toBe(true);
+});
+
+for (const theme of ["light", "dark"]) {
+  test(`Chinese titlebar fits the minimum window in ${theme} mode`, async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 400 });
+    await page.goto(`http://127.0.0.1:1429/tests/desktop-terminal.html?language=zh-CN&theme=${theme}`);
+    await page.getByRole("combobox", { name: "执行账户" }).click();
+    await page.locator(".ant-select-dropdown:visible").getByText("Administrator · 2", { exact: true }).click();
+    await page.getByRole("button", { name: "打开 Shell" }).click();
+    const header = page.locator(".desktop-terminal-header");
+    await expect(header.getByText("已连接", { exact: true })).toBeVisible();
+    await expect(header.getByText("P2P", { exact: true })).toBeVisible();
+    expect(await header.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    expect(await header.locator(".desktop-terminal-title").evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await page.evaluate(() => (window as any).fixture.output("PS C:\\Users\\Administrator> Write-Output '中文测试'\r\n中文测试\r\nPS C:\\Users\\Administrator> "));
+    await page.screenshot({ path: `../../.build/desktop-terminal-titlebar-zh-${theme}.png` });
+  });
+}
+
+for (const mode of ["console", "system"]) {
+  test(`the ${mode} menu mode opens its Shell automatically without an account chooser`, async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 400 });
+    await page.goto(`http://127.0.0.1:1429/tests/desktop-terminal.html?launch=${mode}`);
+    await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Execution account" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open Shell", exact: true })).toHaveCount(0);
+    const starts = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_start"));
+    expect(starts).toHaveLength(1);
+    expect(starts[0].args.execution).toEqual(mode === "system" ? { mode: "service" } : { mode: "user", context_ref: "fixture-console" });
+    expect(await page.locator(".desktop-terminal-title").evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    if (mode === "system") await expect(page.locator(".desktop-terminal-header").getByText("System", { exact: true })).toBeVisible();
+    await page.evaluate(() => (window as any).fixture.end());
+    await page.getByRole("button", { name: "Reopen", exact: true }).click();
+    await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+    const selections = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_selection"));
+    expect(selections).toHaveLength(2);
+  });
+}
+
+test("an unavailable console does not start a service Shell; retry obtains a fresh context", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/desktop-terminal.html?launch=console&no-console");
+  await expect(page.getByText("no active local console login was found", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_terminal_start"))).toBe(false);
+  await expect(page.getByRole("combobox", { name: "Execution account" })).toHaveCount(0);
+  await page.evaluate(() => { (window as any).fixture.failSelection = false; });
+  await page.getByRole("button", { name: "Reopen", exact: true }).click();
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  const starts = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_start"));
+  expect(starts).toHaveLength(1);
+  expect(starts[0].args.execution.mode).toBe("user");
+});
+
+test("Mac terminals explain remote file privacy prompts while input remains usable", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/desktop-terminal.html?launch=console&os=macos&language=zh-CN");
+  await expect(page.getByText("已连接", { exact: true })).toBeVisible();
+  const notice = page.getByRole("alert");
+  await expect(notice).toContainText("macOS 文件访问权限");
+  await expect(notice).toContainText("/Library/Application Support/PixelsAgentBridge/pab-executor");
+  await expect(notice).toContainText("远端 Mac");
+  await page.locator(".xterm-helper-textarea").focus();
+  await page.keyboard.type("pwd");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((call: any) => call.command === "desktop_terminal_input"))).toBe(true);
+  await notice.getByRole("button", { name: "Close" }).click();
+  await expect(notice).toHaveCount(0);
+  await page.evaluate(() => (window as any).fixture.end());
+  await page.getByRole("button", { name: "重新打开", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("macOS 文件访问权限");
+});
+
+for (const os of ["windows", "linux"]) {
+  test(`${os} does not receive macOS-specific permission guidance`, async ({ page }) => {
+    await page.goto(`http://127.0.0.1:1429/tests/desktop-terminal.html?launch=system&os=${os}`);
+    await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+    await expect(page.getByText("macOS file access", { exact: true })).toHaveCount(0);
+  });
+}

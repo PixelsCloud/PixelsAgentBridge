@@ -332,7 +332,7 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let database = root.join("bridge.sqlite3");
-    let path = root.join("mcp-tools.json");
+    let path = root.join("mcp-tools.toml");
     let settings = McpToolSettings {
         version: McpToolSettings::default().version,
         enabled_groups: vec![ToolGroup::Core],
@@ -374,16 +374,16 @@ async fn tool_groups_are_fixed_at_start_and_disabled_calls_never_initialize_runt
 async fn invalid_tool_settings_fail_startup_without_exposing_a_fallback_catalog() {
     for (content, expected) in [
         (
-            r#"{"version":4294967295,"enabledGroups":["core"]}"#,
+            "version = 4294967295\nenabledGroups = ['core']",
             "Unsupported MCP tool settings version",
         ),
         (
-            r#"{"version":1,"enabledGroups":["core"],"invalid":true}"#,
-            "unknown field",
+            "version = 3\nenabledGroups = ['core']\ninvalid = true",
+            "Invalid TOML configuration",
         ),
     ] {
         let directory = tempfile::tempdir().unwrap();
-        std::fs::write(directory.path().join("mcp-tools.json"), content).unwrap();
+        std::fs::write(directory.path().join("mcp-tools.toml"), content).unwrap();
         let child = tokio::process::Command::new(env!("CARGO_BIN_EXE_pab-mcp"))
             .env("PAB_DATA_DIR", directory.path())
             .stdin(Stdio::null())

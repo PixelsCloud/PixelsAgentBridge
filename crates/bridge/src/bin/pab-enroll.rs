@@ -6,8 +6,36 @@ use rand_core::OsRng;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
-#[tokio::main]
-async fn main() -> ExitCode {
+fn main() -> ExitCode {
+    let (args, values) = match pab_service_config::client::startup(
+        pab_service_config::client::Role::Operator,
+        env::args_os().skip(1),
+    ) {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("pab-enroll: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    // Configuration is applied before any runtime threads exist.
+    for (key, value) in values {
+        unsafe {
+            env::set_var(key, value);
+        }
+    }
+    match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime.block_on(async_main(args)),
+        Err(error) => {
+            eprintln!("pab-enroll: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn async_main(args: Vec<String>) -> ExitCode {
     let log_root = match DataPaths::for_scope(DataScope::User) {
         Ok(paths) => paths.root().to_path_buf(),
         Err(error) => {
@@ -19,7 +47,7 @@ async fn main() -> ExitCode {
         eprintln!("pab-enroll: {error}");
         return ExitCode::FAILURE;
     }
-    match run().await {
+    match run(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             tracing::error!(%error, "enrollment failed");
@@ -29,8 +57,8 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run() -> Result<(), EnrollCliError> {
-    let mut args = env::args().skip(1);
+async fn run(args: Vec<String>) -> Result<(), EnrollCliError> {
+    let mut args = args.into_iter();
     let username = args.next().ok_or(EnrollCliError::Usage)?;
     let account_password_file = PathBuf::from(args.next().ok_or(EnrollCliError::Usage)?);
     let device_name = args.next().ok_or(EnrollCliError::Usage)?;

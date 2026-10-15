@@ -96,17 +96,9 @@ chown -R root:wheel "$upgrade/new-support/document-runtime"
 for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$upgrade/new-support/$name"
 done
-{
-    printf 'export PAB_CONTROL_URL=%q\n' "$control_url"
-    printf 'export PAB_RELAY_URLS=%q\n' "$relay_url"
-} > "$upgrade/new-support/settings.env"
-chmod 644 "$upgrade/new-support/settings.env"
-settings_file="$upgrade/new-support/operator-server.json"
-plutil -create xml1 "$settings_file"
-plutil -insert controlUrl -string "$control_url" "$settings_file"
-plutil -insert relayUrl -string "$relay_url" "$settings_file"
-plutil -convert json "$settings_file"
-chmod 644 "$settings_file"
+"$upgrade/new-support/pab-executor" configure --config "$upgrade/new-support/config.toml" \
+    --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
+chmod 644 "$upgrade/new-support/config.toml"
 
 # Stop launchd respawn before retiring the old executable paths.
 upgrade_step='停止旧版后台服务 / stopping old services'

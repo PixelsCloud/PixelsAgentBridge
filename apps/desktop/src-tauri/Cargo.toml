@@ -19,6 +19,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 pab-executor = { path = "../../../crates/executor" }
 pab-bridge = { path = "../../../crates/bridge" }
 pab-agent-core = { path = "../../../crates/agent-core" }
+pab-service-config = { path = "../../../crates/service-config" }
 pab-logging = { path = "../../../crates/logging" }
 pab-protocol = { path = "../../../crates/protocol" }
 pab-desktop-control = { path = "../../../crates/desktop-control" }
@@ -54,7 +55,7 @@ enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }
 libc = "0.2"
 objc2 = "=0.6.4"
 objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWorkspace"] }
-objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSString", "NSURL"] }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSString", "NSURL"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 xcap = "=0.8.2"
