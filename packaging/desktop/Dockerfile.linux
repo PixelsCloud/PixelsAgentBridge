@@ -1,8 +1,12 @@
-FROM rust:1.95-bookworm AS dependencies
+FROM rust:1.95-bullseye AS dependencies
 ARG PAB_PROFILE=release
 
-RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' \
-        /etc/apt/sources.list.d/debian.sources \
+# Freeze the build sysroot to the base image's Debian snapshot. Bullseye's
+# moving security index can reference packages already removed from mirrors.
+RUN printf '%s\n' \
+        'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/20260518T000000Z bullseye main' \
+        'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/20260518T000000Z bullseye-security main' \
+        > /etc/apt/sources.list \
     && apt-get -o Acquire::Retries=3 update \
     && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     libssl-dev \
@@ -15,17 +19,17 @@ FROM dependencies AS builder
 WORKDIR /src
 COPY . .
 ENV CARGO_TARGET_DIR=/src/target
-ENV CARGO_BUILD_JOBS=10 CMAKE_BUILD_PARALLEL_LEVEL=10
+ENV CARGO_BUILD_JOBS=8 CMAKE_BUILD_PARALLEL_LEVEL=2
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/src/target \
+    --mount=type=cache,id=pab-linux-bullseye-target,target=/src/target \
     if [ "$PAB_PROFILE" = release ]; then cargo_flags=--release; build_dir=release; \
     elif [ "$PAB_PROFILE" = debug ]; then cargo_flags=; build_dir=debug; \
     else echo "invalid PAB_PROFILE: $PAB_PROFILE" >&2; exit 2; fi \
     && cargo build --locked $cargo_flags \
         -p pab-executor --bin pab-executor \
         -p pab-bridge --bin pab-mcp \
-        -p pab-document --bin pab-document-worker -j 10 \
+        -p pab-document --bin pab-document-worker -j 8 \
     && mkdir -p /out \
     && cp /src/target/$build_dir/pab-executor /out/pab-executor \
     && cp /src/target/$build_dir/pab-mcp /out/pab-mcp \

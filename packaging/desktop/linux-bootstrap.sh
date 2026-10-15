@@ -16,15 +16,15 @@ main() {
         privilege=(sudo)
     fi
     # Python parses the signed metadata and extracts only regular package files.
-    if ! command -v python3 >/dev/null || ! command -v openssl >/dev/null; then
-        echo 'Installing Python 3, OpenSSL and CA certificates...'
+    if ! command -v python3 >/dev/null || ! python3 -c 'from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey' 2>/dev/null; then
+        echo 'Installing Python 3, signature verification support and CA certificates...'
         if command -v apt-get >/dev/null; then
             "${privilege[@]}" apt-get update
-            "${privilege[@]}" apt-get install -y python3 openssl ca-certificates
+            "${privilege[@]}" apt-get install -y python3 python3-cryptography ca-certificates
         elif command -v dnf >/dev/null; then
-            "${privilege[@]}" dnf install -y python3 openssl ca-certificates
+            "${privilege[@]}" dnf install -y python3 python3-cryptography ca-certificates
         else
-            echo 'Install python3, openssl and ca-certificates, then retry.' >&2; return 1
+            echo 'Install python3, python3-cryptography and ca-certificates, then retry.' >&2; return 1
         fi
     fi
     python3 - "$@" <<'PY'
@@ -44,6 +44,8 @@ from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 SITE = 'https://agent.rgaa.vip'
 PUBLIC_KEY = 'dOqSsbkPvJmGFblm/tH23cwbRmHjVhu6POF+WLmnKXk='
@@ -93,15 +95,12 @@ def validate_manifest(info, directory, public_key=PUBLIC_KEY):
         raise RuntimeError('Invalid release signature.') from None
     if len(signature) != 64 or len(key) != 32:
         raise RuntimeError('Invalid release signature.')
-    (directory / 'manifest').write_bytes(canonical.encode())
-    (directory / 'signature').write_bytes(signature)
-    # RFC 8410 SubjectPublicKeyInfo for Ed25519, followed by the raw public key.
-    (directory / 'public.der').write_bytes(bytes.fromhex('302a300506032b6570032100') + key)
-    result = subprocess.run(['openssl', 'pkeyutl', '-verify', '-pubin', '-keyform', 'DER',
-        '-inkey', str(directory / 'public.der'), '-rawin', '-in', str(directory / 'manifest'),
-        '-sigfile', str(directory / 'signature')], capture_output=True)
-    if result.returncode:
-        raise RuntimeError('Release signature verification failed. OpenSSL 3 or newer is required.')
+    try:
+        Ed25519PublicKey.from_public_bytes(key).verify(signature, canonical.encode())
+    except (InvalidSignature, ValueError):
+        raise RuntimeError('Release signature verification failed.') from None
+    except UnsupportedAlgorithm:
+        raise RuntimeError('Installed signature verification library does not support Ed25519.') from None
 
 
 def download_package(info, path):
@@ -171,9 +170,16 @@ def main():
         raise RuntimeError('Only Linux x86_64 is supported.')
     if not args.no_service and not Path('/run/systemd/system').is_dir():
         raise RuntimeError('systemd is not running. Use --no-service with your process supervisor.')
-    for tool in ('openssl', 'tar', 'ldd', 'bash'):
+    for tool in ('tar', 'ldd', 'bash'):
         if not shutil.which(tool):
             raise RuntimeError(f'Required program is missing: {tool}')
+    try:
+        libc = os.confstr('CS_GNU_LIBC_VERSION') or ''
+    except (OSError, ValueError):
+        libc = ''
+    match = re.fullmatch(r'glibc (\d+)\.(\d+)', libc)
+    if not match or tuple(map(int, match.groups())) < (2, 31):
+        raise RuntimeError('Linux glibc 2.31 or newer is required (Ubuntu 20.04+). Detected: ' + (libc or 'non-glibc runtime'))
     privilege = [] if os.geteuid() == 0 else ['sudo']
     print('Checking the latest signed Linux release...', flush=True)
     with fetch(SITE + '/api/updates/check?platform=linux&architecture=x86_64&channel=stable&current=0.0.0') as response:
@@ -185,7 +191,10 @@ def main():
         info = json.loads(data)
     if not isinstance(info, dict):
         raise RuntimeError('Invalid release metadata.')
-    with tempfile.TemporaryDirectory(prefix='pixels-install-') as temp:
+    # /tmp and /var/tmp may be mounted noexec. The verified package must be
+    # executable for ldd and configure before any installed service is stopped.
+    # TemporaryDirectory creates a private (0700) directory and removes it.
+    with tempfile.TemporaryDirectory(prefix='.pixels-install-', dir=Path.home()) as temp:
         directory = Path(temp)
         validate_manifest(info, directory)
         print(f'Downloading Pixels {info["version"]} ({info["size"] / 1024 / 1024:.1f} MiB)...', flush=True)

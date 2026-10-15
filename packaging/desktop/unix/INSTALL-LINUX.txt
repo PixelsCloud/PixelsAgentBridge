@@ -1,4 +1,4 @@
-Pixels Agent Bridge - Linux headless (x86_64, glibc 2.36 or newer)
+Pixels Agent Bridge - Linux headless (x86_64, glibc 2.31 or newer)
 
 Executor, MCP and offline document worker. No Desktop, display server, logind or graphical login
 is required for core tools. Install Git and your workload programs separately.
@@ -7,6 +7,9 @@ One-line installation/upgrade (requires a published Linux release):
   curl -fsSL https://agent.rgaa.vip/install.sh | bash
 Uses the official service on first install; preserves configured URLs on upgrade.
 The bootstrap verifies the release signature, checksum and runtime libraries.
+Ubuntu 20.04 and newer use their existing system runtime libraries. The bootstrap
+installs python3-cryptography if needed for Ed25519 verification; OpenSSL 3 is not
+required and system OpenSSL/glibc libraries are not replaced by this installer.
 
 Application configuration is TOML: /etc/pixels-agent-bridge/config.toml
   control_url = "wss://pab.rgaa.vip/control"

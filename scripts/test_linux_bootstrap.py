@@ -12,6 +12,8 @@ import tempfile
 import types
 import unittest
 from unittest.mock import patch
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / 'packaging/desktop/linux-bootstrap.sh').read_text(encoding='utf-8').split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
@@ -23,16 +25,15 @@ class Response(io.BytesIO):
     status = 200
 
 
-@unittest.skipUnless(sys.platform == 'linux' and shutil.which('openssl'), 'Run in Linux with OpenSSL 3')
+@unittest.skipUnless(sys.platform == 'linux', 'Run in Linux')
 class Bootstrap(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.directory = Path(self.temp.name)
-        self.key = self.directory / 'private.pem'
-        subprocess.run(['openssl', 'genpkey', '-algorithm', 'ED25519', '-out', str(self.key)], check=True, capture_output=True)
-        public = subprocess.run(['openssl', 'pkey', '-in', str(self.key), '-pubout', '-outform', 'DER'], check=True, capture_output=True).stdout
-        self.public = base64.b64encode(public[-32:]).decode()
+        self.key = Ed25519PrivateKey.generate()
+        public = self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.public = base64.b64encode(public).decode()
 
     def manifest(self, data=b'package'):
         filename = 'pixels-agent-bridge-linux-x86_64-release-1.3.0.tar.gz'
@@ -40,9 +41,7 @@ class Bootstrap(unittest.TestCase):
             filename=filename, size=len(data), sha256=hashlib.sha256(data).hexdigest(),
             download_url=f'https://fixture.cos.ap-beijing.myqcloud.com/releases/linux/x86_64/1.3.0/{filename}')
         canonical = f'PAB-RELEASE-V1\nlinux\nx86_64\nstable\n1.3.0\n{filename}\n{len(data)}\n{info["sha256"]}\n'
-        message = self.directory / 'to-sign'
-        message.write_bytes(canonical.encode())
-        signature = subprocess.run(['openssl', 'pkeyutl', '-sign', '-rawin', '-inkey', str(self.key), '-in', str(message)], check=True, capture_output=True).stdout
+        signature = self.key.sign(canonical.encode())
         info['signature'] = base64.b64encode(signature).decode()
         return info
 
@@ -64,6 +63,19 @@ class Bootstrap(unittest.TestCase):
                 else:
                     with self.assertRaises(RuntimeError):
                         bootstrap.download_package(info, self.directory / 'download')
+
+    def test_unsupported_libc_stops_before_download_or_install(self):
+        for libc in ('glibc 2.30', '', 'musl 1.2'):
+            with self.subTest(libc=libc), patch.object(bootstrap.os, 'confstr', return_value=libc), \
+                    patch.object(bootstrap.platform, 'system', return_value='Linux'), \
+                    patch.object(bootstrap.platform, 'machine', return_value='x86_64'), \
+                    patch.object(bootstrap.sys, 'argv', ['installer', '--no-service']), \
+                    patch.object(bootstrap, 'fetch') as fetch, \
+                    patch.object(bootstrap.subprocess, 'run') as execute:
+                with self.assertRaisesRegex(RuntimeError, 'glibc 2.31'):
+                    bootstrap.main()
+                fetch.assert_not_called()
+                execute.assert_not_called()
 
     def test_archive_rejects_links_traversal_duplicates_and_missing_files(self):
         for name, kind, duplicate in (('../escape', tarfile.REGTYPE, False), ('safe', tarfile.SYMTYPE, False),

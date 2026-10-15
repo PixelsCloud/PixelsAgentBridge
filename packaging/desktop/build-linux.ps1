@@ -12,7 +12,7 @@ if (-not $ComponentsOnly) {
 }
 $dockerfile = Join-Path $PSScriptRoot 'Dockerfile.linux'
 $mount = "type=bind,source=$root,target=/src"
-$image = 'pab-linux-headless-build-deps:bookworm'
+$image = 'pab-linux-headless-build-deps:bullseye'
 
 & docker build --target dependencies -t $image -f $dockerfile $root
 if ($LASTEXITCODE -ne 0) {
@@ -22,17 +22,18 @@ if ($LASTEXITCODE -ne 0) {
 $cargoFlags = if ($Profile -eq 'release') { '--release' } else { '' }
 $buildScript = @"
 set -eu
-cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp -p pab-document --bin pab-document-worker -j 10
+cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp -p pab-document --bin pab-document-worker -j 8
 mkdir -p .build/guest-desktop-linux-$Profile
-cp .build/linux-target/$Profile/pab-executor .build/linux-target/$Profile/pab-mcp .build/linux-target/$Profile/pab-document-worker .build/guest-desktop-linux-$Profile/
+cp .build/linux-target-bullseye/$Profile/pab-executor .build/linux-target-bullseye/$Profile/pab-mcp .build/linux-target-bullseye/$Profile/pab-document-worker .build/guest-desktop-linux-$Profile/
 "@
 $buildScript = $buildScript.Replace("`r`n", "`n")
 
 & docker run --rm --mount $mount --workdir /src `
     --env CARGO_HOME=/src/.build/linux-cargo-home `
-    --env CARGO_TARGET_DIR=/src/.build/linux-target `
-    --env CARGO_BUILD_JOBS=10 `
-    --env CMAKE_BUILD_PARALLEL_LEVEL=10 `
+    --env CARGO_TARGET_DIR=/src/.build/linux-target-bullseye `
+    --cpus 10 `
+    --env CARGO_BUILD_JOBS=8 `
+    --env CMAKE_BUILD_PARALLEL_LEVEL=2 `
     --env PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin `
     $image sh -c $buildScript
 if ($LASTEXITCODE -ne 0) {
