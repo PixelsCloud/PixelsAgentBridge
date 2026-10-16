@@ -58,4 +58,27 @@ python experiments/remote-desktop/verify_nvenc_probe.py --capture --animate --di
 
 `--capture` 可直接编码 DXGI 返回的 BGRA8 纹理，禁止与 `--output` 同用，不保存真实桌面码流。`--animate` 只能与采集一起启用，创建不激活的合成颜色窗口，为静止桌面提供更新；它不是解码显示器。显示器编号仅在本次实验枚举中有效。
 
-编码器关闭 B 帧及 lookahead，单帧同步等待码流后才解除资源映射、释放 DXGI frame lease。码流字节读至 CPU 是编码输出，不是像素回读。报告中的零复制、零转换计数仅描述本实验代码，驱动内部处理未知。暂不包含硬解码、渲染、网络、软编后备、会话恢复和锁屏支持。
+编码器关闭 B 帧及 lookahead，单帧同步等待码流后才解除资源映射、释放 DXGI frame lease。码流字节读至 CPU 是编码输出，不是像素回读。报告中的零复制、零转换计数仅描述本实验代码，驱动内部处理未知。该编码探针不包含解码和显示，完整本地实验见下文。
+
+## 硬解码与原生显示闭环
+
+```powershell
+python experiments/remote-desktop/build_loopback_probe.py
+python experiments/remote-desktop/verify_loopback_probe.py
+# 增加实际桌面采集：短暂显示动画与查看窗口，不抢焦点、不保存画面。
+python experiments/remote-desktop/verify_loopback_probe.py --capture --display 0
+```
+
+独立 `loopback-probe.exe` 复用 `nvenc_encoder.h`，新增 `mf_decoder.h`、`d3d_presenter.h`。Windows SDK 系统 H.264 Media Foundation 解码器通过 DXGI device manager 使用同一个 D3D11 device，输出必须为带 `D3D11_BIND_DECODER` 的 NV12 GPU 纹理；缺少组件或硬件支持时明确失败，不把隐式软件后备计为硬解成功。参考 hwcodec 固定版本的 D3D11 视频处理器路径，实验实现自行编写，未引入上游 FFmpeg 构建或二进制依赖。
+
+解码 sample 持有纹理数组槽位直到 GPU 处理完成。视频处理器直接读取该槽位，进行一次必要的 NV12→BGRA 转换及缩放，写入 flip swapchain，不先复制到中间 RGB 纹理。码流声明 SDR BT.709、有限视频范围，输出为全范围 RGB；1080p 对齐到 1088 行时按解码器可见 aperture 裁剪。测试窗口固定 960×540，当前验收视频尺寸为 1920×1080。
+
+窗口使用单帧呈现队列，每次 `Present` 后等待 DXGI frame statistics 确认对应 present ID，再提交下一帧。`effective_display_fps` 是确认显示的不同帧数 / 实测墙钟时长，含首帧启动和末帧 drain；不以编码或 Present 调用次数代替。`source_to_display_observed_*` 是本机开始生成/获取一帧到观察到系统显示确认的耗时，包含轮询误差，**不是网络延迟、输入响应时间或光学测得的屏幕延迟**。`decode_output_*` 是 MFT 交付 GPU sample 的耗时；实际 GPU 完成等待计入后续显示阶段。
+
+默认验证包括：变化四色图案的四角 RGB、帧时间戳顺序、编码/解码/显示数量一致、15/30 FPS 性能、有限待解码队列、非法参数拒绝，以及关闭本脚本创建的查看窗口后进程退出。`--verify-pixels` 每帧只回读四个合成图像像素，单独计量；性能场景不启用它，真实桌面禁止启用。不会保存码流或屏幕图片。采集时排除本地查看窗口，避免递归画面。
+
+报告包含进程 CPU 时间、峰值工作集、结束时 private bytes、DXGI 采样的进程本地显存峰值；不包含 DWM/驱动的全部系统开销，未测 GPU 引擎利用率。应用显式复制次数为零不代表驱动和系统内部零复制。
+
+本机 RTX 3060 与 90 RTX 4090 的 1080p 本地闭环已通过，证据见 [实验记录](RESULTS-2026-10-16.md) 和 [验收数据](../../acceptance/remote-desktop-loopback-2026-10-16.json)。这一阶段尚未接入网络、Desktop 产品入口、多屏切换/旋转、输入、锁屏、软编后备或 Mac/Linux 媒体路径。固定尺寸和颜色契约仅适用于本实验，不能作为生产协议省略 generation、色彩与屏幕布局协商的依据。
+
+系统接口参考：[H.264 解码器](https://learn.microsoft.com/en-us/windows/win32/medfound/h-264-video-decoder)、[D3D11 解码资源交接](https://learn.microsoft.com/en-us/windows/win32/medfound/supporting-direct3d-11-video-decoding-in-media-foundation)、[可见区域](https://learn.microsoft.com/en-us/windows/win32/medfound/picture-aspect-ratio)、[显示统计](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics)。

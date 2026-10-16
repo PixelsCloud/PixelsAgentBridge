@@ -8,7 +8,7 @@ import shutil
 import subprocess
 
 
-def build_probe(filename="dxgi_probe.cpp", probe_name="dxgi", include_dir=None):
+def build_probe(filename="dxgi_probe.cpp", probe_name="dxgi", include_dir=None, libraries=()):
     if os.name != "nt":
         raise SystemExit("Windows SDK / MSVC required")
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -64,7 +64,7 @@ def build_probe(filename="dxgi_probe.cpp", probe_name="dxgi", include_dir=None):
         compiler, "/nologo", "/std:c++17", "/EHsc", "/W4", "/WX", "/O2", "/MT",
         *([f"/external:I{include_dir}", "/external:W0"] if include_dir else []),
         str(source), f"/Fo{output / (probe_name + '-probe.obj')}", f"/Fe{output / (probe_name + '-probe.exe')}",
-        "/link", "d3d11.lib", "dxgi.lib", "user32.lib",
+        "/link", "d3d11.lib", "dxgi.lib", "user32.lib", *libraries,
     ], cwd=output, env=environment, check=True)
     print(json.dumps({"executable": str(output / (probe_name + "-probe.exe")),
                       "build_jobs": 1, "affinity_cpu_count": chosen.bit_count()}))

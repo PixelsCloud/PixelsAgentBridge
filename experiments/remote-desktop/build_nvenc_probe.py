@@ -7,7 +7,7 @@ import tomllib
 from build_dxgi_probe import build_probe
 
 
-if __name__ == "__main__":
+def pinned_include():
     root = Path(__file__).resolve().parents[2]
     pins = tomllib.loads(Path(__file__).with_name("sources.toml").read_text(encoding="utf-8"))
     external = root / ".build/remote-desktop/upstream/hwcodec/externals"
@@ -25,4 +25,8 @@ if __name__ == "__main__":
     if header.read_bytes().replace(b"\r\n", b"\n") != original.replace(b"\r\n", b"\n"):
         raise SystemExit("Pinned NVENC header has local modifications")
     print("NVENC header SHA256: " + sha256(original).hexdigest(), flush=True)
-    build_probe("nvenc_probe.cpp", "nvenc", include)
+    return include
+
+
+if __name__ == "__main__":
+    build_probe("nvenc_probe.cpp", "nvenc", pinned_include())
