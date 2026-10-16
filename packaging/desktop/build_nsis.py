@@ -34,6 +34,8 @@ CONTENTS = set(BINARIES) | {
     "launch-app.ps1",
     "run-session-supervisor.ps1",
     "uninstall.ps1",
+    "installer-logging.ps1",
+    "installer-recovery.ps1",
     "INSTALL-WINDOWS.txt",
 }
 

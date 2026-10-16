@@ -5,21 +5,18 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RelayUrl,
 
-    [string]$InstallRoot
+    [string]$InstallRoot,
+    [string]$InstallerLogPath
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'installer-logging.ps1')
+Initialize-PabInstallerLog -Action 'install' -Path $InstallerLogPath
 $errorLog = Join-Path $env:ProgramData 'PixelsAgentBridge\logs\install-error.log'
 trap {
     $failure = $_
-    try {
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $errorLog) | Out-Null
-        @(
-            (Get-Date).ToString('o')
-            $failure.ToString()
-            $failure.ScriptStackTrace
-        ) | Set-Content -LiteralPath $errorLog -Encoding UTF8
-    } catch { }
+    Write-PabInstallerFailure -Failure $failure -LegacyLog $errorLog
+    Stop-PabInstallerLog
     break
 }
 
@@ -170,12 +167,26 @@ function Install-PabBinaries {
     }
 }
 
+function Stop-PabRuntimeProcesses {
+    param([string]$InstallRoot)
+    $node = [IO.Path]::GetFullPath((Join-Path $InstallRoot 'browser-runtime\node.exe'))
+    Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -OperationTimeoutSec 5 |
+        Where-Object { $_.ExecutablePath -ieq $node } |
+        ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            Wait-Process -Id $_.ProcessId -Timeout 5 -ErrorAction SilentlyContinue
+        }
+    Stop-PabInstalledBinary -Paths @((Join-Path $InstallRoot 'pab-document-worker.exe')) -WarnIfRunning
+}
+
+Set-PabInstallerStage 'validate_inputs'
 if (-not $ControlUrl.StartsWith('wss://')) {
     throw 'ControlUrl must use wss://'
 }
 if (-not $RelayUrl.StartsWith('https://')) {
     throw 'RelayUrl must use https://'
 }
+Set-PabInstallerStage 'check_administrator'
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Installation requires an elevated PowerShell window'
@@ -183,17 +194,15 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 if (-not $InstallRoot) {
     $InstallRoot = Join-Path $env:ProgramFiles 'PixelsAgentBridge'
 }
-$sasPolicy = (Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' `
-    -Name SoftwareSASGeneration -ErrorAction SilentlyContinue).SoftwareSASGeneration
-if ($sasPolicy -notin @(1, 3)) {
-    throw 'Windows policy SoftwareSASGeneration must allow Services (value 1 or 3) for remote Ctrl+Alt+Delete'
-}
+Set-PabInstallerStage 'check_sas_policy'
+Enable-PabServiceSasPolicy
 
 $source = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-PabInstallerStage 'validate_package'
 $requiredFiles = @(
     'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe',
     'browser-runtime.zip', 'document-runtime.zip',
-    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1'
+    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'installer-logging.ps1'
 )
 foreach ($name in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $name) -PathType Leaf)) {
@@ -202,9 +211,11 @@ foreach ($name in $requiredFiles) {
 }
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
 # Validate/create TOML with the new binary before stopping installed services.
-& (Join-Path $source 'pab-executor.exe') configure --config (Join-Path $InstallRoot 'config.toml') `
-    --previous $InstallRoot --control-url $ControlUrl --relay-url $RelayUrl
-if ($LASTEXITCODE -ne 0) { throw 'Could not prepare TOML configuration' }
+Set-PabInstallerStage 'prepare_configuration'
+$nativeExit = Invoke-PabInstallerNativeCommand -FilePath (Join-Path $source 'pab-executor.exe') -ArgumentList @(
+    'configure', '--config', (Join-Path $InstallRoot 'config.toml'),
+    '--previous', $InstallRoot, '--control-url', $ControlUrl, '--relay-url', $RelayUrl)
+if ($nativeExit -ne 0) { throw "Could not prepare TOML configuration (exit code $nativeExit)" }
 $installFull = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $runtimeCurrent = Join-Path $installFull 'browser-runtime'
 $runtimeNew = Join-Path $installFull ("browser-runtime." + [Guid]::NewGuid().ToString('N') + '.new')
@@ -217,6 +228,7 @@ foreach ($path in @($runtimeCurrent, $runtimeNew, $runtimeOld, $documentCurrent,
         throw 'Browser runtime path escaped the install directory'
     }
 }
+Set-PabInstallerStage 'extract_runtimes'
 Expand-Archive -LiteralPath (Join-Path $source 'browser-runtime.zip') -DestinationPath $runtimeNew
 Expand-Archive -LiteralPath (Join-Path $source 'document-runtime.zip') -DestinationPath $documentNew
 foreach ($name in @('node.exe', 'node_modules\@playwright\mcp\cli.js', 'manifest.json')) {
@@ -230,6 +242,7 @@ foreach ($name in @('pdfium.dll', 'tessdata\eng.traineddata', 'tessdata\chi_sim.
     }
 }
 $taskName = 'PixelsAgentBridgeExecutor'
+Set-PabInstallerStage 'stop_existing_services'
 $supervisorTaskName = 'PixelsAgentBridgeSessionSupervisor'
 $existingSupervisorTask = Get-ScheduledTask -TaskName $supervisorTaskName -ErrorAction SilentlyContinue
 $supervisorWasRunning = $existingSupervisorTask -and $existingSupervisorTask.State -eq 'Running'
@@ -244,7 +257,8 @@ if ($existingTask) {
 $existingService = Get-Service -Name $taskName -ErrorAction SilentlyContinue
 $serviceWasRunning = $existingService -and $existingService.Status -eq 'Running'
 if ($existingService) {
-    Stop-Service -Name $taskName -ErrorAction SilentlyContinue
+    try { $null = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('stop', $taskName) -TimeoutSeconds 15 }
+    catch { Write-Warning "Service stop request failed; checking for a stuck process: $($_.Exception.Message)" }
     try {
         $existingService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(10))
     } catch [System.Management.Automation.MethodInvocationException] {
@@ -276,6 +290,9 @@ if ($existingService) {
     }
 }
 try {
+    Set-PabInstallerStage 'stop_runtime_processes'
+    Stop-PabRuntimeProcesses -InstallRoot $InstallRoot
+    Set-PabInstallerStage 'replace_program_files'
     if (Test-Path -LiteralPath $runtimeCurrent) {
         Move-Item -LiteralPath $runtimeCurrent -Destination $runtimeOld -ErrorAction Stop
     }
@@ -313,7 +330,7 @@ try {
     # The binary transaction restored the previous files. Bring the old
     # service and session helpers back before reporting the install failure.
     if ($serviceWasRunning) {
-        try { Start-Service -Name $taskName -ErrorAction Stop }
+        try { $null = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('start', $taskName) -TimeoutSeconds 20 }
         catch { Write-Warning "Could not restart previous Executor service: $($_.Exception.Message)" }
     }
     if ($taskWasRunning) {
@@ -335,22 +352,25 @@ foreach ($obsolete in @('run-ui.ps1', 'run-device-ui.ps1', 'run-executor.ps1', '
         Remove-Item -LiteralPath $path -Force
     }
 }
-foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1')) {
+foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'installer-logging.ps1')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 
 
+Set-PabInstallerStage 'configure_local_access'
 $dataRoot = Join-Path $env:ProgramData 'PixelsAgentBridge'
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
-& icacls.exe $dataRoot /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw 'Could not protect the Executor data directory'
+$nativeExit = Invoke-PabInstallerNativeCommand -FilePath 'icacls.exe' -ArgumentList @(
+    $dataRoot, '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F')
+if ($nativeExit -ne 0) {
+    throw "Could not protect the Executor data directory (exit code $nativeExit)"
 }
 $env:PAB_DATA_DIR = $dataRoot
 $userToken = Join-Path $env:LOCALAPPDATA 'PixelsAgentBridge\local-access.key'
-& (Join-Path $InstallRoot 'pab-executor.exe') issue-local-access $userToken
-if ($LASTEXITCODE -ne 0) {
-    throw 'Could not grant this user local device access'
+$nativeExit = Invoke-PabInstallerNativeCommand -FilePath (Join-Path $InstallRoot 'pab-executor.exe') -ArgumentList @(
+    'issue-local-access', $userToken)
+if ($nativeExit -ne 0) {
+    throw "Could not grant this user local device access (exit code $nativeExit)"
 }
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $system = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
@@ -359,14 +379,18 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Seco
     -StartWhenAvailable -MultipleInstances IgnoreNew `
     -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $serviceCommand = '"' + (Join-Path $InstallRoot 'pab-executor.exe') + '" --service --config "' + (Join-Path $InstallRoot 'config.toml') + '"'
+Set-PabInstallerStage 'register_executor_service'
 if ($existingService) {
     Set-PabServiceConfiguration -Name $taskName -BinaryPath $serviceCommand
 } else {
     New-Service -Name $taskName -BinaryPathName $serviceCommand `
         -DisplayName 'Pixels Agent Bridge Executor' -StartupType Automatic | Out-Null
 }
+Set-PabInstallerStage 'start_executor_service'
 try {
-    Start-Service -Name $taskName
+    $startExit = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('start', $taskName) -TimeoutSeconds 20
+    $startedService = Get-Service -Name $taskName
+    $startedService.WaitForStatus('Running', [TimeSpan]::FromSeconds(15))
 } catch {
     $startupFailure = $_
     Write-Output 'Executor startup failed. Recent startup diagnostics:'
@@ -387,6 +411,7 @@ try {
     throw $startupFailure
 }
 
+Set-PabInstallerStage 'register_session_supervisor'
 $supervisorAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument (
     '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
     (Join-Path $InstallRoot 'run-session-supervisor.ps1') + '"'
@@ -402,6 +427,7 @@ $supervisorTask = @{
 Register-ScheduledTask @supervisorTask | Out-Null
 Start-ScheduledTask -TaskName $supervisorTaskName
 
+Set-PabInstallerStage 'configure_desktop_startup'
 Set-PabDesktopStartup -InstallRoot $InstallRoot
 
 if (Test-Path -LiteralPath $runtimeOld) {
@@ -415,4 +441,6 @@ if (Test-Path -LiteralPath $documentOld) {
 
 Write-Output "Installed to $InstallRoot"
 Write-Output "App: powershell.exe -File `"$(Join-Path $InstallRoot 'run-app.ps1')`""
-Remove-Item -LiteralPath $errorLog -Force -ErrorAction SilentlyContinue
+Set-PabInstallerStage 'completed'
+Write-PabInstallerLog 'success'
+Stop-PabInstallerLog

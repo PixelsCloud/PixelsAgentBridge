@@ -1,6 +1,8 @@
-param([string]$InstallRoot)
+param([string]$InstallRoot, [string]$InstallerLogPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'installer-logging.ps1')
+Initialize-PabInstallerLog -Action 'uninstall' -Path $InstallerLogPath
 function Remove-PabDesktopStartup {
     param(
         [Parameter(Mandatory = $true)][string]$InstallRoot,
@@ -22,14 +24,7 @@ $retiredBinaries = [ordered]@{}
 $errorLog = Join-Path $env:ProgramData 'PixelsAgentBridge\logs\uninstall-error.log'
 trap {
     $failure = $_
-    try {
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $errorLog) | Out-Null
-        @(
-            (Get-Date).ToString('o')
-            $failure.ToString()
-            $failure.ScriptStackTrace
-        ) | Set-Content -LiteralPath $errorLog -Encoding UTF8
-    } catch { }
+    Write-PabInstallerFailure -Failure $failure -LegacyLog $errorLog
     foreach ($binary in $retiredBinaries.Keys) {
         $retired = $retiredBinaries[$binary]
         if ((Test-Path -LiteralPath $retired -PathType Leaf) -and
@@ -48,13 +43,15 @@ trap {
                 New-Service -Name 'PixelsAgentBridgeExecutor' -BinaryPathName $serviceCommand `
                     -DisplayName 'Pixels Agent Bridge Executor' -StartupType Automatic | Out-Null
             }
-            Start-Service -Name 'PixelsAgentBridgeExecutor' -ErrorAction Stop
+            $null = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('start', 'PixelsAgentBridgeExecutor') -TimeoutSeconds 20
         } catch {
             Add-Content -LiteralPath $errorLog -Value "Service recovery failed: $($_.Exception.Message)" -ErrorAction SilentlyContinue
         }
     }
+    Stop-PabInstallerLog
     break
 }
+Set-PabInstallerStage 'check_administrator'
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Uninstallation requires an elevated PowerShell window'
@@ -62,6 +59,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 if (-not $InstallRoot) {
     $InstallRoot = Join-Path $env:ProgramFiles 'PixelsAgentBridge'
 }
+Set-PabInstallerStage 'remove_services'
 $supervisorTask = Get-ScheduledTask -TaskName 'PixelsAgentBridgeSessionSupervisor' -ErrorAction SilentlyContinue
 if ($supervisorTask) {
     Stop-ScheduledTask -TaskName 'PixelsAgentBridgeSessionSupervisor' -ErrorAction SilentlyContinue
@@ -74,7 +72,8 @@ if ($task) {
 }
 $executorService = Get-Service -Name 'PixelsAgentBridgeExecutor' -ErrorAction SilentlyContinue
 if ($executorService) {
-    Stop-Service -Name 'PixelsAgentBridgeExecutor' -ErrorAction SilentlyContinue
+    try { $null = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('stop', 'PixelsAgentBridgeExecutor') -TimeoutSeconds 15 }
+    catch { Write-Warning "Service stop request failed; checking for a stuck process: $($_.Exception.Message)" }
     try {
         $executorService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(10))
     } catch [System.Management.Automation.MethodInvocationException] {
@@ -104,11 +103,12 @@ if ($executorService) {
             }
         }
     }
-    & sc.exe delete 'PixelsAgentBridgeExecutor' | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not remove the Executor Windows service' }
+    $nativeExit = Invoke-PabInstallerNativeCommand -FilePath 'sc.exe' -ArgumentList @('delete', 'PixelsAgentBridgeExecutor')
+    if ($nativeExit -ne 0) { throw "Could not remove the Executor Windows service (exit code $nativeExit)" }
     $serviceRemoved = $true
 }
 
+Set-PabInstallerStage 'stop_installed_processes'
 foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor', 'pab-document-worker')) {
     Get-Process -Name $processName -ErrorAction SilentlyContinue |
         Where-Object { $_.Path -eq (Join-Path $InstallRoot "$processName.exe") } |
@@ -118,6 +118,7 @@ foreach ($processName in @('pab-desktop', 'pab-mcp', 'pab-bridge', 'pab-executor
 # A desktop helper can restart pab-mcp while the uninstaller is stopping the
 # running processes. Retire each launch path first so the helper cannot reopen
 # it, then wait for Windows to release the old image before removing it.
+Set-PabInstallerStage 'remove_program_files'
 $retirementId = [Guid]::NewGuid().ToString('N')
 foreach ($name in @('pab-mcp.exe', 'pab-bridge.exe', 'pab-desktop.exe', 'pab-executor.exe', 'pab-document-worker.exe')) {
     $binary = Join-Path $InstallRoot $name
@@ -176,7 +177,8 @@ foreach ($name in @(
     'run-device-ui.ps1',
     'run-executor.ps1',
     'run-session-supervisor.ps1',
-    'uninstall.ps1'
+    'uninstall.ps1',
+    'installer-logging.ps1'
 )) {
     $path = Join-Path $InstallRoot $name
     if (Test-Path -LiteralPath $path) {
@@ -185,4 +187,6 @@ foreach ($name in @(
 }
 Remove-PabDesktopStartup -InstallRoot $InstallRoot
 Write-Output 'Application files removed. Persistent user and machine data were retained.'
-Remove-Item -LiteralPath $errorLog -Force -ErrorAction SilentlyContinue
+Set-PabInstallerStage 'completed'
+Write-PabInstallerLog 'success'
+Stop-PabInstallerLog
