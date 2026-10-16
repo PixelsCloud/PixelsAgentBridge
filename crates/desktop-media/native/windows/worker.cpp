@@ -228,6 +228,12 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         if (argc == 3 && std::string(argv[1]) == "input-fixture" && !found.empty()) {
             input_fixture(found.front(), number(argv[2], 120)); return 0;
         }
+        if (argc == 4 && std::string(argv[1]) == "input-fixture") {
+            for (const auto& d : found) if (screen_id(d) == argv[2]) {
+                input_fixture(d, number(argv[3], 120)); return 0;
+            }
+            throw std::runtime_error("Selected fixture screen disappeared");
+        }
         if (argc == 3 && std::string(argv[1]) == "input") {
             for (const auto& d : found) if (screen_id(d) == argv[2]) { input_worker(d); return 0; }
             throw std::runtime_error("Selected input screen disappeared");

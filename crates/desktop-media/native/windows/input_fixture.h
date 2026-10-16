@@ -5,6 +5,7 @@
 struct InputFixture {
     unsigned clicks = 0, key_down = 0, key_up = 0, control_down = 0, control_up = 0;
     int wheel = 0;
+    POINT last_click{-1, -1};
     static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
         auto* self = reinterpret_cast<InputFixture*>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
@@ -12,7 +13,11 @@ struct InputFixture {
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
         if (self) {
-            if (message == WM_LBUTTONDOWN) ++self->clicks;
+            if (message == WM_LBUTTONDOWN) {
+                ++self->clicks;
+                self->last_click = POINT{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+                ClientToScreen(window, &self->last_click);
+            }
             if (message == WM_MOUSEWHEEL) self->wheel += GET_WHEEL_DELTA_WPARAM(wparam);
             if (message == WM_KEYDOWN && wparam == VK_F24) ++self->key_down;
             if (message == WM_KEYUP && wparam == VK_F24) ++self->key_up;
@@ -45,6 +50,7 @@ static void input_fixture(const Display& display, unsigned seconds) {
             << ",\"clicks\":" << state.clicks << ",\"f24_down\":" << state.key_down << ",\"f24_up\":" << state.key_up
             << ",\"ctrl_down\":" << state.control_down << ",\"ctrl_up\":" << state.control_up
             << ",\"wheel\":" << state.wheel
+            << ",\"last_click_x\":" << state.last_click.x << ",\"last_click_y\":" << state.last_click.y
             << ",\"ctrl_held\":" << ((GetAsyncKeyState(VK_CONTROL) & 0x8000) ? "true" : "false")
             << ",\"left_held\":" << ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) ? "true" : "false") << "}\n" << std::flush;
         Sleep(100);

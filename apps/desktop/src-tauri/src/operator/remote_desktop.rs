@@ -17,8 +17,21 @@ enum Command {
     Screen(String),
     Fps(u16),
     Retry,
-    Input(bool),
-    SecureAttention,
+    Input(bool, InputGeneration),
+    SecureAttention(InputGeneration),
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct InputGeneration {
+    session: RequestId,
+    generation: u64,
+}
+impl From<&DesktopOpened> for InputGeneration {
+    fn from(opened: &DesktopOpened) -> Self {
+        Self {
+            session: opened.config.session_id,
+            generation: opened.config.generation,
+        }
+    }
 }
 struct StreamFailure {
     message: String,
@@ -76,11 +89,12 @@ pub struct RemoteDesktopState {
     windows: Mutex<HashMap<String, Arc<Owner>>>,
 }
 fn account() -> Result<String, String> {
-    pab_agent_core::account::AccountStore::from_env()
+    let snapshot = pab_agent_core::account::AccountStore::from_env()
         .and_then(|s| s.read())
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    snapshot
         .user
-        .map(|u| u.id.to_string())
+        .map(|u| format!("{}:{}", u.id, snapshot.revision))
         .ok_or_else(|| "login required to view a remote computer".into())
 }
 impl RemoteDesktopState {
@@ -248,6 +262,15 @@ pub async fn desktop_viewer_control(
     secure_attention: Option<bool>,
 ) -> Result<(), String> {
     let owner = state.owner(&window).await?;
+    let status = owner.status.borrow().clone();
+    let input_generation = || {
+        status
+            .opened
+            .as_ref()
+            .filter(|_| status.phase == "viewing" && status.input_ready)
+            .map(InputGeneration::from)
+            .ok_or_else(|| "remote desktop input is not ready".to_owned())
+    };
     let command = match (screen, fps, retry, input_enabled, secure_attention) {
         (Some(screen), None, None, None, None) => {
             pab_protocol::validate_desktop_screen_id(&screen).map_err(str::to_owned)?;
@@ -255,9 +278,9 @@ pub async fn desktop_viewer_control(
         }
         (None, Some(fps @ (15 | 30)), None, None, None) => Command::Fps(fps),
         (None, None, Some(true), None, None) => Command::Retry,
-        (None, None, None, Some(enabled), None) => Command::Input(enabled),
-        (None, None, None, None, Some(true)) if owner.status.borrow().input_enabled => {
-            Command::SecureAttention
+        (None, None, None, Some(enabled), None) => Command::Input(enabled, input_generation()?),
+        (None, None, None, None, Some(true)) if status.input_enabled => {
+            Command::SecureAttention(input_generation()?)
         }
         _ => return Err("invalid remote desktop command".into()),
     };
@@ -299,11 +322,15 @@ async fn run(
     let mut stopped = owner.stop.subscribe();
     let mut accounts = pab_agent_core::account::account_changes();
     let cancelled = async {
+        // Account notifications are process-local hints; another Desktop/CLI
+        // can change the protected store without notifying this process.
+        let mut poll = tokio::time::interval(Duration::from_secs(3));
+        poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             if *stopped.borrow() || account().ok().as_ref() != Some(&owner.account) {
                 break;
             }
-            tokio::select! { _ = stopped.changed() => {}, result = accounts.changed() => if result.is_err() { break; } }
+            tokio::select! { _ = stopped.changed() => {}, _ = poll.tick() => {}, result = accounts.changed() => if result.is_err() { break; } }
         }
     };
     let work = async {
@@ -375,7 +402,7 @@ async fn run(
                                 screen = Some(value);
                                 break;
                             }
-                            Some(Command::Input(_) | Command::SecureAttention) => continue,
+                            Some(Command::Input(..) | Command::SecureAttention(_)) => continue,
                             None => return,
                         }
                     }
@@ -402,11 +429,28 @@ async fn stream(
         .resolve_device_code(owner.code)
         .await
         .map_err(StreamFailure::from)?;
-    let mut session = owner
+    let opened = owner
         .runtime
         .open_remote_desktop(device, screen.clone(), *fps)
-        .await
-        .map_err(StreamFailure::from)?;
+        .await;
+    let mut session = match opened {
+        Err(pab_bridge::RuntimeError::Bridge(pab_bridge::BridgeError::RemoteDesktop(
+            pab_bridge::RemoteDesktopError::Rejected {
+                code: pab_protocol::DesktopErrorCode::NotFound,
+                ..
+            },
+        ))) if screen.is_some() => {
+            // Open's NotFound means the selected output disappeared. A fresh
+            // primary-screen session is view-only; never replay old input.
+            *screen = None;
+            owner
+                .runtime
+                .open_remote_desktop(device, None, *fps)
+                .await
+                .map_err(StreamFailure::from)?
+        }
+        other => other.map_err(StreamFailure::from)?,
+    };
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let prefix = vec!["--media-worker".into()];
     loop {
@@ -426,6 +470,7 @@ async fn stream(
         );
         let control = session.input_control();
         let supported = session.opened().input_supported;
+        let input_generation = InputGeneration::from(session.opened());
         let (ready, mut ready_rx) = watch::channel(false);
         // These are independent futures for the entire generation. Mouse/keys
         // and toolbar commands never cancel a partially-read compressed frame.
@@ -457,7 +502,7 @@ async fn stream(
                 tokio::select! {
                     biased;
                     command = commands.recv() => match command {
-                        Some(Command::Input(value)) => {
+                        Some(Command::Input(value, target)) if target == input_generation => {
                             if value && (!supported || !*ready_rx.borrow_and_update()) {
                                 publish_input(window, owner, supported && *ready_rx.borrow(), false);
                                 continue;
@@ -473,7 +518,7 @@ async fn stream(
                             enabled = value;
                             publish_input(window, owner, supported && *ready_rx.borrow(), enabled);
                         }
-                        Some(Command::SecureAttention) => {
+                        Some(Command::SecureAttention(target)) if target == input_generation => {
                             if !enabled { continue; }
                             // Stop local collection and retire held remote keys
                             // before the system changes desktops. SAS is sent
@@ -486,6 +531,7 @@ async fn stream(
                                 .await.map_err(|e| e.to_string())?;
                             return Ok(Some(Command::Retry));
                         }
+                        Some(Command::Input(..) | Command::SecureAttention(_)) => continue,
                         other => return Ok::<_, StreamFailure>(other),
                     },
                     event = native_input.next() => {
@@ -518,10 +564,21 @@ async fn stream(
                     Some(session.opened().clone()),
                     None,
                 );
-                session
-                    .select_screen(id.clone())
-                    .await
-                    .map_err(StreamFailure::from)?;
+                if let Err(error) = session.select_screen(id.clone()).await {
+                    let missing = matches!(
+                        error,
+                        pab_bridge::RemoteDesktopError::Rejected {
+                            code: pab_protocol::DesktopErrorCode::NotFound,
+                            ..
+                        }
+                    );
+                    let _ = tokio::time::timeout(Duration::from_secs(2), session.close()).await;
+                    if missing {
+                        *screen = None;
+                        return Ok(true);
+                    }
+                    return Err(error.into());
+                }
                 *screen = Some(id);
             }
             Some(Command::Fps(value)) => {
@@ -533,7 +590,7 @@ async fn stream(
                 session.close().await.map_err(StreamFailure::from)?;
                 return Ok(true);
             }
-            Some(Command::Input(_) | Command::SecureAttention) => {
+            Some(Command::Input(..) | Command::SecureAttention(_)) => {
                 unreachable!("input commands are handled within the generation")
             }
             None => {
