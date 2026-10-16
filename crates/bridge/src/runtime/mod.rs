@@ -18,6 +18,8 @@ mod session;
 mod store;
 #[cfg(test)]
 mod store_tests;
+#[cfg(test)]
+mod test_support;
 mod system_query;
 mod terminal;
 mod terminal_store;

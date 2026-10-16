@@ -47,8 +47,14 @@ impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
 }
 impl From<pab_bridge::RuntimeError> for StreamFailure {
     fn from(error: pab_bridge::RuntimeError) -> Self {
-        let recoverable = matches!(&error, pab_bridge::RuntimeError::Bridge(
-            pab_bridge::BridgeError::RemoteDesktop(error)) if error.is_recoverable_media());
+        let recoverable = match &error {
+            pab_bridge::RuntimeError::Bridge(error) => {
+                error.is_recoverable_connection()
+                    || matches!(error, pab_bridge::BridgeError::RemoteDesktop(media)
+                        if media.is_recoverable_media())
+            }
+            _ => false,
+        };
         Self {
             recoverable,
             message: error.to_string(),
@@ -169,7 +175,7 @@ pub async fn desktop_viewer_window(
             &saved.alias
         }
     );
-    match WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         &app,
         &label,
         WebviewUrl::App(format!("index.html?desktopViewer={label}").into()),
@@ -177,9 +183,16 @@ pub async fn desktop_viewer_window(
     .title(title)
     .inner_size(1100.0, 760.0)
     .min_inner_size(640.0, 400.0)
-    .resizable(true)
-    .build()
-    {
+    .resizable(true);
+    // All WebViews sharing the acceptance profile must use identical WebView2
+    // environment arguments, as the terminal and main window already do.
+    #[cfg(all(windows, debug_assertions))]
+    let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments() {
+        builder.additional_browser_args(arguments)
+    } else {
+        builder
+    };
+    match builder.build() {
         Ok(created) => {
             let label = label.clone();
             created.on_window_event(move |event| {
