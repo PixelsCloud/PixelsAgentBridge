@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Duration};
+use std::time::Duration;
 
 use pab_protocol::{
     ControlClientMessage, ControlServerMessage, EndpointAuthenticationResult, EndpointKey,
@@ -40,8 +40,6 @@ pub struct ControlSession {
     endpoint: Option<RegisteredEndpoint>,
     pending_proof: Option<PendingProof>,
     open_registration_attempts: u8,
-    guest_code_lookups: HashSet<pab_protocol::DeviceCode>,
-    device_network_lookups: HashSet<pab_protocol::DeviceRef>,
 }
 
 impl ControlSession {
@@ -54,8 +52,6 @@ impl ControlSession {
             endpoint: None,
             pending_proof: None,
             open_registration_attempts: 0,
-            guest_code_lookups: HashSet::new(),
-            device_network_lookups: HashSet::new(),
         }
     }
 
@@ -522,12 +518,6 @@ impl ControlSession {
             .endpoint
             .as_ref()
             .ok_or(ControlSessionError::UserEndpointRequired)?;
-        if !self.device_network_lookups.contains(&device_ref)
-            && self.device_network_lookups.len() >= 20
-        {
-            return Err(ControlSessionError::RateLimited);
-        }
-        self.device_network_lookups.insert(device_ref);
         self.control
             .device_network_snapshot(endpoint, device_ref)
             .await
@@ -538,7 +528,6 @@ impl ControlSession {
         &mut self,
         device_code: pab_protocol::DeviceCode,
     ) -> Result<pab_protocol::DeviceRef, ControlSessionError> {
-        self.accept_code_lookup(device_code)?;
         let endpoint = self
             .endpoint
             .as_ref()
@@ -553,7 +542,6 @@ impl ControlSession {
         &mut self,
         device_code: pab_protocol::DeviceCode,
     ) -> Result<pab_protocol::DevicePresence, ControlSessionError> {
-        self.accept_code_lookup(device_code)?;
         let endpoint = self
             .endpoint
             .as_ref()
@@ -562,17 +550,6 @@ impl ControlSession {
             .device_presence(endpoint, device_code)
             .await
             .map_err(Into::into)
-    }
-
-    fn accept_code_lookup(
-        &mut self,
-        device_code: pab_protocol::DeviceCode,
-    ) -> Result<(), ControlSessionError> {
-        if !self.guest_code_lookups.contains(&device_code) && self.guest_code_lookups.len() >= 20 {
-            return Err(ControlSessionError::RateLimited);
-        }
-        self.guest_code_lookups.insert(device_code);
-        Ok(())
     }
 
     async fn list_devices(

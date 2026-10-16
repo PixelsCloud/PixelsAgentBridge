@@ -71,8 +71,8 @@ export function RemoteConnectionPanel({
                   className={`home-recent-presence ${online ? "online" : availability === false ? "offline" : "unknown"}`}
                   aria-label={status}
                 />
-                <span className={`home-recent-connection ${device.connected ? "connected" : "disconnected"}`}>
-                  {device.connected ? t.connected : t.disconnected}
+                <span className={`home-recent-connection ${online ? "connected" : "disconnected"}`}>
+                  {device.connected ? t.connected : status}
                   {device.connected && device.connectionPath && (
                     <> · {device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.connectionPathUnknown}</>
                   )}

@@ -879,8 +879,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
                       <small>{deviceName}</small>
                     </span>
                     <span className={`home-recent-presence ${status}`} aria-label={statusLabel} />
-                    <span className={`home-recent-connection ${device.connected ? "connected" : "disconnected"}`}>
-                      {device.connected ? t.connected : t.disconnected}
+                    <span className={`home-recent-connection ${availability === true ? "connected" : "disconnected"}`}>
+                      {device.connected ? t.connected : statusLabel}
                       {device.connected && device.connectionPath && (
                         <> · {device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.connectionPathUnknown}</>
                       )}

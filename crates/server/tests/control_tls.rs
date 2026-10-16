@@ -504,7 +504,6 @@ async fn tls_account_flow(pool: PgPool) {
             },
         }
     );
-    drop(endpoint_socket);
 
     let http_account = pab_agent_core::account::AccountClient::new(
         &format!("https://localhost:{}", address.port()),
@@ -535,6 +534,55 @@ async fn tls_account_flow(pool: PgPool) {
         .bind_endpoint(&second_user_secret, 1, Some(&secondary_login.access_token))
         .await
         .unwrap();
+    // A large saved-device refresh must not limit later device lookups on the
+    // same authenticated socket.
+    for value in 800_000_000..800_000_040 {
+        let request_id = RequestId::new();
+        send(
+            &mut endpoint_socket,
+            &ControlClientMessage::GetDevicePresence {
+                request_id,
+                device_code: pab_protocol::DeviceCode::new(value).unwrap(),
+            },
+        )
+        .await;
+        let response = receive(&mut endpoint_socket).await;
+        assert!(matches!(
+            response,
+            ControlServerMessage::Error { request_id: Some(id), code: ControlErrorCode::NotFound, .. }
+                | ControlServerMessage::DevicePresenceFound { request_id: id, .. }
+                if id == request_id
+        ), "unexpected presence response: {response:?}");
+    }
+    for value in 800_000_000..800_000_040 {
+        let request_id = RequestId::new();
+        send(
+            &mut endpoint_socket,
+            &ControlClientMessage::ResolveDeviceCode {
+                request_id,
+                device_code: pab_protocol::DeviceCode::new(value).unwrap(),
+            },
+        )
+        .await;
+        assert!(matches!(
+            receive(&mut endpoint_socket).await,
+            ControlServerMessage::Error { request_id: Some(id), code: ControlErrorCode::NotFound, .. }
+                | ControlServerMessage::DeviceCodeResolved { request_id: id, .. }
+                if id == request_id
+        ));
+    }
+    let request_id = RequestId::new();
+    send(
+        &mut endpoint_socket,
+        &ControlClientMessage::ResolveDeviceCode { request_id, device_code },
+    )
+    .await;
+    assert!(matches!(
+        receive(&mut endpoint_socket).await,
+        ControlServerMessage::DeviceCodeResolved { request_id: id, device_ref: found }
+            if id == request_id && found.device_id == device_id
+    ));
+    drop(endpoint_socket);
     let connector = tls_connector(Some(&std::fs::read(&certificate_path).unwrap())).unwrap();
     let agent_config = EndpointControlConfig {
         url: format!("wss://localhost:{}/control", address.port()),
@@ -803,8 +851,8 @@ async fn tls_account_flow(pool: PgPool) {
     })
     .await
     .expect("offline device was not reported");
-    // Saved refs must not bypass the per-control-session target limit.
-    for _ in 0..19 {
+    // Querying more than 20 distinct targets must not exhaust this connection.
+    for _ in 0..25 {
         let missing = DeviceRef {
             device_id: pab_protocol::DeviceId::new(),
             ..device_ref
@@ -819,19 +867,6 @@ async fn tls_account_flow(pool: PgPool) {
             })
         ));
     }
-    let missing = DeviceRef {
-        device_id: pab_protocol::DeviceId::new(),
-        ..device_ref
-    };
-    assert!(matches!(
-        offline_connection
-            .get_device_network(missing, Duration::from_secs(5))
-            .await,
-        Err(pab_agent_core::EndpointControlError::Server {
-            code: ControlErrorCode::RateLimited,
-            ..
-        })
-    ));
     offline_connection.close().await.unwrap();
 
     let (mut login_socket, _) = tokio::time::timeout(
