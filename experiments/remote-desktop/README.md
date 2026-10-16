@@ -1,6 +1,6 @@
 # 远程桌面开发实验
 
-本目录保存隔离实验的入口和版本清单。生产协议、Cargo 工作区和发布构建尚未接入新功能；完整任务见 [开发方案](../../REMOTE_DESKTOP_IMPLEMENTATION_PLAN.md)。
+本目录保存隔离实验的入口和版本清单。P2 协议与会话 crate 已进入工作区，原生媒体尚未注册到安装版启动路径；完整任务见 [开发方案](../../REMOTE_DESKTOP_IMPLEMENTATION_PLAN.md)。Windows 原生媒体接入真实可靠流的最新实验见 [说明与复现](RELIABLE_MEDIA.md)。
 
 ## 准备检查
 
