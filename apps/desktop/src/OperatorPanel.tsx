@@ -233,7 +233,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     }
   }
 
-  async function connectSaved(device: ConnectedDevice) {
+  async function connectSaved(device: ConnectedDevice, replacementPassword?: string) {
     if (!signedIn) { onSignIn(); return; }
     const attempt = ++savedConnectionAttemptRef.current;
     setSavedConnection({
@@ -252,7 +252,9 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       return;
     }
     try {
-      const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
+      const connected = replacementPassword === undefined
+        ? await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode })
+        : await invoke<ConnectedDevice>("operator_connect", { code: device.deviceCode, password: replacementPassword });
       setDevices((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
       setSelectedCode(connected.deviceCode);
       setAliasDraft(connected.alias);
@@ -651,11 +653,11 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     return () => window.clearInterval(interval);
   }, [view, devices]);
 
-  async function connect() {
+  async function connect(deviceCode = code, devicePassword = password) {
     if (!signedIn) { onSignIn(); return; }
-    if (connecting || code.length !== 9 || !password) return;
+    if (connecting || deviceCode.length !== 9 || !devicePassword) return;
     const attempt = ++savedConnectionAttemptRef.current;
-    const deviceCode = code;
+    setPassword(devicePassword);
     setConnecting(true);
     setSavedConnection({
       mode: "manual",
@@ -670,7 +672,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     try {
       const device = await invoke<ConnectedDevice>("operator_connect", {
         code: deviceCode,
-        password,
+        password: devicePassword,
       });
       setDevices((current) => [device, ...current.filter((item) => item.deviceCode !== device.deviceCode)]);
       setSelectedCode(device.deviceCode);
@@ -1010,12 +1012,12 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
           language={language}
           connection={savedConnection}
           onClose={() => setSavedConnection(null)}
-          onRetry={() => {
+          onRetry={(replacementPassword) => {
             if (savedConnection.mode === "manual") {
-              void connect();
+              void connect(savedConnection.deviceCode, replacementPassword ?? password);
             } else {
               const device = devices.find((item) => item.deviceId === savedConnection.deviceId);
-              if (device) void connectSaved(device);
+              if (device) void connectSaved(device, replacementPassword);
             }
           }}
           onOpen={() => {

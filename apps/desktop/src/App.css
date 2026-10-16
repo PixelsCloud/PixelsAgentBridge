@@ -209,6 +209,7 @@ h1, h2, h3, p { margin: 0; }
 .saved-connect-stage.failed { color: #b7494d; background: #fff0f0; }
 .saved-connect-progress-title { margin-top: 19px; color: #667e8a; font-size: 11px; font-weight: 750; }
 .saved-connect-error { overflow-wrap: anywhere; }
+.saved-connect-password { margin-top: 16px; }
 .saved-connect-note { margin-top: 19px; }
 .device-dialog-error { margin-top: 10px; color: #b7494d; font-size: 12px; }
 .primary-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 8px; color: #fff; background: #218574; font-size: 12px; font-weight: 750; box-shadow: 0 6px 13px #21857424; }

@@ -1,4 +1,5 @@
-import { Alert, Button, Modal, Spin, Steps } from "antd";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Button, Input, Modal, Spin, Steps } from "antd";
 import { RotateCw } from "lucide-react";
 import { formatDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
@@ -18,12 +19,25 @@ type Props = {
   language: Language;
   connection: SavedConnection;
   onClose: () => void;
-  onRetry: () => void;
+  onRetry: (password?: string) => void;
   onOpen: () => void;
 };
 
 export function SavedConnectionDialog({ language, connection, onClose, onRetry, onOpen }: Props) {
   const t = messages[language];
+  const [password, setPassword] = useState("");
+  const submitted = useRef(false);
+  useEffect(() => {
+    setPassword("");
+    submitted.current = false;
+  }, [connection.attempt]);
+  const passwordRequired = /device password has not been entered|the device rejected authentication/i.test(connection.message);
+  function retry() {
+    if (connection.phase !== "failed" || submitted.current || (passwordRequired && !password)) return;
+    submitted.current = true;
+    onRetry(password || undefined);
+    setPassword("");
+  }
   const adding = connection.mode === "manual";
   const stage = {
     preparing: t.savedConnectPreparing,
@@ -41,7 +55,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
     <Modal open title={adding ? t.addDevice : t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
       onCancel={onClose} footer={[
         <Button key="close" onClick={onClose}>{t.savedConnectClose}</Button>,
-        connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} onClick={onRetry}>{t.savedConnectRetry}</Button>,
+        connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} disabled={passwordRequired && !password} onClick={retry}>{t.savedConnectRetry}</Button>,
         connection.phase === "connected" && <Button key="open" type="primary" onClick={onOpen}>{t.savedConnectOpen}</Button>,
       ].filter(Boolean)}>
       <p className="saved-connect-target">{formatDeviceCode(connection.deviceCode)}{connection.name ? ` · ${connection.name}` : ""}</p>
@@ -55,6 +69,17 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
         items={steps.map((title) => ({ title }))} />
       {connection.phase === "failed" && connection.message &&
         <Alert className="saved-connect-error" type="error" showIcon message={connectionErrorMessage(connection.message, language)} />}
+      {connection.phase === "failed" && <div className="saved-connect-password">
+        <label className="field-label" htmlFor="saved-connect-password">{t.remotePassword}</label>
+        <Input.Password id="saved-connect-password" value={password} autoFocus={passwordRequired}
+          autoComplete="off" onChange={(event) => setPassword(event.target.value)}
+          onPressEnter={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!event.nativeEvent.isComposing) retry();
+          }} />
+        <p className="saved-connect-note">{passwordRequired ? t.connectEnterPassword : t.connectReplacePassword}</p>
+      </div>}
       {isPending && <p className="saved-connect-note">{adding ? t.addDeviceBackground : t.savedConnectBackground}</p>}
     </Modal>
   );
@@ -63,6 +88,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
 function connectionErrorMessage(message: string, language: Language): string {
   const t = messages[language];
   const text = message.toLowerCase();
+  if (text.includes("device password has not been entered")) return t.connectEnterPassword;
   if (text.includes("the device is offline")) return t.connectDeviceOffline;
   if (text.includes("the device rejected authentication")) return t.connectPasswordRejected;
   if (text.includes("permissiondenied") || text.includes("invalidcredentials")) return t.connectPermissionDenied;
