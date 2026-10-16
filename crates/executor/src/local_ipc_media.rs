@@ -133,7 +133,7 @@ async fn request(
 /// availability. Failure here is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
-    fn supports_input(&self) -> bool { cfg!(windows) }
+    fn supports_input(&self) -> bool { cfg!(any(windows, target_os = "macos")) }
     fn input(
         &self,
         config: DesktopVideoConfig,
@@ -457,7 +457,7 @@ fn unavailable_local(error: DesktopError) -> LocalIpcError {
     LocalIpcError::Remote(error.to_string())
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, any(windows, target_os = "macos")))]
 mod tests {
     use super::*;
     use pab_protocol::{DesktopCodec, DesktopColor, DesktopRotation, RequestId};

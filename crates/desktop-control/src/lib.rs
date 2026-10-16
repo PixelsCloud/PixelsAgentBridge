@@ -45,8 +45,8 @@ mod native;
 mod native;
 #[cfg(target_os = "macos")]
 pub use native::{
-    accessibility_allowed, active_console, apply_input, login_window_active, release_idle_input,
-    release_input, request_accessibility, request_screen_capture, require_screen_capture,
+    MacMediaInput, accessibility_allowed, active_console, apply_input, login_window_active,
+    release_idle_input, release_input, request_accessibility, request_screen_capture, require_screen_capture,
     screen_capture_allowed,
 };
 #[cfg(target_os = "macos")]

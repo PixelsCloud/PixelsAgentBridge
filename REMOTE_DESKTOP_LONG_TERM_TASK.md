@@ -95,6 +95,16 @@ Windows/macOS 共用媒体模块各 11 项测试、8 组 native 窗口生命周�
 详见 [Mac 宿主阶段记录](acceptance/remote-desktop-macos-host-2026-10-17.md)，
 仍不关闭 07.1/07.2。
 
+W4 被控端接入继续推进：Mac Executor 已接入现有媒体 backend，Aqua/LoginWindow
+helper 新增独立媒体/输入连接；每个输入代次绑定屏幕布局并在结束时取消排队输入、
+释放按键。Apple 的负原点/Retina 坐标与代次取消测试、显示选择测试已通过，
+跨机器实操与锁屏登录仍待验收。详见 [Mac helper 阶段记录](acceptance/remote-desktop-macos-helper-2026-10-17.md)。
+
+Linux 前置复查（2026-10-17）：VM 当前活动会话已是 **Wayland**，不能继续沿用
+之前 X11 的环境判断。系统同时提供 Xorg/Wayland 会话入口，VMware SVGA II、
+DRM render 节点与 uinput 存在；Rust、C/C++ 和开发头文件仍缺失。此次仅只读
+检查，没有切换会话或安装依赖。详见 [Linux 前置记录](acceptance/remote-desktop-linux-preflight-2026-10-17.json)。
+
 ### 连续执行与完成规则
 
 1. 本任务按整体验收收尾，不在每个小阶段结束后要求用户发送“继续”。每个阶段

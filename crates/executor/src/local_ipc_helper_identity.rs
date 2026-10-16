@@ -91,7 +91,8 @@ impl VerifiedMediaHelper {
 }
 fn media_account_allowed(account: &str, session: Option<u32>) -> bool {
     session.is_some_and(|id| id != 0)
-        && !matches!(account, "uid:0" | "S-1-5-19" | "S-1-5-20")
+        && !matches!(account, "S-1-5-19" | "S-1-5-20")
+        && (account != "uid:0" || cfg!(target_os = "macos"))
         && (account != "S-1-5-18" || cfg!(windows))
 }
 pub(super) async fn verify_media(
@@ -104,7 +105,9 @@ pub(super) async fn verify_media(
     // The existing supervisor launches the Winlogon helper as SYSTEM in the
     // actual interactive session. Allow that identity only for media; never
     // expose it as a DesktopUser/application execution context. Session 0 and
-    // Local/NetworkService remain rejected. Identity comes from the kernel.
+    // Local/NetworkService remain rejected. macOS LoginWindow likewise uses
+    // the existing root helper in its graphical audit session. Application
+    // execution registration above still rejects root. Identity is kernel read.
     Ok(
         media_account_allowed(&verified.native.account_id, verified.native.session_id)
             .then_some(verified),
@@ -156,7 +159,7 @@ async fn verify_process(
 #[cfg(test)]
 mod media_tests {
     use super::*;
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     #[test]
     fn media_pairing_binds_process_lifetime_and_session() {
         let pid = std::process::id();
@@ -187,7 +190,8 @@ mod media_tests {
         assert!(!media_account_allowed("user", None));
         assert!(!media_account_allowed("S-1-5-19", Some(2)));
         assert!(!media_account_allowed("S-1-5-20", Some(2)));
-        assert!(!media_account_allowed("uid:0", Some(2)));
+        assert_eq!(media_account_allowed("uid:0", Some(2)), cfg!(target_os = "macos"));
+        assert!(!media_account_allowed("uid:0", Some(0)));
         assert!(media_account_allowed("user", Some(2)));
         assert_eq!(media_account_allowed("S-1-5-18", Some(2)), cfg!(windows));
     }

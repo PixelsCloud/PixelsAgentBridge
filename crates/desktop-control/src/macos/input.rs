@@ -155,7 +155,7 @@ fn direction(down: bool) -> Direction {
         Direction::Release
     }
 }
-fn map_virtual_key(value: u16) -> Option<Key> {
+pub(super) fn map_virtual_key(value: u16) -> Option<Key> {
     let key = match value {
         8 => Key::Backspace,
         9 => Key::Tab,

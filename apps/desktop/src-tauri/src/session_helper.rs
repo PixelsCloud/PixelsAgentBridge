@@ -7,6 +7,9 @@ use crate::{desktop_input, screenshot_session, window_session};
 
 #[path = "application_deadline.rs"]
 mod application_deadline;
+#[cfg(target_os = "macos")]
+#[path = "session_helper_macos_media.rs"]
+mod macos_media;
 
 pub fn run() -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
@@ -52,7 +55,11 @@ pub fn run() -> Result<(), String> {
         let app = NSApplication::sharedApplication(main);
         // A helper must service AppKit/AX and the main dispatch queue without
         // becoming the foreground app and taking focus away from its target.
-        if !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited) {
+        // An unbundled helper can already be Prohibited. AppKit may return
+        // false for that no-op, so do not mistake it for a startup failure.
+        if app.activationPolicy() != NSApplicationActivationPolicy::Prohibited
+            && !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited)
+        {
             return Err("unable to configure background session helper".into());
         }
         // Finder can send the shared bundle's open event to this helper. Keep
@@ -63,6 +70,12 @@ pub fn run() -> Result<(), String> {
             app.setDelegate(Some(objc2::runtime::ProtocolObject::from_ref(&**delegate)));
         }
         let task = tauri::async_runtime::spawn(async move {
+            // A separate helper socket carries media/input; existing application
+            // requests and their user identity keep their original route.
+            let Ok(mut media) = macos_media::start(expected_desktop.clone()) else {
+                tracing::error!("unable to start Mac media helper");
+                std::process::exit(1);
+            };
             use tokio::signal::unix::{SignalKind, signal};
             let Ok(mut termination) = signal(SignalKind::terminate()) else {
                 tracing::error!("unable to install helper termination handler");
@@ -76,6 +89,7 @@ pub fn run() -> Result<(), String> {
             }
             // The request loop has been dropped. Release on the still-running
             // AppKit thread before launchd starts the replacement helper.
+            media.shutdown().await;
             pab_desktop_control::release_input();
             std::process::exit(0);
         });

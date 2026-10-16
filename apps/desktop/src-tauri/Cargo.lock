@@ -5408,6 +5408,7 @@ dependencies = [
  "pab-executor",
  "pab-logging",
  "pab-protocol",
+ "pab-remote-desktop",
  "pab-screenshot",
  "pab-service-config",
  "reqwest 0.12.28",

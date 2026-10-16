@@ -163,6 +163,10 @@ impl RecoveryInput {
 
     pub(crate) fn key(&mut self, key: Key, direction: Direction) -> Result<(), String> {
         let code = u16::try_from(key).map_err(|_| "unsupported key for input recovery")?;
+        self.raw_key(code, direction)
+    }
+
+    pub(crate) fn raw_key(&mut self, code: u16, direction: Direction) -> Result<(), String> {
         if usize::from(code) >= KEY_SLOTS {
             return Err("unsupported key for input recovery".into());
         }
