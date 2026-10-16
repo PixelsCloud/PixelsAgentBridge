@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-15",
+  "platform": "linux-x86_64",
+  "artifact": {
+    "version": "1.0.1",
+    "bytes": 47784921,
+    "sha256": "6150cabd5fea811cb86ac884ce3f76d6382acfa0ce1f0a74cf99bada2da9c07c",
+    "commit": "00dd3d88da94a6542b5130ce815574553fff652d"
+  },
+  "bootstrap_noexec_fix": true,
+  "public": {
+    "website_health": 204,
+    "bootstrap_http": 200,
+    "bootstrap_sha256": "7d54396af1bbee43fb15427befeb853af795bd1dd7d6398f952ab97502c2800f",
+    "linux_update_http": 200,
+    "current_version_update_http": 204,
+    "cos_object_http": 200,
+    "cos_size_matches": true,
+    "windows_macos_releases_unchanged": true
+  },
+  "online_install": [
+    {
+      "container": "pab-linux-online-debian-20261015",
+      "mode": "systemd",
+      "version": "1.0.1",
+      "device_code": "902937758",
+      "registered": true,
+      "online_install": true
+    },
+    {
+      "container": "pab-linux-online-ubuntu-20261015",
+      "mode": "manual",
+      "version": "1.0.1",
+      "device_code": "334052969",
+      "registered": true,
+      "online_install": true
+    }
+  ],
+  "reinstall": [
+    {
+      "container": "pab-linux-online-debian-20261015",
+      "reinstall": true,
+      "device_code_preserved": true,
+      "password_preserved": true,
+      "endpoint_identity_preserved": true,
+      "toml_and_comment_preserved": true,
+      "systemd_boot_start": true
+    },
+    {
+      "container": "pab-linux-online-ubuntu-20261015",
+      "reinstall": true,
+      "device_code_preserved": true,
+      "password_preserved": true,
+      "endpoint_identity_preserved": true,
+      "toml_and_comment_preserved": true,
+      "systemd_boot_start": false
+    }
+  ],
+  "remote_use": [
+    {
+      "container": "pab-linux-online-debian-20261015",
+      "device_code": "902937758",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    },
+    {
+      "container": "pab-linux-online-ubuntu-20261015",
+      "device_code": "334052969",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    }
+  ],
+  "cleanup": {
+    "containers_removed": [
+      "pab-linux-online-debian-20261015",
+      "pab-linux-online-ubuntu-20261015"
+    ],
+    "temporary_credentials_removed": true,
+    "temporary_remembered_devices_removed": true,
+    "private_access_files_removed": true,
+    "temporary_account_devices_deleted_afterwards": true
+  },
+  "scope": {
+    "debian_12_systemd_container": true,
+    "ubuntu_24_04_manual_container": true,
+    "physical_host_reboot": false,
+    "local_pixels_updated": false,
+    "other_devices_updated": false
+  }
+}

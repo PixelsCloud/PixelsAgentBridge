@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Pixels Agent Bridge
+Comment=Connect AI agents and remote computers
+Comment[zh_CN]=连接 AI Agent 与远程计算机
+Exec=/opt/pixels-agent-bridge/run-desktop.sh
+Icon=pixels-agent-bridge
+Terminal=false
+Categories=Network;RemoteAccess;Utility;
+StartupWMClass=pab-desktop

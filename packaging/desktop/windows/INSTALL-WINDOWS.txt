@@ -21,6 +21,11 @@ Pixels Agent Bridge - Windows Debug test package
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:ProgramFiles\PixelsAgentBridge\run-app.ps1"
 
    The NSIS setup.exe opens this window automatically after installation.
+   Both NSIS and ZIP installation also enable automatic desktop window startup
+   for every Windows user at sign-in. After a reboot, the background service
+   starts before sign-in; the visible desktop window opens after sign-in.
+   Reinstalling or upgrading refreshes the same startup shortcut. Uninstallation
+   removes it. Starting the app again restores the existing window in that session.
    The command above is for manual ZIP installation or reopening the app.
 
    The overview shows this machine's 9-digit device code and temporary

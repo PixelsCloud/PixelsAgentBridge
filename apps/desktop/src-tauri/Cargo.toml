@@ -68,3 +68,4 @@ strip = true
 
 [patch.crates-io]
 enigo = { path = "../../../vendor/enigo" }
+libspa = { path = "../../../vendor/libspa" }

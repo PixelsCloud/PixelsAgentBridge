@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+case ${1:-} in
+    remove|upgrade|deconfigure)
+        if [[ -d /run/systemd/system ]]; then
+            systemctl stop pixels-agent-bridge-executor.service || true
+            if [[ $1 != upgrade ]]; then systemctl disable pixels-agent-bridge-executor.service || true; fi
+        fi
+        if [[ -f /opt/pixels-agent-bridge/lifecycle.sh ]]; then
+            source /opt/pixels-agent-bridge/lifecycle.sh
+            stop_installed_processes /opt/pixels-agent-bridge
+        fi
+        ;;
+esac

@@ -2,7 +2,7 @@
 
 ## 实施状态（2026-10-15）
 
-一行安装及发布支持已在工作区实现，尚未部署官网、签名上传或发布 Linux 版本。以下命令需要官网更新并发布首个 Linux 正式包后才可用于真实安装：
+一行安装入口及发布服务已部署到官网，Linux x86_64 stable 当前正式包 **1.0.2** 已签名发布到 COS，增加 Ubuntu 20.04 兼容。以下命令已完成真实在线安装验收：
 
 ```bash
 curl -fsSL https://agent.rgaa.vip/install.sh | bash
@@ -14,9 +14,19 @@ curl -fsSL https://agent.rgaa.vip/install.sh | bash
 - 项目自己定义的程序配置统一 TOML，详见 `docs/CONFIGURATION.md`。Linux 使用 `/etc/pixels-agent-bridge/config.toml`，安装与重装保留已有设置及注释；旧 env 只按数据迁移，禁止执行。
 - Linux 安装参数只设置首次默认值。后续编辑 TOML，再执行 `sudo systemctl restart pixels-agent-bridge-executor.service`。
 - 容器需要同时持久化 `/etc/pixels-agent-bridge` 和 `/var/lib/pixels-agent-bridge`，无 systemd 时使用 `--no-service`。
-- 编译、配置迁移、MCP 回归、隔离安装及官网检查已通过，结果见 [本次验收记录](acceptance/toml-linux-install-2026-10-15.md)；正式 Release 包、真实 systemd/Ubuntu/macOS 安装验收及官网部署仍需在发布前完成。
+- 编译、配置迁移、MCP 回归、隔离安装及官网检查已通过，早期结果见 [源码验收记录](acceptance/toml-linux-install-2026-10-15.md)。最终 Release 包已在 Debian 12/systemd 和 Ubuntu 24.04/外部进程管理容器完成官网在线安装、注册、重装保留及远程使用验证，见 [发布验收记录](acceptance/linux-online-install-2026-10-15/README.md)。
+- 在线验收发现 `/tmp` 禁止执行会使运行库预检误报，官网引导脚本已改用当前用户主目录下的私有临时目录，并在保留 `/tmp` 的 `noexec` 限制下重测通过。
+- V1.0.2 以 glibc 2.31 环境构建，签名校验使用 Python cryptography，不要求 OpenSSL 3。本机 WSL Ubuntu 20.04.2 及 Ubuntu 20.04/22.04/24.04、Debian 12 容器均通过在线安装和远程使用；本机 WSL 的 PDF/OCR 十项样例也通过。详见 [Ubuntu 20.04 兼容验收](acceptance/linux-ubuntu2004-2026-10-15/README.md)。
+- 官网 Linux 下载区已直接展示一行安装及查看设备码/密码的命令，包含复制按钮、中英文和手机布局。
+- 同一 V1.0.2 正式包已补充通过 Debian 11 的官网安装、自动补齐验签依赖、覆盖安装保留、systemd 启动、远程使用和 10 项文档/OCR 样例验收；Debian 已实测 11、12。Debian 11 测试环境使用官方签名快照解决软件源 404，详见 [Debian 11 验收记录](acceptance/linux-debian11-2026-10-15/README.md)。
 
-下面保留改造前的调查作为历史依据；其中“当前限制”和旧包名指初次调查时的状态，以本节及当前源码为准。
+## Linux 桌面版（2026-10-16）
+
+独立的 Ubuntu 22.04 x86_64 Tauri/React GUI 已生成 V1.0.0 deb，并在 VMware 的 Ubuntu 22.04.5 / GNOME Wayland 安装验收。账号登录、连接 Company、远程命令和流式终端、设置、单实例与菜单恢复、覆盖安装/卸载重装保留均通过；后台直接复用已验证的 V1.0.2 组件。构建、动态库和产品版本均与无界面包独立。
+
+构建入口为 `scripts/build_linux_desktop.py`，具体参数及安装方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)，结果见 [桌面验收记录](acceptance/linux-desktop-2026-10-16/README.md)。GUI V1.0.1 已通过 `scripts/release.py linux-desktop` 独立目标签名发布到 COS，官网已提供下载、安装说明和后台管理，并完成官网下载安装包的真实覆盖升级。见 [发布验收](acceptance/linux-desktop-publish-2026-10-16/README.md)。GUI 尚未接入在线安装升级；升级使用新版 deb。官网一行安装仍提供已发布的无界面服务。仅本次 Ubuntu 桌面已实测，不扩展宣称其他发行版或本机 Wayland 桌面操控已通过。
+
+下面保留改造前的调查作为历史依据；其中“当前限制”和旧包名指初次调查时的状态，以前述实施状态及当前源码为准。
 
 
 日期：2026-10-15。状态：发布方案，官网 Linux 发布链路尚未接入。

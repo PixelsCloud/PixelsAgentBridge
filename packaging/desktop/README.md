@@ -72,6 +72,16 @@ retirement, client respawn and file restoration in temporary directories.
 
 ## Windows and Linux
 
+Desktop installations open the main window after graphical sign-in: Windows
+uses an all-users Startup shortcut, macOS uses the Aqua-only
+`com.pixelsagentbridge.desktop` LaunchAgent, and the Linux desktop DEB uses an
+XDG autostart entry without `--background`. These run as the signed-in user.
+The macOS agent opens the app once and has no KeepAlive, so explicitly quitting
+does not immediately relaunch it. Existing single-instance handling restores
+an already running window. Upgrades refresh the startup entries; uninstallers
+remove them (the DEB entries are owned by dpkg). macOS rollback also restores
+the previous desktop LaunchAgent. The Linux headless package has no GUI.
+
 The Windows EXE uses solid LZMA compression with a 64 MiB dictionary. During NSIS
 staging, the browser and document runtime ZIPs are rewritten with stored entries
 so the outer installer can compress their contents together. Shared runtime
@@ -193,8 +203,8 @@ ordinary remote keyboard input also works. A full Windows sign-in was not tested
 
 The session supervisor task runs without an execution time limit and restarts
 after a failure. The visible Tauri window remains the single user interface
-and can be opened when a user logs in. Uninstallation removes the service and
-supervisor task while retaining machine identity and task data.
+and opens automatically when a user logs in. Uninstallation removes the service,
+supervisor task and desktop Startup shortcut while retaining machine identity and task data.
 # Windows installer behavior
 
 The NSIS installer starts the desktop window after installing the background

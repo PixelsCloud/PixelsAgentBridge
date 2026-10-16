@@ -1,0 +1,104 @@
+{
+  "account-results": {
+    "native_logout": true,
+    "native_login_form": true,
+    "account_authenticated": true,
+    "login_form_closed": true
+  },
+  "remote-command-results": {
+    "client": "Ubuntu 22.04.5 GNOME Wayland",
+    "remote_device": "559038160",
+    "native_add_device_form": true,
+    "command_completed": true,
+    "expected_stdout": true,
+    "state": "Succeeded"
+  },
+  "terminal-results": {
+    "client": "Ubuntu 22.04.5 GNOME Wayland",
+    "remote_device": "559038160",
+    "separate_native_window": true,
+    "automatic_console_session": true,
+    "typed_via_xterm": true,
+    "echo_output_received": true
+  },
+  "gui-settings-results": {
+    "light_dark_toggle": true,
+    "language_changed_using_visible_selector": true,
+    "gui_version_consistent": true,
+    "headless_update_not_offered": true,
+    "password_reveal_and_hide": true,
+    "local_service_offline_visible": true,
+    "service_restart_recovered": true,
+    "device_identity_preserved": true
+  },
+  "window-results": {
+    "close_hides_window": true,
+    "application_menu_restores_window": true,
+    "single_gui_process": true
+  },
+  "lifecycle-results": {
+    "overwrite_install": {
+      "device_code": "556688188",
+      "account_restored": true,
+      "company_device_restored": true,
+      "language_preserved": true
+    },
+    "uninstall_removes_owned_programs_and_entries": true,
+    "reinstall": {
+      "device_code": "556688188",
+      "account_restored": true,
+      "company_device_restored": true,
+      "language_preserved": true
+    },
+    "toml_unchanged": true,
+    "device_key_and_password_unchanged": true,
+    "password_dots_icon_centers_aligned": true
+  },
+  "password-mask-results": {
+    "eight_uniform_dots": true,
+    "dot_size_px": 6,
+    "center_spacing_px": 16,
+    "aligned": true,
+    "password_hidden": true
+  },
+  "package-receipt-results": {
+    "actual_build_receipt_accepted": true,
+    "wrong_version_rejected": true,
+    "modified_binary_rejected": true,
+    "missing_receipt_rejected": true
+  },
+  "final-state": {
+    "normal_user_launch_without_automation": true,
+    "background_start_hidden": true,
+    "menu_restores_background_process": true,
+    "installed_vmware_graphics_workaround": true,
+    "password_masked_via_native_accessibility": true,
+    "idle_setting_restored": true,
+    "service_active": true,
+    "application_left_running": true
+  },
+  "final-integrity": {
+    "installed_package_integrity": true,
+    "unix_launcher_line_endings": true,
+    "installed_gui_sha256": "0f71ef9bd3dfe60a664c438ceef47b600c368182a9902598406d9f8dda3d472b",
+    "package_sha256": "202391106df7c6f048ae1f7f90bc97532ecd3a664c4175371d2bd45f47a9ea2a",
+    "gui_version": "1.0.0",
+    "backend_version": "1.0.2"
+  },
+  "package": {
+    "version": "1.0.0",
+    "platform": "linux-desktop",
+    "architecture": "x86_64",
+    "filename": "pixels-agent-bridge-desktop-linux-x86_64-1.0.0.deb",
+    "bytes": 64828008,
+    "sha256": "202391106df7c6f048ae1f7f90bc97532ecd3a664c4175371d2bd45f47a9ea2a",
+    "backend_version": "1.0.2",
+    "backend_sha256": "15965d7b3a305d9ed97af6bd805eaa2e689fd9a30c93033d9b11061c0a2aef71",
+    "desktop_sha256": "0f71ef9bd3dfe60a664c438ceef47b600c368182a9902598406d9f8dda3d472b"
+  },
+  "native_unit_test": {
+    "name": "repeat_launch_signals_owner_and_crash_endpoint_is_recovered",
+    "passed": 1,
+    "failed": 0
+  }
+}

@@ -96,6 +96,7 @@ def package_unix(platform, architecture, binaries):
         files.extend(scripts / "macos" / name for name in (
             "com.pixelsagentbridge.executor.plist", "com.pixelsagentbridge.session-helper.plist",
             "com.pixelsagentbridge.login-helper.plist",
+            "com.pixelsagentbridge.desktop.plist",
         ))
     else:
         document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-linux.tar.gz'

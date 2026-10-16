@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Pixels Agent Bridge
+Exec=/opt/pixels-agent-bridge/run-desktop.sh
+Icon=pixels-agent-bridge
+Terminal=false
+X-GNOME-Autostart-enabled=true

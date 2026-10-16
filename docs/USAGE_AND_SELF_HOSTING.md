@@ -7,7 +7,7 @@
 - [开始之前](#overview)
 - [安装 Pixels](#install)
 - [程序配置统一使用 TOML](#application-config)
-- [Linux 一行安装](#linux-install)
+- [Linux 安装](#linux-install)
 - [登录账号](#account)
 - [添加设备](#devices)
 - [接入 AI Agent](#agents)
@@ -32,7 +32,7 @@ Pixels Agent Bridge 由操作端、目标设备和 AI Agent 组成。操作端�
 
 ## 安装 Pixels
 
-在操作端和目标设备安装适合系统的版本。Windows 和 macOS 安装包包含桌面应用、后台设备服务与 MCP。Linux 提供无界面设备服务与 MCP。两端需要连接到同一个 Pixels 控制服务。
+在操作端和目标设备安装适合系统的版本。Windows 和 macOS 安装包包含桌面应用、后台设备服务与 MCP。Linux 可选 Ubuntu 桌面版或无界面服务器版。两端需要连接到同一个 Pixels 控制服务。
 
 1. 从官网下载对应平台的安装包。
 2. 完成安装并启动 Pixels Desktop；目标设备上的后台服务保持运行。
@@ -66,13 +66,23 @@ relay_urls = ["https://pab-relay.rgaa.vip"]
 
 <a id="linux-install"></a>
 
-## Linux 一行安装
+## Linux 安装
 
-Linux x86_64 服务器可用下面一行命令安装后台设备服务和 MCP。默认连接官方服务；需要 root 或 sudo 权限。脚本会下载正式版本并验证签名、校验和及运行库，再安装服务。
+### Ubuntu 桌面版
+
+Ubuntu 22.04 x86_64 图形桌面可在官网下载 DEB，包含桌面应用、后台设备服务和 MCP。在终端进入安装包所在目录，执行下方命令（将文件名替换为实际下载的文件）。
+
+sudo apt install ./pixels-agent-bridge-desktop-linux-x86_64-VERSION.deb
+
+从应用菜单打开 Pixels Agent Bridge，登录并添加设备即可使用。升级下载新版 DEB 并再次运行安装命令，账号、设备身份和配置会保留；重装相同版本时加 --reinstall。安装会重启服务并中断连接。桌面版不使用下方无界面服务器的安装脚本升级。Wayland 下的本机截屏和键鼠能力取决于桌面环境。
+
+### 服务器版一行安装
+
+Linux x86_64 服务器可用下面一行命令安装后台设备服务和 MCP。支持 Ubuntu 20.04 及以上、Debian 11 及以上（glibc 2.31+），需要 root 或 sudo 权限；默认连接官方服务。脚本会下载正式版本并验证签名、校验和及运行库，再安装服务。
 
 curl -fsSL https://agent.rgaa.vip/install.sh | bash
 
-首次发布前会提示暂无 Linux 版本。安装成功后，运行下面的命令查看设备码和密码，再从 Windows 或 macOS Desktop 添加这台设备。
+安装器按需补齐 Python 签名验证组件，无需升级系统的 OpenSSL 或 glibc。安装成功后，运行下面的命令查看设备码和密码，再从 Windows、macOS 或 Linux Desktop 添加这台设备。
 
 sudo /opt/pixels-agent-bridge/run-executor.sh show-access
 
@@ -87,7 +97,7 @@ sudo systemctl restart pixels-agent-bridge-executor.service
 
 curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://bridge.example.com/control --relay-url https://relay.example.com
 
-没有 systemd 的容器可在 bash -s -- 后添加 --no-service，然后由自己的进程管理器启动 /opt/pixels-agent-bridge/run-executor.sh，并持久化 /etc/pixels-agent-bridge 和 /var/lib/pixels-agent-bridge。Linux 版不包含桌面应用；Git 等工作负载程序按需另装。
+没有 systemd 的容器可在 bash -s -- 后添加 --no-service，然后由自己的进程管理器启动 /opt/pixels-agent-bridge/run-executor.sh，并持久化 /etc/pixels-agent-bridge 和 /var/lib/pixels-agent-bridge。上述无界面服务器包不包含桌面应用；Git 等工作负载程序按需另装。
 
 <a id="account"></a>
 

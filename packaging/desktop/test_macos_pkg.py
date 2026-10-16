@@ -17,6 +17,17 @@ import build_macos_pkg as pkg
 
 
 class Installer(unittest.TestCase):
+    def test_desktop_login_opens_visible_app_once_as_user(self):
+        with (pkg.SCRIPTS / 'com.pixelsagentbridge.desktop.plist').open('rb') as source:
+            desktop = plistlib.load(source)
+        self.assertEqual(desktop['ProgramArguments'], ['/usr/bin/open', '/Applications/Pixels Agent Bridge.app'])
+        self.assertEqual(desktop['LimitLoadToSessionType'], 'Aqua')
+        self.assertTrue(desktop['RunAtLoad'])
+        self.assertFalse(desktop.get('KeepAlive', False))
+        self.assertNotIn('UserName', desktop)
+        self.assertNotIn('EnvironmentVariables', desktop)
+        self.assertIn('com.pixelsagentbridge.desktop.plist', pkg.REQUIRED)
+
     def test_login_helper_is_separate_and_uses_machine_local_access(self):
         with (pkg.SCRIPTS / "com.pixelsagentbridge.login-helper.plist").open('rb') as source:
             login = plistlib.load(source)

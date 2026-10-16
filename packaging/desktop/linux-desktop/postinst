@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ ${1:-} == configure ]] || exit 0
+install_dir=/opt/pixels-agent-bridge
+install -d -m 755 /etc/pixels-agent-bridge
+"$install_dir/pab-executor" configure --config /etc/pixels-agent-bridge/config.toml \
+    --previous "$install_dir" --control-url wss://pab.rgaa.vip/control --relay-url https://pab-relay.rgaa.vip
+chmod 644 /etc/pixels-agent-bridge/config.toml
+install -d -m 700 /var/lib/pixels-agent-bridge
+if [[ -d /run/systemd/system ]]; then
+    systemctl daemon-reload
+    systemctl enable pixels-agent-bridge-executor.service
+    systemctl restart pixels-agent-bridge-executor.service
+    systemctl is-active --quiet pixels-agent-bridge-executor.service
+fi
+declare -A users=()
+if [[ -n ${SUDO_USER:-} && ${SUDO_USER} != root ]]; then users["$SUDO_USER"]=1; fi
+if command -v loginctl >/dev/null && [[ -d /run/systemd/system ]]; then
+    while read -r session uid user rest; do
+        [[ $uid =~ ^[0-9]+$ && $uid -ge 1000 && $uid -lt 65534 ]] || continue
+        users["$user"]=1
+    done < <(loginctl list-sessions --no-legend 2>/dev/null || true)
+fi
+for user in "${!users[@]}"; do "$install_dir/grant-desktop-user.sh" "$user"; done
+command -v update-desktop-database >/dev/null && update-desktop-database /usr/share/applications || true
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+printf '%s\n' 'Pixels Agent Bridge is installed. Open it from the application menu.'
+printf '%s\n' 'For another desktop account: sudo /opt/pixels-agent-bridge/grant-desktop-user.sh USER'

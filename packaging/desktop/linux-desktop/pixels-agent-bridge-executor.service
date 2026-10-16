@@ -1,0 +1,16 @@
+[Unit]
+Description=Pixels Agent Bridge Executor (headless)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/pixels-agent-bridge/run-executor.sh
+Restart=always
+RestartSec=3
+TimeoutStopSec=60
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

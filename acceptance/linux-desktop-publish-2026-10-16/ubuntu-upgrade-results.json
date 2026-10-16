@@ -1,0 +1,16 @@
+{
+  "public_website_download": true,
+  "ed25519_signature_verified": true,
+  "complete_file_sha256_verified": true,
+  "from_version": "1.0.0",
+  "to_version": "1.0.1",
+  "toml_preserved": true,
+  "device_identity_key_and_password_preserved": true,
+  "device_code": "556688188",
+  "native_gui_title_version_correct": true,
+  "account_restored": true,
+  "company_saved_device_restored": true,
+  "company_remote_command_passed": true,
+  "local_windows_untouched": true,
+  "package_sha256": "2b62688e1809f03aaa3290663edd9cd70f9b354db7572bf0b44f2a5acc7ab6a0"
+}

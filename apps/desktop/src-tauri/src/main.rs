@@ -32,6 +32,13 @@ fn main() {
         }
     }
     match std::env::args().nth(1).as_deref() {
+        #[cfg(target_os = "linux")]
+        Some("--local-data-path") => {
+            match pab_desktop_lib::linux_user_data_path() {
+                Ok(path) => println!("{}", path.display()),
+                Err(error) => { eprintln!("{error}"); std::process::exit(1); }
+            }
+        }
         #[cfg(target_os = "macos")]
         Some("--file-access-probe") => {
             if pab_executor::file_access::worker_main().is_err() { std::process::exit(1); }

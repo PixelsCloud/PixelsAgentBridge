@@ -11,9 +11,11 @@ if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&
     launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
 fi
 while read -r uid; do
-    if launchctl print "gui/$uid/com.pixelsagentbridge.session-helper" >/dev/null 2>&1; then
-        launchctl bootout "gui/$uid/com.pixelsagentbridge.session-helper"
-    fi
+    for agent in com.pixelsagentbridge.desktop com.pixelsagentbridge.session-helper; do
+        if launchctl print "gui/$uid/$agent" >/dev/null 2>&1; then
+            launchctl bootout "gui/$uid/$agent"
+        fi
+    done
 done < <(dscl . -list /Users UniqueID | awk '$2 >= 500 {print $2}')
 if pgrep -f '^/Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop' >/dev/null \
     || pgrep -f '^/Library/Application Support/PixelsAgentBridge/pab-mcp' >/dev/null; then
@@ -24,6 +26,7 @@ if launchctl print system/com.pixelsagentbridge.executor >/dev/null 2>&1; then
 fi
 rm -f -- /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
 rm -f -- /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
+rm -f -- /Library/LaunchAgents/com.pixelsagentbridge.desktop.plist
 rm -rf -- '/Applications/Pixels Agent Bridge.app'
 for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh settings.env operator-server.json; do
     rm -f -- "$install_dir/$name"

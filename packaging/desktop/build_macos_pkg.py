@@ -36,6 +36,7 @@ REQUIRED = {
     "run-mcp.sh", "run-executor.sh", "com.pixelsagentbridge.executor.plist",
     "com.pixelsagentbridge.session-helper.plist",
     "com.pixelsagentbridge.login-helper.plist",
+    "com.pixelsagentbridge.desktop.plist",
 }
 
 

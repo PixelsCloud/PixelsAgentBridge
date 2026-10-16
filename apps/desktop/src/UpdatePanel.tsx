@@ -24,8 +24,10 @@ export function UpdatePanel({ language }: { language: Language }) {
   const [downloaded, setDownloaded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  const [installationMode, setInstallationMode] = useState("native");
 
   useEffect(() => {
+    void invoke<string>("update_installation_mode").then(setInstallationMode).catch(() => {});
     void invoke<UpdateInfo | null>("update_status").then(setAvailable).catch(() => {});
     let closed = false;
     let offAvailable: (() => void) | undefined;
@@ -63,6 +65,13 @@ export function UpdatePanel({ language }: { language: Language }) {
       setError(String(reason)); setInstalling(false); busy.current = false;
     } finally { setDownloading(false); }
   }
+
+  if (installationMode === "package") return <div className="settings-update">
+    <div className="settings-update-heading"><div>
+      <h3>{t("软件更新", "Updates")}</h3>
+      <p>{t("安装新版 Linux 桌面安装包即可升级，账号、设备和设置会保留。", "Install a newer Linux desktop package to update. Your account, devices, and settings are preserved.")}</p>
+    </div></div>
+  </div>;
 
   return <div className="settings-update">
     <div className="settings-update-heading">

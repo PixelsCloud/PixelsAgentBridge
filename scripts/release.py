@@ -62,6 +62,22 @@ def canonical(platform, arch, version, filename, size, hash_value):
 
 
 def package_info(platform, arch, version):
+    if platform == 'linux-desktop':
+        from importlib.util import spec_from_file_location, module_from_spec
+        directory = ROOT / '.build/linux-desktop' / version
+        manifest = json.loads((directory / 'package.json').read_text(encoding='utf-8'))
+        filename = f'pixels-agent-bridge-desktop-linux-{arch}-{version}.deb'
+        path = directory / filename
+        size, hash_value = path.stat().st_size, digest(path)
+        if (manifest.get('version'), manifest.get('platform'), manifest.get('architecture'), manifest.get('filename'), manifest.get('bytes'), manifest.get('sha256')) != (version, platform, arch, filename, size, hash_value):
+            raise RuntimeError('Linux desktop package does not match its build receipt')
+        spec = spec_from_file_location('linux_desktop_package', ROOT / 'packaging/desktop/build_linux_desktop_package.py')
+        packager = module_from_spec(spec)
+        spec.loader.exec_module(packager)
+        packager.verify_desktop(directory / 'pab-desktop', version)
+        if manifest.get('desktop_sha256') != digest(directory / 'pab-desktop'):
+            raise RuntimeError('Linux desktop package refers to a different GUI executable')
+        return path, size, hash_value
     if platform == 'linux':
         filename = f'pixels-agent-bridge-linux-{arch}-release-{version}.tar.gz'
         path = PACKAGES / filename
@@ -124,17 +140,21 @@ def upload(url, path):
 
 def main():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('platform', choices=('windows', 'macos', 'linux'))
+    parser.add_argument('platform', choices=('windows', 'macos', 'linux', 'linux-desktop'))
     parser.add_argument('--arch', default=None, choices=('x86_64', 'aarch64'))
     parser.add_argument('--site', default='https://agent.rgaa.vip')
     parser.add_argument('--notes-zh', required=True)
     parser.add_argument('--notes-en', required=True)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--allow-dirty', action='store_true', help='For release rehearsals only')
+    parser.add_argument('--headless-package', type=Path, help='Verified backend archive for the Linux desktop build')
+    parser.add_argument('--headless-sha256', help='Expected SHA-256 of that archive')
     args = parser.parse_args()
     arch = args.arch or ('aarch64' if args.platform == 'macos' else 'x86_64')
-    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64'), ('linux', 'x86_64')):
+    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64'), ('linux', 'x86_64'), ('linux-desktop', 'x86_64')):
         parser.error('Stable supports Windows/Linux x86_64 and macOS aarch64')
+    if args.platform == 'linux-desktop' and not (args.headless_package and args.headless_sha256):
+        parser.error('Linux desktop requires --headless-package and --headless-sha256')
     base = args.site.rstrip('/')
     if not base.startswith('https://'):
         parser.error('--site must be HTTPS')
@@ -173,7 +193,10 @@ def main():
     version = state['version']
     if state['phase'] == 'reserved':
         target = 'desktop' if args.platform == 'windows' else args.platform
-        command = [sys.executable, 'scripts/build.py', target, '--profile', 'release', '--package', '--installer-version', version]
+        command = ([sys.executable, 'scripts/build_linux_desktop.py', '--version', version, '--package',
+                    '--headless-package', str(args.headless_package.resolve()), '--headless-sha256', args.headless_sha256]
+                   if args.platform == 'linux-desktop' else
+                   [sys.executable, 'scripts/build.py', target, '--profile', 'release', '--package', '--installer-version', version])
         if args.platform == 'macos':
             command += ['--macos-arch', arch]
             if installer_identity:

@@ -6,6 +6,8 @@ use tokio::sync::RwLock;
 
 mod agent_integrations;
 mod desktop_input;
+#[cfg(target_os = "linux")]
+mod linux_launch;
 #[cfg(target_os = "macos")]
 mod macos_launch;
 mod macos_permissions;
@@ -303,6 +305,12 @@ pub fn run_session_helper() -> Result<(), String> {
     session_helper::run()
 }
 
+#[cfg(target_os = "linux")]
+pub fn linux_user_data_path() -> Result<std::path::PathBuf, String> {
+    server_settings::apply_saved_at_start()?;
+    DataPaths::for_scope(DataScope::User).map(|p| p.root().to_owned()).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if let Err(error) = server_settings::apply_saved_at_start() {
@@ -329,7 +337,24 @@ pub fn run() {
         }
     };
     pab_logging::init("desktop", paths.root()).expect("could not initialize desktop log file");
+    #[cfg(target_os = "linux")]
+    let gui_instance = match linux_launch::GuiInstance::acquire(paths.root()) {
+        Ok(Some(instance)) => instance,
+        Ok(None) => return,
+        Err(error) => {
+            eprintln!("Could not open desktop window: {error}");
+            return;
+        }
+    };
     let context = tauri::generate_context!();
+    #[cfg(target_os = "linux")]
+    let context = {
+        let mut context = context;
+        if std::env::args_os().any(|a| a == "--background") {
+            for window in &mut context.config_mut().app.windows { window.visible = false; }
+        }
+        context
+    };
     #[cfg(all(windows, debug_assertions))]
     let context = {
         let mut context = context;
@@ -354,6 +379,11 @@ pub fn run() {
             tauri::async_runtime::spawn(device_accounts.run());
             tauri::async_runtime::spawn(device_account::run_catalog());
             tray::setup(app)?;
+            #[cfg(target_os = "linux")]
+            {
+                gui_instance.listen(app.handle().clone())?;
+                app.manage(gui_instance);
+            }
             tauri::async_runtime::spawn(show_pending_browser_handoff(app.handle().clone()));
             let update_state = app.state::<update::UpdateState>().inner().clone();
             update::start_background_checks(app.handle().clone(), update_state);
@@ -406,6 +436,7 @@ pub fn run() {
                 operator::desktop_terminal::desktop_terminal_destroy,
                 tray::set_tray_language,
                 update::check_for_update,
+                update::update_installation_mode,
                 update::update_status,
                 update::download_update,
                 update::install_update,

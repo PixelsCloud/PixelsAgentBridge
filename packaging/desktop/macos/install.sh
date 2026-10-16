@@ -18,7 +18,7 @@ install_dir='/Library/Application Support/PixelsAgentBridge'
 app='/Applications/Pixels Agent Bridge.app'
 data_dir='/Library/Application Support/PixelsAgentBridgeData'
 user_data="$user_home/Library/Application Support/PixelsAgentBridge"
-for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh com.pixelsagentbridge.executor.plist com.pixelsagentbridge.session-helper.plist com.pixelsagentbridge.login-helper.plist; do
+for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh com.pixelsagentbridge.executor.plist com.pixelsagentbridge.session-helper.plist com.pixelsagentbridge.login-helper.plist com.pixelsagentbridge.desktop.plist; do
     [[ -f $source_dir/$name ]] || { echo "Missing package file: $name" >&2; exit 2; }
 done
 [[ -f $source_dir/browser-runtime-macos.tar.gz ]] || { echo 'Missing offline browser runtime' >&2; exit 2; }
@@ -39,7 +39,7 @@ committed=0
 stopped_domains=()
 stopped_plists=()
 started_jobs=()
-plist_paths=(/Library/LaunchDaemons/com.pixelsagentbridge.executor.plist /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist)
+plist_paths=(/Library/LaunchDaemons/com.pixelsagentbridge.executor.plist /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist /Library/LaunchAgents/com.pixelsagentbridge.desktop.plist)
 plists_written=0
 upgrade_step='准备新版本文件 / staging new files'
 finish_upgrade() {
@@ -108,11 +108,13 @@ if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&
     stopped_plists+=(/Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist)
 fi
 while read -r uid; do
-    if launchctl print "gui/$uid/com.pixelsagentbridge.session-helper" >/dev/null 2>&1; then
-        launchctl bootout "gui/$uid/com.pixelsagentbridge.session-helper"
-        stopped_domains+=("gui/$uid")
-        stopped_plists+=(/Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist)
-    fi
+    for agent in com.pixelsagentbridge.desktop com.pixelsagentbridge.session-helper; do
+        if launchctl print "gui/$uid/$agent" >/dev/null 2>&1; then
+            launchctl bootout "gui/$uid/$agent"
+            stopped_domains+=("gui/$uid")
+            stopped_plists+=("/Library/LaunchAgents/$agent.plist")
+        fi
+    done
 done < <(dscl . -list /Users UniqueID | awk '$2 >= 500 {print $2}')
 if launchctl print system/com.pixelsagentbridge.executor >/dev/null 2>&1; then
     launchctl bootout system/com.pixelsagentbridge.executor
@@ -132,6 +134,7 @@ upgrade_step='注册并启动后台服务 / registering and starting services'
 install -m 644 "$source_dir/com.pixelsagentbridge.executor.plist" /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist
 install -m 644 "$source_dir/com.pixelsagentbridge.session-helper.plist" /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
 install -m 644 "$source_dir/com.pixelsagentbridge.login-helper.plist" /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
+install -m 644 "$source_dir/com.pixelsagentbridge.desktop.plist" /Library/LaunchAgents/com.pixelsagentbridge.desktop.plist
 launchctl bootstrap system /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist
 started_jobs+=(system/com.pixelsagentbridge.executor)
 for ((i=0; i<${#stopped_domains[@]}; i++)); do
@@ -142,11 +145,13 @@ for ((i=0; i<${#stopped_domains[@]}; i++)); do
     fi
 done
 if launchctl print "gui/$desktop_uid" >/dev/null 2>&1; then
-    if ! launchctl print "gui/$desktop_uid/com.pixelsagentbridge.session-helper" >/dev/null 2>&1; then
-        launchctl bootstrap "gui/$desktop_uid" /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist
-        started_jobs+=("gui/$desktop_uid/com.pixelsagentbridge.session-helper")
-    fi
+    for agent in com.pixelsagentbridge.session-helper com.pixelsagentbridge.desktop; do
+        if ! launchctl print "gui/$desktop_uid/$agent" >/dev/null 2>&1; then
+            launchctl bootstrap "gui/$desktop_uid" "/Library/LaunchAgents/$agent.plist"
+            started_jobs+=("gui/$desktop_uid/$agent")
+        fi
+    done
 fi
 committed=1
-printf '%s\n' 'Installed Pixels Agent Bridge. Open it from Applications; grant Screen Recording and Accessibility in Settings.'
+printf '%s\n' 'Installed Pixels Agent Bridge. The desktop window opens at sign-in; grant Screen Recording and Accessibility in Settings.'
 printf '%s\n' "MCP command: $install_dir/run-mcp.sh"

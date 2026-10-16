@@ -1,0 +1,193 @@
+{
+  "date": "2026-10-15",
+  "artifact": {
+    "version": "1.0.2",
+    "bytes": 47422010,
+    "sha256": "15965d7b3a305d9ed97af6bd805eaa2e689fd9a30c93033d9b11061c0a2aef71",
+    "commit": "eb1685aa636871a6a43ddf68ea883c67d7d0c1db"
+  },
+  "public": {
+    "website_health": 204,
+    "bootstrap_sha256": "1802f6587ceaae42d76d73b221b306808731cfc9bae5b4c9a4d1beccfc83139a",
+    "linux_update_http": 200,
+    "current_version_http": 204,
+    "cos_object_http": 200,
+    "cos_size_matches": true,
+    "windows_macos_releases_unchanged": true
+  },
+  "elf": {
+    "pab-document-worker": {
+      "GLIBC": "2.30",
+      "GLIBCXX": "3.4.26"
+    },
+    "pab-executor": {
+      "GLIBC": "2.30",
+      "GLIBCXX": "3.4.26"
+    },
+    "pab-mcp": {
+      "GLIBC": "2.30"
+    }
+  },
+  "online_install": [
+    {
+      "container": "wsl-ubuntu2004",
+      "mode": "systemd",
+      "version": "1.0.2",
+      "device_code": "779303687",
+      "registered": true,
+      "online_install": true
+    },
+    {
+      "container": "pab-linux-compat-debian12-20261015",
+      "mode": "systemd",
+      "version": "1.0.2",
+      "device_code": "837345877",
+      "registered": true,
+      "online_install": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2004-20261015",
+      "mode": "manual",
+      "version": "1.0.2",
+      "device_code": "139114183",
+      "registered": true,
+      "online_install": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2204-20261015",
+      "mode": "manual",
+      "version": "1.0.2",
+      "device_code": "672323060",
+      "registered": true,
+      "online_install": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2404-20261015",
+      "mode": "manual",
+      "version": "1.0.2",
+      "device_code": "229803889",
+      "registered": true,
+      "online_install": true
+    }
+  ],
+  "remote_use": [
+    {
+      "container": "wsl-ubuntu2004",
+      "device_code": "779303687",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    },
+    {
+      "container": "pab-linux-compat-debian12-20261015",
+      "device_code": "837345877",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2004-20261015",
+      "device_code": "139114183",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2204-20261015",
+      "device_code": "672323060",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    },
+    {
+      "container": "pab-linux-compat-ubuntu2404-20261015",
+      "device_code": "229803889",
+      "authenticated_connection": true,
+      "remote_command": true,
+      "utf8_file_roundtrip": true,
+      "system_log_source_query": true,
+      "interactive_terminal": true,
+      "offline_pdf_worker": true,
+      "port_forward_http": true
+    }
+  ],
+  "wsl": {
+    "distribution": "Ubuntu 20.04.2",
+    "glibc": "2.31",
+    "openssl": "1.1.1f",
+    "python": "3.8",
+    "cryptography": "2.8",
+    "system_libraries_replaced": false,
+    "online_reinstall_credentials_preserved": true,
+    "service_restart": true,
+    "document_fixtures_passed": 10
+  },
+  "web_ui": {
+    "clipboard_install": true,
+    "clipboard_access": true,
+    "mobile_no_overflow": true,
+    "english": true,
+    "dark_mode": true,
+    "runtime_errors": 0
+  },
+  "cleanup": {
+    "temporary_account_devices_deleted": [
+      {
+        "device_id": "580ecb0e-fab5-4819-91dd-1e91999d3dc5",
+        "code": "779303687",
+        "deleted": true
+      },
+      {
+        "device_id": "ef7dfc07-3bf8-40a3-b9ec-dad7605717d7",
+        "code": "837345877",
+        "deleted": true
+      },
+      {
+        "device_id": "77afa990-0a45-442f-b4c0-627cf0c08462",
+        "code": "139114183",
+        "deleted": true
+      },
+      {
+        "device_id": "f29cb798-765e-463d-bd20-6c50a76419c7",
+        "code": "672323060",
+        "deleted": true
+      },
+      {
+        "device_id": "55704fe7-e581-47d0-b2d6-3d4664a3781f",
+        "code": "229803889",
+        "deleted": true
+      },
+      {
+        "device_id": "2166c984-0a27-44db-b5c3-90c951124697",
+        "code": "902937758",
+        "deleted": true
+      },
+      {
+        "device_id": "d568018d-acb6-47cf-9722-d5176f85bb8c",
+        "code": "334052969",
+        "deleted": true
+      }
+    ],
+    "temporary_credentials_and_cache_removed": true,
+    "temporary_containers_removed": true,
+    "private_access_files_removed": true,
+    "wsl_installation_retained": true,
+    "wsl_service_active": true
+  }
+}

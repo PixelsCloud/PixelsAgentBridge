@@ -40,6 +40,12 @@ struct Inner {
 #[derive(Clone, Default)]
 pub struct UpdateState(Arc<RwLock<Inner>>);
 
+/// Linux GUI packages have a separate delivery path from Linux headless releases.
+#[tauri::command]
+pub fn update_installation_mode() -> &'static str {
+    if cfg!(target_os = "linux") { "package" } else { "native" }
+}
+
 fn platform() -> Result<(&'static str, &'static str), String> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("windows", "x86_64") => Ok(("windows", "x86_64")),

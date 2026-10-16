@@ -19,6 +19,7 @@ import { MacosPermissionStatus, requestMacosPermissionsAtStartup } from "./Macos
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
 import "./App.css";
+import "./PasswordMask.css";
 import "./theme.css";
 
 export type View = "home" | "remote" | "mcp" | "activity" | "me" | "settings";
@@ -295,7 +296,11 @@ function App() {
                     <div className="home-credential">
                       <span className="code-label">{t.temporaryPassword}</span>
                       <div className="home-credential-value">
-                        <strong>{showPassword ? device.temporary_password : "••••••••"}</strong>
+                        <strong className={showPassword ? undefined : "masked-password"}>{showPassword ? device.temporary_password : (
+                          <span className="password-mask" role="img" aria-label={`${t.temporaryPassword} (${t.hide})`}>
+                            {Array.from({ length: 8 }, (_, index) => <span key={index} aria-hidden="true" />)}
+                          </span>
+                        )}</strong>
                         <button className="credential-icon-button" aria-label={showPassword ? t.hide : t.show} title={showPassword ? t.hide : t.show} onClick={() => setShowPassword(!showPassword)}>
                           {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                         </button>

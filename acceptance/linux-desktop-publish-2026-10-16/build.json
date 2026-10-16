@@ -1,0 +1,10 @@
+{
+  "version": "1.0.1",
+  "platform": "linux-desktop",
+  "architecture": "x86_64",
+  "sysroot": "Ubuntu 22.04",
+  "cargo_jobs": 8,
+  "cmake_jobs": 2,
+  "source_commit": "3f3d0e0f2bda7b289ed63eabbc161fd0778e86c5",
+  "sha256": "2147c6b674342ba1c94f1c3df1db7e991c46dfe247d57b5182f4e0ce077b6095"
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${1:-} == remove || ${1:-} == purge ]]; then
+    # The systemd unit belongs to dpkg. Remove an older tar install's identical unit.
+    unit=/etc/systemd/system/pixels-agent-bridge-executor.service
+    if [[ -f $unit ]] && grep -Fxq 'ExecStart=/opt/pixels-agent-bridge/run-executor.sh' "$unit"; then rm -f -- "$unit"; fi
+    if [[ -d /run/systemd/system ]]; then systemctl daemon-reload; fi
+    printf '%s\n' 'Pixels removed. Device data and user configuration have been preserved.'
+fi

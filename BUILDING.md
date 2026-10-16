@@ -61,6 +61,8 @@ macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_
 - 修改 Rust 源码、共享依赖、编译器或选项：Cargo 正常重编受影响部分，内部版本仍固定。
 - Windows/macOS 使用相同规则，Linux 无界面版继续通过现有 Docker 入口构建。
 
+Linux 无界面版以 Debian 11（glibc 2.31）及其固定软件源快照构建，兼容 Ubuntu 20.04 及以上。构建缓存使用 `.build/linux-target-bullseye`，与此前 Debian 12 的缓存分开，避免复用引用新版 glibc 的本地库。Linux 构建使用 Cargo 8 个任务和 CMake 2 个任务，总并发不超过 10。
+
 安装包发布版本与程序内部版本独立。构建记录同时记录发布版本、组件版本和产物 SHA-256；打包仍逐项核验哈希。内部关于页、MCP 握手、设备与 Relay 上报继续显示各组件自己的版本，不伪装成安装包版本。
 
 ## 打包与版本校验
@@ -103,3 +105,14 @@ python -m unittest discover -s scripts -p 'test_build*.py' -v
 2026-10-04 合并后验证：快进同步远端 `1691883`，该提交已合并 macOS 原生支持、双架构安装工具与上述版本管理功能，无需再次处理文本冲突。在 Windows 上通过9项版本测试、1项包含 Windows/Linux/macOS 归档的测试、3项 macOS 安装器输入校验测试，以及 Desktop `tsc --noEmit` 和 `cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`。Rust 检查日志 `.build/merge-macos-windows-check.log`。未执行 macOS 原生编译、PKG 构建或安装；macOS 独立构建脚本尚未接入统一版本递增，归档沿用已编译 App 的版本。此次检查不消耗产品版本，仍为 `1.2.0`、计数1。
 
 2026-10-04 macOS 入口已接入：通过 Pixels MCP 在设备603527578的 `/Users/huayang/source/PixelsAgentBridge`，以仓库用户 huayang 运行 `bash packaging/desktop/build-macos.sh debug all`。本轮从 `1.2.0` 计数1递增到 `1.2.1` 计数2，ARM/Intel 均成功编译并生成 tar.gz、PKG。两套安装包均通过展开、架构、App 签名完整性、内嵌版本和SHA-256验证；每种架构的5项PKG测试全部通过。另通过13项版本测试和三平台归档回归。重新打包测试后版本计数仍为2。本机版本清单已同步此远端构建结果，不再次分配版本。远端构建日志 `.build/macos-versioned-build.log`。本轮仅构建和展开验证，没有安装、更新运行中的服务，也未在 Intel 实机执行程序。
+
+
+## Linux 图形桌面独立构建
+
+Ubuntu 22.04 x86_64 GUI 使用独立入口，不改变已发布的 glibc 2.31 无界面包：
+
+```powershell
+python scripts/build_linux_desktop.py --version 1.0.0 --package --headless-package PATH_TO_VERIFIED_TAR --headless-sha256 VERIFIED_SHA256
+```
+
+该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)，实测结果见 [Ubuntu 桌面验收](acceptance/linux-desktop-2026-10-16/README.md)。GUI V1.0.1 已签名发布到官网/COS，当前通过新版 deb 覆盖升级。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。

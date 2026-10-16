@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-15",
+  "artifact": {
+    "version": "1.0.2",
+    "bytes": 47422010,
+    "sha256": "15965d7b3a305d9ed97af6bd805eaa2e689fd9a30c93033d9b11061c0a2aef71",
+    "commit": "eb1685aa636871a6a43ddf68ea883c67d7d0c1db"
+  },
+  "environment": {
+    "debian": "11",
+    "architecture": "x86_64",
+    "type": "isolated container with systemd",
+    "cpus": 2,
+    "glibc": "glibc 2.31",
+    "python": "3.9.2",
+    "openssl": "OpenSSL 1.1.1w  11 Sep 2023",
+    "cryptography": "3.3.2",
+    "apt_source": "official signed Debian snapshot 20260518T000000Z; default mirror had package 404s"
+  },
+  "online_install": {
+    "debian": "11",
+    "architecture": "x86_64",
+    "version": "1.0.2",
+    "online_install": true,
+    "automatic_python_and_signature_dependencies": true,
+    "systemd_active": "active",
+    "systemd_enabled": "enabled"
+  },
+  "runtime_libraries_available": [
+    "pab-executor",
+    "pab-mcp",
+    "pab-document-worker",
+    "document-runtime/libpdfium.so"
+  ],
+  "lifecycle": {
+    "online_reinstall": true,
+    "device_code_and_password_preserved": true,
+    "endpoint_identity_preserved": true,
+    "toml_and_comment_preserved": true,
+    "systemd_container_restart_autostart": true
+  },
+  "remote_tools": {
+    "authenticated_connection": true,
+    "remote_command": true,
+    "utf8_file_roundtrip": true,
+    "system_log_source_query": true,
+    "interactive_terminal": true,
+    "offline_pdf_worker": true,
+    "port_forward_http": true
+  },
+  "document_fixtures": {
+    "fixture_count": 10,
+    "all_passed": true,
+    "output": "10 document worker fixtures passed"
+  },
+  "installed_linux_mcp": {
+    "initialize": true,
+    "tools_list": true,
+    "tool_count": 110
+  },
+  "cleanup": {
+    "owned_account_device_deleted": true,
+    "local_credentials_and_cache_removed": true,
+    "owned_test_container_removed": true,
+    "private_password_file_removed": true,
+    "temporary_test_image_removed": true
+  },
+  "local_windows_install_unchanged": true,
+  "compilation_performed": false,
+  "limits": [
+    "shared Docker kernel; no independent host/kernel validation",
+    "container restart, not physical machine reboot",
+    "no Linux graphical desktop validation",
+    "no long-duration stress test"
+  ]
+}

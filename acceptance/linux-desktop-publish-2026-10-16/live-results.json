@@ -1,0 +1,13 @@
+{
+  "public_site": "https://agent.rgaa.vip",
+  "actual_release_metadata": true,
+  "all_platforms_same_panel_height": 550,
+  "linux_desktop_download": true,
+  "public_deb_range_206": true,
+  "correct_attachment_filename": true,
+  "headless_install_preserved": true,
+  "english_documentation_updated": true,
+  "real_admin_desktop_release_visible": true,
+  "dark_english_mobile_checked": true,
+  "page_errors": []
+}

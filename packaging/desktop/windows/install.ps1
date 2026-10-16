@@ -23,6 +23,32 @@ trap {
     break
 }
 
+function Set-PabDesktopStartup {
+    param(
+        [Parameter(Mandatory = $true)][string]$InstallRoot,
+        [string]$StartupDirectory = [Environment]::GetFolderPath('CommonStartup')
+    )
+    $installFull = [IO.Path]::GetFullPath($InstallRoot)
+    $desktop = Join-Path $installFull 'pab-desktop.exe'
+    if (-not (Test-Path -LiteralPath $desktop -PathType Leaf)) {
+        throw "Desktop application not found: $desktop"
+    }
+    if (-not $StartupDirectory) { throw 'Windows common Startup directory is unavailable' }
+    New-Item -ItemType Directory -Path $StartupDirectory -Force | Out-Null
+    # Explorer runs this as the signed-in user. No elevation or hidden/helper
+    # arguments: the normal GUI shows its window and restores an existing one.
+    $shortcutPath = Join-Path $StartupDirectory 'Pixels Agent Bridge.lnk'
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $desktop
+    $shortcut.Arguments = ''
+    $shortcut.WorkingDirectory = $installFull
+    $shortcut.IconLocation = "$desktop,0"
+    $shortcut.Description = 'Pixels Agent Bridge'
+    $shortcut.WindowStyle = 1
+    $shortcut.Save()
+}
+
 function Set-PabServiceConfiguration {
     param([string]$Name, [string]$BinaryPath)
     $service = Get-CimInstance Win32_Service -Filter "Name = '$Name'" -ErrorAction Stop
@@ -375,6 +401,8 @@ $supervisorTask = @{
 }
 Register-ScheduledTask @supervisorTask | Out-Null
 Start-ScheduledTask -TaskName $supervisorTaskName
+
+Set-PabDesktopStartup -InstallRoot $InstallRoot
 
 if (Test-Path -LiteralPath $runtimeOld) {
     try { Remove-Item -LiteralPath $runtimeOld -Recurse -Force -ErrorAction Stop }

@@ -1,6 +1,22 @@
 param([string]$InstallRoot)
 
 $ErrorActionPreference = 'Stop'
+function Remove-PabDesktopStartup {
+    param(
+        [Parameter(Mandatory = $true)][string]$InstallRoot,
+        [string]$StartupDirectory = [Environment]::GetFolderPath('CommonStartup')
+    )
+    if (-not $StartupDirectory) { throw 'Windows common Startup directory is unavailable' }
+    $shortcutPath = Join-Path $StartupDirectory 'Pixels Agent Bridge.lnk'
+    if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) { return }
+    $desktop = Join-Path ([IO.Path]::GetFullPath($InstallRoot)) 'pab-desktop.exe'
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
+    # An old installation's uninstaller must not remove a newer install's entry.
+    if ($shortcut.TargetPath -ieq $desktop) {
+        Remove-Item -LiteralPath $shortcutPath -Force
+    }
+}
+
 $serviceRemoved = $false
 $retiredBinaries = [ordered]@{}
 $errorLog = Join-Path $env:ProgramData 'PixelsAgentBridge\logs\uninstall-error.log'
@@ -167,5 +183,6 @@ foreach ($name in @(
         Remove-Item -LiteralPath $path -Force
     }
 }
+Remove-PabDesktopStartup -InstallRoot $InstallRoot
 Write-Output 'Application files removed. Persistent user and machine data were retained.'
 Remove-Item -LiteralPath $errorLog -Force -ErrorAction SilentlyContinue
