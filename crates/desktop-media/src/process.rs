@@ -112,7 +112,7 @@ impl NativeBackend {
     /// Only the dedicated interactive media helper enables OS input. Capture
     /// experiments and all other NativeBackend callers remain view-only.
     pub fn with_input(mut self) -> Self {
-        self.input_enabled = cfg!(windows);
+        self.input_enabled = cfg!(any(windows, target_os = "linux"));
         self
     }
     pub async fn recover_input(&self) -> std::io::Result<()> {

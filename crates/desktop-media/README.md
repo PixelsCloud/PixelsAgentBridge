@@ -126,7 +126,9 @@ encoder. It keeps one pending pool buffer, releases it before pipe writes, and
 retires the source when the layout, session or format changes. Linux Desktop now
 registers its media helper using the existing process identity challenge plus
 kernel UID and logind graphical-user observations. Idle registrations retire on
-session changes too. Linux rendering, native input and system login remain open.
+session changes too. GNOME native input now uses a separate worker with
+compositor-owned virtual devices, selected-stream coordinates and release on
+layout changes, EOF or worker death. Linux rendering and system login remain open.
 Build dependencies are gio-2.0, libpipewire-0.3 and NASM; the existing Linux
 Desktop image and package already include PipeWire. GNOME's interface is private
 and versioned; this adapter does not claim support for every Wayland desktop.
@@ -136,3 +138,6 @@ in `tests/native_linux.cpp` can run with ASan/UBSan without a desktop session.
 See `acceptance/remote-desktop-linux-helper-2026-10-17.md` for real helper IPC,
 isolated Desktop helper startup and embedded-worker tests. These do not yet
 constitute an end-to-end remote window or system-login acceptance.
+Real GTK input and crash/layout release checks are recorded in
+`acceptance/remote-desktop-linux-input-2026-10-17.md`. This GNOME adapter does not
+yet provide X11/general Wayland or login-manager input acceptance.

@@ -28,7 +28,8 @@ pub(crate) fn start() -> Result<Task, String> {
     let backend = NativeBackend::new(
         std::env::current_exe().map_err(|e| e.to_string())?,
         vec!["--media-worker".into()],
-    );
+    )
+    .with_input();
     Ok(Task(tauri::async_runtime::spawn(async move {
         loop {
             if let Ok(Ok(session)) =

@@ -60,6 +60,15 @@ Windows worker，90 的 1080p 硬软混合、全软件和动态桌面均通过 1
 显示、真实注销切换、X11 与系统登录继续待验收。详见
 [Linux helper 阶段验收](acceptance/remote-desktop-linux-helper-2026-10-17.md)。
 
+后续 W5 输入进展：GNOME 普通桌面已接入原生键鼠与正式 helper 配对输入通道。
+VM 自建窗口的 10 项实际操作/释放测试、70 项带 ASan/UBSan 的原生边界检查及
+4 项 helper 测试通过；包括按键按住期间改变布局、半包 EOF、worker 被杀后的
+状态释放与重开。Linux 原生显示、完整网络操作闭环、X11/其他 Wayland 桌面、
+登录界面仍待完成，不将普通桌面输入计作系统登录成功。详见
+[Linux 输入阶段验收](acceptance/remote-desktop-linux-input-2026-10-17.md)。
+完整 Linux Desktop 内嵌 worker 已重复通过 10 项输入检查，原分辨率/布局恢复，
+临时 native 进程为 0；Windows Desktop 编译检查通过。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

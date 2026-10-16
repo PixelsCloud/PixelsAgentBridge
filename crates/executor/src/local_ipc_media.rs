@@ -133,7 +133,7 @@ async fn request(
 /// availability. Failure here is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
-    fn supports_input(&self) -> bool { cfg!(any(windows, target_os = "macos")) }
+    fn supports_input(&self) -> bool { cfg!(any(windows, target_os = "macos", target_os = "linux")) }
     fn input(
         &self,
         config: DesktopVideoConfig,
@@ -643,7 +643,8 @@ mod tests {
         let _lock = LOCK.lock().await;
         let worker = std::env::current_exe().unwrap().parent().unwrap().join("pab-linux-media-worker-cargo");
         assert!(worker.is_file(), "place the Cargo-built media worker beside this test binary");
-        let backend = Arc::new(NativeBackend::new(worker, vec![]));
+        let backend = Arc::new(NativeBackend::new(worker, vec![]).with_input());
+        assert!(HelperMediaBackend.supports_input() && backend.supports_input());
         for cycle in 0..2 {
             let pair = pair(backend.clone()).await;
             let screens = HelperMediaBackend.screens().await.unwrap();
@@ -652,19 +653,27 @@ mod tests {
             let width = config.screen.pixel_width as usize;
             let height = config.screen.pixel_height as usize;
             let mut decoder = SoftwareDecoder::new(width, height).unwrap();
-            let mut source = HelperMediaBackend.start(config).await.unwrap();
+            let mut source = HelperMediaBackend.start(config.clone()).await.unwrap();
             let frame = tokio::time::timeout(WAIT, source.next_frame()).await.unwrap().unwrap();
             assert!(frame.keyframe);
             assert_eq!(decoder.decode(&frame.bytes).unwrap().unwrap().len(), width * height * 3 / 2);
+            let id = providers().lock().unwrap()[0].id;
+            let input_pair = input_pair(backend.clone(), id).await;
+            let mut sink = HelperMediaBackend.input(config).await.unwrap();
+            // Exercise the real native input worker without typing into an
+            // arbitrary user window. Actual input has its owned GTK fixture.
+            sink.apply(pab_protocol::RemoteDesktopInput::ReleaseAll).await.unwrap();
+            drop(sink);
             drop(source);
             tokio::time::timeout(WAIT, async {
-                while !pair.server.is_finished() || !pair.helper.is_finished() {
+                while !pair.server.is_finished() || !pair.helper.is_finished()
+                    || !input_pair.server.is_finished() || !input_pair.helper.is_finished() {
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
                 backend.idle().await;
             }).await.unwrap();
             assert!(providers().lock().unwrap().is_empty());
-            println!("Linux native helper cycle {cycle}: {width}x{height}, decoded, worker reaped, registration retired");
+            println!("Linux native helper cycle {cycle}: {width}x{height}, decoded, paired native input acknowledged, workers reaped, registration retired");
         }
     }
     #[tokio::test]
@@ -701,7 +710,7 @@ mod tests {
         }
     }
 
-    async fn input_pair(backend: Arc<Backend>, provider_id: u64) -> Pair {
+    async fn input_pair(backend: Arc<dyn DesktopBackend>, provider_id: u64) -> Pair {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {

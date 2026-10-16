@@ -1,5 +1,6 @@
 // Standalone Linux boundary tests; no compositor, capture or user input needed.
 #include "../native/linux/capture.h"
+#include "../native/linux/input.h"
 #include <cassert>
 #include <limits>
 
@@ -46,5 +47,21 @@ int main() {
     assert(keyframe({idr3, sizeof(idr3)}) && keyframe({idr4, sizeof(idr4)})); ++checked;
     assert(!keyframe({partial, sizeof(partial)}) && !keyframe({delta, sizeof(delta)})); ++checked;
     assert(json_string("a\"b\\c\n") == "\"a\\\"b\\\\c\\u000a\""); ++checked;
+    for (unsigned pixels : {1u, 1920u, 3840u, 8192u}) {
+        assert(stream_coordinate(0, pixels) == 0);
+        assert(stream_coordinate(65535, pixels) == pixels - 1);
+        assert(stream_coordinate(32768, pixels) >= 0 && stream_coordinate(32768, pixels) <= pixels - 1);
+        ++checked;
+    }
+    rejects([] { stream_coordinate(1, 0); }); ++checked;
+    rejects([] { stream_coordinate(1, 8193); }); ++checked;
+    for (unsigned vk = 0x41; vk <= 0x5a; ++vk) { assert(evdev_key(vk) > 0 && evdev_key(vk) <= KEY_MAX); ++checked; }
+    assert(evdev_key(0x41) == KEY_A && evdev_key(0x5a) == KEY_Z); ++checked;
+    assert(evdev_key(0x30) == KEY_0 && evdev_key(0x39) == KEY_9); ++checked;
+    assert(evdev_key(0x70) == KEY_F1 && evdev_key(0x79) == KEY_F10 && evdev_key(0x7a) == KEY_F11 && evdev_key(0x87) == KEY_F24); ++checked;
+    assert(evdev_key(0x11) == KEY_LEFTCTRL && evdev_key(0xa2) == KEY_LEFTCTRL && evdev_key(0xa3) == KEY_RIGHTCTRL); ++checked;
+    assert(evdev_key(0x10) == KEY_LEFTSHIFT && evdev_key(0xa1) == KEY_RIGHTSHIFT); ++checked;
+    assert(evdev_key(0x12) == KEY_LEFTALT && evdev_key(0xa5) == KEY_RIGHTALT); ++checked;
+    for (unsigned vk : {0u, 1u, 255u, 65535u}) { rejects([&] { evdev_key(vk); }); ++checked; }
     printf("{\"checks\":%u,\"passed\":true}\n", checked);
 }
