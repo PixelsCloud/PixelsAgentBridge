@@ -188,6 +188,7 @@ async fn receive(
                 state.decoder = Some(match output.read_u8().await? {
                     1 => "d3d11_hardware",
                     2 => "openh264_software",
+                    3 => "videotoolbox_hardware",
                     _ => return Err("invalid native decoder path".into()),
                 });
             }
@@ -324,17 +325,16 @@ mod tests {
 
     #[tokio::test]
     async fn decoder_path_is_reported_and_cannot_change_within_generation() {
-        let (mut pipe, output) = tokio::io::duplex(256);
-        let renderer = Renderer::start(output);
-        pipe.write_all(&[4, 2]).await.unwrap();
-        event(&mut pipe, 3, 0).await;
-        pipe.write_u64_le(0).await.unwrap();
-        pipe.write_u32_le(0).await.unwrap();
-        assert_eq!(
-            renderer.summary().await.unwrap()["decoder"],
-            "openh264_software"
-        );
-        for bytes in [&[4, 2, 4, 1][..], &[4, 9][..]] {
+        for (code, name) in [(2, "openh264_software"), (3, "videotoolbox_hardware")] {
+            let (mut pipe, output) = tokio::io::duplex(256);
+            let renderer = Renderer::start(output);
+            pipe.write_all(&[4, code]).await.unwrap();
+            event(&mut pipe, 3, 0).await;
+            pipe.write_u64_le(0).await.unwrap();
+            pipe.write_u32_le(0).await.unwrap();
+            assert_eq!(renderer.summary().await.unwrap()["decoder"], name);
+        }
+        for bytes in [&[4, 2, 4, 1][..], &[4, 3, 4, 2][..], &[4, 9][..]] {
             let (mut pipe, output) = tokio::io::duplex(256);
             let renderer = Renderer::start(output);
             pipe.write_all(bytes).await.unwrap();

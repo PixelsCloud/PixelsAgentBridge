@@ -2,6 +2,8 @@
 // authenticated reliable transport. No application/network configuration here.
 #include "encoder.h"
 #include "capture.h"
+#include "decoder.h"
+#include "presenter.h"
 #include <csignal>
 
 namespace pab_mac {
@@ -68,6 +70,44 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         next = std::max(next + std::chrono::microseconds(1000000/fps), Clock::now());
     } }
 }
+static void render(unsigned width, unsigned height, unsigned fps, unsigned rotation, bool verify, bool software, bool fail_decoder, bool lifecycle) {
+    if (uint64_t(width)*height > 33554432) throw std::runtime_error("Render dimensions outside bounds");
+    VideoDecoder decoder(width, height, fps, software, fail_decoder);
+    NativePresenter presenter(width, height, rotation, verify);
+    const auto idle = [&] { presenter.pump_events(); };
+    write_value(magic); write_value(uint32_t(2));
+    uint64_t expected = 0;
+    double decode_us = 0, render_us = 0;
+    for (;;) { @autoreleasepool {
+        idle();
+        const auto size = read_value<uint32_t>(idle);
+        if (!size) {
+            presenter.finish();
+            if (lifecycle) presenter.verify_lifecycle();
+            write_value(uint8_t(3)); write_value(presenter.displayed());
+            write_value(presenter.pixel_checks); write_value(presenter.max_color_error);
+            if (verify && expected) fprintf(stderr, "media decode_ms=%.3f render_ms=%.3f drawable_ms=%.3f gpu_wait_ms=%.3f draws=%llu frames=%llu\n",
+                decode_us/expected/1000, render_us/expected/1000, presenter.drawable_us/expected/1000,
+                presenter.gpu_wait_us/expected/1000, presenter.draw_count, expected);
+            return;
+        }
+        if (size > max_packet) throw std::runtime_error("Render packet outside bounds");
+        const auto index = read_value<uint64_t>(idle);
+        if (index != expected) throw std::runtime_error("Render frame sequence mismatch");
+        std::vector<uint8_t> packet(size); read_bytes(packet.data(), packet.size(), idle);
+        auto before = Clock::now(); auto image = decoder.decode(packet, index);
+        decode_us += std::chrono::duration<double,std::micro>(Clock::now()-before).count();
+        if (index == 0) {
+            write_value(uint8_t(4)); write_value(uint8_t(decoder.software() ? 2 : 3));
+            fprintf(stderr, "media decoder=%s cpu_pixel_mappings_per_frame=%u\n",
+                decoder.software() ? "openh264_software" : "videotoolbox_hardware", decoder.software() ? 1 : 0);
+        }
+        write_value(uint8_t(1)); write_value(index);
+        before = Clock::now(); presenter.render(image.get(), index);
+        render_us += std::chrono::duration<double,std::micro>(Clock::now()-before).count();
+        write_value(uint8_t(2)); write_value(index); ++expected;
+    } }
+}
 }
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     @autoreleasepool {
@@ -82,7 +122,29 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 }
                 throw std::runtime_error("Selected display is unavailable");
             }
-            throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop|synthetic");
+            if (argc >= 6 && argc <= 8 && std::string(argv[1]) == "render") {
+                std::string mode(argv[5]);
+                const bool lifecycle = mode.size() > 10 && mode.compare(mode.size()-10,10,"-lifecycle") == 0;
+                if (lifecycle) mode.resize(mode.size()-10);
+                const bool fail_decoder = mode.size() > 13 && mode.compare(mode.size()-13,13,"-fail-decoder") == 0;
+                if (fail_decoder) mode.resize(mode.size()-13);
+                const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
+                if (software) mode.resize(mode.size()-9);
+                if (mode != "stream" && mode != "stream-verify") throw std::runtime_error("Unsupported Mac renderer mode");
+                if (lifecycle && mode != "stream-verify") throw std::runtime_error("Lifecycle check requires generated verification mode");
+                if (argc >= 7 && std::string(argv[6]) != "0") throw std::runtime_error("Mac views must be embedded in their owning process");
+                unsigned rotation = 0;
+                if (argc == 8) {
+                    const std::string angle(argv[7]);
+                    if (angle == "90") rotation = 1;
+                    else if (angle == "180") rotation = 2;
+                    else if (angle == "270") rotation = 3;
+                    else if (angle != "0") throw std::runtime_error("Invalid rotation");
+                }
+                pab_mac::render(pab_mac::number(argv[2],8192), pab_mac::number(argv[3],8192),
+                    pab_mac::number(argv[4],60), rotation, mode == "stream-verify", software, fail_decoder, lifecycle); return 0;
+            }
+            throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop|synthetic | render WIDTH HEIGHT FPS stream|stream-verify");
         } catch (const std::exception& error) { fprintf(stderr, "media: %s\n", error.what()); return 1; }
         catch (...) { fprintf(stderr, "media: unknown native failure\n"); return 1; }
     }

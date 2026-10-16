@@ -89,7 +89,7 @@ system libraries.
 
 The macOS worker now has display inventory, ScreenCaptureKit NV12/IOSurface
 capture and direct VideoToolbox H.264 encoding. It is not yet registered as a
-product media helper: native viewer/input, real desktop permission acceptance,
+product media helper: product viewer/input, real desktop permission acceptance,
 system login and older-system/software encoder fallback are still unfinished.
 The application keeps its macOS 12.0 minimum; the current hardware media worker
 requires macOS 13 to configure the tested single-reference low-latency stream.
@@ -103,3 +103,13 @@ throughput, not desktop capture/display FPS. The Apple-generated fixture in
 `tests/fixtures` also checks immediate ordered software output on Windows/macOS.
 See `acceptance/remote-desktop-macos-codec-2026-10-17.md` for measured Windows
 native display interoperability and the still-unmet macOS product requirements.
+
+Mac native decoding/display now uses hardware VideoToolbox NV12 IOSurfaces and
+Metal texture views, with bundled OpenH264 on initial hardware failure. The
+worker supports `render WIDTH HEIGHT FPS stream|stream-verify [0] [ROTATION]`;
+`-software`, `-fail-decoder` and `-lifecycle` are explicit developer diagnostics.
+No NSView pointer is accepted over the worker pipe. Production embedding/input
+remain unfinished; the platform's product entry stays disabled until integrated.
+See `acceptance/remote-desktop-macos-renderer-2026-10-17.md` and
+`experiments/remote-desktop/verify_macos_renderer.py` for generated-frame replay,
+hardware/software, rotation, malformed-packet and static-window checks.

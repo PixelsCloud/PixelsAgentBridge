@@ -4,7 +4,7 @@ mod input;
 mod process;
 mod renderer;
 pub mod software;
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 mod software_ffi;
 mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};

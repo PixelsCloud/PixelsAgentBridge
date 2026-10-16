@@ -1,4 +1,4 @@
-//! Private ABI used only by the in-process Windows media worker. Opaque codec
+//! Private ABI used only inside native media workers. Opaque codec
 //! handles have one owner; returned buffers live until its next call or drop.
 use crate::software::{SoftwareDecoder, SoftwareEncoder};
 use std::panic::{AssertUnwindSafe, catch_unwind};

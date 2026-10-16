@@ -65,15 +65,16 @@ inline void parent_alive() {
     if (status > 0 && (pipe.revents & (POLLHUP | POLLERR | POLLNVAL)))
         throw std::runtime_error("Parent pipe ended");
 }
-inline void read_bytes(void* target, size_t size) {
+inline void read_bytes(void* target, size_t size, const std::function<void()>& idle = {}) {
     auto* out = static_cast<uint8_t*>(target);
     while (size) {
         pollfd pipe{STDIN_FILENO, POLLIN, 0};
         const int status = poll(&pipe, 1, 2);
         if (status < 0 && errno == EINTR) continue;
         if (status < 0) throw std::runtime_error("Parent pipe poll failed");
-        pump();
-        if (!status) continue;
+        // Do not sleep/pump once for every already-buffered field. Pipe
+        // framing otherwise adds several run-loop deadlines to each frame.
+        if (!status) { if (idle) idle(); pump(); continue; }
         const auto count = read(STDIN_FILENO, out, size);
         if (count < 0 && errno == EINTR) continue;
         if (count <= 0) throw std::runtime_error("Parent pipe ended");
@@ -89,7 +90,7 @@ inline void write_bytes(const void* bytes, size_t size) {
         in += count; size -= count;
     }
 }
-template<class T> T read_value() { T value{}; read_bytes(&value, sizeof(value)); return value; }
+template<class T> T read_value(const std::function<void()>& idle = {}) { T value{}; read_bytes(&value, sizeof(value), idle); return value; }
 template<class T> void write_value(T value) { write_bytes(&value, sizeof(value)); }
 
 struct Display {

@@ -31,6 +31,8 @@ fn main() {
             "CoreMedia",
             "CoreVideo",
             "IOSurface",
+            "Metal",
+            "QuartzCore",
         ] {
             println!("cargo:rustc-link-lib=framework={library}");
         }
