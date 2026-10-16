@@ -1,0 +1,144 @@
+#pragma once
+#include "common.h"
+
+namespace pab_mac {
+struct EncodedFrame { std::vector<uint8_t> bytes; bool key = false; };
+class Encoder {
+    OwnedCF<VTCompressionSessionRef> session_;
+    unsigned fps_;
+    struct Output {
+        std::mutex mutex;
+        bool completed = false;
+        EncodedFrame frame;
+        std::string error;
+    } output_;
+    static void append_nal(std::vector<uint8_t>& result, const uint8_t* data, size_t size) {
+        if (!size || size > max_packet - 4 || result.size() > max_packet - size - 4)
+            throw std::runtime_error("Encoded packet outside bounds");
+        result.insert(result.end(), {0, 0, 0, 1});
+        result.insert(result.end(), data, data + size);
+    }
+    static EncodedFrame annex_b(CMSampleBufferRef sample) {
+        if (!sample || !CMSampleBufferDataIsReady(sample) || CMSampleBufferGetNumSamples(sample) != 1)
+            throw std::runtime_error("Invalid encoder sample");
+        EncodedFrame result;
+        const auto attachments = CMSampleBufferGetSampleAttachmentsArray(sample, false);
+        CFDictionaryRef properties = attachments && CFArrayGetCount(attachments)
+            ? static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(attachments, 0)) : nullptr;
+        result.key = !properties || CFDictionaryGetValue(properties, kCMSampleAttachmentKey_NotSync) != kCFBooleanTrue;
+        const auto format = CMSampleBufferGetFormatDescription(sample);
+        int length_bytes = 0; size_t sets = 0;
+        check(CMVideoFormatDescriptionGetH264ParameterSetAtIndex(format, 0, nullptr, nullptr, &sets, &length_bytes), "H264 format");
+        if (length_bytes != 4 || sets < 2 || sets > 16) throw std::runtime_error("Unsupported H264 format");
+        if (result.key) {
+            for (size_t i = 0; i < sets; ++i) {
+                const uint8_t* data = nullptr; size_t size = 0;
+                check(CMVideoFormatDescriptionGetH264ParameterSetAtIndex(format, i, &data, &size, nullptr, nullptr), "H264 parameter set");
+                append_nal(result.bytes, data, size);
+            }
+        }
+        CMBlockBufferRef block = CMSampleBufferGetDataBuffer(sample);
+        if (!block) throw std::runtime_error("Encoder block missing");
+        const size_t total = CMBlockBufferGetDataLength(block);
+        if (!total || total > max_packet) throw std::runtime_error("Encoded block outside bounds");
+        // Copy only compressed bytes. Neither capture nor encoding maps pixels.
+        std::vector<uint8_t> avcc(total);
+        check(CMBlockBufferCopyDataBytes(block, 0, total, avcc.data()), "Encoder block read");
+        size_t offset = 0;
+        while (offset < total) {
+            if (total - offset < 4) throw std::runtime_error("Truncated H264 NAL length");
+            const uint32_t size = (uint32_t(avcc[offset]) << 24) | (uint32_t(avcc[offset+1]) << 16) |
+                (uint32_t(avcc[offset+2]) << 8) | avcc[offset+3];
+            offset += 4;
+            if (!size || size > total - offset) throw std::runtime_error("Truncated H264 NAL");
+            append_nal(result.bytes, avcc.data() + offset, size); offset += size;
+        }
+        return result;
+    }
+    static void receive(void* context, void*, OSStatus status, VTEncodeInfoFlags flags, CMSampleBufferRef sample) noexcept {
+        auto& output = *static_cast<Output*>(context);
+        std::lock_guard<std::mutex> lock(output.mutex);
+        try {
+            check(status, "Hardware encode");
+            if (output.completed) throw std::runtime_error("Unexpected duplicate encoder output");
+            if (flags & kVTEncodeInfo_FrameDropped) throw std::runtime_error("Encoder dropped a requested frame");
+            output.frame = annex_b(sample);
+        } catch (const std::exception& error) { output.error = error.what(); }
+        catch (...) { output.error = "Unknown encoder failure"; }
+        output.completed = true;
+    }
+    void property(CFStringRef key, CFTypeRef value) {
+        const std::string operation = "Encoder property " + std::string([(__bridge NSString*)key UTF8String]);
+        check(VTSessionSetProperty(session_.get(), key, value), operation.c_str());
+    }
+public:
+    Encoder(unsigned width, unsigned height, unsigned fps) : fps_(fps) {
+        if (!width || !height || width > 8192 || height > 8192 || uint64_t(width)*height > 33554432 ||
+            width % 2 || height % 2 || !fps || fps > 60) throw std::runtime_error("Encoder geometry outside bounds");
+        NSDictionary* specification = @{
+            (__bridge NSString*)kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder: @YES,
+            (__bridge NSString*)kVTVideoEncoderSpecification_EnableLowLatencyRateControl: @YES};
+        NSDictionary* attributes = @{(__bridge NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange),
+            (__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey: @{}};
+        VTCompressionSessionRef session = nullptr;
+        check(VTCompressionSessionCreate(kCFAllocatorDefault, width, height, kCMVideoCodecType_H264,
+            (__bridge CFDictionaryRef)specification, (__bridge CFDictionaryRef)attributes,
+            nullptr, receive, &output_, &session), "Hardware encoder create");
+        session_ = OwnedCF<VTCompressionSessionRef>(session);
+        property(kVTCompressionPropertyKey_RealTime, kCFBooleanTrue);
+        property(kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
+        property(kVTCompressionPropertyKey_ProfileLevel, kVTProfileLevel_H264_High_AutoLevel);
+        property(kVTCompressionPropertyKey_BaseLayerFrameRateFraction, (__bridge CFNumberRef)@1.0);
+        property(kVTCompressionPropertyKey_EnableLTR, kCFBooleanFalse);
+        // One reference plus explicit no-reorder VUI is interoperable with
+        // both the bounded Windows hardware pipeline and bundled OpenH264.
+        // Older macOS needs a separately verified fallback before advertising
+        // this backend; silently accepting its default multi-reference stream
+        // can produce stale software-decoded images.
+        if (@available(macOS 13.0, *))
+            property(kVTCompressionPropertyKey_ReferenceBufferCount, (__bridge CFNumberRef)@1);
+        else throw std::runtime_error("This hardware media backend requires macOS 13 or later");
+        property(kVTCompressionPropertyKey_ExpectedFrameRate, (__bridge CFNumberRef)@(fps));
+        property(kVTCompressionPropertyKey_MaxKeyFrameInterval, (__bridge CFNumberRef)@(fps * 2));
+        property(kVTCompressionPropertyKey_AverageBitRate, (__bridge CFNumberRef)@(std::max(uint64_t(2000000), uint64_t(width)*height*fps/4)));
+        property(kVTCompressionPropertyKey_ColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
+        property(kVTCompressionPropertyKey_TransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
+        property(kVTCompressionPropertyKey_YCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+        check(VTCompressionSessionPrepareToEncodeFrames(session_.get()), "Encoder prepare");
+        CFTypeRef hardware = nullptr;
+        const auto hardware_status = VTSessionCopyProperty(session_.get(), kVTCompressionPropertyKey_UsingHardwareAcceleratedVideoEncoder,
+            kCFAllocatorDefault, &hardware);
+        OwnedCF<CFTypeRef> used(hardware);
+        // Apple's low-latency encoder does not expose this informational
+        // property on every system. RequireHardware in session creation still
+        // prohibits a software encoder; honor an explicit false result.
+        if (hardware_status != kVTPropertyNotSupportedErr) {
+            check(hardware_status, "Encoder hardware check");
+            if (hardware != kCFBooleanTrue) throw std::runtime_error("Hardware encoder was not selected");
+        }
+    }
+    ~Encoder() {
+        // Stop callbacks while output_ still exists. CFRelease alone is not a
+        // callback lifetime barrier, including constructor/encode failures.
+        if (session_.get()) VTCompressionSessionInvalidate(session_.get());
+    }
+    EncodedFrame encode(CVPixelBufferRef image, uint64_t index) {
+        {
+            std::lock_guard<std::mutex> lock(output_.mutex);
+            output_.completed = false; output_.frame = {}; output_.error.clear();
+        }
+        NSDictionary* options = index == 0 ? @{(__bridge NSString*)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES} : nil;
+        VTEncodeInfoFlags flags{};
+        check(VTCompressionSessionEncodeFrame(session_.get(), image, CMTimeMake(index, fps_), CMTimeMake(1, fps_),
+            (__bridge CFDictionaryRef)options, nullptr, &flags), "Encode frame submit");
+        // One requested frame in flight: no hidden encoder backlog is allowed
+        // to accumulate behind the reliable transport's existing credit window.
+        check(VTCompressionSessionCompleteFrames(session_.get(), CMTimeMake(index, fps_)), "Encode frame complete");
+        std::lock_guard<std::mutex> lock(output_.mutex);
+        if (!output_.error.empty()) throw std::runtime_error(output_.error);
+        if (!output_.completed || output_.frame.bytes.empty() || (index == 0 && !output_.frame.key))
+            throw std::runtime_error("Encoder did not produce the requested frame");
+        return std::move(output_.frame);
+    }
+};
+}

@@ -14,7 +14,7 @@ pub use viewer_input::NativeViewerInput;
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments
 /// start with the operation (inventory, capture or render), without argv[0].
 pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         use std::ffi::{CString, c_char};
         unsafe extern "C" {
@@ -29,7 +29,7 @@ pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
         // catches C++ exceptions and retains no argument after returning.
         unsafe { pab_media_main(pointers.len() as i32, pointers.as_ptr()) }
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = arguments;
         eprintln!("native desktop media is not available on this platform yet");

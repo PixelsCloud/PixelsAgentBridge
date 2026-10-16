@@ -72,7 +72,7 @@ frame is forced to IDR after configuring slices; no priming frame is transmitted
 
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
 NVIDIA hardware encoding, system D3D11 MFT decoding, SDR BT.709,
-no cursor channel yet, no native macOS/Linux backend. Windows native keyboard,
+no cursor channel yet, no complete macOS/Linux product backend. Windows native keyboard,
 mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
 capture and multi-monitor hotplug still require hardware acceptance.
@@ -86,3 +86,20 @@ Vendor source/license details are in `native/vendor/README.md`. The native
 sources here are independent of `experiments/` and `.build/`; Cargo compiles one
 translation unit using the Windows SDK and links the bundled CPU codec plus
 system libraries.
+
+The macOS worker now has display inventory, ScreenCaptureKit NV12/IOSurface
+capture and direct VideoToolbox H.264 encoding. It is not yet registered as a
+product media helper: native viewer/input, real desktop permission acceptance,
+system login and older-system/software encoder fallback are still unfinished.
+The application keeps its macOS 12.0 minimum; the current hardware media worker
+requires macOS 13 to configure the tested single-reference low-latency stream.
+ScreenCaptureKit is weak-linked, verified in the Cargo-built Mach-O executable.
+No TCC grant is fabricated and no missing permission is reported as a frame.
+
+`cargo run --release -p pab-desktop-media --example native_capture_check -- WORKER 15`
+tests native synthetic encoding through the production private pipe and bundled
+OpenH264 decoding. It checks every frame's four quadrants and reports codec
+throughput, not desktop capture/display FPS. The Apple-generated fixture in
+`tests/fixtures` also checks immediate ordered software output on Windows/macOS.
+See `acceptance/remote-desktop-macos-codec-2026-10-17.md` for measured Windows
+native display interoperability and the still-unmet macOS product requirements.

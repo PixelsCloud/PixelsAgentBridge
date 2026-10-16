@@ -14,6 +14,33 @@ fn main() {
             "NASM is required for the bundled software codec on x86/x64; install it before Cargo (after changing this toolchain, rebuild openh264-sys2)"
         );
     }
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        cc::Build::new()
+            .cpp(true)
+            .std("c++17")
+            .file("native/macos/worker.mm")
+            .flag("-fobjc-arc")
+            .flag("-fblocks")
+            .flag("-mmacosx-version-min=12.0")
+            .compile("pab_desktop_media");
+        for library in [
+            "Foundation",
+            "AppKit",
+            "ApplicationServices",
+            "VideoToolbox",
+            "CoreMedia",
+            "CoreVideo",
+            "IOSurface",
+        ] {
+            println!("cargo:rustc-link-lib=framework={library}");
+        }
+        // The application still supports macOS 12.0. ScreenCaptureKit is
+        // optional until a capture is requested on macOS 12.3 or later. The
+        // native unit's 12.0 deployment target makes all SCK imports weak;
+        // Apple's linker consequently emits LC_LOAD_WEAK_DYLIB for this entry.
+        println!("cargo:rustc-link-lib=framework=ScreenCaptureKit");
+        return;
+    }
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }

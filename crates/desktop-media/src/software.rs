@@ -224,6 +224,60 @@ impl SoftwareDecoder {
 mod tests {
     use super::*;
     #[test]
+    fn apple_low_latency_stream_has_immediate_ordered_pixels() {
+        // Real M4 VideoToolbox output, generated quadrants only. This catches
+        // stale images that a self-encoded OpenH264 round trip cannot expose.
+        let fixture = include_bytes!("../tests/fixtures/apple-low-latency.pabvideo");
+        assert_eq!(&fixture[..8], b"PABMAC1\0");
+        let number =
+            |offset: usize| u32::from_le_bytes(fixture[offset..offset + 4].try_into().unwrap());
+        let (width, height) = (number(8) as usize, number(12) as usize);
+        let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+        let mut offset = 24;
+        for index in 0..number(20) as usize {
+            let size = number(offset) as usize;
+            assert_eq!(
+                u64::from_le_bytes(fixture[offset + 4..offset + 12].try_into().unwrap()),
+                index as u64
+            );
+            offset += 24;
+            let frame = decoder
+                .decode(&fixture[offset..offset + size])
+                .unwrap()
+                .expect("each low-latency frame must be immediately available");
+            offset += size;
+            for quadrant in 0..4 {
+                let rgb = [
+                    24 + (index * 3 + quadrant * 43) % 208,
+                    24 + (index * 7 + quadrant * 67) % 208,
+                    24 + (index * 11 + quadrant * 97) % 208,
+                ];
+                let mut expected = Planar::new(2, 2).unwrap();
+                expected
+                    .bgra(
+                        &[rgb[2] as u8, rgb[1] as u8, rgb[0] as u8, 255].repeat(4),
+                        8,
+                    )
+                    .unwrap();
+                let x = (quadrant % 2) * width / 2 + width / 4;
+                let y = (quadrant / 2) * height / 2 + height / 4;
+                let uv = width * height + (y / 2) * width + (x / 2) * 2;
+                for (actual, wanted) in [
+                    (frame[y * width + x], expected.y[0]),
+                    (frame[uv], expected.u[0]),
+                    (frame[uv + 1], expected.v[0]),
+                ] {
+                    assert!(
+                        actual.abs_diff(wanted) <= 5,
+                        "stale/color error at frame {index}, quadrant {quadrant}"
+                    );
+                }
+            }
+        }
+        assert_eq!(offset, fixture.len());
+    }
+
+    #[test]
     fn bt709_primary_colors_padding_and_truncation() {
         for (rgb, expected) in [
             ([0, 0, 0], [16, 128, 128]),
