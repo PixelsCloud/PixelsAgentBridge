@@ -3,6 +3,7 @@
 #include "nvenc_encoder.h"
 #include "pattern_window.h"
 #include "d3d_presenter.h"
+#include "software_codec.h"
 #include <d3d11_1.h>
 #include <shellscalingapi.h>
 #include <algorithm>
@@ -88,7 +89,7 @@ static bool idr(const std::vector<uint8_t>& bytes) {
     }
     return false;
 }
-static void capture(const Display& display, unsigned fps, const std::string& mode) {
+static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software) {
     const bool synthetic = mode == "synthetic";
     if (!synthetic && mode != "desktop" && mode != "animate") throw std::runtime_error("Unknown source mode");
     ComPtr<ID3D11Device> device;
@@ -123,14 +124,15 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         check(device->CreateTexture2D(&desc, nullptr, &texture), "Synthetic texture");
         check(device->CreateRenderTargetView(texture.Get(), nullptr, &target), "Synthetic target");
     }
-    Encoder encoder; encoder.initialize(device.Get(), width, height, fps);
+    CaptureEncoder encoder(device.Get(), width, height, fps, force_software);
+    std::cerr << "media encoder=" << (encoder.software() ? "openh264_software readback_per_frame=1" : "nvenc_gpu readback_per_frame=0") << '\n';
     write_value(magic); write_value(width); write_value(height);
     const auto start = Clock::now(); auto next = start;
     uint64_t index = 0;
     LONGLONG last_present = 0;
     while (true) {
         const auto command = read_value<uint8_t>();
-        if (command == 0) return;
+        if (command == 0) { if (mode != "desktop") encoder.report(); return; }
         if (command != 1) throw std::runtime_error("Invalid capture command");
         std::this_thread::sleep_until(next);
         std::vector<uint8_t> packet;
@@ -163,7 +165,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                 }
                 sampled = Clock::now();
             }
-            encoder.encode(texture.Get(), index, nullptr, &packet);
+            encoder.encode(texture.Get(), index, packet);
         }
         if (!synthetic) texture.Reset();
         if (packet.empty() || packet.size() > max_packet) throw std::runtime_error("Encoded frame outside bounds");
@@ -175,8 +177,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         next = (std::max)(next + std::chrono::microseconds(1000000/fps), Clock::now());
     }
 }
-static void render_stream(HardwareDecoder& decoder, NativePresenter& presenter, unsigned fps, bool interactive) {
+static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, unsigned fps, bool interactive) {
     write_value(uint32_t(2)); // Version of the private event protocol, not network framing.
+    write_value(uint8_t(4)); write_value(uint8_t(decoder.software() ? 2 : 1));
     uint64_t expected = 0;
     std::deque<std::pair<LONGLONG, uint64_t>> pending;
     auto last_output = Clock::now();
@@ -229,13 +232,13 @@ static void render_stream(HardwareDecoder& decoder, NativePresenter& presenter, 
         if (pending.size() > 4) throw std::runtime_error("Decoder exceeds the four-frame latency budget");
     }
 }
-static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive, bool streaming) {
+static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive, bool streaming, bool force_software) {
     MediaRuntime runtime;
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
         D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
         nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context), "Render device");
-    HardwareDecoder decoder(device.Get(), width, height, fps);
+    VideoDecoder decoder(device.Get(), width, height, fps, force_software);
     NativePresenter presenter;
     presenter.input_available(interactive);
     presenter.initialize(device.Get(), width, height, fps, display.screen.DesktopCoordinates, true, verify, parent, rotation);
@@ -311,13 +314,18 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             return 0;
         }
         if (argc == 5 && std::string(argv[1]) == "capture") {
+            std::string mode(argv[4]);
+            const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
+            if (software) mode.resize(mode.size()-9);
             for (const auto& d : found) if (screen_id(d) == argv[2]) {
-                capture(d, number(argv[3],60),argv[4]); return 0;
+                capture(d, number(argv[3],60),mode,software); return 0;
             }
             throw std::runtime_error("Selected screen disappeared");
         }
         if (argc >= 6 && argc <= 8 && std::string(argv[1]) == "render" && !found.empty()) {
-            const std::string mode(argv[5]);
+            std::string mode(argv[5]);
+            const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
+            if (software) mode.resize(mode.size()-9);
             const bool streaming = mode == "stream" || mode == "stream-verify" || mode == "stream-interactive";
             if (!streaming && mode != "verify" && mode != "normal" && mode != "interactive") throw std::runtime_error("Invalid render mode");
             const auto width = number(argv[2],8192), height = number(argv[3],8192);
@@ -337,7 +345,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 else if (angle != "0") throw std::runtime_error("Invalid rotation");
             }
             render(found.front(),width,height,number(argv[4],60),mode == "verify" || mode == "stream-verify", parent, rotation,
-                mode == "interactive" || mode == "stream-interactive", streaming); return 0;
+                mode == "interactive" || mode == "stream-interactive", streaming, software); return 0;
         }
         throw std::runtime_error("usage: stream-media inventory | capture SCREEN_ID FPS synthetic|desktop|animate | render WIDTH HEIGHT FPS normal|verify");
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }

@@ -96,6 +96,9 @@ chown -R root:wheel "$upgrade/new-support/document-runtime"
 for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$upgrade/new-support/$name"
 done
+if [[ -f $source_dir/THIRD-PARTY-NOTICES.txt ]]; then
+    install -m 644 "$source_dir/THIRD-PARTY-NOTICES.txt" "$upgrade/new-support/THIRD-PARTY-NOTICES.txt"
+fi
 "$upgrade/new-support/pab-executor" configure --config "$upgrade/new-support/config.toml" \
     --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
 chmod 644 "$upgrade/new-support/config.toml"

@@ -39,7 +39,10 @@ def unpack_backend(archive, expected_sha256, destination):
         raise ValueError('Backend archive checksum does not match')
     with tarfile.open(archive, 'r:gz') as tar:
         members = tar.getmembers()
-        if len(members) != len(ALLOWED) or {m.name for m in members} != ALLOWED:
+        # Accept verified older headless archives too; this Desktop build adds
+        # its own current notice below, independent of the backend version.
+        names = {m.name for m in members}
+        if len(members) != len(names) or names not in (ALLOWED, ALLOWED | {'THIRD-PARTY-NOTICES.txt'}):
             raise ValueError('Unexpected backend package entries')
         if any(not m.isfile() or not 0 <= m.size <= 500_000_000 for m in members):
             raise ValueError('Unsafe backend archive entry')
@@ -91,6 +94,7 @@ def main():
     install.mkdir(parents=True)
     backend = unpack_backend(args.headless_package, args.headless_sha256, install)
     shutil.copy2(args.desktop, install / 'pab-desktop')
+    shutil.copy2(ROOT / 'packaging/desktop/windows/THIRD-PARTY-NOTICES.txt', install / 'THIRD-PARTY-NOTICES.txt')
     for name in ['run-desktop.sh','grant-desktop-user.sh']: shutil.copy2(SCRIPTS / name, install / name)
     (install / 'desktop-release.toml').write_text(
         f'version = "{args.version}"\nbackend_version = "{backend["version"]}"\n'

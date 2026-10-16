@@ -261,7 +261,17 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         verify: bool,
     ) -> std::result::Result<Self, AnyError> {
-        Self::open_inner(path, prefix, config, verify, None, false).await
+        Self::open_inner(path, prefix, config, verify, None, false, false).await
+    }
+    /// Explicit diagnostic/fallback selection; normal callers use automatic
+    /// hardware selection and retain the direct GPU path when it is available.
+    pub async fn open_software(
+        path: &PathBuf,
+        prefix: &[String],
+        config: &DesktopVideoConfig,
+        verify: bool,
+    ) -> std::result::Result<Self, AnyError> {
+        Self::open_inner(path, prefix, config, verify, None, false, true).await
     }
     /// Parent HWND is obtained by the native Desktop host, never from a remote
     /// message or webview argument. The child leaves 72 logical px for controls.
@@ -271,7 +281,7 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         parent: usize,
     ) -> std::result::Result<Self, AnyError> {
-        Self::open_inner(path, prefix, config, false, Some(parent), false).await
+        Self::open_inner(path, prefix, config, false, Some(parent), false, false).await
     }
     pub async fn open_interactive(
         path: &PathBuf,
@@ -279,7 +289,8 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         parent: usize,
     ) -> std::result::Result<(Self, crate::NativeViewerInput), AnyError> {
-        let mut viewer = Self::open_inner(path, prefix, config, false, Some(parent), true).await?;
+        let mut viewer =
+            Self::open_inner(path, prefix, config, false, Some(parent), true, false).await?;
         let events = crate::NativeViewerInput::new(
             viewer.process.input.clone(),
             viewer.process.events.take().unwrap(),
@@ -293,6 +304,7 @@ impl NativeViewer {
         verify: bool,
         parent: Option<usize>,
         interactive: bool,
+        software: bool,
     ) -> std::result::Result<Self, AnyError> {
         config.validate()?;
         let mut arguments = vec![
@@ -309,6 +321,9 @@ impl NativeViewer {
             }
             .into(),
         ];
+        if software {
+            arguments[4].push_str("-software");
+        }
         arguments.push(parent.unwrap_or(0).to_string());
         arguments.push(
             match config.screen.rotation {

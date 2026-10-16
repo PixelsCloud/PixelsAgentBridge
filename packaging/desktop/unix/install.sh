@@ -39,6 +39,7 @@ for name in pab-mcp pab-executor pab-document-worker run-mcp.sh run-executor.sh 
     install -m 755 "$source_dir/$name" "$install_dir/$name"
 done
 install -m 644 "$source_dir/INSTALL-LINUX.txt" "$install_dir/INSTALL-LINUX.txt"
+if [[ -f $source_dir/THIRD-PARTY-NOTICES.txt ]]; then install -m 644 "$source_dir/THIRD-PARTY-NOTICES.txt" "$install_dir/THIRD-PARTY-NOTICES.txt"; fi
 if [[ -f $source_dir/release.json ]]; then install -m 644 "$source_dir/release.json" "$install_dir/release.json"; fi
 if [[ -f $install_dir/settings.env ]]; then mv -n -- "$install_dir/settings.env" "$install_dir/settings.env.migrated"; fi
 # Remove only obsolete product entry points. Persistent device/user data is retained.

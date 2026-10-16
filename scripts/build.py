@@ -107,6 +107,8 @@ def main():
     required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
     if 'macos' in targets:
         required += ['node', 'rustup'] + (['/usr/bin/pkgbuild', '/usr/bin/productbuild'] if args.package else [])
+    if 'desktop' in targets or ('macos' in targets and 'x86_64' in architectures):
+        required.append('nasm')  # Bundled software H.264 needs its x86 SIMD build.
     for tool in required:
         if not shutil.which(tool):
             parser.error(f'{tool} is not installed')

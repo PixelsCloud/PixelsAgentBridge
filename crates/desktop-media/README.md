@@ -2,6 +2,11 @@
 
 The Windows worker implements DXGI texture capture, direct BGRA-texture NVENC
 H.264 input, Media Foundation D3D11 decoding and native swapchain display.
+Codec initialization failures fall back independently to bundled OpenH264.
+Software encoding reads back BGRA and converts it to limited BT.709 I420;
+software decoding uploads NV12 for the same native presenter. These CPU copies
+are absent from the successful direct hardware path. Runtime device-loss
+fallback and systems without usable D3D11 capture/display remain unfinished.
 `pab-media-worker` is the standalone developer binary. Desktop embeds the same
 native library and dispatches `--media-worker` before initializing Tauri; the
 installer therefore needs no extra executable or downloaded SDK.
@@ -43,9 +48,22 @@ implementation; hardware MFT event negotiation remains future work.
 explicitly tests the production adapter on the primary screen. `animate` uses
 real desktop duplication of a temporary animation; neither mode saves video.
 The report uses actual screen dimensions and DXGI-confirmed display counts.
+Its optional final argument selects `software-encode`, `software-decode` or
+`software` to test each mixed pair explicitly. This is a diagnostic argument,
+not persisted application configuration. A final `--embedded` tests a Desktop
+executable through its `--media-worker` entry point. `software_codec_check` measures only
+CPU conversion/codec time; its result is not capture or displayed FPS.
+
+Building the bundled software codec on x86/x64 requires NASM on PATH before
+Cargo starts. Rebuild `openh264-sys2` after installing NASM if an older cache was
+built without it; upstream otherwise silently disables x86 assembly. All Cargo
+and nested compilation must stay within the shared 10-job limit. OpenH264 is
+compiled from the pinned dependency source, with no runtime codec download.
+Its four encoding slices use at most four worker threads. The first published
+frame is forced to IDR after configuring slices; no priming frame is transmitted.
 
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
-NVIDIA capture only, system D3D11 MFT decoding, SDR BT.709,
+NVIDIA hardware encoding, system D3D11 MFT decoding, SDR BT.709,
 no cursor channel yet, no native macOS/Linux backend. Windows native keyboard,
 mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
@@ -58,4 +76,5 @@ The synthetic/animate modes are explicit developer diagnostics; the product
 
 Vendor source/license details are in `native/vendor/README.md`. The native
 sources here are independent of `experiments/` and `.build/`; Cargo compiles one
-translation unit using the Windows SDK and links only system libraries.
+translation unit using the Windows SDK and links the bundled CPU codec plus
+system libraries.

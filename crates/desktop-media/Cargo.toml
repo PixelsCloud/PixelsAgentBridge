@@ -9,6 +9,8 @@ pab-protocol = { path = "../protocol" }
 pab-remote-desktop = { path = "../remote-desktop" }
 serde_json.workspace = true
 tokio.workspace = true
+openh264 = "=0.9.8"
+openh264-sys2 = "=0.9.9"
 
 [build-dependencies]
 cc = "1"

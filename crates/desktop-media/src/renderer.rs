@@ -13,6 +13,7 @@ use tokio::{
 type Error = Box<dyn std::error::Error + Send + Sync>;
 #[derive(Clone, Default)]
 struct Progress {
+    decoder: Option<&'static str>,
     consumed: u64,
     presented: Option<DesktopFrameHeader>,
     summary: Option<serde_json::Value>,
@@ -175,10 +176,20 @@ async fn receive(
                     return Err("native decoder did not drain submitted frames".into());
                 }
                 state.summary = Some(
-                    serde_json::json!({"displayed":displayed,"test_pixel_checks":pixel_checks,"test_max_rgb_error":max_rgb_error}),
+                    serde_json::json!({"displayed":displayed,"test_pixel_checks":pixel_checks,"test_max_rgb_error":max_rgb_error,"decoder":state.decoder}),
                 );
                 sender.send_replace(state);
                 return Ok(());
+            }
+            4 => {
+                if state.decoder.is_some() || state.consumed != 0 {
+                    return Err("native decoder path changed within generation".into());
+                }
+                state.decoder = Some(match output.read_u8().await? {
+                    1 => "d3d11_hardware",
+                    2 => "openh264_software",
+                    _ => return Err("invalid native decoder path".into()),
+                });
             }
             _ => return Err("invalid native renderer event".into()),
         }
@@ -309,5 +320,30 @@ mod tests {
                 .unwrap()
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn decoder_path_is_reported_and_cannot_change_within_generation() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        pipe.write_all(&[4, 2]).await.unwrap();
+        event(&mut pipe, 3, 0).await;
+        pipe.write_u64_le(0).await.unwrap();
+        pipe.write_u32_le(0).await.unwrap();
+        assert_eq!(
+            renderer.summary().await.unwrap()["decoder"],
+            "openh264_software"
+        );
+        for bytes in [&[4, 2, 4, 1][..], &[4, 9][..]] {
+            let (mut pipe, output) = tokio::io::duplex(256);
+            let renderer = Renderer::start(output);
+            pipe.write_all(bytes).await.unwrap();
+            assert!(
+                timeout(Duration::from_secs(1), renderer.summary())
+                    .await
+                    .unwrap()
+                    .is_err()
+            );
+        }
     }
 }

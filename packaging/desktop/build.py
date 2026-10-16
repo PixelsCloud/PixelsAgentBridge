@@ -84,6 +84,7 @@ def package_unix(platform, architecture, binaries):
             ("install.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh", "INSTALL-LINUX.txt")
         )),
     ]
+    files.append(scripts / "windows" / "THIRD-PARTY-NOTICES.txt")
     if platform == "macos":
         browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-macos.tar.gz'
         document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-macos.tar.gz'

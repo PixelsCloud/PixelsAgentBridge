@@ -3,6 +3,9 @@
 mod input;
 mod process;
 mod renderer;
+pub mod software;
+#[cfg(windows)]
+mod software_ffi;
 mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};
 pub use renderer::NativePresentations;

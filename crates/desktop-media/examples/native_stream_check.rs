@@ -21,15 +21,34 @@ async fn main() -> Result<(), Error> {
 
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() != 3 || !matches!(args[1].as_str(), "synthetic" | "animate") {
-        return Err("usage: native_stream_check WORKER synthetic|animate 15|30".into());
+    if !(3..=5).contains(&args.len()) || !matches!(args[1].as_str(), "synthetic" | "animate") {
+        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software] [--embedded]".into());
     }
+    let prefix = match args.get(4).map(String::as_str) {
+        None => vec![],
+        Some("--embedded") => vec!["--media-worker".to_string()],
+        _ => return Err("unknown worker mode".into()),
+    };
+    let codecs = args.get(3).map(String::as_str).unwrap_or("auto");
+    if !matches!(
+        codecs,
+        "auto" | "software-encode" | "software-decode" | "software"
+    ) {
+        return Err("unknown codec selection".into());
+    }
+    let software_encode = matches!(codecs, "software-encode" | "software");
+    let software_decode = matches!(codecs, "software-decode" | "software");
+    let capture_mode = if software_encode {
+        format!("{}-software", args[1])
+    } else {
+        args[1].clone()
+    };
     let executable = PathBuf::from(&args[0]);
     let fps: u16 = args[2].parse()?;
     if !matches!(fps, 15 | 30) {
         return Err("FPS must be 15 or 30".into());
     }
-    let screen = NativeBackend::new(executable.clone(), vec![])
+    let screen = NativeBackend::new(executable.clone(), prefix.clone())
         .screens()
         .await?
         .into_iter()
@@ -45,7 +64,13 @@ async fn run() -> Result<(), Error> {
     };
     let mut command = Command::new(&executable);
     command
-        .args(["capture", &config.screen.id, &fps.to_string(), &args[1]])
+        .args(&prefix)
+        .args([
+            "capture",
+            &config.screen.id,
+            &fps.to_string(),
+            &capture_mode,
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -62,7 +87,11 @@ async fn run() -> Result<(), Error> {
         return Err("source metadata mismatch".into());
     }
     let verify = args[1] == "synthetic";
-    let mut viewer = NativeViewer::open(&executable, &[], &config, verify).await?;
+    let mut viewer = if software_decode {
+        NativeViewer::open_software(&executable, &prefix, &config, verify).await?
+    } else {
+        NativeViewer::open(&executable, &prefix, &config, verify).await?
+    };
     let mut presentations = viewer.presentations();
     let warmup = u64::from(fps);
     let total = warmup * 6;
@@ -123,6 +152,7 @@ async fn run() -> Result<(), Error> {
         .ok_or("missing display count")?;
     let effective_fps = confirmed.saturating_sub(warmup) as f64 / elapsed.as_secs_f64();
     let passed = confirmed <= total
+        && (!software_decode || display["decoder"] == "openh264_software")
         && effective_fps > 12.0
         && effective_fps >= f64::from(fps) * 0.9
         && (!verify
@@ -132,7 +162,7 @@ async fn run() -> Result<(), Error> {
                     .is_some_and(|n| n <= 12)));
     println!(
         "{}",
-        serde_json::json!({"passed":passed,"source":args[1],"target_fps":fps,
+        serde_json::json!({"passed":passed,"source":args[1],"target_fps":fps,"codec_selection":codecs,
         "dimensions":[config.screen.pixel_width,config.screen.pixel_height],"submitted":total,"warmup":warmup,"display":display,
         "effective_display_fps":effective_fps,"renderer":"production_stream_protocol_v2"})
     );

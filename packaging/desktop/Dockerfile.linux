@@ -12,6 +12,7 @@ RUN printf '%s\n' \
     libssl-dev \
     pkg-config \
     cmake \
+    nasm \
     clang \
     && rm -rf /var/lib/apt/lists/*
 

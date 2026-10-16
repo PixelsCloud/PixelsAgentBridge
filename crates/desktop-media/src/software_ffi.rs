@@ -1,0 +1,114 @@
+//! Private ABI used only by the in-process Windows media worker. Opaque codec
+//! handles have one owner; returned buffers live until its next call or drop.
+use crate::software::{SoftwareDecoder, SoftwareEncoder};
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+#[repr(C)]
+pub struct Bytes {
+    data: *const u8,
+    len: usize,
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn pab_soft_encoder_new(width: u32, height: u32, fps: u16) -> *mut SoftwareEncoder {
+    catch_unwind(|| {
+        SoftwareEncoder::new(width as usize, height as usize, fps)
+            .ok()
+            .map_or(std::ptr::null_mut(), |value| Box::into_raw(Box::new(value)))
+    })
+    .unwrap_or(std::ptr::null_mut())
+}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_encoder_drop(value: *mut SoftwareEncoder) {
+    if !value.is_null() {
+        // SAFETY: native RAII passes its uniquely owned, live handle once.
+        drop(unsafe { Box::from_raw(value) });
+    }
+}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_encode(
+    value: *mut SoftwareEncoder,
+    data: *const u8,
+    len: usize,
+    stride: usize,
+    output: *mut Bytes,
+) -> bool {
+    if value.is_null() || data.is_null() || output.is_null() || len > 256 * 1024 * 1024 {
+        return false;
+    }
+    // SAFETY: the worker keeps the mapped D3D texture and unique codec handle
+    // alive throughout this call; length is the validated mapped row pitch.
+    let (value, input, output) = unsafe {
+        (
+            &mut *value,
+            std::slice::from_raw_parts(data, len),
+            &mut *output,
+        )
+    };
+    output.data = std::ptr::null();
+    output.len = 0;
+    catch_unwind(AssertUnwindSafe(|| {
+        match value.encode_bgra(input, stride) {
+            Ok(packet) => {
+                output.data = packet.as_ptr();
+                output.len = packet.len();
+                true
+            }
+            Err(_) => false,
+        }
+    }))
+    .unwrap_or(false)
+}
+#[unsafe(no_mangle)]
+extern "C" fn pab_soft_decoder_new(width: u32, height: u32) -> *mut SoftwareDecoder {
+    catch_unwind(|| {
+        SoftwareDecoder::new(width as usize, height as usize)
+            .ok()
+            .map_or(std::ptr::null_mut(), |value| Box::into_raw(Box::new(value)))
+    })
+    .unwrap_or(std::ptr::null_mut())
+}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_decoder_drop(value: *mut SoftwareDecoder) {
+    if !value.is_null() {
+        // SAFETY: native RAII passes its uniquely owned, live handle once.
+        drop(unsafe { Box::from_raw(value) });
+    }
+}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_decode(
+    value: *mut SoftwareDecoder,
+    data: *const u8,
+    len: usize,
+    output: *mut Bytes,
+) -> bool {
+    if value.is_null()
+        || data.is_null()
+        || output.is_null()
+        || len == 0
+        || len > pab_protocol::DESKTOP_MAX_FRAME_BYTES
+    {
+        return false;
+    }
+    // SAFETY: native packet storage and output struct outlive the call; the
+    // codec handle is exclusively used on this worker thread.
+    let (value, input, output) = unsafe {
+        (
+            &mut *value,
+            std::slice::from_raw_parts(data, len),
+            &mut *output,
+        )
+    };
+    output.data = std::ptr::null();
+    output.len = 0;
+    catch_unwind(AssertUnwindSafe(|| match value.decode(input) {
+        Ok(Some(frame)) => {
+            output.data = frame.as_ptr();
+            output.len = frame.len();
+            true
+        }
+        Ok(None) => true,
+        Err(_) => false,
+    }))
+    .unwrap_or(false)
+}

@@ -30,6 +30,7 @@ IDENTIFIER = "vip.rgaa.pab.desktop.installer"
 CONTROL_URL = "wss://pab.rgaa.vip/control"
 RELAY_URL = "https://pab-relay.rgaa.vip"
 REQUIRED = {
+    "THIRD-PARTY-NOTICES.txt",
     "browser-runtime-macos.tar.gz",
     "document-runtime-macos.tar.gz",
     "pab-executor", "pab-mcp", "pab-document-worker", "install.sh", "uninstall.sh", "run-app.sh", "lifecycle.sh",
@@ -81,7 +82,7 @@ def extract_verified(archive, manifest_path, destination):
             raise ValueError("incomplete macOS package")
         package.extractall(destination, filter="data")
     for name in REQUIRED:
-        source = SCRIPTS / name
+        source = (SCRIPTS.parent / "windows" / name) if name == "THIRD-PARTY-NOTICES.txt" else SCRIPTS / name
         if source.is_file() and (destination / name).read_bytes() != source.read_bytes().replace(b"\r\n", b"\n"):
             raise ValueError(f"archive has an outdated macOS installation file: {name}")
 
