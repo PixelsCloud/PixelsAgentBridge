@@ -1,6 +1,87 @@
 import { test, expect } from '@playwright/test';
 
+for (const presence of ['offline', 'unknown', 'error']) {
+  test(`a confirmed connection shows online across home, list and details despite ${presence} directory data`,async({page})=>{
+    await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=${presence}`);
+    const card=page.locator('.home-recent-device');
+    await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label',presence==='offline'?'Offline':'Unknown');
+    await card.dblclick();
+    await expect(page.getByRole('dialog')).toContainText('Device connected');
+    await page.getByRole('dialog').locator('.ant-modal-footer').getByRole('button',{name:'Close',exact:true}).click();
+    await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
+    await expect(card.locator('.home-recent-connection')).toContainText('Connected');
+    await expect(card.locator('.home-recent-connection')).toContainText('P2P');
+    await page.evaluate(()=>(window as any).fixture.setView('remote'));
+    await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label','Online');
+    await expect(page.locator('.device-basic-grid > div').nth(1).locator('strong')).toHaveText('Online');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
+    await page.evaluate(()=>(window as any).fixture.setView('home'));
+    await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
+  });
+}
+
+test('disconnect stops proving online, while directory online does not imply a client connection',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=offline&connected');
+  const card=page.locator('.home-recent-device');
+  await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
+  await page.evaluate(()=>(window as any).fixture.emitConnection('disconnected'));
+  await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Offline');
+  await expect(card.locator('.home-recent-connection')).toHaveText('Disconnected');
+  await page.evaluate(()=>{const f=(window as any).fixture;f.presence=true;f.setView('remote');});
+  await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label','Online');
+  await expect(page.locator('.device-list .home-recent-connection')).toHaveText('Disconnected');
+  await expect(page.locator('.device-basic-grid > div').nth(1).locator('strong')).toHaveText('Online');
+  await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Disconnected');
+});
+
+test('an in-flight disconnected path snapshot cannot overwrite a successful connection',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=offline&hold-paths');
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingPaths.length)).toBe(1);
+  const card=page.locator('.home-recent-device');await card.dblclick();
+  await expect(page.getByRole('dialog')).toContainText('Device connected');
+  await page.getByRole('dialog').locator('.ant-modal-footer').getByRole('button',{name:'Close',exact:true}).click();
+  await page.evaluate(()=>(window as any).fixture.pendingPaths[0].resolve([{deviceCode:'123456789',path:null}]));
+  // The next refresh stays pending so it cannot conceal a stale-state regression.
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingPaths.length)).toBeGreaterThan(1);
+  await expect(card.locator('.home-recent-connection')).toHaveText('Connected');
+  await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
+});
+
+test('an in-flight connected path snapshot cannot resurrect a disconnected session',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=unknown&connected&hold-paths');
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingPaths.length)).toBe(1);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.emitConnection('disconnected');f.pendingPaths[0].resolve([{deviceCode:'123456789',path:'p2p'}]);});
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingPaths.length)).toBeGreaterThan(1);
+  await expect(page.locator('.home-recent-connection')).toHaveText('Disconnected');
+  await expect(page.locator('.home-recent-presence')).toHaveAttribute('aria-label','Unknown');
+});
+
 for (const error of ['device password has not been entered', 'the device rejected authentication']) {
+  test(`online presence is independent of a failed device password: ${error}`, async ({page}) => {
+    await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=online&connection-error=${encodeURIComponent(error)}`);
+    const card = page.locator('.home-recent-device');
+    await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label', 'Online');
+    await expect(card.locator('.home-recent-connection')).toHaveText('Disconnected');
+    await card.dblclick();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('#saved-connect-password')).toBeVisible();
+    await expect(dialog.getByRole('button', {name:'Retry', exact:true})).toBeDisabled();
+    await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label', 'Online');
+    await expect(card.locator('.home-recent-connection')).toHaveText('Disconnected');
+    await dialog.locator('.ant-modal-footer').getByRole('button', {name:'Close', exact:true}).click();
+    await page.evaluate(() => (window as any).fixture.setView('remote'));
+    await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label', 'Online');
+    await expect(page.locator('.device-basic-grid > div').nth(1).locator('strong')).toHaveText('Online');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Disconnected');
+    await page.getByText('Original', {exact:true}).first().click({button:'right'});
+    await page.getByRole('menuitem', {name:'Connect', exact:true}).click();
+    await dialog.locator('#saved-connect-password').fill('correct-device-password');
+    await dialog.getByRole('button', {name:'Retry', exact:true}).click();
+    await expect(dialog).toContainText('Device connected');
+    await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label', 'Online');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
+  });
+
   test(`saved connection allows password correction: ${error}`, async ({page}) => {
     await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?connection-error=${encodeURIComponent(error)}`);
     await page.getByText('Original', {exact:true}).first().click({button:'right'});

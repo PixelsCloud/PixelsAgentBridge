@@ -3,6 +3,7 @@ import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
 import { formatDeviceCode } from "./deviceCode";
 import { Dropdown, type MenuProps } from "antd";
+import { deviceOnline } from "./deviceAvailability";
 
 type Props = {
   language: Language;
@@ -20,8 +21,8 @@ export function RemoteConnectionPanel({
 }: Props) {
   const t = messages[language];
   const sortedDevices = [...devices].sort((first, second) =>
-    Number(devicePresence[second.deviceCode]?.online === true)
-    - Number(devicePresence[first.deviceCode]?.online === true));
+    Number(deviceOnline(second, devicePresence[second.deviceCode]) === true)
+    - Number(deviceOnline(first, devicePresence[first.deviceCode]) === true));
 
   return (
     <section className="surface remote-list">
@@ -31,8 +32,9 @@ export function RemoteConnectionPanel({
         <div className="device-list">
           {sortedDevices.map((device) => {
             const presence = devicePresence[device.deviceCode];
-            const online = presence?.online === true;
-            const status = presence?.online === null || presence === undefined
+            const availability = deviceOnline(device, presence);
+            const online = availability === true;
+            const status = availability === null
               ? t.unknown
               : online ? t.online : t.offline;
             const deviceName = device.alias || presence?.name || t.unnamedDevice;
@@ -56,7 +58,7 @@ export function RemoteConnectionPanel({
                   <small>{deviceName}</small>
                 </span>
                 <span
-                  className={`home-recent-presence ${online ? "online" : presence?.online === false ? "offline" : "unknown"}`}
+                  className={`home-recent-presence ${online ? "online" : availability === false ? "offline" : "unknown"}`}
                   aria-label={status}
                 />
                 <span className={`home-recent-connection ${device.connected ? "connected" : "disconnected"}`}>

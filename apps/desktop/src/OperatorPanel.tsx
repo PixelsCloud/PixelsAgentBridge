@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type SetStateAction } from "react";
 import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -15,6 +15,7 @@ import { formatDeviceCode } from "./deviceCode";
 import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
 import { OsLogo } from "./OsLogo";
 import { SavedConnectionDialog, type SavedConnection } from "./SavedConnectionDialog";
+import { deviceOnline } from "./deviceAvailability";
 
 const ActivityPanel = lazy(() => import("./ActivityPanel").then(({ ActivityPanel }) => ({ default: ActivityPanel })));
 const DeviceHistoryPanel = lazy(() => import("./DeviceHistoryPanel").then(({ DeviceHistoryPanel }) => ({ default: DeviceHistoryPanel })));
@@ -69,12 +70,18 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const [startingTransfer, setStartingTransfer] = useState(false);
   const tasksRef = useRef(tasks);
   const savedConnectionAttemptRef = useRef(0);
+  const connectionRevisionRef = useRef(0);
   const historyRefreshRef = useRef<Promise<void> | null>(null);
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
   const selected = devices.find((device) => device.deviceCode === selectedCode);
   const connectedCodes = devices.filter((device) => device.connected).map((device) => device.deviceCode).join(",");
   const savedCodes = devices.map((device) => device.deviceCode).join(",");
+
+  function updateDeviceConnections(update: SetStateAction<ConnectedDevice[]>) {
+    connectionRevisionRef.current += 1;
+    setDevices(update);
+  }
 
   useEffect(() => {
     if (view !== "remote") return;
@@ -134,13 +141,14 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     const refresh = async () => {
       if (refreshing) return;
       refreshing = true;
+      const revision = connectionRevisionRef.current;
       try {
         const statuses = await invoke<{ deviceCode: string; path: ConnectedDevice["connectionPath"] }[]>(
           "operator_connection_paths",
         );
-        if (closed) return;
+        if (closed || revision !== connectionRevisionRef.current) return;
         const paths = new Map(statuses.map((status) => [status.deviceCode, status.path]));
-        setDevices((current) => current.map((device) => {
+        setDevices((current) => revision !== connectionRevisionRef.current ? current : current.map((device) => {
           if (!paths.has(device.deviceCode)) return device;
           const connectionPath = paths.get(device.deviceCode) ?? null;
           const connected = connectionPath !== null;
@@ -149,8 +157,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
             : { ...device, connected, connectionPath };
         }));
       } catch {
-        if (!closed) {
-          setDevices((current) => current.map((device) =>
+        if (!closed && revision === connectionRevisionRef.current) {
+          setDevices((current) => revision !== connectionRevisionRef.current ? current : current.map((device) =>
             device.connectionPath ? { ...device, connectionPath: null } : device));
         }
       } finally {
@@ -213,7 +221,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     try {
       if (!device.connected) {
         const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
-        setDevices((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
+        updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
       }
       await invoke("desktop_terminal_window", { code: device.deviceCode, mode });
     } catch (cause) {
@@ -255,7 +263,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       const connected = replacementPassword === undefined
         ? await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode })
         : await invoke<ConnectedDevice>("operator_connect", { code: device.deviceCode, password: replacementPassword });
-      setDevices((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
+      updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
       setSelectedCode(connected.deviceCode);
       setAliasDraft(connected.alias);
       setSavedConnection((current) => current?.attempt === attempt
@@ -268,8 +276,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         return;
       }
       if (savedConnectionAttemptRef.current === attempt) {
-        setDevices((current) => current.map((item) => item.deviceId === device.deviceId
-          ? { ...item, connected: false }
+        updateDeviceConnections((current) => current.map((item) => item.deviceId === device.deviceId
+          ? { ...item, connected: false, connectionPath: null }
           : item));
       }
       setSavedConnection((current) => current?.attempt === attempt
@@ -304,8 +312,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     setDisconnectError("");
     try {
       await invoke("operator_disconnect_device", { code: disconnectTarget.deviceCode });
-      setDevices((current) => current.map((device) => device.deviceId === disconnectTarget.deviceId
-        ? { ...device, connected: false }
+      updateDeviceConnections((current) => current.map((device) => device.deviceId === disconnectTarget.deviceId
+        ? { ...device, connected: false, connectionPath: null }
         : device));
       setDisconnectTarget(null);
     } catch (cause) {
@@ -527,7 +535,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         return;
       }
       stopDevice = await listen<{ deviceId: string; phase: string }>("operator-device-connection", (event) => {
-        setDevices((current) => current.map((device) => device.deviceId === event.payload.deviceId ? {
+        updateDeviceConnections((current) => current.map((device) => device.deviceId === event.payload.deviceId ? {
           ...device,
           connected: event.payload.phase === "connected",
           connectionPath: null,
@@ -674,7 +682,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         code: deviceCode,
         password: devicePassword,
       });
-      setDevices((current) => [device, ...current.filter((item) => item.deviceCode !== device.deviceCode)]);
+      updateDeviceConnections((current) => [device, ...current.filter((item) => item.deviceCode !== device.deviceCode)]);
       setSelectedCode(device.deviceCode);
       setCode("");
       setPassword("");
@@ -837,9 +845,10 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
               {devices.slice(0, 6).map((device) => {
                 const presence = devicePresence[device.deviceCode];
                 const deviceName = device.alias || presence?.name || t.unnamedDevice;
-                const status = presence?.online === true
+                const availability = deviceOnline(device, presence);
+                const status = availability === true
                   ? "online"
-                  : presence?.online === false
+                  : availability === false
                     ? "offline"
                     : "unknown";
                 const statusLabel = status === "online"

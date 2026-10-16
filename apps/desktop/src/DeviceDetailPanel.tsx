@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Button, Input, Segmented } from "antd";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
+import { deviceOnline } from "./deviceAvailability";
 
 type DetailTab = "info" | "history" | "command";
 
@@ -25,7 +26,8 @@ export function DeviceDetailPanel({
   const [tab, setTab] = useState<DetailTab>("info");
   const [historyOpened, setHistoryOpened] = useState(false);
   const [commandOpened, setCommandOpened] = useState(false);
-  const online = presence?.online === true ? t.online : presence?.online === false ? t.offline : t.unknown;
+  const availability = deviceOnline(selected, presence);
+  const online = availability === true ? t.online : availability === false ? t.offline : t.unknown;
   const connection = selected?.connected ? t.connected : t.disconnected;
   const path = selected?.connected
     ? selected.connectionPath === "p2p"
