@@ -325,6 +325,7 @@ async fn large_frames_credit_screen_switch_and_legacy_stream_coexist() {
         .await
         .unwrap();
     let session_id = viewer.opened().config.session_id;
+    let old_presentations = viewer.presentation_control();
     let mut old_header = None;
     for index in 1..=DESKTOP_MAX_IN_FLIGHT {
         let frame = viewer.next_frame(WAIT).await.unwrap();
@@ -343,6 +344,7 @@ async fn large_frames_credit_screen_switch_and_legacy_stream_coexist() {
     let fifth = viewer.next_frame(WAIT).await.unwrap();
     assert_eq!(fifth.header.frame_id, 5);
     viewer.select_screen("left".into()).await.unwrap();
+    assert!(old_presentations.report_presented(&old_header).is_err());
     assert_eq!(viewer.opened().config.generation, 2);
     assert_eq!(viewer.opened().config.screen.x, -960);
     assert_eq!(viewer.opened().config.screen.scale_milli, 2000);
@@ -351,6 +353,31 @@ async fn large_frames_credit_screen_switch_and_legacy_stream_coexist() {
     assert!(switched.header.keyframe);
     assert_eq!(switched.bytes, vec![0x55; 512 * 1024 + 13]);
     assert!(viewer.report_presented(&old_header).is_err());
+    assert!(
+        old_presentations
+            .report_presented(&switched.header)
+            .is_err()
+    );
+    let current_presentations = viewer.presentation_control();
+    // Decoder output may arrive independently while the next network frame is
+    // pending; this must neither cancel the read nor grant stale generation credit.
+    let mut last = switched.header.clone();
+    for _ in 1..DESKTOP_MAX_IN_FLIGHT {
+        last = viewer.next_frame(WAIT).await.unwrap().header;
+    }
+    {
+        let reading = viewer.next_frame(WAIT);
+        tokio::pin!(reading);
+        // Keep the same partially pending read alive while decoder output
+        // independently returns credit. Cancelling and restarting it is unsafe.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut reading)
+                .await
+                .is_err()
+        );
+        current_presentations.report_presented(&last).unwrap();
+        assert_eq!(reading.await.unwrap().header.frame_id, 5);
+    }
     assert!(matches!(
         server
             .request(RemoteDesktopRequest::Video {
@@ -365,6 +392,11 @@ async fn large_frames_credit_screen_switch_and_legacy_stream_coexist() {
     ));
     assert_eq!(backend.maximum.load(Ordering::SeqCst), 1);
     viewer.close().await.unwrap();
+    assert!(
+        current_presentations
+            .report_presented(&switched.header)
+            .is_err()
+    );
     viewer.close().await.unwrap();
     eventually(|| backend.active.load(Ordering::SeqCst) == 0).await;
     server.legacy().await;

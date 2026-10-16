@@ -474,26 +474,39 @@ async fn stream(
         let (ready, mut ready_rx) = watch::channel(false);
         // These are independent futures for the entire generation. Mouse/keys
         // and toolbar commands never cancel a partially-read compressed frame.
+        let mut presentations = viewer.presentations();
+        let acknowledgements = session.presentation_control();
         let video = async {
-            loop {
-                let frame = session
-                    .next_frame_when_changed()
-                    .await
-                    .map_err(StreamFailure::from)?;
-                tokio::time::timeout(Duration::from_secs(5), viewer.present(&frame))
-                    .await
-                    .map_err(|_| "native renderer timed out")?
-                    .map_err(|e| e.to_string())?;
-                session
-                    .report_presented(&frame.header)
-                    .map_err(StreamFailure::from)?;
-                if !*ready.borrow() {
-                    first_presented.get_or_insert_with(Instant::now);
-                    ready.send_replace(true);
-                    publish_input(window, owner, supported, false);
+            let submit = async {
+                loop {
+                    let frame = session
+                        .next_frame_when_changed()
+                        .await
+                        .map_err(StreamFailure::from)?;
+                    tokio::time::timeout(Duration::from_secs(5), viewer.submit(&frame))
+                        .await
+                        .map_err(|_| "native decoder submission timed out")?
+                        .map_err(|e| e.to_string())?;
                 }
-            }
-            #[allow(unreachable_code)]
+                #[allow(unreachable_code)]
+                Ok::<(), StreamFailure>(())
+            };
+            let output = async {
+                loop {
+                    let header = presentations.next().await.map_err(|e| e.to_string())?;
+                    acknowledgements
+                        .report_presented(&header)
+                        .map_err(StreamFailure::from)?;
+                    if !*ready.borrow() {
+                        first_presented.get_or_insert_with(Instant::now);
+                        ready.send_replace(true);
+                        publish_input(window, owner, supported, false);
+                    }
+                }
+                #[allow(unreachable_code)]
+                Ok::<(), StreamFailure>(())
+            };
+            tokio::try_join!(submit, output)?;
             Ok::<(), StreamFailure>(())
         };
         let interaction = async {

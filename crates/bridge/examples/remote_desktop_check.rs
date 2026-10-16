@@ -95,23 +95,36 @@ async fn measure(
         let config = session.opened().config.clone();
         let mut viewer =
             NativeViewer::open(&executable, &["--media-worker".into()], &config, false).await?;
-        let mut started = Instant::now();
-        let mut legacy_max_ms = 0.0f64;
-        for index in 0..warmup + measured {
-            let frame = session.next_frame(Duration::from_secs(10)).await?;
-            viewer.present(&frame).await?;
-            session.report_presented(&frame.header)?;
-            if index % u64::from(fps) == 0 {
-                let query = Instant::now();
-                runtime.current_environment(device).await?;
-                legacy_max_ms = legacy_max_ms.max(query.elapsed().as_secs_f64() * 1000.0);
+        let mut presentations = viewer.presentations();
+        let acknowledgements = session.presentation_control();
+        let output = async {
+            loop {
+                let header = presentations.next().await?;
+                acknowledgements.report_presented(&header)?;
+                if header.frame_id == warmup + measured {
+                    return Ok::<(), Error>(());
+                }
             }
-            if index + 1 == warmup {
-                started = Instant::now();
+        };
+        let submit = async {
+            let mut started = Instant::now();
+            let mut legacy_max_ms = 0.0f64;
+            for index in 0..warmup + measured {
+                let frame = session.next_frame(Duration::from_secs(10)).await?;
+                viewer.submit(&frame).await?;
+                if index % u64::from(fps) == 0 {
+                    let query = Instant::now();
+                    runtime.current_environment(device).await?;
+                    legacy_max_ms = legacy_max_ms.max(query.elapsed().as_secs_f64() * 1000.0);
+                }
+                if index + 1 == warmup {
+                    started = Instant::now();
+                }
             }
-        }
-        let display = viewer.finish().await?;
-        let elapsed = started.elapsed();
+            let display = viewer.finish().await?;
+            Ok::<_, Error>((display, started.elapsed(), legacy_max_ms))
+        };
+        let ((display, elapsed, legacy_max_ms), ()) = tokio::try_join!(submit, output)?;
         let confirmed = display["displayed"]
             .as_u64()
             .ok_or("missing display statistics")?;

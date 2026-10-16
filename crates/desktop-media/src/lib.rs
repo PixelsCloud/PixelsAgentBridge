@@ -2,8 +2,10 @@
 //! no native FFI. Only compressed packets cross the private worker pipes.
 mod input;
 mod process;
+mod renderer;
 mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};
+pub use renderer::NativePresentations;
 pub use viewer_input::NativeViewerInput;
 
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments

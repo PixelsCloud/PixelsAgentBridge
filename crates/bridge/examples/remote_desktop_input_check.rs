@@ -75,19 +75,27 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
         false,
     )
     .await?;
-    let first = session.next_frame(Duration::from_secs(10)).await?;
-    viewer.present(&first).await?;
-    session.report_presented(&first.header)?;
-    println!(
-        "{}",
-        serde_json::json!({"ready":true,"screen":session.opened().config.screen})
-    );
+    let screen = session.opened().config.screen.clone();
     let control = session.input_control();
+    let acknowledgements = session.presentation_control();
+    let mut presentations = viewer.presentations();
+    let (ready, mut ready_rx) = tokio::sync::watch::channel(false);
     let video = async {
         loop {
             let frame = session.next_frame_when_changed().await?;
-            viewer.present(&frame).await?;
-            session.report_presented(&frame.header)?;
+            viewer.submit(&frame).await?;
+        }
+        #[allow(unreachable_code)]
+        Ok::<(), Error>(())
+    };
+    let output = async {
+        loop {
+            let header = presentations.next().await?;
+            acknowledgements.report_presented(&header)?;
+            if !*ready.borrow() {
+                println!("{}", serde_json::json!({"ready":true,"screen":screen}));
+                ready.send_replace(true);
+            }
         }
         #[allow(unreachable_code)]
         Ok::<(), Error>(())
@@ -102,7 +110,12 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
             let command: Command =
                 serde_json::from_str(&line).map_err(|_| "invalid input acceptance command")?;
             match command {
-                Command::Enable { enabled } => control.set_enabled(enabled).await?,
+                Command::Enable { enabled } => {
+                    if enabled {
+                        ready_rx.wait_for(|value| *value).await?;
+                    }
+                    control.set_enabled(enabled).await?;
+                }
                 Command::Input { event } => control.send(event).await?,
                 Command::Close => break,
             }
@@ -110,7 +123,7 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
         }
         Ok::<(), Error>(())
     };
-    tokio::select! { result = video => result?, result = inputs => result? }
+    tokio::select! { result = video => result?, result = output => result?, result = inputs => result? }
     session.close().await?;
     runtime.current_environment(device).await?;
     println!("{{\"closed\":true,\"legacy_environment\":true}}");

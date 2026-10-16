@@ -1,7 +1,13 @@
 use crate::{DesktopError, DesktopVideoReader, Result, VideoFrame};
 use pab_protocol::*;
 use pab_transport::{PabBiStream, PabConnection, PabFrameWriter};
-use std::time::Duration;
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 use tokio::sync::{mpsc, oneshot, watch};
 
 struct Command {
@@ -19,9 +25,54 @@ pub struct RemoteDesktopSession {
     video: Option<DesktopVideoReader>,
     video_keepalive: Option<PabFrameWriter>,
     presentations: watch::Sender<Option<(u64, u64)>>,
-    last_received: u64,
+    last_received: Arc<AtomicU64>,
+    presentation_valid: Arc<Mutex<bool>>,
     closed: bool,
     close_confirmed: bool,
+}
+/// Acknowledges only frames received in this generation. Closing or selecting
+/// another screen invalidates existing handles before accepting new output.
+#[derive(Clone)]
+pub struct RemoteDesktopPresentationControl {
+    session: RequestId,
+    generation: u64,
+    received: Arc<AtomicU64>,
+    valid: Arc<Mutex<bool>>,
+    presentations: watch::Sender<Option<(u64, u64)>>,
+}
+impl RemoteDesktopPresentationControl {
+    pub fn report_presented(&self, header: &DesktopFrameHeader) -> Result<()> {
+        let valid = self.valid.lock().unwrap();
+        if !*valid || self.presentations.is_closed() {
+            return Err(DesktopError::Closed);
+        }
+        if header.session_id != self.session
+            || header.generation != self.generation
+            || header.frame_id == 0
+            || header.frame_id > self.received.load(Ordering::Acquire)
+        {
+            return Err(DesktopError::Protocol(
+                "cannot acknowledge an obsolete or unreceived desktop frame",
+            ));
+        }
+        let mut backwards = false;
+        self.presentations.send_if_modified(|latest| {
+            if let Some((generation, frame_id)) = *latest {
+                if generation == header.generation && frame_id >= header.frame_id {
+                    backwards = frame_id > header.frame_id;
+                    return false;
+                }
+            }
+            *latest = Some((header.generation, header.frame_id));
+            true
+        });
+        if backwards {
+            return Err(DesktopError::Protocol(
+                "desktop consumption cannot move backwards",
+            ));
+        }
+        Ok(())
+    }
 }
 async fn stream(
     connection: &PabConnection,
@@ -201,7 +252,8 @@ impl RemoteDesktopSession {
             video: None,
             video_keepalive: None,
             presentations,
-            last_received: 0,
+            last_received: Arc::new(AtomicU64::new(0)),
+            presentation_valid: Arc::new(Mutex::new(true)),
             closed: false,
             close_confirmed: false,
         };
@@ -222,6 +274,17 @@ impl RemoteDesktopSession {
             generation: self.opened.config.generation,
             supported: self.opened.input_supported,
             commands: self.commands.clone(),
+        }
+    }
+    /// Separate generation-bound handle for asynchronous decoder output. It
+    /// can acknowledge rendered frames while another future reads video.
+    pub fn presentation_control(&self) -> RemoteDesktopPresentationControl {
+        RemoteDesktopPresentationControl {
+            session: self.opened.config.session_id,
+            generation: self.opened.config.generation,
+            received: self.last_received.clone(),
+            valid: self.presentation_valid.clone(),
+            presentations: self.presentations.clone(),
         }
     }
     /// Confirms enabling/retiring this generation's input route. It does not
@@ -272,7 +335,8 @@ impl RemoteDesktopSession {
             .ok_or(DesktopError::Closed)?
             .receive(timeout)
             .await?;
-        self.last_received = frame.header.frame_id;
+        self.last_received
+            .store(frame.header.frame_id, Ordering::Release);
         Ok(frame)
     }
     /// Product viewers use this for static desktops. Control heartbeat failure
@@ -286,7 +350,8 @@ impl RemoteDesktopSession {
             frame = reader.receive_after_idle(self.timeout) => frame?,
             _ = &mut self.worker => return Err(DesktopError::Closed),
         };
-        self.last_received = frame.header.frame_id;
+        self.last_received
+            .store(frame.header.frame_id, Ordering::Release);
         Ok(frame)
     }
     /// Queue cumulative decode/display consumption without blocking the render
@@ -294,43 +359,17 @@ impl RemoteDesktopSession {
     /// This confirms local queuing, not remote delivery. Video credit is granted
     /// only after the server processes the acknowledgment.
     pub fn report_presented(&self, header: &DesktopFrameHeader) -> Result<()> {
-        if self.closed || self.worker.is_finished() {
-            return Err(DesktopError::Closed);
-        }
-        if header.session_id != self.opened.config.session_id
-            || header.generation != self.opened.config.generation
-            || header.frame_id == 0
-            || header.frame_id > self.last_received
-        {
-            return Err(DesktopError::Protocol(
-                "cannot acknowledge an obsolete or unreceived desktop frame",
-            ));
-        }
-        let mut backwards = false;
-        self.presentations.send_if_modified(|latest| {
-            if let Some((generation, frame_id)) = *latest {
-                if generation == header.generation && frame_id >= header.frame_id {
-                    backwards = frame_id > header.frame_id;
-                    return false;
-                }
-            }
-            *latest = Some((header.generation, header.frame_id));
-            true
-        });
-        if backwards {
-            return Err(DesktopError::Protocol(
-                "desktop consumption cannot move backwards",
-            ));
-        }
-        Ok(())
+        self.presentation_control().report_presented(header)
     }
     /// Same screen ID explicitly restarts a stalled video stream. A cancelled
     /// switch leaves video absent; there is no automatic replay or stale reuse.
     pub async fn select_screen(&mut self, screen_id: String) -> Result<()> {
         validate_desktop_screen_id(&screen_id).map_err(DesktopError::Protocol)?;
         let previous = self.opened.config.clone();
+        *self.presentation_valid.lock().unwrap() = false;
         self.presentations.send_replace(None);
-        self.last_received = 0;
+        self.last_received = Arc::new(AtomicU64::new(0));
+        self.presentation_valid = Arc::new(Mutex::new(true));
         self.video = None;
         self.video_keepalive = None;
         let opened = match self
@@ -359,6 +398,7 @@ impl RemoteDesktopSession {
             return Ok(());
         }
         self.closed = true;
+        *self.presentation_valid.lock().unwrap() = false;
         self.video = None;
         self.video_keepalive = None;
         self.worker.abort();
@@ -374,6 +414,7 @@ impl RemoteDesktopSession {
 }
 impl Drop for RemoteDesktopSession {
     fn drop(&mut self) {
+        *self.presentation_valid.lock().unwrap() = false;
         self.worker.abort();
         if !self.close_confirmed {
             drop(OpenCleanup {

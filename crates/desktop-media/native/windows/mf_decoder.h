@@ -123,7 +123,7 @@ public:
             decoder_->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, 0);
         }
     }
-    void submit(const std::vector<uint8_t>& packet, LONGLONG timestamp) {
+    bool try_submit(const std::vector<uint8_t>& packet, LONGLONG timestamp) {
         if (packet.empty() || packet.size() > 16 * 1024 * 1024)
             throw std::runtime_error("Invalid compressed frame size");
         ComPtr<IMFSample> sample;
@@ -138,7 +138,13 @@ public:
         check(sample->AddBuffer(buffer.Get()), "Add compressed buffer");
         check(sample->SetSampleTime(timestamp), "Set sample time");
         check(sample->SetSampleDuration(duration_), "Set sample duration");
-        check(decoder_->ProcessInput(0, sample.Get(), 0), "Decode ProcessInput");
+        const auto result = decoder_->ProcessInput(0, sample.Get(), 0);
+        if (result == MF_E_NOTACCEPTING) return false;
+        check(result, "Decode ProcessInput");
+        return true;
+    }
+    void submit(const std::vector<uint8_t>& packet, LONGLONG timestamp) {
+        if (!try_submit(packet, timestamp)) throw std::runtime_error("Decoder requires output before input");
     }
     void receive(const std::function<void(DecodedFrame&)>& consume) {
         // Bound even a faulty transform's format-change/output loop.

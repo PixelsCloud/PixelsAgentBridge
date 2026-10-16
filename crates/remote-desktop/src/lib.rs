@@ -9,7 +9,9 @@ pub use host::{
     MediaFrame, MediaFuture,
 };
 mod client;
-pub use client::{RemoteDesktopInputControl, RemoteDesktopSession};
+pub use client::{
+    RemoteDesktopInputControl, RemoteDesktopPresentationControl, RemoteDesktopSession,
+};
 
 use pab_protocol::DesktopErrorCode;
 #[derive(Debug, thiserror::Error)]

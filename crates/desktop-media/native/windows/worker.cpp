@@ -11,14 +11,15 @@
 static constexpr uint32_t magic = 0x31424150; // PAB1, little endian local IPC
 static constexpr uint32_t max_packet = 16 * 1024 * 1024;
 
-static void read_bytes(void* data, uint32_t size, NativePresenter* viewer = nullptr) {
+static void read_bytes(void* data, uint32_t size, NativePresenter* viewer = nullptr,
+    const std::function<void()>& idle = {}) {
     auto* cursor = static_cast<uint8_t*>(data);
     while (size) {
         if (viewer) viewer->pump();
         DWORD available = 0;
         if (!PeekNamedPipe(GetStdHandle(STD_INPUT_HANDLE), nullptr, 0, nullptr, &available, nullptr))
             throw std::runtime_error("Parent pipe ended");
-        if (!available) { Sleep(2); continue; }
+        if (!available) { if (idle) idle(); Sleep(2); continue; }
         DWORD read = 0;
         if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), cursor, (std::min)(size, static_cast<uint32_t>(available)), &read, nullptr) || !read)
             throw std::runtime_error("Parent pipe read failed");
@@ -34,8 +35,9 @@ static void write_bytes(const void* data, uint32_t size) {
         cursor += written; size -= written;
     }
 }
-template<class T> static T read_value(NativePresenter* viewer = nullptr) {
-    T value{}; read_bytes(&value, sizeof(value), viewer); return value;
+template<class T> static T read_value(NativePresenter* viewer = nullptr,
+    const std::function<void()>& idle = {}) {
+    T value{}; read_bytes(&value, sizeof(value), viewer, idle); return value;
 }
 template<class T> static void write_value(T value) { write_bytes(&value, sizeof(value)); }
 static unsigned number(const char* value, unsigned maximum) {
@@ -173,7 +175,61 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         next = (std::max)(next + std::chrono::microseconds(1000000/fps), Clock::now());
     }
 }
-static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive) {
+static void render_stream(HardwareDecoder& decoder, NativePresenter& presenter, unsigned fps, bool interactive) {
+    write_value(uint32_t(2)); // Version of the private event protocol, not network framing.
+    uint64_t expected = 0;
+    std::deque<std::pair<LONGLONG, uint64_t>> pending;
+    auto last_output = Clock::now();
+    const auto consume = [&](DecodedFrame& frame) {
+        if (pending.empty() || pending.front().first != frame.timestamp)
+            throw std::runtime_error("Decoder reordered or invented a timestamp");
+        const auto index = pending.front().second;
+        presenter.render(frame, index);
+        pending.pop_front(); last_output = Clock::now();
+        write_value(uint8_t(2)); write_value(index);
+    };
+    const auto drain_ready = [&] {
+        if (pending.empty()) return;
+        decoder.receive(consume);
+        if (!pending.empty() && Clock::now() - last_output > std::chrono::seconds(5))
+            throw std::runtime_error("Decoder output exceeded bounded latency");
+    };
+    while (true) {
+        const auto size = read_value<uint32_t>(&presenter, drain_ready);
+        if (interactive && size == UINT32_MAX) {
+            const auto enabled = read_value<uint8_t>(&presenter, drain_ready);
+            if (enabled > 1) throw std::runtime_error("Invalid viewer input mode");
+            presenter.input_enabled(enabled != 0); continue;
+        }
+        if (!size) {
+            decoder.drain(consume);
+            if (!pending.empty()) throw std::runtime_error("Decoder did not drain all submitted frames");
+            presenter.finish();
+            write_value(uint8_t(3));
+            write_value(presenter.displayed); write_value(presenter.pixel_checks); write_value(presenter.max_color_error);
+            return;
+        }
+        if (size > max_packet) throw std::runtime_error("Render packet too large");
+        const auto index = read_value<uint64_t>(&presenter, drain_ready);
+        if (index != expected) throw std::runtime_error("Render frame sequence mismatch");
+        std::vector<uint8_t> packet(size); read_bytes(packet.data(), size, &presenter, drain_ready);
+        const LONGLONG timestamp = static_cast<LONGLONG>(index) * 10000000 / fps;
+        const auto deadline = Clock::now() + std::chrono::seconds(2);
+        while (!decoder.try_submit(packet, timestamp)) {
+            drain_ready(); presenter.pump();
+            if (Clock::now() >= deadline) throw std::runtime_error("Decoder backpressure timed out");
+            Sleep(1);
+        }
+        if (pending.empty()) last_output = Clock::now();
+        pending.emplace_back(timestamp, index);
+        // Acceptance permits another compressed packet, but gives no network
+        // credit and never enables input. Only event 2 confirms rendered output.
+        write_value(uint8_t(1)); write_value(index); ++expected;
+        drain_ready();
+        if (pending.size() > 4) throw std::runtime_error("Decoder exceeds the four-frame latency budget");
+    }
+}
+static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive, bool streaming) {
     MediaRuntime runtime;
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
@@ -184,6 +240,7 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
     presenter.input_available(interactive);
     presenter.initialize(device.Get(), width, height, fps, display.screen.DesktopCoordinates, true, verify, parent, rotation);
     write_value(magic);
+    if (streaming) { render_stream(decoder, presenter, fps, interactive); return; }
     uint64_t expected = 0;
     while (true) {
         const auto size = read_value<uint32_t>(&presenter);
@@ -261,7 +318,8 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         }
         if (argc >= 6 && argc <= 8 && std::string(argv[1]) == "render" && !found.empty()) {
             const std::string mode(argv[5]);
-            if (mode != "verify" && mode != "normal" && mode != "interactive") throw std::runtime_error("Invalid render mode");
+            const bool streaming = mode == "stream" || mode == "stream-verify" || mode == "stream-interactive";
+            if (!streaming && mode != "verify" && mode != "normal" && mode != "interactive") throw std::runtime_error("Invalid render mode");
             const auto width = number(argv[2],8192), height = number(argv[3],8192);
             if (uint64_t(width)*height > 33554432) throw std::runtime_error("Render dimensions too large");
             HWND parent = nullptr;
@@ -278,7 +336,8 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 else if (angle == "270") rotation = 3;
                 else if (angle != "0") throw std::runtime_error("Invalid rotation");
             }
-            render(found.front(),width,height,number(argv[4],60),mode == "verify", parent, rotation, mode == "interactive"); return 0;
+            render(found.front(),width,height,number(argv[4],60),mode == "verify" || mode == "stream-verify", parent, rotation,
+                mode == "interactive" || mode == "stream-interactive", streaming); return 0;
         }
         throw std::runtime_error("usage: stream-media inventory | capture SCREEN_ID FPS synthetic|desktop|animate | render WIDTH HEIGHT FPS normal|verify");
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }

@@ -21,7 +21,7 @@ pub(crate) fn media_error(error: impl std::fmt::Display) -> DesktopError {
 pub struct MediaChild {
     child: Option<Child>,
     input: Arc<Mutex<ChildStdin>>,
-    output: ChildStdout,
+    output: Option<ChildStdout>,
     events: Option<ChildStderr>,
     permit: Option<OwnedMutexGuard<()>>,
 }
@@ -34,7 +34,9 @@ impl MediaChild {
     ) -> std::io::Result<Self> {
         let mut command = Command::new(path);
         let interactive = args.first().is_some_and(|s| s == "render")
-            && args.get(4).is_some_and(|s| s == "interactive");
+            && args
+                .get(4)
+                .is_some_and(|s| s == "interactive" || s == "stream-interactive");
         command
             .args(prefix)
             .args(args)
@@ -51,14 +53,14 @@ impl MediaChild {
         let mut child = command.spawn()?;
         Ok(Self {
             input: Arc::new(Mutex::new(child.stdin.take().unwrap())),
-            output: child.stdout.take().unwrap(),
+            output: child.stdout.take(),
             events: child.stderr.take(),
             child: Some(child),
             permit,
         })
     }
     async fn ready(&mut self) -> std::io::Result<()> {
-        if self.output.read_u32_le().await? != MAGIC {
+        if self.output.as_mut().unwrap().read_u32_le().await? != MAGIC {
             return Err(std::io::Error::other("media IPC version mismatch"));
         }
         Ok(())
@@ -121,21 +123,26 @@ impl DesktopSource for NativeSource {
         Box::pin(async {
             let operation = async {
                 self.process.input.lock().await.write_u8(1).await?;
-                let size = self.process.output.read_u32_le().await? as usize;
+                let size = self.process.output.as_mut().unwrap().read_u32_le().await? as usize;
                 if size == 0 || size > DESKTOP_MAX_FRAME_BYTES {
                     return Err(std::io::Error::other("invalid media length"));
                 }
-                let index = self.process.output.read_u64_le().await?;
+                let index = self.process.output.as_mut().unwrap().read_u64_le().await?;
                 if index != self.index {
                     return Err(std::io::Error::other("media sequence mismatch"));
                 }
-                let capture_time_us = self.process.output.read_u64_le().await?;
-                let key = self.process.output.read_u32_le().await?;
+                let capture_time_us = self.process.output.as_mut().unwrap().read_u64_le().await?;
+                let key = self.process.output.as_mut().unwrap().read_u32_le().await?;
                 if key > 1 || (index == 0 && key == 0) {
                     return Err(std::io::Error::other("media keyframe mismatch"));
                 }
                 let mut bytes = vec![0; size];
-                self.process.output.read_exact(&mut bytes).await?;
+                self.process
+                    .output
+                    .as_mut()
+                    .unwrap()
+                    .read_exact(&mut bytes)
+                    .await?;
                 self.index += 1;
                 Ok(MediaFrame {
                     bytes,
@@ -175,7 +182,10 @@ impl DesktopBackend for NativeBackend {
                 MediaChild::spawn(&self.executable, &self.prefix, &["inventory".into()], None)
                     .map_err(media_error)?;
             let mut bytes = Vec::new();
-            (&mut process.output)
+            process
+                .output
+                .as_mut()
+                .unwrap()
                 .take((DESKTOP_CONTROL_BYTES + 1) as u64)
                 .read_to_end(&mut bytes)
                 .await
@@ -217,8 +227,20 @@ impl DesktopBackend for NativeBackend {
             )
             .map_err(media_error)?;
             process.ready().await.map_err(media_error)?;
-            let width = process.output.read_u32_le().await.map_err(media_error)?;
-            let height = process.output.read_u32_le().await.map_err(media_error)?;
+            let width = process
+                .output
+                .as_mut()
+                .unwrap()
+                .read_u32_le()
+                .await
+                .map_err(media_error)?;
+            let height = process
+                .output
+                .as_mut()
+                .unwrap()
+                .read_u32_le()
+                .await
+                .map_err(media_error)?;
             if (width, height) != (config.screen.pixel_width, config.screen.pixel_height) {
                 return Err(media_error("screen changed during source startup"));
             }
@@ -230,6 +252,7 @@ pub struct NativeViewer {
     process: MediaChild,
     config: DesktopVideoConfig,
     next_frame: u64,
+    renderer: crate::renderer::Renderer,
 }
 impl NativeViewer {
     pub async fn open(
@@ -278,11 +301,11 @@ impl NativeViewer {
             config.screen.pixel_height.to_string(),
             config.fps.to_string(),
             if interactive {
-                "interactive"
+                "stream-interactive"
             } else if verify {
-                "verify"
+                "stream-verify"
             } else {
-                "normal"
+                "stream"
             }
             .into(),
         ];
@@ -298,29 +321,35 @@ impl NativeViewer {
         );
         let mut process = MediaChild::spawn(path, prefix, &arguments, None)?;
         process.ready().await?;
+        if process.output.as_mut().unwrap().read_u32_le().await? != 2 {
+            return Err("native renderer protocol mismatch".into());
+        }
+        let renderer = crate::renderer::Renderer::start(process.output.take().unwrap());
         Ok(Self {
             process,
             config: config.clone(),
             next_frame: 1,
+            renderer,
         })
     }
-    /// Confirm bounded decoder/render submission. Actual displayed frames are
-    /// reported separately by finish(), after native presentation statistics.
-    pub async fn present(&mut self, frame: &VideoFrame) -> std::result::Result<(), AnyError> {
+    pub fn presentations(&self) -> crate::renderer::NativePresentations {
+        self.renderer.presentations()
+    }
+    /// Submit compressed data with bounded decoder backpressure. Rendering is
+    /// reported independently by presentations(); consumption is never a video ACK.
+    pub async fn submit(&mut self, frame: &VideoFrame) -> std::result::Result<(), AnyError> {
         frame.header.validate(&self.config, self.next_frame)?;
         if frame.bytes.len() != frame.header.payload_bytes as usize {
             return Err("native frame payload length mismatch".into());
         }
+        self.renderer.enqueue(frame.header.clone()).await?;
         {
             let mut input = self.process.input.lock().await;
             input.write_u32_le(frame.bytes.len().try_into()?).await?;
             input.write_u64_le(frame.header.frame_id - 1).await?;
             input.write_all(&frame.bytes).await?;
         }
-        let consumed = self.process.output.read_u64_le().await?;
-        if consumed != frame.header.frame_id - 1 {
-            return Err("native renderer consumption mismatch".into());
-        }
+        self.renderer.consumed(frame.header.frame_id).await?;
         self.next_frame = self
             .next_frame
             .checked_add(1)
@@ -329,14 +358,12 @@ impl NativeViewer {
     }
     pub async fn finish(mut self) -> std::result::Result<serde_json::Value, AnyError> {
         self.process.input.lock().await.write_u32_le(0).await?;
-        let displayed = self.process.output.read_u64_le().await?;
-        let pixel_checks = self.process.output.read_u64_le().await?;
-        let max_rgb_error = self.process.output.read_u32_le().await?;
+        let summary =
+            tokio::time::timeout(std::time::Duration::from_secs(5), self.renderer.summary())
+                .await??;
         if !self.process.child.as_mut().unwrap().wait().await?.success() {
             return Err("native viewer failed on shutdown".into());
         }
-        Ok(
-            serde_json::json!({"displayed":displayed,"test_pixel_checks":pixel_checks,"test_max_rgb_error":max_rgb_error}),
-        )
+        Ok(summary)
     }
 }

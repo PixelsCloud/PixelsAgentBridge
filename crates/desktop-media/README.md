@@ -28,14 +28,31 @@ Presentation statistics are observed asynchronously, with at most three pending
 IDs; only specifically observed IDs count. A render acknowledgment confirms
 consumption/submission, not physical display. `finish()` drains statistics.
 
+The production render pipe uses version 2 events: decoder acceptance and
+decoded/rendered consumption are separate. `NativeViewer::submit()` waits for
+acceptance; `presentations()` independently wakes the session's generation-bound
+acknowledgment handle, even while a video read is pending. At most four packet
+headers wait for output. Acceptance alone cannot grant network credit or mark
+the first frame ready. A screen change or close invalidates old acknowledgment
+handles. The Windows system MFT may return NEED_MORE_INPUT or NOTACCEPTING;
+the worker drains available output and bounds stalls instead of demanding one
+immediate output for each input. This is not an event-driven asynchronous MFT
+implementation; hardware MFT event negotiation remains future work.
+
+`cargo run -p pab-desktop-media --example native_stream_check -- WORKER synthetic 15`
+explicitly tests the production adapter on the primary screen. `animate` uses
+real desktop duplication of a temporary animation; neither mode saves video.
+The report uses actual screen dimensions and DXGI-confirmed display counts.
+
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
-NVIDIA capture only, synchronous low-latency decoder output, SDR BT.709,
+NVIDIA capture only, system D3D11 MFT decoding, SDR BT.709,
 no cursor channel yet, no native macOS/Linux backend. Windows native keyboard,
 mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
 capture and multi-monitor hotplug still require hardware acceptance.
-Windows secure-desktop routing passed stepwise lock/login acceptance on 90;
-continuous recovery in the product viewer still needs end-to-end acceptance.
+Windows secure-desktop routing and continuous recovery in the product viewer
+passed lock/login acceptance on 90, including the streaming output adapter;
+see the 2026-10-17 lock/login and decoder-output acceptance records.
 The synthetic/animate modes are explicit developer diagnostics; the product
 `NativeBackend` always starts ordinary desktop capture.
 
