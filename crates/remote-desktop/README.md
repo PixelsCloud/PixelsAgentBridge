@@ -1,0 +1,82 @@
+# Remote desktop reliable sessions
+
+This crate implements the transport/session portion of P2. Native capture,
+encoding, decoding, presentation and input are separate adapters. The current
+tests use deterministic bytes; they do not demonstrate network video playback.
+
+## Integration
+
+`AuthenticatedDeviceConnection::open_remote_desktop` probes the additive
+`remote_desktop_schema_version` capability before opening streams over the
+existing authenticated `PabConnection`. There is no second credential exchange.
+Old peers and executors without a registered backend remain unsupported.
+
+Register a `DesktopBackend` using
+`DeviceSessionAcceptor::with_remote_desktop_backend` after configuring its task
+service. Register once before accepting connections: each connection gets its
+own identity but shares the device's single-viewer slot. Do not construct a new
+host per connection. The normal session handler supplies the authenticated
+operator/account and owns the cleanup guard.
+
+The viewer calls `next_frame`, decodes frames in sequence, and calls
+`report_presented` after consumption/display. Presentation reports are cumulative
+and coalesced asynchronously; the render loop does not await one network RTT per
+frame. A successful call confirms local queuing, not delivery to the executor.
+At most four frames can be outstanding. Encoded reference frames are never
+discarded arbitrarily to recover latency.
+
+## Wire and lifetime
+
+- Open/close requests use ordinary task streams. Control and video each use a
+  separate reliable bidirectional stream. The reverse video direction stays
+  open as a lifetime signal and carries no application data.
+- JSON carries bounded metadata only. Each encoded frame has a validated header
+  followed by ordered binary chunks of at most 64 KiB, using the existing frame
+  transport. A frame is at most 16 MiB; the old 256 KiB transport limit is unchanged.
+- Session ID, generation and exact frame sequence are checked before allocation.
+  Each generation starts with a keyframe; the media provider must supply Annex B
+  H.264 with the SPS/PPS and IDR needed to initialize a decoder. Framing validation
+  does not parse or validate the H.264 bitstream itself.
+- `select_screen` stops the old source before publishing a new generation and
+  attaching its video stream. Selecting the same ID restarts a stalled stream.
+  Layout includes stable screen ID, negative origins, native coordinate size,
+  pixel size, DPI scale and rotation. Input mapping is not implemented here yet.
+- A partial frame read/write that times out or is cancelled permanently consumes
+  that stream handle. The next call fails rather than parsing leftover payload
+  as another header. Recover with a new generation or a new viewer.
+- Heartbeat is 5 seconds and abandonment lease is 15 seconds. Control loss,
+  connection loss, verified account change and explicit close release the viewer.
+  A closing slot remains occupied until the active source has been dropped.
+  Cleanup from an old session cannot remove a replacement session.
+- Dropping a client only ends its desktop streams. The shared connection and
+  existing task, terminal and transfer streams remain owned by their callers.
+
+## Native adapter contract
+
+`screens` must report the current desktop layout. `start` is called only after
+the video stream is attached, once per generation. `DesktopSource::next_frame`
+must be cancellation-safe: dropping the source or its pending operation must
+stop/release capture and encoding resources. Any native worker queue must be
+bounded; transport backpressure does not bound an adapter's private queue.
+
+The adapter owns frame pacing, capture timestamps, codec/color compatibility and
+encoder resource lifetime. GPU textures should pass directly to compatible
+hardware encoders. This crate carries compressed bytes, not raw pixel textures.
+Do not log/archive frame payloads. No application configuration is introduced.
+
+## Verification
+
+Run compilation sequentially, with no other build active and at most 10 total
+build jobs (including native builds):
+
+```text
+cargo test -p pab-protocol -p pab-remote-desktop -j 8 -- --test-threads=2
+cargo test -p pab-executor -p pab-bridge remote_desktop -j 8 -- --test-threads=2
+```
+
+Real local QUIC fixtures cover large-frame chunking, stalled-consumer backpressure,
+concurrent legacy requests, generation replacement, atomic single ownership,
+connection loss, cancellation and malformed headers. Executor/Bridge tests cover
+capability compatibility and task dispatch. Native network video, forced Relay,
+bandwidth/latency adaptation, screen input and login desktops still require their
+own integration and machine acceptance runs.

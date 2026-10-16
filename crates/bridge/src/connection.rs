@@ -24,10 +24,12 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::{BridgeConfig, BridgeConfigError};
 
 mod desktop_terminal;
+mod remote_desktop;
 #[cfg(test)]
 mod desktop_terminal_tests;
 mod directory;
 pub use desktop_terminal::DesktopTerminalSession;
+pub use pab_remote_desktop::RemoteDesktopSession;
 mod document;
 mod file_transfer;
 mod filesystem;
@@ -670,6 +672,8 @@ fn read_file(path: &std::path::Path, kind: &'static str) -> Result<Vec<u8>, Brid
 
 #[derive(Debug, Error)]
 pub enum BridgeError {
+    #[error(transparent)]
+    RemoteDesktop(#[from] pab_remote_desktop::DesktopError),
     #[error(
         "target Executor does not support the requested command options; env/stdin/timeout require v2 and user execution requires v3; upgrade the target"
     )]

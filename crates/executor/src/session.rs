@@ -129,6 +129,21 @@ impl DeviceSessionAcceptor {
         self
     }
 
+    /// Register native capture only after its platform helper is available.
+    /// This adds media capability to the existing authenticated session handler.
+    pub fn with_remote_desktop_backend(
+        mut self,
+        backend: Arc<dyn pab_remote_desktop::DesktopBackend>,
+    ) -> Result<Self, DeviceSessionError> {
+        let tasks = self.tasks.take().ok_or_else(|| {
+            DeviceSessionError::TaskService(
+                "configure the task service before the remote desktop backend".into(),
+            )
+        })?;
+        self.tasks = Some(tasks.with_remote_desktop_backend(backend));
+        Ok(self)
+    }
+
     pub async fn handle(&self, connection: PabConnection) -> Result<(), DeviceSessionError> {
         let credential = DeviceCredential::read(&self.credential_path).await?;
         authenticate(
@@ -240,6 +255,7 @@ async fn authenticate(
         let tasks = tasks.for_ui_connection();
         let _terminals = tasks.terminal_connection_guard();
         let _desktop_terminals = tasks.desktop_terminal_connection_guard();
+        let _remote_desktop = tasks.remote_desktop_connection_guard();
         let mut recheck = tokio::time::interval(AUTHORIZATION_RECHECK_INTERVAL);
         recheck.set_missed_tick_behavior(MissedTickBehavior::Delay);
         recheck.tick().await;
@@ -249,6 +265,7 @@ async fn authenticate(
                     let current_authorization = authorizer.report_authenticated(peer_endpoint_key).await;
                     if let Ok(current) = &current_authorization {
                         tasks.recheck_desktop_terminal_account(current.user_context.user.as_ref().map(|u| u.user_id));
+                        tasks.recheck_remote_desktop_account(current.user_context.user.as_ref().map(|u| u.user_id));
                     }
                     let still_authorized = matches!(
                         current_authorization,

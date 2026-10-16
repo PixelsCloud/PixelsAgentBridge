@@ -11,6 +11,7 @@ pub use config::{BridgeConfig, BridgeConfigError, BridgeIdentity, GuestConfigErr
 pub use connection::{
     AuthenticatedDeviceConnection, BridgeClient, BridgeConnector, BridgeError,
     DesktopTerminalSession, FileSystemResult, Screenshot, TaskSubscription, TransferControl,
+    RemoteDesktopSession,
 };
 pub use pab_transport::ConnectionPath;
 pub use runtime::{

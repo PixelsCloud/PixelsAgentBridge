@@ -13,6 +13,7 @@ members = [
     "crates/desktop-control",
     "crates/document",
     "crates/protocol",
+    "crates/remote-desktop",
     "crates/relay",
     "crates/server",
     "crates/service-config",

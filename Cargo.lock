@@ -4775,6 +4775,7 @@ dependencies = [
  "pab-agent-core",
  "pab-logging",
  "pab-protocol",
+ "pab-remote-desktop",
  "pab-screenshot",
  "pab-service-config",
  "pab-transport",
@@ -4868,6 +4869,7 @@ dependencies = [
  "pab-os-system-log",
  "pab-platform",
  "pab-protocol",
+ "pab-remote-desktop",
  "pab-screenshot",
  "pab-service-config",
  "pab-system-log-store",
@@ -5025,6 +5027,19 @@ dependencies = [
  "tracing",
  "uuid",
  "webpki-roots 1.0.9",
+]
+
+[[package]]
+name = "pab-remote-desktop"
+version = "0.1.0"
+dependencies = [
+ "iroh-base",
+ "pab-protocol",
+ "pab-transport",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]

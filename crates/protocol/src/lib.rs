@@ -30,6 +30,8 @@ mod peer;
 mod platform;
 pub use execution_identity::*;
 mod desktop_terminal;
+mod remote_desktop;
+pub use remote_desktop::*;
 mod file_transfer;
 mod relay_cluster;
 mod relay_control;

@@ -1,0 +1,79 @@
+{
+  "started_at": "2026-10-16T10:19:07.036489+00:00",
+  "tests": [
+    {
+      "binary": "pab_protocol",
+      "filter": "",
+      "exit_code": 0,
+      "summary": [
+        "ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "binary": "target_context",
+      "filter": "",
+      "exit_code": 0,
+      "summary": [
+        "ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "binary": "pab_remote_desktop",
+      "filter": "",
+      "exit_code": 0,
+      "summary": [
+        "ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "binary": "reliable_sessions",
+      "filter": "",
+      "exit_code": 0,
+      "summary": [
+        "ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s"
+      ]
+    },
+    {
+      "binary": "pab_bridge",
+      "filter": "connection::",
+      "exit_code": 0,
+      "summary": [
+        "ok. 19 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 12.88s"
+      ]
+    },
+    {
+      "binary": "pab_executor",
+      "filter": "remote_desktop",
+      "exit_code": 0,
+      "summary": [
+        "ok. 2 passed; 0 failed; 0 ignored; 0 measured; 198 filtered out; finished in 0.25s"
+      ]
+    },
+    {
+      "binary": "pab_executor",
+      "filter": "task_service::desktop_terminal::tests",
+      "exit_code": 0,
+      "summary": [
+        "ok. 3 passed; 0 failed; 4 ignored; 0 measured; 193 filtered out; finished in 0.23s"
+      ]
+    },
+    {
+      "binary": "pab_executor",
+      "filter": "task_service::terminal::tests",
+      "exit_code": 0,
+      "summary": [
+        "ok. 4 passed; 0 failed; 1 ignored; 0 measured; 195 filtered out; finished in 0.98s"
+      ]
+    },
+    {
+      "binary": "pab_executor",
+      "filter": "task_service::transfer_tests",
+      "exit_code": 0,
+      "summary": [
+        "ok. 5 passed; 0 failed; 0 ignored; 0 measured; 195 filtered out; finished in 6.76s"
+      ]
+    }
+  ],
+  "passed": true,
+  "finished_at": "2026-10-16T10:21:47.186885+00:00"
+}

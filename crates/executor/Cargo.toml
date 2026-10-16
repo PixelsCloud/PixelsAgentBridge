@@ -24,6 +24,7 @@ pab-os-control = { path = "../os-control" }
 pab-os-system-log = { path = "../os-system-log" }
 pab-system-log-store = { path = "../system-log-store" }
 pab-protocol = { path = "../protocol" }
+pab-remote-desktop = { path = "../remote-desktop" }
 pab-screenshot = { path = "../screenshot" }
 pab-task-runtime = { path = "../task-runtime" }
 pab-terminal = { path = "../terminal" }
