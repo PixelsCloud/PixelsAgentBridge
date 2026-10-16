@@ -2,6 +2,7 @@
 // transport, authentication, session authority or application settings here.
 #include "capture.h"
 #include "input.h"
+#include "render.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
@@ -9,6 +10,13 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
     pw_init(nullptr, nullptr);
     int status = 1;
     try {
+        if (argc == 8 && std::string(argv[1]) == "render") {
+            if (std::string(argv[6]) != "0") throw std::runtime_error("Linux worker does not accept a foreign window handle");
+            const std::string angle = argv[7];
+            unsigned rotation = angle == "0" ? 0 : angle == "90" ? 1 : angle == "180" ? 2 : angle == "270" ? 3 : 4;
+            pab_linux::render(pab_linux::number(argv[2],8192),pab_linux::number(argv[3],8192),pab_linux::number(argv[4],60),argv[5],rotation);
+            pw_deinit(); return 0;
+        }
         // Input state belongs to compositor-owned per-client devices. Reaping
         // the prior process closes its D-Bus peer; there is no global key journal.
         if (argc == 2 && std::string(argv[1]) == "recover-input") { pw_deinit(); return 0; }

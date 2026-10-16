@@ -116,7 +116,7 @@ def main():
         f'Package: pixels-agent-bridge\nVersion: {args.version}\nArchitecture: amd64\n'
         'Maintainer: Pixels <support@rgaa.vip>\nSection: net\nPriority: optional\n'
         'Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libgtk-3-0, libwebkit2gtk-4.1-0, '
-        'libayatana-appindicator3-1, libxdo3, libpipewire-0.3-0, libgbm1, libegl1, '
+        'libayatana-appindicator3-1, libxdo3, libpipewire-0.3-0, libepoxy0, libgbm1, libegl1, '
         'libwayland-client0, libwayland-server0, libxcb1, systemd, util-linux, bash\n'
         'Description: Pixels Agent Bridge desktop and device service\n'
         ' Native graphical client, remote terminal, MCP and offline document tools.\n', encoding='utf-8')

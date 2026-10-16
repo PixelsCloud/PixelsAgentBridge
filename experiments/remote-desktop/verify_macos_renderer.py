@@ -91,7 +91,7 @@ def capture(worker, folder, prefix):
         print(json.dumps({"fixture": destination.name, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}), flush=True)
 
 
-def render(worker, folder, source, rotation, verify, decoder, lifecycle=False):
+def render(worker, folder, source, rotation, verify, decoder, lifecycle=False, redraw_only=False):
     width, height, fps, packets = fixture(folder / f"{source}.pabvideo")
     mode = "stream-verify" if verify else "stream"
     if decoder == "software":
@@ -99,7 +99,7 @@ def render(worker, folder, source, rotation, verify, decoder, lifecycle=False):
     elif decoder == "failure":
         mode += "-fail-decoder"
     if lifecycle:
-        mode += "-lifecycle"
+        mode += "-redraw" if redraw_only else "-lifecycle"
         packets = packets[:1]
     process, timer = spawn(worker, ["render", str(width), str(height), str(fps), mode, "0", str(rotation)])
     state = {"consumed": 0, "presented": 0}
@@ -187,8 +187,11 @@ def render(worker, folder, source, rotation, verify, decoder, lifecycle=False):
         report["stderr"] = process.stderr.read().decode(errors="replace")
     if decoder == "failure" and "Diagnostic initial decoder failure" not in report["stderr"]:
         report.update(passed=False, error="Injection did not follow a successful hardware decode")
-    if lifecycle and "lifecycle=resize_minimize_restore_close_passed" not in report["stderr"]:
+    marker = "lifecycle=resize_redraw_close_passed" if redraw_only else "lifecycle=resize_minimize_restore_close_passed"
+    if lifecycle and marker not in report["stderr"]:
         report.update(passed=False, error="Lifecycle diagnostic did not finish")
+    if redraw_only:
+        report["minimize_tested"] = False
     return report
 
 

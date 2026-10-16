@@ -69,6 +69,14 @@ VM 自建窗口的 10 项实际操作/释放测试、70 项带 ASan/UBSan 的原
 完整 Linux Desktop 内嵌 worker 已重复通过 10 项输入检查，原分辨率/布局恢复，
 临时 native 进程为 0；Windows Desktop 编译检查通过。
 
+后续 W5 显示进展：Linux worker 已接入 OpenH264 软件解码及 GTK/OpenGL NV12
+两平面显示，避免额外 CPU RGB 转换。完整 Desktop 内嵌 worker 的四方向 1080p
+合成画面显示约 14.95～14.99 FPS，真正 1080p 全屏约 14.98 FPS；静态重绘、
+6 类异常码流、76 项 sanitizer 边界检查和 Windows 编译检查通过。XWayland
+最小化/恢复通过，原生 Wayland 最小化状态尚未验证，不混用结果。Linux Tauri
+正式宿主、网络闭环、硬件解码和登录仍待完成，详见
+[Linux 显示阶段验收](acceptance/remote-desktop-linux-renderer-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

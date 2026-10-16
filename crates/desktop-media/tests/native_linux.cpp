@@ -1,6 +1,7 @@
 // Standalone Linux boundary tests; no compositor, capture or user input needed.
 #include "../native/linux/capture.h"
 #include "../native/linux/input.h"
+#include "../native/linux/presenter.h"
 #include <cassert>
 #include <limits>
 
@@ -63,5 +64,14 @@ int main() {
     assert(evdev_key(0x10) == KEY_LEFTSHIFT && evdev_key(0xa1) == KEY_RIGHTSHIFT); ++checked;
     assert(evdev_key(0x12) == KEY_LEFTALT && evdev_key(0xa5) == KEY_RIGHTALT); ++checked;
     for (unsigned vk : {0u, 1u, 255u, 65535u}) { rejects([&] { evdev_key(vk); }); ++checked; }
+    auto wide = viewport(1920,1080,0,960,600);
+    assert(wide.x == 0 && wide.y == 30 && wide.width == 960 && wide.height == 540); ++checked;
+    auto tall = viewport(1920,1080,1,960,600);
+    assert(tall.x == 311 && tall.y == 0 && tall.width == 338 && tall.height == 600); ++checked;
+    auto full = viewport(1920,1080,2,1920,1080);
+    assert(full.x == 0 && full.y == 0 && full.width == 1920 && full.height == 1080); ++checked;
+    rejects([] { viewport(0,1080,0,960,600); }); ++checked;
+    rejects([] { viewport(1920,1080,4,960,600); }); ++checked;
+    rejects([] { viewport(1920,1080,0,0,600); }); ++checked;
     printf("{\"checks\":%u,\"passed\":true}\n", checked);
 }

@@ -75,7 +75,7 @@ fn main() {
             .cpp(true)
             .std("c++17")
             .file("native/linux/worker.cpp");
-        for library in ["gio-2.0", "libpipewire-0.3"] {
+        for library in ["gio-2.0", "libpipewire-0.3", "gtk+-3.0", "epoxy"] {
             let dependency = pkg_config::Config::new()
                 .probe(library)
                 .unwrap_or_else(|error| {
