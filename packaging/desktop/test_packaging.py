@@ -87,6 +87,7 @@ class Packages(unittest.TestCase):
                             self.assertIn("pab-document-worker.exe", package.namelist())
                             self.assertIn("browser-runtime.zip", package.namelist())
                             self.assertIn("document-runtime.zip", package.namelist())
+                            self.assertIn(b"NVIDIA Corporation", package.read("THIRD-PARTY-NOTICES.txt"))
                             self.assertEqual(package.read("install.ps1"), (SCRIPTS / "windows/install.ps1").read_bytes())
                             self.assertNotIn("install.sh", package.namelist())
                     else:

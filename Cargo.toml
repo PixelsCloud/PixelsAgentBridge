@@ -11,6 +11,7 @@ members = [
     "crates/system-log-store",
     "crates/screenshot",
     "crates/desktop-control",
+    "crates/desktop-media",
     "crates/document",
     "crates/protocol",
     "crates/remote-desktop",

@@ -1,6 +1,8 @@
 # 远程桌面与人工协助开发方案
 
-日期：2026-10-16。状态：P1 媒体开发中，直接纹理 H.264 编码已在两台 Windows 机器验证，完整远程桌面尚未实现。
+日期：2026-10-16。状态：正式 Windows helper 媒体接入、90 到本机的已认证直连/Relay 动态画面已通过；Windows 独立窗口已实现。完整多屏操作、登录桌面、跨平台和 AI 协助仍在开发，详见长期任务和 [产品接入验收](acceptance/remote-desktop-product-2026-10-16.md)。
+
+后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md)。本文件保留架构约束与历史进展。
 
 以 RustDesk 的采集、编解码、原生纹理显示、输入及桌面切换实现为参考，新增独立远程桌面能力。沿用 Pixels 的账号、设备密码、已认证连接、可靠传输和 Relay，不增加远控专用鉴权体系。
 
@@ -37,15 +39,15 @@
 
 ## 模块及接入边界
 
-以下文件为拟新增位置，不代表已经创建生产实现。
+以下列出接入位置；已实现范围与待验收项以长期任务为准。
 
 | 模块 | 拟定位置 | 职责 |
 | --- | --- | --- |
 | 协议 | `crates/protocol/src/remote_desktop.rs` | 版本、能力、会话、视频帧、屏幕、输入和关闭消息 |
 | 目标端会话 | `crates/remote-desktop/src/host.rs`，由 Executor task service 接入 | 独占占用、流、心跳、清理和媒体后端接口 |
 | 操作端会话 | `crates/bridge/src/connection/remote_desktop.rs` | 使用已认证连接建立远控专用可靠流 |
-| 平台与媒体 | 新增独立 crate，名称在实验后确定 | 采集、编解码、纹理与输入平台接口 |
-| 查看器 | 新增原生 viewer 与 Desktop 启动适配 | 原生窗口、显示、输入、工具栏 |
+| 平台与媒体 | `crates/desktop-media`、`crates/executor/src/local_ipc_media.rs` | Windows 原生采集、编解码、纹理显示与独立 helper 媒体 IPC；输入待实现 |
+| 查看器 | `apps/desktop/src-tauri/src/operator/remote_desktop.rs`、`RemoteDesktopWindow.tsx` | 独立 Tauri 窗口、原生显示子窗口、屏幕和 FPS 工具栏 |
 | 人工协助 | 新增协议、MCP 工具、Desktop 通知适配 | 请求、领取、状态、完成和取消 |
 
 只在现有请求分派和能力声明中做必要的新增接入。通用传输的旧方法、帧大小上限和旧协议语义保持不变。无新能力的旧设备明确返回需要升级。

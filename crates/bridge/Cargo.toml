@@ -32,4 +32,5 @@ zeroize = "1"
 tempfile = "3"
 
 [dev-dependencies]
+pab-desktop-media = { path = "../desktop-media" }
 rmcp = { version = "=3.5.0", default-features = false, features = ["client", "transport-io"] }

@@ -193,7 +193,7 @@ $source = Split-Path -Parent $MyInvocation.MyCommand.Path
 $requiredFiles = @(
     'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe',
     'browser-runtime.zip', 'document-runtime.zip',
-    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1'
+    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'THIRD-PARTY-NOTICES.txt'
 )
 foreach ($name in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $name) -PathType Leaf)) {
@@ -335,7 +335,7 @@ foreach ($obsolete in @('run-ui.ps1', 'run-device-ui.ps1', 'run-executor.ps1', '
         Remove-Item -LiteralPath $path -Force
     }
 }
-foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1')) {
+foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'THIRD-PARTY-NOTICES.txt')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 

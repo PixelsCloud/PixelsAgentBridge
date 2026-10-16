@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, OnceCell};
 use zeroize::Zeroizing;
 
 pub(crate) mod desktop_terminal;
+pub(crate) mod remote_desktop;
 pub(crate) mod directory;
 pub(crate) mod execution;
 pub(crate) mod history;

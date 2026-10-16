@@ -1,0 +1,26 @@
+import { test, expect } from "@playwright/test";
+test("viewer uses stable screen IDs and bounded controls without frame or input IPC", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+  expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(72);
+  await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("combobox", { name: "Display" })).toHaveValue("adapter:left");
+  await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
+  await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
+  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => !c.command.startsWith("plugin:")));
+  expect(calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args)).toEqual([{ screen: "adapter:left" }, { fps: 30 }]);
+  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control"].includes(c.command))).toBe(true);
+});
+test("control errors remain above native surface and capture failure can reconnect", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.evaluate(() => { (window as any).fixture.reject = true; });
+  await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
+  await expect(page.locator("header").getByRole("alert")).toContainText("Renderer is busy");
+  await page.evaluate(() => { (window as any).fixture.reject = false; (window as any).fixture.fail(); });
+  await expect(page.getByRole("alert")).toContainText("Capture helper unavailable");
+  await page.getByRole("button", { name: "Reconnect" }).click();
+  await expect(page.getByRole("status")).toHaveText("Connected");
+});

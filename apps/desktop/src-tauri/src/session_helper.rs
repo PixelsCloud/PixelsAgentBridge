@@ -14,10 +14,16 @@ pub fn run() -> Result<(), String> {
         .nth(2)
         .and_then(|argument| argument.strip_prefix("--desktop=").map(str::to_owned));
     let applications_only = std::env::args().nth(1).as_deref() == Some("--application-helper");
+    let media_only = std::env::args().nth(1).as_deref() == Some("--media-helper");
+    if media_only && (!cfg!(windows) || !matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon"))) {
+        return Err("media helper requires a Windows interactive desktop".into());
+    }
     if applications_only && (!cfg!(windows) || expected_desktop.as_deref() != Some("Default")) {
         return Err("application helper requires the Windows Default desktop".into());
     }
-    let log_role = if applications_only {
+    let log_role = if media_only {
+        "media-helper"
+    } else if applications_only {
         "application-helper"
     } else {
         match expected_desktop.as_deref() {
@@ -28,6 +34,14 @@ pub fn run() -> Result<(), String> {
         }
     };
     pab_logging::init(log_role, paths.root()).map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    if media_only {
+        return tauri::async_runtime::block_on(async {
+            let _worker = start_media_helper(expected_desktop)?;
+            std::future::pending::<()>().await;
+            Ok(())
+        });
+    }
     #[cfg(target_os = "macos")]
     {
         use objc2::MainThreadMarker;
@@ -87,6 +101,12 @@ async fn run_forever(
     expected_desktop: Option<String>,
     applications_only: bool,
 ) -> Result<(), String> {
+    #[cfg(windows)]
+    let _media = if !applications_only && matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")) {
+        Some(start_media_helper(expected_desktop.clone())?)
+    } else {
+        None
+    };
     #[cfg(target_os = "macos")]
     let _recovery = crate::desktop_input::start_recovery_monitor();
     loop {
@@ -126,6 +146,42 @@ async fn run_forever(
         }
         tokio::time::sleep(Duration::from_secs(3)).await;
     }
+}
+
+#[cfg(windows)]
+struct MediaHelperTask(tauri::async_runtime::JoinHandle<()>);
+#[cfg(windows)]
+impl Drop for MediaHelperTask {
+    fn drop(&mut self) { self.0.abort(); }
+}
+#[cfg(windows)]
+fn start_media_helper(desktop: Option<String>) -> Result<MediaHelperTask, String> {
+    let backend = pab_desktop_media::NativeBackend::new(
+        std::env::current_exe().map_err(|e| e.to_string())?,
+        vec!["--media-worker".into()],
+    );
+    Ok(MediaHelperTask(tauri::async_runtime::spawn(async move {
+        loop {
+            if desktop_is_active(desktop.as_deref()) {
+                let stopped = async {
+                    loop {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        if !desktop_is_active(desktop.as_deref()) { break; }
+                    }
+                };
+                tokio::select! {
+                    result = local_ipc::media::serve_helper(&backend) => {
+                        if let Err(error) = result { tracing::debug!(%error, "media helper disconnected"); }
+                    }
+                    _ = stopped => {}
+                }
+                // Do not re-register until the previous worker has really
+                // exited; this gate also covers interrupted native startup.
+                backend.idle().await;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })))
 }
 
 async fn serve_application_requests(socket: &mut LocalSocket) -> Result<(), String> {

@@ -144,12 +144,12 @@ async fn view(
                 start = Instant::now();
             }
         }
-        let seconds = start.elapsed().as_secs_f64();
         let displayed = tokio::time::timeout(WAIT, renderer.finish()).await??;
+        let seconds = start.elapsed().as_secs_f64();
         render_ms.sort_by(f64::total_cmp);
         results.push(serde_json::json!({"generation":config.generation,"screen":config.screen,"frames":frames,"warmup_frames":warmup,
             "display":displayed,"seconds":seconds,"effective_display_fps":frames as f64/seconds,"encoded_bytes":bytes,
-            "receive_to_display_p95_ms":render_ms[(render_ms.len()-1)*95/100],"parallel_legacy_max_ms":max_legacy_ms}));
+            "receive_to_renderer_consumed_p95_ms":render_ms[(render_ms.len()-1)*95/100],"parallel_legacy_max_ms":max_legacy_ms}));
     }
     session.close().await?;
     legacy(connection).await?;

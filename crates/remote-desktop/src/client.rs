@@ -169,6 +169,9 @@ impl RemoteDesktopSession {
     pub fn opened(&self) -> &DesktopOpened {
         &self.opened
     }
+    pub fn connection_path(&self) -> Option<pab_transport::ConnectionPath> {
+        self.connection.selected_path()
+    }
     async fn attach_video(&mut self) -> Result<()> {
         let config = self.opened.config.clone();
         let mut video = stream(
@@ -209,6 +212,20 @@ impl RemoteDesktopSession {
             .ok_or(DesktopError::Closed)?
             .receive(timeout)
             .await?;
+        self.last_received = frame.header.frame_id;
+        Ok(frame)
+    }
+    /// Product viewers use this for static desktops. Control heartbeat failure
+    /// still terminates the wait; lack of a changed image does not.
+    pub async fn next_frame_when_changed(&mut self) -> Result<VideoFrame> {
+        if self.closed || self.worker.is_finished() {
+            return Err(DesktopError::Closed);
+        }
+        let reader = self.video.as_mut().ok_or(DesktopError::Closed)?;
+        let frame = tokio::select! {
+            frame = reader.receive_after_idle(self.timeout) => frame?,
+            _ = &mut self.worker => return Err(DesktopError::Closed),
+        };
         self.last_received = frame.header.frame_id;
         Ok(frame)
     }

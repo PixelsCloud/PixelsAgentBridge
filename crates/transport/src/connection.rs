@@ -41,6 +41,38 @@ impl PabFrameWriter {
     }
 }
 impl PabFrameReader {
+    /// Wait for an idle producer without a deadline, then bound the partial
+    /// length/header read. Callers must drop this reader on error/cancellation.
+    /// Existing task/terminal reads retain their original timeout behavior.
+    pub async fn read_after_idle(
+        &mut self,
+        limit: usize,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, PabConnectionError> {
+        let mut header = [0; 4];
+        self.0
+            .read_exact(&mut header[..1])
+            .await
+            .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+        tokio::time::timeout(timeout, async {
+            self.0
+                .read_exact(&mut header[1..])
+                .await
+                .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+            let len = u32::from_be_bytes(header) as usize;
+            if len == 0 || len > limit.min(MAX_BINARY_FRAME_BYTES) {
+                return Err(PabConnectionError::InvalidBinaryFrame(len));
+            }
+            let mut bytes = vec![0; len];
+            self.0
+                .read_exact(&mut bytes)
+                .await
+                .map_err(|e| PabConnectionError::Stream(e.to_string()))?;
+            Ok(bytes)
+        })
+        .await
+        .map_err(|_| PabConnectionError::Timeout)?
+    }
     pub async fn read(&mut self, limit: usize) -> Result<Vec<u8>, PabConnectionError> {
         let mut header = [0; 4];
         self.0

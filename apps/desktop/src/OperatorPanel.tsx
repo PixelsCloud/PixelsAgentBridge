@@ -185,6 +185,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   function deviceMenu(device: ConnectedDevice): MenuProps {
     return {
       items: [
+        { key: "desktop-viewer", label: language === "en" ? "Remote desktop" : language === "zh-TW" ? "遠端桌面" : "远程桌面" },
         { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : language === "zh-TW" ? "遠端終端" : "远程终端" },
         { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : language === "zh-TW" ? "遠端終端（System）" : "远程终端（System）" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
@@ -195,6 +196,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         { key: "delete", icon: <Trash2 size={16} />, label: t.deleteDevice, danger: true },
       ],
       onClick: ({ key }) => {
+        if (key === "desktop-viewer") void openRemoteDesktop(device);
         if (key === "desktop-terminal") void openDesktopTerminal(device, "console");
         if (key === "desktop-terminal-system") void openDesktopTerminal(device, "system");
         if (key === "connect") void connectSaved(device);
@@ -227,6 +229,20 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     } catch (cause) {
       if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
       notification.error({ message: language === "en" ? "Could not open remote terminal" : "无法打开远程终端", description: String(cause), placement: "bottomRight" });
+    }
+  }
+
+  async function openRemoteDesktop(device: ConnectedDevice) {
+    if (!signedIn) { onSignIn(); return; }
+    try {
+      if (!device.connected) {
+        const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
+        updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
+      }
+      await invoke("desktop_viewer_window", { code: device.deviceCode });
+    } catch (cause) {
+      if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
+      notification.error({ message: language === "en" ? "Could not open remote desktop" : "无法打开远程桌面", description: String(cause), placement: "bottomRight" });
     }
   }
 

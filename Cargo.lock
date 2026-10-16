@@ -4773,6 +4773,7 @@ dependencies = [
  "futures-util",
  "iroh-base",
  "pab-agent-core",
+ "pab-desktop-media",
  "pab-logging",
  "pab-protocol",
  "pab-remote-desktop",
@@ -4820,6 +4821,17 @@ dependencies = [
  "windows-sys 0.61.2",
  "x11rb",
  "xcap",
+]
+
+[[package]]
+name = "pab-desktop-media"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "pab-protocol",
+ "pab-remote-desktop",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

@@ -389,6 +389,7 @@ pub fn run() {
         .manage(mcp_reporting::McpReportingState::default())
         .manage(operator::OperatorState::new())
         .manage(operator::desktop_terminal::DesktopTerminalState::default())
+        .manage(operator::remote_desktop::RemoteDesktopState::default())
         .manage(github_login::GithubLoginState::default())
         .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
@@ -427,6 +428,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| {
+            if invoke.message.webview().label().starts_with("desktop-viewer-")
+                && !invoke.message.command().starts_with("desktop_viewer_") {
+                invoke.resolver.reject("command is unavailable in a remote desktop window");
+                return true;
+            }
             // A terminal WebView cannot call stable operator/account/task APIs.
             // Every allowed terminal command additionally checks its native label.
             if invoke
@@ -442,6 +448,9 @@ pub fn run() {
                 return true;
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                operator::remote_desktop::desktop_viewer_window,
+                operator::remote_desktop::desktop_viewer_start,
+                operator::remote_desktop::desktop_viewer_control,
                 operator::desktop_terminal::desktop_terminal_window,
                 operator::desktop_terminal::desktop_terminal_info,
                 operator::desktop_terminal::desktop_terminal_accounts,

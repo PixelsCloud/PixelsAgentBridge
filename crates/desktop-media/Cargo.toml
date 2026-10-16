@@ -1,0 +1,18 @@
+[package]
+name = "pab-desktop-media"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pab-protocol = { path = "../protocol" }
+pab-remote-desktop = { path = "../remote-desktop" }
+serde_json.workspace = true
+tokio.workspace = true
+
+[build-dependencies]
+cc = "1"
+
+[[bin]]
+name = "pab-media-worker"
+path = "src/main.rs"

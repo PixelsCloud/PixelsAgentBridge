@@ -2,6 +2,7 @@ mod account;
 mod catalog;
 mod credential;
 mod desktop_terminal;
+mod remote_desktop;
 mod device;
 mod directory;
 mod document;

@@ -176,6 +176,7 @@ foreach ($name in @(
     'run-device-ui.ps1',
     'run-executor.ps1',
     'run-session-supervisor.ps1',
+    'THIRD-PARTY-NOTICES.txt',
     'uninstall.ps1'
 )) {
     $path = Join-Path $InstallRoot $name

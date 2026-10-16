@@ -5367,6 +5367,7 @@ dependencies = [
  "pab-agent-core",
  "pab-logging",
  "pab-protocol",
+ "pab-remote-desktop",
  "pab-screenshot",
  "pab-service-config",
  "pab-transport",
@@ -5403,6 +5404,7 @@ dependencies = [
  "pab-agent-core",
  "pab-bridge",
  "pab-desktop-control",
+ "pab-desktop-media",
  "pab-executor",
  "pab-logging",
  "pab-protocol",
@@ -5456,6 +5458,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-desktop-media"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "pab-protocol",
+ "pab-remote-desktop",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "pab-document"
 version = "1.2.48"
 dependencies = [
@@ -5500,6 +5513,7 @@ dependencies = [
  "pab-os-system-log",
  "pab-platform",
  "pab-protocol",
+ "pab-remote-desktop",
  "pab-screenshot",
  "pab-service-config",
  "pab-system-log-store",
@@ -5616,6 +5630,18 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "uuid",
+]
+
+[[package]]
+name = "pab-remote-desktop"
+version = "0.1.0"
+dependencies = [
+ "pab-protocol",
+ "pab-transport",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]

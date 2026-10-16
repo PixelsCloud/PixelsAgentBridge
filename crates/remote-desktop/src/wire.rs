@@ -20,6 +20,40 @@ pub struct DesktopVideoWriter {
     next_frame: u64,
 }
 impl DesktopVideoReader {
+    /// Static desktops may produce no frame for hours. After the first byte,
+    /// partial headers and payloads still have deadlines. On cancellation this
+    /// generation is poisoned, just like `receive`.
+    pub async fn receive_after_idle(&mut self, timeout: Duration) -> Result<VideoFrame> {
+        let mut reader = self.reader.take().ok_or(DesktopError::Closed)?;
+        let next = self
+            .next_frame
+            .checked_add(1)
+            .ok_or(DesktopError::Protocol("frame sequence overflow"))?;
+        let header: DesktopFrameHeader = serde_json::from_slice(
+            &reader
+                .read_after_idle(DESKTOP_CONTROL_BYTES, timeout)
+                .await?,
+        )?;
+        header
+            .validate(&self.config, self.next_frame)
+            .map_err(DesktopError::Protocol)?;
+        let size = header.payload_bytes as usize;
+        let bytes = tokio::time::timeout(timeout, async {
+            let mut bytes = Vec::with_capacity(size);
+            while bytes.len() < size {
+                let chunk = reader
+                    .read(DESKTOP_VIDEO_CHUNK_BYTES.min(size - bytes.len()))
+                    .await?;
+                bytes.extend_from_slice(&chunk);
+            }
+            Ok::<_, DesktopError>(bytes)
+        })
+        .await
+        .map_err(|_| DesktopError::Timeout)??;
+        self.reader = Some(reader);
+        self.next_frame = next;
+        Ok(VideoFrame { header, bytes })
+    }
     pub fn new(reader: PabFrameReader, config: DesktopVideoConfig) -> Result<Self> {
         config.validate().map_err(DesktopError::Protocol)?;
         Ok(Self {

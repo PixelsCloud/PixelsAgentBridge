@@ -336,14 +336,17 @@ impl DesktopHost {
             .checked_add(1)
             .ok_or(DesktopError::Protocol("desktop generation overflow"))?;
         let backend = self.shared.backend.as_ref().ok_or(DesktopError::Closed)?;
-        let screens = tokio::time::timeout(MEDIA_TIMEOUT, backend.screens())
-            .await
-            .map_err(|_| DesktopError::Timeout)??;
-        let opened = make_opened(entry.id, next, screens, Some(screen_id), old.config.fps)?;
+        // A helper may currently be waiting indefinitely for a changed image.
+        // Retire that source before asking the same helper for a fresh layout.
+        // Otherwise a static desktop can deadlock display switching.
         old.stop();
         tokio::time::timeout(MEDIA_TIMEOUT, cancelled(&old.stopped))
             .await
             .map_err(|_| DesktopError::Timeout)?;
+        let screens = tokio::time::timeout(MEDIA_TIMEOUT, backend.screens())
+            .await
+            .map_err(|_| DesktopError::Timeout)??;
+        let opened = make_opened(entry.id, next, screens, Some(screen_id), old.config.fps)?;
         if *entry.cancelled.borrow() {
             return Err(DesktopError::Closed);
         }

@@ -93,6 +93,10 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
         config.operation_timeout,
     )
     .with_task_service(task_service);
+    #[cfg(windows)]
+    let session_acceptor = session_acceptor
+        .with_remote_desktop_backend(Arc::new(crate::local_ipc::media::HelperMediaBackend))
+        .map_err(|error| ExecutorError::TaskService(error.to_string()))?;
     let session_limit = Arc::new(Semaphore::new(64));
     let mut sessions = JoinSet::new();
     let mut status = supervisor.status();

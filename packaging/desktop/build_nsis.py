@@ -35,6 +35,7 @@ CONTENTS = set(BINARIES) | {
     "run-session-supervisor.ps1",
     "uninstall.ps1",
     "INSTALL-WINDOWS.txt",
+    "THIRD-PARTY-NOTICES.txt",
 }
 
 

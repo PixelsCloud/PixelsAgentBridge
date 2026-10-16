@@ -28,9 +28,10 @@ def validate(report, verify=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--helper", type=Path, help="Override with the production pab-media-worker binary")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    helper = root / ".build/remote-desktop/stream-media/stream-media-probe.exe"
+    helper = args.helper.resolve() if args.helper else root / ".build/remote-desktop/stream-media/stream-media-probe.exe"
     folder = root / ".build/remote-desktop/stream-media" / ("verify-" + uuid.uuid4().hex[:12])
     folder.mkdir()
     report = {"created_at": datetime.now(timezone.utc).isoformat(), "passed": False, "cases": []}

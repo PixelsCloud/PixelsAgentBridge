@@ -136,6 +136,7 @@ Section "Install"
     File "${PAYLOAD_DIR}\run-session-supervisor.ps1"
     File "${PAYLOAD_DIR}\uninstall.ps1"
     File "${PAYLOAD_DIR}\INSTALL-WINDOWS.txt"
+    File "${PAYLOAD_DIR}\THIRD-PARTY-NOTICES.txt"
 
     nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" -ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}" -InstallRoot "$INSTDIR"'
     Pop $0

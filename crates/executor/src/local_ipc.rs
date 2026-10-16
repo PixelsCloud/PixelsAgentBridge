@@ -42,6 +42,8 @@ pub(crate) mod applications;
 mod device_account;
 #[path = "local_ipc_helper_identity.rs"]
 mod helper_identity;
+#[path = "local_ipc_media.rs"]
+pub mod media;
 
 struct HelperRegistration(Option<u64>);
 impl Drop for HelperRegistration {
@@ -988,6 +990,9 @@ async fn handle_connection(
                             Err(_)=>send_json(&mut socket,&json!({"type":"error","message":"device association proof rejected"})).await?,
                         }
                     },
+                    Some("register_media_helper") if registration.0.is_none() => {
+                        return media::serve_registered(socket, frame).await;
+                    }
                     Some("register_window_helper") if registration.0.is_none() => {
                         let identity=helper_identity::verify(&mut socket,&frame).await?;
                         let applications_only = frame["applications_only"].as_bool().unwrap_or(false);

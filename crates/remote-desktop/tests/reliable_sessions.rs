@@ -438,6 +438,46 @@ async fn partial_frame_timeout_and_cancel_poison_only_that_video_stream() {
 }
 
 #[tokio::test]
+async fn idle_video_waits_for_changes_but_bounds_partial_payload() {
+    let (_a, _b, client, peer) = pair().await;
+    let config = config();
+    let header = DesktopFrameHeader {
+        version: 1,
+        session_id: config.session_id,
+        generation: 1,
+        frame_id: 1,
+        capture_time_us: 0,
+        keyframe: true,
+        payload_bytes: 100,
+    };
+    let mut sent = client.open_bi(WAIT).await.unwrap();
+    // Announce the stream, then leave it completely idle for longer than the
+    // per-packet timeout. The first metadata frame is test setup, not video.
+    sent.send_frame_json(&42, WAIT).await.unwrap();
+    let mut received = peer.accept_bi(WAIT).await.unwrap();
+    assert_eq!(received.receive_json::<u32>(WAIT).await.unwrap(), 42);
+    let (_, reader) = received.into_framed();
+    let mut video = DesktopVideoReader::new(reader, config).unwrap();
+    let waiting = tokio::spawn(async move {
+        let result = video.receive_after_idle(Duration::from_millis(150)).await;
+        (video, result)
+    });
+    tokio::time::sleep(Duration::from_millis(350)).await;
+    assert!(
+        !waiting.is_finished(),
+        "static desktop must remain connected"
+    );
+    sent.send_frame_json(&header, WAIT).await.unwrap();
+    sent.send_binary_frame(&[7; 10], WAIT).await.unwrap();
+    let (mut video, result) = tokio::time::timeout(WAIT, waiting).await.unwrap().unwrap();
+    assert!(matches!(result, Err(DesktopError::Timeout)));
+    assert!(matches!(
+        video.receive_after_idle(WAIT).await,
+        Err(DesktopError::Closed)
+    ));
+}
+
+#[tokio::test]
 async fn oversized_stale_or_non_key_first_frame_is_rejected_before_payload() {
     let (_a, _b, client, peer) = pair().await;
     for case in 0..4 {

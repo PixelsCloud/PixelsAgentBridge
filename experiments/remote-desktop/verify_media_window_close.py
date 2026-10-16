@@ -18,10 +18,12 @@ def children(pid):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--helper", type=Path)
+    parser.add_argument("--window-class", default="PixelsDecodeDisplayProbe")
     parser.add_argument("--kill-parent", action="store_true", help="Test unexpected parent loss instead of WM_CLOSE")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    helper = root / ".build/remote-desktop/stream-media/stream-media-probe.exe"
+    helper = args.helper.resolve() if args.helper else root / ".build/remote-desktop/stream-media/stream-media-probe.exe"
     user32 = ctypes.WinDLL("user32", use_last_error=True)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -45,7 +47,7 @@ def main():
         user32.GetWindowThreadProcessId(window, ctypes.byref(pid))
         name = ctypes.create_unicode_buffer(128)
         user32.GetClassNameW(window, name, len(name))
-        if pid.value in owned and name.value == "PixelsDecodeDisplayProbe": windows.append(window)
+        if pid.value in owned and name.value == args.window_class: windows.append(window)
         return True
 
     try:

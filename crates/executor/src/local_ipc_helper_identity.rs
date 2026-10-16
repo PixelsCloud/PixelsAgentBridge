@@ -1,7 +1,7 @@
 //! Reuse the existing kernel-verified worker channel as a registration challenge.
 //! Registration usernames/session fields are never trusted to select an account.
 use super::*;
-use pab_os_control::execution::{channel, process_user_identity};
+use pab_os_control::execution::{UserIdentity, channel, process_user_identity};
 use pab_protocol::{ExecutionEnvironmentSource, ExecutionIdentity, ExecutionMode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -51,6 +51,66 @@ pub(super) async fn verify(
     socket: &mut WebSocketStream<TcpStream>,
     frame: &Value,
 ) -> Result<Option<VerifiedHelper>, LocalIpcError> {
+    let Some(verified) = verify_process(socket, frame).await? else {
+        return Ok(None);
+    };
+    let account = verified.native.account_id.as_str();
+    // Existing application routing policy is intentionally unchanged.
+    if matches!(account, "uid:0" | "S-1-5-18" | "S-1-5-19" | "S-1-5-20")
+        || verified.native.session_id.is_none_or(|s| s == 0)
+    {
+        return Ok(None);
+    }
+    let identity = verified
+        .native
+        .observation(
+            ExecutionMode::DesktopUser,
+            ExecutionEnvironmentSource::InteractiveSession,
+        )
+        .map_err(|_| LocalIpcError::Protocol)?;
+    Ok(Some(VerifiedHelper {
+        identity,
+        process_id: verified.pid,
+        process_identity: verified.marker,
+    }))
+}
+
+pub(super) struct VerifiedMediaHelper {
+    native: UserIdentity,
+    pid: u32,
+    marker: String,
+}
+impl VerifiedMediaHelper {
+    pub fn current(&self) -> bool {
+        pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
+            && process_user_identity(self.pid).ok().as_ref() == Some(&self.native)
+    }
+}
+fn media_account_allowed(account: &str, session: Option<u32>) -> bool {
+    session.is_some_and(|id| id != 0)
+        && !matches!(account, "uid:0" | "S-1-5-19" | "S-1-5-20")
+        && (account != "S-1-5-18" || cfg!(windows))
+}
+pub(super) async fn verify_media(
+    socket: &mut WebSocketStream<TcpStream>,
+    frame: &Value,
+) -> Result<Option<VerifiedMediaHelper>, LocalIpcError> {
+    let Some(verified) = verify_process(socket, frame).await? else {
+        return Ok(None);
+    };
+    // The existing supervisor launches the Winlogon helper as SYSTEM in the
+    // actual interactive session. Allow that identity only for media; never
+    // expose it as a DesktopUser/application execution context. Session 0 and
+    // Local/NetworkService remain rejected. Identity comes from the kernel.
+    Ok(
+        media_account_allowed(&verified.native.account_id, verified.native.session_id)
+            .then_some(verified),
+    )
+}
+async fn verify_process(
+    socket: &mut WebSocketStream<TcpStream>,
+    frame: &Value,
+) -> Result<Option<VerifiedMediaHelper>, LocalIpcError> {
     let Some(pid) = frame["process_id"]
         .as_u64()
         .and_then(|v| u32::try_from(v).ok())
@@ -83,23 +143,26 @@ pub(super) async fn verify(
         return Err(LocalIpcError::Protocol);
     }
     peer.write_u8(1).await?;
-    let account = native.account_id.as_str();
-    if matches!(account, "uid:0" | "S-1-5-18" | "S-1-5-19" | "S-1-5-20")
-        || native.session_id.is_none_or(|s| s == 0)
-    {
-        return Ok(None);
-    }
-    let identity = native
-        .observation(
-            ExecutionMode::DesktopUser,
-            ExecutionEnvironmentSource::InteractiveSession,
-        )
-        .map_err(|_| LocalIpcError::Protocol)?;
-    Ok(Some(VerifiedHelper {
-        identity,
-        process_id: pid,
-        process_identity: marker,
+    Ok(Some(VerifiedMediaHelper {
+        native,
+        pid,
+        marker,
     }))
+}
+
+#[cfg(test)]
+mod media_tests {
+    use super::*;
+    #[test]
+    fn media_requires_interactive_session_and_does_not_admit_service_accounts() {
+        assert!(!media_account_allowed("S-1-5-18", Some(0)));
+        assert!(!media_account_allowed("user", None));
+        assert!(!media_account_allowed("S-1-5-19", Some(2)));
+        assert!(!media_account_allowed("S-1-5-20", Some(2)));
+        assert!(!media_account_allowed("uid:0", Some(2)));
+        assert!(media_account_allowed("user", Some(2)));
+        assert_eq!(media_account_allowed("S-1-5-18", Some(2)), cfg!(windows));
+    }
 }
 
 pub(crate) fn desktop_identities() -> Vec<ExecutionIdentity> {
