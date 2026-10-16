@@ -30,10 +30,12 @@ consumption/submission, not physical display. `finish()` drains statistics.
 
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
 NVIDIA capture only, synchronous low-latency decoder output, SDR BT.709,
-no cursor channel or keyboard/mouse yet, no native macOS/Linux backend.
+no cursor channel yet, no native macOS/Linux backend. Windows native keyboard,
+mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
 capture and multi-monitor hotplug still require hardware acceptance.
-Windows secure-desktop routing is implemented but needs lock/login acceptance.
+Windows secure-desktop routing passed stepwise lock/login acceptance on 90;
+continuous recovery in the product viewer still needs end-to-end acceptance.
 The synthetic/animate modes are explicit developer diagnostics; the product
 `NativeBackend` always starts ordinary desktop capture.
 
