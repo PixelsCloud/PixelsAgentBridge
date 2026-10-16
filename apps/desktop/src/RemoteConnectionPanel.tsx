@@ -1,8 +1,10 @@
+import { useState } from "react";
+import { Search } from "lucide-react";
 import { OsLogo } from "./OsLogo";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
 import { formatDeviceCode } from "./deviceCode";
-import { Dropdown, type MenuProps } from "antd";
+import { Dropdown, Input, type MenuProps } from "antd";
 import { deviceOnline } from "./deviceAvailability";
 
 type Props = {
@@ -20,15 +22,23 @@ export function RemoteConnectionPanel({
   language, error, devices, devicePresence, selectedCode, onSelect, onConnect, onDeviceMenu,
 }: Props) {
   const t = messages[language];
-  const sortedDevices = [...devices].sort((first, second) =>
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const codeQuery = query.replace(/[\s-]/g, "");
+  const sortedDevices = devices.filter((device) => !query
+    || (codeQuery.length > 0 && device.deviceCode.includes(codeQuery))
+    || [device.alias, devicePresence[device.deviceCode]?.name, device.deviceCode, formatDeviceCode(device.deviceCode)]
+      .some((value) => value?.toLocaleLowerCase().includes(query))).sort((first, second) =>
     Number(deviceOnline(second, devicePresence[second.deviceCode]) === true)
     - Number(deviceOnline(first, devicePresence[first.deviceCode]) === true));
 
   return (
     <section className="surface remote-list">
       <div className="list-heading"><h2>{t.connectedDevices}</h2><span>{devices.length}</span></div>
+      <Input className="device-search" aria-label={t.searchDevices} placeholder={t.searchDevices}
+        prefix={<Search size={15} />} allowClear value={search} onChange={(event) => setSearch(event.target.value)} />
       {error && <div className="inline-error" role="alert">{error}</div>}
-      {devices.length === 0 ? <div className="empty-list">{t.noConnectedDevices}</div> : (
+      {sortedDevices.length === 0 ? <div className="empty-list">{devices.length === 0 ? t.noConnectedDevices : t.noMatchingDevices}</div> : (
         <div className="device-list">
           {sortedDevices.map((device) => {
             const presence = devicePresence[device.deviceCode];

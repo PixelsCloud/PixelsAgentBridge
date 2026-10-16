@@ -151,6 +151,11 @@ h1, h2, h3, p { margin: 0; }
 .home-credential-value strong { flex: 0 0 200px; width: 200px; overflow: hidden; color: #153448; font-size: clamp(24px, 2.5vw, 28px); font-weight: 760; letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .credential-icon-button { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #dce8e9; border-radius: 8px; color: #416478; background: #fff; }
 .credential-icon-button:hover { border-color: #8ccbbb; color: #247a6c; }
+.home-password-value strong { flex: 1 1 auto; width: auto; }
+.credential-icon-button:disabled { cursor: not-allowed; opacity: .5; }
+.password-refreshing { animation: password-refresh-spin 1s linear infinite; }
+@keyframes password-refresh-spin { to { transform: rotate(360deg); } }
+.device-search { flex: none; margin-top: 12px; }
 .home-account { padding-top: 18px; padding-bottom: 19px; }
 .home-account h2 { margin-top: 0; font-size: 17px; }
 .account-current { display: grid; gap: 5px; margin-top: 20px; }

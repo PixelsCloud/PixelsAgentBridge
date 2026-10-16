@@ -137,8 +137,14 @@ async fn ensure_device_access(
 }
 
 pub async fn rotate_temporary_password(path: &Path) -> Result<(), BootstrapError> {
+    static ROTATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _rotation = ROTATION.lock().await;
     let mut access = crate::device_access::load(path).await?;
-    set_new_password(&mut access)?;
+    // Argon2 must not block the local service's async event loop.
+    access = tokio::task::spawn_blocking(move || {
+        set_new_password(&mut access)?;
+        Ok::<_, BootstrapError>(access)
+    }).await.map_err(BootstrapError::PasswordWorker)??;
     crate::device_access::save(path, &access).await?;
     Ok(())
 }
@@ -155,7 +161,10 @@ fn new_device_access() -> crate::device_access::DeviceAccess {
 }
 
 fn set_new_password(access: &mut crate::device_access::DeviceAccess) -> Result<(), BootstrapError> {
-    let password = generate_temporary_password();
+    let password = loop {
+        let password = generate_temporary_password();
+        if password != access.temporary_password { break password; }
+    };
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &SaltString::generate(&mut OsRng))
         .map_err(|_| BootstrapError::Hash)?
@@ -168,7 +177,7 @@ fn set_new_password(access: &mut crate::device_access::DeviceAccess) -> Result<(
     )
     .map_err(|_| BootstrapError::Clock)?;
     access.temporary_password = password;
-    access.password_version = version;
+    access.password_version = version.max(access.password_version.checked_add(1).ok_or(BootstrapError::Clock)?);
     access.password_hash = hash;
     Ok(())
 }
@@ -207,6 +216,8 @@ pub enum BootstrapError {
     Clock,
     #[error("temporary password could not be hashed")]
     Hash,
+    #[error("temporary password worker failed")]
+    PasswordWorker(tokio::task::JoinError),
     #[error(transparent)]
     Config(#[from] ExecutorConfigError),
     #[error(transparent)]

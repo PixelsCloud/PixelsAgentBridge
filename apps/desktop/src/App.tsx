@@ -6,7 +6,7 @@ import { App as AntdApp, Avatar, Button, ConfigProvider, Menu, theme as antdThem
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import zhTW from "antd/locale/zh_TW";
-import { Check, Copy, Eye, EyeOff, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, Settings2, Sun, UserRound, X } from "lucide-react";
+import { Check, Copy, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, Settings2, Sun, UserRound, X } from "lucide-react";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
@@ -18,20 +18,14 @@ import type { ScopeStatus } from "./operatorTypes";
 import { MacosPermissionStatus, requestMacosPermissionsAtStartup } from "./MacosPermissionsPanel";
 import brand from "./assets/brand.svg";
 import { formatDeviceCode } from "./deviceCode";
+import { DevicePassword } from "./DevicePassword";
+import { currentDeviceStatus, type DeviceStatus } from "./localDeviceStatus";
 import "./App.css";
 import "./PasswordMask.css";
 import "./theme.css";
 
 export type View = "home" | "remote" | "mcp" | "activity" | "me" | "settings";
 type Theme = "light" | "dark";
-
-type DeviceStatus = {
-  device_code: string;
-  device_id: string;
-  temporary_password: string;
-  executor_running: boolean;
-  control_phase: string;
-};
 
 const navItems = [
   { id: "home", icon: Monitor },
@@ -56,7 +50,6 @@ function App() {
   const [device, setDevice] = useState<DeviceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(true);
   const [copiedField, setCopiedField] = useState<"code" | "password" | null>(null);
   const t = messages[language];
   const appWindow = getCurrentWindow();
@@ -131,7 +124,8 @@ function App() {
 
   const refresh = useCallback(async () => {
     try {
-      setDevice(await invoke<DeviceStatus>("device_status"));
+      const next = await invoke<DeviceStatus>("device_status");
+      setDevice((current) => currentDeviceStatus(current, next));
     } catch {
       setDevice(null);
     } finally {
@@ -145,7 +139,7 @@ function App() {
     let active = true;
     const unlisteners: (() => void)[] = [];
     void listen<DeviceStatus>("local-device-status", (event) => {
-      setDevice(event.payload);
+      setDevice((current) => currentDeviceStatus(current, event.payload));
       setLoading(false);
     }).then((unlisten) => active ? unlisteners.push(unlisten) : unlisten());
     void listen("local-device-offline", () => void refresh()).then((unlisten) => active ? unlisteners.push(unlisten) : unlisten());
@@ -293,22 +287,8 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="home-credential">
-                      <span className="code-label">{t.temporaryPassword}</span>
-                      <div className="home-credential-value">
-                        <strong className={showPassword ? undefined : "masked-password"}>{showPassword ? device.temporary_password : (
-                          <span className="password-mask" role="img" aria-label={`${t.temporaryPassword} (${t.hide})`}>
-                            {Array.from({ length: 8 }, (_, index) => <span key={index} aria-hidden="true" />)}
-                          </span>
-                        )}</strong>
-                        <button className="credential-icon-button" aria-label={showPassword ? t.hide : t.show} title={showPassword ? t.hide : t.show} onClick={() => setShowPassword(!showPassword)}>
-                          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                        </button>
-                        <button className="credential-icon-button" aria-label={`${t.copy} ${t.temporaryPassword}`} title={copiedField === "password" ? t.copied : t.copy} onClick={() => void copy(device.temporary_password, "password")}>
-                          {copiedField === "password" ? <Check size={17} /> : <Copy size={17} />}
-                        </button>
-                      </div>
-                    </div>
+                    <DevicePassword language={language} device={device} onError={setError}
+                      onRefreshed={(next) => setDevice((current) => currentDeviceStatus(current, next))} />
                   </div>
                 ) : <div className="empty-device">{t.localUnavailable}</div>}
               </section>

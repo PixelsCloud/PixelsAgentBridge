@@ -796,6 +796,28 @@ pub async fn connect_local() -> Result<LocalSocket, LocalIpcError> {
     connect_with_token(local_port()?, &token).await
 }
 
+/// Use a separate authenticated connection so a password refresh cannot consume
+/// desktop helper events. The service owns and writes its credential database.
+pub async fn rotate_local_password() -> Result<crate::DeviceStatus, LocalIpcError> {
+    tokio::time::timeout(Duration::from_secs(20), async {
+        let mut socket = connect_local().await?;
+        request_password_rotation(&mut socket).await
+    }).await.map_err(|_| LocalIpcError::Timeout)?
+}
+
+async fn request_password_rotation(socket: &mut LocalSocket) -> Result<crate::DeviceStatus, LocalIpcError> {
+    send_json(socket, &json!({"type":"rotate_password"})).await?;
+    loop {
+        let frame = receive_json(socket).await?;
+        match frame["type"].as_str() {
+            Some("password_rotated") => return serde_json::from_value(frame["status"].clone()).map_err(Into::into),
+            Some("status") => {},
+            Some("error") => return Err(LocalIpcError::Remote("password refresh failed or unsupported; refresh device status before retrying".into())),
+            _ => return Err(LocalIpcError::Protocol),
+        }
+    }
+}
+
 /// A dedicated authenticated socket; never consumes a UI helper's event stream.
 /// The server challenges the actual caller PID before choosing its home folder.
 #[cfg(target_os = "macos")]
@@ -936,6 +958,15 @@ async fn handle_connection(
                 let Message::Text(text) = frame else { break Err(LocalIpcError::Protocol) };
                 let frame: Value = serde_json::from_str(&text)?;
                 match frame["type"].as_str() {
+                    Some("rotate_password") if registration.0.is_none() => {
+                        match crate::rotate_temporary_password(&root.join("executor.sqlite3")).await {
+                            Ok(()) => {
+                                let status = read_device_status_from_service(root).await.map_err(|_|LocalIpcError::Protocol)?;
+                                send_json(&mut socket, &json!({"type":"password_rotated","status":status})).await?;
+                            },
+                            Err(_) => send_json(&mut socket, &json!({"type":"error","message":"password refresh failed"})).await?,
+                        }
+                    },
                     #[cfg(target_os = "macos")]
                     Some("check_file_access") if registration.0.is_none() => {
                         // Native PID/UID proof, not caller-supplied paths/accounts.
@@ -1890,6 +1921,92 @@ mod tests {
 
         let wrong_token = [0u8; 32];
         assert!(connect_with_token(port, &wrong_token).await.is_err());
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn password_refresh_persists_invalidates_old_password_and_updates_status_without_restart() {
+        use crate::credential::DeviceCredential;
+        use zeroize::Zeroizing;
+
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let path = root.join("executor.sqlite3");
+        // Seed and rotate once to establish a valid pre-existing credential.
+        crate::device_access::save(&path, &crate::device_access::DeviceAccess {
+            tenant_id: "tenant".into(), device_id: "device".into(), device_code: "123456789".into(),
+            temporary_password: "OLDPASS8".into(), password_version: 1,
+            password_hash: "unused initial hash".into(),
+        }).await.unwrap();
+        crate::rotate_temporary_password(&path).await.unwrap();
+        let token = ensure_machine_token(root).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(serve(listener, root.to_path_buf(), token));
+        let mut observer = connect_with_token(port, &token).await.unwrap();
+        let previous = next_status(&mut observer).await.unwrap();
+        assert!(DeviceCredential::read(&path).await.unwrap().verify(Zeroizing::new(previous.temporary_password.clone())).await.unwrap());
+        let mut requester = connect_with_token(port, &token).await.unwrap();
+        let refreshed = request_password_rotation(&mut requester).await.unwrap();
+        assert_eq!(refreshed.device_code, previous.device_code);
+        assert_eq!(refreshed.device_id, previous.device_id);
+        assert!(refreshed.executor_running);
+        assert_ne!(refreshed.temporary_password, previous.temporary_password);
+        assert!(refreshed.password_version > previous.password_version);
+        let stored = crate::device_access::load(&path).await.unwrap();
+        assert_eq!(stored.temporary_password, refreshed.temporary_password);
+        let credential = DeviceCredential::read(&path).await.unwrap();
+        assert!(credential.verify(Zeroizing::new(refreshed.temporary_password.clone())).await.unwrap());
+        assert!(!credential.verify(Zeroizing::new(previous.temporary_password)).await.unwrap());
+        let observed = tokio::time::timeout(Duration::from_secs(6), async {
+            loop {
+                let status = next_status(&mut observer).await.unwrap();
+                if status.password_version == refreshed.password_version { break status; }
+            }
+        }).await.unwrap();
+        assert_eq!(observed.temporary_password, refreshed.temporary_password);
+        // A second explicit refresh changes the credential again; the same
+        // authenticated local socket and observer remain usable.
+        let again = request_password_rotation(&mut requester).await.unwrap();
+        assert_ne!(again.temporary_password, refreshed.temporary_password);
+        assert!(again.password_version > refreshed.password_version);
+        assert!(!DeviceCredential::read(&path).await.unwrap().verify(Zeroizing::new(refreshed.temporary_password)).await.unwrap());
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn unauthenticated_password_refresh_cannot_change_the_credential() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("executor.sqlite3");
+        crate::device_access::save(&path, &crate::device_access::DeviceAccess {
+            tenant_id: "tenant".into(), device_id: "device".into(), device_code: "123456789".into(),
+            temporary_password: "OLDPASS8".into(), password_version: 1, password_hash: "initial hash".into(),
+        }).await.unwrap();
+        let token = ensure_machine_token(directory.path()).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
+        assert!(connect_with_token(port, &[0u8;32]).await.is_err());
+        let (mut socket, _) = connect_async(format!("ws://127.0.0.1:{port}/local")).await.unwrap();
+        assert_eq!(receive_json(&mut socket).await.unwrap()["type"], "hello");
+        send_json(&mut socket, &json!({"type":"rotate_password"})).await.unwrap();
+        assert!(tokio::time::timeout(Duration::from_secs(3), receive_json(&mut socket)).await.unwrap().is_err());
+        let stored = crate::device_access::load(&path).await.unwrap();
+        assert_eq!(stored.temporary_password, "OLDPASS8");
+        assert_eq!(stored.password_version, 1);
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn missing_credential_password_refresh_returns_error_without_creating_a_device() {
+        let directory = tempfile::tempdir().unwrap();
+        let token = ensure_machine_token(directory.path()).unwrap();
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(serve(listener, directory.path().to_path_buf(), token));
+        let mut socket = connect_with_token(port, &token).await.unwrap();
+        assert!(tokio::time::timeout(Duration::from_secs(3), request_password_rotation(&mut socket)).await.unwrap().is_err());
+        assert!(!directory.path().join("executor.sqlite3").exists());
         server.abort();
     }
 

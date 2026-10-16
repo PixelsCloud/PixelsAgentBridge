@@ -1,5 +1,29 @@
 import { test, expect } from '@playwright/test';
 
+test('device search matches names, raw and formatted codes and supports clearing without connecting',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?many-devices');
+  const search=page.getByRole('textbox',{name:'Search name or device code',exact:true});
+  const cards=page.locator('.device-list .home-recent-device');
+  await expect(cards).toHaveCount(33);
+  await search.fill('DEVICE 33');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText('Device 33');
+  await search.fill('123456791');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText('Device 3');
+  await search.fill('123 456 791');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText('Device 3');
+  await search.fill('missing-device');
+  await expect(cards).toHaveCount(0);
+  await expect(page.getByText('No matching devices',{exact:true})).toBeVisible();
+  await page.locator('.device-search .ant-input-clear-icon').click();
+  await expect(cards).toHaveCount(33);
+  await page.locator('.remote-list').evaluate(element=>{element.style.width='290px';element.style.height='600px';});
+  await page.locator('.remote-list').screenshot({path:'../../.build/device-search-preview.png'});
+  expect(await page.evaluate(()=>(window as any).fixture.calls.filter((call:any)=>call.command==='operator_connect_saved'))).toEqual([]);
+});
+
 for (const presence of ['offline', 'unknown', 'error']) {
   test(`a confirmed connection shows online across home, list and details despite ${presence} directory data`,async({page})=>{
     await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?home&presence=${presence}`);

@@ -27,6 +27,8 @@ pub struct DeviceStatus {
     pub device_code: String,
     pub device_id: String,
     pub temporary_password: String,
+    #[serde(default)]
+    pub password_version: u64,
     pub executor_running: bool,
     pub control_phase: String,
 }
@@ -74,6 +76,7 @@ async fn read_device_status_with_service(
         device_code: access.device_code,
         device_id: access.device_id,
         temporary_password: access.temporary_password,
+        password_version: access.password_version,
         executor_running: service_alive || heartbeat_running || service_running(),
         control_phase,
     })

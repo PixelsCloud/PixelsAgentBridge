@@ -64,6 +64,24 @@ async fn device_status(state: tauri::State<'_, LocalStatus>) -> Result<DeviceSta
         .map_err(|error| error.to_string())
 }
 
+fn accept_local_status(current: &mut Option<DeviceStatus>, next: DeviceStatus) -> bool {
+    if current.as_ref().is_some_and(|old| old.device_id == next.device_id && old.password_version > next.password_version) {
+        return false;
+    }
+    *current = Some(next);
+    true
+}
+
+#[tauri::command]
+async fn rotate_device_password(app: tauri::AppHandle, state: tauri::State<'_, LocalStatus>) -> Result<DeviceStatus, String> {
+    let status = pab_executor::local_ipc::rotate_local_password().await.map_err(|_| "password_refresh_failed")?;
+    let mut current = state.0.write().await;
+    accept_local_status(&mut current, status.clone());
+    let status = current.clone().unwrap_or(status);
+    let _ = app.emit("local-device-status", status.clone());
+    Ok(status)
+}
+
 async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
     #[cfg(target_os = "macos")]
     let _recovery = desktop_input::start_recovery_monitor();
@@ -97,8 +115,9 @@ async fn watch_local_service(handle: tauri::AppHandle, status: LocalStatus) {
                     .await
                     {
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::Status(next))) => {
-                            *status.0.write().await = Some(next.clone());
-                            let _ = handle.emit("local-device-status", next);
+                            if accept_local_status(&mut *status.0.write().await, next.clone()) {
+                                let _ = handle.emit("local-device-status", next);
+                            }
                         }
                         Ok(Ok(pab_executor::local_ipc::LocalEvent::StatusUnavailable(message))) => {
                             tracing::debug!(%message, "local device status unavailable");
@@ -449,6 +468,7 @@ pub fn run() {
                 macos_permissions::open_macos_permission_settings,
                 macos_permissions::restart_macos_permission_processes,
                 device_status,
+                rotate_device_password,
                 browser_setup::browser_runtime_info,
                 browser_setup::browser_profile_status,
                 browser_setup::browser_profile_clear,
