@@ -48,9 +48,17 @@ Windows worker，90 的 1080p 硬软混合、全软件和动态桌面均通过 1
 采集 worker，复用原有压缩帧管道和内置软件编解码。2 vCPU VM 在真实 1080p
 全屏动画下，正式 Cargo 产物完成 90 帧解码、89 次画面变化，预热后约 13.74 FPS；
 28 项原生边界检查及 8 组实机生命周期检查通过。测试后恢复原分辨率，临时 native
-进程为 0。此数字不含网络/显示，不能关闭产品显示性能验收。Linux helper 注册、
+进程为 0。此数字不含网络/显示，不能关闭产品显示性能验收。Linux
 原生显示、输入、X11 和登录界面仍未完成；VM 主画面 DRM GETFB2 返回 ENODEV，
 已记录硬件路径限制。详见 [Linux 采集阶段验收](acceptance/remote-desktop-linux-capture-2026-10-17.md)。
+
+后续 W5 helper 进展：已接入 Linux 内核进程身份、logind 图形会话观察和独立
+媒体 helper 注册；3 项 OS 测试与 VM 上 4 项媒体通道测试通过，真实桌面两次
+采集/解码/关闭重开均回收 worker 和旧注册。完整 Linux Desktop Release 编译
+和隔离 helper 启停通过；内嵌 worker 1080p 动画约 13.61 FPS，测试后恢复布局，
+自有 native 进程为 0。输入通道测试使用模拟后端，尚无 Linux 原生操作；网络、
+显示、真实注销切换、X11 与系统登录继续待验收。详见
+[Linux helper 阶段验收](acceptance/remote-desktop-linux-helper-2026-10-17.md)。
 
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已

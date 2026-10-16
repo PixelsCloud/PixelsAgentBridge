@@ -16,8 +16,8 @@ from gi.repository import Gio, GLib
 
 def main():
     probe = pathlib.Path(sys.argv[1]).resolve(strict=True)
-    if len(sys.argv) != 3 or sys.argv[2] not in ("--animate", "--fullscreen", "--native-worker"):
-        raise SystemExit("usage: linux_capture_1080.py PROBE --animate|--fullscreen|--native-worker")
+    if len(sys.argv) != 3 or sys.argv[2] not in ("--animate", "--fullscreen", "--native-worker", "--embedded-worker"):
+        raise SystemExit("usage: linux_capture_1080.py PROBE --animate|--fullscreen|--native-worker|--embedded-worker")
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
     def call(method, args=None):
@@ -65,7 +65,9 @@ def main():
         time.sleep(1)
         command = ([sys.executable, str(probe.parent / "verify_linux_worker.py"), str(probe),
                     str(probe.parent / "libpab-codec-check.so")]
-                   if sys.argv[2] == "--native-worker" else [str(probe), connector, sys.argv[2]])
+                   if sys.argv[2] in ("--native-worker", "--embedded-worker") else [str(probe), connector, sys.argv[2]])
+        if sys.argv[2] == "--embedded-worker":
+            command.append("--embedded")
         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
         report["probe_exit"] = result.returncode
         report["probe_stderr"] = result.stderr[-2000:]

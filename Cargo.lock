@@ -4907,6 +4907,7 @@ dependencies = [
  "hmac",
  "iroh-base",
  "pab-agent-core",
+ "pab-desktop-media",
  "pab-document",
  "pab-interactive-terminal",
  "pab-logging",
@@ -4966,6 +4967,7 @@ version = "1.2.48"
 dependencies = [
  "futures-util",
  "libc",
+ "libloading",
  "pab-protocol",
  "pab-terminal",
  "plist",

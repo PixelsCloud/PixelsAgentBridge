@@ -10,6 +10,9 @@ mod application_deadline;
 #[cfg(target_os = "macos")]
 #[path = "session_helper_macos_media.rs"]
 mod macos_media;
+#[cfg(target_os = "linux")]
+#[path = "session_helper_linux_media.rs"]
+pub(crate) mod linux_media;
 
 pub fn run() -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
@@ -99,7 +102,19 @@ pub fn run() -> Result<(), String> {
         task.abort();
         return Ok(());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    return tauri::async_runtime::block_on(async {
+        let mut media = linux_media::start()?;
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut termination = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
+        let result = tokio::select! {
+            result = run_forever(expected_desktop, applications_only) => result,
+            _ = termination.recv() => Ok(()),
+        };
+        media.shutdown().await;
+        result
+    });
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     tauri::async_runtime::block_on(run_forever(expected_desktop, applications_only))
 }
 

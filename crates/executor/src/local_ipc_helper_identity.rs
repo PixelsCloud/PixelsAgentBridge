@@ -51,6 +51,11 @@ pub(super) async fn verify(
     socket: &mut WebSocketStream<TcpStream>,
     frame: &Value,
 ) -> Result<Option<VerifiedHelper>, LocalIpcError> {
+    // Linux media is additive. Preserve the existing application-registration
+    // policy until Linux application routing has its own acceptance.
+    if !cfg!(any(windows, target_os = "macos")) {
+        return Ok(None);
+    }
     let Some(verified) = verify_process(socket, frame).await? else {
         return Ok(None);
     };
@@ -79,16 +84,36 @@ pub(super) struct VerifiedMediaHelper {
     native: UserIdentity,
     pid: u32,
     marker: String,
+    #[cfg(target_os = "linux")]
+    graphical: Option<pab_os_control::execution::LinuxGraphicalSession>,
 }
 impl VerifiedMediaHelper {
     pub fn same_process(&self, other: &Self) -> bool {
-        self.pid == other.pid && self.marker == other.marker && self.native == other.native
+        let same = self.pid == other.pid && self.marker == other.marker && self.native == other.native;
+        #[cfg(target_os = "linux")]
+        { same && self.graphical == other.graphical }
+        #[cfg(not(target_os = "linux"))]
+        { same }
     }
     pub fn current(&self) -> bool {
-        pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
-            && process_user_identity(self.pid).ok().as_ref() == Some(&self.native)
+        let current = pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
+            && process_user_identity(self.pid).ok().as_ref() == Some(&self.native);
+        #[cfg(target_os = "linux")]
+        { current && self.graphical.as_ref().is_some_and(|session| session.current(self.pid)) }
+        #[cfg(not(target_os = "linux"))]
+        { current }
+    }
+    pub async fn wait_retired(&self) {
+        #[cfg(target_os = "linux")]
+        loop {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            if !self.current() { return; }
+        }
+        #[cfg(not(target_os = "linux"))]
+        std::future::pending::<()>().await;
     }
 }
+#[cfg(any(not(target_os = "linux"), test))]
 fn media_account_allowed(account: &str, session: Option<u32>) -> bool {
     session.is_some_and(|id| id != 0)
         && !matches!(account, "S-1-5-19" | "S-1-5-20")
@@ -102,12 +127,24 @@ pub(super) async fn verify_media(
     let Some(verified) = verify_process(socket, frame).await? else {
         return Ok(None);
     };
+    #[cfg(target_os = "linux")]
+    {
+        let mut verified = verified;
+        let uid = verified.native.account_id.strip_prefix("uid:").and_then(|s| s.parse().ok());
+        let Some(uid) = uid else { return Ok(None); };
+        let pid = verified.pid;
+        verified.graphical = tokio::task::spawn_blocking(move || {
+            pab_os_control::execution::LinuxGraphicalSession::for_process(pid, uid).ok()
+        }).await.map_err(|_| LocalIpcError::Protocol)?;
+        return Ok(verified.current().then_some(verified));
+    }
     // The existing supervisor launches the Winlogon helper as SYSTEM in the
     // actual interactive session. Allow that identity only for media; never
     // expose it as a DesktopUser/application execution context. Session 0 and
     // Local/NetworkService remain rejected. macOS LoginWindow likewise uses
     // the existing root helper in its graphical audit session. Application
     // execution registration above still rejects root. Identity is kernel read.
+    #[cfg(not(target_os = "linux"))]
     Ok(
         media_account_allowed(&verified.native.account_id, verified.native.session_id)
             .then_some(verified),
@@ -123,8 +160,7 @@ async fn verify_process(
     else {
         return Ok(None);
     };
-    // Linux headless still supports old diagnostic helpers, not user app routing.
-    if !cfg!(any(windows, target_os = "macos")) {
+    if !cfg!(any(windows, target_os = "macos", target_os = "linux")) {
         return Ok(None);
     }
     let (native, marker) = tokio::task::spawn_blocking(move || {
@@ -153,6 +189,8 @@ async fn verify_process(
         native,
         pid,
         marker,
+        #[cfg(target_os = "linux")]
+        graphical: None,
     }))
 }
 

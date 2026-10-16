@@ -11,6 +11,10 @@ use std::{
 };
 
 pub mod channel;
+#[cfg(target_os = "linux")]
+mod linux_graphical;
+#[cfg(target_os = "linux")]
+pub use linux_graphical::LinuxGraphicalSession;
 
 #[cfg(unix)]
 mod unix;

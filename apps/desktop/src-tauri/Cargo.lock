@@ -5407,6 +5407,7 @@ dependencies = [
  "pab-desktop-media",
  "pab-executor",
  "pab-logging",
+ "pab-os-control",
  "pab-protocol",
  "pab-remote-desktop",
  "pab-screenshot",
@@ -5567,6 +5568,7 @@ version = "1.2.48"
 dependencies = [
  "futures-util",
  "libc",
+ "libloading 0.8.9",
  "pab-protocol",
  "plist",
  "rustix 1.1.4",

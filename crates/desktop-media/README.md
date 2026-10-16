@@ -123,11 +123,16 @@ The Linux native worker now implements GNOME DisplayConfig inventory and
 ScreenCast v4 / PipeWire capture through the same private compressed pipe.
 This is the CPU fallback: mapped BGRx is converted by the bundled BT.709 software
 encoder. It keeps one pending pool buffer, releases it before pipe writes, and
-retires the source when the layout, session or format changes. It does not yet
-register a Linux product helper or provide Linux rendering/input/login support.
+retires the source when the layout, session or format changes. Linux Desktop now
+registers its media helper using the existing process identity challenge plus
+kernel UID and logind graphical-user observations. Idle registrations retire on
+session changes too. Linux rendering, native input and system login remain open.
 Build dependencies are gio-2.0, libpipewire-0.3 and NASM; the existing Linux
 Desktop image and package already include PipeWire. GNOME's interface is private
 and versioned; this adapter does not claim support for every Wayland desktop.
 See `acceptance/remote-desktop-linux-capture-2026-10-17.md` for 1080p VM results,
 real cancellation/layout checks and remaining work. The native boundary checks
 in `tests/native_linux.cpp` can run with ASan/UBSan without a desktop session.
+See `acceptance/remote-desktop-linux-helper-2026-10-17.md` for real helper IPC,
+isolated Desktop helper startup and embedded-worker tests. These do not yet
+constitute an end-to-end remote window or system-login acceptance.

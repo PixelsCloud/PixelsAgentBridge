@@ -408,6 +408,10 @@ pub fn run() {
             {
                 gui_instance.listen(app.handle().clone())?;
                 app.manage(gui_instance);
+                match session_helper::linux_media::start() {
+                    Ok(media) => { app.manage(media); }
+                    Err(error) => tracing::warn!(%error, "Linux media helper is unavailable"),
+                }
             }
             tauri::async_runtime::spawn(show_pending_browser_handoff(app.handle().clone()));
             let update_state = app.state::<update::UpdateState>().inner().clone();

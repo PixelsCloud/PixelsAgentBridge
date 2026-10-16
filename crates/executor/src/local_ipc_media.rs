@@ -247,11 +247,14 @@ pub(super) async fn serve_registered(
         }));
     CHANGED.notify_waiters();
     let mut stop: Option<oneshot::Receiver<()>> = None;
+    let retired = identity.wait_retired();
+    tokio::pin!(retired);
     loop {
         let request = tokio::select! {
             request = requests.recv() => request.ok_or(LocalIpcError::Closed)?,
             _ = stopped(&mut stop) => return Ok(()),
             _ = receive_frame(&mut socket) => return Err(LocalIpcError::Closed),
+            _ = &mut retired => return Err(LocalIpcError::Authentication),
         };
         if !identity.current() {
             return Err(LocalIpcError::Authentication);
@@ -274,6 +277,7 @@ pub(super) async fn serve_registered(
             result = exchange(&mut socket, &operation) => result,
             _ = reply.closed() => return Ok(()),
             _ = stopped(&mut stop) => return Ok(()),
+            _ = &mut retired => return Err(LocalIpcError::Authentication),
         };
         let failed = result.is_err();
         if reply.send(result).is_err() || failed {
@@ -457,7 +461,7 @@ fn unavailable_local(error: DesktopError) -> LocalIpcError {
     LocalIpcError::Remote(error.to_string())
 }
 
-#[cfg(all(test, any(windows, target_os = "macos")))]
+#[cfg(all(test, any(windows, target_os = "macos", target_os = "linux")))]
 mod tests {
     use super::*;
     use pab_protocol::{DesktopCodec, DesktopColor, DesktopRotation, RequestId};
@@ -578,7 +582,7 @@ mod tests {
             self.helper.abort();
         }
     }
-    async fn pair(backend: Arc<Backend>) -> Pair {
+    async fn pair(backend: Arc<dyn DesktopBackend>) -> Pair {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
@@ -616,6 +620,7 @@ mod tests {
         assert!(providers().lock().unwrap().is_empty());
     }
     #[tokio::test]
+    #[cfg_attr(target_os = "linux", ignore = "requires an active local graphical user; run on the Linux VM with --ignored")]
     async fn verified_helper_transfers_bounded_binary_and_retires_on_idle_drop() {
         let _lock = LOCK.lock().await;
         for _ in 0..2 {
@@ -630,7 +635,40 @@ mod tests {
             ended(pair, &backend).await;
         }
     }
+    #[cfg(target_os = "linux")]
     #[tokio::test]
+    #[ignore = "requires active GNOME and sibling pab-linux-media-worker-cargo; run on the Linux VM"]
+    async fn linux_native_capture_crosses_verified_helper_pipe_and_reopens() {
+        use pab_desktop_media::{NativeBackend, software::SoftwareDecoder};
+        let _lock = LOCK.lock().await;
+        let worker = std::env::current_exe().unwrap().parent().unwrap().join("pab-linux-media-worker-cargo");
+        assert!(worker.is_file(), "place the Cargo-built media worker beside this test binary");
+        let backend = Arc::new(NativeBackend::new(worker, vec![]));
+        for cycle in 0..2 {
+            let pair = pair(backend.clone()).await;
+            let screens = HelperMediaBackend.screens().await.unwrap();
+            let mut config = config();
+            config.screen = screens.into_iter().find(|screen| screen.primary).unwrap();
+            let width = config.screen.pixel_width as usize;
+            let height = config.screen.pixel_height as usize;
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let mut source = HelperMediaBackend.start(config).await.unwrap();
+            let frame = tokio::time::timeout(WAIT, source.next_frame()).await.unwrap().unwrap();
+            assert!(frame.keyframe);
+            assert_eq!(decoder.decode(&frame.bytes).unwrap().unwrap().len(), width * height * 3 / 2);
+            drop(source);
+            tokio::time::timeout(WAIT, async {
+                while !pair.server.is_finished() || !pair.helper.is_finished() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                backend.idle().await;
+            }).await.unwrap();
+            assert!(providers().lock().unwrap().is_empty());
+            println!("Linux native helper cycle {cycle}: {width}x{height}, decoded, worker reaped, registration retired");
+        }
+    }
+    #[tokio::test]
+    #[cfg_attr(target_os = "linux", ignore = "requires an active local graphical user; run on the Linux VM with --ignored")]
     async fn cancellation_during_start_or_static_capture_releases_helper() {
         let _lock = LOCK.lock().await;
         for starting in [true, false] {
@@ -680,6 +718,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(target_os = "linux", ignore = "requires an active local graphical user; run on the Linux VM with --ignored")]
     async fn paired_input_works_during_static_capture_and_releases_on_socket_close() {
         let _lock = LOCK.lock().await;
         for close_input in [true, false] {

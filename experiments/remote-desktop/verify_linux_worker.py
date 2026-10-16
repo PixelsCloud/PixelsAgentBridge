@@ -23,16 +23,17 @@ class Bytes(ctypes.Structure):
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: verify_linux_worker.py WORKER CODEC_LIBRARY")
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--embedded"):
+        raise SystemExit("usage: verify_linux_worker.py WORKER CODEC_LIBRARY [--embedded]")
     worker = pathlib.Path(sys.argv[1]).resolve(strict=True)
+    command = [str(worker)] + (["--media-worker"] if len(sys.argv) == 4 else [])
     library = ctypes.CDLL(str(pathlib.Path(sys.argv[2]).resolve(strict=True)))
     library.pab_soft_decoder_new.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
     library.pab_soft_decoder_new.restype = ctypes.c_void_p
     library.pab_soft_decoder_drop.argtypes = [ctypes.c_void_p]
     library.pab_soft_decode.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(Bytes)]
     library.pab_soft_decode.restype = ctypes.c_bool
-    inventory = subprocess.run([str(worker), "inventory"], capture_output=True, text=True, timeout=8, check=True)
+    inventory = subprocess.run(command + ["inventory"], capture_output=True, text=True, timeout=8, check=True)
     screens = json.loads(inventory.stdout)
     screen = next(s for s in screens if s["primary"])
     width, height = screen["pixel_width"], screen["pixel_height"]
@@ -62,7 +63,7 @@ def main():
             if not context.pending():
                 break
             context.iteration(False)
-    source = subprocess.Popen([str(worker), "capture", screen["id"], "15", "desktop"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+    source = subprocess.Popen(command + ["capture", screen["id"], "15", "desktop"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
     total_bytes = 0
     samples = []
     times = []
