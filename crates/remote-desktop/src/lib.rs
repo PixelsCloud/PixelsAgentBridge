@@ -5,10 +5,11 @@ mod wire;
 pub use wire::{DesktopVideoReader, DesktopVideoWriter, VideoFrame};
 mod host;
 pub use host::{
-    DesktopBackend, DesktopConnectionGuard, DesktopHost, DesktopSource, MediaFrame, MediaFuture,
+    DesktopBackend, DesktopConnectionGuard, DesktopHost, DesktopInputSink, DesktopSource,
+    MediaFrame, MediaFuture,
 };
 mod client;
-pub use client::RemoteDesktopSession;
+pub use client::{RemoteDesktopInputControl, RemoteDesktopSession};
 
 use pab_protocol::DesktopErrorCode;
 #[derive(Debug, thiserror::Error)]

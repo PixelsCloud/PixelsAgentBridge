@@ -58,12 +58,46 @@ struct Backend {
     active: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     maximum: Arc<AtomicUsize>,
+    input_active: Arc<AtomicUsize>,
+    input_held: Arc<AtomicUsize>,
+    wake: Option<Arc<tokio::sync::Notify>>,
+    fail_after: Option<u64>,
+}
+struct InputSink {
+    active: Arc<AtomicUsize>,
+    held: Arc<AtomicUsize>,
+    wake: Option<Arc<tokio::sync::Notify>>,
+}
+impl Drop for InputSink {
+    fn drop(&mut self) {
+        self.held.store(0, Ordering::SeqCst);
+        self.active.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+impl DesktopInputSink for InputSink {
+    fn apply(&mut self, event: RemoteDesktopInput) -> MediaFuture<'_, ()> {
+        Box::pin(async move {
+            match event {
+                RemoteDesktopInput::Key { down, .. } => {
+                    self.held.store(usize::from(down), Ordering::SeqCst)
+                }
+                RemoteDesktopInput::ReleaseAll => self.held.store(0, Ordering::SeqCst),
+                _ => {}
+            }
+            if let Some(wake) = &self.wake {
+                wake.notify_one();
+            }
+            Ok(())
+        })
+    }
 }
 struct Source {
     backend: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     number: u64,
     marker: u8,
+    wake: Option<Arc<tokio::sync::Notify>>,
+    fail_after: Option<u64>,
 }
 impl Drop for Source {
     fn drop(&mut self) {
@@ -74,6 +108,14 @@ impl DesktopSource for Source {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async move {
             tokio::task::yield_now().await;
+            if self.number > 0 {
+                if let Some(wake) = &self.wake {
+                    wake.notified().await;
+                }
+            }
+            if self.fail_after.is_some_and(|count| self.number >= count) {
+                return Err(DesktopError::Closed);
+            }
             self.number += 1;
             self.produced.fetch_add(1, Ordering::SeqCst);
             Ok(MediaFrame {
@@ -85,6 +127,19 @@ impl DesktopSource for Source {
     }
 }
 impl DesktopBackend for Backend {
+    fn supports_input(&self) -> bool {
+        true
+    }
+    fn input(&self, _: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopInputSink>> {
+        Box::pin(async move {
+            self.input_active.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(InputSink {
+                active: self.input_active.clone(),
+                held: self.input_held.clone(),
+                wake: self.wake.clone(),
+            }) as Box<dyn DesktopInputSink>)
+        })
+    }
     fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>> {
         Box::pin(async { Ok(screens()) })
     }
@@ -96,6 +151,8 @@ impl DesktopBackend for Backend {
                 backend: self.active.clone(),
                 produced: self.produced.clone(),
                 number: 0,
+                wake: self.wake.clone(),
+                fail_after: self.fail_after,
                 marker: if config.screen.id == "left" {
                     0x55
                 } else {
@@ -395,7 +452,7 @@ async fn partial_frame_timeout_and_cancel_poison_only_that_video_stream() {
     for cancel in [false, true] {
         let config = config();
         let header = DesktopFrameHeader {
-            version: 1,
+            version: REMOTE_DESKTOP_SCHEMA_VERSION,
             session_id: config.session_id,
             generation: 1,
             frame_id: 1,
@@ -442,7 +499,7 @@ async fn idle_video_waits_for_changes_but_bounds_partial_payload() {
     let (_a, _b, client, peer) = pair().await;
     let config = config();
     let header = DesktopFrameHeader {
-        version: 1,
+        version: REMOTE_DESKTOP_SCHEMA_VERSION,
         session_id: config.session_id,
         generation: 1,
         frame_id: 1,
@@ -483,7 +540,7 @@ async fn oversized_stale_or_non_key_first_frame_is_rejected_before_payload() {
     for case in 0..4 {
         let config = config();
         let mut header = DesktopFrameHeader {
-            version: 1,
+            version: REMOTE_DESKTOP_SCHEMA_VERSION,
             session_id: config.session_id,
             generation: 1,
             frame_id: 1,
@@ -527,4 +584,136 @@ async fn no_backend_means_no_capability_and_open_does_not_reserve_device() {
         ));
     }
     server.legacy().await;
+}
+
+#[tokio::test]
+async fn input_is_opt_in_and_released_on_disable_screen_change_and_disconnect() {
+    let backend = Arc::new(Backend::default());
+    let host = DesktopHost::new(Some(backend.clone()));
+    let server = Harness::new(&host).await;
+    let mut viewer = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+        .await
+        .unwrap();
+    viewer.next_frame(WAIT).await.unwrap();
+    let press = RemoteDesktopInput::Key {
+        virtual_key: 65,
+        down: true,
+    };
+    assert!(viewer.send_input(press.clone()).await.is_err());
+    assert_eq!(backend.input_active.load(Ordering::SeqCst), 0);
+    for finish in ["release", "disable", "switch", "disconnect"] {
+        viewer.set_input_enabled(true).await.unwrap();
+        viewer.send_input(press.clone()).await.unwrap();
+        assert_eq!(backend.input_held.load(Ordering::SeqCst), 1);
+        match finish {
+            "release" => {
+                viewer
+                    .send_input(RemoteDesktopInput::ReleaseAll)
+                    .await
+                    .unwrap();
+                assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+                viewer.set_input_enabled(false).await.unwrap();
+            }
+            "disable" => viewer.set_input_enabled(false).await.unwrap(),
+            "switch" => {
+                let obsolete = viewer.input_control();
+                viewer.select_screen("left".into()).await.unwrap();
+                viewer.next_frame(WAIT).await.unwrap();
+                assert!(viewer.send_input(press.clone()).await.is_err());
+                viewer.set_input_enabled(true).await.unwrap();
+                assert!(matches!(
+                    obsolete.set_enabled(false).await,
+                    Err(DesktopError::Rejected {
+                        code: DesktopErrorCode::StaleGeneration,
+                        ..
+                    })
+                ));
+                assert!(matches!(
+                    obsolete.send(press.clone()).await,
+                    Err(DesktopError::Rejected {
+                        code: DesktopErrorCode::StaleGeneration,
+                        ..
+                    })
+                ));
+                assert_eq!(backend.input_active.load(Ordering::SeqCst), 1);
+                viewer.set_input_enabled(false).await.unwrap();
+            }
+            _ => server.peer.close(b"test input connection loss"),
+        }
+        eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
+        assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn input_wakes_static_capture_without_cancelling_pending_video_read() {
+    let backend = Arc::new(Backend {
+        wake: Some(Arc::new(tokio::sync::Notify::new())),
+        ..Default::default()
+    });
+    let host = DesktopHost::new(Some(backend));
+    let server = Harness::new(&host).await;
+    let mut viewer = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+        .await
+        .unwrap();
+    let first = viewer.next_frame(WAIT).await.unwrap();
+    viewer.report_presented(&first.header).unwrap();
+    let input = viewer.input_control();
+    input.set_enabled(true).await.unwrap();
+    let receiving = viewer.next_frame_when_changed();
+    tokio::pin!(receiving);
+    tokio::select! {
+        _ = &mut receiving => panic!("static capture must wait for input"),
+        _ = tokio::time::sleep(Duration::from_millis(50)) => {},
+    }
+    input
+        .send(RemoteDesktopInput::Key {
+            virtual_key: 65,
+            down: true,
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        tokio::time::timeout(WAIT, receiving)
+            .await
+            .unwrap()
+            .unwrap()
+            .header
+            .frame_id,
+        2
+    );
+    input.set_enabled(false).await.unwrap();
+    server.legacy().await;
+}
+
+#[tokio::test]
+async fn media_failure_releases_input_without_closing_shared_connection() {
+    let backend = Arc::new(Backend {
+        wake: Some(Arc::new(tokio::sync::Notify::new())),
+        fail_after: Some(1),
+        ..Default::default()
+    });
+    let host = DesktopHost::new(Some(backend.clone()));
+    let server = Harness::new(&host).await;
+    let mut viewer = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+        .await
+        .unwrap();
+    viewer.next_frame(WAIT).await.unwrap();
+    viewer.set_input_enabled(true).await.unwrap();
+    viewer
+        .send_input(RemoteDesktopInput::Key {
+            virtual_key: 65,
+            down: true,
+        })
+        .await
+        .unwrap();
+    assert!(viewer.next_frame(WAIT).await.is_err());
+    eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
+    assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+    server.legacy().await;
+    viewer.select_screen("primary".into()).await.unwrap();
+    viewer.next_frame(WAIT).await.unwrap();
+    viewer.set_input_enabled(true).await.unwrap();
+    viewer.close().await.unwrap();
+    eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
 }

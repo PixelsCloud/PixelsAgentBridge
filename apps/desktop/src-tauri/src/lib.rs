@@ -320,6 +320,11 @@ pub fn run_session_supervisor() -> Result<(), String> {
     windows_session_supervisor::run()
 }
 
+#[cfg(windows)]
+pub fn run_media_supervisor() -> Result<(), String> {
+    windows_session_supervisor::run_media_only()
+}
+
 pub fn run_session_helper() -> Result<(), String> {
     session_helper::run()
 }

@@ -40,7 +40,8 @@ discarded arbitrarily to recover latency.
 - `select_screen` stops the old source before publishing a new generation and
   attaching its video stream. Selecting the same ID restarts a stalled stream.
   Layout includes stable screen ID, negative origins, native coordinate size,
-  pixel size, DPI scale and rotation. Input mapping is not implemented here yet.
+  pixel size, DPI scale and rotation. Normalized input maps to the selected
+  desktop rectangle; coordinates already describe the visibly rotated screen.
 - A partial frame read/write that times out or is cancelled permanently consumes
   that stream handle. The next call fails rather than parsing leftover payload
   as another header. Recover with a new generation or a new viewer.
@@ -63,6 +64,26 @@ The adapter owns frame pacing, capture timestamps, codec/color compatibility and
 encoder resource lifetime. GPU textures should pass directly to compatible
 hardware encoders. This crate carries compressed bytes, not raw pixel textures.
 Do not log/archive frame payloads. No application configuration is introduced.
+
+## Input contract (schema v2)
+
+Input starts disabled, including after every generation change. A backend opts
+in using `supports_input` and creates a `DesktopInputSink` only after the first
+video frame has been sent and the viewer explicitly enables input. Native
+backends currently retain the default unsupported implementation.
+
+`input_control()` returns a generation-bound handle which can send controls
+while `next_frame_when_changed()` is pending. Never cancel the pending frame to
+handle mouse/keyboard events: a partial video read cannot be resumed. An old
+handle cannot operate a new generation or disable its input. The bounded
+existing control stream carries input; there is no new device authentication.
+
+The sink must release its own held keys/buttons on drop, including cancellation
+of `apply`. A timeout retires the sink without replaying the uncertain event.
+Native implementations must bind to the capture helper/session, check layout
+changes and provide crash recovery; the session tests use fake sinks and do
+not demonstrate operating-system injection or recovery. Input Debug output is
+redacted. Never log serialized input or password text.
 
 ## Verification
 

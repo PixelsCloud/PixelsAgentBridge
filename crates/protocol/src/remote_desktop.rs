@@ -3,7 +3,7 @@
 use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
-pub const REMOTE_DESKTOP_SCHEMA_VERSION: u16 = 1;
+pub const REMOTE_DESKTOP_SCHEMA_VERSION: u16 = 2;
 pub const DESKTOP_VIDEO_CHUNK_BYTES: usize = 64 * 1024;
 pub const DESKTOP_MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
 pub const DESKTOP_MAX_IN_FLIGHT: u64 = 4;
@@ -126,6 +126,7 @@ pub struct DesktopOpened {
     pub screens: Vec<DesktopScreen>,
     pub heartbeat_ms: u32,
     pub lease_ms: u32,
+    pub input_supported: bool,
 }
 impl DesktopOpened {
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -208,6 +209,62 @@ pub enum DesktopControlCommand {
         generation: u64,
         frame_id: u64,
     },
+    SetInput {
+        generation: u64,
+        enabled: bool,
+    },
+    Input {
+        generation: u64,
+        event: RemoteDesktopInput,
+    },
+}
+
+/// Coordinates are normalized in the already-rotated visible desktop. The
+/// receiver maps them using this generation's selected screen, never primary.
+/// Debug deliberately redacts key/button content; input is not an audit log.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RemoteDesktopInput {
+    Move {
+        x: u16,
+        y: u16,
+    },
+    Button {
+        x: u16,
+        y: u16,
+        button: crate::DesktopMouseButton,
+        down: bool,
+    },
+    Wheel {
+        delta: i16,
+    },
+    Key {
+        virtual_key: u16,
+        down: bool,
+    },
+    ReleaseAll,
+}
+impl std::fmt::Debug for RemoteDesktopInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RemoteDesktopInput(<redacted>)")
+    }
+}
+impl RemoteDesktopInput {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if matches!(self, Self::Key { virtual_key, .. } if !(1..=254).contains(virtual_key)) {
+            return Err("invalid remote desktop key");
+        }
+        Ok(())
+    }
+}
+impl DesktopScreen {
+    pub fn input_position(&self, x: u16, y: u16) -> Result<(i32, i32), &'static str> {
+        self.validate()?;
+        Ok((
+            self.x + (i64::from(x) * i64::from(self.desktop_width - 1) / 65535) as i32,
+            self.y + (i64::from(y) * i64::from(self.desktop_height - 1) / 65535) as i32,
+        ))
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -287,9 +344,38 @@ mod tests {
             primary: false,
         };
         validate_desktop_screens(&[s.clone()]).unwrap();
+        assert_eq!(s.input_position(0, 0).unwrap(), (-720, -50));
+        assert_eq!(s.input_position(u16::MAX, u16::MAX).unwrap(), (-1, 1229));
+        // Visible coordinates are already rotated and scaled: neither is
+        // applied twice when mapping to this screen's desktop rectangle.
+        assert_eq!(s.input_position(32768, 32768).unwrap(), (-361, 589));
         assert!(validate_desktop_screens(&[s.clone(), s.clone()]).is_err());
         let mut bad = s;
         bad.x = i32::MAX;
         assert!(bad.validate().is_err());
+    }
+    #[test]
+    fn input_validates_keys_without_exposing_them_in_debug() {
+        for key in [0, 255, u16::MAX] {
+            assert!(
+                RemoteDesktopInput::Key {
+                    virtual_key: key,
+                    down: true
+                }
+                .validate()
+                .is_err()
+            );
+        }
+        let event = RemoteDesktopInput::Key {
+            virtual_key: 65,
+            down: true,
+        };
+        event.validate().unwrap();
+        assert_eq!(format!("{event:?}"), "RemoteDesktopInput(<redacted>)");
+        let encoded = serde_json::to_vec(&event).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<RemoteDesktopInput>(&encoded).unwrap(),
+            event
+        );
     }
 }

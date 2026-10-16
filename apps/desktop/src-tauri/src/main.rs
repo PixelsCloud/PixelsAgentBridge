@@ -62,6 +62,13 @@ fn main() {
             }
         }
         #[cfg(windows)]
+        Some("--media-supervisor") => {
+            if let Err(error) = pab_desktop_lib::run_media_supervisor() {
+                eprintln!("pab-media-supervisor: {error}");
+                std::process::exit(1);
+            }
+        }
+        #[cfg(windows)]
         Some("--session-supervisor") => {
             if let Err(error) = pab_desktop_lib::run_session_supervisor() {
                 eprintln!("pab-session-supervisor: {error}");

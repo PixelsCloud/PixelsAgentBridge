@@ -28,11 +28,31 @@ pub struct MediaFrame {
 pub trait DesktopSource: Send {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame>;
 }
+/// Owns only this viewer's held keys/buttons. Drop must release them, including
+/// when apply is cancelled. Never replay events after an uncertain result.
+pub trait DesktopInputSink: Send {
+    fn apply(&mut self, event: RemoteDesktopInput) -> MediaFuture<'_, ()>;
+}
 pub trait DesktopBackend: Send + Sync {
     fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>>;
     /// First frame must initialize H.264 decoding (IDR + SPS/PPS). One source per
     /// generation; no native capture starts before the video stream is attached.
     fn start(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopSource>>;
+    fn supports_input(&self) -> bool {
+        false
+    }
+    fn input(&self, _config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopInputSink>> {
+        Box::pin(async {
+            Err(DesktopError::reject(
+                DesktopErrorCode::Unsupported,
+                "remote desktop input is unavailable",
+            ))
+        })
+    }
+}
+struct InputLease {
+    generation: Arc<Generation>,
+    sink: Box<dyn DesktopInputSink>,
 }
 
 struct Shared {
@@ -66,6 +86,7 @@ struct Generation {
     cancelled: watch::Sender<bool>,
     stopped: watch::Sender<bool>,
     claimed: AtomicBool,
+    frame_ready: AtomicBool,
     progress: Mutex<(u64, u64)>, // sent, cumulatively presented
     credit: Notify,
 }
@@ -90,6 +111,7 @@ impl Generation {
             cancelled: signal(),
             stopped: signal(),
             claimed: AtomicBool::new(false),
+            frame_ready: AtomicBool::new(false),
             progress: Mutex::new((0, 0)),
             credit: Notify::new(),
         })
@@ -301,7 +323,14 @@ impl DesktopHost {
             _ = cancelled(&entry.cancelled) => return Err(DesktopError::Closed),
             value = tokio::time::timeout(MEDIA_TIMEOUT, backend.screens()) => value.map_err(|_| DesktopError::Timeout)??,
         };
-        let opened = make_opened(id, 1, screens, screen_id.as_deref(), fps)?;
+        let opened = make_opened(
+            id,
+            1,
+            screens,
+            screen_id.as_deref(),
+            fps,
+            backend.supports_input(),
+        )?;
         *entry.state.lock().unwrap() = Some(Ready {
             video: Generation::new(opened.config.clone()),
         });
@@ -346,7 +375,14 @@ impl DesktopHost {
         let screens = tokio::time::timeout(MEDIA_TIMEOUT, backend.screens())
             .await
             .map_err(|_| DesktopError::Timeout)??;
-        let opened = make_opened(entry.id, next, screens, Some(screen_id), old.config.fps)?;
+        let opened = make_opened(
+            entry.id,
+            next,
+            screens,
+            Some(screen_id),
+            old.config.fps,
+            backend.supports_input(),
+        )?;
         if *entry.cancelled.borrow() {
             return Err(DesktopError::Closed);
         }
@@ -482,11 +518,30 @@ impl DesktopHost {
     ) -> Result<()> {
         let (mut writer, mut reader) = stream.into_framed();
         let mut sequence = 0_u64;
+        let mut input_lease: Option<InputLease> = None;
         loop {
             // No timeout/retry of a partial read. Lease expiry drops the entire
             // control future/stream via the outer cancellation select.
-            let input: DesktopControl =
-                serde_json::from_slice(&reader.read(DESKTOP_CONTROL_BYTES).await?)?;
+            let input: DesktopControl = {
+                let read = reader.read(DESKTOP_CONTROL_BYTES);
+                tokio::pin!(read);
+                loop {
+                    let active_generation =
+                        input_lease.as_ref().map(|lease| lease.generation.clone());
+                    let release = async move {
+                        if let Some(generation) = active_generation {
+                            cancelled(&generation.cancelled).await;
+                        } else {
+                            std::future::pending::<()>().await;
+                        }
+                    };
+                    tokio::select! {
+                        biased;
+                        _ = release => input_lease = None,
+                        message = &mut read => break serde_json::from_slice(&message?)?,
+                    }
+                }
+            };
             sequence = sequence
                 .checked_add(1)
                 .ok_or(DesktopError::Protocol("control sequence overflow"))?;
@@ -506,10 +561,23 @@ impl DesktopHost {
                 DesktopControlCommand::SelectScreen {
                     generation,
                     screen_id,
+                } => {
+                    input_lease = None;
+                    self.select_screen(entry, generation, &screen_id)
+                        .await
+                        .map(Some)
+                }
+                DesktopControlCommand::SetInput {
+                    generation,
+                    enabled,
                 } => self
-                    .select_screen(entry, generation, &screen_id)
+                    .set_input(entry, &mut input_lease, generation, enabled)
                     .await
-                    .map(Some),
+                    .map(|_| None),
+                DesktopControlCommand::Input { generation, event } => self
+                    .apply_input(entry, &mut input_lease, generation, event)
+                    .await
+                    .map(|_| None),
             };
             let output = match action {
                 Ok(None) => DesktopControlReply::Applied { sequence },
@@ -527,6 +595,71 @@ impl DesktopHost {
             .await
             .map_err(|_| DesktopError::Timeout)??;
         }
+    }
+    async fn set_input(
+        &self,
+        entry: &Arc<Entry>,
+        lease: &mut Option<InputLease>,
+        generation: u64,
+        enabled: bool,
+    ) -> Result<()> {
+        let video = entry.video(generation)?;
+        if !enabled {
+            *lease = None;
+            return Ok(());
+        }
+        if *video.cancelled.borrow() || !video.frame_ready.load(Ordering::Acquire) {
+            return Err(DesktopError::reject(
+                DesktopErrorCode::MediaUnavailable,
+                "wait for the current desktop image before enabling input",
+            ));
+        }
+        if lease
+            .as_ref()
+            .is_some_and(|l| Arc::ptr_eq(&l.generation, &video))
+        {
+            return Ok(());
+        }
+        *lease = None;
+        let backend = self.shared.backend.as_ref().ok_or(DesktopError::Closed)?;
+        let sink = tokio::select! {
+            biased;
+            _ = cancelled(&video.cancelled) => return Err(DesktopError::Closed),
+            result = tokio::time::timeout(MEDIA_TIMEOUT, backend.input(video.config.clone())) => result.map_err(|_| DesktopError::Timeout)??,
+        };
+        *lease = Some(InputLease {
+            generation: video,
+            sink,
+        });
+        Ok(())
+    }
+    async fn apply_input(
+        &self,
+        entry: &Arc<Entry>,
+        lease: &mut Option<InputLease>,
+        generation: u64,
+        event: RemoteDesktopInput,
+    ) -> Result<()> {
+        event.validate().map_err(DesktopError::Protocol)?;
+        let video = entry.video(generation)?;
+        let active = lease
+            .as_mut()
+            .filter(|l| Arc::ptr_eq(&l.generation, &video))
+            .ok_or_else(|| {
+                DesktopError::reject(
+                    DesktopErrorCode::InvalidRequest,
+                    "remote desktop is view only",
+                )
+            })?;
+        let result = tokio::select! {
+            biased;
+            _ = cancelled(&video.cancelled) => Err(DesktopError::Closed),
+            result = tokio::time::timeout(MEDIA_TIMEOUT, active.sink.apply(event)) => result.unwrap_or(Err(DesktopError::Timeout)),
+        };
+        if result.is_err() {
+            *lease = None;
+        }
+        result
     }
     async fn video(
         &self,
@@ -577,7 +710,9 @@ impl DesktopHost {
                     },
                     bytes: media.bytes,
                 };
-                writer.send(&frame, timeout).await
+                writer.send(&frame, timeout).await?;
+                video.frame_ready.store(true, Ordering::Release);
+                Ok::<_, DesktopError>(())
             };
             tokio::select! { biased; _ = &mut peer_end => return Ok(()), result = send => result? }
         }
@@ -589,6 +724,7 @@ fn make_opened(
     screens: Vec<DesktopScreen>,
     selected: Option<&str>,
     fps: u16,
+    input_supported: bool,
 ) -> Result<DesktopOpened> {
     validate_desktop_screens(&screens).map_err(DesktopError::Protocol)?;
     let screen = match selected {
@@ -617,6 +753,7 @@ fn make_opened(
         screens,
         heartbeat_ms: HEARTBEAT_MS,
         lease_ms: LEASE_MS,
+        input_supported,
     };
     opened.validate().map_err(DesktopError::Protocol)?;
     Ok(opened)
@@ -722,11 +859,102 @@ mod tests {
         OperatorRef::guest(EndpointKey::new([8; 32]))
     }
 
+    struct PendingInput(Arc<AtomicBool>);
+    impl Drop for PendingInput {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+    impl DesktopInputSink for PendingInput {
+        fn apply(&mut self, _: RemoteDesktopInput) -> MediaFuture<'_, ()> {
+            Box::pin(async {
+                self.0.store(true, Ordering::SeqCst);
+                std::future::pending().await
+            })
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn input_timeout_releases_partially_applied_press_and_never_replays() {
+        let host = DesktopHost::new(Some(Arc::new(Backend { pending: false })));
+        let (_, guard) = host
+            .open(
+                owner(),
+                None,
+                REMOTE_DESKTOP_SCHEMA_VERSION,
+                RequestId::new(),
+                None,
+                15,
+            )
+            .await
+            .unwrap();
+        let entry = guard.entry.as_ref().unwrap();
+        let held = Arc::new(AtomicBool::new(false));
+        let mut lease = Some(InputLease {
+            generation: entry.video(1).unwrap(),
+            sink: Box::new(PendingInput(held.clone())),
+        });
+        let event = RemoteDesktopInput::Key {
+            virtual_key: 65,
+            down: true,
+        };
+        assert!(matches!(
+            host.apply_input(entry, &mut lease, 1, event.clone()).await,
+            Err(DesktopError::Timeout)
+        ));
+        assert!(lease.is_none());
+        assert!(!held.load(Ordering::SeqCst));
+        assert!(host.apply_input(entry, &mut lease, 1, event).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn no_input_before_first_frame_or_after_generation_cancellation() {
+        let host = DesktopHost::new(Some(Arc::new(Backend { pending: false })));
+        let (_, guard) = host
+            .open(
+                owner(),
+                None,
+                REMOTE_DESKTOP_SCHEMA_VERSION,
+                RequestId::new(),
+                None,
+                15,
+            )
+            .await
+            .unwrap();
+        let entry = guard.entry.as_ref().unwrap();
+        let mut lease = None;
+        assert!(matches!(
+            host.set_input(entry, &mut lease, 1, true).await,
+            Err(DesktopError::Rejected {
+                code: DesktopErrorCode::MediaUnavailable,
+                ..
+            })
+        ));
+        let generation = entry.video(1).unwrap();
+        generation.frame_ready.store(true, Ordering::Release);
+        generation.stop();
+        assert!(matches!(
+            host.set_input(entry, &mut lease, 1, true).await,
+            Err(DesktopError::Rejected {
+                code: DesktopErrorCode::MediaUnavailable,
+                ..
+            })
+        ));
+        assert!(lease.is_none());
+    }
+
     #[tokio::test(start_paused = true)]
     async fn abandoned_open_expires_and_old_guard_cannot_release_new_session() {
         let host = DesktopHost::new(Some(Arc::new(Backend { pending: false })));
         let (_, mut old_guard) = host
-            .open(owner(), None, 1, RequestId::new(), None, 15)
+            .open(
+                owner(),
+                None,
+                REMOTE_DESKTOP_SCHEMA_VERSION,
+                RequestId::new(),
+                None,
+                15,
+            )
             .await
             .unwrap();
         tokio::task::yield_now().await;
@@ -734,7 +962,14 @@ mod tests {
         tokio::task::yield_now().await;
         assert!(host.shared.slot.lock().unwrap().is_none());
         let (_, _new_guard) = host
-            .open(owner(), None, 1, RequestId::new(), None, 15)
+            .open(
+                owner(),
+                None,
+                REMOTE_DESKTOP_SCHEMA_VERSION,
+                RequestId::new(),
+                None,
+                15,
+            )
             .await
             .unwrap();
         let new_id = host.shared.slot.lock().unwrap().as_ref().unwrap().id;
@@ -753,7 +988,14 @@ mod tests {
         let opening = host.clone();
         let task = tokio::spawn(async move {
             opening
-                .open(owner(), None, 1, RequestId::new(), None, 15)
+                .open(
+                    owner(),
+                    None,
+                    REMOTE_DESKTOP_SCHEMA_VERSION,
+                    RequestId::new(),
+                    None,
+                    15,
+                )
                 .await
         });
         while host.shared.slot.lock().unwrap().is_none() {
@@ -763,9 +1005,16 @@ mod tests {
         assert!(matches!(task.await.unwrap(), Err(DesktopError::Closed)));
         assert!(host.shared.slot.lock().unwrap().is_none());
         assert!(
-            host.open(owner(), None, 1, RequestId::new(), None, 15)
-                .await
-                .is_err()
+            host.open(
+                owner(),
+                None,
+                REMOTE_DESKTOP_SCHEMA_VERSION,
+                RequestId::new(),
+                None,
+                15
+            )
+            .await
+            .is_err()
         );
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -776,7 +1025,14 @@ mod tests {
             let contender = host.for_connection();
             jobs.spawn(async move {
                 contender
-                    .open(owner(), None, 1, RequestId::new(), None, 15)
+                    .open(
+                        owner(),
+                        None,
+                        REMOTE_DESKTOP_SCHEMA_VERSION,
+                        RequestId::new(),
+                        None,
+                        15,
+                    )
                     .await
             });
         }

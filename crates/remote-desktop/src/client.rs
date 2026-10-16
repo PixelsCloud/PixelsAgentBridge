@@ -9,7 +9,7 @@ struct Command {
     result: oneshot::Sender<Result<DesktopControlReply>>,
 }
 /// One viewer bound to one already-authenticated connection. Dropping it ends
-/// its streams only. No reconnect, account changes, credential storage or input.
+/// its streams only. No reconnect, account changes or credential storage.
 pub struct RemoteDesktopSession {
     connection: PabConnection,
     opened: DesktopOpened,
@@ -66,6 +66,49 @@ struct OpenCleanup {
     id: RequestId,
     timeout: Duration,
     armed: bool,
+}
+/// Generation-bound control handle, separate from the video reader. Input must
+/// never cancel a partially received video frame, including on a static screen.
+/// Keeping this handle does not keep the session alive after its owner closes.
+#[derive(Clone)]
+pub struct RemoteDesktopInputControl {
+    generation: u64,
+    supported: bool,
+    commands: mpsc::Sender<Command>,
+}
+impl RemoteDesktopInputControl {
+    async fn command(&self, command: DesktopControlCommand) -> Result<()> {
+        let (result, reply) = oneshot::channel();
+        self.commands
+            .send(Command { command, result })
+            .await
+            .map_err(|_| DesktopError::Closed)?;
+        match reply.await.map_err(|_| DesktopError::Closed)?? {
+            DesktopControlReply::Applied { .. } => Ok(()),
+            _ => Err(DesktopError::Protocol("unexpected input control reply")),
+        }
+    }
+    pub async fn set_enabled(&self, enabled: bool) -> Result<()> {
+        if enabled && !self.supported {
+            return Err(DesktopError::reject(
+                DesktopErrorCode::Unsupported,
+                "remote desktop input is unavailable",
+            ));
+        }
+        self.command(DesktopControlCommand::SetInput {
+            generation: self.generation,
+            enabled,
+        })
+        .await
+    }
+    pub async fn send(&self, event: RemoteDesktopInput) -> Result<()> {
+        event.validate().map_err(DesktopError::Protocol)?;
+        self.command(DesktopControlCommand::Input {
+            generation: self.generation,
+            event,
+        })
+        .await
+    }
 }
 impl Drop for OpenCleanup {
     fn drop(&mut self) {
@@ -171,6 +214,23 @@ impl RemoteDesktopSession {
     }
     pub fn connection_path(&self) -> Option<pab_transport::ConnectionPath> {
         self.connection.selected_path()
+    }
+    /// Acquire again after screen selection/restart. Old handles cannot send
+    /// input to a newer generation or accidentally disable its input lease.
+    pub fn input_control(&self) -> RemoteDesktopInputControl {
+        RemoteDesktopInputControl {
+            generation: self.opened.config.generation,
+            supported: self.opened.input_supported,
+            commands: self.commands.clone(),
+        }
+    }
+    /// Confirms enabling/retiring this generation's input route. It does not
+    /// confirm that the OS processed releases or an application acted on input.
+    pub async fn set_input_enabled(&self, enabled: bool) -> Result<()> {
+        self.input_control().set_enabled(enabled).await
+    }
+    pub async fn send_input(&self, event: RemoteDesktopInput) -> Result<()> {
+        self.input_control().send(event).await
     }
     async fn attach_video(&mut self) -> Result<()> {
         let config = self.opened.config.clone();

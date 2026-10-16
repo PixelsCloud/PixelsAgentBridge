@@ -81,6 +81,9 @@ pub(super) struct VerifiedMediaHelper {
     marker: String,
 }
 impl VerifiedMediaHelper {
+    pub fn same_process(&self, other: &Self) -> bool {
+        self.pid == other.pid && self.marker == other.marker && self.native == other.native
+    }
     pub fn current(&self) -> bool {
         pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
             && process_user_identity(self.pid).ok().as_ref() == Some(&self.native)
@@ -153,6 +156,31 @@ async fn verify_process(
 #[cfg(test)]
 mod media_tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn media_pairing_binds_process_lifetime_and_session() {
+        let pid = std::process::id();
+        let native = process_user_identity(pid).unwrap();
+        let first = VerifiedMediaHelper {
+            native: native.clone(),
+            pid,
+            marker: "first-lifetime".into(),
+        };
+        let mut other = VerifiedMediaHelper {
+            native,
+            pid,
+            marker: "first-lifetime".into(),
+        };
+        assert!(first.same_process(&other));
+        other.marker = "reused-pid".into();
+        assert!(!first.same_process(&other));
+        other.marker = first.marker.clone();
+        other.pid = pid.saturating_add(1);
+        assert!(!first.same_process(&other));
+        other.pid = pid;
+        other.native.session_id = Some(u32::MAX);
+        assert!(!first.same_process(&other));
+    }
     #[test]
     fn media_requires_interactive_session_and_does_not_admit_service_accounts() {
         assert!(!media_account_allowed("S-1-5-18", Some(0)));

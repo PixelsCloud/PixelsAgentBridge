@@ -7,4 +7,4 @@ acceptance/fixtures/document/*.docx binary
 acceptance/fixtures/document/*.xlsx binary
 acceptance/fixtures/document/*.pptx binary
 assets/tessdata/*.traineddata binary
-crates/desktop-media/native/vendor/nvEncodeAPI.h text eol=lf
+crates/desktop-media/native/vendor/nvEncodeAPI.h text eol=lf whitespace=-blank-at-eof

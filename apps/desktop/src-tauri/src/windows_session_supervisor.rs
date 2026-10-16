@@ -86,8 +86,26 @@ impl Drop for Worker {
 }
 
 pub fn run() -> Result<(), String> {
+    run_mode(false)
+}
+
+/// Isolated acceptance can attach media to Default/Winlogon without registering
+/// another application, screenshot or legacy input provider.
+pub fn run_media_only() -> Result<(), String> {
+    run_mode(true)
+}
+
+fn run_mode(media_only: bool) -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::Machine).map_err(|error| error.to_string())?;
-    pab_logging::init("session-supervisor", paths.root()).map_err(|error| error.to_string())?;
+    pab_logging::init(
+        if media_only {
+            "media-supervisor"
+        } else {
+            "session-supervisor"
+        },
+        paths.root(),
+    )
+    .map_err(|error| error.to_string())?;
 
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut workers = Vec::<Worker>::new();
@@ -95,7 +113,11 @@ pub fn run() -> Result<(), String> {
     loop {
         // Application sessions are independent of the single desktop selected
         // for legacy window/input control. Never redirect an explicit user.
-        match application_targets() {
+        match if media_only {
+            Ok(Vec::new())
+        } else {
+            application_targets()
+        } {
             Ok(targets) => {
                 application_workers
                     .retain(|worker| targets.contains(&worker.target) && worker.is_running());
@@ -106,7 +128,7 @@ pub fn run() -> Result<(), String> {
                     {
                         continue;
                     }
-                    match launch_helper(&executable, target) {
+                    match launch_helper(&executable, target, false) {
                         Ok(worker) => application_workers.push(worker),
                         Err(error) => {
                             tracing::warn!(session_id = target.session_id, %error, "could not launch application helper")
@@ -140,7 +162,7 @@ pub fn run() -> Result<(), String> {
                     if workers.iter().any(|worker| worker.target == next_target) {
                         continue;
                     }
-                    match launch_helper(&executable, next_target) {
+                    match launch_helper(&executable, next_target, media_only) {
                         Ok(next) => {
                             tracing::info!(
                                 session_id = target.session_id,
@@ -521,7 +543,7 @@ fn environment_value(entry: &[u16], name: &str) -> Option<OsString> {
         .then(|| OsString::from_wide(&entry[separator + 1..]))
 }
 
-fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
+fn launch_helper(executable: &Path, target: Target, media_only: bool) -> io::Result<Worker> {
     // Window properties on a user's desktop must be accessed in that user's
     // logon context. Keep SYSTEM confined to the Winlogon helper.
     let primary = match target.desktop {
@@ -546,6 +568,8 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
         executable.display(),
         if target.desktop == DesktopKind::Applications {
             "--application-helper"
+        } else if media_only {
+            "--media-helper"
         } else {
             "--session-helper"
         },

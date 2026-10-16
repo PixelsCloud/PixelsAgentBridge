@@ -11,6 +11,8 @@ use pab_remote_desktop::{DesktopBackend, DesktopError, DesktopSource, MediaFrame
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicBool;
 use tokio::sync::Notify;
+#[path = "local_ipc_media_input.rs"]
+pub(super) mod input;
 
 const VERSION: u16 = 1;
 static PROVIDERS: OnceLock<Mutex<Vec<Arc<Provider>>>> = OnceLock::new();
@@ -22,12 +24,25 @@ struct Provider {
     id: u64,
     sender: mpsc::Sender<Request>,
     retired: AtomicBool,
+    identity: Arc<helper_identity::VerifiedMediaHelper>,
+    active_config: Mutex<Option<DesktopVideoConfig>>,
+    input_supported: bool,
+    input: Mutex<Option<Arc<input::InputProvider>>>,
+    ended: tokio::sync::watch::Sender<bool>,
 }
 struct Registration(u64);
 impl Drop for Registration {
     fn drop(&mut self) {
         if let Ok(mut providers) = providers().lock() {
-            providers.retain(|p| p.id != self.0);
+            providers.retain(|p| {
+                if p.id == self.0 {
+                    p.retired.store(true, Ordering::Release);
+                    p.ended.send_replace(true);
+                    false
+                } else {
+                    true
+                }
+            });
         }
         CHANGED.notify_waiters();
     }
@@ -118,6 +133,12 @@ async fn request(
 /// availability. Failure here is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
+    fn input(
+        &self,
+        config: DesktopVideoConfig,
+    ) -> MediaFuture<'_, Box<dyn pab_remote_desktop::DesktopInputSink>> {
+        Box::pin(input::open(config))
+    }
     fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>> {
         Box::pin(async {
             let provider = provider().await.map_err(unavailable)?;
@@ -135,14 +156,27 @@ impl DesktopBackend for HelperMediaBackend {
             config.validate().map_err(unavailable)?;
             let provider = provider().await.map_err(unavailable)?;
             let (stop, stopped) = oneshot::channel();
-            match request(&provider, Operation::Start { config }, Some(stopped))
-                .await
-                .map_err(unavailable)?
+            match request(
+                &provider,
+                Operation::Start {
+                    config: config.clone(),
+                },
+                Some(stopped),
+            )
+            .await
+            .map_err(unavailable)?
             {
-                Response::Started => Ok(Box::new(HelperSource {
-                    provider,
-                    _stop: stop,
-                }) as Box<dyn DesktopSource>),
+                Response::Started => {
+                    *provider
+                        .active_config
+                        .lock()
+                        .map_err(|_| unavailable("media provider state unavailable"))? =
+                        Some(config);
+                    Ok(Box::new(HelperSource {
+                        provider,
+                        _stop: stop,
+                    }) as Box<dyn DesktopSource>)
+                }
                 _ => Err(unavailable("invalid media start reply")),
             }
         })
@@ -157,6 +191,7 @@ impl Drop for HelperSource {
         // Mark unavailable synchronously before the next generation queries
         // screens. The actor then closes the pipe and awaits helper restart.
         self.provider.retired.store(true, Ordering::Release);
+        self.provider.ended.send_replace(true);
         CHANGED.notify_waiters();
     }
 }
@@ -183,15 +218,17 @@ pub(super) async fn serve_registered(
     }
     // Same kernel PID/account challenge; SYSTEM is accepted only in an
     // interactive session for the supervisor's secure-desktop media helper.
-    let identity = helper_identity::verify_media(&mut socket, &frame)
-        .await?
-        .ok_or(LocalIpcError::Authentication)?;
+    let identity = Arc::new(
+        helper_identity::verify_media(&mut socket, &frame)
+            .await?
+            .ok_or(LocalIpcError::Authentication)?,
+    );
     let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
     let (sender, mut requests) = mpsc::channel(1);
     let _registration = Registration(id);
     send_json(
         &mut socket,
-        &json!({"type":"media_helper_registered","version":VERSION}),
+        &json!({"type":"media_helper_registered","version":VERSION,"provider_id":id}),
     )
     .await?;
     providers()
@@ -201,6 +238,11 @@ pub(super) async fn serve_registered(
             id,
             sender,
             retired: AtomicBool::new(false),
+            identity: identity.clone(),
+            active_config: Mutex::new(None),
+            input_supported: frame["input_supported"].as_bool().unwrap_or(false),
+            input: Mutex::new(None),
+            ended: tokio::sync::watch::channel(false).0,
         }));
     CHANGED.notify_waiters();
     let mut stop: Option<oneshot::Receiver<()>> = None;
@@ -304,18 +346,19 @@ async fn read_control<S: AsyncRead + AsyncWrite + Unpin, T: serde::de::Deseriali
 /// Run on a separate connection in the active interactive helper. The caller
 /// owns the desktop/session lifecycle and must drop this future on a switch.
 pub async fn serve_helper(backend: &dyn DesktopBackend) -> Result<(), LocalIpcError> {
-    serve_helper_socket(connect_local().await?, backend).await
+    serve_helper_socket(connect_local().await?, backend, true).await
 }
 async fn serve_helper_socket(
     mut socket: LocalSocket,
     backend: &dyn DesktopBackend,
+    connect_input: bool,
 ) -> Result<(), LocalIpcError> {
     send_json(
         &mut socket,
-        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id()}),
+        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input()}),
     )
     .await?;
-    tokio::time::timeout(AUTH_TIMEOUT, async {
+    let provider_id = tokio::time::timeout(AUTH_TIMEOUT, async {
         loop {
             let frame: Value = read_control(&mut socket).await?;
             match frame["type"].as_str() {
@@ -323,7 +366,7 @@ async fn serve_helper_socket(
                 Some("media_helper_registered")
                     if frame["version"].as_u64() == Some(VERSION.into()) =>
                 {
-                    return Ok(());
+                    return frame["provider_id"].as_u64().ok_or(LocalIpcError::Protocol);
                 }
                 Some("status") | Some("error") => {}
                 _ => return Err(LocalIpcError::Protocol),
@@ -332,6 +375,18 @@ async fn serve_helper_socket(
     })
     .await
     .map_err(|_| LocalIpcError::Timeout)??;
+    tokio::select! {
+        result = serve_media_requests(socket, backend) => result,
+        result = async {
+            if connect_input { input::serve_helper(backend, provider_id).await }
+            else { std::future::pending().await }
+        } => result,
+    }
+}
+async fn serve_media_requests(
+    mut socket: LocalSocket,
+    backend: &dyn DesktopBackend,
+) -> Result<(), LocalIpcError> {
     let mut source: Option<Box<dyn DesktopSource>> = None;
     loop {
         let operation = read_control(&mut socket).await?;
@@ -413,6 +468,32 @@ mod tests {
         active: Arc<AtomicUsize>,
         starting: bool,
         pending_frame: bool,
+        input_enabled: bool,
+        input_active: Arc<AtomicUsize>,
+        held: Arc<AtomicBool>,
+    }
+    struct TestInput(Arc<AtomicUsize>, Arc<AtomicBool>);
+    impl Drop for TestInput {
+        fn drop(&mut self) {
+            self.1.store(false, Ordering::SeqCst);
+            self.0.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+    impl pab_remote_desktop::DesktopInputSink for TestInput {
+        fn apply(&mut self, event: pab_protocol::RemoteDesktopInput) -> MediaFuture<'_, ()> {
+            Box::pin(async move {
+                match event {
+                    pab_protocol::RemoteDesktopInput::Key { down, .. } => {
+                        self.1.store(down, Ordering::SeqCst)
+                    }
+                    pab_protocol::RemoteDesktopInput::ReleaseAll => {
+                        self.1.store(false, Ordering::SeqCst)
+                    }
+                    _ => {}
+                }
+                Ok(())
+            })
+        }
     }
     struct Source(Arc<AtomicUsize>, bool);
     impl Drop for Source {
@@ -457,6 +538,21 @@ mod tests {
         }
     }
     impl DesktopBackend for Backend {
+        fn supports_input(&self) -> bool {
+            self.input_enabled
+        }
+        fn input(
+            &self,
+            _: DesktopVideoConfig,
+        ) -> MediaFuture<'_, Box<dyn pab_remote_desktop::DesktopInputSink>> {
+            Box::pin(async move {
+                self.input_active.fetch_add(1, Ordering::SeqCst);
+                Ok(
+                    Box::new(TestInput(self.input_active.clone(), self.held.clone()))
+                        as Box<dyn pab_remote_desktop::DesktopInputSink>,
+                )
+            })
+        }
         fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>> {
             Box::pin(async { Ok(vec![config().screen]) })
         }
@@ -494,7 +590,7 @@ mod tests {
         });
         let helper = tokio::spawn(async move {
             let (socket, _) = connect_async(format!("ws://{address}")).await.unwrap();
-            let _ = serve_helper_socket(socket, backend.as_ref()).await;
+            let _ = serve_helper_socket(socket, backend.as_ref(), false).await;
         });
         Pair { server, helper }
     }
@@ -562,6 +658,108 @@ mod tests {
                 );
                 drop(source);
             }
+            ended(pair, &backend).await;
+        }
+    }
+
+    async fn input_pair(backend: Arc<Backend>, provider_id: u64) -> Pair {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async_with_config(stream, None).await.unwrap();
+            let frame: Value = read_control(&mut socket).await.unwrap();
+            let _ = input::serve_registered(socket, frame).await;
+        });
+        let helper = tokio::spawn(async move {
+            let (socket, _) = connect_async(format!("ws://{address}")).await.unwrap();
+            let _ = input::serve_helper_socket(socket, backend.as_ref(), provider_id).await;
+        });
+        Pair { server, helper }
+    }
+
+    #[tokio::test]
+    async fn paired_input_works_during_static_capture_and_releases_on_socket_close() {
+        let _lock = LOCK.lock().await;
+        for close_input in [true, false] {
+            let backend = Arc::new(Backend {
+                pending_frame: true,
+                input_enabled: true,
+                ..Default::default()
+            });
+            let pair = pair(backend.clone()).await;
+            let config = config();
+            let mut source = HelperMediaBackend.start(config.clone()).await.unwrap();
+            let id = providers().lock().unwrap()[0].id;
+            let wrong = input_pair(backend.clone(), u64::MAX).await;
+            tokio::time::timeout(WAIT, async {
+                while !wrong.server.is_finished() || !wrong.helper.is_finished() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            drop(wrong);
+            assert!(
+                providers().lock().unwrap()[0]
+                    .input
+                    .lock()
+                    .unwrap()
+                    .is_none()
+            );
+            let input_pair = input_pair(backend.clone(), id).await;
+            let mut sink = Some(HelperMediaBackend.input(config.clone()).await.unwrap());
+            let mut stale = config.clone();
+            stale.generation += 1;
+            assert!(HelperMediaBackend.input(stale).await.is_err());
+            {
+                let pending = source.next_frame();
+                tokio::pin!(pending);
+                tokio::select! {
+                    _ = &mut pending => panic!("static source unexpectedly returned"),
+                    _ = tokio::time::sleep(Duration::from_millis(50)) => {},
+                }
+                sink.as_mut()
+                    .unwrap()
+                    .apply(pab_protocol::RemoteDesktopInput::Key {
+                        virtual_key: 65,
+                        down: true,
+                    })
+                    .await
+                    .unwrap();
+                assert!(backend.held.load(Ordering::SeqCst));
+                if close_input {
+                    sink = None;
+                    tokio::time::timeout(WAIT, async {
+                        while backend.input_active.load(Ordering::SeqCst) != 0 {
+                            tokio::task::yield_now().await;
+                        }
+                    })
+                    .await
+                    .unwrap();
+                    assert!(!backend.held.load(Ordering::SeqCst));
+                    assert_eq!(backend.active.load(Ordering::SeqCst), 1);
+                }
+                // Ending the pending request retires capture. In the second
+                // case its input lease is still alive and must become unusable.
+            }
+            drop(source);
+            tokio::time::timeout(WAIT, async {
+                while backend.input_active.load(Ordering::SeqCst) != 0 {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            assert!(!backend.held.load(Ordering::SeqCst));
+            if let Some(mut sink) = sink {
+                assert!(
+                    sink.apply(pab_protocol::RemoteDesktopInput::ReleaseAll)
+                        .await
+                        .is_err()
+                );
+            }
+            drop(input_pair);
             ended(pair, &backend).await;
         }
     }
