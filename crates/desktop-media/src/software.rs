@@ -204,6 +204,7 @@ impl SoftwareDecoder {
             return Err("software decoder dimensions changed".into());
         }
         let (sy, su, sv) = frame.strides();
+        self.nv12.resize(self.width * self.height * 3 / 2, 0);
         for row in 0..self.height {
             self.nv12[row * self.width..(row + 1) * self.width]
                 .copy_from_slice(&frame.y()[row * sy..row * sy + self.width]);
@@ -218,11 +219,62 @@ impl SoftwareDecoder {
         }
         Ok(Some(&self.nv12))
     }
+
+    /// Transfer the output allocation to a UI thread and recycle it after GPU
+    /// upload. Moving the Vec does not copy its pixels or borrow the decoder.
+    #[cfg(target_os = "linux")]
+    pub(crate) fn decode_owned(
+        &mut self,
+        packet: &[u8],
+        recycled: Vec<u8>,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        if !recycled.is_empty() {
+            self.nv12 = recycled;
+        }
+        if self.decode(packet)?.is_some() {
+            Ok(Some(std::mem::take(&mut self.nv12)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn owned_decode_reuses_allocation_and_matches_borrowed_pixels() {
+        let fixture = include_bytes!("../tests/fixtures/apple-low-latency.pabvideo");
+        let number = |offset: usize| {
+            u32::from_le_bytes(fixture[offset..offset + 4].try_into().unwrap()) as usize
+        };
+        let mut owned = SoftwareDecoder::new(number(8), number(12)).unwrap();
+        let mut borrowed = SoftwareDecoder::new(number(8), number(12)).unwrap();
+        let mut recycled = Vec::new();
+        let mut allocation: *const u8 = std::ptr::null();
+        let mut offset = 24;
+        for _ in 0..number(20) {
+            let size = number(offset);
+            offset += 24;
+            let packet = &fixture[offset..offset + size];
+            offset += size;
+            recycled = owned.decode_owned(packet, recycled).unwrap().unwrap();
+            assert_eq!(
+                recycled.as_slice(),
+                borrowed.decode(packet).unwrap().unwrap()
+            );
+            if allocation.is_null() {
+                allocation = recycled.as_ptr();
+            }
+            assert_eq!(
+                recycled.as_ptr(),
+                allocation,
+                "NV12 storage was unnecessarily reallocated"
+            );
+        }
+        assert_eq!(offset, fixture.len());
+    }
     #[test]
     fn apple_low_latency_stream_has_immediate_ordered_pixels() {
         // Real M4 VideoToolbox output, generated quadrants only. This catches

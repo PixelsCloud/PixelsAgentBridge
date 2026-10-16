@@ -3,6 +3,7 @@
 #include "capture.h"
 #include "input.h"
 #include "render.h"
+#include "host.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {

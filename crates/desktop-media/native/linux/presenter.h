@@ -18,6 +18,8 @@ inline Viewport viewport(unsigned frame_width, unsigned frame_height, unsigned r
 class Presenter {
     GtkWidget* window_ = nullptr;
     GtkWidget* area_ = nullptr;
+    GtkWidget* hosted_root_ = nullptr;
+    GtkWidget* overlay_ = nullptr;
     GdkFrameClock* clock_ = nullptr;
     gulong painted_signal_ = 0;
     GThread* thread_ = g_thread_self();
@@ -151,14 +153,23 @@ void main() {
         view.drop_gl(); view.closed_ = true;
     }
 public:
-    Presenter(unsigned width, unsigned height, unsigned rotation, bool verify, bool fullscreen = false)
+    Presenter(unsigned width, unsigned height, unsigned rotation, bool verify, bool fullscreen = false, GtkWidget* host = nullptr)
         : width_(width), height_(height), rotation_(rotation), verify_(verify) {
         if (!width || !height || width%2 || height%2 || width>8192 || height>8192 || uint64_t(width)*height>33554432 || rotation>3)
             throw std::runtime_error("Invalid native renderer geometry");
-        if (!gtk_init_check(nullptr, nullptr)) throw std::runtime_error("Native viewer requires a graphical GTK session");
-        window_ = gtk_window_new(GTK_WINDOW_TOPLEVEL); g_object_ref_sink(window_);
-        gtk_window_set_title(GTK_WINDOW(window_), "Pixels remote desktop media test");
-        gtk_window_set_default_size(GTK_WINDOW(window_), 960, 600);
+        if (host) {
+            if (!GTK_IS_WINDOW(host) || !gtk_widget_get_realized(host) || fullscreen || verify)
+                throw std::runtime_error("Native host requires a realized GTK window");
+            hosted_root_ = gtk_bin_get_child(GTK_BIN(host));
+            if (!hosted_root_) throw std::runtime_error("Native host content is missing");
+            g_object_ref(hosted_root_);
+            window_ = host; g_object_ref(window_);
+        } else {
+            if (!gtk_init_check(nullptr, nullptr)) throw std::runtime_error("Native viewer requires a graphical GTK session");
+            window_ = gtk_window_new(GTK_WINDOW_TOPLEVEL); g_object_ref_sink(window_);
+            gtk_window_set_title(GTK_WINDOW(window_), "Pixels remote desktop media test");
+            gtk_window_set_default_size(GTK_WINDOW(window_), 960, 600);
+        }
         area_ = gtk_gl_area_new(); g_object_ref_sink(area_);
         gtk_gl_area_set_required_version(GTK_GL_AREA(area_), 3, 2);
         gtk_gl_area_set_use_es(GTK_GL_AREA(area_), FALSE);
@@ -167,9 +178,22 @@ public:
         g_signal_connect(area_, "render", G_CALLBACK(draw_callback), this);
         g_signal_connect(area_, "destroy", G_CALLBACK(destroyed), this);
         g_signal_connect(area_, "unrealize", G_CALLBACK(unrealized), this);
-        gtk_container_add(GTK_CONTAINER(window_), area_);
-        if (fullscreen) gtk_window_fullscreen(GTK_WINDOW(window_));
-        gtk_widget_show_all(window_);
+        if (hosted_root_) {
+            // The WebKit content keeps the toolbar and its existing state.
+            // Only this generation's GL overlay is removed on retirement.
+            overlay_ = gtk_overlay_new(); g_object_ref_sink(overlay_);
+            gtk_container_remove(GTK_CONTAINER(window_), hosted_root_);
+            gtk_container_add(GTK_CONTAINER(overlay_), hosted_root_);
+            gtk_container_add(GTK_CONTAINER(window_), overlay_);
+            gtk_widget_set_margin_top(area_, 72);
+            gtk_widget_set_hexpand(area_, TRUE); gtk_widget_set_vexpand(area_, TRUE);
+            gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), area_);
+            gtk_widget_show(area_); gtk_widget_show(overlay_);
+        } else {
+            gtk_container_add(GTK_CONTAINER(window_), area_);
+            if (fullscreen) gtk_window_fullscreen(GTK_WINDOW(window_));
+            gtk_widget_show_all(window_);
+        }
         clock_ = gtk_widget_get_frame_clock(area_);
         if (clock_) { g_object_ref(clock_); painted_signal_ = g_signal_connect(clock_, "after-paint", G_CALLBACK(after_paint), this); }
         // Potential GL errors are reported by poll/present after construction,
@@ -186,17 +210,30 @@ public:
             drop_gl();
         }
         g_signal_handlers_disconnect_by_data(area_, this);
-        gtk_widget_destroy(window_); g_object_unref(area_); g_object_unref(window_);
+        if (hosted_root_) {
+            gtk_widget_destroy(area_);
+            // A host close may already have destroyed this widget tree. Never
+            // restore content into a closed window or destroy a host we borrow.
+            if (gtk_widget_get_parent(overlay_) == window_ && gtk_widget_get_parent(hosted_root_) == overlay_) {
+                gtk_container_remove(GTK_CONTAINER(overlay_), hosted_root_);
+                gtk_container_remove(GTK_CONTAINER(window_), overlay_);
+                gtk_container_add(GTK_CONTAINER(window_), hosted_root_);
+            }
+            gtk_widget_destroy(overlay_); g_object_unref(overlay_); g_object_unref(hosted_root_);
+        } else gtk_widget_destroy(window_);
+        g_object_unref(area_); g_object_unref(window_);
     }
-    void poll_events() {
-        pump();
+    void poll_events(bool dispatch_events = true) {
+        // In-process hosts own their GTK loop. Re-entering it during a render
+        // or FFI call could destroy this generation while it is borrowed.
+        if (dispatch_events) pump();
         if (closed_) throw std::runtime_error("Native viewer window closed");
         if (!error_.empty()) throw std::runtime_error(error_);
         if (!clock_) throw std::runtime_error("Native viewer frame clock unavailable");
         current();
     }
-    void present(const PabCodecBytes& nv12, uint64_t index) {
-        poll_events(); initialize();
+    void submit(const PabCodecBytes& nv12, uint64_t index) {
+        poll_events(false); initialize();
         if (pending_ || index != presented_ || !nv12.data || nv12.size != uint64_t(width_)*height_*3/2)
             throw std::runtime_error("Invalid decoded native frame");
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -207,6 +244,9 @@ public:
         if (glGetError() != GL_NO_ERROR) throw std::runtime_error("Native NV12 upload failed");
         index_ = index; uploaded_ = true; pending_ = true; drawn_ = false;
         gtk_gl_area_queue_render(GTK_GL_AREA(area_));
+    }
+    void present(const PabCodecBytes& nv12, uint64_t index) {
+        poll_events(); submit(nv12,index);
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
     }
     uint64_t presented() const { return presented_; }
@@ -219,7 +259,7 @@ public:
     }
     // Explicit generated-frame diagnostic, never run for a normal remote view.
     void lifecycle_check(bool minimize = true) {
-        if (!verify_ || presented_ != 1) throw std::runtime_error("Lifecycle check requires one verified frame");
+        if (hosted_root_ || !verify_ || presented_ != 1) throw std::runtime_error("Lifecycle check requires one verified standalone frame");
         const auto wait = [&](const char* stage, auto ready) {
             const auto end = Clock::now()+std::chrono::seconds(4);
             while (!ready()) {

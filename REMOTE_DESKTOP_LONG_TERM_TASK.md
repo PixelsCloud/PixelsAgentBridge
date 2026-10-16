@@ -77,6 +77,13 @@ VM 自建窗口的 10 项实际操作/释放测试、70 项带 ASan/UBSan 的原
 正式宿主、网络闭环、硬件解码和登录仍待完成，详见
 [Linux 显示阶段验收](acceptance/remote-desktop-linux-renderer-2026-10-17.md)。
 
+后续 W5 宿主进展：新增进程内 GTK overlay 与 Rust 串行解码/显示桥接，NV12
+所有权跨线程移动后复用分配，不增加整帧复制。真实 GTK/WebKit 的 20 次生命周期
+共 270 项检查通过，Rust 宿主在 Wayland/XWayland 的显示、隐藏恢复、取消、失败
+与关闭等待帧测试通过；Linux/Windows 媒体库分别 12/11 项测试通过。正式 Tauri
+入口及操作端原生输入尚未接入。VM 的 SVGA 释放诊断在纯 GTK 对照程序也复现，
+仍保留后续持续资源观察要求。详见 [Linux 宿主阶段记录](acceptance/remote-desktop-linux-host-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
