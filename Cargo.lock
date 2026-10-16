@@ -4862,6 +4862,7 @@ dependencies = [
  "openh264-sys2",
  "pab-protocol",
  "pab-remote-desktop",
+ "pkg-config",
  "serde_json",
  "tokio",
 ]

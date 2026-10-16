@@ -8,7 +8,7 @@ mod renderer;
 #[cfg(target_os = "macos")]
 pub use macos_view::{MacNativeViewer, MainThreadDispatch};
 pub mod software;
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod software_ffi;
 mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};
@@ -18,7 +18,7 @@ pub use viewer_input::NativeViewerInput;
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments
 /// start with the operation (inventory, capture or render), without argv[0].
 pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     {
         use std::ffi::{CString, c_char};
         unsafe extern "C" {
@@ -33,7 +33,7 @@ pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
         // catches C++ exceptions and retains no argument after returning.
         unsafe { pab_media_main(pointers.len() as i32, pointers.as_ptr()) }
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         let _ = arguments;
         eprintln!("native desktop media is not available on this platform yet");

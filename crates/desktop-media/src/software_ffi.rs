@@ -36,8 +36,8 @@ unsafe extern "C" fn pab_soft_encode(
     if value.is_null() || data.is_null() || output.is_null() || len > 256 * 1024 * 1024 {
         return false;
     }
-    // SAFETY: the worker keeps the mapped D3D texture and unique codec handle
-    // alive throughout this call; length is the validated mapped row pitch.
+    // SAFETY: the worker keeps its mapped texture/PipeWire buffer and unique
+    // codec handle alive throughout this call, with validated pitch and extent.
     let (value, input, output) = unsafe {
         (
             &mut *value,

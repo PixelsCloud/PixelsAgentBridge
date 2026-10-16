@@ -1,0 +1,21 @@
+{
+  "bundle": "/private/tmp/pab-mac-media-99f879354739/Pixels Remote Desktop Test.app",
+  "source_sha256": "fcd1ec3630e8f03073daf6cf366a27937cd15f1db1c43586228edeb1f5b70da4",
+  "signed_binary_sha256": "252568145762bd183074ae28ab80107191d42df45265fde9bd901373780c2177",
+  "existing_product_signature_verified": true,
+  "diagnostic": {
+    "activeConsole": true,
+    "architecture": "aarch64",
+    "localAccessConfigured": false,
+    "monitors": {
+      "Ok": 0
+    },
+    "permissions": {
+      "accessibility": false,
+      "screenRecording": false
+    },
+    "platform": "macos"
+  },
+  "installed_app_modified": false,
+  "tcc_modified": false
+}

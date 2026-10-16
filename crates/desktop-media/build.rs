@@ -69,6 +69,25 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=ScreenCaptureKit");
         return;
     }
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
+        let mut native = cc::Build::new();
+        native
+            .cpp(true)
+            .std("c++17")
+            .file("native/linux/worker.cpp");
+        for library in ["gio-2.0", "libpipewire-0.3"] {
+            let dependency = pkg_config::Config::new()
+                .probe(library)
+                .unwrap_or_else(|error| {
+                    panic!("Linux desktop media requires {library} development files: {error}")
+                });
+            for path in dependency.include_paths {
+                native.include(path);
+            }
+        }
+        native.compile("pab_desktop_media");
+        return;
+    }
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }

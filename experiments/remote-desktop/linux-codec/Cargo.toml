@@ -1,0 +1,18 @@
+[package]
+name = "pab-linux-codec-probe"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+crate-type = ["staticlib"]
+path = "lib.rs"
+
+[dependencies]
+openh264 = "=0.9.8"
+openh264-sys2 = "=0.9.9"
+pab-protocol = { path = "../../../crates/protocol" }
+
+[profile.release]
+debug = 0

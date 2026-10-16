@@ -88,8 +88,8 @@ translation unit using the Windows SDK and links the bundled CPU codec plus
 system libraries.
 
 The macOS worker now has display inventory, ScreenCaptureKit NV12/IOSurface
-capture and direct VideoToolbox H.264 encoding. It is not yet registered as a
-product media helper: real desktop permission acceptance,
+capture and direct VideoToolbox H.264 encoding. The Aqua/LoginWindow product
+helper is connected, while real desktop permission acceptance,
 system login and older-system/software encoder fallback are still unfinished.
 The application keeps its macOS 12.0 minimum; the current hardware media worker
 requires macOS 13 to configure the tested single-reference low-latency stream.
@@ -118,3 +118,16 @@ local event checks, lifecycle recheck and remaining limits.
 See `acceptance/remote-desktop-macos-renderer-2026-10-17.md` and
 `experiments/remote-desktop/verify_macos_renderer.py` for generated-frame replay,
 hardware/software, rotation, malformed-packet and static-window checks.
+
+The Linux native worker now implements GNOME DisplayConfig inventory and
+ScreenCast v4 / PipeWire capture through the same private compressed pipe.
+This is the CPU fallback: mapped BGRx is converted by the bundled BT.709 software
+encoder. It keeps one pending pool buffer, releases it before pipe writes, and
+retires the source when the layout, session or format changes. It does not yet
+register a Linux product helper or provide Linux rendering/input/login support.
+Build dependencies are gio-2.0, libpipewire-0.3 and NASM; the existing Linux
+Desktop image and package already include PipeWire. GNOME's interface is private
+and versioned; this adapter does not claim support for every Wayland desktop.
+See `acceptance/remote-desktop-linux-capture-2026-10-17.md` for 1080p VM results,
+real cancellation/layout checks and remaining work. The native boundary checks
+in `tests/native_linux.cpp` can run with ASan/UBSan without a desktop session.

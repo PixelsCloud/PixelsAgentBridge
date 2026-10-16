@@ -5467,6 +5467,7 @@ dependencies = [
  "cc",
  "pab-protocol",
  "pab-remote-desktop",
+ "pkg-config",
  "serde_json",
  "tokio",
 ]
