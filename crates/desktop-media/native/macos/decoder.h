@@ -220,7 +220,10 @@ public:
         if (!output.data || output.size != size_t(width_)*height_*3/2)
             throw std::runtime_error("Software decoder delayed a frame or changed dimensions");
         CVPixelBufferRef image = nullptr;
-        NSDictionary* allocation = @{(__bridge NSString*)kCVPixelBufferPoolAllocationThresholdKey: @4};
+        // Four negotiated in-flight frames plus the presenter's retained
+        // static image. Keeping only four surfaces can fail when the UI pauses
+        // briefly while the background decoder fills its bounded window.
+        NSDictionary* allocation = @{(__bridge NSString*)kCVPixelBufferPoolAllocationThresholdKey: @5};
         check(CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(kCFAllocatorDefault, pool_.get(),
             (__bridge CFDictionaryRef)allocation, &image), "Software texture allocation");
         OwnedCF<CVPixelBufferRef> owned(image);

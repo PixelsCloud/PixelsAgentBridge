@@ -2,7 +2,13 @@
 //! input cannot block video, and motion is coalesced without dropping key ups.
 #![forbid(unsafe_code)]
 use pab_protocol::{DesktopMouseButton, RemoteDesktopInput};
-use std::{io, sync::Arc};
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     process::{ChildStderr, ChildStdin},
@@ -16,10 +22,69 @@ enum Event {
 }
 type Stamped = (u64, Event);
 pub struct NativeViewerInput {
-    input: Arc<Mutex<ChildStdin>>,
+    input: Control,
     inbox: Inbox,
-    reader: tokio::task::JoinHandle<()>,
+    reader: Option<tokio::task::JoinHandle<()>>,
     pending: Option<RemoteDesktopInput>,
+}
+enum Control {
+    Pipe(Arc<Mutex<ChildStdin>>),
+    #[cfg(target_os = "macos")]
+    Callback(Arc<dyn Fn(bool) -> io::Result<()> + Send + Sync>),
+}
+pub(crate) struct InputSink {
+    index: AtomicU64,
+    events: mpsc::Sender<Stamped>,
+    movement: watch::Sender<Option<Stamped>>,
+    failure: watch::Sender<bool>,
+}
+impl InputSink {
+    pub(crate) fn fail(&self) {
+        self.failure.send_replace(true);
+    }
+    pub(crate) fn emit(&self, packet: [u8; 8]) -> bool {
+        let Some(event) = decode(packet) else {
+            self.fail();
+            return false;
+        };
+        let Ok(previous) = self
+            .index
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
+        else {
+            self.fail();
+            return false;
+        };
+        if *self.failure.borrow() || self.events.is_closed() || self.movement.is_closed() {
+            return false;
+        }
+        let stamped = (previous + 1, event);
+        if matches!(stamped.1, Event::Input(RemoteDesktopInput::Move { .. })) {
+            self.movement.send_replace(Some(stamped));
+        } else if self.events.try_send(stamped).is_err() {
+            self.fail();
+            return false; // Never silently lose a key-up or mode ACK.
+        }
+        true
+    }
+    fn channel() -> (Arc<Self>, Inbox) {
+        let (events, receive) = mpsc::channel(64);
+        let (movement, moves) = watch::channel(None);
+        let (failure, failed) = watch::channel(false);
+        (
+            Arc::new(Self {
+                index: AtomicU64::new(0),
+                events,
+                movement,
+                failure,
+            }),
+            Inbox {
+                events: receive,
+                movement: moves,
+                failed,
+                consumed: 0,
+            },
+        )
+    }
 }
 struct Inbox {
     events: mpsc::Receiver<Stamped>,
@@ -29,52 +94,59 @@ struct Inbox {
 }
 impl Drop for NativeViewerInput {
     fn drop(&mut self) {
-        self.reader.abort();
+        if let Some(reader) = &self.reader {
+            reader.abort();
+        }
     }
 }
 impl NativeViewerInput {
     pub(crate) fn new(input: Arc<Mutex<ChildStdin>>, mut pipe: ChildStderr) -> Self {
-        let (send, events) = mpsc::channel(64);
-        let (moves, movement) = watch::channel(None);
-        let (failure, failed) = watch::channel(false);
+        let (sink, inbox) = InputSink::channel();
         let reader = tokio::spawn(async move {
-            let mut index = 0u64;
             loop {
                 let mut packet = [0; 8];
                 if pipe.read_exact(&mut packet).await.is_err() {
                     break;
                 }
-                let Some(event) = decode(packet) else {
+                if !sink.emit(packet) {
                     break;
-                };
-                index += 1;
-                if matches!(event, Event::Input(RemoteDesktopInput::Move { .. })) {
-                    moves.send_replace(Some((index, event)));
-                } else if send.try_send((index, event)).is_err() {
-                    break; // Fail closed; never silently lose a release.
                 }
             }
-            failure.send_replace(true);
+            sink.fail();
         });
         Self {
-            input,
-            inbox: Inbox {
-                events,
-                movement,
-                failed,
-                consumed: 0,
-            },
-            reader,
+            input: Control::Pipe(input),
+            inbox,
+            reader: Some(reader),
             pending: None,
         }
     }
+    #[cfg(target_os = "macos")]
+    pub(crate) fn from_callback(
+        control: Arc<dyn Fn(bool) -> io::Result<()> + Send + Sync>,
+    ) -> (Self, Arc<InputSink>) {
+        let (sink, inbox) = InputSink::channel();
+        (
+            Self {
+                input: Control::Callback(control),
+                inbox,
+                reader: None,
+                pending: None,
+            },
+            sink,
+        )
+    }
     pub async fn set_enabled(&mut self, enabled: bool) -> io::Result<()> {
         self.pending = None;
-        {
-            let mut input = self.input.lock().await;
-            input
-                .write_all(&[255, 255, 255, 255, u8::from(enabled)])
-                .await?;
+        match &self.input {
+            Control::Pipe(pipe) => {
+                let mut input = pipe.lock().await;
+                input
+                    .write_all(&[255, 255, 255, 255, u8::from(enabled)])
+                    .await?;
+            }
+            #[cfg(target_os = "macos")]
+            Control::Callback(apply) => apply(enabled)?,
         }
         // Native ACK is ordered after all events from the previous mode. Drain
         // those events; they must never be delivered under a new input lease.
@@ -142,6 +214,33 @@ impl Inbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn motion_bursts_preserve_releases_and_overflow_fails_closed() {
+        let (sink, mut inbox) = InputSink::channel();
+        for _ in 0..10000 {
+            assert!(sink.emit([1, 1, 0, 2, 0, 0, 0, 0]));
+        }
+        assert!(sink.emit([4, 0, 0, 0, 0, 65, 0, 0]));
+        assert!(sink.emit([6, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(matches!(
+            inbox.next_raw().await.unwrap(),
+            Event::Input(RemoteDesktopInput::Key {
+                virtual_key: 65,
+                down: false
+            })
+        ));
+        assert!(matches!(
+            inbox.next_raw().await.unwrap(),
+            Event::Mode(false)
+        ));
+        // A stalled consumer cannot silently lose a release and remain usable.
+        for _ in 0..64 {
+            assert!(sink.emit([4, 0, 0, 0, 0, 65, 0, 1]));
+        }
+        assert!(!sink.emit([4, 0, 0, 0, 0, 65, 0, 0]));
+        assert!(inbox.next_raw().await.is_err());
+    }
 
     #[tokio::test]
     async fn motion_channel_race_cannot_discard_key_release_or_mode_barrier() {

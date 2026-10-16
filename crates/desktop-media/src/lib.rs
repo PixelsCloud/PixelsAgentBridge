@@ -1,8 +1,12 @@
 //! Platform media workers. The authenticated session/transport crate contains
 //! no native FFI. Only compressed packets cross the private worker pipes.
 mod input;
+#[cfg(target_os = "macos")]
+mod macos_view;
 mod process;
 mod renderer;
+#[cfg(target_os = "macos")]
+pub use macos_view::{MacNativeViewer, MainThreadDispatch};
 pub mod software;
 #[cfg(any(windows, target_os = "macos"))]
 mod software_ffi;

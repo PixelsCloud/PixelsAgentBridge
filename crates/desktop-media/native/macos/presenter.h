@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "viewer_input.h"
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/CATransaction.h>
@@ -7,18 +8,23 @@
 #include <array>
 #include <optional>
 
-@interface PABMetalView : NSView
+@interface PABMetalView : PABInputView
 @property(nonatomic) BOOL needsMediaRedraw;
 @end
 @implementation PABMetalView
 - (CALayer*)makeBackingLayer { return [CAMetalLayer layer]; }
 - (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; self.needsMediaRedraw = YES; }
 - (void)viewDidChangeBackingProperties { [super viewDidChangeBackingProperties]; self.needsMediaRedraw = YES; }
-- (void)windowMediaChanged:(NSNotification*)notification { (void)notification; self.needsMediaRedraw = YES; }
+- (void)windowMediaChanged:(NSNotification*)notification {
+    if ([notification.name isEqualToString:NSWindowDidResignKeyNotification] ||
+        [notification.name isEqualToString:NSWindowDidMiniaturizeNotification]) mediaInput.release();
+    self.needsMediaRedraw = YES;
+}
 - (void)viewDidMoveToWindow {
     [super viewDidMoveToWindow];
     [NSNotificationCenter.defaultCenter removeObserver:self];
-    for (NSNotificationName name in @[NSWindowDidDeminiaturizeNotification, NSWindowDidChangeOcclusionStateNotification])
+    for (NSNotificationName name in @[NSWindowDidDeminiaturizeNotification, NSWindowDidChangeOcclusionStateNotification,
+        NSWindowDidResignKeyNotification, NSWindowDidMiniaturizeNotification])
         if (self.window) [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(windowMediaChanged:) name:name object:self.window];
     self.needsMediaRedraw = YES;
 }
@@ -226,7 +232,13 @@ public:
             window_.releasedWhenClosed = NO; window_.title = @"Pixels remote desktop — native media check";
             parent = window_.contentView; owns_window_ = true;
         } else window_ = parent.window;
-        view_ = [[PABMetalView alloc] initWithFrame:parent.bounds];
+        auto frame = parent.bounds;
+        if (!owns_window_) {
+            frame.size.height = std::max(0.0,frame.size.height-72);
+            if (parent.flipped) frame.origin.y += 72;
+        }
+        view_ = [[PABMetalView alloc] initWithFrame:frame];
+        view_->mediaInput.width = width; view_->mediaInput.height = height; view_->mediaInput.rotation = rotation;
         view_.autoresizingMask = NSViewWidthSizable|NSViewHeightSizable;
         view_.wantsLayer = YES;
         CAMetalLayer* layer = (CAMetalLayer*)view_.layer;
@@ -244,17 +256,21 @@ public:
         }
     }
     ~NativePresenter() {
+        view_->mediaInput.release(); view_->mediaInput.enabled = false; view_->mediaInput.sink = {};
         [view_ removeFromSuperview];
         if (owns_window_) { [window_ orderOut:nil]; [window_ close]; }
     }
     void pump_events() {
         require_main();
         @autoreleasepool {
-            for (unsigned count = 0; count < 64; ++count) {
-                NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:NSDate.distantPast inMode:NSDefaultRunLoopMode dequeue:YES];
-                if (!event) break; [NSApp sendEvent:event];
+            if (owns_window_) {
+                for (unsigned count = 0; count < 64; ++count) {
+                    NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:NSDate.distantPast inMode:NSDefaultRunLoopMode dequeue:YES];
+                    if (!event) break; [NSApp sendEvent:event];
+                }
+                [NSApp updateWindows];
             }
-            [NSApp updateWindows];
+            if (!view_.window) throw std::runtime_error("Native view detached");
             if (owns_window_ && !window_.visible && !window_.miniaturized) throw std::runtime_error("Native viewer closed");
             bool dropped = false;
             {
@@ -272,6 +288,8 @@ public:
         last_image_ = OwnedCF<CVPixelBufferRef>(CVPixelBufferRetain(image)); last_index_ = index;
         last_verified_ = draw(image, index, verify_);
     }
+    void input_sink(std::function<bool(const InputPacket&)> sink) { require_main(); view_->mediaInput.sink = std::move(sink); }
+    void input_enabled(bool value) { require_main(); [view_ setMediaInputEnabled:value]; }
     uint64_t displayed() { std::lock_guard<std::mutex> lock(stats_->mutex); return stats_->displayed; }
     void finish() {
         const auto deadline = Clock::now() + std::chrono::seconds(2);

@@ -88,6 +88,13 @@ VideoToolbox 直接硬件编码模块，Apple 上正式 Rust Release 构建及 9
 已通过。Mac 正式窗口嵌入、键鼠、真实桌面权限与系统登录尚未接通，仍不能交付
 为完整 Mac 远控。详见 [Mac 原生显示验收](acceptance/remote-desktop-macos-renderer-2026-10-17.md)。
 
+W4 宿主接入继续推进：已实现 Tauri 主线程内嵌 Metal 视图、串行后台解码、
+原生鼠标键盘采集及有界事件桥接。Apple 本地 NSView 的 36 项输入检查通过，
+Windows/macOS 共用媒体模块各 11 项测试、8 组 native 窗口生命周期复测通过；
+完整 Mac Desktop Release 构建及隔离主窗口启动通过，跨机器产品验收继续进行。
+详见 [Mac 宿主阶段记录](acceptance/remote-desktop-macos-host-2026-10-17.md)，
+仍不关闭 07.1/07.2。
+
 ### 连续执行与完成规则
 
 1. 本任务按整体验收收尾，不在每个小阶段结束后要求用户发送“继续”。每个阶段

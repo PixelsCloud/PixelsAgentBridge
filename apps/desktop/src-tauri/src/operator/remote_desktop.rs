@@ -1,4 +1,7 @@
 use super::*;
+#[cfg(target_os = "macos")]
+use pab_desktop_media::MacNativeViewer as NativeViewer;
+#[cfg(not(target_os = "macos"))]
 use pab_desktop_media::NativeViewer;
 use pab_protocol::DesktopOpened;
 use std::time::{Duration, Instant};
@@ -150,7 +153,7 @@ pub async fn desktop_viewer_window(
     if window.label() != "main" {
         return Err("only the main window can open a remote desktop".into());
     }
-    if !cfg!(windows) {
+    if !cfg!(any(windows, target_os = "macos")) {
         return Err("native remote desktop viewer is not available on this platform yet".into());
     }
     let account = account()?;
@@ -481,7 +484,8 @@ async fn stream(
     loop {
         let started = tokio::time::timeout(
             Duration::from_secs(10),
-            NativeViewer::open_interactive_with_software(
+            open_native_viewer(
+                window,
                 &executable,
                 &prefix,
                 &session.opened().config,
@@ -654,5 +658,58 @@ async fn stream(
                 return Ok(false);
             }
         }
+    }
+}
+
+async fn open_native_viewer(
+    window: &WebviewWindow,
+    path: &std::path::PathBuf,
+    prefix: &[String],
+    config: &pab_protocol::DesktopVideoConfig,
+    parent: usize,
+    software: bool,
+) -> Result<
+    (NativeViewer, pab_desktop_media::NativeViewerInput),
+    Box<dyn std::error::Error + Send + Sync>,
+> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+        NativeViewer::open_interactive_with_software(path, prefix, config, parent, software).await
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (path, prefix, parent);
+        let app = window.app_handle().clone();
+        let dispatch: pab_desktop_media::MainThreadDispatch = Arc::new(move |work| {
+            app.run_on_main_thread(work)
+                .map_err(|error| error.to_string())
+        });
+        let host = window.clone();
+        let config = config.clone();
+        let runtime = tokio::runtime::Handle::current();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        window.app_handle().run_on_main_thread(move || {
+            if sender.is_closed() {
+                return;
+            }
+            let _entered = runtime.enter();
+            let result = host
+                .ns_window()
+                .map_err(|error| {
+                    Box::<dyn std::error::Error + Send + Sync>::from(error.to_string())
+                })
+                .and_then(|parent| {
+                    // SAFETY: get the live NSWindow on its owning main thread;
+                    // no raw address comes from a webview or remote message.
+                    unsafe { NativeViewer::create(parent, &config, software, dispatch) }
+                });
+            // If startup was cancelled while queued, dropping this result also
+            // retires its native view and input sink on the owning thread.
+            let _ = sender.send(result);
+        })?;
+        receiver
+            .await
+            .map_err(|_| "native view creation interrupted")?
     }
 }

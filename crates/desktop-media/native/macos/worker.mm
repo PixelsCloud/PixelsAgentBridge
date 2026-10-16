@@ -4,6 +4,7 @@
 #include "capture.h"
 #include "decoder.h"
 #include "presenter.h"
+#include "host.h"
 #include <csignal>
 
 namespace pab_mac {

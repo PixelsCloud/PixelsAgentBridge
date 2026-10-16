@@ -192,6 +192,15 @@ async fn receive(
                     _ => return Err("invalid native decoder path".into()),
                 });
             }
+            5 => {
+                let length = usize::from(output.read_u16_le().await?);
+                if length == 0 || length > 512 {
+                    return Err("invalid native renderer error length".into());
+                }
+                let mut message = vec![0; length];
+                output.read_exact(&mut message).await?;
+                return Err(String::from_utf8(message)?.into());
+            }
             _ => return Err("invalid native renderer event".into()),
         }
         sender.send_replace(state.clone());
@@ -207,6 +216,27 @@ mod tests {
         io::{AsyncWriteExt, DuplexStream},
         time::timeout,
     };
+
+    #[tokio::test]
+    async fn bounded_native_failure_wakes_pending_consumption() {
+        for (length, body) in [(4u16, &b"lost"[..]), (513, &b""[..])] {
+            let (mut pipe, output) = tokio::io::duplex(256);
+            let renderer = Renderer::start(output);
+            renderer.enqueue(header(1)).await.unwrap();
+            pipe.write_u8(5).await.unwrap();
+            pipe.write_u16_le(length).await.unwrap();
+            pipe.write_all(body).await.unwrap();
+            let error = timeout(Duration::from_secs(1), renderer.consumed(1))
+                .await
+                .unwrap()
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(if length == 4 { "lost" } else { "error length" })
+            );
+        }
+    }
 
     fn header(frame_id: u64) -> DesktopFrameHeader {
         DesktopFrameHeader {

@@ -89,7 +89,7 @@ system libraries.
 
 The macOS worker now has display inventory, ScreenCaptureKit NV12/IOSurface
 capture and direct VideoToolbox H.264 encoding. It is not yet registered as a
-product media helper: product viewer/input, real desktop permission acceptance,
+product media helper: real desktop permission acceptance,
 system login and older-system/software encoder fallback are still unfinished.
 The application keeps its macOS 12.0 minimum; the current hardware media worker
 requires macOS 13 to configure the tested single-reference low-latency stream.
@@ -108,8 +108,13 @@ Mac native decoding/display now uses hardware VideoToolbox NV12 IOSurfaces and
 Metal texture views, with bundled OpenH264 on initial hardware failure. The
 worker supports `render WIDTH HEIGHT FPS stream|stream-verify [0] [ROTATION]`;
 `-software`, `-fail-decoder` and `-lifecycle` are explicit developer diagnostics.
-No NSView pointer is accepted over the worker pipe. Production embedding/input
-remain unfinished; the platform's product entry stays disabled until integrated.
+No NSView pointer is accepted over the worker pipe. The Mac product viewer now
+creates its view inside the owning Tauri main thread, with bounded background
+decode and local mouse/keyboard callbacks. Default view-only and existing input
+leases are preserved. The integrated Desktop builds and launches on Apple;
+real remote product-window/input and system-login acceptance remain unfinished.
+See `acceptance/remote-desktop-macos-host-2026-10-17.md` for the host integration,
+local event checks, lifecycle recheck and remaining limits.
 See `acceptance/remote-desktop-macos-renderer-2026-10-17.md` and
 `experiments/remote-desktop/verify_macos_renderer.py` for generated-frame replay,
 hardware/software, rotation, malformed-packet and static-window checks.

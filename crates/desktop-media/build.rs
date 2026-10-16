@@ -15,7 +15,8 @@ fn main() {
         );
     }
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        cc::Build::new()
+        let mut native = cc::Build::new();
+        native
             .cpp(true)
             .std("c++17")
             .file("native/macos/worker.mm")
@@ -23,6 +24,31 @@ fn main() {
             .flag("-fblocks")
             .flag("-mmacosx-version-min=12.0")
             .compile("pab_desktop_media");
+        // @available emits Clang runtime calls for older deployment targets.
+        // Rust links with -nodefaultlibs, so explicitly propagate the runtime
+        // selected by the same compiler (not a hard-coded Xcode path).
+        let runtime = native
+            .get_compiler()
+            .to_command()
+            .arg("--print-file-name=libclang_rt.osx.a")
+            .output()
+            .expect("query macOS Clang runtime");
+        assert!(
+            runtime.status.success(),
+            "cannot locate macOS Clang runtime"
+        );
+        let path = String::from_utf8(runtime.stdout).expect("Clang runtime path is UTF-8");
+        let path = std::path::Path::new(path.trim());
+        assert!(
+            path.is_file(),
+            "macOS Clang runtime missing: {}",
+            path.display()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            path.parent().unwrap().display()
+        );
+        println!("cargo:rustc-link-lib=static=clang_rt.osx");
         for library in [
             "Foundation",
             "AppKit",
