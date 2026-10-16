@@ -717,3 +717,53 @@ async fn media_failure_releases_input_without_closing_shared_connection() {
     viewer.close().await.unwrap();
     eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
 }
+
+#[tokio::test]
+async fn reopening_after_media_failure_does_not_replay_input_or_retain_ownership() {
+    let backend = Arc::new(Backend {
+        wake: Some(Arc::new(tokio::sync::Notify::new())),
+        fail_after: Some(1),
+        ..Default::default()
+    });
+    let host = DesktopHost::new(Some(backend.clone()));
+    let server = Harness::new(&host).await;
+    let mut old = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+        .await
+        .unwrap();
+    old.next_frame(WAIT).await.unwrap();
+    old.set_input_enabled(true).await.unwrap();
+    let previous_control = old.input_control();
+    let press = RemoteDesktopInput::Key {
+        virtual_key: 0xa2,
+        down: true,
+    };
+    old.send_input(press.clone()).await.unwrap();
+    let failure = match old.next_frame(WAIT).await {
+        Err(error) => error,
+        Ok(_) => panic!("capture should fail after the first frame"),
+    };
+    assert!(failure.is_recoverable_media());
+    old.close().await.unwrap();
+    eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
+    assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+
+    let mut replacement = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+        .await
+        .unwrap();
+    replacement.next_frame(WAIT).await.unwrap();
+    assert!(previous_control.send(press.clone()).await.is_err());
+    assert!(
+        replacement.send_input(press).await.is_err(),
+        "new viewer must remain view-only"
+    );
+    assert_eq!(backend.input_active.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+    server.legacy().await;
+    replacement.set_input_enabled(true).await.unwrap();
+    assert_eq!(
+        backend.input_held.load(Ordering::SeqCst),
+        0,
+        "old press must never replay"
+    );
+    replacement.close().await.unwrap();
+}

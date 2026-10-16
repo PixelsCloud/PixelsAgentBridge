@@ -1,7 +1,7 @@
 use super::*;
 use pab_desktop_media::NativeViewer;
 use pab_protocol::DesktopOpened;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::sync::{mpsc, watch};
 
@@ -18,6 +18,42 @@ enum Command {
     Fps(u16),
     Retry,
     Input(bool),
+    SecureAttention,
+}
+struct StreamFailure {
+    message: String,
+    recoverable: bool,
+}
+impl From<String> for StreamFailure {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            recoverable: false,
+        }
+    }
+}
+impl From<&str> for StreamFailure {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
+    fn from(error: pab_bridge::RemoteDesktopError) -> Self {
+        Self {
+            recoverable: error.is_recoverable_media(),
+            message: error.to_string(),
+        }
+    }
+}
+impl From<pab_bridge::RuntimeError> for StreamFailure {
+    fn from(error: pab_bridge::RuntimeError) -> Self {
+        let recoverable = matches!(&error, pab_bridge::RuntimeError::Bridge(
+            pab_bridge::BridgeError::RemoteDesktop(error)) if error.is_recoverable_media());
+        Self {
+            recoverable,
+            message: error.to_string(),
+        }
+    }
 }
 struct Owner {
     code: DeviceCode,
@@ -196,16 +232,20 @@ pub async fn desktop_viewer_control(
     fps: Option<u16>,
     retry: Option<bool>,
     input_enabled: Option<bool>,
+    secure_attention: Option<bool>,
 ) -> Result<(), String> {
     let owner = state.owner(&window).await?;
-    let command = match (screen, fps, retry, input_enabled) {
-        (Some(screen), None, None, None) => {
+    let command = match (screen, fps, retry, input_enabled, secure_attention) {
+        (Some(screen), None, None, None, None) => {
             pab_protocol::validate_desktop_screen_id(&screen).map_err(str::to_owned)?;
             Command::Screen(screen)
         }
-        (None, Some(fps @ (15 | 30)), None, None) => Command::Fps(fps),
-        (None, None, Some(true), None) => Command::Retry,
-        (None, None, None, Some(enabled)) => Command::Input(enabled),
+        (None, Some(fps @ (15 | 30)), None, None, None) => Command::Fps(fps),
+        (None, None, Some(true), None, None) => Command::Retry,
+        (None, None, None, Some(enabled), None) => Command::Input(enabled),
+        (None, None, None, None, Some(true)) if owner.status.borrow().input_enabled => {
+            Command::SecureAttention
+        }
         _ => return Err("invalid remote desktop command".into()),
     };
     owner
@@ -256,8 +296,29 @@ async fn run(
     let work = async {
         let mut fps = 15;
         let mut screen = None;
+        let mut failures = 0u32;
         loop {
-            publish(&window, &owner, "connecting", None, None);
+            // Input and SAS belong to the previous generation. Never replay
+            // queued actions into a newly opened login desktop.
+            while let Ok(command) = commands.try_recv() {
+                match command {
+                    Command::Screen(id) => screen = Some(id),
+                    Command::Fps(value) => fps = value,
+                    _ => {}
+                }
+            }
+            publish(
+                &window,
+                &owner,
+                if failures == 0 {
+                    "connecting"
+                } else {
+                    "reconnecting"
+                },
+                None,
+                None,
+            );
+            let mut first_presented = None;
             let result = stream(
                 &window,
                 &owner,
@@ -265,13 +326,28 @@ async fn run(
                 parent,
                 &mut fps,
                 &mut screen,
+                &mut first_presented,
             )
             .await;
             match result {
                 Ok(true) => continue,
                 Ok(false) => break,
                 Err(error) => {
-                    publish(&window, &owner, "failed", None, Some(error));
+                    // A single frame followed by failure must not create an
+                    // endless restart loop. Reset only after a stable interval.
+                    if first_presented
+                        .is_some_and(|at: Instant| at.elapsed() >= Duration::from_secs(5))
+                    {
+                        failures = 0;
+                    }
+                    if error.recoverable && failures < 6 {
+                        let delay = Duration::from_millis((250u64 << failures).min(2000));
+                        failures += 1;
+                        publish(&window, &owner, "reconnecting", None, None);
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                    publish(&window, &owner, "failed", None, Some(error.message));
                     loop {
                         match commands.recv().await {
                             Some(Command::Retry) => {
@@ -286,10 +362,11 @@ async fn run(
                                 screen = Some(value);
                                 break;
                             }
-                            Some(Command::Input(_)) => continue,
+                            Some(Command::Input(_) | Command::SecureAttention) => continue,
                             None => return,
                         }
                     }
+                    failures = 0;
                 }
             }
         }
@@ -305,17 +382,18 @@ async fn stream(
     parent: usize,
     fps: &mut u16,
     screen: &mut Option<String>,
-) -> Result<bool, String> {
+    first_presented: &mut Option<Instant>,
+) -> Result<bool, StreamFailure> {
     let device = owner
         .runtime
         .resolve_device_code(owner.code)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(StreamFailure::from)?;
     let mut session = owner
         .runtime
         .open_remote_desktop(device, screen.clone(), *fps)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(StreamFailure::from)?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let prefix = vec!["--media-worker".into()];
     loop {
@@ -343,21 +421,22 @@ async fn stream(
                 let frame = session
                     .next_frame_when_changed()
                     .await
-                    .map_err(|e| e.to_string())?;
+                    .map_err(StreamFailure::from)?;
                 tokio::time::timeout(Duration::from_secs(5), viewer.present(&frame))
                     .await
                     .map_err(|_| "native renderer timed out")?
                     .map_err(|e| e.to_string())?;
                 session
                     .report_presented(&frame.header)
-                    .map_err(|e| e.to_string())?;
+                    .map_err(StreamFailure::from)?;
                 if !*ready.borrow() {
+                    first_presented.get_or_insert_with(Instant::now);
                     ready.send_replace(true);
                     publish_input(window, owner, supported, false);
                 }
             }
             #[allow(unreachable_code)]
-            Ok::<(), String>(())
+            Ok::<(), StreamFailure>(())
         };
         let interaction = async {
             let mut enabled = false;
@@ -373,7 +452,7 @@ async fn stream(
                             // Drain old local events before changing remote ownership.
                             tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(false)).await
                                 .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
-                            control.set_enabled(value).await.map_err(|e| e.to_string())?;
+                            control.set_enabled(value).await.map_err(StreamFailure::from)?;
                             if value {
                                 tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(true)).await
                                     .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
@@ -381,20 +460,42 @@ async fn stream(
                             enabled = value;
                             publish_input(window, owner, supported && *ready_rx.borrow(), enabled);
                         }
-                        other => return Ok::<_, String>(other),
+                        Some(Command::SecureAttention) => {
+                            if !enabled { continue; }
+                            // Stop local collection and retire held remote keys
+                            // before the system changes desktops. SAS is sent
+                            // once through the existing authenticated service.
+                            tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(false)).await
+                                .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                            control.set_enabled(false).await.map_err(StreamFailure::from)?;
+                            publish_input(window, owner, false, false);
+                            owner.runtime.desktop_input(device, pab_protocol::DesktopInputEvent::SecureAttention)
+                                .await.map_err(|e| e.to_string())?;
+                            return Ok(Some(Command::Retry));
+                        }
+                        other => return Ok::<_, StreamFailure>(other),
                     },
                     event = native_input.next() => {
                         let event = event.map_err(|e| e.to_string())?;
-                        if enabled { control.send(event).await.map_err(|e| e.to_string())?; }
+                        if enabled { control.send(event).await.map_err(StreamFailure::from)?; }
                     }
                 }
             }
         };
-        let command = tokio::select! {
-            result = video => { result?; None },
-            result = interaction => result?,
+        let outcome = tokio::select! {
+            result = video => result.map(|_| None),
+            result = interaction => result,
         };
         drop(viewer);
+        let command = match outcome {
+            Ok(command) => command,
+            Err(error) => {
+                // Retire this owner's remote slot before reopening. Dropping
+                // alone schedules cleanup asynchronously and can race Busy.
+                let _ = tokio::time::timeout(Duration::from_secs(2), session.close()).await;
+                return Err(error);
+            }
+        };
         match command {
             Some(Command::Screen(id)) => {
                 publish(
@@ -407,19 +508,19 @@ async fn stream(
                 session
                     .select_screen(id.clone())
                     .await
-                    .map_err(|e| e.to_string())?;
+                    .map_err(StreamFailure::from)?;
                 *screen = Some(id);
             }
             Some(Command::Fps(value)) => {
                 *fps = value;
-                session.close().await.map_err(|e| e.to_string())?;
+                session.close().await.map_err(StreamFailure::from)?;
                 return Ok(true);
             }
             Some(Command::Retry) => {
-                session.close().await.map_err(|e| e.to_string())?;
+                session.close().await.map_err(StreamFailure::from)?;
                 return Ok(true);
             }
-            Some(Command::Input(_)) => {
+            Some(Command::Input(_) | Command::SecureAttention) => {
                 unreachable!("input commands are handled within the generation")
             }
             None => {

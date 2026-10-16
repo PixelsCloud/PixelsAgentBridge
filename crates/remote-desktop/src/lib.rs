@@ -32,6 +32,20 @@ pub enum DesktopError {
 }
 pub type Result<T> = std::result::Result<T, DesktopError>;
 impl DesktopError {
+    /// Only media lifecycle failures may reopen a viewer automatically. Never
+    /// retry ownership, capability, malformed protocol or occupied sessions.
+    pub fn is_recoverable_media(&self) -> bool {
+        matches!(
+            self,
+            Self::Closed
+                | Self::Timeout
+                | Self::Transport(_)
+                | Self::Rejected {
+                    code: DesktopErrorCode::MediaUnavailable | DesktopErrorCode::StaleGeneration,
+                    ..
+                }
+        )
+    }
     pub(crate) fn reject(code: DesktopErrorCode, message: impl Into<String>) -> Self {
         Self::Rejected {
             code,
@@ -43,5 +57,32 @@ impl DesktopError {
             Self::Rejected { code, .. } => *code,
             _ => DesktopErrorCode::InvalidRequest,
         }
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn recovery_never_bypasses_ownership_or_protocol_rejections() {
+        for code in [
+            DesktopErrorCode::Unsupported,
+            DesktopErrorCode::InvalidRequest,
+            DesktopErrorCode::Busy,
+            DesktopErrorCode::NotFound,
+            DesktopErrorCode::WrongOwner,
+        ] {
+            assert!(!DesktopError::reject(code, "test").is_recoverable_media());
+        }
+        for code in [
+            DesktopErrorCode::MediaUnavailable,
+            DesktopErrorCode::StaleGeneration,
+        ] {
+            assert!(DesktopError::reject(code, "test").is_recoverable_media());
+        }
+        assert!(DesktopError::Closed.is_recoverable_media());
+        assert!(DesktopError::Timeout.is_recoverable_media());
+        assert!(!DesktopError::Protocol("invalid frame").is_recoverable_media());
     }
 }

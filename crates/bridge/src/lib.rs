@@ -14,6 +14,7 @@ pub use connection::{
     RemoteDesktopSession,
 };
 pub use pab_transport::ConnectionPath;
+pub use pab_remote_desktop::DesktopError as RemoteDesktopError;
 pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, CatalogStatus, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,

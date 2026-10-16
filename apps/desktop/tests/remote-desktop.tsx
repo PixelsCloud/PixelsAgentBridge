@@ -16,6 +16,7 @@ const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false,
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
+  recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; fixture.emit(status()); },
   ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; fixture.emit(status()); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };

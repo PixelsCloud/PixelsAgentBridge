@@ -13,6 +13,23 @@ test("viewer uses stable screen IDs and bounded controls without frame or input 
   expect(calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args)).toEqual([{ screen: "adapter:left" }, { fps: 30 }]);
   expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control"].includes(c.command))).toBe(true);
 });
+test("secure attention requires control and recovery never restores input automatically", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  const sas = page.getByRole("button", { name: "Ctrl+Alt+Delete", exact: true });
+  await expect(sas).toBeDisabled();
+  await page.getByRole("button", { name: "Enable control" }).click();
+  await expect(sas).toBeEnabled();
+  await sas.click();
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(sas).toBeDisabled();
+  const commands = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
+  expect(commands).toEqual([{ inputEnabled: true }, { secureAttention: true }]);
+  await page.evaluate(() => (window as any).fixture.recover());
+  await expect(page.getByRole("status")).toHaveText("Restoring desktop");
+  await expect(page.getByRole("button", { name: "Enable control" })).toBeDisabled();
+  await expect(sas).toBeDisabled();
+  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+});
 test("control errors remain above native surface and capture failure can reconnect", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
   await expect(page.getByRole("status")).toHaveText("Connected");
