@@ -10,11 +10,14 @@ pub struct ViewerStatus {
     phase: String,
     error: Option<String>,
     opened: Option<DesktopOpened>,
+    input_ready: bool,
+    input_enabled: bool,
 }
 enum Command {
     Screen(String),
     Fps(u16),
     Retry,
+    Input(bool),
 }
 struct Owner {
     code: DeviceCode,
@@ -192,15 +195,17 @@ pub async fn desktop_viewer_control(
     screen: Option<String>,
     fps: Option<u16>,
     retry: Option<bool>,
+    input_enabled: Option<bool>,
 ) -> Result<(), String> {
     let owner = state.owner(&window).await?;
-    let command = match (screen, fps, retry) {
-        (Some(screen), None, None) => {
+    let command = match (screen, fps, retry, input_enabled) {
+        (Some(screen), None, None, None) => {
             pab_protocol::validate_desktop_screen_id(&screen).map_err(str::to_owned)?;
             Command::Screen(screen)
         }
-        (None, Some(fps @ (15 | 30)), None) => Command::Fps(fps),
-        (None, None, Some(true)) => Command::Retry,
+        (None, Some(fps @ (15 | 30)), None, None) => Command::Fps(fps),
+        (None, None, Some(true), None) => Command::Retry,
+        (None, None, None, Some(enabled)) => Command::Input(enabled),
         _ => return Err("invalid remote desktop command".into()),
     };
     owner
@@ -219,7 +224,16 @@ fn publish(
         phase: phase.into(),
         opened,
         error,
+        input_ready: false,
+        input_enabled: false,
     };
+    owner.status.send_replace(status.clone());
+    let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
+}
+fn publish_input(window: &WebviewWindow, owner: &Owner, ready: bool, enabled: bool) {
+    let mut status = owner.status.borrow().clone();
+    status.input_ready = ready;
+    status.input_enabled = enabled;
     owner.status.send_replace(status.clone());
     let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
 }
@@ -272,6 +286,7 @@ async fn run(
                                 screen = Some(value);
                                 break;
                             }
+                            Some(Command::Input(_)) => continue,
                             None => return,
                         }
                     }
@@ -304,9 +319,9 @@ async fn stream(
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let prefix = vec!["--media-worker".into()];
     loop {
-        let mut viewer = tokio::time::timeout(
+        let (mut viewer, mut native_input) = tokio::time::timeout(
             Duration::from_secs(10),
-            NativeViewer::open_in_window(&executable, &prefix, &session.opened().config, parent),
+            NativeViewer::open_interactive(&executable, &prefix, &session.opened().config, parent),
         )
         .await
         .map_err(|_| "native viewer startup timed out")?
@@ -318,15 +333,66 @@ async fn stream(
             Some(session.opened().clone()),
             None,
         );
-        let command = loop {
-            tokio::select! {
-                command = commands.recv() => break command,
-                frame = session.next_frame_when_changed() => {
-                    let frame = frame.map_err(|e| e.to_string())?;
-                    tokio::time::timeout(Duration::from_secs(5), viewer.present(&frame)).await.map_err(|_| "native renderer timed out")?.map_err(|e| e.to_string())?;
-                    session.report_presented(&frame.header).map_err(|e| e.to_string())?;
+        let control = session.input_control();
+        let supported = session.opened().input_supported;
+        let (ready, mut ready_rx) = watch::channel(false);
+        // These are independent futures for the entire generation. Mouse/keys
+        // and toolbar commands never cancel a partially-read compressed frame.
+        let video = async {
+            loop {
+                let frame = session
+                    .next_frame_when_changed()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                tokio::time::timeout(Duration::from_secs(5), viewer.present(&frame))
+                    .await
+                    .map_err(|_| "native renderer timed out")?
+                    .map_err(|e| e.to_string())?;
+                session
+                    .report_presented(&frame.header)
+                    .map_err(|e| e.to_string())?;
+                if !*ready.borrow() {
+                    ready.send_replace(true);
+                    publish_input(window, owner, supported, false);
                 }
             }
+            #[allow(unreachable_code)]
+            Ok::<(), String>(())
+        };
+        let interaction = async {
+            let mut enabled = false;
+            loop {
+                tokio::select! {
+                    biased;
+                    command = commands.recv() => match command {
+                        Some(Command::Input(value)) => {
+                            if value && (!supported || !*ready_rx.borrow_and_update()) {
+                                publish_input(window, owner, supported && *ready_rx.borrow(), false);
+                                continue;
+                            }
+                            // Drain old local events before changing remote ownership.
+                            tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(false)).await
+                                .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                            control.set_enabled(value).await.map_err(|e| e.to_string())?;
+                            if value {
+                                tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(true)).await
+                                    .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                            }
+                            enabled = value;
+                            publish_input(window, owner, supported && *ready_rx.borrow(), enabled);
+                        }
+                        other => return Ok::<_, String>(other),
+                    },
+                    event = native_input.next() => {
+                        let event = event.map_err(|e| e.to_string())?;
+                        if enabled { control.send(event).await.map_err(|e| e.to_string())?; }
+                    }
+                }
+            }
+        };
+        let command = tokio::select! {
+            result = video => { result?; None },
+            result = interaction => result?,
         };
         drop(viewer);
         match command {
@@ -352,6 +418,9 @@ async fn stream(
             Some(Command::Retry) => {
                 session.close().await.map_err(|e| e.to_string())?;
                 return Ok(true);
+            }
+            Some(Command::Input(_)) => {
+                unreachable!("input commands are handled within the generation")
             }
             None => {
                 let _ = session.close().await;

@@ -25,6 +25,8 @@ fn main() {
         "wmcodecdspuuid",
         "ole32",
         "shcore",
+        "shell32",
+        "advapi32",
     ] {
         println!("cargo:rustc-link-lib={library}");
     }

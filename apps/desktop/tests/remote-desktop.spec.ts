@@ -24,3 +24,18 @@ test("control errors remain above native surface and capture failure can reconne
   await page.getByRole("button", { name: "Reconnect" }).click();
   await expect(page.getByRole("status")).toHaveText("Connected");
 });
+test("control requires the first frame and resets to viewing on a new screen", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
+  await page.evaluate(() => (window as any).fixture.ready(false));
+  await expect(page.getByRole("button", { name: "Enable control" })).toBeDisabled();
+  await page.evaluate(() => (window as any).fixture.ready(true));
+  await page.getByRole("button", { name: "Enable control" }).click();
+  await expect(page.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Control enabled", { exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
+  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
+  expect(calls).toEqual([{ inputEnabled: true }, { screen: "adapter:left" }]);
+});

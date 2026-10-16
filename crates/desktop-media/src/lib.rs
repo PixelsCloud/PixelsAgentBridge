@@ -1,7 +1,10 @@
 //! Platform media workers. The authenticated session/transport crate contains
 //! no native FFI. Only compressed packets cross the private worker pipes.
+mod input;
 mod process;
+mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};
+pub use viewer_input::NativeViewerInput;
 
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments
 /// start with the operation (inventory, capture or render), without argv[0].

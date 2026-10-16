@@ -8,12 +8,15 @@ const screens = [
   { id: "adapter:primary", name: "Main", desktop_width: 1920, desktop_height: 1080, primary: true },
   { id: "adapter:left", name: "Portrait", desktop_width: 1080, desktop_height: 1920, primary: false },
 ];
-let opened = { config: { screen: screens[0], fps: 15, generation: 1 }, screens };
+let opened = { config: { screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
 let phase = "viewing";
+let inputReady = true, inputEnabled = false;
+const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled });
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false,
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
+  ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; fixture.emit(status()); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
 (window as any).__TAURI_INTERNALS__ = {
@@ -24,13 +27,14 @@ const fixture = (window as any).fixture = {
     fixture.calls.push({ command, args });
     if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
     if (command.startsWith("plugin:")) return null;
-    if (command === "desktop_viewer_start") return { phase, opened };
+    if (command === "desktop_viewer_start") return status();
     if (command === "desktop_viewer_control") {
       if (fixture.reject) throw "Renderer is busy; retry shortly";
       fixture.emit({ phase: "switching", opened });
+      inputEnabled = typeof args.inputEnabled === "boolean" ? args.inputEnabled : false;
       if (args.screen) opened = { ...opened, config: { ...opened.config, screen: screens.find((s) => s.id === args.screen)!, generation: opened.config.generation + 1 } };
       if (args.fps) opened = { ...opened, config: { ...opened.config, fps: args.fps } };
-      setTimeout(() => { phase = "viewing"; fixture.emit({ phase, opened }); }, 40);
+      setTimeout(() => { phase = "viewing"; fixture.emit(status()); }, 40);
       return null;
     }
     throw new Error(`Unexpected viewer call: ${command}`);

@@ -4,6 +4,7 @@
 #include <array>
 #include <deque>
 #include <thread>
+#include "viewer_input.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -14,6 +15,16 @@ inline std::array<float, 4> test_color(uint64_t frame, unsigned quadrant) {
 }
 
 class NativePresenter {
+    ViewerInput input_;
+    static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
+        auto* self = reinterpret_cast<NativePresenter*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (message == WM_NCCREATE) {
+            self = static_cast<NativePresenter*>(reinterpret_cast<CREATESTRUCTW*>(lparam)->lpCreateParams);
+            SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        }
+        if (self && self->input_.message(window, message, wparam, lparam, self->viewport_)) return 0;
+        return DefWindowProcW(window, message, wparam, lparam);
+    }
     HWND window_ = nullptr;
     HWND parent_ = nullptr;
     DecodedFrame retained_;
@@ -39,6 +50,8 @@ class NativePresenter {
     UINT width_ = 0, height_ = 0;
     UINT output_width_ = 960, output_height_ = 540;
 public:
+    void input_available(bool available) { input_.available = available; }
+    void input_enabled(bool enabled) { input_.enable(window_, enabled); }
     uint64_t submitted = 0, displayed = 0, pixel_checks = 0;
     unsigned max_color_error = 0;
     uint64_t stats_disjoint = 0;
@@ -47,6 +60,7 @@ public:
     NativePresenter(const NativePresenter&) = delete;
     NativePresenter& operator=(const NativePresenter&) = delete;
     ~NativePresenter() {
+        input_.release(window_);
         pixel_.Reset();
         processor_.Reset();
         enumerator_.Reset();
@@ -133,7 +147,7 @@ public:
         check(device_.As(&video_), "D3D11 video device");
         check(context_.As(&video_context_), "D3D11 video context");
         WNDCLASSW cls{};
-        cls.lpfnWndProc = DefWindowProcW;
+        cls.lpfnWndProc = window_proc;
         cls.hInstance = GetModuleHandleW(nullptr);
         cls.lpszClassName = L"PixelsRemoteDesktopSurface";
         if (!RegisterClassW(&cls) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
@@ -147,7 +161,7 @@ public:
             cls.lpszClassName, L"Pixels · Remote desktop", style,
             monitor.right - (bounds.right - bounds.left) - 32, monitor.bottom - (bounds.bottom - bounds.top) - 32,
             bounds.right - bounds.left, bounds.bottom - bounds.top,
-            parent_, nullptr, cls.hInstance, nullptr);
+            parent_, nullptr, cls.hInstance, this);
         if (!window_) throw std::runtime_error("Cannot create native viewer");
         // Avoid recursively capturing the test viewer in local desktop loopback.
         if (capture && !parent_ && !SetWindowDisplayAffinity(window_, WDA_EXCLUDEFROMCAPTURE))

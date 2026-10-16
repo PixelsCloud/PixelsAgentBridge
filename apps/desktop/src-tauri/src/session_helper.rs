@@ -15,7 +15,9 @@ pub fn run() -> Result<(), String> {
         .and_then(|argument| argument.strip_prefix("--desktop=").map(str::to_owned));
     let applications_only = std::env::args().nth(1).as_deref() == Some("--application-helper");
     let media_only = std::env::args().nth(1).as_deref() == Some("--media-helper");
-    if media_only && (!cfg!(windows) || !matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon"))) {
+    if media_only
+        && (!cfg!(windows) || !matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")))
+    {
         return Err("media helper requires a Windows interactive desktop".into());
     }
     if applications_only && (!cfg!(windows) || expected_desktop.as_deref() != Some("Default")) {
@@ -101,12 +103,6 @@ async fn run_forever(
     expected_desktop: Option<String>,
     applications_only: bool,
 ) -> Result<(), String> {
-    #[cfg(windows)]
-    let _media = if !applications_only && matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")) {
-        Some(start_media_helper(expected_desktop.clone())?)
-    } else {
-        None
-    };
     #[cfg(target_os = "macos")]
     let _recovery = crate::desktop_input::start_recovery_monitor();
     loop {
@@ -152,21 +148,31 @@ async fn run_forever(
 struct MediaHelperTask(tauri::async_runtime::JoinHandle<()>);
 #[cfg(windows)]
 impl Drop for MediaHelperTask {
-    fn drop(&mut self) { self.0.abort(); }
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 #[cfg(windows)]
 fn start_media_helper(desktop: Option<String>) -> Result<MediaHelperTask, String> {
     let backend = pab_desktop_media::NativeBackend::new(
         std::env::current_exe().map_err(|e| e.to_string())?,
         vec!["--media-worker".into()],
-    );
+    )
+    .with_input();
     Ok(MediaHelperTask(tauri::async_runtime::spawn(async move {
         loop {
             if desktop_is_active(desktop.as_deref()) {
+                if let Err(error) = backend.recover_input().await {
+                    tracing::debug!(%error, "waiting for previous input owner to release");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
                 let stopped = async {
                     loop {
                         tokio::time::sleep(Duration::from_millis(100)).await;
-                        if !desktop_is_active(desktop.as_deref()) { break; }
+                        if !desktop_is_active(desktop.as_deref()) {
+                            break;
+                        }
                     }
                 };
                 tokio::select! {

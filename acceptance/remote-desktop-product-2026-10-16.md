@@ -144,3 +144,7 @@ Windows 内核身份挑战、独立 socket 和模拟输入 sink，覆盖静帧�
 进程生命周期/登录会话配对与服务账号拒绝策略。Windows Desktop debug 构建通过
 （7 分钟，含媒体 supervisor 和输入 v2 会话基础）；后续 helper 输入 socket 改动
 已通过上述 Executor 构建与测试，尚未重新生成用于部署的 Desktop 安装包。
+
+后续原生输入已接通并在 90 完成点击、键盘、滚轮、停止/关闭以及输入进程崩溃后的
+释放验收；最新进展和构建哈希见[原生输入验收](remote-desktop-input-2026-10-16.md)。
+上文“尚未接入原生输入”描述的是此前协议/IPC 基础检查点。

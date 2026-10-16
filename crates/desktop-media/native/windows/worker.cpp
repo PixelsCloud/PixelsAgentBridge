@@ -78,6 +78,8 @@ static void inventory(const std::vector<Display>& found) {
     }
     std::cout << "]\n";
 }
+#include "input_worker.h"
+#include "input_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
     for (size_t i = 0; i + 4 < bytes.size(); ++i) {
         if (!bytes[i] && !bytes[i+1] && bytes[i+2] == 1 && (bytes[i+3] & 31) == 5) return true;
@@ -171,7 +173,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         next = (std::max)(next + std::chrono::microseconds(1000000/fps), Clock::now());
     }
 }
-static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation) {
+static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive) {
     MediaRuntime runtime;
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
@@ -179,11 +181,17 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
         nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context), "Render device");
     HardwareDecoder decoder(device.Get(), width, height, fps);
     NativePresenter presenter;
+    presenter.input_available(interactive);
     presenter.initialize(device.Get(), width, height, fps, display.screen.DesktopCoordinates, true, verify, parent, rotation);
     write_value(magic);
     uint64_t expected = 0;
     while (true) {
         const auto size = read_value<uint32_t>(&presenter);
+        if (interactive && size == UINT32_MAX) {
+            const auto enabled = read_value<uint8_t>(&presenter);
+            if (enabled > 1) throw std::runtime_error("Invalid viewer input mode");
+            presenter.input_enabled(enabled != 0); continue;
+        }
         if (!size) {
             presenter.finish();
             write_value(presenter.displayed); write_value(presenter.pixel_checks); write_value(presenter.max_color_error);
@@ -210,7 +218,20 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     try {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (argc == 2 && std::string(argv[1]) == "input-recovery-check") {
+            input_recovery_check(); return 0;
+        }
+        if (argc == 2 && std::string(argv[1]) == "recover-input") {
+            InputReleases releases(input_recovery_path()); recover_input(releases); return 0;
+        }
         const auto found = displays();
+        if (argc == 3 && std::string(argv[1]) == "input-fixture" && !found.empty()) {
+            input_fixture(found.front(), number(argv[2], 120)); return 0;
+        }
+        if (argc == 3 && std::string(argv[1]) == "input") {
+            for (const auto& d : found) if (screen_id(d) == argv[2]) { input_worker(d); return 0; }
+            throw std::runtime_error("Selected input screen disappeared");
+        }
         if (argc == 2 && std::string(argv[1]) == "inventory") { inventory(found); return 0; }
         if (argc == 4 && std::string(argv[1]) == "animate-display" && !found.empty()) {
             const auto fps = number(argv[2], 60), seconds = number(argv[3], 120);
@@ -233,7 +254,8 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             throw std::runtime_error("Selected screen disappeared");
         }
         if (argc >= 6 && argc <= 8 && std::string(argv[1]) == "render" && !found.empty()) {
-            if (std::string(argv[5]) != "verify" && std::string(argv[5]) != "normal") throw std::runtime_error("Invalid render mode");
+            const std::string mode(argv[5]);
+            if (mode != "verify" && mode != "normal" && mode != "interactive") throw std::runtime_error("Invalid render mode");
             const auto width = number(argv[2],8192), height = number(argv[3],8192);
             if (uint64_t(width)*height > 33554432) throw std::runtime_error("Render dimensions too large");
             HWND parent = nullptr;
@@ -250,7 +272,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 else if (angle == "270") rotation = 3;
                 else if (angle != "0") throw std::runtime_error("Invalid rotation");
             }
-            render(found.front(),width,height,number(argv[4],60),std::string(argv[5]) == "verify", parent, rotation); return 0;
+            render(found.front(),width,height,number(argv[4],60),mode == "verify", parent, rotation, mode == "interactive"); return 0;
         }
         throw std::runtime_error("usage: stream-media inventory | capture SCREEN_ID FPS synthetic|desktop|animate | render WIDTH HEIGHT FPS normal|verify");
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }

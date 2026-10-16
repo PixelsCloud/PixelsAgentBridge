@@ -6,12 +6,12 @@ use pab_remote_desktop::*;
 use std::{path::PathBuf, process::Stdio, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    process::{Child, ChildStdin, ChildStdout, Command},
+    process::{Child, ChildStderr, ChildStdin, ChildStdout, Command},
     sync::{Mutex, OwnedMutexGuard},
 };
-const MAGIC: u32 = 0x31424150;
+pub(crate) const MAGIC: u32 = 0x31424150;
 type AnyError = Box<dyn std::error::Error + Send + Sync>;
-fn media_error(error: impl std::fmt::Display) -> DesktopError {
+pub(crate) fn media_error(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::Rejected {
         code: DesktopErrorCode::MediaUnavailable,
         message: error.to_string(),
@@ -20,8 +20,9 @@ fn media_error(error: impl std::fmt::Display) -> DesktopError {
 
 pub struct MediaChild {
     child: Option<Child>,
-    input: ChildStdin,
+    input: Arc<Mutex<ChildStdin>>,
     output: ChildStdout,
+    events: Option<ChildStderr>,
     permit: Option<OwnedMutexGuard<()>>,
 }
 impl MediaChild {
@@ -32,19 +33,26 @@ impl MediaChild {
         permit: Option<OwnedMutexGuard<()>>,
     ) -> std::io::Result<Self> {
         let mut command = Command::new(path);
+        let interactive = args.first().is_some_and(|s| s == "render")
+            && args.get(4).is_some_and(|s| s == "interactive");
         command
             .args(prefix)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(if interactive {
+                Stdio::piped()
+            } else {
+                Stdio::inherit()
+            })
             .kill_on_drop(true);
         #[cfg(windows)]
         command.creation_flags(0x08000000); // No console; the render window is created explicitly.
         let mut child = command.spawn()?;
         Ok(Self {
-            input: child.stdin.take().unwrap(),
+            input: Arc::new(Mutex::new(child.stdin.take().unwrap())),
             output: child.stdout.take().unwrap(),
+            events: child.stderr.take(),
             child: Some(child),
             permit,
         })
@@ -76,6 +84,8 @@ pub struct NativeBackend {
     executable: PathBuf,
     prefix: Vec<String>,
     gate: Arc<Mutex<()>>,
+    input_gate: Arc<Mutex<()>>,
+    input_enabled: bool,
 }
 impl NativeBackend {
     pub fn new(executable: PathBuf, prefix: Vec<String>) -> Self {
@@ -83,10 +93,23 @@ impl NativeBackend {
             executable,
             prefix,
             gate: Arc::new(Mutex::new(())),
+            input_gate: Arc::new(Mutex::new(())),
+            input_enabled: false,
         }
     }
     pub async fn idle(&self) {
         drop(self.gate.lock().await);
+        drop(self.input_gate.lock().await);
+    }
+    /// Only the dedicated interactive media helper enables OS input. Capture
+    /// experiments and all other NativeBackend callers remain view-only.
+    pub fn with_input(mut self) -> Self {
+        self.input_enabled = cfg!(windows);
+        self
+    }
+    pub async fn recover_input(&self) -> std::io::Result<()> {
+        let _permit = self.input_gate.lock().await;
+        crate::input::recover(&self.executable, &self.prefix).await
     }
 }
 struct NativeSource {
@@ -97,7 +120,7 @@ impl DesktopSource for NativeSource {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
             let operation = async {
-                self.process.input.write_u8(1).await?;
+                self.process.input.lock().await.write_u8(1).await?;
                 let size = self.process.output.read_u32_le().await? as usize;
                 if size == 0 || size > DESKTOP_MAX_FRAME_BYTES {
                     return Err(std::io::Error::other("invalid media length"));
@@ -125,6 +148,27 @@ impl DesktopSource for NativeSource {
     }
 }
 impl DesktopBackend for NativeBackend {
+    fn supports_input(&self) -> bool {
+        self.input_enabled
+    }
+    fn input(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopInputSink>> {
+        Box::pin(async move {
+            if !self.input_enabled {
+                return Err(media_error("native input is disabled"));
+            }
+            config.validate().map_err(media_error)?;
+            let permit = self.input_gate.clone().lock_owned().await;
+            let sink = crate::input::NativeInput::open(
+                self.executable.clone(),
+                self.prefix.clone(),
+                config,
+                permit,
+            )
+            .await
+            .map_err(media_error)?;
+            Ok(Box::new(sink) as Box<dyn DesktopInputSink>)
+        })
+    }
     fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>> {
         Box::pin(async {
             let mut process =
@@ -194,7 +238,7 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         verify: bool,
     ) -> std::result::Result<Self, AnyError> {
-        Self::open_inner(path, prefix, config, verify, None).await
+        Self::open_inner(path, prefix, config, verify, None, false).await
     }
     /// Parent HWND is obtained by the native Desktop host, never from a remote
     /// message or webview argument. The child leaves 72 logical px for controls.
@@ -204,7 +248,20 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         parent: usize,
     ) -> std::result::Result<Self, AnyError> {
-        Self::open_inner(path, prefix, config, false, Some(parent)).await
+        Self::open_inner(path, prefix, config, false, Some(parent), false).await
+    }
+    pub async fn open_interactive(
+        path: &PathBuf,
+        prefix: &[String],
+        config: &DesktopVideoConfig,
+        parent: usize,
+    ) -> std::result::Result<(Self, crate::NativeViewerInput), AnyError> {
+        let mut viewer = Self::open_inner(path, prefix, config, false, Some(parent), true).await?;
+        let events = crate::NativeViewerInput::new(
+            viewer.process.input.clone(),
+            viewer.process.events.take().unwrap(),
+        );
+        Ok((viewer, events))
     }
     async fn open_inner(
         path: &PathBuf,
@@ -212,6 +269,7 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         verify: bool,
         parent: Option<usize>,
+        interactive: bool,
     ) -> std::result::Result<Self, AnyError> {
         config.validate()?;
         let mut arguments = vec![
@@ -219,7 +277,14 @@ impl NativeViewer {
             config.screen.pixel_width.to_string(),
             config.screen.pixel_height.to_string(),
             config.fps.to_string(),
-            if verify { "verify" } else { "normal" }.into(),
+            if interactive {
+                "interactive"
+            } else if verify {
+                "verify"
+            } else {
+                "normal"
+            }
+            .into(),
         ];
         arguments.push(parent.unwrap_or(0).to_string());
         arguments.push(
@@ -246,15 +311,12 @@ impl NativeViewer {
         if frame.bytes.len() != frame.header.payload_bytes as usize {
             return Err("native frame payload length mismatch".into());
         }
-        self.process
-            .input
-            .write_u32_le(frame.bytes.len().try_into()?)
-            .await?;
-        self.process
-            .input
-            .write_u64_le(frame.header.frame_id - 1)
-            .await?;
-        self.process.input.write_all(&frame.bytes).await?;
+        {
+            let mut input = self.process.input.lock().await;
+            input.write_u32_le(frame.bytes.len().try_into()?).await?;
+            input.write_u64_le(frame.header.frame_id - 1).await?;
+            input.write_all(&frame.bytes).await?;
+        }
         let consumed = self.process.output.read_u64_le().await?;
         if consumed != frame.header.frame_id - 1 {
             return Err("native renderer consumption mismatch".into());
@@ -266,7 +328,7 @@ impl NativeViewer {
         Ok(())
     }
     pub async fn finish(mut self) -> std::result::Result<serde_json::Value, AnyError> {
-        self.process.input.write_u32_le(0).await?;
+        self.process.input.lock().await.write_u32_le(0).await?;
         let displayed = self.process.output.read_u64_le().await?;
         let pixel_checks = self.process.output.read_u64_le().await?;
         let max_rgb_error = self.process.output.read_u32_le().await?;

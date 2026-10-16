@@ -133,6 +133,7 @@ async fn request(
 /// availability. Failure here is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
+    fn supports_input(&self) -> bool { cfg!(windows) }
     fn input(
         &self,
         config: DesktopVideoConfig,

@@ -5,11 +5,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./remoteDesktop.css";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
-type Status = { phase: string; error?: string; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[] } };
+type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
 const english = localStorage.getItem("pab.language") === "en";
 const text = english
   ? { title: "Remote desktop", view: "View only", screen: "Display", retry: "Reconnect", full: "Fullscreen", ready: "Preparing", connecting: "Connecting", switching: "Switching display", viewing: "Connected", failed: "Connection failed", ended: "Disconnected", waiting: "Waiting for remote desktop…" }
   : { title: "远程桌面", view: "仅查看", screen: "显示器", retry: "重新连接", full: "全屏", ready: "准备中", connecting: "正在连接", switching: "正在切换屏幕", viewing: "已连接", failed: "连接失败", ended: "已断开", waiting: "等待远端画面…" };
+const inputText = english
+  ? { enable: "Enable control", disable: "Stop control", active: "Control enabled" }
+  : { enable: "启用操作", disable: "停止操作", active: "可操作" };
 
 export default function RemoteDesktopWindow() {
   const [status, setStatus] = useState<Status>({ phase: "ready" });
@@ -37,7 +40,7 @@ export default function RemoteDesktopWindow() {
   const phase = text[status.phase as keyof typeof text] || status.phase;
   return <main className="remote-desktop">
     <header className="remote-desktop-toolbar">
-      <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span></div>
+      <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span></div>
       <div className="remote-desktop-controls">
         <select aria-label={text.screen} disabled={busy || status.phase !== "viewing"} value={opened?.config.screen.id || ""} onChange={(event) => void control({ screen: event.target.value })}>
           {!opened && <option value="">{text.screen}</option>}
@@ -46,6 +49,7 @@ export default function RemoteDesktopWindow() {
         <select aria-label="FPS" value={opened?.config.fps || 15} disabled={busy || status.phase !== "viewing"} onChange={(event) => void control({ fps: Number(event.target.value) })}>
           <option value={15}>15 FPS</option><option value={30}>30 FPS</option>
         </select>
+        <button aria-pressed={Boolean(status.input_enabled)} disabled={busy || status.phase !== "viewing" || !status.input_ready} onClick={() => void control({ inputEnabled: !status.input_enabled })}>{status.input_enabled ? inputText.disable : inputText.enable}</button>
         <button onClick={() => void getCurrentWindow().isFullscreen().then((full) => getCurrentWindow().setFullscreen(!full)).catch((cause) => setError(String(cause)))}>{text.full}</button>
         {status.phase === "failed" && <button disabled={busy} onClick={() => void control({ retry: true })}>{text.retry}</button>}
       </div>
