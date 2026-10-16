@@ -89,7 +89,7 @@ static bool idr(const std::vector<uint8_t>& bytes) {
     }
     return false;
 }
-static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software) {
+static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder) {
     const bool synthetic = mode == "synthetic";
     if (!synthetic && mode != "desktop" && mode != "animate") throw std::runtime_error("Unknown source mode");
     ComPtr<ID3D11Device> device;
@@ -124,7 +124,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         check(device->CreateTexture2D(&desc, nullptr, &texture), "Synthetic texture");
         check(device->CreateRenderTargetView(texture.Get(), nullptr, &target), "Synthetic target");
     }
-    CaptureEncoder encoder(device.Get(), width, height, fps, force_software);
+    CaptureEncoder encoder(device.Get(), width, height, fps, force_software, fail_encoder);
     std::cerr << "media encoder=" << (encoder.software() ? "openh264_software readback_per_frame=1" : "nvenc_gpu readback_per_frame=0") << '\n';
     write_value(magic); write_value(width); write_value(height);
     const auto start = Clock::now(); auto next = start;
@@ -315,10 +315,12 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         }
         if (argc == 5 && std::string(argv[1]) == "capture") {
             std::string mode(argv[4]);
+            const bool fail_encoder = mode.size() > 13 && mode.compare(mode.size()-13,13,"-fail-encoder") == 0;
+            if (fail_encoder) mode.resize(mode.size()-13);
             const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
             if (software) mode.resize(mode.size()-9);
             for (const auto& d : found) if (screen_id(d) == argv[2]) {
-                capture(d, number(argv[3],60),mode,software); return 0;
+                capture(d, number(argv[3],60),mode,software,fail_encoder); return 0;
             }
             throw std::runtime_error("Selected screen disappeared");
         }

@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !(3..=5).contains(&args.len()) || !matches!(args[1].as_str(), "synthetic" | "animate") {
-        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software] [--embedded]".into());
+        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software|encoder-failure] [--embedded]".into());
     }
     let prefix = match args.get(4).map(String::as_str) {
         None => vec![],
@@ -32,13 +32,15 @@ async fn run() -> Result<(), Error> {
     let codecs = args.get(3).map(String::as_str).unwrap_or("auto");
     if !matches!(
         codecs,
-        "auto" | "software-encode" | "software-decode" | "software"
+        "auto" | "software-encode" | "software-decode" | "software" | "encoder-failure"
     ) {
         return Err("unknown codec selection".into());
     }
     let software_encode = matches!(codecs, "software-encode" | "software");
     let software_decode = matches!(codecs, "software-decode" | "software");
-    let capture_mode = if software_encode {
+    let capture_mode = if codecs == "encoder-failure" {
+        format!("{}-fail-encoder", args[1])
+    } else if software_encode {
         format!("{}-software", args[1])
     } else {
         args[1].clone()
@@ -118,6 +120,9 @@ async fn run() -> Result<(), Error> {
             let key = packets.read_u32_le().await?;
             if key > 1 {
                 return Err("invalid keyframe flag".into());
+            }
+            if codecs == "encoder-failure" && index == 2 && key != 1 {
+                return Err("encoder fallback did not begin with a keyframe".into());
             }
             let mut bytes = vec![0; size as usize];
             packets.read_exact(&mut bytes).await?;

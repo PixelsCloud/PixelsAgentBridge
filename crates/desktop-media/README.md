@@ -7,6 +7,12 @@ Software encoding reads back BGRA and converts it to limited BT.709 I420;
 software decoding uploads NV12 for the same native presenter. These CPU copies
 are absent from the successful direct hardware path. Runtime device-loss
 fallback and systems without usable D3D11 capture/display remain unfinished.
+An NVENC API failure now retires that encoder and begins software output with
+a new IDR at the same frame number. The Desktop viewer handles native renderer
+failure by closing the old session and trying software once in a fresh view-only
+session; another software failure is surfaced until user retry. Transport/auth
+errors retain their existing recovery policy. See the codec-recovery acceptance
+record for the injected encode failure and real renderer-process crash tests.
 `pab-media-worker` is the standalone developer binary. Desktop embeds the same
 native library and dispatches `--media-worker` before initializing Tauri; the
 installer therefore needs no extra executable or downloaded SDK.
@@ -53,6 +59,8 @@ Its optional final argument selects `software-encode`, `software-decode` or
 not persisted application configuration. A final `--embedded` tests a Desktop
 executable through its `--media-worker` entry point. `software_codec_check` measures only
 CPU conversion/codec time; its result is not capture or displayed FPS.
+`encoder-failure` starts on real NVENC, injects failure at the third frame, and
+checks that fallback starts with a keyframe and continues the decoded sequence.
 
 Building the bundled software codec on x86/x64 requires NASM on PATH before
 Cargo starts. Rebuild `openh264-sys2` after installing NASM if an older cache was

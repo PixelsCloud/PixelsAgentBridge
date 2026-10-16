@@ -34,9 +34,15 @@ impl MediaChild {
     ) -> std::io::Result<Self> {
         let mut command = Command::new(path);
         let interactive = args.first().is_some_and(|s| s == "render")
-            && args
-                .get(4)
-                .is_some_and(|s| s == "interactive" || s == "stream-interactive");
+            && args.get(4).is_some_and(|s| {
+                matches!(
+                    s.as_str(),
+                    "interactive"
+                        | "stream-interactive"
+                        | "interactive-software"
+                        | "stream-interactive-software"
+                )
+            });
         command
             .args(prefix)
             .args(args)
@@ -289,8 +295,19 @@ impl NativeViewer {
         config: &DesktopVideoConfig,
         parent: usize,
     ) -> std::result::Result<(Self, crate::NativeViewerInput), AnyError> {
+        Self::open_interactive_with_software(path, prefix, config, parent, false).await
+    }
+    /// A fresh viewer after a renderer failure can explicitly select software.
+    /// This does not reuse the failed generation's pending frames or input.
+    pub async fn open_interactive_with_software(
+        path: &PathBuf,
+        prefix: &[String],
+        config: &DesktopVideoConfig,
+        parent: usize,
+        software: bool,
+    ) -> std::result::Result<(Self, crate::NativeViewerInput), AnyError> {
         let mut viewer =
-            Self::open_inner(path, prefix, config, false, Some(parent), true, false).await?;
+            Self::open_inner(path, prefix, config, false, Some(parent), true, software).await?;
         let events = crate::NativeViewerInput::new(
             viewer.process.input.clone(),
             viewer.process.events.take().unwrap(),

@@ -36,12 +36,23 @@ impl From<&DesktopOpened> for InputGeneration {
 struct StreamFailure {
     message: String,
     recoverable: bool,
+    renderer: bool,
+}
+impl StreamFailure {
+    fn renderer(error: impl std::fmt::Display) -> Self {
+        Self {
+            message: error.to_string(),
+            recoverable: false,
+            renderer: true,
+        }
+    }
 }
 impl From<String> for StreamFailure {
     fn from(message: String) -> Self {
         Self {
             message,
             recoverable: false,
+            renderer: false,
         }
     }
 }
@@ -55,6 +66,7 @@ impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
         Self {
             recoverable: error.is_recoverable_media(),
             message: error.to_string(),
+            renderer: false,
         }
     }
 }
@@ -71,6 +83,7 @@ impl From<pab_bridge::RuntimeError> for StreamFailure {
         Self {
             recoverable,
             message: error.to_string(),
+            renderer: false,
         }
     }
 }
@@ -337,6 +350,7 @@ async fn run(
         let mut fps = 15;
         let mut screen = None;
         let mut failures = 0u32;
+        let mut software_decoder = false;
         loop {
             // Input and SAS belong to the previous generation. Never replay
             // queued actions into a newly opened login desktop.
@@ -367,12 +381,22 @@ async fn run(
                 &mut fps,
                 &mut screen,
                 &mut first_presented,
+                software_decoder,
             )
             .await;
             match result {
                 Ok(true) => continue,
                 Ok(false) => break,
                 Err(error) => {
+                    if error.renderer && !software_decoder {
+                        // Decode/render failure gets one software attempt in a
+                        // fresh, view-only session. Network/auth failures never
+                        // change codec selection or replay previous input.
+                        software_decoder = true;
+                        failures += 1;
+                        publish(&window, &owner, "reconnecting", None, None);
+                        continue;
+                    }
                     // A single frame followed by failure must not create an
                     // endless restart loop. Reset only after a stable interval.
                     if first_presented
@@ -423,6 +447,7 @@ async fn stream(
     fps: &mut u16,
     screen: &mut Option<String>,
     first_presented: &mut Option<Instant>,
+    software_decoder: bool,
 ) -> Result<bool, StreamFailure> {
     let device = owner
         .runtime
@@ -454,13 +479,26 @@ async fn stream(
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let prefix = vec!["--media-worker".into()];
     loop {
-        let (mut viewer, mut native_input) = tokio::time::timeout(
+        let started = tokio::time::timeout(
             Duration::from_secs(10),
-            NativeViewer::open_interactive(&executable, &prefix, &session.opened().config, parent),
+            NativeViewer::open_interactive_with_software(
+                &executable,
+                &prefix,
+                &session.opened().config,
+                parent,
+                software_decoder,
+            ),
         )
         .await
-        .map_err(|_| "native viewer startup timed out")?
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| StreamFailure::renderer("native viewer startup timed out"))
+        .and_then(|result| result.map_err(StreamFailure::renderer));
+        let (mut viewer, mut native_input) = match started {
+            Ok(viewer) => viewer,
+            Err(error) => {
+                let _ = tokio::time::timeout(Duration::from_secs(2), session.close()).await;
+                return Err(error);
+            }
+        };
         publish(
             window,
             owner,
@@ -485,15 +523,20 @@ async fn stream(
                         .map_err(StreamFailure::from)?;
                     tokio::time::timeout(Duration::from_secs(5), viewer.submit(&frame))
                         .await
-                        .map_err(|_| "native decoder submission timed out")?
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|_| {
+                            StreamFailure::renderer("native decoder submission timed out")
+                        })?
+                        .map_err(StreamFailure::renderer)?;
                 }
                 #[allow(unreachable_code)]
                 Ok::<(), StreamFailure>(())
             };
             let output = async {
                 loop {
-                    let header = presentations.next().await.map_err(|e| e.to_string())?;
+                    let header = presentations
+                        .next()
+                        .await
+                        .map_err(StreamFailure::renderer)?;
                     acknowledgements
                         .report_presented(&header)
                         .map_err(StreamFailure::from)?;
@@ -522,11 +565,11 @@ async fn stream(
                             }
                             // Drain old local events before changing remote ownership.
                             tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(false)).await
-                                .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                                .map_err(|_| StreamFailure::renderer("native input mode timed out"))?.map_err(StreamFailure::renderer)?;
                             control.set_enabled(value).await.map_err(StreamFailure::from)?;
                             if value {
                                 tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(true)).await
-                                    .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                                    .map_err(|_| StreamFailure::renderer("native input mode timed out"))?.map_err(StreamFailure::renderer)?;
                             }
                             enabled = value;
                             publish_input(window, owner, supported && *ready_rx.borrow(), enabled);
@@ -537,7 +580,7 @@ async fn stream(
                             // before the system changes desktops. SAS is sent
                             // once through the existing authenticated service.
                             tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(false)).await
-                                .map_err(|_| "native input mode timed out")?.map_err(|e| e.to_string())?;
+                                .map_err(|_| StreamFailure::renderer("native input mode timed out"))?.map_err(StreamFailure::renderer)?;
                             control.set_enabled(false).await.map_err(StreamFailure::from)?;
                             publish_input(window, owner, false, false);
                             owner.runtime.desktop_input(device, pab_protocol::DesktopInputEvent::SecureAttention)
@@ -548,7 +591,7 @@ async fn stream(
                         other => return Ok::<_, StreamFailure>(other),
                     },
                     event = native_input.next() => {
-                        let event = event.map_err(|e| e.to_string())?;
+                        let event = event.map_err(StreamFailure::renderer)?;
                         if enabled { control.send(event).await.map_err(StreamFailure::from)?; }
                     }
                 }

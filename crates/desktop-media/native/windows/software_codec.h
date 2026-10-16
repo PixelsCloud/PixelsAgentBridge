@@ -17,29 +17,36 @@ bool pab_soft_decode(void* decoder, const uint8_t* data, size_t size, PabCodecBy
 class CaptureEncoder {
     std::unique_ptr<Encoder> hardware_;
     void* software_ = nullptr;
+    ComPtr<ID3D11Device> device_;
     ComPtr<ID3D11DeviceContext> context_;
     ComPtr<ID3D11Texture2D> readback_;
-    UINT width_, height_;
+    UINT width_, height_, fps_;
+    bool fail_encoder_ = false;
     double readback_ms_ = 0, codec_ms_ = 0;
     uint64_t frames_ = 0;
+    void initialize_software() {
+        // Retire NVENC's retained surface/session before constructing fallback.
+        hardware_.reset();
+        D3D11_TEXTURE2D_DESC description{};
+        description.Width = width_; description.Height = height_;
+        description.MipLevels = description.ArraySize = description.SampleDesc.Count = 1;
+        description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        description.Usage = D3D11_USAGE_STAGING; description.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        check(device_->CreateTexture2D(&description,nullptr,&readback_), "Software capture readback texture");
+        device_->GetImmediateContext(&context_);
+        software_ = pab_soft_encoder_new(width_,height_,static_cast<uint16_t>(fps_));
+        if (!software_) throw std::runtime_error("Software encoder initialization failed");
+    }
 public:
-    CaptureEncoder(ID3D11Device* device, UINT width, UINT height, UINT fps, bool force_software)
-        : width_(width), height_(height) {
+    CaptureEncoder(ID3D11Device* device, UINT width, UINT height, UINT fps, bool force_software, bool fail_encoder = false)
+        : device_(device), width_(width), height_(height), fps_(fps), fail_encoder_(fail_encoder) {
         if (!force_software) {
             auto candidate = std::make_unique<Encoder>();
             try { candidate->initialize(device,width,height,fps); hardware_ = std::move(candidate); }
             catch (const std::exception&) {} // Native RAII retires partial GPU setup before fallback.
         }
-        if (hardware_) return;
-        D3D11_TEXTURE2D_DESC description{};
-        description.Width = width; description.Height = height;
-        description.MipLevels = description.ArraySize = description.SampleDesc.Count = 1;
-        description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        description.Usage = D3D11_USAGE_STAGING; description.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        check(device->CreateTexture2D(&description,nullptr,&readback_), "Software capture readback texture");
-        device->GetImmediateContext(&context_);
-        software_ = pab_soft_encoder_new(width,height,static_cast<uint16_t>(fps));
-        if (!software_) throw std::runtime_error("Software encoder initialization failed");
+        if (fail_encoder_ && !hardware_) throw std::runtime_error("Fault test requires a working hardware encoder");
+        if (!hardware_) initialize_software();
     }
     ~CaptureEncoder() { if (software_) pab_soft_encoder_drop(software_); }
     CaptureEncoder(const CaptureEncoder&) = delete;
@@ -50,7 +57,17 @@ public:
             << " mean_conversion_encode_ms=" << codec_ms_/frames_ << '\n';
     }
     void encode(ID3D11Texture2D* texture, uint64_t index, std::vector<uint8_t>& packet) {
-        if (hardware_) { hardware_->encode(texture,index,nullptr,&packet); return; }
+        if (hardware_) {
+            try {
+                if (fail_encoder_ && index == 2) throw std::runtime_error("Injected encoder failure");
+                hardware_->encode(texture,index,nullptr,&packet); return;
+            } catch (const std::exception&) {
+                initialize_software();
+                // Its first published output is a new SPS/PPS + IDR. No failed
+                // packet is sent and no frame number or input generation resets.
+                std::cerr << "media encoder fallback=openh264_software readback_per_frame=1\n";
+            }
+        }
         D3D11_TEXTURE2D_DESC description{}; texture->GetDesc(&description);
         if (description.Width != width_ || description.Height != height_ || description.Format != DXGI_FORMAT_B8G8R8A8_UNORM || description.ArraySize != 1 || description.SampleDesc.Count != 1)
             throw std::runtime_error("Software capture texture changed");

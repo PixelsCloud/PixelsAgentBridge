@@ -35,10 +35,12 @@
 Direct 产品连接、独立窗口连续锁屏登录均已通过。软件编解码后备现已接入生产
 Windows worker，90 的 1080p 硬软混合、全软件和动态桌面均通过 15 FPS 验收；
 本机 4K 全软件动态桌面在完整 Release 内嵌 worker 中达到 13.5 FPS，
-高强度全屏变化仍单独评估。初始化失败回退已实现，运行中故障回退、GUI
-软件输入验收、完整异步 MFT、弱网和跨平台仍待完成。
+高强度全屏变化仍未达标。初始化失败回退、NVENC API 运行故障回退，以及正式
+窗口渲染进程故障后的软件恢复、只查看复位和输入释放均已通过。GPU 设备丢失、
+完整异步 MFT、弱网和跨平台仍待完成。
 详见 [解码输出验收](acceptance/remote-desktop-decoder-output-2026-10-17.md)。
 软件实现、依赖与实测边界见 [软件编解码验收](acceptance/remote-desktop-software-codec-2026-10-17.md)。
+运行中故障与软件输入见 [编解码恢复验收](acceptance/remote-desktop-codec-recovery-2026-10-17.md)。
 
 ### 开始即核实的条件
 
