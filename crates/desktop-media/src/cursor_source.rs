@@ -7,12 +7,19 @@ use tokio::sync::watch;
 pub(super) struct CaptureLease {
     config: DesktopVideoConfig,
     pub(super) ended: watch::Sender<bool>,
+    #[cfg(target_os = "linux")]
+    pub(super) channel: Option<super::linux_cursor_channel::Channel>,
 }
 impl CaptureLease {
-    pub(super) fn new(config: DesktopVideoConfig) -> Self {
+    pub(super) fn new(
+        config: DesktopVideoConfig,
+        #[cfg(target_os = "linux")] channel: Option<super::linux_cursor_channel::Channel>,
+    ) -> Self {
         Self {
             config,
             ended: watch::channel(false).0,
+            #[cfg(target_os = "linux")]
+            channel,
         }
     }
 }
@@ -39,73 +46,169 @@ pub(super) async fn open(
         .and_then(std::sync::Weak::upgrade)
         .filter(|lease| lease.config == config && !*lease.ended.borrow())
         .ok_or(DesktopError::Closed)?;
-    let mut stopped = lease.ended.subscribe();
+    let stopped = lease.ended.subscribe();
+    #[cfg(target_os = "linux")]
+    let channel = lease.channel.as_ref().map(|channel| channel.path.clone());
     // Do not hold a strong lease: dropping video must invalidate this cursor,
     // even when its caller retains the source without requesting another update.
     drop(lease);
+    #[cfg(target_os = "linux")]
+    {
+        let path = channel
+            .ok_or_else(|| media_error("independent cursor unavailable for this capture"))?;
+        return open_unix(backend, config, stopped, path).await;
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let mut stopped = stopped;
+        let start = async {
+            let permit = backend.cursor_gate.clone().lock_owned().await;
+            let mut process = MediaChild::spawn(
+                &backend.executable,
+                &backend.prefix,
+                &["cursor".into(), config.screen.id.clone()],
+                Some(permit),
+            )
+            .map_err(media_error)?;
+            {
+                let mut input = process.input.lock().await;
+                input
+                    .write_i32_le(config.screen.x)
+                    .await
+                    .map_err(media_error)?;
+                input
+                    .write_i32_le(config.screen.y)
+                    .await
+                    .map_err(media_error)?;
+                input
+                    .write_u32_le(config.screen.desktop_width)
+                    .await
+                    .map_err(media_error)?;
+                input
+                    .write_u32_le(config.screen.desktop_height)
+                    .await
+                    .map_err(media_error)?;
+                input
+                    .write_u32_le(match config.screen.rotation {
+                        DesktopRotation::Identity => 0,
+                        DesktopRotation::Clockwise90 => 1,
+                        DesktopRotation::Clockwise180 => 2,
+                        DesktopRotation::Clockwise270 => 3,
+                    })
+                    .await
+                    .map_err(media_error)?;
+            }
+            process.ready().await.map_err(media_error)?;
+            if process
+                .output
+                .as_mut()
+                .unwrap()
+                .read_u32_le()
+                .await
+                .map_err(media_error)?
+                != 1
+            {
+                return Err(media_error("native cursor IPC version mismatch"));
+            }
+            Ok(process)
+        };
+        let process = tokio::select! {
+            biased;
+            _ = ended(&mut stopped) => return Err(DesktopError::Closed),
+            result = tokio::time::timeout(Duration::from_secs(5), start) => result.map_err(|_| DesktopError::Timeout)??,
+        };
+        // Own the process in a task which observes capture retirement also while
+        // the caller is idle. The one-slot request queue has no position history.
+        let (requests, receiver) = tokio::sync::mpsc::channel(1);
+        let task = tokio::spawn(run(process, config, stopped, receiver));
+        Ok(Box::new(NativeCursor { requests, task }))
+    }
+}
+type Reply = tokio::sync::oneshot::Sender<Result<CursorUpdate>>;
+#[cfg(target_os = "linux")]
+async fn open_unix(
+    backend: &NativeBackend,
+    config: DesktopVideoConfig,
+    mut stopped: watch::Receiver<bool>,
+    path: PathBuf,
+) -> Result<Box<dyn DesktopCursorSource>> {
     let start = async {
         let permit = backend.cursor_gate.clone().lock_owned().await;
-        let mut process = MediaChild::spawn(
-            &backend.executable,
-            &backend.prefix,
-            &["cursor".into(), config.screen.id.clone()],
-            Some(permit),
-        )
-        .map_err(media_error)?;
-        {
-            let mut input = process.input.lock().await;
-            input
-                .write_i32_le(config.screen.x)
-                .await
-                .map_err(media_error)?;
-            input
-                .write_i32_le(config.screen.y)
-                .await
-                .map_err(media_error)?;
-            input
-                .write_u32_le(config.screen.desktop_width)
-                .await
-                .map_err(media_error)?;
-            input
-                .write_u32_le(config.screen.desktop_height)
-                .await
-                .map_err(media_error)?;
-            input
-                .write_u32_le(match config.screen.rotation {
-                    DesktopRotation::Identity => 0,
-                    DesktopRotation::Clockwise90 => 1,
-                    DesktopRotation::Clockwise180 => 2,
-                    DesktopRotation::Clockwise270 => 3,
-                })
-                .await
-                .map_err(media_error)?;
-        }
-        process.ready().await.map_err(media_error)?;
-        if process
-            .output
-            .as_mut()
-            .unwrap()
-            .read_u32_le()
+        let mut stream = tokio::net::UnixStream::connect(path)
             .await
-            .map_err(media_error)?
-            != 1
+            .map_err(media_error)?;
+        stream
+            .write_i32_le(config.screen.x)
+            .await
+            .map_err(media_error)?;
+        stream
+            .write_i32_le(config.screen.y)
+            .await
+            .map_err(media_error)?;
+        stream
+            .write_u32_le(config.screen.desktop_width)
+            .await
+            .map_err(media_error)?;
+        stream
+            .write_u32_le(config.screen.desktop_height)
+            .await
+            .map_err(media_error)?;
+        if config.screen.rotation != DesktopRotation::Identity {
+            return Err(media_error("Linux capture must be oriented"));
+        }
+        stream.write_u32_le(0).await.map_err(media_error)?;
+        if stream.read_u32_le().await.map_err(media_error)? != MAGIC
+            || stream.read_u32_le().await.map_err(media_error)? != 1
         {
             return Err(media_error("native cursor IPC version mismatch"));
         }
-        Ok(process)
+        Ok((stream, permit))
     };
-    let process = tokio::select! {
+    let (mut stream, permit) = tokio::select! {
         biased;
-        _ = ended(&mut stopped) => return Err(DesktopError::Closed),
-        result = tokio::time::timeout(Duration::from_secs(5), start) => result.map_err(|_| DesktopError::Timeout)??,
+        _=ended(&mut stopped)=>return Err(DesktopError::Closed),
+        result=tokio::time::timeout(Duration::from_secs(5),start)=>result.map_err(|_|DesktopError::Timeout)??,
     };
-    // Own the process in a task which observes capture retirement also while
-    // the caller is idle. The one-slot request queue has no position history.
-    let (requests, receiver) = tokio::sync::mpsc::channel(1);
-    let task = tokio::spawn(run(process, config, stopped, receiver));
+    let (requests, mut receiver) = tokio::sync::mpsc::channel::<Reply>(1);
+    let task = tokio::spawn(async move {
+        let _permit = permit;
+        let mut sequence = 1;
+        let mut image_id = 0;
+        loop {
+            let mut reply = tokio::select! {
+                biased;
+                _=ended(&mut stopped)=>return,
+                request=receiver.recv()=>match request { Some(reply)=>reply,None=>return },
+            };
+            let operation = async {
+                stream.write_u8(1).await.map_err(media_error)?;
+                read_packet(
+                    &mut stream,
+                    &config,
+                    sequence,
+                    image_id,
+                    Duration::from_secs(5),
+                )
+                .await
+            };
+            let result = tokio::select! {
+                biased;
+                _=ended(&mut stopped)=>return,
+                _=reply.closed()=>return,
+                result=operation=>result,
+            };
+            let failed = result.is_err();
+            if let Ok(update) = &result {
+                image_id = update.header.image_id;
+                sequence += 1;
+            }
+            if reply.send(result).is_err() || failed {
+                return;
+            }
+        }
+    });
     Ok(Box::new(NativeCursor { requests, task }))
 }
-type Reply = tokio::sync::oneshot::Sender<Result<CursorUpdate>>;
 struct NativeCursor {
     requests: tokio::sync::mpsc::Sender<Reply>,
     task: tokio::task::JoinHandle<()>,
@@ -127,6 +230,7 @@ impl DesktopCursorSource for NativeCursor {
         })
     }
 }
+#[cfg(not(target_os = "linux"))]
 async fn run(
     mut process: MediaChild,
     config: DesktopVideoConfig,
@@ -157,6 +261,7 @@ async fn run(
         }
     }
 }
+#[cfg(not(target_os = "linux"))]
 async fn read_update(
     process: &mut MediaChild,
     config: &DesktopVideoConfig,

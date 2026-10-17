@@ -1,5 +1,6 @@
 #pragma once
 #include "gnome.h"
+#include "cursor_channel.h"
 #include "../software_codec_ffi.h"
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
@@ -32,6 +33,7 @@ class Capture {
     GDBusConnection* bus_;
     Display display_;
     unsigned fps_;
+    CursorState* cursor_;
     std::string session_;
     std::vector<guint> subscriptions_;
     pw_thread_loop* loop_ = nullptr;
@@ -44,8 +46,10 @@ class Capture {
     // loop lock. The main thread owns D-Bus callbacks and the codec.
     static void state_changed(void* opaque, pw_stream_state, pw_stream_state state, const char*) noexcept {
         auto& c = *static_cast<Capture*>(opaque);
-        if (state == PW_STREAM_STATE_ERROR || state == PW_STREAM_STATE_UNCONNECTED)
+        if (state == PW_STREAM_STATE_ERROR || state == PW_STREAM_STATE_UNCONNECTED) {
             c.error_ = "PipeWire capture disconnected";
+            if(c.cursor_)c.cursor_->fail(c.error_);
+        }
     }
     static void removed(void* opaque, pw_buffer* buffer) noexcept {
         auto& c = *static_cast<Capture*>(opaque);
@@ -58,6 +62,19 @@ class Capture {
         for (unsigned i = 0; i < 8; ++i) {
             auto* next = pw_stream_dequeue_buffer(c.stream_);
             if (!next) break;
+            if(c.cursor_) {
+                try {
+                    const auto* meta=spa_buffer_find_meta(next->buffer,SPA_META_Cursor);
+                    if(!meta)throw std::runtime_error("PipeWire cursor metadata missing");
+                    cursor_metadata(*c.cursor_,c.display_,*meta);
+                } catch(const std::exception& error) { c.cursor_->fail(error.what()); }
+            }
+            // Mutter emits cursor-only buffers with a zero-sized pixel chunk.
+            // Return them immediately without replacing the pending video frame.
+            if(c.cursor_ && next->buffer && next->buffer->n_datas==1 && next->buffer->datas &&
+                next->buffer->datas[0].chunk && next->buffer->datas[0].chunk->size==0) {
+                pw_stream_queue_buffer(c.stream_,next);continue;
+            }
             if (c.pending_) pw_stream_queue_buffer(c.stream_, c.pending_);
             c.pending_ = next; c.sampled_ = Clock::now();
         }
@@ -80,7 +97,16 @@ class Capture {
             SPA_PARAM_BUFFERS_size, SPA_POD_Int(format.size.width * format.size.height * 4),
             SPA_PARAM_BUFFERS_stride, SPA_POD_Int(format.size.width * 4),
             SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int((1 << SPA_DATA_MemFd) | (1 << SPA_DATA_MemPtr))));
-        if (pw_stream_update_params(c.stream_, &buffers, 1) < 0) c.error_ = "PipeWire buffer negotiation failed";
+        const spa_pod* params[2]={buffers,nullptr};unsigned count=1;
+        if(c.cursor_) {
+            params[count++]=static_cast<const spa_pod*>(spa_pod_builder_add_object(&builder,
+                SPA_TYPE_OBJECT_ParamMeta,SPA_PARAM_Meta,SPA_PARAM_META_type,SPA_POD_Id(SPA_META_Cursor),
+                SPA_PARAM_META_size,SPA_POD_CHOICE_RANGE_Int(
+                    int(sizeof(spa_meta_cursor)+sizeof(spa_meta_bitmap)+384*384*4),
+                    int(sizeof(spa_meta_cursor)+sizeof(spa_meta_bitmap)),
+                    int(sizeof(spa_meta_cursor)+sizeof(spa_meta_bitmap)+512*512*4))));
+        }
+        if (pw_stream_update_params(c.stream_, params, count) < 0) c.error_ = "PipeWire buffer negotiation failed";
         else c.formatted_ = true;
     }
     static const pw_stream_events& events() {
@@ -94,6 +120,7 @@ class Capture {
     static void invalidated(GDBusConnection*, const char*, const char*, const char*, const char*, GVariant*, void* opaque) noexcept {
         auto& c = *static_cast<Capture*>(opaque);
         PwLock lock(c.loop_); c.error_ = "Desktop session or display layout changed; refresh capture generation";
+        if(c.cursor_)c.cursor_->fail(c.error_);
     }
     static void node_added(GDBusConnection*, const char*, const char*, const char*, const char*, GVariant* params, void* opaque) noexcept {
         auto& c = *static_cast<Capture*>(opaque);
@@ -134,10 +161,12 @@ class Capture {
         if (g_dbus_connection_is_closed(bus_)) throw std::runtime_error("Desktop session bus closed");
     }
 public:
-    Capture(GDBusConnection* bus, Display display, unsigned fps) : bus_(bus), display_(std::move(display)), fps_(fps) {}
+    Capture(GDBusConnection* bus, Display display, unsigned fps,CursorState* cursor=nullptr)
+        : bus_(bus), display_(std::move(display)), fps_(fps),cursor_(cursor) {}
     Capture(const Capture&) = delete;
     Capture& operator=(const Capture&) = delete;
     ~Capture() {
+        if(cursor_)cursor_->fail("Video capture ended");
         for (auto id : subscriptions_) g_dbus_connection_signal_unsubscribe(bus_, id);
         if (loop_) {
             if (started_) pw_thread_loop_stop(loop_);
@@ -169,7 +198,7 @@ public:
         subscribe("org.gnome.Mutter.ScreenCast", "org.gnome.Mutter.ScreenCast.Session", "Closed", session_.c_str(), invalidated);
         GVariantBuilder options;
         g_variant_builder_init(&options, G_VARIANT_TYPE_VARDICT);
-        g_variant_builder_add(&options, "{sv}", "cursor-mode", g_variant_new_uint32(1));
+        g_variant_builder_add(&options, "{sv}", "cursor-mode", g_variant_new_uint32(cursor_?2:1));
         result = session_call("RecordMonitor", g_variant_new("(sa{sv})", display_.connector.c_str(), &options), G_VARIANT_TYPE("(o)"));
         auto path = text(child(result.get(), 0).get());
         subscribe("org.gnome.Mutter.ScreenCast", "org.gnome.Mutter.ScreenCast.Stream", "PipeWireStreamAdded", path.c_str(), node_added);

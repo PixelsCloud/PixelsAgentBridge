@@ -47,7 +47,8 @@ and reaps retained cursor sources even while idle. `cursor-shape-check` uses
 generated shapes without touching the OS pointer; the Windows cursor integration
 test includes an explicitly ignored real-GPU lifecycle check. Windows native
 viewer overlays are connected, as are the Mac Metal and Linux OpenGL overlays.
-Linux independent capture remains pending.
+Linux GNOME Wayland independent capture is connected; X11/DRM cursor sources
+and full product acceptance remain pending.
 
 The Mac backend now shares this cursor process/lease adapter and advertises it
 through the existing session helper. Its video worker selects
@@ -68,6 +69,18 @@ older macOS still need real-platform acceptance. Generated shape checks and the
 Mac build pass; live Mac source/video coexistence, hidden/shown/motion and retained
 lease teardown remain pending while the Apple test machine is locked. See
 `acceptance/remote-desktop-macos-cursor-source-2026-10-18.md` from the repo root.
+
+On GNOME Wayland, the capture worker extracts cursor metadata from the existing
+PipeWire stream (`cursor-mode=2`). Cursor-only buffers are returned without
+replacing pending video pixels. One immutable shape and latest position are read
+through a private per-capture Unix socket, restricted to the capture parent's
+PID/UID. There is no second capture, full-frame cursor readback or video-credit
+dependency. The Rust reader shares video cancellation, generation validation and
+bounded framing. X11 retains embedded capture; protected-desktop DRM fallback
+reports independent cursor unavailability and keeps its existing video path.
+The real Ubuntu worker lease/reopen/motion checks passed; this does not establish
+formal viewer, X11, DRM cursor-plane or long-run acceptance. See
+`acceptance/remote-desktop-linux-cursor-source-2026-10-18.md`.
 
 `NativeViewer::cursor_renderer()` returns a generation-owned independent
 submitter. Windows Desktop reads the remote cursor stream alongside video and

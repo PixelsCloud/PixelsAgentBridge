@@ -70,12 +70,14 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             if (pab_linux::x11::selected()) pab_linux::x11::recover();
             pw_deinit(); return 0;
         }
-        if (argc != 2 && argc != 3 && argc != 5) throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop | input SCREEN_ID");
+        const bool separate=argc==6 && std::string(argv[1])=="capture" && std::string(argv[4])=="desktop-separate-cursor";
+        if (argc != 2 && argc != 3 && argc != 5 && !separate) throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop | input SCREEN_ID");
         if (argc == 2 && std::string(argv[1]) != "inventory") throw std::runtime_error("Unsupported Linux media operation");
         if (argc == 3 && std::string(argv[1]) != "input" && std::string(argv[1]) != "input-uinput") throw std::runtime_error("Unsupported Linux media operation");
         if (argc == 5 && (std::string(argv[1]) != "capture" || std::string(argv[4]) != "desktop"))
             throw std::runtime_error("Unsupported Linux media operation");
         if (pab_linux::x11::selected()) {
+            if(separate)throw std::runtime_error("Independent X11 cursor capture is not available");
             pab_linux::x11::run(argc, argv); pw_deinit(); return 0;
         }
         auto bus = pab_linux::session_bus();
@@ -87,14 +89,17 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             if (argc == 3) pab_linux::input(bus.get(), *selected, std::string(argv[1]) == "input-uinput");
             else {
                 const auto fps = pab_linux::number(argv[3], 60);
+                std::unique_ptr<pab_linux::CursorChannel> cursor;
+                if(separate)cursor=std::make_unique<pab_linux::CursorChannel>(argv[5],*selected);
                 const bool sleeping = pab_linux::dma::asleep(bus.get());
                 if (sleeping || pab_linux::dma::protected_screen(bus.get())) {
+                    if(cursor)cursor->state.fail("Independent cursor unavailable for DRM capture");
                     auto channel = pab_linux::dma::connect_broker(selected->connector, sleeping);
                     if (sleeping) pab_linux::dma::await_awake(bus.get());
                     pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
                     pw_deinit(); return 0;
                 }
-                auto source = std::make_unique<pab_linux::Capture>(bus.get(), *selected, fps);
+                auto source = std::make_unique<pab_linux::Capture>(bus.get(), *selected, fps,cursor?&cursor->state:nullptr);
                 try { source->start(); }
                 catch (const std::exception& error) {
                     // No compressed header/frame has been published yet. Close

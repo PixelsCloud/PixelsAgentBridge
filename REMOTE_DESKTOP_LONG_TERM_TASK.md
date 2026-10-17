@@ -15,7 +15,7 @@ Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证�
 
 剩余重点开发集中在四块：
 
-1. Mac 独立光标源实机收口及 Linux 独立光标采集，保持与视频是否包含光标一致。
+1. Mac/Linux 光标源的正式窗口收口，Linux X11/锁屏 DMA 光标开发；保持与视频是否包含光标一致。
 2. 输入异常及多屏边界，尤其 90 首次激活的重复鼠标消息、混合 DPI/旋转/热插拔。
 3. 登录与会话边界：Mac 系统登录，Windows 开机未登录/UAC/用户切换等。
 4. 媒体积压降档、设备故障/弱网恢复及测试发现的问题。
@@ -30,6 +30,12 @@ Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证�
 和 Mac 23 项媒体单测及 Mac 完整 Desktop 构建通过。Apple 随后处于锁屏状态，
 真实源的移动/隐藏/视频共存及退出回收仍待解锁验证，不能关闭交付条目。见
 [Mac 光标源阶段记录](acceptance/remote-desktop-macos-cursor-source-2026-10-18.md)。
+
+Linux GNOME Wayland 源现已复用 PipeWire 光标元数据和独立本地读取通道；生成数据
+113 组异常检查、Linux 24/Windows 22 项媒体单测和完整 Linux Desktop 构建通过。
+Ubuntu 上正式内嵌 worker 的双代次/重开/退出回收，以及不请求编码视频帧时的
+光标移动合并检查通过；未打开正式远程窗口，X11、锁屏 DMA、真实隐藏/形状变化
+和长时间性能尚未验收。见 [Linux 光标源记录](acceptance/remote-desktop-linux-cursor-source-2026-10-18.md)。
 
 ## 一次性执行任务：完成三平台远程桌面首版并发布
 

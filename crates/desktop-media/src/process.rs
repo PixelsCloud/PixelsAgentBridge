@@ -9,9 +9,12 @@ use tokio::{
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command},
     sync::{Mutex, OwnedMutexGuard},
 };
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 #[path = "cursor_source.rs"]
 mod cursor;
+#[cfg(target_os = "linux")]
+#[path = "linux_cursor_channel.rs"]
+mod linux_cursor_channel;
 pub(crate) const MAGIC: u32 = 0x31424150;
 type AnyError = Box<dyn std::error::Error + Send + Sync>;
 pub(crate) fn media_error(error: impl std::fmt::Display) -> DesktopError {
@@ -97,9 +100,9 @@ pub struct NativeBackend {
     gate: Arc<Mutex<()>>,
     input_gate: Arc<Mutex<()>>,
     input_enabled: bool,
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     cursor_gate: Arc<Mutex<()>>,
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     capture: std::sync::Mutex<Option<std::sync::Weak<cursor::CaptureLease>>>,
 }
 impl NativeBackend {
@@ -110,16 +113,16 @@ impl NativeBackend {
             gate: Arc::new(Mutex::new(())),
             input_gate: Arc::new(Mutex::new(())),
             input_enabled: false,
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
             cursor_gate: Arc::new(Mutex::new(())),
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
             capture: std::sync::Mutex::new(None),
         }
     }
     pub async fn idle(&self) {
         drop(self.gate.lock().await);
         drop(self.input_gate.lock().await);
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         drop(self.cursor_gate.lock().await);
     }
     /// Only the dedicated interactive media helper enables OS input. Capture
@@ -136,10 +139,10 @@ impl NativeBackend {
 struct NativeSource {
     process: MediaChild,
     index: u64,
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     capture: Arc<cursor::CaptureLease>,
 }
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 impl Drop for NativeSource {
     fn drop(&mut self) {
         self.capture.ended.send_replace(true);
@@ -183,9 +186,16 @@ impl DesktopSource for NativeSource {
 }
 impl DesktopBackend for NativeBackend {
     fn supports_cursor(&self) -> bool {
-        cfg!(any(windows, target_os = "macos"))
+        #[cfg(target_os = "linux")]
+        {
+            linux_cursor_channel::supported()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            cfg!(any(windows, target_os = "macos"))
+        }
     }
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     fn cursor(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopCursorSource>> {
         Box::pin(cursor::open(self, config))
     }
@@ -248,22 +258,40 @@ impl DesktopBackend for NativeBackend {
         Box::pin(async move {
             config.validate().map_err(media_error)?;
             let permit = self.gate.clone().lock_owned().await;
-            let mut process = MediaChild::spawn(
-                &self.executable,
-                &self.prefix,
-                &[
-                    "capture".into(),
-                    config.screen.id.clone(),
-                    config.fps.to_string(),
-                    if cfg!(target_os = "macos") {
-                        "desktop-separate-cursor".into()
-                    } else {
-                        "desktop".into()
-                    },
-                ],
-                Some(permit),
-            )
-            .map_err(media_error)?;
+            #[cfg(target_os = "linux")]
+            let channel = if self.supports_cursor() && config.screen.id.starts_with("gnome:") {
+                Some(linux_cursor_channel::Channel::new().map_err(media_error)?)
+            } else {
+                None
+            };
+            let args = vec![
+                "capture".into(),
+                config.screen.id.clone(),
+                config.fps.to_string(),
+                if cfg!(target_os = "macos") {
+                    "desktop-separate-cursor".into()
+                } else {
+                    "desktop".into()
+                },
+            ];
+            #[cfg(target_os = "linux")]
+            let args = {
+                let mut args = args;
+                if let Some(channel) = &channel {
+                    args[3] = "desktop-separate-cursor".into();
+                    args.push(
+                        channel
+                            .path
+                            .to_str()
+                            .ok_or_else(|| media_error("cursor channel path is not UTF-8"))?
+                            .into(),
+                    );
+                }
+                args
+            };
+            let mut process =
+                MediaChild::spawn(&self.executable, &self.prefix, &args, Some(permit))
+                    .map_err(media_error)?;
             process.ready().await.map_err(media_error)?;
             let width = process
                 .output
@@ -282,9 +310,13 @@ impl DesktopBackend for NativeBackend {
             if (width, height) != (config.screen.pixel_width, config.screen.pixel_height) {
                 return Err(media_error("screen changed during source startup"));
             }
-            #[cfg(any(windows, target_os = "macos"))]
+            #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
             let capture = {
-                let lease = Arc::new(cursor::CaptureLease::new(config));
+                let lease = Arc::new(cursor::CaptureLease::new(
+                    config,
+                    #[cfg(target_os = "linux")]
+                    channel,
+                ));
                 *self
                     .capture
                     .lock()
@@ -295,7 +327,7 @@ impl DesktopBackend for NativeBackend {
             Ok(Box::new(NativeSource {
                 process,
                 index: 0,
-                #[cfg(any(windows, target_os = "macos"))]
+                #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
                 capture,
             }) as Box<dyn DesktopSource>)
         })
