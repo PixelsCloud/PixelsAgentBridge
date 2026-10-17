@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-17",
   "implementation_base": "0521a2e",
-  "scope": "Formal Linux Wayland operator to Windows 90: displayed native frame, exact click, Ctrl, view-only suppression, and explicit AI assistance completion; not full W5/W6/W7 acceptance",
+  "scope": "Formal Linux GNOME Wayland and Windows product workflows in both directions: native frames, exact clicks, Ctrl, and explicit AI assistance completion; not complete W5/W6/W7 acceptance",
   "operator": {
     "device_code": "556688188",
     "os": "Ubuntu 22.04.5",
@@ -129,7 +129,6 @@
     "native_binary_rebuilt": false
   },
   "pending": [
-    "Windows to Linux product path",
     "X11 product path",
     "Linux system login and desktop recovery",
     "actual dynamic network/display FPS",
@@ -138,5 +137,97 @@
     "F24 delivery through VM compositor input path",
     "macOS product acceptance and full nine-way matrix",
     "sustained acceptance and release"
-  ]
+  ],
+  "windows_to_linux": {
+    "implementation_base": "75cf888",
+    "product": {
+      "passed": true,
+      "direction": "Windows to Linux GNOME Wayland",
+      "native_first_frame": true,
+      "explicit_control": true,
+      "fixture_before": {
+        "clicks": 0,
+        "releases": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": null,
+        "last_y": null,
+        "updated": 1792202786.8982532,
+        "width": 1314,
+        "height": 742,
+        "focused": true
+      },
+      "fixture_after": {
+        "clicks": 1,
+        "releases": 1,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": 656.890625,
+        "last_y": 371.28515625,
+        "updated": 1792202819.8962505,
+        "width": 1314,
+        "height": 742,
+        "focused": true
+      },
+      "ai_completed_and_rechecked": true,
+      "artifacts": {
+        "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97",
+        "pab-desktop.exe": "bdacbfad5580c64ca93a9fe68daa7ae08199706b12e0223f5d859c131f68e4e6"
+      }
+    },
+    "linux_desktop_sha256": "8ac8671c8c1b5a80daae33f4f7926fb7e893f5e5e24128375e03b6dbac4f0c76",
+    "linux_executor_build": {
+      "exit_code": 0,
+      "sha256": "d1b3376f6680dfb611b44576d6ea2545358c935bc13e347dc02798cbdd0568f0",
+      "bytes": 44827176,
+      "cargo_jobs": 8,
+      "nested_jobs": 1
+    },
+    "configuration_integrity": {
+      "task_id": "bb387df4-865d-4ad1-9ab9-37207d4bc2e8",
+      "result": {
+        "config_unchanged": true,
+        "installed_executor_unchanged": true,
+        "unit_unchanged": true
+      }
+    },
+    "service_cleanup": {
+      "task_id": "6c5fb0e8-6bd9-4652-816b-9eb6e4a7234c",
+      "result": {
+        "temporary_service_state_removed": true,
+        "original_service_running": true
+      }
+    },
+    "profile_cleanup": {
+      "task_id": "3521ce35-637e-46c3-85d2-4964b02d30f1",
+      "result": {
+        "private_host_profile_removed": true,
+        "last_fixture_state": {
+          "clicks": 1,
+          "releases": 1,
+          "ctrl_down": 1,
+          "ctrl_up": 1,
+          "ctrl_held": false,
+          "left_held": false,
+          "last_x": 656.890625,
+          "last_y": 371.28515625,
+          "updated": 1792202893.250688,
+          "width": 1314,
+          "height": 742,
+          "focused": true
+        }
+      }
+    },
+    "installed_local_app_updated": false,
+    "temporary_systemd_override_removed": true,
+    "native_windows_processes_after_cleanup": 0,
+    "configured_fps": 15,
+    "dynamic_display_fps_measured": false,
+    "login_screen_tested": false,
+    "x11_tested": false
+  }
 }
