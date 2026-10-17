@@ -4,10 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./remoteDesktop.css";
 import type { Assistance } from "./DesktopAssistanceNotice";
+import { initialLanguage } from "./i18n";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
 type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
-const english = localStorage.getItem("pab.language") === "en";
+const english = initialLanguage() === "en";
 const text = english
   ? { title: "Remote desktop", view: "View only", screen: "Display", retry: "Reconnect", full: "Fullscreen", ready: "Preparing", connecting: "Connecting", reconnecting: "Restoring desktop", switching: "Switching display", viewing: "Connected", failed: "Connection failed", ended: "Disconnected", waiting: "Waiting for remote desktop…" }
   : { title: "远程桌面", view: "仅查看", screen: "显示器", retry: "重新连接", full: "全屏", ready: "准备中", connecting: "正在连接", reconnecting: "正在恢复画面", switching: "正在切换屏幕", viewing: "已连接", failed: "连接失败", ended: "已断开", waiting: "等待远端画面…" };

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-17",
+  "implementation_base": "0521a2e",
+  "scope": "Formal Linux Wayland operator to Windows 90: displayed native frame, exact click, Ctrl, view-only suppression, and explicit AI assistance completion; not full W5/W6/W7 acceptance",
+  "operator": {
+    "device_code": "556688188",
+    "os": "Ubuntu 22.04.5",
+    "desktop": "GNOME Wayland",
+    "session": 13,
+    "user": "hy",
+    "display_pixels": [
+      1314,
+      742
+    ],
+    "scale_percent": 100,
+    "vcpu": 2
+  },
+  "target": {
+    "device_code": "428358431",
+    "os": "Windows Server 2022",
+    "session": 2,
+    "display_pixels": [
+      1920,
+      1080
+    ],
+    "fixture_precondition": "Dedicated window already focused"
+  },
+  "configured_fps": 15,
+  "dynamic_display_fps_measured": false,
+  "transport_route_measured": false,
+  "artifacts_sha256": {
+    "linux_desktop": "8ac8671c8c1b5a80daae33f4f7926fb7e893f5e5e24128375e03b6dbac4f0c76",
+    "linux_mcp": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d",
+    "windows_media_helper": "bdacbfad5580c64ca93a9fe68daa7ae08199706b12e0223f5d859c131f68e4e6",
+    "windows_executor": "f788fe26e6cfcccc0b34e55527934d1283a8abf65773c031243cf79df279d8c1",
+    "windows_fixture": "4e7a78dd4e3a287a76a65d2a6a34eef372170363c715c59bdd7d85f8798c79ef"
+  },
+  "product": {
+    "actual_viewer_opened_from_prompt": true,
+    "actual_first_frame_reviewed": true,
+    "native_gl_surface_visible": true,
+    "explicit_control_enabled": true,
+    "mouse": {
+      "foreground": true,
+      "clicks": 1,
+      "f24_down": 0,
+      "f24_up": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "wheel": 0,
+      "last_click_x": 960,
+      "last_click_y": 540,
+      "ctrl_held": false,
+      "left_held": false
+    },
+    "ctrl": {
+      "foreground": true,
+      "clicks": 1,
+      "f24_down": 0,
+      "f24_up": 0,
+      "ctrl_down": 1,
+      "ctrl_up": 1,
+      "wheel": 0,
+      "last_click_x": 960,
+      "last_click_y": 540,
+      "ctrl_held": false,
+      "left_held": false
+    },
+    "view_only_rejected_click": true,
+    "explicit_completion_received": true,
+    "ai_recheck": {
+      "foreground": true,
+      "clicks": 1,
+      "f24_down": 0,
+      "f24_up": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "wheel": 0,
+      "last_click_x": 960,
+      "last_click_y": 540,
+      "ctrl_held": false,
+      "left_held": false
+    },
+    "viewer_closed_through_owned_native_button": true
+  },
+  "f24_diagnostic": {
+    "task_id": "35d3dcfd-0b28-4383-a17d-0b9bae9ed7ea",
+    "result": {
+      "counts": {
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 1,
+        "ctrl_up": 1
+      },
+      "result": {
+        "owned_window_active": true,
+        "owned_area_focused": true,
+        "injected_and_released": true
+      },
+      "errors": []
+    }
+  },
+  "linux_cleanup": {
+    "task_id": "b0ba887d-b148-4d58-aea9-c9242ebd6a86",
+    "result": {
+      "owned_native_processes": [],
+      "private_profile_removed": true,
+      "installed_profile_untouched": true
+    }
+  },
+  "windows_cleanup": {
+    "original_service_restored": true,
+    "owned_processes": 0,
+    "held_release_flags": 0,
+    "test_tasks_and_directory_removed": true
+  },
+  "linux_mcp_build": {
+    "exit_code": 0,
+    "sha256": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d",
+    "bytes": 34513160,
+    "cargo_jobs": 8,
+    "nested_jobs": 1
+  },
+  "source_change_after_runtime_acceptance": {
+    "description": "Remote viewer uses shared system-language fallback when no saved language exists",
+    "frontend_build_passed": true,
+    "existing_ui_tests_passed": 8,
+    "native_binary_rebuilt": false
+  },
+  "pending": [
+    "Windows to Linux product path",
+    "X11 product path",
+    "Linux system login and desktop recovery",
+    "actual dynamic network/display FPS",
+    "real multi-screen and hotplug",
+    "complete keyboard/layout/IME coverage",
+    "F24 delivery through VM compositor input path",
+    "macOS product acceptance and full nine-way matrix",
+    "sustained acceptance and release"
+  ]
+}

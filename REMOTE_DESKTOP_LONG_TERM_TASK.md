@@ -91,6 +91,13 @@ VM 自建窗口的 10 项实际操作/释放测试、70 项带 ASan/UBSan 的原
 和 Windows 检查通过。实际 Tauri 网络连接、Linux 系统登录与持续性能仍待验收，
 不关闭 W5。详见 [Linux 操作端输入记录](acceptance/remote-desktop-linux-viewer-input-2026-10-17.md)。
 
+后续 W5/W6 产品验证：Linux GNOME Wayland 正式独立窗口已通过 Linux → 90 的
+原生首帧、精确单击、Ctrl 按下/抬起、只查看禁止输入，以及 AI 提示→打开→
+实际操作→明确完成→AI 复核。已恢复 90 原服务并清理测试资源，删除 Linux
+隔离凭据 profile。F24 在独立 GTK 对照窗口也未收到，输入路径根因待查；系统
+登录、反向链路、X11、动态帧率与持续运行仍未关闭。详见
+[Linux 正式产品记录](acceptance/remote-desktop-linux-product-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
