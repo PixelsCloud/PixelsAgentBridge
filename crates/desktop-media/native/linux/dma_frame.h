@@ -37,10 +37,10 @@ struct Request { uint32_t magic = wire_magic, version = wire_version; uint64_t s
 static_assert(sizeof(Request) == 16);
 struct Frame { Metadata info; Fd image, render; };
 
-inline uint64_t validate(const Metadata& m, uint64_t sequence) {
+inline uint64_t validate(const Metadata& m, uint64_t sequence, unsigned minimum_size = 2) {
     if (m.magic != wire_magic || m.version != wire_version || m.sequence != sequence || m.reserved ||
         !m.crtc || !m.framebuffer || !m.connector || m.flags & ~2u ||
-        m.width < 2 || m.height < 2 || m.width > 8192 || m.height > 8192 ||
+        m.width < minimum_size || m.height < minimum_size || m.width > 8192 || m.height > 8192 ||
         uint64_t(m.width) * m.height > 33554432 || m.stride < uint64_t(m.width) * 4 ||
         m.stride > INT32_MAX || m.offset > INT32_MAX)
         throw std::runtime_error("Invalid DMA frame metadata");
@@ -53,6 +53,13 @@ inline uint64_t validate(const Metadata& m, uint64_t sequence) {
     const uint64_t bytes = uint64_t(m.offset) + uint64_t(m.stride) * m.height;
     if (bytes > 256 * 1024 * 1024) throw std::runtime_error("DMA frame extent exceeds bound");
     return bytes;
+}
+inline uint64_t validate_cursor_image(const Metadata& m, uint64_t sequence) {
+    const auto extent = validate(m, sequence, 1);
+    if (m.width > 512 || m.height > 512 || extent > 4 * 1024 * 1024 ||
+        (m.format != DRM_FORMAT_ARGB8888 && m.format != DRM_FORMAT_ABGR8888))
+        throw std::runtime_error("Unsupported DMA cursor image");
+    return extent;
 }
 inline void channel(int fd) {
     int type = 0; socklen_t length = sizeof(type);

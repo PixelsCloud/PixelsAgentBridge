@@ -82,6 +82,17 @@ The real Ubuntu worker lease/reopen/motion checks passed; this does not establis
 formal viewer, X11, DRM cursor-plane or long-run acceptance. See
 `acceptance/remote-desktop-linux-cursor-source-2026-10-18.md`.
 
+The DRM exporter now has a native cursor-plane extraction component. It enables
+the virtual-driver hotspot capability only on its own observer fd, selects the
+currently bound cursor plane, and exports its bounded image/render descriptors.
+Unobservable capability is distinct from a known-but-unbound (hidden) cursor.
+The unprivileged reader can CPU-map linear cursor DMA-BUFs with START/END READ
+sync; this handles vmwgfx dumb cursor buffers which cannot be imported into EGL.
+Other supported cursor images retain the EGL import path; video behavior is
+unchanged. The component is not yet wired into the broker's single-exporter
+scheduling or the formal cursor channel. Native VM evidence and remaining work:
+`acceptance/remote-desktop-linux-drm-cursor-native-2026-10-18.md`.
+
 On X11, a separate cursor worker shares the existing process/lease adapter.
 It uses its own X connection/process, keeping the process-global Xlib error
 handler away from the video/input connections. XFixes shape events update a

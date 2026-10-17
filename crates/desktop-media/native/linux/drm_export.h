@@ -2,6 +2,12 @@
 #include "dma_frame.h"
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <optional>
+
+// Linux 6.6 added this UAPI; older libdrm headers can still target that kernel.
+#ifndef DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT
+#define DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT 6
+#endif
 
 namespace pab_linux::dma {
 template<class T, void(*release)(T*)> struct DrmDrop { void operator()(T* p) const { if (p) release(p); } };
@@ -14,6 +20,17 @@ using Plane = std::unique_ptr<drmModePlane, DrmDrop<drmModePlane, drmModeFreePla
 using Props = std::unique_ptr<drmModeObjectProperties, DrmDrop<drmModeObjectProperties, drmModeFreeObjectProperties>>;
 using Prop = std::unique_ptr<drmModePropertyRes, DrmDrop<drmModePropertyRes, drmModeFreeProperty>>;
 struct Refresh : std::runtime_error { using std::runtime_error::runtime_error; };
+struct CursorScanout {
+    uint32_t screen_width = 0, screen_height = 0, crtc = 0, connector = 0;
+    int32_t left = 0, top = 0;
+    uint32_t hotspot_x = 0, hotspot_y = 0;
+    std::optional<Frame> image;
+};
+inline int32_t cursor_coordinate(uint64_t value) {
+    if (value > uint64_t(INT32_MAX) && value < UINT64_MAX - uint64_t(INT32_MAX))
+        throw std::runtime_error("DRM cursor coordinate outside bounds");
+    return value <= uint64_t(INT32_MAX) ? int32_t(value) : -1 - int32_t(UINT64_MAX - value);
+}
 
 inline uint64_t property(int fd, const Props& properties, const char* name, uint64_t fallback) {
     if (!properties || properties->count_props > 128) throw std::runtime_error("Cannot read DRM properties");
@@ -132,6 +149,10 @@ public:
             drmSetClientCap(observer_.get(), DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) ||
             drmSetClientCap(observer_.get(), DRM_CLIENT_CAP_ATOMIC, 1))
             throw std::runtime_error("Cannot observe DRM atomic plane properties");
+        // Para-virtualized drivers hide their cursor planes from atomic clients
+        // until this capability is set. Never change the borrowed compositor fd.
+        // EOPNOTSUPP on physical drivers is normal; inspect actual planes below.
+        (void)drmSetClientCap(observer_.get(), DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT, 1);
         if (borrowed) {
             drmVersionPtr version = drmGetVersion(card_);
             const bool vmware = version && version->name_len == 6 && !memcmp(version->name, "vmwgfx", 6);
@@ -176,6 +197,80 @@ private:
         return frame;
     }
 public:
+    CursorScanout cursor(uint64_t sequence) const {
+        const auto fd = observer_.get();
+        auto connector = selected();
+        EncoderInfo encoder(drmModeGetEncoder(fd, connector->encoder_id));
+        if (!encoder || !encoder->crtc_id) throw std::runtime_error("DRM cursor output is disabled");
+        Crtc crtc(drmModeGetCrtc(fd, encoder->crtc_id));
+        Resources resources(drmModeGetResources(fd));
+        if (!crtc || !crtc->mode_valid || !resources || resources->count_crtcs < 1 || resources->count_crtcs > 32)
+            throw std::runtime_error("DRM cursor CRTC is unavailable");
+        int index = 0;
+        while (index < resources->count_crtcs && resources->crtcs[index] != crtc->crtc_id) ++index;
+        if (index == resources->count_crtcs) throw Refresh("DRM cursor CRTC changed");
+        CursorScanout result;
+        result.screen_width = crtc->width; result.screen_height = crtc->height;
+        if (crtc->width < 2 || crtc->height < 2 || crtc->width > 8192 || crtc->height > 8192)
+            throw std::runtime_error("DRM cursor screen dimensions outside bounds");
+        result.crtc = crtc->crtc_id; result.connector = connector->connector_id;
+        Planes planes(drmModeGetPlaneResources(fd));
+        if (!planes || planes->count_planes > 128) throw std::runtime_error("DRM cursor plane inventory unavailable");
+        bool capable = false; Plane selected_plane;
+        Props selected_props;
+        for (uint32_t i = 0; i < planes->count_planes; ++i) {
+            Plane plane(drmModeGetPlane(fd, planes->planes[i]));
+            if (!plane) throw Refresh("DRM cursor plane changed");
+            Props props(drmModeObjectGetProperties(fd, plane->plane_id, DRM_MODE_OBJECT_PLANE));
+            if (property(fd, props, "type", UINT64_MAX) != DRM_PLANE_TYPE_CURSOR) continue;
+            capable |= (plane->possible_crtcs & (uint32_t(1) << index)) != 0;
+            if (property(fd, props, "CRTC_ID", UINT64_MAX) != crtc->crtc_id) continue;
+            if (selected_plane) throw std::runtime_error("Multiple DRM cursor planes target this output");
+            selected_plane = std::move(plane); selected_props = std::move(props);
+        }
+        if (!capable) throw std::runtime_error("DRM cursor plane is not observable on this output");
+        if (!selected_plane) return result; // A known cursor plane is currently unbound.
+        const auto framebuffer = property(fd, selected_props, "FB_ID", UINT64_MAX);
+        if (!framebuffer) return result;
+        if (framebuffer > UINT32_MAX) throw std::runtime_error("Invalid DRM cursor framebuffer");
+        Framebuffer owned(card_, uint32_t(framebuffer)); const auto& fb = owned.get();
+        if (!fb.handles[0] || fb.handles[1] || fb.handles[2] || fb.handles[3] ||
+            !fb.width || !fb.height || fb.width > 512 || fb.height > 512 ||
+            (fb.pixel_format != DRM_FORMAT_ARGB8888 && fb.pixel_format != DRM_FORMAT_ABGR8888))
+            throw std::runtime_error("Unsupported DRM cursor framebuffer layout");
+        if (property(fd, selected_props, "SRC_X", UINT64_MAX) || property(fd, selected_props, "SRC_Y", UINT64_MAX) ||
+            property(fd, selected_props, "SRC_W", 0) != uint64_t(fb.width) << 16 ||
+            property(fd, selected_props, "SRC_H", 0) != uint64_t(fb.height) << 16 ||
+            property(fd, selected_props, "CRTC_W", 0) != fb.width || property(fd, selected_props, "CRTC_H", 0) != fb.height ||
+            property(fd, selected_props, "rotation", DRM_MODE_ROTATE_0) != DRM_MODE_ROTATE_0 ||
+            property(fd, selected_props, "alpha", 65535) != 65535 ||
+            property(fd, selected_props, "pixel blend mode", 0) != 0) // DRM_MODE_BLEND_PREMULTI
+            throw std::runtime_error("DRM cursor needs crop, scale, rotation or blending adapter");
+        // CRTC_X/Y are signed coordinates represented in a u64 property value.
+        result.left = cursor_coordinate(property(fd, selected_props, "CRTC_X", uint64_t(1) << 63));
+        result.top = cursor_coordinate(property(fd, selected_props, "CRTC_Y", uint64_t(1) << 63));
+        const auto hx = property(fd, selected_props, "HOTSPOT_X", 0), hy = property(fd, selected_props, "HOTSPOT_Y", 0);
+        if (hx >= fb.width || hy >= fb.height) throw std::runtime_error("DRM cursor hotspot outside image");
+        result.hotspot_x = uint32_t(hx); result.hotspot_y = uint32_t(hy);
+        Frame frame; auto& m = frame.info;
+        m.sequence = sequence; m.width = fb.width; m.height = fb.height; m.format = fb.pixel_format;
+        m.stride = fb.pitches[0]; m.offset = fb.offsets[0]; m.modifier = fb.modifier; m.flags = fb.flags;
+        m.crtc = crtc->crtc_id; m.framebuffer = fb.fb_id; m.connector = connector->connector_id;
+        validate_cursor_image(m, sequence);
+        int exported = -1;
+        if (drmPrimeHandleToFD(card_, fb.handles[0], DRM_CLOEXEC, &exported))
+            throw std::runtime_error("DRM cursor export failed");
+        frame.image = Fd(exported); frame.render = Fd(fcntl(render_, F_DUPFD_CLOEXEC, 3));
+        if (frame.render.get() < 0) throw std::runtime_error("Cannot retain cursor render node");
+        auto current = selected();
+        if (current->connector_id != connector->connector_id || current->encoder_id != connector->encoder_id)
+            throw Refresh("DRM cursor output changed during export");
+        Props now(drmModeObjectGetProperties(fd, selected_plane->plane_id, DRM_MODE_OBJECT_PLANE));
+        for (const auto* name : {"FB_ID", "CRTC_ID", "CRTC_X", "CRTC_Y", "CRTC_W", "CRTC_H", "SRC_X", "SRC_Y", "SRC_W", "SRC_H", "HOTSPOT_X", "HOTSPOT_Y"})
+            if (property(fd, now, name, UINT64_MAX) != property(fd, selected_props, name, UINT64_MAX))
+                throw Refresh("DRM cursor changed during export");
+        owned.finish(); result.image.emplace(std::move(frame)); return result;
+    }
     Frame next(uint64_t sequence) const {
         // A modeset/page flip can retire an FB between plane and GETFB2. Each
         // failed attempt releases its own handles; nothing was sent downstream.

@@ -1,6 +1,6 @@
 // Native descriptor boundary tests: real SCM_RIGHTS, including rejection paths
 // that must close every received fd. No display, GPU, root privilege or input.
-#include "../native/linux/dma_frame.h"
+#include "../native/linux/drm_export.h"
 #include <cassert>
 #include <dirent.h>
 #include <sys/mman.h>
@@ -34,6 +34,24 @@ int main() {
     m.crtc = 1; m.framebuffer = 2; m.connector = 3;
     assert(validate(m, 0) == 12288);
     unsigned checked = 1;
+    // Cursor limits are distinct from the unchanged video descriptor contract.
+    auto cursor = m; cursor.width = cursor.height = 1; cursor.stride = 4;
+    cursor.format = DRM_FORMAT_ARGB8888;
+    assert(validate_cursor_image(cursor,0)==4); ++checked;
+    rejects([&] { validate(cursor,0); }); ++checked;
+    for(auto mutate:std::initializer_list<void(*)(Metadata&)>{
+        [](Metadata& a) { a.width=513;a.stride=2052; },
+        [](Metadata& a) { a.height=513; },
+        [](Metadata& a) { a.height=512;a.stride=8193; },
+        [](Metadata& a) { a.format=DRM_FORMAT_XRGB8888; },
+        [](Metadata& a) { a.offset=4*1024*1024; }}) {
+        auto invalid=cursor;mutate(invalid);rejects([&] { validate_cursor_image(invalid,0); });++checked;
+    }
+    assert(cursor_coordinate(0)==0 && cursor_coordinate(INT32_MAX)==INT32_MAX);
+    assert(cursor_coordinate(UINT64_MAX)==-1 && cursor_coordinate(UINT64_MAX-uint64_t(INT32_MAX))==INT32_MIN);++checked;
+    for(const auto value:{uint64_t(INT32_MAX)+1,(uint64_t(1)<<63),UINT64_MAX-uint64_t(INT32_MAX)-1}) {
+        rejects([&] { cursor_coordinate(value); });++checked;
+    }
     for (auto mutate : std::initializer_list<void(*)(Metadata&)>{
         [](Metadata& a) { a.magic = 0; }, [](Metadata& a) { a.version = 2; },
         [](Metadata& a) { a.sequence = 1; }, [](Metadata& a) { a.reserved = 1; },

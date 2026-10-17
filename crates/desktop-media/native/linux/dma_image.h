@@ -3,6 +3,9 @@
 #include <gbm.h>
 #include <epoxy/egl.h>
 #include <epoxy/gl.h>
+#include <linux/dma-buf.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 
 namespace pab_linux::dma {
 // One persistent context, no surface/context recreation per frame. Only this
@@ -16,6 +19,44 @@ class ImageReader {
     GLuint texture_ = 0, framebuffer_ = 0;
     std::vector<uint8_t> pixels_;
     bool bgra_ = false;
+    bool linear_cursor_ = false;
+    bool read_linear_cursor(const Frame& frame, uint64_t extent) {
+        const auto& m = frame.info;
+        if (m.modifier != DRM_FORMAT_MOD_LINEAR) return false;
+        struct stat info{};
+        if (fstat(frame.image.get(), &info) || info.st_size < 0 ||
+            (info.st_size && uint64_t(info.st_size) < extent))
+            throw std::runtime_error("DMA cursor descriptor extent mismatch");
+        const auto sync = [&](uint64_t flags) {
+            dma_buf_sync value{flags}; int status;
+            do { status = ioctl(frame.image.get(), DMA_BUF_IOCTL_SYNC, &value); } while (status < 0 && errno == EINTR);
+            return status == 0;
+        };
+        if (!sync(DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ)) return false;
+        struct EndSync {
+            int fd; bool ended=false;
+            bool end() {
+                if(ended)return true;
+                ended=true; dma_buf_sync value{DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ}; int status;
+                do { status=ioctl(fd,DMA_BUF_IOCTL_SYNC,&value); } while(status<0 && errno==EINTR);
+                return status==0;
+            }
+            ~EndSync(){end();}
+        } end{frame.image.get()};
+        auto* data=mmap(nullptr,size_t(extent),PROT_READ,MAP_SHARED,frame.image.get(),0);
+        if(data==MAP_FAILED)return false;
+        struct Unmap { void* data;size_t length;~Unmap(){munmap(data,length);} } unmap{data,size_t(extent)};
+        pixels_.resize(size_t(m.width)*m.height*4);
+        for(unsigned y=0;y<m.height;++y) {
+            const auto* source=static_cast<const uint8_t*>(data)+m.offset+size_t(y)*m.stride;
+            auto* target=pixels_.data()+size_t(y)*m.width*4;
+            memcpy(target,source,size_t(m.width)*4);
+        }
+        if(m.format==DRM_FORMAT_ABGR8888)
+            for(size_t i=0;i<pixels_.size();i+=4)std::swap(pixels_[i],pixels_[i+2]);
+        if(!end.end())return false;
+        linear_cursor_=true;return true;
+    }
     void cleanup() noexcept {
         if (framebuffer_) glDeleteFramebuffers(1, &framebuffer_);
         if (texture_) glDeleteTextures(1, &texture_);
@@ -65,8 +106,14 @@ public:
     ImageReader(const ImageReader&) = delete;
     ImageReader& operator=(const ImageReader&) = delete;
     ~ImageReader() { cleanup(); }
-    const std::vector<uint8_t>& read(const Frame& frame) {
-        const auto& m = frame.info; validate(m, m.sequence); initialize(frame);
+    const std::vector<uint8_t>& read(const Frame& frame, bool cursor = false) {
+        const auto& m = frame.info;
+        const auto extent = cursor ? validate_cursor_image(m, m.sequence) : validate(m, m.sequence);
+        linear_cursor_ = false;
+        // Some virtual cursor BOs are linear dumb buffers without an EGL
+        // surface. Map only the bounded cursor, with explicit DMA CPU sync.
+        if (cursor && read_linear_cursor(frame, extent)) return pixels_;
+        initialize(frame);
         std::vector<EGLint> attributes{EGL_WIDTH, EGLint(m.width), EGL_HEIGHT, EGLint(m.height),
             EGL_LINUX_DRM_FOURCC_EXT, EGLint(m.format), EGL_DMA_BUF_PLANE0_FD_EXT, frame.image.get(),
             EGL_DMA_BUF_PLANE0_OFFSET_EXT, EGLint(m.offset), EGL_DMA_BUF_PLANE0_PITCH_EXT, EGLint(m.stride)};
@@ -94,5 +141,6 @@ public:
         return pixels_;
     }
     bool direct_bgra() const { return bgra_; }
+    bool linear_cursor() const { return linear_cursor_; }
 };
 }

@@ -1,0 +1,197 @@
+{
+  "recorded_at": "2026-10-18T02:16:51.406017+08:00",
+  "baseline": "fb118a8",
+  "status": "native_component_partial",
+  "formal_cursor_channel_connected": false,
+  "requirements_closed": false,
+  "production_source_sha256": {
+    "crates/desktop-media/native/linux/dma_frame.h": "dc3fcc8d38e86a9c84f857a0aa6e6c30a96b3a1d8528ed4b2d760f955f7d0a74",
+    "crates/desktop-media/native/linux/dma_image.h": "cd9fda1b123624efd9b84fc6b50cf076410563503c7df2932867a5f9e0a0225d",
+    "crates/desktop-media/native/linux/drm_export.h": "baa5f2b30de12414a4975f2a1635f7b6ac3e612503c75ede2a3b6a36701b0318"
+  },
+  "full_linux_build": {
+    "exit_code": 0,
+    "sha256": "37cbd1fad03a9b0f42ae813ff191c9bef709b9d1a2587faeca1b3b0b3268a51c",
+    "bytes": 46046792,
+    "cargo_jobs": 4,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "unit_tests": {
+    "linux_media": 24,
+    "native_dma_sanitized": 39,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ]
+  },
+  "probe": {
+    "kernel": "6.8.0-138-generic",
+    "reports": [
+      {
+        "card": "/dev/dri/card0",
+        "returncode": 0,
+        "stdout": "{\"scans\":[{\"universal_result\":0,\"atomic_result\":0,\"hotspot_requested\":false,\"hotspot_result\":0,\"hotspot_errno\":0,\"planes\":[{\"id\":34,\"crtc_id\":42,\"fb_id\":108,\"possible_crtcs\":1,\"properties\":{\"type\":1,\"FB_ID\":108,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":42,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":1314,\"CRTC_H\":704,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":86114304,\"SRC_H\":46137344,\"IN_FORMATS\":35,\"FB_DAMAGE_CLIPS\":0}},{\"id\":43,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":2,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":44,\"FB_DAMAGE_CLIPS\":0}},{\"id\":52,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":4,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":53,\"FB_DAMAGE_CLIPS\":0}},{\"id\":61,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":8,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":62,\"FB_DAMAGE_CLIPS\":0}},{\"id\":70,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":16,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":71,\"FB_DAMAGE_CLIPS\":0}},{\"id\":79,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":32,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":80,\"FB_DAMAGE_CLIPS\":0}},{\"id\":88,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":64,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":89,\"FB_DAMAGE_CLIPS\":0}},{\"id\":97,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":128,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":98,\"FB_DAMAGE_CLIPS\":0}}]},{\"universal_result\":0,\"atomic_result\":0,\"hotspot_requested\":true,\"hotspot_result\":0,\"hotspot_errno\":0,\"planes\":[{\"id\":34,\"crtc_id\":42,\"fb_id\":108,\"possible_crtcs\":1,\"properties\":{\"type\":1,\"FB_ID\":108,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":42,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":1314,\"CRTC_H\":704,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":86114304,\"SRC_H\":46137344,\"IN_FORMATS\":35,\"FB_DAMAGE_CLIPS\":0}},{\"id\":36,\"crtc_id\":42,\"fb_id\":110,\"possible_crtcs\":1,\"properties\":{\"type\":2,\"FB_ID\":110,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":42,\"CRTC_X\":772,\"CRTC_Y\":425,\"CRTC_W\":64,\"CRTC_H\":64,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":4194304,\"SRC_H\":4194304,\"HOTSPOT_X\":4,\"HOTSPOT_Y\":4,\"IN_FORMATS\":39},\"framebuffer\":{\"width\":64,\"height\":64,\"format\":875713089,\"pitch\":256,\"offset\":0,\"flags\":2,\"modifier\":0,\"handle_available\":true}},{\"id\":43,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":2,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":44,\"FB_DAMAGE_CLIPS\":0}},{\"id\":45,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":2,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":48}},{\"id\":52,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":4,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":53,\"FB_DAMAGE_CLIPS\":0}},{\"id\":54,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":4,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":57}},{\"id\":61,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":8,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":62,\"FB_DAMAGE_CLIPS\":0}},{\"id\":63,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":8,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":66}},{\"id\":70,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":16,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":71,\"FB_DAMAGE_CLIPS\":0}},{\"id\":72,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":16,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":75}},{\"id\":79,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":32,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":80,\"FB_DAMAGE_CLIPS\":0}},{\"id\":81,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":32,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":84}},{\"id\":88,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":64,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":89,\"FB_DAMAGE_CLIPS\":0}},{\"id\":90,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":64,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":93}},{\"id\":97,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":128,\"properties\":{\"type\":1,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"IN_FORMATS\":98,\"FB_DAMAGE_CLIPS\":0}},{\"id\":99,\"crtc_id\":0,\"fb_id\":0,\"possible_crtcs\":128,\"properties\":{\"type\":2,\"FB_ID\":0,\"IN_FENCE_FD\":18446744073709551615,\"CRTC_ID\":0,\"CRTC_X\":0,\"CRTC_Y\":0,\"CRTC_W\":0,\"CRTC_H\":0,\"SRC_X\":0,\"SRC_Y\":0,\"SRC_W\":0,\"SRC_H\":0,\"HOTSPOT_X\":0,\"HOTSPOT_Y\":0,\"IN_FORMATS\":102}}]}]}\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "first_egl_failure": {
+    "returncode": 5,
+    "stdout": "{\"root_samples\":32,\"visible\":32,\"hidden\":0,\"no_fd_growth\":true,\"screen\":[1314,704],\"position\":[772,425],\"hotspot\":[4,4]}\n",
+    "stderr": "Failed referencing shared surface. SID 6.\nError -22 (Invalid argument).\ncursor consumer: Cannot import DMA image\n",
+    "sha256": "39bc8023ce31f1bb2bc2a7e0404ef85153d0bae7b6647c1cf40b00481661d630"
+  },
+  "intermediate_visible_lock": {
+    "returncode": 0,
+    "stdout": "{\"root_samples\":32,\"visible\":32,\"hidden\":0,\"no_fd_growth\":true,\"screen\":[1314,704],\"position\":[772,425],\"hotspot\":[4,4]}\n{\"consumer_uid\":1000,\"width\":64,\"height\":64,\"bytes\":16384,\"nontransparent_pixels\":294,\"max_premult_error\":0,\"nontransparent_bounds\":[0,0,17,23],\"fnv64\":\"bcfdcbc3ee636180\",\"linear_cursor\":true}\n",
+    "stderr": "",
+    "sha256": "b4c8d63e302a6045bcdd917db5050ffdf92c56d2bc484b169af2e6ecfff54614",
+    "before": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ],
+    "locked": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "yes"
+      }
+    ],
+    "restored": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ]
+  },
+  "final_normal": {
+    "returncode": 0,
+    "stdout": "{\"root_samples\":32,\"visible\":32,\"hidden\":0,\"no_fd_growth\":true,\"screen\":[1314,704],\"position\":[772,425],\"hotspot\":[4,4]}\n{\"consumer_uid\":1000,\"width\":64,\"height\":64,\"bytes\":16384,\"nontransparent_pixels\":294,\"max_premult_error\":0,\"nontransparent_bounds\":[0,0,17,23],\"fnv64\":\"bcfdcbc3ee636180\",\"linear_cursor\":true}\n",
+    "stderr": "",
+    "sha256": "0f7158f6ab10704131b7ba20e20f3d799d13fa023c881539c437ce5d2e05c48d"
+  },
+  "final_sleep_guard": {
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "cursor exporter: Selected display is asleep\n",
+    "sha256": "0f7158f6ab10704131b7ba20e20f3d799d13fa023c881539c437ce5d2e05c48d",
+    "before": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ],
+    "locked": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "yes"
+      }
+    ],
+    "restored": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ]
+  },
+  "final_awake_lock_hidden": {
+    "returncode": 0,
+    "stdout": "{\"root_samples\":32,\"visible\":0,\"hidden\":32,\"no_fd_growth\":true,\"screen\":[1314,704],\"position\":[0,0],\"hotspot\":[0,0]}\n",
+    "stderr": "",
+    "sha256": "0f7158f6ab10704131b7ba20e20f3d799d13fa023c881539c437ce5d2e05c48d",
+    "before": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ],
+    "locked": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "yes"
+      }
+    ],
+    "restored": [
+      "299",
+      {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      }
+    ]
+  },
+  "lock_wake_fixture": "Authorized temporary lock; root scheduled an emergency unlock, explicitly restored and checked the original session. Awake fixture set the active user Mutter PowerSaveMode runtime property to 0; not the production broker wake path.",
+  "existing_video_regression": {
+    "exit_code": 0,
+    "stdout": "{\"session\": \"299\", \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1314, \"desktop_height\": 704, \"pixel_width\": 1314, \"pixel_height\": 704, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"exporter_uid\": 0, \"consumer_uid\": 1000, \"exporter_exit\": 0, \"exporter_error\": \"\", \"consumer_exit\": -15, \"consumer_output\": \"\", \"consumer_error\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"session_unchanged\": true, \"boundary\": {\"case\": \"capture_sigterm\", \"initial_frames\": 3, \"bytes_after_boundary\": 0}}\n",
+    "stderr": "",
+    "hashes": {
+      "worker": "c252963fc701769a2320c953a2e3d8c5a017eb34c51abfaf37622713b37c378d",
+      "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+      "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+      "run.py": "b106a15da042835684bc4d984de9d9f3ac918061e41869f47d0f15391bb9404c"
+    }
+  },
+  "existing_video_cleanup": {
+    "removed": true,
+    "owned_workers": [],
+    "service": "active"
+  },
+  "max_build_jobs": 4,
+  "installed_program_modified": false,
+  "remaining": [
+    "Single exporter scheduling and private fd protocol",
+    "Cursor channel and capture lifecycle integration",
+    "Final visible locked-cursor test",
+    "Real window, login/wake transitions, multi-output/geometry",
+    "Nonlinear cursor EGL branch",
+    "Weak network, long-run fd/GEM/memory and performance"
+  ],
+  "validation_source_sha256": {
+    "crates/desktop-media/tests/native_linux_dma.cpp": "a5522dc33569fb39b65542e53ef5309520e3a6458478c5048b6ff17984e7b3bb",
+    "crates/desktop-media/tests/native_linux_drm_cursor.cpp": "148eb9159f2b32cdfb161f790c4cbbf4ec46cc5b3d2e5dae8b9b852d59657c8e",
+    "experiments/remote-desktop/probe_linux_drm_cursor.cpp": "fe55f4cdf301a2a2416192b42d6ce880af141c64c8033e7c266ff76752e955d4"
+  },
+  "final_cleanup": {
+    "left": [],
+    "session": "299",
+    "locked": "no",
+    "restore_units": ""
+  }
+}
