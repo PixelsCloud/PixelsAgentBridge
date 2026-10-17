@@ -1,6 +1,8 @@
 #pragma once
 #include "common.h"
 #include "viewer_input.h"
+#include "cursor_overlay.h"
+#include "video_shader.h"
 #include "../software_codec_ffi.h"
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -11,8 +13,33 @@
 
 @interface PABMetalView : PABInputView
 @property(nonatomic) BOOL needsMediaRedraw;
+@property(nonatomic) BOOL tracksRemoteCursor;
 @end
 @implementation PABMetalView
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if (!self.tracksRemoteCursor || !mediaInput.enabled) return;
+    const double w = mediaInput.rotation%2 ? mediaInput.height : mediaInput.width;
+    const double h = mediaInput.rotation%2 ? mediaInput.width : mediaInput.height;
+    if (w <= 0 || h <= 0) return;
+    const auto bounds = self.bounds;
+    const double scale = std::min(bounds.size.width/w,bounds.size.height/h);
+    if (scale <= 0) return;
+    static NSCursor* transparent = [] {
+        auto bitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:nullptr pixelsWide:1 pixelsHigh:1
+            bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:4 bitsPerPixel:32];
+        if (!bitmap) return NSCursor.arrowCursor;
+        std::memset(bitmap.bitmapData,0,4);
+        auto image = [[NSImage alloc] initWithSize:NSMakeSize(1,1)];
+        [image addRepresentation:bitmap];
+        return [[NSCursor alloc] initWithImage:image hotSpot:NSZeroPoint];
+    }();
+    [self addCursorRect:NSMakeRect(NSMidX(bounds)-w*scale/2,NSMidY(bounds)-h*scale/2,w*scale,h*scale) cursor:transparent];
+}
+- (void)setMediaInputEnabled:(BOOL)enabled {
+    [super setMediaInputEnabled:enabled];
+    [self.window invalidateCursorRectsForView:self];
+}
 - (CALayer*)makeBackingLayer { return [CAMetalLayer layer]; }
 - (void)setFrameSize:(NSSize)size { [super setFrameSize:size]; self.needsMediaRedraw = YES; }
 - (void)viewDidChangeBackingProperties { [super viewDidChangeBackingProperties]; self.needsMediaRedraw = YES; }
@@ -71,6 +98,7 @@ class NativePresenter {
     uint64_t submission_ = 0;
     unsigned width_, height_, rotation_;
     PabVideoGeometry geometry_;
+    CursorOverlay cursor_;
     bool verify_, owns_window_ = false, last_verified_ = false;
     Clock::time_point next_redraw_{};
     std::shared_ptr<DisplayStats> stats_ = std::make_shared<DisplayStats>();
@@ -121,6 +149,9 @@ class NativePresenter {
         [render setVertexBytes:visible_fraction length:sizeof(visible_fraction) atIndex:1];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->y.get()) atIndex:0];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->uv.get()) atIndex:1];
+        const auto cursor = cursor_.parameters(viewport,rotated_w,rotated_h);
+        [render setFragmentTexture:cursor_.image(device_) atIndex:2];
+        [render setFragmentBytes:&cursor length:sizeof(cursor) atIndex:0];
         [render drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
         [render endEncoding];
         id<MTLBuffer> samples = nil;
@@ -194,26 +225,7 @@ public:
         device_ = MTLCreateSystemDefaultDevice();
         queue_ = [device_ newCommandQueue];
         if (!device_ || !queue_) throw std::runtime_error("Metal device unavailable");
-        static NSString* source = @R"(
-            #include <metal_stdlib>
-            using namespace metal;
-            struct Vertex { float4 position [[position]]; float2 uv; };
-            vertex Vertex video_vertex(uint id [[vertex_id]], constant uint& rotation [[buffer(0)]], constant float2& visible_fraction [[buffer(1)]]) {
-                const float2 positions[4] = {float2(-1,-1), float2(1,-1), float2(-1,1), float2(1,1)};
-                float2 uv = float2((id & 1) ? 1 : 0, (id & 2) ? 0 : 1);
-                if (rotation == 1) uv = float2(uv.y, 1-uv.x);
-                else if (rotation == 2) uv = 1-uv;
-                else if (rotation == 3) uv = float2(1-uv.y, uv.x);
-                return {float4(positions[id],0,1), uv * visible_fraction};
-            }
-            fragment float4 video_fragment(Vertex in [[stage_in]], texture2d<float> y [[texture(0)]], texture2d<float> uv [[texture(1)]]) {
-                constexpr sampler filter(coord::normalized, address::clamp_to_edge, filter::linear);
-                float luma = (y.sample(filter,in.uv).r*255-16)/219;
-                float2 chroma = (uv.sample(filter,in.uv).rg*255-128)/224;
-                return float4(clamp(float3(luma+1.5748*chroma.y, luma-0.187324*chroma.x-0.468124*chroma.y,
-                    luma+1.8556*chroma.x),0.0,1.0),1.0);
-            }
-        )";
+        NSString* source = video_shader();
         NSError* error = nil;
         id<MTLLibrary> library = [device_ newLibraryWithSource:source options:nil error:&error];
         if (!library) throw std::runtime_error("Metal shader compilation failed: " + std::string(error.localizedDescription.UTF8String ?: "unknown"));
@@ -310,6 +322,14 @@ public:
         last_verified_ = draw(image, index, verify_);
     }
     void input_sink(std::function<bool(const InputPacket&)> sink) { require_main(); view_->mediaInput.sink = std::move(sink); }
+    void cursor(const uint8_t* bytes, size_t size) {
+        require_main(); cursor_.update(device_,bytes,size);
+        if (view_.tracksRemoteCursor != cursor_.tracking()) {
+            view_.tracksRemoteCursor = cursor_.tracking();
+            [view_.window invalidateCursorRectsForView:view_];
+        }
+        view_.needsMediaRedraw = YES;
+    }
     void input_enabled(bool value) { require_main(); [view_ setMediaInputEnabled:value]; }
     uint64_t displayed() { std::lock_guard<std::mutex> lock(stats_->mutex); return stats_->displayed; }
     void finish() {

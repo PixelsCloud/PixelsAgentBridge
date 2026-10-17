@@ -54,6 +54,13 @@ unsafe extern "C" {
         capacity: usize,
     ) -> bool;
     fn pab_mac_view_drop(view: *mut c_void);
+    fn pab_mac_view_cursor(
+        view: *mut c_void,
+        bytes: *const u8,
+        size: usize,
+        error: *mut c_char,
+        capacity: usize,
+    ) -> bool;
     fn pab_mac_decoder_new(
         width: u32,
         height: u32,
@@ -205,6 +212,65 @@ pub struct MacNativeViewer {
     relay: tokio::task::JoinHandle<()>,
     timer: tokio::task::JoinHandle<()>,
     decode: tokio::task::JoinHandle<()>,
+}
+/// Independent of video submission. A cancelled or failed submission retires
+/// this handle; queued native work can only run within the owning generation.
+pub struct MacCursorRenderer {
+    state: Option<std::sync::Weak<State>>,
+    config: DesktopVideoConfig,
+    next_sequence: u64,
+    image_id: u64,
+    acknowledgements: crate::renderer::CursorAcknowledgements,
+}
+impl MacCursorRenderer {
+    pub async fn submit(&mut self, update: &pab_remote_desktop::CursorUpdate) -> Result<(), Error> {
+        let next = self
+            .next_sequence
+            .checked_add(1)
+            .ok_or("cursor sequence exhausted")?;
+        if update
+            .header
+            .validate(&self.config, self.next_sequence, self.image_id)?
+            != update.bytes.len()
+        {
+            return Err("cursor payload length mismatch".into());
+        }
+        self.send(crate::cursor_packet::encode(&self.config, update))
+            .await?;
+        self.next_sequence = next;
+        self.image_id = update.header.image_id;
+        Ok(())
+    }
+    pub async fn clear(&mut self) -> Result<(), Error> {
+        self.send(vec![0]).await
+    }
+    async fn send(&mut self, packet: Vec<u8>) -> Result<(), Error> {
+        let weak = self.state.take().ok_or("cursor renderer ended")?;
+        let state = weak.upgrade().ok_or("native viewer closed")?;
+        let sequence = self.acknowledgements.prepare()?;
+        state.schedule(move |state| {
+            let mut error = [0; 512];
+            // SAFETY: schedule retains the view on AppKit main; packet remains
+            // alive for the synchronous upload. The native side retains no bytes.
+            if unsafe {
+                pab_mac_view_cursor(
+                    state.pointer(),
+                    packet.as_ptr(),
+                    packet.len(),
+                    error.as_mut_ptr(),
+                    error.len(),
+                )
+            } {
+                state.event(6, sequence);
+            } else {
+                state.fail(message(&error));
+            }
+        })?;
+        drop(state);
+        self.acknowledgements.consumed(sequence).await?;
+        self.state = Some(weak);
+        Ok(())
+    }
 }
 impl MacNativeViewer {
     /// Create on the host main thread, within an entered Tokio runtime.
@@ -454,6 +520,15 @@ impl MacNativeViewer {
     pub fn presentations(&self) -> NativePresentations {
         self.renderer.presentations()
     }
+    pub fn cursor_renderer(&self) -> Result<MacCursorRenderer, Error> {
+        Ok(MacCursorRenderer {
+            state: Some(Arc::downgrade(&self.state)),
+            config: self.config.clone(),
+            next_sequence: 1,
+            image_id: 0,
+            acknowledgements: self.renderer.cursor()?,
+        })
+    }
     pub async fn submit(&mut self, frame: &VideoFrame) -> Result<(), Error> {
         frame.header.validate(&self.config, self.next_frame)?;
         if frame.bytes.len() != frame.header.payload_bytes as usize {
@@ -480,5 +555,82 @@ impl Drop for MacNativeViewer {
         self.decode.abort();
         // Running decode is synchronous; it owns no view. On return it sees
         // stopped and releases its surface. Closing frames wakes an idle decode.
+    }
+}
+
+#[cfg(test)]
+mod cursor_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancelled_cursor_retires_handle_and_stopped_generation_skips_queued_native_work() {
+        let queue = Arc::new(Mutex::new(Vec::<Box<dyn FnOnce() + Send>>::new()));
+        let dispatch_queue = queue.clone();
+        let (events, _receive) = mpsc::channel(16);
+        let (failure, _) = watch::channel(None);
+        let state = Arc::new(State {
+            // Deliberately no native view. Executing the closure after stop
+            // would call native FFI with null and fail this test.
+            view: AtomicUsize::new(0),
+            stopped: AtomicBool::new(false),
+            poll_pending: AtomicBool::new(false),
+            displayed: AtomicU64::new(0),
+            wake: Condvar::new(),
+            gate: Mutex::new(()),
+            dispatch: Arc::new(move |work| {
+                dispatch_queue.lock().unwrap().push(work);
+                Ok(())
+            }),
+            events,
+            failure,
+        });
+        let (writer, reader) = tokio::io::duplex(256);
+        let renderer = Renderer::start(reader);
+        let config = DesktopVideoConfig {
+            session_id: pab_protocol::RequestId::new(),
+            generation: 1,
+            fps: 15,
+            codec: pab_protocol::DesktopCodec::H264AnnexB,
+            color: pab_protocol::DesktopColor::Bt709Limited,
+            screen: pab_protocol::DesktopScreen {
+                id: "generated".into(),
+                name: "Generated".into(),
+                x: 0,
+                y: 0,
+                desktop_width: 640,
+                desktop_height: 480,
+                pixel_width: 640,
+                pixel_height: 480,
+                rotation: DesktopRotation::Identity,
+                scale_milli: 1000,
+                primary: true,
+            },
+        };
+        let weak = Arc::downgrade(&state);
+        let mut cursor = MacCursorRenderer {
+            state: Some(weak.clone()),
+            config,
+            next_sequence: 1,
+            image_id: 0,
+            acknowledgements: renderer.cursor().unwrap(),
+        };
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), cursor.clear())
+                .await
+                .is_err()
+        );
+        assert_eq!(queue.lock().unwrap().len(), 1);
+        assert!(cursor.clear().await.is_err());
+        assert_eq!(queue.lock().unwrap().len(), 1);
+        state.stop();
+        drop(state);
+        let work = queue.lock().unwrap().pop().unwrap();
+        assert!(weak.upgrade().is_some());
+        work();
+        assert!(
+            weak.upgrade().is_none(),
+            "cursor retained its stopped owner"
+        );
+        drop(writer);
     }
 }

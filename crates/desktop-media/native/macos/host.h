@@ -59,6 +59,14 @@ void pab_mac_view_drop(void* view) noexcept {
     if (![NSThread isMainThread]) { fprintf(stderr,"media view cleanup requires main thread\n"); return; }
     @autoreleasepool { delete static_cast<pab_mac::NativePresenter*>(view); }
 }
+bool pab_mac_view_cursor(void* view, const uint8_t* bytes, size_t size, char* error, size_t capacity) noexcept {
+    return pab_mac::host_call(error,capacity,[&] {
+        pab_mac::host_main();
+        if (!view || !bytes || !size || size > 2*1024*1024+43)
+            throw std::runtime_error("Invalid native cursor command");
+        static_cast<pab_mac::NativePresenter*>(view)->cursor(bytes,size);
+    });
+}
 void* pab_mac_decoder_new(unsigned width, unsigned height, unsigned fps, bool software, char* error, size_t capacity) noexcept {
     void* result = nullptr;
     pab_mac::host_call(error,capacity,[&] {

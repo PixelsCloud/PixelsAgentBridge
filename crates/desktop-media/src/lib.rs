@@ -7,6 +7,8 @@ mod linux_view;
 pub use linux_view::{LinuxNativeViewer, MainThreadDispatch};
 #[cfg(windows)]
 mod cursor_renderer;
+#[cfg(any(windows, target_os = "macos"))]
+mod cursor_packet;
 #[cfg(target_os = "macos")]
 mod macos_view;
 mod process;
@@ -14,7 +16,7 @@ mod renderer;
 #[cfg(windows)]
 pub use cursor_renderer::NativeCursorRenderer;
 #[cfg(target_os = "macos")]
-pub use macos_view::{MacNativeViewer, MainThreadDispatch};
+pub use macos_view::{MacCursorRenderer, MacNativeViewer, MainThreadDispatch};
 pub mod software;
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod software_ffi;
