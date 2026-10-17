@@ -1,8 +1,9 @@
 """Sample generated frame codes from an owned, visible native viewer surface.
 
 Reads the desktop compositor through a small GDI rectangle, not decoder events.
-Only frame IDs/times are saved. Requires linux_display_fixture.py's generated
-1080p pattern and rejects invalid complementary cells and backwards frame IDs.
+Only frame IDs/times are saved. Requires the generated 1080p pattern from
+linux_display_fixture.py or macos_display_fixture.m; rejects invalid
+complementary cells and backwards frame IDs.
 """
 import argparse
 import ctypes as C
