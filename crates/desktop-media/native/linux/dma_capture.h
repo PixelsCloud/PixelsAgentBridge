@@ -1,6 +1,7 @@
 #pragma once
 #include "capture.h"
 #include "dma_image.h"
+#include "dma_stream.h"
 
 namespace pab_linux::dma {
 inline bool protected_screen(GDBusConnection* bus) {
@@ -77,12 +78,12 @@ class GnomeGuard {
     GDBusConnection* bus_;
     Display display_;
     bool locked_;
-    bool locked() {
+    bool locked() const {
         return protected_screen(bus_);
     }
 public:
     GnomeGuard(GDBusConnection* bus, Display display) : bus_(bus), display_(std::move(display)), locked_(locked()) { check(); }
-    void check() {
+    void check() const {
         auto result = call(bus_, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
             "org.freedesktop.DBus.Properties", "Get",
             g_variant_new("(ss)", "org.gnome.Mutter.DisplayConfig", "PowerSaveMode"), G_VARIANT_TYPE("(v)"));
@@ -97,11 +98,71 @@ public:
             throw std::runtime_error("DMA display layout changed");
     }
 };
-inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, int socket) {
+class CursorSampler {
+    CursorState& state_;
+    std::atomic<bool> stopped_{false};
+    std::thread thread_;
+    void run(ExportStream& stream,const GnomeGuard& guard,const Display& display) noexcept {
+        try {
+            ImageReader reader;auto next_check=Clock::now();
+            while(!stopped_.load()) {
+                const auto next_sample=Clock::now()+std::chrono::milliseconds(8);
+                // GDBusConnection's synchronous methods are thread safe. The
+                // guard is immutable; only the main thread pumps GMainContext.
+                if(Clock::now()>=next_check) {
+                    guard.check();next_check=Clock::now()+std::chrono::milliseconds(250);
+                }
+                auto frame=stream.cursor(stopped_);const auto& m=frame.info;
+                if(m.status==CursorStatus::Unavailable)throw std::runtime_error("DRM cursor unavailable");
+                if(m.status!=CursorStatus::Retry) {
+                    if(m.screen_width!=display.size.width || m.screen_height!=display.size.height)
+                        throw std::runtime_error("DRM cursor display changed");
+                    if(m.status==CursorStatus::Hidden)state_.update(false,0,0);
+                    else {
+                        const auto& pixels=reader.read(*frame.image,true);
+                        bool opaque=false;
+                        for(size_t i=0;i<pixels.size();i+=4) {
+                            if(pixels[i]>pixels[i+3] || pixels[i+1]>pixels[i+3] || pixels[i+2]>pixels[i+3])
+                                throw std::runtime_error("DRM cursor is not premultiplied");
+                            opaque|=pixels[i+3]!=0;
+                        }
+                        const int64_t px=int64_t(m.left)+m.hotspot_x,py=int64_t(m.top)+m.hotspot_y;
+                        if(px<INT32_MIN || px>INT32_MAX || py<INT32_MIN || py>INT32_MAX)
+                            throw std::runtime_error("DRM cursor hotspot position overflow");
+                        const auto x=cursor_position(int32_t(px),display.x,display.size.logical_width,display.size.width);
+                        const auto y=cursor_position(int32_t(py),display.y,display.size.logical_height,display.size.height);
+                        const auto previous=state_.snapshot();
+                        std::shared_ptr<CursorImage> image;
+                        if(!previous.image || previous.image->width!=m.image.width || previous.image->height!=m.image.height ||
+                            previous.image->hotspot_x!=m.hotspot_x || previous.image->hotspot_y!=m.hotspot_y || previous.image->pixels!=pixels) {
+                            image=std::make_shared<CursorImage>();image->width=m.image.width;image->height=m.image.height;
+                            image->hotspot_x=m.hotspot_x;image->hotspot_y=m.hotspot_y;image->pixels=pixels;
+                        }
+                        state_.update(opaque && px>=0 && py>=0 && px<m.screen_width && py<m.screen_height,x,y,std::move(image));
+                    }
+                }
+                std::this_thread::sleep_until(next_sample);
+            }
+        } catch(const std::exception& error) {state_.fail(error.what());}
+        catch(...) {state_.fail("DRM cursor sampling failed");}
+    }
+public:
+    CursorSampler(CursorState& state,ExportStream& stream,const GnomeGuard& guard,const Display& display):state_(state) {
+        thread_=std::thread([this,&stream,&guard,display]{run(stream,guard,display);});
+    }
+    ~CursorSampler() {
+        stopped_.store(true);if(thread_.joinable())thread_.join();state_.fail("Video capture ended");
+    }
+    CursorSampler(const CursorSampler&)=delete;
+};
+inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, int socket,CursorState* cursor=nullptr) {
     if (geteuid() == 0) throw std::runtime_error("DMA conversion must run as the graphical user");
     channel(socket);
     const PabVideoGeometry geometry(display.size.width, display.size.height);
     GnomeGuard guard(bus, display); LockedScreenAwake awake(bus); ImageReader reader;
+    ExportStream stream(socket);
+    std::unique_ptr<CursorSampler> sampler;
+    if(cursor)sampler=std::make_unique<CursorSampler>(*cursor,stream,guard,display);
     Encoder encoder(pab_soft_encoder_new(display.size.width, display.size.height, fps));
     if (!encoder) throw std::runtime_error("Cannot initialize DMA software encoder");
     write_value(magic); write_value(display.size.width); write_value(display.size.height);
@@ -111,18 +172,7 @@ inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, 
         if (!command) return;
         if (command != 1) throw std::runtime_error("Invalid DMA capture command");
         while (Clock::now() < next) { parent_alive(); pump(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
-        guard.check(); send_request(socket, sequence);
-        // Parent closure/cancellation retires this worker, including an export
-        // in flight. Keep the receive bounded independently of network traffic.
-        const auto deadline = Clock::now() + std::chrono::seconds(3);
-        for (;;) {
-            parent_alive(); pollfd wait{socket, POLLIN, 0};
-            const auto status = poll(&wait, 1, 10);
-            if (status > 0) break;
-            if ((status < 0 && errno != EINTR) || Clock::now() >= deadline)
-                throw std::runtime_error("DMA export response timed out");
-        }
-        auto frame = receive(socket, sequence);
+        guard.check();auto frame=stream.video();
         if (frame.info.width != display.size.width || frame.info.height != display.size.height)
             throw std::runtime_error("DMA frame dimensions changed");
         const auto& pixels = reader.read(frame); const auto sampled = Clock::now();

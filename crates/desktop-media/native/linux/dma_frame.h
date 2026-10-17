@@ -79,23 +79,24 @@ inline bool request(int socket, uint64_t sequence) {
         throw std::runtime_error("Invalid DMA request");
     return true;
 }
-inline void send_frame(int socket, const Frame& frame) {
-    validate(frame.info, frame.info.sequence);
-    std::array<int, 2> fds{frame.image.get(), frame.render.get()};
-    if (fds[0] < 0 || fds[1] < 0) throw std::runtime_error("Missing DMA descriptors");
-    alignas(cmsghdr) std::array<unsigned char, CMSG_SPACE(sizeof(fds))> control{};
-    iovec data{const_cast<Metadata*>(&frame.info), sizeof(frame.info)};
+template<class T> inline void send_descriptors(int socket, const T& info, const std::vector<int>& fds) {
+    if (fds.size() > 2 || std::any_of(fds.begin(),fds.end(),[](int fd){return fd<0;}))
+        throw std::runtime_error("Invalid DMA descriptors");
+    alignas(cmsghdr) std::array<unsigned char, CMSG_SPACE(2*sizeof(int))> control{};
+    iovec data{const_cast<T*>(&info), sizeof(info)};
     msghdr message{}; message.msg_iov = &data; message.msg_iovlen = 1;
-    message.msg_control = control.data(); message.msg_controllen = control.size();
-    auto* rights = CMSG_FIRSTHDR(&message);
-    rights->cmsg_level = SOL_SOCKET; rights->cmsg_type = SCM_RIGHTS;
-    rights->cmsg_len = CMSG_LEN(sizeof(fds));
-    memcpy(CMSG_DATA(rights), fds.data(), sizeof(fds));
-    if (sendmsg(socket, &message, MSG_NOSIGNAL) != sizeof(frame.info))
+    if (!fds.empty()) {
+        message.msg_control = control.data(); message.msg_controllen = CMSG_SPACE(fds.size()*sizeof(int));
+        auto* rights = CMSG_FIRSTHDR(&message);
+        rights->cmsg_level = SOL_SOCKET; rights->cmsg_type = SCM_RIGHTS;
+        rights->cmsg_len = CMSG_LEN(fds.size()*sizeof(int));
+        memcpy(CMSG_DATA(rights), fds.data(), fds.size()*sizeof(int));
+    }
+    if (sendmsg(socket, &message, MSG_NOSIGNAL) != sizeof(info))
         throw std::runtime_error("DMA descriptor channel closed");
 }
-inline Frame receive(int socket, uint64_t sequence) {
-    Metadata info{};
+template<class T> inline std::pair<T,std::vector<Fd>> receive_descriptors(int socket) {
+    T info{};
     // Receive more than the allowed count so malformed messages can be tested;
     // every descriptor delivered by the kernel is owned before validation.
     alignas(cmsghdr) std::array<unsigned char, CMSG_SPACE(4 * sizeof(int))> control{};
@@ -112,13 +113,25 @@ inline Frame receive(int socket, uint64_t sequence) {
             int fd; memcpy(&fd, CMSG_DATA(c) + i * sizeof(int), sizeof(fd)); fds.emplace_back(fd);
         }
     }
-    if (count != sizeof(info) || message.msg_flags & (MSG_TRUNC | MSG_CTRUNC) || other || fds.size() != 2)
+    if (count != sizeof(info) || message.msg_flags & (MSG_TRUNC | MSG_CTRUNC) || other)
         throw std::runtime_error("Invalid DMA descriptor packet");
-    const auto extent = validate(info, sequence);
+    return {info,std::move(fds)};
+}
+inline void validate_descriptors(const std::vector<Fd>& fds,uint64_t extent) {
+    if (fds.size()!=2)throw std::runtime_error("Invalid DMA descriptor count");
     struct stat image{}, render{};
     if (fstat(fds[0].get(), &image) || fstat(fds[1].get(), &render) || !S_ISCHR(render.st_mode) ||
         image.st_size < 0 || (image.st_size && uint64_t(image.st_size) < extent))
         throw std::runtime_error("DMA descriptors do not match metadata");
+}
+inline void send_frame(int socket, const Frame& frame) {
+    validate(frame.info,frame.info.sequence);
+    send_descriptors(socket,frame.info,{frame.image.get(),frame.render.get()});
+}
+inline Frame receive(int socket, uint64_t sequence) {
+    auto [info,fds]=receive_descriptors<Metadata>(socket);
+    const auto extent = validate(info, sequence);
+    validate_descriptors(fds,extent);
     return {info, std::move(fds[0]), std::move(fds[1])};
 }
 }

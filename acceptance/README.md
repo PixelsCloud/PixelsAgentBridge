@@ -1,5 +1,9 @@
 # Tool acceptance
 
+Linux DMA video/cursor multiplexing, production worker checks and the remaining
+rapid-lock wake failure are recorded in
+[the 2026-10-18 cursor stream report](remote-desktop-linux-dma-cursor-stream-2026-10-18.md).
+
 `python scripts/acceptance.py run isolated` runs protocol/desktop, real stdio MCP,
 and Executor regressions. Every run has a fresh UUID and isolated fixtures;
 reports and raw test logs remain in `.build/acceptance/<run-id>/` locally.

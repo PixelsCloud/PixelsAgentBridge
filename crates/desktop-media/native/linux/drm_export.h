@@ -1,5 +1,5 @@
 #pragma once
-#include "dma_frame.h"
+#include "dma_cursor_frame.h"
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <optional>
@@ -285,9 +285,34 @@ public:
 };
 inline void export_loop(int card, int render, int socket, const std::string& connector, bool borrowed) {
     channel(socket); Exporter exporter(card, render, connector, borrowed);
-    uint64_t sequence = 0;
-    while (request(socket, sequence)) {
-        auto frame = exporter.next(sequence); send_frame(socket, frame); ++sequence;
+    uint64_t sequence = 0,cursor_sequence=0;
+    for(;;) {
+        const auto operation=export_request(socket,sequence,cursor_sequence);
+        if(operation==ExportOperation::Closed)return;
+        if(operation==ExportOperation::Video) {
+            if(sequence==UINT64_MAX)throw std::runtime_error("DMA video sequence exhausted");
+            auto frame=exporter.next(sequence);send_frame(socket,frame);++sequence;continue;
+        }
+        if(cursor_sequence==UINT64_MAX)throw std::runtime_error("DMA cursor sequence exhausted");
+        CursorFrame frame;frame.info.sequence=cursor_sequence;
+        try {
+            auto snapshot=exporter.cursor(cursor_sequence);
+            frame.info.screen_width=snapshot.screen_width;frame.info.screen_height=snapshot.screen_height;
+            frame.info.crtc=snapshot.crtc;frame.info.connector=snapshot.connector;
+            if(snapshot.image) {
+                frame.info.status=CursorStatus::Visible;
+                frame.info.left=snapshot.left;frame.info.top=snapshot.top;
+                frame.info.hotspot_x=snapshot.hotspot_x;frame.info.hotspot_y=snapshot.hotspot_y;
+                frame.info.image=snapshot.image->info;frame.image=std::move(snapshot.image);
+            }
+        } catch(const Refresh&) { frame=CursorFrame{};frame.info.sequence=cursor_sequence;frame.info.status=CursorStatus::Retry; }
+        catch(const std::exception& error) {
+            fprintf(stderr,"media: DRM cursor unavailable: %s\n",error.what());
+            frame=CursorFrame{};frame.info.sequence=cursor_sequence;frame.info.status=CursorStatus::Unavailable;
+        }
+        // Unsupported cursor images never terminate the video exporter. Wire
+        // failures remain fatal: an ambiguous response cannot be reused.
+        send_cursor(socket,frame);++cursor_sequence;
     }
 }
 }

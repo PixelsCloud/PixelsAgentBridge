@@ -95,10 +95,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 if(separate)cursor=std::make_unique<pab_linux::CursorChannel>(argv[5],*selected);
                 const bool sleeping = pab_linux::dma::asleep(bus.get());
                 if (sleeping || pab_linux::dma::protected_screen(bus.get())) {
-                    if(cursor)cursor->state.fail("Independent cursor unavailable for DRM capture");
                     auto channel = pab_linux::dma::connect_broker(selected->connector, sleeping);
                     if (sleeping) pab_linux::dma::await_awake(bus.get());
-                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
+                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get(),cursor?&cursor->state:nullptr);
                     pw_deinit(); return 0;
                 }
                 auto source = std::make_unique<pab_linux::Capture>(bus.get(), *selected, fps,cursor?&cursor->state:nullptr);
@@ -108,10 +107,11 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                     // the denied PipeWire session before choosing the fallback.
                     fprintf(stderr, "media: PipeWire start failed: %s; trying supervised DMA\n", error.what());
                     source.reset();
+                    if(cursor)cursor->state.reset_before_capture();
                     const bool wake = pab_linux::dma::asleep(bus.get());
                     auto channel = pab_linux::dma::connect_broker(selected->connector, wake);
                     if (wake) pab_linux::dma::await_awake(bus.get());
-                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
+                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get(),cursor?&cursor->state:nullptr);
                 }
                 if (source) pab_linux::capture(*source, *selected, fps);
             }

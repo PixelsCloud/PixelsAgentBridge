@@ -35,6 +35,12 @@ public:
     void fail(const char* error) {
         std::lock_guard<std::mutex> lock(mutex_); error_=error;
     }
+    // Only before publishing the first video header: a failed PipeWire start
+    // can hand the same private channel to DMA without inheriting its error.
+    void reset_before_capture() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        latest_=CursorSnapshot{};sprite_present_=false;error_.clear();
+    }
     void update(bool visible,int32_t x,int32_t y,std::shared_ptr<const CursorImage> image=nullptr,bool clear=false) {
         std::lock_guard<std::mutex> lock(mutex_);
         bool changed=latest_.revision==0;

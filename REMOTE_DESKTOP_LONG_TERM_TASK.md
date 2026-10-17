@@ -56,6 +56,15 @@ UID 1000 关闭控制 fd 后以 DMA 同步只读映射读取。普通桌面像�
 独立采样和取消，不能直接开第二连接造成等待。见
 [DRM 光标原生记录](acceptance/remote-desktop-linux-drm-cursor-native-2026-10-18.md)。
 
+后续已接通单 exporter 内的视频/光标独立请求及后台采样，原视频线格式保持。
+39 项旧边界、38 项新增边界/并发/取消测试、Linux 24 项单测和完整 Desktop 构建通过。
+Ubuntu 正式内嵌 worker 经隔离 supervisor/broker 完成普通桌面与稳定锁屏各三次：
+先读光标而不请求编码帧，随后视频解码、光标客户端故障隔离、重连和退出回收通过。
+锁屏取得 64×64 光标，fd 15→15，正常停止约 35ms。尚非正式远程窗口验收。
+紧接锁屏启动曾出现 `Display did not wake`；测试等待锁屏稳定两秒后通过，产品
+唤醒时序问题未修复，需要继续定位，不能以稳定锁屏结果替代。见
+[DMA 光标通道记录](acceptance/remote-desktop-linux-dma-cursor-stream-2026-10-18.md)。
+
 ## 一次性执行任务：完成三平台远程桌面首版并发布
 
 任务基线：`d9bbf8e`。本节是用户要求的一次性完整执行任务，下文 LT 编号仍作为
