@@ -120,6 +120,9 @@ impl LinuxGraphicalSession {
     pub fn kind(&self) -> &str {
         self.kind.to_str().expect("validated logind text")
     }
+    pub fn class(&self) -> &str {
+        self.class.to_str().expect("validated logind text")
+    }
     /// The UID must come from process_user_identity, never from registration or
     /// XDG_SESSION_ID. User-manager applications can live outside session.scope;
     /// only ENODATA permits fallback to logind's primary graphical user session.

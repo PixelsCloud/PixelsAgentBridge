@@ -78,6 +78,9 @@ impl LinuxMediaEnvironment {
         values.insert("XDG_RUNTIME_DIR".into(), runtime.into());
         values.insert("XDG_SESSION_TYPE".into(), session.kind().into());
         values.insert("XDG_SESSION_ID".into(), session.id().into());
+        // A greeter lacks the user ScreenSaver interface. Export only the
+        // independently observed logind class, never a process-supplied claim.
+        values.insert("XDG_SESSION_CLASS".into(), session.class().into());
         Ok(Self {
             session,
             pid,
@@ -215,10 +218,11 @@ mod tests {
     use super::*;
     #[test]
     fn graphical_environment_is_selected_without_service_secrets_or_identity_claims() {
-        let selected = select(b"DISPLAY=:2\0XAUTHORITY=/run/user/128/gdm/Xauthority\0DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-example\0LD_PRELOAD=/tmp/evil.so\0PAB_DATA_DIR=/root/private\0XDG_SESSION_ID=forged\0PASSWORD=secret\0", "x11").unwrap();
+        let selected = select(b"DISPLAY=:2\0XAUTHORITY=/run/user/128/gdm/Xauthority\0DBUS_SESSION_BUS_ADDRESS=unix:abstract=/tmp/dbus-example\0LD_PRELOAD=/tmp/evil.so\0PAB_DATA_DIR=/root/private\0XDG_SESSION_ID=forged\0XDG_SESSION_CLASS=greeter\0PASSWORD=secret\0", "x11").unwrap();
         assert_eq!(selected.len(), 3);
         assert_eq!(selected["DISPLAY"], ":2");
         assert!(!selected.contains_key("PASSWORD"));
+        assert!(!selected.contains_key("XDG_SESSION_CLASS"));
         assert!(
             select(
                 b"DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus\0",

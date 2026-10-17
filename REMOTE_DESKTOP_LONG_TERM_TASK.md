@@ -258,6 +258,16 @@ Wayland 已完成一次熄屏→自动唤醒→密码框→单次密码提交解
 本轮解决已复现的空闲重连，不替代长稳、Wayland GDM、注销后新会话和安装升级；
 W5/W7 仍开放。详见 [Linux 锁屏空闲修复](acceptance/remote-desktop-linux-lock-idle-2026-10-17.md)。
 
+W5 已进一步确认 Wayland GDM 缺少用户 ScreenSaver 接口，改由核实的 logind class
+选择登录画面的监督 DMA/uinput 路径。真实 GDM 的两次显式 DMA 和一次正常入口
+均解码 30 帧，idle cookie 与进程回收通过；这只是采集组件，不代替正式窗口
+密码登录。用户回归虽然锁屏、密码和动态子项成功，却因一条 broker 错误整体
+失败，记录保留。独立跟踪把同类错误定位到已取消进程的 getpgid/ESRCH；修复后
+12 次取消及三轮动态采集通过。完整 Desktop 候选正在重建，接下来验收正式 GDM
+登录、原用户返回以及注销后的新会话。详见
+[Wayland GDM 采集](acceptance/remote-desktop-linux-gdm-wayland-capture-2026-10-17.md)和
+[broker 取消处理](acceptance/remote-desktop-linux-broker-cancel-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

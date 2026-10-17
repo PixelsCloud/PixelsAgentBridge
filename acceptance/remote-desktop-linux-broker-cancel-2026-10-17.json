@@ -1,0 +1,331 @@
+{
+  "date": "2026-10-17",
+  "source_sha256": "c4cb93a3829aaa54475e9bccc4505c68c7592b77f3bcab67e740a25a76480a47",
+  "build": {
+    "exit": 0,
+    "broker_source_sha256": "c4cb93a3829aaa54475e9bccc4505c68c7592b77f3bcab67e740a25a76480a47",
+    "check_sha256": "7c72aeb50396791fe9e1124d6a412c3478ee9a73d845b7aa37f048bf271baa37",
+    "cargo_jobs": 8,
+    "nested_jobs": 1,
+    "desktop_rebuilt": false
+  },
+  "baseline": {
+    "run": "broker-cancel-766f8e04d5a1",
+    "operation": {
+      "stage": "/tmp/pab-broker-cancel-766f8e04d5a1",
+      "transfer": "/tmp/pab-broker-upload-766f8e04d5a1",
+      "hashes": {
+        "desktop": "de544ef367034fff987037c09fa47fcadfa2870a30025a321e184490aa096d5b",
+        "check": "09e3b153aa8f0b55bb9af2abba8fbeba644a06349dade1e77794a0181f391d03",
+        "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+        "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+        "cancel.py": "b361dd0872bcc58a1661651b403cf7ae3be6cdcfa207121d18c1b240400419ef"
+      }
+    },
+    "report": {
+      "exit": 1,
+      "stderr": "media: DRM framebuffer changed\nError: \"supervised DMA check failed\"\n",
+      "session_preserved": true,
+      "result": {
+        "broker_errors": [
+          "media broker peer is outside the supervised helper",
+          "media broker peer is outside the supervised helper",
+          "media broker peer is outside the supervised helper",
+          "media broker peer is outside the supervised helper",
+          "media broker peer is outside the supervised helper",
+          "media broker peer is outside the supervised helper"
+        ],
+        "helper_exit": "Some(1)",
+        "runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "result": {
+              "early_capture_cancellations": [
+                {
+                  "pid": 27768,
+                  "exit": -9
+                },
+                {
+                  "pid": 27772,
+                  "exit": -9
+                },
+                {
+                  "pid": 27776,
+                  "exit": -9
+                },
+                {
+                  "pid": 27779,
+                  "exit": -9
+                },
+                {
+                  "pid": 27784,
+                  "exit": -9
+                },
+                {
+                  "pid": 27789,
+                  "exit": -9
+                },
+                {
+                  "pid": 27793,
+                  "exit": -9
+                },
+                {
+                  "pid": 27796,
+                  "exit": -9
+                },
+                {
+                  "pid": 27801,
+                  "exit": -9
+                },
+                {
+                  "pid": 27805,
+                  "exit": -9
+                },
+                {
+                  "pid": 27808,
+                  "exit": -9
+                },
+                {
+                  "pid": 27813,
+                  "exit": -9
+                }
+              ],
+              "frames_requested": 0
+            }
+          },
+          {
+            "dma": true,
+            "exit": 1,
+            "stderr": "Traceback (most recent call last):\n  File \"/tmp/pab-broker-cancel-766f8e04d5a1/verify.py\", line 141, in <module>\n    main()\n  File \"/tmp/pab-broker-cancel-766f8e04d5a1/verify.py\", line 105, in main\n    size, index, captured, key = struct.unpack(\"<IQQI\", read(24))\n  File \"/tmp/pab-broker-cancel-766f8e04d5a1/verify.py\", line 98, in read\n    raise RuntimeError(\"Capture pipe closed: \" + source.stderr.read(2000).decode(errors=\"replace\"))\nRuntimeError: Capture pipe closed: media source=drm_dma encoder=openh264_software direct_bgra=true\nmedia: Invalid DMA descriptor packet\n\n",
+            "result": null
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true
+      },
+      "trace_sha256": "139356c3d9a4f1d8c8083dc3a7cc47300440514739ccb2c0cc95d219d3b7a892",
+      "esrch_calls": [
+        "27758 getpgid(27776)                    = -1 ESRCH (No such process)",
+        "27758 getpgid(27784)                    = -1 ESRCH (No such process)",
+        "27758 getpgid(27793)                    = -1 ESRCH (No such process)",
+        "27758 getpgid(27796)                    = -1 ESRCH (No such process)",
+        "27758 getpgid(27805)                    = -1 ESRCH (No such process)",
+        "27758 getpgid(27813)                    = -1 ESRCH (No such process)"
+      ]
+    },
+    "cleanup": {
+      "removed": true,
+      "owned": [],
+      "runtime": []
+    }
+  },
+  "fixed": {
+    "run": "broker-cancel-aaffaa64b70a",
+    "operation": {
+      "stage": "/tmp/pab-broker-cancel-aaffaa64b70a",
+      "transfer": "/tmp/pab-broker-upload-aaffaa64b70a",
+      "hashes": {
+        "desktop": "de544ef367034fff987037c09fa47fcadfa2870a30025a321e184490aa096d5b",
+        "check": "7c72aeb50396791fe9e1124d6a412c3478ee9a73d845b7aa37f048bf271baa37",
+        "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+        "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+        "cancel.py": "851ab234a73a0b3b5a50bd42b7531ce4eac614278802bb09c0143ab00f0d6201"
+      }
+    },
+    "report": {
+      "exit": 0,
+      "stderr": "",
+      "session_preserved": true,
+      "result": {
+        "broker_errors": [],
+        "helper_exit": "Some(0)",
+        "runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "result": {
+              "early_capture_cancellations": [
+                {
+                  "pid": 27979,
+                  "exit": -9
+                },
+                {
+                  "pid": 27982,
+                  "exit": -9
+                },
+                {
+                  "pid": 27985,
+                  "exit": -9
+                },
+                {
+                  "pid": 27988,
+                  "exit": -9
+                },
+                {
+                  "pid": 27991,
+                  "exit": -9
+                },
+                {
+                  "pid": 27994,
+                  "exit": -9
+                },
+                {
+                  "pid": 27997,
+                  "exit": -9
+                },
+                {
+                  "pid": 28000,
+                  "exit": -9
+                },
+                {
+                  "pid": 28004,
+                  "exit": -9
+                },
+                {
+                  "pid": 28007,
+                  "exit": -9
+                },
+                {
+                  "pid": 28011,
+                  "exit": -9
+                },
+                {
+                  "pid": 28014,
+                  "exit": -9
+                }
+              ],
+              "frames_requested": 0
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 15.018834279828363,
+              "changed_fps_after_warmup": 15.018834279828363,
+              "encoded_bytes": 353872,
+              "fixture_ticks": 178,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 14.940111777591413,
+              "changed_fps_after_warmup": 14.940111777591413,
+              "encoded_bytes": 355090,
+              "fixture_ticks": 180,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 13.998445491919387,
+              "changed_fps_after_warmup": 13.998445491919387,
+              "encoded_bytes": 365949,
+              "fixture_ticks": 191,
+              "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "pipewire"
+            }
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true
+      }
+    },
+    "cleanup": {
+      "removed": true,
+      "owned": [],
+      "runtime": []
+    }
+  },
+  "limitations": [
+    "Traced baseline additionally failed its first dynamic DMA capture after DRM framebuffer changed; this failure is preserved and is not attributed to ptrace without further proof.",
+    "The fixed root broker was built into the opt-in real-session launcher. The Desktop supervisor must also be rebuilt and tested through a formal window before release.",
+    "This follow-up establishes cancelled-peer handling and subsequent capture recovery; it does not replace GDM password login or the full stability matrix."
+  ],
+  "full_w5_gate_passed": false
+}

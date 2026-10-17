@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-17",
+  "initial_probe": {
+    "original_session": "23",
+    "before": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_unit": "pab-gdm-state-bb1ffbbabd6e",
+    "config_hashes": {
+      "/etc/gdm3/custom.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+      "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799"
+    },
+    "created": "(objectpath '/org/gnome/DisplayManager/Displays/105935764677728',)",
+    "greeter_session": "c4",
+    "greeter": {
+      "User": "128",
+      "Type": "wayland",
+      "Class": "greeter",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "compositor_pid": 25385,
+    "probe_exit": 0,
+    "probe_error": "",
+    "interfaces": {
+      "screen_active": {
+        "ok": false,
+        "error": "g-dbus-error-quark: GDBus.Error:org.freedesktop.DBus.Error.NoReply: Message recipient disconnected from message bus without replying (4)"
+      },
+      "power": {
+        "ok": false,
+        "error": "g-dbus-error-quark: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.Mutter.DisplayConfig was not provided by any .service files (2)"
+      },
+      "session_inhibitors": {
+        "ok": true,
+        "value": [
+          []
+        ]
+      },
+      "screens": {
+        "ok": false,
+        "error": "g-dbus-error-quark: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.gnome.Mutter.DisplayConfig was not provided by any .service files (2)"
+      }
+    },
+    "restored": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "timer_triggered": false,
+    "service": "active"
+  },
+  "initial_late_restore": {
+    "terminated_test_fallback_greeter": "c5",
+    "active_samples": [
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23"
+    ],
+    "sessions": "141 1000 hy       \n 23 1000 hy seat0 tty2",
+    "original_user_restored": true,
+    "service": "active",
+    "gdm_config_sha256": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af"
+  },
+  "ready_probe": {
+    "original_session": "23",
+    "before": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_unit": "pab-gdm-state-7bd616da9450",
+    "config_hashes": {
+      "/etc/gdm3/custom.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+      "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799"
+    },
+    "created": "(objectpath '/org/gnome/DisplayManager/Displays/105935764678240',)",
+    "greeter_session": "c6",
+    "greeter": {
+      "User": "128",
+      "Type": "wayland",
+      "Class": "greeter",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "compositor_pid": 26060,
+    "probe_exit": 0,
+    "probe_error": "",
+    "interfaces": {
+      "display_ready_attempts": 5,
+      "screen_active": {
+        "ok": false,
+        "error": "g-dbus-error-quark: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Name \"org.gnome.ScreenSaver\" does not exist (3)"
+      },
+      "power": {
+        "ok": true,
+        "value": [
+          0
+        ]
+      },
+      "session_inhibitors": {
+        "ok": true,
+        "value": [
+          []
+        ]
+      },
+      "screens": {
+        "ok": true,
+        "value": {
+          "serial": 1,
+          "physical_count": 1,
+          "logical_count": 1
+        }
+      }
+    },
+    "restored": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_samples": [
+      "c8",
+      "c9",
+      "c10",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23"
+    ],
+    "late_greeters": [
+      "c8",
+      "c9",
+      "c10"
+    ],
+    "timer_triggered": false,
+    "service": "active"
+  },
+  "probe_script_sha256": "e9509821b5b7a99074f0bc2bef56c3b1162ebcfea6894964cdd9b94dc80acd65",
+  "notes": [
+    "Initial probe queried before the compositor owned its D-Bus names; those errors do not establish API availability.",
+    "Its cleanup terminated the greeter soon after startup and a late Xorg fallback took the active seat. A subsequent restoration stopped that owned greeter and observed original session 23 for 15 seconds.",
+    "The ready probe waits for DisplayConfig without D-Bus auto-activation. GDM Wayland has no ScreenSaver owner, but DisplayConfig and SessionManager are available.",
+    "During ready-probe cleanup GDM created late greeters c8/c9/c10; the bounded restoration retired only newly created greeters and original session 23 remained active for the remaining 12 samples.",
+    "A subsequent read-only session/process query showed only original graphical session 23, no greeter, and the installed executor active."
+  ],
+  "full_w5_gate_passed": false
+}

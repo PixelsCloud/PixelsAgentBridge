@@ -1,0 +1,656 @@
+{
+  "date": "2026-10-17",
+  "base_commit": "5b9141986163374b86059d9a1da4ea990ac549eb",
+  "source_sha256": {
+    "crates/desktop-media/native/linux/dma_capture.h": "5754f6c844c5c34b9e57a4da0beab193fa63b464e48f55fa066accf6ef2a919f",
+    "crates/desktop-media/native/linux/input.h": "e5d47131855b21702010b967e96aaa13ad67d2a8f70e95ec7dc5de53cc1db231",
+    "crates/desktop-media/native/linux/worker.cpp": "19c2d3ea90e15ccbcbad64fc751b7763ee3a8ce372b91cffb8cc8e151439b665",
+    "crates/os-control/src/execution/linux_graphical.rs": "f6584e82631d7b44e46b8111bbc116769e561f498692815921f4dc16412ac59b",
+    "crates/os-control/src/execution/linux_media_environment.rs": "4be2a9752ba824c24c91515fda1835cce80c7df8502a3515563cb31594879380"
+  },
+  "snapshot_matches": true,
+  "run": "gdm-capture-7c56c029a958",
+  "operation": {
+    "stage": "/tmp/pab-gdm-capture-7c56c029a958",
+    "transfer": "/tmp/pab-gdm-upload-7c56c029a958",
+    "hashes": {
+      "desktop": "de544ef367034fff987037c09fa47fcadfa2870a30025a321e184490aa096d5b",
+      "check": "09e3b153aa8f0b55bb9af2abba8fbeba644a06349dade1e77794a0181f391d03",
+      "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+      "verify.py": "e5f46f6820f1390cb854c2fba6becc0f59380c67a56060f28004050bcb1e9864"
+    }
+  },
+  "report": {
+    "original_session": "23",
+    "before": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_unit": "pab-gdm-state-d9915ddb1291",
+    "config_hashes": {
+      "/etc/gdm3/custom.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+      "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799"
+    },
+    "created": "(objectpath '/org/gnome/DisplayManager/Displays/105935764679520',)",
+    "greeter_session": "c11",
+    "greeter": {
+      "User": "128",
+      "Type": "wayland",
+      "Class": "greeter",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "compositor_pid": 26807,
+    "probe_exit": 0,
+    "probe_error": "",
+    "interfaces": {
+      "display_ready_attempts": 6,
+      "screen_active": {
+        "ok": false,
+        "error": "g-dbus-error-quark: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Name \"org.gnome.ScreenSaver\" does not exist (3)"
+      },
+      "power": {
+        "ok": true,
+        "value": [
+          0
+        ]
+      },
+      "session_inhibitors": {
+        "ok": true,
+        "value": [
+          []
+        ]
+      },
+      "screens": {
+        "ok": true,
+        "value": {
+          "serial": 1,
+          "physical_count": 1,
+          "logical_count": 1
+        }
+      }
+    },
+    "capture": {
+      "exit": 0,
+      "stderr": "",
+      "result": {
+        "broker_errors": [],
+        "helper_exit": "Some(0)",
+        "runs": [
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "passed": true,
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 30,
+              "last_luma_range": [
+                43,
+                241
+              ],
+              "uid": 128,
+              "entry": "explicit_dma",
+              "inhibitor_released": true,
+              "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "saved_pixels": 0
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "passed": true,
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 30,
+              "last_luma_range": [
+                38,
+                241
+              ],
+              "uid": 128,
+              "entry": "explicit_dma",
+              "inhibitor_released": true,
+              "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "saved_pixels": 0
+            }
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "result": {
+              "passed": true,
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 30,
+              "last_luma_range": [
+                38,
+                241
+              ],
+              "uid": 128,
+              "entry": "normal_capture",
+              "inhibitor_released": true,
+              "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "saved_pixels": 0
+            }
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true
+      }
+    },
+    "restored": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_samples": [
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23",
+      "23"
+    ],
+    "late_greeters": [],
+    "timer_triggered": false,
+    "service": "active"
+  },
+  "cleanup": {
+    "removed": true,
+    "owned": [],
+    "runtime": [],
+    "devices": []
+  },
+  "regression_run": "idle-fixed-daa318e133a7",
+  "regression_passed": false,
+  "regression": {
+    "before": [
+      "23",
+      "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+    ],
+    "hashes": {
+      "desktop": "de544ef367034fff987037c09fa47fcadfa2870a30025a321e184490aa096d5b",
+      "check": "09e3b153aa8f0b55bb9af2abba8fbeba644a06349dade1e77794a0181f391d03",
+      "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+      "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+      "input.py": "1c46e52e6a3ccbc9cc63a3e03084a8619825ff75a7f56d7f1b56f9504e83b309"
+    },
+    "installed": {
+      "/opt/pixels-agent-bridge/pab-executor": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+      "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "/lib/systemd/system/pixels-agent-bridge-executor.service": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+    },
+    "unit": "pab-lock-uinput-daa318e133a7",
+    "recovery_unit": "pab-lock-uinput-daa318e133a7-recover",
+    "exit_code": 1,
+    "stderr": "Error: \"supervised DMA check failed\"\n",
+    "before_recovery": [
+      "23",
+      "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+    ],
+    "timer_triggered": false,
+    "recovery_unlock_needed": false,
+    "after": [
+      "23",
+      "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+    ],
+    "result": {
+      "broker_errors": [
+        "media broker peer is outside the supervised helper"
+      ],
+      "helper_exit": "Some(0)",
+      "runs": [
+        {
+          "exit": 0,
+          "kind": "input",
+          "stderr": "",
+          "result": {
+            "passed": true,
+            "normal_entry_points": true,
+            "login_submissions": 1,
+            "locked_power": 3,
+            "automatic_wake": true,
+            "idle_samples": [
+              {
+                "seconds": 0.0,
+                "power": 0,
+                "locked": true,
+                "frames": 0
+              },
+              {
+                "seconds": 1.046,
+                "power": 0,
+                "locked": true,
+                "frames": 16
+              },
+              {
+                "seconds": 2.044,
+                "power": 0,
+                "locked": true,
+                "frames": 31
+              },
+              {
+                "seconds": 3.049,
+                "power": 0,
+                "locked": true,
+                "frames": 46
+              },
+              {
+                "seconds": 4.043,
+                "power": 0,
+                "locked": true,
+                "frames": 61
+              },
+              {
+                "seconds": 5.048,
+                "power": 0,
+                "locked": true,
+                "frames": 76
+              },
+              {
+                "seconds": 6.045,
+                "power": 0,
+                "locked": true,
+                "frames": 91
+              },
+              {
+                "seconds": 7.046,
+                "power": 0,
+                "locked": true,
+                "frames": 106
+              },
+              {
+                "seconds": 8.047,
+                "power": 0,
+                "locked": true,
+                "frames": 121
+              },
+              {
+                "seconds": 9.044,
+                "power": 0,
+                "locked": true,
+                "frames": 136
+              },
+              {
+                "seconds": 10.047,
+                "power": 0,
+                "locked": true,
+                "frames": 151
+              },
+              {
+                "seconds": 11.049,
+                "power": 0,
+                "locked": true,
+                "frames": 166
+              },
+              {
+                "seconds": 12.046,
+                "power": 0,
+                "locked": true,
+                "frames": 181
+              },
+              {
+                "seconds": 13.047,
+                "power": 0,
+                "locked": true,
+                "frames": 196
+              },
+              {
+                "seconds": 14.047,
+                "power": 0,
+                "locked": true,
+                "frames": 211
+              },
+              {
+                "seconds": 15.049,
+                "power": 0,
+                "locked": true,
+                "frames": 226
+              },
+              {
+                "seconds": 16.047,
+                "power": 0,
+                "locked": true,
+                "frames": 241
+              },
+              {
+                "seconds": 17.042,
+                "power": 0,
+                "locked": true,
+                "frames": 256
+              },
+              {
+                "seconds": 18.042,
+                "power": 0,
+                "locked": true,
+                "frames": 271
+              },
+              {
+                "seconds": 19.045,
+                "power": 0,
+                "locked": true,
+                "frames": 286
+              },
+              {
+                "seconds": 20.046,
+                "power": 0,
+                "locked": true,
+                "frames": 301
+              },
+              {
+                "seconds": 21.046,
+                "power": 0,
+                "locked": true,
+                "frames": 316
+              },
+              {
+                "seconds": 22.043,
+                "power": 0,
+                "locked": true,
+                "frames": 331
+              },
+              {
+                "seconds": 23.047,
+                "power": 0,
+                "locked": true,
+                "frames": 346
+              },
+              {
+                "seconds": 24.044,
+                "power": 0,
+                "locked": true,
+                "frames": 361
+              },
+              {
+                "seconds": 25.047,
+                "power": 0,
+                "locked": true,
+                "frames": 376
+              },
+              {
+                "seconds": 26.05,
+                "power": 0,
+                "locked": true,
+                "frames": 391
+              },
+              {
+                "seconds": 27.049,
+                "power": 0,
+                "locked": true,
+                "frames": 406
+              },
+              {
+                "seconds": 28.046,
+                "power": 0,
+                "locked": true,
+                "frames": 421
+              },
+              {
+                "seconds": 29.047,
+                "power": 0,
+                "locked": true,
+                "frames": 436
+              },
+              {
+                "seconds": 30.049,
+                "power": 0,
+                "locked": true,
+                "frames": 451
+              },
+              {
+                "seconds": 31.049,
+                "power": 0,
+                "locked": true,
+                "frames": 466
+              },
+              {
+                "seconds": 32.045,
+                "power": 0,
+                "locked": true,
+                "frames": 481
+              },
+              {
+                "seconds": 33.045,
+                "power": 0,
+                "locked": true,
+                "frames": 496
+              },
+              {
+                "seconds": 34.05,
+                "power": 0,
+                "locked": true,
+                "frames": 511
+              },
+              {
+                "seconds": 35.049,
+                "power": 0,
+                "locked": true,
+                "frames": 526,
+                "capture_exit": null
+              }
+            ],
+            "idle_requested_seconds": 35,
+            "idle_completed": true,
+            "normal_close_released_inhibitor": true,
+            "sigkill_released_inhibitor": true,
+            "password_login_unlocked": true,
+            "locked_capture_source": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\nmedia: Lock state changed; restart capture generation\n",
+            "old_generation_retired": true,
+            "unlock_released_inhibitor": true,
+            "ordinary_capture_not_inhibited": true,
+            "unlocked_capture_source": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+            "final_locked": false,
+            "input_contents_saved": false
+          }
+        },
+        {
+          "dma": true,
+          "exit": 0,
+          "stderr": "",
+          "result": {
+            "dimensions": [
+              1280,
+              800
+            ],
+            "inventory": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1280,
+                "desktop_height": 800,
+                "pixel_width": 1280,
+                "pixel_height": 800,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "frames": 90,
+            "changed_samples": 89,
+            "decoded_fps_after_warmup": 14.860300818181639,
+            "changed_fps_after_warmup": 14.860300818181639,
+            "encoded_bytes": 355019,
+            "fixture_ticks": 180,
+            "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+            "pixel_bytes_saved": 0,
+            "worker_exit": 0,
+            "consumer_uid": 1000,
+            "source": "dma"
+          }
+        },
+        {
+          "dma": true,
+          "exit": 0,
+          "stderr": "",
+          "result": {
+            "dimensions": [
+              1280,
+              800
+            ],
+            "inventory": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1280,
+                "desktop_height": 800,
+                "pixel_width": 1280,
+                "pixel_height": 800,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "frames": 90,
+            "changed_samples": 89,
+            "decoded_fps_after_warmup": 14.972662128434397,
+            "changed_fps_after_warmup": 14.972662128434397,
+            "encoded_bytes": 357129,
+            "fixture_ticks": 179,
+            "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+            "pixel_bytes_saved": 0,
+            "worker_exit": 0,
+            "consumer_uid": 1000,
+            "source": "dma"
+          }
+        },
+        {
+          "dma": false,
+          "exit": 0,
+          "stderr": "",
+          "result": {
+            "dimensions": [
+              1280,
+              800
+            ],
+            "inventory": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1280,
+                "desktop_height": 800,
+                "pixel_width": 1280,
+                "pixel_height": 800,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "frames": 90,
+            "changed_samples": 89,
+            "decoded_fps_after_warmup": 12.754907986645334,
+            "changed_fps_after_warmup": 12.754907986645334,
+            "encoded_bytes": 370013,
+            "fixture_ticks": 204,
+            "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+            "pixel_bytes_saved": 0,
+            "worker_exit": 0,
+            "consumer_uid": 1000,
+            "source": "pipewire"
+          }
+        }
+      ],
+      "session_unchanged": true,
+      "socket_removed": true
+    }
+  },
+  "regression_cleanup": {
+    "removed": true,
+    "owned_workers": [],
+    "input_devices": [],
+    "runtime_profiles": [],
+    "service": "active"
+  },
+  "regression_observations": [
+    {
+      "phase": "lock",
+      "mean_luminance_error": 4.6978466796875,
+      "fraction_over_30": 0.0,
+      "passed": true
+    },
+    {
+      "phase": "prompt",
+      "mean_luminance_error": 4.695791015625,
+      "fraction_over_30": 9.765625e-07,
+      "passed": true
+    }
+  ],
+  "build": {
+    "exit_code": 0,
+    "sha256": "de544ef367034fff987037c09fa47fcadfa2870a30025a321e184490aa096d5b",
+    "bytes": 45971416,
+    "cargo_jobs": 8,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "limitations": [
+    "Greeter component test decodes nonblank frames; no independent console comparison in that run.",
+    "Greeter network window, mouse/keyboard/password login and session handoff still require validation.",
+    "User-session regression submitted one password and compared lock/prompt to VMware console; it does not replace greeter login.",
+    "The user regression failed overall because the broker reported one peer outside the helper; successful subchecks do not override that failure.",
+    "No logout/new-session or long-duration acceptance."
+  ],
+  "full_w5_gate_passed": false
+}

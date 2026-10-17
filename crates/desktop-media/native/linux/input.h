@@ -141,7 +141,7 @@ inline void input(GDBusConnection* bus, const Display& display, bool force_super
     const auto width = read_value<uint32_t>(), height = read_value<uint32_t>();
     if (x != display.x || y != display.y || width != display.size.logical_width || height != display.size.logical_height)
         throw std::runtime_error("Selected input geometry changed");
-    if (force_supervised || dma::screen_locked(bus)) { supervised_input(bus, display); return; }
+    if (force_supervised || dma::protected_screen(bus)) { supervised_input(bus, display); return; }
     auto session = std::make_unique<Input>(bus, display);
     try { session->start(); }
     catch (const std::exception& error) {

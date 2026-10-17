@@ -198,7 +198,21 @@ impl LinuxMediaDmaBroker {
         if size as usize != std::mem::size_of_val(&peer)
             || peer.pid <= 1
             || peer.uid != self.target.session().uid()
-            || unsafe { libc::getpgid(peer.pid) } != self.helper_group as i32
+        {
+            return Err(io::Error::other("invalid media broker peer credentials"));
+        }
+        let group = unsafe { libc::getpgid(peer.pid) };
+        if group < 0 {
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() == Some(libc::ESRCH) {
+                // A capture may connect, publish its local header, then be
+                // cancelled/reaped before this polling loop accepts it. Drop
+                // the queued connection; no privileged child is launched.
+                return Ok(());
+            }
+            return Err(error);
+        }
+        if group != self.helper_group as i32
             || LinuxGraphicalSession::for_media_process(peer.pid as _, peer.uid)
                 .as_ref()
                 .ok()

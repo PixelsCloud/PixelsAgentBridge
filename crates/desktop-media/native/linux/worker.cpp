@@ -88,7 +88,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             else {
                 const auto fps = pab_linux::number(argv[3], 60);
                 const bool sleeping = pab_linux::dma::asleep(bus.get());
-                if (sleeping || pab_linux::dma::screen_locked(bus.get())) {
+                if (sleeping || pab_linux::dma::protected_screen(bus.get())) {
                     auto channel = pab_linux::dma::connect_broker(selected->connector, sleeping);
                     if (sleeping) pab_linux::dma::await_awake(bus.get());
                     pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());

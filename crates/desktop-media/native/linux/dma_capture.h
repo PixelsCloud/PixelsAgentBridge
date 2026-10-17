@@ -3,7 +3,12 @@
 #include "dma_image.h"
 
 namespace pab_linux::dma {
-inline bool screen_locked(GDBusConnection* bus) {
+inline bool protected_screen(GDBusConnection* bus) {
+    // GDM has no org.gnome.ScreenSaver. The supervisor supplies the logind
+    // class; this only selects a backend, never authorizes a privileged broker.
+    // Broker peer/session/compositor checks still apply to every connection.
+    const char* session_class = std::getenv("XDG_SESSION_CLASS");
+    if (session_class && std::strcmp(session_class, "greeter") == 0) return true;
     auto value = call(bus, "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver",
         "org.gnome.ScreenSaver", "GetActive", nullptr, G_VARIANT_TYPE("(b)"));
     return g_variant_get_boolean(child(value.get(), 0).get());
@@ -30,8 +35,8 @@ inline void await_awake(GDBusConnection* bus) {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     parent_alive();
 }
-// The locked GNOME screen normally blanks again after a short idle timeout.
-// Keep its idle watches inhibited only for this locked capture's lifetime;
+// The GNOME lock/login screen normally blanks after a short idle timeout.
+// Keep its idle watches inhibited only for this protected capture's lifetime;
 // ordinary viewing retains the user's normal automatic lock behavior.
 class LockedScreenAwake {
     GDBusConnection* bus_;
@@ -39,7 +44,7 @@ class LockedScreenAwake {
     bool held_ = false;
 public:
     explicit LockedScreenAwake(GDBusConnection* bus) : bus_(bus) {
-        if (!screen_locked(bus_)) return;
+        if (!protected_screen(bus_)) return;
         try {
             auto result = call(bus_, "org.gnome.SessionManager", "/org/gnome/SessionManager",
                 "org.gnome.SessionManager", "Inhibit",
@@ -73,7 +78,7 @@ class GnomeGuard {
     Display display_;
     bool locked_;
     bool locked() {
-        return screen_locked(bus_);
+        return protected_screen(bus_);
     }
 public:
     GnomeGuard(GDBusConnection* bus, Display display) : bus_(bus), display_(std::move(display)), locked_(locked()) { check(); }
