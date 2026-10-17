@@ -7,7 +7,7 @@ import type { Assistance } from "./DesktopAssistanceNotice";
 import { initialLanguage } from "./i18n";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
-type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
+type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; decoder?: string | null; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
 const english = initialLanguage() === "en";
 const text = english
   ? { title: "Remote desktop", view: "View only", screen: "Display", retry: "Reconnect", full: "Fullscreen", ready: "Preparing", connecting: "Connecting", reconnecting: "Restoring desktop", switching: "Switching display", viewing: "Connected", failed: "Connection failed", ended: "Disconnected", waiting: "Waiting for remote desktop…" }
@@ -53,9 +53,14 @@ export default function RemoteDesktopWindow() {
   }
   const opened = status.opened;
   const phase = text[status.phase as keyof typeof text] || status.phase;
+  const decoder = status.decoder === "openh264_software"
+    ? (english ? "Software decoding" : "软件解码")
+    : ["d3d11_hardware", "videotoolbox_hardware"].includes(status.decoder || "")
+      ? (english ? "Hardware decoding" : "硬件解码") : null;
   return <main className="remote-desktop">
     <header className="remote-desktop-toolbar">
       <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span>
+        {status.phase === "viewing" && decoder && <span className="remote-desktop-decoder">{decoder}</span>}
         {assistance[0] && <button className="remote-desktop-assistance" disabled={finishing || status.phase !== "viewing"}
           title={assistance[0].request.expected_action} onClick={() => {
             const id = assistance[0].assistance_id;

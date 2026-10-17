@@ -78,6 +78,17 @@ pub struct NativePresentations {
     last: u64,
 }
 impl NativePresentations {
+    /// Actual native decoder reported for this generation, never the requested
+    /// preference. Older/missing reports and failed renderers remain unknown.
+    pub fn decoder(&self) -> Option<&'static str> {
+        let value = self.progress.borrow();
+        if value.error.is_some() {
+            None
+        } else {
+            value.decoder
+        }
+    }
+
     pub async fn next(&mut self) -> Result<DesktopFrameHeader, Error> {
         loop {
             let value = self.progress.borrow_and_update().clone();
@@ -496,5 +507,38 @@ mod tests {
                     .is_err()
             );
         }
+    }
+
+    #[tokio::test]
+    async fn live_decoder_matches_native_report_and_is_not_inferred_or_reused() {
+        for (code, name) in [
+            (1, "d3d11_hardware"),
+            (2, "openh264_software"),
+            (3, "videotoolbox_hardware"),
+        ] {
+            let (mut pipe, output) = tokio::io::duplex(256);
+            let renderer = Renderer::start(output);
+            let mut presentations = renderer.presentations();
+            assert_eq!(presentations.decoder(), None);
+            renderer.enqueue(header(1)).await.unwrap();
+            pipe.write_all(&[4, code]).await.unwrap();
+            event(&mut pipe, 1, 0).await;
+            event(&mut pipe, 2, 0).await;
+            assert_eq!(presentations.next().await.unwrap().frame_id, 1);
+            assert_eq!(presentations.decoder(), Some(name));
+            // A later conflicting decoder report invalidates the generation.
+            pipe.write_all(&[4, code]).await.unwrap();
+            assert!(presentations.next().await.is_err());
+            assert_eq!(presentations.decoder(), None);
+        }
+        // A fresh/legacy worker may present without a decoder-kind report.
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        let mut presentations = renderer.presentations();
+        renderer.enqueue(header(1)).await.unwrap();
+        event(&mut pipe, 1, 0).await;
+        event(&mut pipe, 2, 0).await;
+        presentations.next().await.unwrap();
+        assert_eq!(presentations.decoder(), None);
     }
 }

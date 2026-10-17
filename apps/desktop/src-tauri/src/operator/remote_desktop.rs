@@ -19,6 +19,7 @@ pub struct ViewerStatus {
     input_ready: bool,
     frame_ready: bool,
     input_enabled: bool,
+    decoder: Option<&'static str>,
 }
 enum Command {
     Screen(String),
@@ -371,6 +372,7 @@ fn publish(
         input_ready: false,
         frame_ready: false,
         input_enabled: false,
+        decoder: None,
     };
     owner.status.send_replace(status.clone());
     let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
@@ -655,7 +657,10 @@ async fn stream(
                     if !*ready.borrow() {
                         first_presented.get_or_insert_with(Instant::now);
                         ready.send_replace(true);
-                        owner.status.send_modify(|status| status.frame_ready = true);
+                        owner.status.send_modify(|status| {
+                            status.frame_ready = true;
+                            status.decoder = presentations.decoder();
+                        });
                         publish_input(window, owner, supported, false);
                     }
                 }

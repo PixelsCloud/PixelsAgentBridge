@@ -1,4 +1,20 @@
 import { test, expect } from "@playwright/test";
+
+test("decoder badge uses actual reports and clears during recovery", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
+  for (const [kind, label] of [["d3d11_hardware", "Hardware decoding"], ["openh264_software", "Software decoding"], ["videotoolbox_hardware", "Hardware decoding"]]) {
+    await page.evaluate((value) => (window as any).fixture.decoder(value), kind);
+    await expect(page.locator(".remote-desktop-decoder")).toHaveText(label);
+    expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(72);
+  }
+  await page.evaluate(() => (window as any).fixture.decoder("unknown_future_decoder"));
+  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
+  await page.evaluate(() => { (window as any).fixture.decoder("openh264_software"); (window as any).fixture.recover(); });
+  await expect(page.getByRole("status")).toHaveText("Restoring desktop");
+  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
+});
 test("viewer uses stable screen IDs and bounded controls without frame or input IPC", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
   await expect(page.getByRole("status")).toHaveText("Connected");

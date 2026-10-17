@@ -11,13 +11,15 @@ const screens = [
 let opened = { config: { screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
 let phase = "viewing";
 let inputReady = true, inputEnabled = false;
-const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled });
+let decoder: string | null = null;
+const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, decoder });
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false,
   assistance: [] as any[],
+  decoder(value: string | null) { decoder = value; fixture.emit(status()); },
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
-  recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; fixture.emit(status()); },
+  recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; decoder = null; fixture.emit(status()); },
   ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; fixture.emit(status()); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
