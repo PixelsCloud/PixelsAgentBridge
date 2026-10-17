@@ -22,12 +22,27 @@ struct Counters {
 WNDPROC original_control = nullptr;
 HWND parent_window = nullptr, target_window = nullptr;
 bool surface = false;
+bool no_activate = false, legacy_input = false;
 std::atomic<bool> injected{false};
 std::atomic<bool> active_at_input{false};
 std::atomic<unsigned> submitted{0};
+std::atomic<bool> interrupted{false};
+void activation_state(const char* phase, UINT message, LRESULT result) {
+    const HWND foreground = GetForegroundWindow(); DWORD pid = 0;
+    const DWORD thread = foreground ? GetWindowThreadProcessId(foreground, &pid) : 0;
+    // Window class only, never another application's title or content.
+    char name[96]{}; if (foreground) GetClassNameA(foreground, name, sizeof(name));
+    std::cout << "{\"activation_phase\":\"" << phase << "\",\"message\":" << message
+        << ",\"result\":" << result << ",\"foreground_own\":" << (foreground == parent_window ? "true" : "false")
+        << ",\"foreground_pid\":" << pid << ",\"foreground_thread\":" << thread
+        << ",\"foreground_class\":\"" << name << "\",\"active_own\":" << (GetActiveWindow() == parent_window ? "true" : "false")
+        << ",\"focus_target\":" << (GetFocus() == target_window ? "true" : "false") << "}\n" << std::flush;
+}
 
 LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
+    if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) interrupted = true;
     if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP || message == WM_LBUTTONDBLCLK) {
+        if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) != marker) interrupted = true;
         std::cout << "{\"message\":" << message << ",\"time\":" << GetMessageTime()
                   << ",\"extra\":" << GetMessageExtraInfo() << "}\n" << std::flush;
         if (message == WM_LBUTTONDOWN) ++counts.down;
@@ -36,6 +51,7 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
             ++counts.up;
             counts.last_up = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
         }
+        activation_state("button", message, 0);
     }
     if (surface) {
         if (message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK) {
@@ -54,8 +70,12 @@ LRESULT CALLBACK control_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
                             : DefWindowProcW(window, message, w, l);
 }
 LRESULT CALLBACK parent_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
+    if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) interrupted = true;
     if (message == WM_COMMAND && HWND(l) == target_window && HIWORD(w) == BN_CLICKED) ++counts.actions;
-    return DefWindowProcW(window, message, w, l);
+    const auto result = message == WM_MOUSEACTIVATE && no_activate ? MA_NOACTIVATE : DefWindowProcW(window, message, w, l);
+    if (message == WM_MOUSEACTIVATE || message == WM_ACTIVATE || message == WM_SETFOCUS)
+        activation_state("parent", message, result);
+    return result;
 }
 bool on_own_desktop() {
     auto input = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
@@ -72,7 +92,7 @@ bool owns_point(POINT p) {
     return IsWindow(target_window) && WindowFromPoint(p) == target_window && on_own_desktop();
 }
 bool send_pointer(POINT point, DWORD flags, bool move = true, bool batch = false) {
-    if (!owns_point(point)) return false;
+    if (interrupted || !owns_point(point)) return false;
     const int x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
     const int width = GetSystemMetrics(SM_CXVIRTUALSCREEN), height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
     if (width <= 0 || height <= 0) return false;
@@ -90,7 +110,15 @@ bool send_pointer(POINT point, DWORD flags, bool move = true, bool batch = false
         pair[1].mi.dwExtraInfo = marker;
     }
     const UINT count = batch && flags ? 2 : 1;
-    auto result = SendInput(count, pair, sizeof(event));
+    UINT result = 0;
+    if (legacy_input) {
+        // Diagnostic comparison only; the product continues to use SendInput.
+        for (UINT index = 0; index < count; ++index) {
+            const auto& m = pair[index].mi;
+            mouse_event(m.dwFlags, m.dx, m.dy, m.mouseData, m.dwExtraInfo);
+        }
+        result = count; // API calls made; correctness still requires observed messages.
+    } else result = SendInput(count, pair, sizeof(event));
     submitted += result;
     return result == count;
 }
@@ -99,7 +127,11 @@ bool release_button() {
     event.type = INPUT_MOUSE;
     event.mi.dwFlags = MOUSEEVENTF_LEFTUP;
     event.mi.dwExtraInfo = marker;
-    auto result = SendInput(1, &event, sizeof(event));
+    UINT result = 0;
+    if (legacy_input) {
+        mouse_event(event.mi.dwFlags, 0, 0, 0, marker);
+        result = 1;
+    } else result = SendInput(1, &event, sizeof(event));
     submitted += result;
     return result == 1;
 }
@@ -110,9 +142,12 @@ int main(int argc, char** argv) {
     const bool separate = requested.find("separate-") == 0;
     const bool batch = requested.find("batch-") == 0;
     const bool focus = requested.find("focused-") == 0;
-    const std::string mode = requested.substr(separate ? 9 : batch ? 6 : focus ? 8 : 0);
+    no_activate = requested.find("noactivate-") == 0;
+    legacy_input = requested.find("legacy-") == 0;
+    const bool blocking = requested.find("getmessage-") == 0;
+    const std::string mode = requested.substr(separate ? 9 : batch ? 6 : focus ? 8 : no_activate ? 11 : legacy_input ? 7 : blocking ? 11 : 0);
     if (mode != "button-self" && mode != "checkbox-self" && mode != "doubleclick-self" && mode != "drag-self") {
-        std::cerr << "Specify button-self, checkbox-self, doubleclick-self or drag-self (optional separate-, batch- or focused- prefix)\n";
+        std::cerr << "Specify button-self, checkbox-self, doubleclick-self or drag-self (optional separate-, batch-, focused-, noactivate-, legacy- or getmessage- prefix)\n";
         return 2;
     }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -179,13 +214,23 @@ int main(int argc, char** argv) {
         injected = ok;
     });
     const auto deadline = Clock::now() + std::chrono::seconds(5);
-    while (IsWindow(parent_window) && Clock::now() < deadline) {
+    if (blocking && !SetTimer(parent_window, 1, 50, nullptr)) {
+        input.join(); DestroyWindow(parent_window); return 7;
+    }
+    while (IsWindow(parent_window) && Clock::now() < deadline && !interrupted) {
         MSG message{};
-        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+        if (blocking) {
+            const auto result = GetMessageW(&message, nullptr, 0, 0);
+            if (result <= 0) break;
             TranslateMessage(&message);
             DispatchMessageW(&message);
+        } else {
+            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+            MsgWaitForMultipleObjects(0, nullptr, FALSE, 10, QS_ALLINPUT);
         }
-        MsgWaitForMultipleObjects(0, nullptr, FALSE, 10, QS_ALLINPUT);
     }
     input.join();
     const auto checked = mode == "checkbox-self" && IsWindow(target_window)
@@ -198,7 +243,7 @@ int main(int argc, char** argv) {
         : counts.actions == 1 && (mode != "checkbox-self" || checked == BST_CHECKED);
     const bool sequence_ok = mode == "doubleclick-self" ? counts.down == 1 && counts.double_click == 1 && counts.up == 2
         : counts.down == 1 && counts.double_click == 0 && counts.up == 1;
-    const bool passed = active_at_input == focus && injected && !left_held && !counts.dragging && gestures_ok && sequence_ok;
+    const bool passed = !interrupted && active_at_input == focus && injected && !left_held && !counts.dragging && gestures_ok && sequence_ok;
     std::cout << "{\"mode\":\"" << requested << "\",\"initially_active\":" << (initially_active ? "true" : "false")
         << ",\"active_at_input\":" << (active_at_input ? "true" : "false")
         << ",\"submitted\":" << submitted << ",\"injected\":" << (injected ? "true" : "false")
@@ -207,10 +252,12 @@ int main(int argc, char** argv) {
         << ",\"drag_ends\":" << counts.drag_ends << ",\"held_moves\":" << counts.held_moves
         << ",\"last_up\":[" << counts.last_up.x << "," << counts.last_up.y << "]"
         << ",\"actions_ok\":" << (gestures_ok ? "true" : "false")
+        << ",\"interrupted_by_external_input\":" << (interrupted ? "true" : "false")
         << ",\"sequence_ok\":" << (sequence_ok ? "true" : "false")
         << ",\"left_held\":" << (left_held ? "true" : "false") << ",\"passed\":" << (passed ? "true" : "false") << "}\n";
     POINT now{}; GetCursorPos(&now);
-    if (GetForegroundWindow() == parent_window && WindowFromPoint(now) == target_window) {
+    if (!interrupted && (GetForegroundWindow() == parent_window || GetForegroundWindow() == previous_foreground)
+            && WindowFromPoint(now) == target_window) {
         SetCursorPos(previous_cursor.x, previous_cursor.y);
         if (IsWindow(previous_foreground)) SetForegroundWindow(previous_foreground);
     }

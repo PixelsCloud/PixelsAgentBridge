@@ -130,6 +130,13 @@ GPU 叠加，彩色透明混合和 AND/XOR 均不回读桌面；形状不变时�
 性能仍待验收，03.5 不关闭。详见
 [Windows 光标产品记录](acceptance/remote-desktop-windows-cursor-product-2026-10-17.md)。
 
+后续 W2 激活边界对照：90 上改用 GetMessage、旧 mouse_event 或 GUI 子系统
+均仍复现重复；仅在自有测试窗口返回 MA_NOACTIVATE 时，单击/双击/拖拽顺序
+通过，说明激活与首次点击处理顺序影响结果，尚未证明根因。不能用于禁止
+远端应用激活或宣称修复。补充外部输入中断测试工具保护；混入外部输入的
+本机结果已排除。原服务保持，临时程序全部清理。详见
+[Windows 激活边界对照](acceptance/remote-desktop-windows-activation-boundary-2026-10-17.md)。
+
 2026-10-17 W4 操作端进展：真实 Mac MCP/Desktop 已通过既有认证连接 90，
 AI 提示打开正式独立窗口。修复全尺寸 contentView 的标题栏偏移导致原生画面
 遮住工具栏；修复前可复现，8 项原生布局检查及真实窗口/全屏/恢复通过。
