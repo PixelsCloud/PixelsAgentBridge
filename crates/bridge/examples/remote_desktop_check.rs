@@ -109,8 +109,18 @@ async fn measure(
         let submit = async {
             let mut started = Instant::now();
             let mut legacy_max_ms = 0.0f64;
+            let mut first_capture = None;
+            let mut last_capture = 0;
+            let mut first_received = None;
+            let mut last_received = Instant::now();
             for index in 0..warmup + measured {
                 let frame = session.next_frame(Duration::from_secs(10)).await?;
+                if index >= warmup {
+                    first_capture.get_or_insert(frame.header.capture_time_us);
+                    last_capture = frame.header.capture_time_us;
+                    first_received.get_or_insert_with(Instant::now);
+                    last_received = Instant::now();
+                }
                 viewer.submit(&frame).await?;
                 if index % u64::from(fps) == 0 {
                     let query = Instant::now();
@@ -121,10 +131,18 @@ async fn measure(
                     started = Instant::now();
                 }
             }
+            let finishing = Instant::now();
             let display = viewer.finish().await?;
-            Ok::<_, Error>((display, started.elapsed(), legacy_max_ms))
+            let timing = serde_json::json!({
+                "capture_span_us": last_capture.saturating_sub(first_capture.unwrap_or(last_capture)),
+                "receive_span_ms": last_received.duration_since(first_received.unwrap_or(last_received)).as_secs_f64()*1000.0,
+                "finish_ms": finishing.elapsed().as_secs_f64()*1000.0,
+                "measured_intervals": measured-1,
+                "parallel_environment_max_ms": legacy_max_ms,
+            });
+            Ok::<_, Error>((display, started.elapsed(), legacy_max_ms, timing))
         };
-        let ((display, elapsed, legacy_max_ms), ()) = tokio::try_join!(submit, output)?;
+        let ((display, elapsed, legacy_max_ms, timing), ()) = tokio::try_join!(submit, output)?;
         let confirmed = display["displayed"]
             .as_u64()
             .ok_or("missing display statistics")?;
@@ -133,10 +151,13 @@ async fn measure(
         // count of decoded/submitted packets. Relay jitter may coalesce presents.
         let effective = confirmed.saturating_sub(warmup) as f64 / elapsed.as_secs_f64();
         if confirmed > warmup + measured || effective <= 12.0 || effective < f64::from(fps) * 0.9 {
-            return Err(format!("display acceptance failed: {effective:.2} FPS, {display}").into());
+            return Err(format!(
+                "display acceptance failed: {effective:.2} FPS, {display}, timing={timing}"
+            )
+            .into());
         }
         generations.push(serde_json::json!({"generation":config.generation,"screen":config.screen,
-            "effective_display_fps":effective,"display":display,
+            "effective_display_fps":effective,"display":display,"timing":timing,
             "unconfirmed_presentations":warmup+measured-confirmed,"parallel_environment_max_ms":legacy_max_ms}));
     }
     let path = format!("{:?}", session.connection_path());

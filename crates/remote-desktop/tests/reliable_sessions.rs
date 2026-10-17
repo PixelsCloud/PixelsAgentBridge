@@ -12,8 +12,9 @@ use std::{
     time::Duration,
 };
 const WAIT: Duration = Duration::from_secs(5);
-mod cursor_wire;
 mod cursor_sessions;
+mod cursor_wire;
+mod flow_recovery;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
@@ -64,6 +65,7 @@ struct Backend {
     input_held: Arc<AtomicUsize>,
     wake: Option<Arc<tokio::sync::Notify>>,
     fail_after: Option<u64>,
+    encode_delay: Option<Duration>,
 }
 struct InputSink {
     active: Arc<AtomicUsize>,
@@ -100,6 +102,7 @@ struct Source {
     marker: u8,
     wake: Option<Arc<tokio::sync::Notify>>,
     fail_after: Option<u64>,
+    encode_delay: Option<Duration>,
 }
 impl Drop for Source {
     fn drop(&mut self) {
@@ -117,6 +120,9 @@ impl DesktopSource for Source {
             }
             if self.fail_after.is_some_and(|count| self.number >= count) {
                 return Err(DesktopError::Closed);
+            }
+            if let Some(delay) = self.encode_delay {
+                tokio::time::sleep(delay).await;
             }
             self.number += 1;
             self.produced.fetch_add(1, Ordering::SeqCst);
@@ -155,6 +161,7 @@ impl DesktopBackend for Backend {
                 number: 0,
                 wake: self.wake.clone(),
                 fail_after: self.fail_after,
+                encode_delay: self.encode_delay,
                 marker: if config.screen.id == "left" {
                     0x55
                 } else {

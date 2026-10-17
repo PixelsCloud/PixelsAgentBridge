@@ -107,6 +107,8 @@ pub struct DesktopVideoConfig {
     pub screen: DesktopScreen,
     pub codec: DesktopCodec,
     pub color: DesktopColor,
+    /// Requested maximum cadence. Capture may slow under consumption pressure;
+    /// this is not a guarantee of distinct frames on a static or slow desktop.
     pub fps: u16,
 }
 impl DesktopVideoConfig {

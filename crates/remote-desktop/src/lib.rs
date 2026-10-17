@@ -5,6 +5,7 @@ mod wire;
 pub use wire::{DesktopVideoReader, DesktopVideoWriter, VideoFrame};
 mod cursor_wire;
 pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};
+mod flow;
 mod host;
 pub use host::{
     DesktopBackend, DesktopConnectionGuard, DesktopCursorSource, DesktopHost, DesktopInputSink,

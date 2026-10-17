@@ -107,8 +107,9 @@ struct Generation {
     cursor_claimed: AtomicBool,
     cursor_stopped: watch::Sender<bool>,
     frame_ready: AtomicBool,
-    progress: Mutex<(u64, u64)>, // sent, cumulatively presented
+    progress: Mutex<crate::flow::VideoFlow>,
     credit: Notify,
+    backlog_changed: Notify,
 }
 fn signal() -> watch::Sender<bool> {
     watch::channel(false).0
@@ -126,6 +127,7 @@ async fn cancelled(sender: &watch::Sender<bool>) {
 }
 impl Generation {
     fn new(config: DesktopVideoConfig) -> Arc<Self> {
+        let flow = crate::flow::VideoFlow::new(config.fps);
         Arc::new(Self {
             config,
             cancelled: signal(),
@@ -134,8 +136,9 @@ impl Generation {
             cursor_claimed: AtomicBool::new(false),
             cursor_stopped: signal(),
             frame_ready: AtomicBool::new(false),
-            progress: Mutex::new((0, 0)),
+            progress: Mutex::new(flow),
             credit: Notify::new(),
+            backlog_changed: Notify::new(),
         })
     }
     fn stop(&self) {
@@ -151,31 +154,51 @@ impl Generation {
         tokio::join!(cancelled(&self.stopped), cancelled(&self.cursor_stopped));
     }
     fn acknowledge(&self, id: u64) -> Result<()> {
-        let mut progress = self.progress.lock().unwrap();
-        if id < progress.1 || id > progress.0 || id == 0 {
-            return Err(DesktopError::reject(
-                DesktopErrorCode::InvalidRequest,
-                "invalid presentation acknowledgment",
-            ));
-        }
-        progress.1 = id;
+        self.progress
+            .lock()
+            .unwrap()
+            .acknowledge(id, Instant::now())?;
         self.credit.notify_one();
+        self.backlog_changed.notify_one();
         Ok(())
     }
-    async fn next_id(&self) -> Result<u64> {
+    async fn wait_to_capture(&self) {
         loop {
             let available = self.credit.notified();
-            {
-                let mut progress = self.progress.lock().unwrap();
-                if progress.0 - progress.1 < DESKTOP_MAX_IN_FLIGHT {
-                    progress.0 = progress
-                        .0
-                        .checked_add(1)
-                        .ok_or(DesktopError::Protocol("frame ID overflow"))?;
-                    return Ok(progress.0);
+            let now = Instant::now();
+            let at = self.progress.lock().unwrap().capture_at(now);
+            match at {
+                Some(at) if at <= now => {
+                    // Include capture/encoding work in the cadence; adding the
+                    // full interval after encoding would throttle twice.
+                    self.progress.lock().unwrap().begin_capture(now);
+                    return;
                 }
+                Some(at) => tokio::select! {
+                    _ = available => {},
+                    _ = tokio::time::sleep_until(at) => {},
+                },
+                None => available.await,
             }
-            available.await;
+        }
+    }
+    fn begin_send(&self) -> Result<u64> {
+        let id = self.progress.lock().unwrap().begin_send(Instant::now())?;
+        self.backlog_changed.notify_one();
+        Ok(id)
+    }
+    async fn backlog_expired(&self) {
+        loop {
+            let changed = self.backlog_changed.notified();
+            let deadline = self.progress.lock().unwrap().backlog_deadline();
+            match deadline {
+                Some(deadline) if deadline <= Instant::now() => return,
+                Some(deadline) => tokio::select! {
+                    _ = changed => {},
+                    _ = tokio::time::sleep_until(deadline) => {},
+                },
+                None => changed.await,
+            }
         }
     }
 }
@@ -740,11 +763,12 @@ impl DesktopHost {
         tokio::pin!(peer_end);
         loop {
             let send = async {
-                let frame_id = video.next_id().await?;
+                video.wait_to_capture().await;
                 let media = source.next_frame().await?;
                 if media.bytes.is_empty() || media.bytes.len() > DESKTOP_MAX_FRAME_BYTES {
                     return Err(DesktopError::Protocol("media frame too large or empty"));
                 }
+                let frame_id = video.begin_send()?;
                 let frame = VideoFrame {
                     header: DesktopFrameHeader {
                         version: REMOTE_DESKTOP_SCHEMA_VERSION,
@@ -761,7 +785,15 @@ impl DesktopHost {
                 video.frame_ready.store(true, Ordering::Release);
                 Ok::<_, DesktopError>(())
             };
-            tokio::select! { biased; _ = &mut peer_end => return Ok(()), result = send => result? }
+            tokio::select! {
+                biased;
+                _ = &mut peer_end => return Ok(()),
+                _ = video.backlog_expired() => return Err(DesktopError::reject(
+                    DesktopErrorCode::MediaUnavailable,
+                    "desktop presentation backlog expired; restart the video generation",
+                )),
+                result = send => result?,
+            }
         }
     }
 }

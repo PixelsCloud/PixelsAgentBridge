@@ -134,7 +134,12 @@ class Capture {
         uint8_t storage[1024];
         spa_pod_builder builder = SPA_POD_BUILDER_INIT(storage, sizeof(storage));
         const spa_rectangle size{c.display_.size.width, c.display_.size.height};
-        const spa_fraction variable{0, 1}, maximum{c.fps_, 1};
+        // Mutter 42 checks a minimum interval at compositor repaint time. An
+        // exact divisor of the display refresh can miss that check by a few
+        // microseconds and fall to the next repaint (15 -> ~12 on 60 Hz).
+        // Allow one extra raw update per second; capture() still limits encode
+        // cadence to fps_, and process() retains only the latest raw buffer.
+        const spa_fraction variable{0, 1}, maximum{c.fps_ + 1, 1};
         const auto* format = static_cast<const spa_pod*>(spa_pod_builder_add_object(&builder,
             SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
             SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video),
