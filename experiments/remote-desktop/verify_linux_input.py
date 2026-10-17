@@ -4,6 +4,7 @@ Checks absolute positioning, drag, wheel, chords and release after EOF, malforme
 input and worker death. No keystroke contents or screen pixels are persisted.
 """
 import json
+import argparse
 import os
 import pathlib
 import select
@@ -18,9 +19,14 @@ from gi.repository import Gtk, Gdk, GLib, Gio
 
 
 def main():
-    worker = pathlib.Path(sys.argv[1]).resolve(strict=True)
-    assert worker.parent.parent == pathlib.Path('/tmp') and worker.parent.name.startswith('pab-linux-media-')
-    command = [str(worker)] + (["--media-worker"] if sys.argv[2:] == ["--embedded"] else [])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('worker', type=pathlib.Path)
+    parser.add_argument('--embedded', action='store_true')
+    parser.add_argument('--uinput', action='store_true')
+    args = parser.parse_args()
+    worker = args.worker.resolve(strict=True)
+    assert worker.parent.parent == pathlib.Path('/tmp') and worker.parent.name.startswith(('pab-linux-media-', 'pab-uinput-'))
+    command = [str(worker)] + (["--media-worker"] if args.embedded else [])
     screens = json.loads(subprocess.check_output(command + ["inventory"], timeout=8))
     assert len(screens) == 1, "Fixture currently requires the single-monitor Linux VM"
     screen = screens[0]
@@ -54,7 +60,7 @@ def main():
         cr.move_to(40, 80); cr.show_text('Pixels remote input verification')
         return True
     area.connect('draw', draw)
-    window.add(area); window.fullscreen(); window.show_all(); window.present(); area.grab_focus()
+    window.add(area); window.show_all(); window.fullscreen(); window.present(); area.grab_focus()
     def pump(seconds=.1):
         end = time.monotonic() + seconds
         while time.monotonic() < end:
@@ -71,7 +77,7 @@ def main():
                 result.extend(part)
         return bytes(result)
     def spawn(offset=0):
-        child = subprocess.Popen(command + ['input', screen['id']], stdin=subprocess.PIPE,
+        child = subprocess.Popen(command + ['input-uinput' if args.uinput else 'input', screen['id']], stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         children.append(child)
         child.stdin.write(struct.pack('<iiII', screen['x']+offset, screen['y'], screen['desktop_width'], screen['desktop_height']))
@@ -96,8 +102,17 @@ def main():
             if e[0] == Gdk.EventType.KEY_PRESS:
                 assert not e[2] & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.BUTTON1_MASK)
     try:
-        pump(.8)
-        assert area.get_allocated_width() == screen['desktop_width'] and area.get_allocated_height() == screen['desktop_height']
+        # Mapping/fullscreen is asynchronous on Wayland. Check the actual
+        # allocation before interpreting absolute input coordinates.
+        expected = (screen['desktop_width'], screen['desktop_height'])
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            pump(.05)
+            if (area.get_allocated_width(), area.get_allocated_height()) == expected:
+                break
+        allocated = (area.get_allocated_width(), area.get_allocated_height())
+        assert allocated == expected, {'fixture_allocation': allocated, 'screen_geometry': expected,
+                                       'scale': area.get_scale_factor()}
         child = spawn()
         send(child, 2, .25, .35, down=True); send(child, 2, .25, .35)
         presses = [e for e in events if e[0] == Gdk.EventType.BUTTON_PRESS]
@@ -128,6 +143,13 @@ def main():
         send(child, 4, value=0x10, down=True); send(child, 2, .5, .5, down=True)
         child.kill(); wait(child, False)
         child = spawn(); normal_a(child); checks.append('worker_death_releases_state')
+        if args.uinput:
+            send(child, 4, value=0x10, down=True); send(child, 2, .5, .5, down=True)
+            data = pathlib.Path(os.environ['PAB_DATA_DIR'])
+            (data/'root-crash-request').write_text('terminate isolated root input child')
+            wait(child, False)
+            assert (data/'root-crash-done').exists(), 'Root crash was not performed by the isolated supervisor'
+            child = spawn(); normal_a(child); checks.append('root_worker_sigkill_releases_state')
         send(child, 4, value=0x11, down=True); child.stdin.write(bytes([99])+bytes(7)); wait(child, False)
         assert child.returncode != 0
         child = spawn(); normal_a(child); child.stdin.close(); wait(child)
@@ -166,6 +188,7 @@ def main():
         print(json.dumps({'passed':True,'checks':checks,'worker_processes_reaped':len(children),
                           'screen':screen['id'],'dimensions':[screen['pixel_width'],screen['pixel_height']],
                           'layout_restored':True,
+                          'input_backend':'supervised_uinput' if args.uinput else 'gnome',
                           'input_contents_saved':False,'installed_application_modified':False}), flush=True)
     finally:
         for child in children:

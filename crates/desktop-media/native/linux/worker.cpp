@@ -12,6 +12,17 @@
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     signal(SIGPIPE, SIG_IGN);
+    if (argc == 5 && std::string(argv[1]) == "input-session") {
+        try {
+            pab_linux::virtual_input::serve(pab_linux::number(argv[2], INT32_MAX),
+                pab_linux::number(argv[3], 1048576), pab_linux::number(argv[4], 1048576));
+            return 0;
+        } catch (const std::exception& error) {
+            if (pab_linux::virtual_input::stopping) return 0;
+            fprintf(stderr, "media: %s\n", error.what()); return 1;
+        }
+        catch (...) { return 1; }
+    }
     if (argc == 5 && std::string(argv[1]) == "export-session") {
         try {
             pab_linux::dma::export_session(pab_linux::number(argv[2], INT32_MAX),
@@ -39,7 +50,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             const auto found = pab_linux::displays(bus.get());
             const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
             if (selected == found.end()) throw std::runtime_error("Selected DMA display is unavailable");
-            auto channel = std::string(argv[5]) == "broker" ? pab_linux::dma::connect_broker(selected->connector) : pab_linux::dma::Fd();
+            const bool wake = std::string(argv[5]) == "broker" && pab_linux::dma::asleep(bus.get());
+            auto channel = std::string(argv[5]) == "broker" ? pab_linux::dma::connect_broker(selected->connector, wake) : pab_linux::dma::Fd();
+            if (wake) pab_linux::dma::await_awake(bus.get());
             const auto fd = channel.get() >= 0 ? channel.get() : pab_linux::number(argv[5], 1048576);
             pab_linux::dma::capture(bus.get(), *selected, pab_linux::number(argv[3], 60), fd);
             pw_deinit(); return 0;
@@ -59,7 +72,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         }
         if (argc != 2 && argc != 3 && argc != 5) throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop | input SCREEN_ID");
         if (argc == 2 && std::string(argv[1]) != "inventory") throw std::runtime_error("Unsupported Linux media operation");
-        if (argc == 3 && std::string(argv[1]) != "input") throw std::runtime_error("Unsupported Linux media operation");
+        if (argc == 3 && std::string(argv[1]) != "input" && std::string(argv[1]) != "input-uinput") throw std::runtime_error("Unsupported Linux media operation");
         if (argc == 5 && (std::string(argv[1]) != "capture" || std::string(argv[4]) != "desktop"))
             throw std::runtime_error("Unsupported Linux media operation");
         if (pab_linux::x11::selected()) {
@@ -71,9 +84,16 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         else {
             const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
             if (selected == found.end()) throw std::runtime_error("Selected display is unavailable");
-            if (argc == 3) pab_linux::input(bus.get(), *selected);
+            if (argc == 3) pab_linux::input(bus.get(), *selected, std::string(argv[1]) == "input-uinput");
             else {
                 const auto fps = pab_linux::number(argv[3], 60);
+                const bool sleeping = pab_linux::dma::asleep(bus.get());
+                if (sleeping || pab_linux::dma::screen_locked(bus.get())) {
+                    auto channel = pab_linux::dma::connect_broker(selected->connector, sleeping);
+                    if (sleeping) pab_linux::dma::await_awake(bus.get());
+                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
+                    pw_deinit(); return 0;
+                }
                 auto source = std::make_unique<pab_linux::Capture>(bus.get(), *selected, fps);
                 try { source->start(); }
                 catch (const std::exception& error) {
@@ -81,7 +101,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                     // the denied PipeWire session before choosing the fallback.
                     fprintf(stderr, "media: PipeWire start failed: %s; trying supervised DMA\n", error.what());
                     source.reset();
-                    auto channel = pab_linux::dma::connect_broker(selected->connector);
+                    const bool wake = pab_linux::dma::asleep(bus.get());
+                    auto channel = pab_linux::dma::connect_broker(selected->connector, wake);
+                    if (wake) pab_linux::dma::await_awake(bus.get());
                     pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
                 }
                 if (source) pab_linux::capture(*source, *selected, fps);

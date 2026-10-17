@@ -230,6 +230,15 @@ W5 已进一步接入 supervisor 的本地 DMA broker 和 PipeWire 启动失败�
 唤醒、锁屏输入、GDM 登录、DRM 多屏变换和稳定性仍需验收；W5 不关闭。详见
 [Linux DMA 会话通道与 helper 路由](acceptance/remote-desktop-linux-dma-broker-2026-10-17.md)。
 
+W5 后续已接入 root uinput 与正常入口的锁屏 DMA/唤醒路径。最终同一 Linux
+产物通过 11 项真实输入与释放检查，包括 root 输入进程 SIGKILL 后重开；GNOME
+Wayland 已完成一次熄屏→自动唤醒→密码框→单次密码提交解锁→PipeWire 桌面采集
+恢复。锁屏画面与独立 VMware 控制台截图吻合，解锁后旧输入退出、旧采集返回
+零字节，恢复定时器未介入。原服务、账号、配置保持，临时进程/虚拟输入设备
+已清理。实测范围为生产 broker/用户启动器/原生组件；完整 supervisor 与正式
+远程窗口中的连续登录、GDM/会话切换、真实多屏及稳定性仍待验收，不关闭 W5。
+详见 [Linux 虚拟输入与锁屏登录](acceptance/remote-desktop-linux-uinput-login-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

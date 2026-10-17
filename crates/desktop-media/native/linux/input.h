@@ -2,6 +2,7 @@
 #include "gnome.h"
 #include <array>
 #include "keycodes.h"
+#include "uinput_client.h"
 
 namespace pab_linux {
 inline double stream_coordinate(uint16_t normalized, unsigned pixels) {
@@ -135,13 +136,20 @@ public:
         throw std::runtime_error("Invalid native input packet");
     }
 };
-inline void input(GDBusConnection* bus, const Display& display) {
+inline void input(GDBusConnection* bus, const Display& display, bool force_supervised = false) {
     const auto x = read_value<int32_t>(), y = read_value<int32_t>();
     const auto width = read_value<uint32_t>(), height = read_value<uint32_t>();
     if (x != display.x || y != display.y || width != display.size.logical_width || height != display.size.logical_height)
         throw std::runtime_error("Selected input geometry changed");
-    Input session(bus, display); session.start(); write_value(magic);
+    if (force_supervised || dma::screen_locked(bus)) { supervised_input(bus, display); return; }
+    auto session = std::make_unique<Input>(bus, display);
+    try { session->start(); }
+    catch (const std::exception& error) {
+        fprintf(stderr, "media: GNOME input start failed: %s; trying supervised input\n", error.what());
+        session.reset(); supervised_input(bus, display); return;
+    }
+    write_value(magic);
     std::array<uint8_t, 8> packet;
-    while (session.packet(packet)) { session.apply(packet); write_value(uint8_t(1)); }
+    while (session->packet(packet)) { session->apply(packet); write_value(uint8_t(1)); }
 }
 }

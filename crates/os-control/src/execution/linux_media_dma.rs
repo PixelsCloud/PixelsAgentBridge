@@ -1,6 +1,6 @@
 //! Per-helper local capability endpoint. No remote authentication or transport
 //! changes: only a native capture child in the supervised helper's process group
-//! can ask the root exporter for scanout image descriptors.
+//! can ask the root worker for scanout descriptors or isolated virtual input.
 use super::{LinuxGraphicalSession, LinuxMediaEnvironment};
 use std::{
     ffi::OsString,
@@ -15,6 +15,7 @@ use std::{
     },
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    time::{Duration, Instant},
 };
 
 pub struct LinuxMediaDmaBroker {
@@ -24,6 +25,7 @@ pub struct LinuxMediaDmaBroker {
     executable: PathBuf,
     prefix: Vec<OsString>,
     helper_group: u32,
+    operation: &'static str,
     child: Option<Child>,
 }
 
@@ -42,6 +44,41 @@ impl LinuxMediaDmaBroker {
         executable: &Path,
         prefix: Vec<OsString>,
         helper_group: u32,
+    ) -> io::Result<Self> {
+        Self::create(
+            path,
+            target,
+            executable,
+            prefix,
+            helper_group,
+            "export-session",
+        )
+    }
+
+    pub fn new_input(
+        path: &Path,
+        target: LinuxMediaEnvironment,
+        executable: &Path,
+        prefix: Vec<OsString>,
+        helper_group: u32,
+    ) -> io::Result<Self> {
+        Self::create(
+            path,
+            target,
+            executable,
+            prefix,
+            helper_group,
+            "input-session",
+        )
+    }
+
+    fn create(
+        path: &Path,
+        target: LinuxMediaEnvironment,
+        executable: &Path,
+        prefix: Vec<OsString>,
+        helper_group: u32,
+        operation: &'static str,
     ) -> io::Result<Self> {
         if unsafe { libc::geteuid() } != 0
             || !path.is_absolute()
@@ -99,6 +136,7 @@ impl LinuxMediaDmaBroker {
             executable: executable.into(),
             prefix,
             helper_group,
+            operation,
             child: None,
         };
         fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
@@ -183,7 +221,7 @@ impl LinuxMediaDmaBroker {
         command
             .args(&self.prefix)
             .args([
-                "export-session",
+                self.operation,
                 &pid.to_string(),
                 &process_fd.to_string(),
                 &socket_fd.to_string(),
@@ -220,16 +258,31 @@ impl LinuxMediaDmaBroker {
 
     pub fn stop(&mut self) -> io::Result<()> {
         if let Some(mut child) = self.child.take() {
-            if child.try_wait()?.is_none() {
-                if let Err(error) = child.kill() {
-                    self.child = Some(child);
-                    return Err(error);
+            let result = (|| {
+                if child.try_wait()?.is_none() {
+                    // Input workers release their own keys before destroying
+                    // devices. A hung worker still has a bounded kill path.
+                    if unsafe { libc::kill(child.id() as _, libc::SIGTERM) } != 0 {
+                        let error = io::Error::last_os_error();
+                        if error.raw_os_error() != Some(libc::ESRCH) {
+                            return Err(error);
+                        }
+                    }
+                    let deadline = Instant::now() + Duration::from_secs(1);
+                    while child.try_wait()?.is_none() {
+                        if Instant::now() >= deadline {
+                            child.kill()?;
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
                 }
-            }
-            if let Err(error) = child.wait() {
+                child.wait().map(|_| ())
+            })();
+            if result.is_err() {
                 self.child = Some(child);
-                return Err(error);
             }
+            result?;
         }
         Ok(())
     }

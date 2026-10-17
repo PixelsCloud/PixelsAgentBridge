@@ -27,6 +27,7 @@ struct Worker {
     target: LinuxMediaEnvironment,
     process: UserProcess,
     dma: Option<LinuxMediaDmaBroker>,
+    input: Option<LinuxMediaDmaBroker>,
     _profile: tempfile::TempDir,
 }
 
@@ -105,6 +106,19 @@ fn start(executable: &Path, target: LinuxMediaEnvironment) -> io::Result<Worker>
             None
         }
     };
+    let input = match LinuxMediaDmaBroker::new_input(
+        &profile.path().join("input.sock"),
+        target.clone(),
+        executable,
+        vec!["--media-worker".into()],
+        process.id(),
+    ) {
+        Ok(broker) => Some(broker),
+        Err(error) => {
+            tracing::warn!(%error, "Linux virtual input fallback unavailable");
+            None
+        }
+    };
     tracing::info!(
         session = target.session().id(),
         uid = owner.uid,
@@ -115,10 +129,14 @@ fn start(executable: &Path, target: LinuxMediaEnvironment) -> io::Result<Worker>
         target,
         process,
         dma,
+        input,
         _profile: profile,
     })
 }
 async fn stop(worker: &mut Worker) -> io::Result<()> {
+    if let Some(mut broker) = worker.input.take() {
+        broker.stop()?;
+    }
     if let Some(mut broker) = worker.dma.take() {
         broker.stop()?;
     }
@@ -269,6 +287,11 @@ pub fn run() -> Result<(), String> {
             if let Some(broker) = worker.as_mut().and_then(|w| w.dma.as_mut()) {
                 if let Err(error) = broker.poll() {
                     tracing::debug!(%error, "Linux DMA request retired");
+                }
+            }
+            if let Some(broker) = worker.as_mut().and_then(|w| w.input.as_mut()) {
+                if let Err(error) = broker.poll() {
+                    tracing::debug!(%error, "Linux virtual input request retired");
                 }
             }
             let error = result.err().map(|e| e.to_string());

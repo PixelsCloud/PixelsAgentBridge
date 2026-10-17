@@ -3,14 +3,39 @@
 #include "dma_image.h"
 
 namespace pab_linux::dma {
+inline bool screen_locked(GDBusConnection* bus) {
+    auto value = call(bus, "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver",
+        "org.gnome.ScreenSaver", "GetActive", nullptr, G_VARIANT_TYPE("(b)"));
+    return g_variant_get_boolean(child(value.get(), 0).get());
+}
+inline bool asleep(GDBusConnection* bus) {
+    auto result = call(bus, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
+        "org.freedesktop.DBus.Properties", "Get",
+        g_variant_new("(ss)", "org.gnome.Mutter.DisplayConfig", "PowerSaveMode"), G_VARIANT_TYPE("(v)"));
+    auto boxed = child(result.get(), 0); Variant power(g_variant_get_variant(boxed.get()));
+    if (!g_variant_is_of_type(power.get(), G_VARIANT_TYPE_INT32)) throw std::runtime_error("Display power state unavailable");
+    // Mutter uses -1 for unsupported/unknown. Do not turn that into a wake
+    // request or divert an otherwise usable ordinary PipeWire session.
+    const auto mode = g_variant_get_int32(power.get());
+    return mode >= 1 && mode <= 3;
+}
+inline void await_awake(GDBusConnection* bus) {
+    const auto deadline = Clock::now() + std::chrono::seconds(3);
+    while (asleep(bus)) {
+        parent_alive(); pump();
+        if (Clock::now() >= deadline) throw std::runtime_error("Display did not wake");
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    // Power-on is asynchronous with the compositor's first visible repaint.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    parent_alive();
+}
 class GnomeGuard {
     GDBusConnection* bus_;
     Display display_;
     bool locked_;
     bool locked() {
-        auto value = call(bus_, "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver",
-            "org.gnome.ScreenSaver", "GetActive", nullptr, G_VARIANT_TYPE("(b)"));
-        return g_variant_get_boolean(child(value.get(), 0).get());
+        return screen_locked(bus_);
     }
 public:
     GnomeGuard(GDBusConnection* bus, Display display) : bus_(bus), display_(std::move(display)), locked_(locked()) { check(); }
