@@ -80,6 +80,8 @@ fn main() {
             "libpipewire-0.3",
             "gtk+-3.0",
             "epoxy",
+            "gbm",
+            "libdrm",
             "x11",
             "xext",
             "xrandr",

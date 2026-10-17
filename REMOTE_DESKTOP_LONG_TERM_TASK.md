@@ -209,6 +209,15 @@ Wayland 登录采集仍待完成。详见
 处理特权导出与非特权转换、熄屏旧帧和会话代次。详见
 [VMware EGL 桌面与锁屏实验](acceptance/remote-desktop-linux-vmware-egl-2026-10-17.md)。
 
+W5 后续已加入原生 DRM 导出、SCM_RIGHTS 帧通道、普通用户 EGL 读取及软件编码
+组件，暂由内部入口测试，尚未接到 supervisor/默认后备选择。最终产物在 VM
+1280×800 动画下连续 90 帧解码、89 次变化，预热后约 15.006 FPS；同一产物的
+原 PipeWire 路径回归约 13.754 FPS。28 项 ASan/UBSan 描述符边界检查通过；
+取消采集后 root 导出进程退出，确认锁屏后再取帧输出 0 字节并终止旧代次。
+原服务/配置保持，临时资源清空。这不是网络呈现、1080p 或完整登录验收；仍需
+完成活动会话 supervisor 路由、重开/唤醒、登录输入和 DRM 多屏变换。详见
+[Linux DMA 原生组件](acceptance/remote-desktop-linux-dma-native-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

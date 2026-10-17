@@ -4,6 +4,7 @@ Uses an explicitly opened GTK animation window. Worker/decoder are isolated test
 artifacts; no installed application, configuration or account is replaced.
 """
 import ctypes
+import argparse
 import json
 import os
 import pathlib
@@ -23,11 +24,16 @@ class Bytes(ctypes.Structure):
 
 
 def main():
-    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != "--embedded"):
-        raise SystemExit("usage: verify_linux_worker.py WORKER CODEC_LIBRARY [--embedded]")
-    worker = pathlib.Path(sys.argv[1]).resolve(strict=True)
-    command = [str(worker)] + (["--media-worker"] if len(sys.argv) == 4 else [])
-    library = ctypes.CDLL(str(pathlib.Path(sys.argv[2]).resolve(strict=True)))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("worker", type=pathlib.Path)
+    parser.add_argument("codec_library", type=pathlib.Path)
+    parser.add_argument("--embedded", action="store_true")
+    parser.add_argument("--dma-fd", type=int)
+    args = parser.parse_args()
+    assert args.dma_fd is None or (args.dma_fd >= 3 and os.geteuid() != 0)
+    worker = args.worker.resolve(strict=True)
+    command = [str(worker)] + (["--media-worker"] if args.embedded else [])
+    library = ctypes.CDLL(str(args.codec_library.resolve(strict=True)))
     library.pab_soft_decoder_new.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
     library.pab_soft_decoder_new.restype = ctypes.c_void_p
     library.pab_soft_decoder_drop.argtypes = [ctypes.c_void_p]
@@ -63,7 +69,13 @@ def main():
             if not context.pending():
                 break
             context.iteration(False)
-    source = subprocess.Popen(command + ["capture", screen["id"], "15", "desktop"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+    capture = ["capture-dma" if args.dma_fd is not None else "capture", screen["id"], "15", "desktop"]
+    if args.dma_fd is not None:
+        capture.append(str(args.dma_fd))
+    source = subprocess.Popen(command + capture, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, bufsize=0, pass_fds=() if args.dma_fd is None else (args.dma_fd,))
+    if args.dma_fd is not None:
+        os.close(args.dma_fd)  # Only the capture child retains the channel.
     total_bytes = 0
     samples = []
     times = []
@@ -107,7 +119,8 @@ def main():
             "changed_samples":changed, "decoded_fps_after_warmup":74/elapsed,
             "changed_fps_after_warmup":sum(a != b for a,b in zip(samples[15:],samples[16:]))/elapsed,
             "encoded_bytes":total_bytes, "fixture_ticks":tick[0], "stderr":stderr,
-            "pixel_bytes_saved":0, "worker_exit":source.returncode}))
+            "pixel_bytes_saved":0, "worker_exit":source.returncode, "consumer_uid":os.geteuid(),
+            "source":"dma" if args.dma_fd is not None else "pipewire"}))
         assert changed >= 85, "Animation did not produce distinct desktop frames"
     finally:
         if source.poll() is None:

@@ -141,3 +141,20 @@ constitute an end-to-end remote window or system-login acceptance.
 Real GTK input and crash/layout release checks are recorded in
 `acceptance/remote-desktop-linux-input-2026-10-17.md`. This GNOME adapter does not
 yet provide X11/general Wayland or login-manager input acceptance.
+
+Linux also contains a split DRM DMA-BUF path (`drm_export.h`, `dma_frame.h`,
+`dma_image.h`, `dma_capture.h`). A root exporter passes read-only image fds plus
+the matching render-node fd over an inherited packet socket; a graphical-user
+worker reuses its EGL context and emits the existing compressed-pipe format.
+These internal `export-dma` / `capture-dma` operations are not yet selected by
+the normal backend or connected to the supervisor. The session supervisor must
+establish identity/lifetime before enabling them; a compositor control fd must
+never reach the unprivileged capture worker. No new application config is used.
+
+The DMA path checks power, lock state and layout before publishing a frame. It
+rejects unsupported primary-plane crops/scaling/rotation until those transforms
+are implemented. Native descriptor tests (`tests/native_linux_dma.cpp`) exercise
+real SCM_RIGHTS and fd cleanup under ASan/UBSan. The VM passed user-process
+encoding/decoding at about 15 FPS at 1280×800 and old-generation rejection after
+locking, but login, 1080p network presentation and supervisor integration remain
+open. See `acceptance/remote-desktop-linux-dma-native-2026-10-17.md`.

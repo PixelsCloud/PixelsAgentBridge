@@ -1,0 +1,76 @@
+#pragma once
+#include "capture.h"
+#include "dma_image.h"
+
+namespace pab_linux::dma {
+class GnomeGuard {
+    GDBusConnection* bus_;
+    Display display_;
+    bool locked_;
+    bool locked() {
+        auto value = call(bus_, "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver",
+            "org.gnome.ScreenSaver", "GetActive", nullptr, G_VARIANT_TYPE("(b)"));
+        return g_variant_get_boolean(child(value.get(), 0).get());
+    }
+public:
+    GnomeGuard(GDBusConnection* bus, Display display) : bus_(bus), display_(std::move(display)), locked_(locked()) { check(); }
+    void check() {
+        auto result = call(bus_, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
+            "org.freedesktop.DBus.Properties", "Get",
+            g_variant_new("(ss)", "org.gnome.Mutter.DisplayConfig", "PowerSaveMode"), G_VARIANT_TYPE("(v)"));
+        auto boxed = child(result.get(), 0); Variant power(g_variant_get_variant(boxed.get()));
+        if (!g_variant_is_of_type(power.get(), G_VARIANT_TYPE_INT32) || g_variant_get_int32(power.get()) != 0)
+            throw std::runtime_error("Display is asleep; refusing stale scanout");
+        if (locked() != locked_) throw std::runtime_error("Lock state changed; restart capture generation");
+        const auto found = displays(bus_);
+        const auto current = std::find_if(found.begin(), found.end(), [&](const Display& d) { return d.id() == display_.id(); });
+        if (current == found.end() || current->layout_serial != display_.layout_serial ||
+            current->size.width != display_.size.width || current->size.height != display_.size.height)
+            throw std::runtime_error("DMA display layout changed");
+    }
+};
+inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, int socket) {
+    if (geteuid() == 0) throw std::runtime_error("DMA conversion must run as the graphical user");
+    channel(socket);
+    if ((display.size.width & 1) || (display.size.height & 1))
+        throw std::runtime_error("Software DMA capture requires even dimensions");
+    GnomeGuard guard(bus, display); ImageReader reader;
+    Encoder encoder(pab_soft_encoder_new(display.size.width, display.size.height, fps));
+    if (!encoder) throw std::runtime_error("Cannot initialize DMA software encoder");
+    write_value(magic); write_value(display.size.width); write_value(display.size.height);
+    const auto start = Clock::now(); auto next = start; uint64_t sequence = 0;
+    for (;;) {
+        const auto command = read_value<uint8_t>();
+        if (!command) return;
+        if (command != 1) throw std::runtime_error("Invalid DMA capture command");
+        while (Clock::now() < next) { parent_alive(); pump(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+        guard.check(); send_request(socket, sequence);
+        // Parent closure/cancellation retires this worker, including an export
+        // in flight. Keep the receive bounded independently of network traffic.
+        const auto deadline = Clock::now() + std::chrono::seconds(3);
+        for (;;) {
+            parent_alive(); pollfd wait{socket, POLLIN, 0};
+            const auto status = poll(&wait, 1, 10);
+            if (status > 0) break;
+            if ((status < 0 && errno != EINTR) || Clock::now() >= deadline)
+                throw std::runtime_error("DMA export response timed out");
+        }
+        auto frame = receive(socket, sequence);
+        if (frame.info.width != display.size.width || frame.info.height != display.size.height)
+            throw std::runtime_error("DMA frame dimensions changed");
+        const auto& pixels = reader.read(frame); const auto sampled = Clock::now();
+        guard.check();
+        PabCodecBytes packet{};
+        if (!pab_soft_encode(encoder.get(), pixels.data(), pixels.size(), size_t(display.size.width) * 4, &packet) ||
+            !packet.size || packet.size > max_packet) throw std::runtime_error("DMA software encoding failed");
+        guard.check(); // Never publish an old desktop after a lock/power transition during encoding.
+        const bool key = keyframe(packet);
+        if (!sequence && !key) throw std::runtime_error("First DMA frame is not IDR");
+        if (!sequence) fprintf(stderr, "media source=drm_dma encoder=openh264_software direct_bgra=%s\n", reader.direct_bgra() ? "true" : "false");
+        write_value(uint32_t(packet.size)); write_value(sequence++);
+        write_value(uint64_t(std::chrono::duration_cast<std::chrono::microseconds>(sampled - start).count()));
+        write_value(uint32_t(key)); write_bytes(packet.data, packet.size);
+        next = std::max(next + std::chrono::microseconds(1000000 / fps), Clock::now());
+    }
+}
+}

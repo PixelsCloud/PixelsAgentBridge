@@ -5,13 +5,35 @@
 #include "render.h"
 #include "host.h"
 #include "x11_input.h"
+#include "drm_export.h"
+#include "dma_capture.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     signal(SIGPIPE, SIG_IGN);
+    // Internal inherited-descriptor entry points. Normal capture selection is
+    // unchanged until the session supervisor owns and authorizes the channel.
+    if (argc == 7 && std::string(argv[1]) == "export-dma") {
+        try {
+            const std::string mode = argv[2];
+            if (mode != "borrowed" && mode != "independent") throw std::runtime_error("Invalid DRM export mode");
+            pab_linux::dma::export_loop(pab_linux::number(argv[3], 1048576),
+                pab_linux::number(argv[4], 1048576), pab_linux::number(argv[5], 1048576), argv[6], mode == "borrowed");
+            return 0;
+        } catch (const std::exception& error) { fprintf(stderr, "media: %s\n", error.what()); return 1; }
+        catch (...) { return 1; }
+    }
     pw_init(nullptr, nullptr);
     int status = 1;
     try {
+        if (argc == 6 && std::string(argv[1]) == "capture-dma" && std::string(argv[4]) == "desktop") {
+            auto bus = pab_linux::session_bus();
+            const auto found = pab_linux::displays(bus.get());
+            const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
+            if (selected == found.end()) throw std::runtime_error("Selected DMA display is unavailable");
+            pab_linux::dma::capture(bus.get(), *selected, pab_linux::number(argv[3], 60), pab_linux::number(argv[5], 1048576));
+            pw_deinit(); return 0;
+        }
         if (argc == 8 && std::string(argv[1]) == "render") {
             if (std::string(argv[6]) != "0") throw std::runtime_error("Linux worker does not accept a foreign window handle");
             const std::string angle = argv[7];
