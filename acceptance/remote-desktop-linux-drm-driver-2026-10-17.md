@@ -80,3 +80,7 @@ root 诊断通过 pidfd 复制活动 UID 1000 GNOME Shell 的 card0 描述符。
 两份实验 PPM 已删除。再次核对：会话 23 active/unlocked、原 Executor active、
 安装二进制和 TOML 哈希不变、临时进程和恢复资源为零。**此路径仍未通过画面
 采集验收，也未接入产品；同步调用成功不代表像素有效。**
+
+后续另行核对对应 Ubuntu 补丁并验证合成器 surface 引用导出 → EGL 读回，已取得
+真实普通桌面与唤醒后的锁屏画面；没有改变上文 mmap/readback 失败结果。新实验
+及尚未完成的产品接入见 [VMware EGL 记录](remote-desktop-linux-vmware-egl-2026-10-17.md)。
