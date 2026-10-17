@@ -1,0 +1,901 @@
+{
+  "date": "2026-10-17",
+  "baseline": "e493928",
+  "target": "90, Windows Server 2022 10.0.20348, Administrator session 2",
+  "service_replaced": false,
+  "build_jobs": 1,
+  "remote_results": [
+    {
+      "task_id": "633b983c-9892-43e4-83db-0b17cc30fbfd",
+      "mode": "combined-tagged-self",
+      "messages": [
+        {
+          "message": 33,
+          "tick": 138362109,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138362109,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138362109,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138362046
+        },
+        {
+          "message": 513,
+          "tick": 138362109,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138362046
+        },
+        {
+          "message": 513,
+          "tick": 138362125,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138362453
+        },
+        {
+          "message": 514,
+          "tick": 138362515,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138366453,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ]
+    },
+    {
+      "mode": "combined-tagged-nouia-self",
+      "task_id": "1719bfe1-71b4-4132-a00e-09a4dec505c5",
+      "done": "succeeded",
+      "messages": [
+        {
+          "message": 33,
+          "tick": 138458718,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138458718,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138458718,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138458671
+        },
+        {
+          "message": 513,
+          "tick": 138458718,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138458671
+        },
+        {
+          "message": 513,
+          "tick": 138458734,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138459062
+        },
+        {
+          "message": 514,
+          "tick": 138459125,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138463062,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ],
+      "last_sample": {
+        "foreground": true,
+        "clicks": 2,
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "wheel": 0,
+        "last_click_x": 960,
+        "last_click_y": 551,
+        "ctrl_held": false,
+        "left_held": false
+      }
+    },
+    {
+      "mode": "combined-tagged-activate-self",
+      "task_id": "240dbf5f-36a1-4c9a-97a9-7940fe6a70cb",
+      "done": "succeeded",
+      "messages": [
+        {
+          "message": 6,
+          "tick": 138484281,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138484296,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138484234
+        },
+        {
+          "message": 513,
+          "tick": 138484296,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138484234
+        },
+        {
+          "message": 513,
+          "tick": 138484296,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138484625
+        },
+        {
+          "message": 514,
+          "tick": 138484703,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138488625,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ],
+      "last_sample": {
+        "foreground": true,
+        "clicks": 2,
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "wheel": 0,
+        "last_click_x": 960,
+        "last_click_y": 551,
+        "ctrl_held": false,
+        "left_held": false
+      }
+    },
+    {
+      "mode": "combined-tagged-self",
+      "task_id": "a111c4fe-2a5b-4b98-a6f7-5ffc52d7e552",
+      "done": "succeeded",
+      "messages": [
+        {
+          "message": 33,
+          "tick": 138492984,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138492984,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138492984,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138492937
+        },
+        {
+          "message": 513,
+          "tick": 138492984,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138492937
+        },
+        {
+          "message": 513,
+          "tick": 138493000,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138493328
+        },
+        {
+          "message": 514,
+          "tick": 138493406,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138497328,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ],
+      "last_sample": {
+        "foreground": true,
+        "clicks": 2,
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "wheel": 0,
+        "last_click_x": 960,
+        "last_click_y": 551,
+        "ctrl_held": false,
+        "left_held": false
+      }
+    },
+    {
+      "task_id": "9fdc0ce4-a32b-4d7d-816a-809e7518dba8",
+      "mode": "observer-combined-tagged-self",
+      "messages": [
+        {
+          "low_level": 513,
+          "flags": 1,
+          "time": 138560296
+        },
+        {
+          "message": 33,
+          "tick": 138560453,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138560453,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138560453,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138560296
+        },
+        {
+          "message": 513,
+          "tick": 138560453,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138560296
+        },
+        {
+          "message": 513,
+          "tick": 138560468,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "low_level": 514,
+          "flags": 1,
+          "time": 138560843
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138560843
+        },
+        {
+          "message": 514,
+          "tick": 138560968,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138564687,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ]
+    },
+    {
+      "mode": "combined-tagged-responsive-self",
+      "task_id": "9c9cc385-0a52-4bb6-a4ce-c97eb42bb796",
+      "done": "succeeded",
+      "messages": [
+        {
+          "low_level": 513,
+          "flags": 1,
+          "time": 138605531
+        },
+        {
+          "message": 33,
+          "tick": 138605531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138605531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138605531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138605531
+        },
+        {
+          "message": 513,
+          "tick": 138605531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138605531
+        },
+        {
+          "message": 513,
+          "tick": 138605546,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "low_level": 514,
+          "flags": 1,
+          "time": 138605937
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138605937
+        },
+        {
+          "message": 514,
+          "tick": 138605937,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138609968,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ],
+      "last_sample": {
+        "foreground": true,
+        "clicks": 2,
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "wheel": 0,
+        "last_click_x": 960,
+        "last_click_y": 551,
+        "ctrl_held": false,
+        "left_held": false
+      }
+    },
+    {
+      "mode": "combined-tagged-self",
+      "task_id": "6e9e8977-b086-4448-a703-2417cddf7118",
+      "done": "succeeded",
+      "messages": [
+        {
+          "low_level": 513,
+          "flags": 1,
+          "time": 138614359
+        },
+        {
+          "message": 33,
+          "tick": 138614515,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        },
+        {
+          "message": 6,
+          "tick": 138614515,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 7,
+          "tick": 138614531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138614359
+        },
+        {
+          "message": 513,
+          "tick": 138614531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "dispatch": 513,
+          "time": 138614359
+        },
+        {
+          "message": 513,
+          "tick": 138614531,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "low_level": 514,
+          "flags": 1,
+          "time": 138614921
+        },
+        {
+          "injected": 1,
+          "released": 1
+        },
+        {
+          "dispatch": 514,
+          "time": 138614921
+        },
+        {
+          "message": 514,
+          "tick": 138615046,
+          "extra": 100,
+          "source_ok": 1,
+          "device": 2,
+          "origin": 2,
+          "dispatching": 1,
+          "sent": 0,
+          "foreground": true
+        },
+        {
+          "message": 6,
+          "tick": 138618765,
+          "extra": 0,
+          "source_ok": 1,
+          "device": 0,
+          "origin": 0,
+          "dispatching": 0,
+          "sent": 0,
+          "foreground": false
+        }
+      ],
+      "last_sample": {
+        "foreground": true,
+        "clicks": 2,
+        "f24_down": 0,
+        "f24_up": 0,
+        "ctrl_down": 0,
+        "ctrl_up": 0,
+        "wheel": 0,
+        "last_click_x": 960,
+        "last_click_y": 551,
+        "ctrl_held": false,
+        "left_held": false
+      }
+    }
+  ],
+  "local_control": {
+    "returncode": 0,
+    "messages": [
+      {
+        "message": 33,
+        "tick": 1606116250,
+        "extra": 100,
+        "source_ok": 1,
+        "device": 0,
+        "origin": 0,
+        "dispatching": 0,
+        "sent": 0,
+        "foreground": false
+      },
+      {
+        "message": 6,
+        "tick": 1606116250,
+        "extra": 100,
+        "source_ok": 1,
+        "device": 0,
+        "origin": 0,
+        "dispatching": 0,
+        "sent": 0,
+        "foreground": true
+      },
+      {
+        "message": 7,
+        "tick": 1606116265,
+        "extra": 100,
+        "source_ok": 1,
+        "device": 0,
+        "origin": 0,
+        "dispatching": 0,
+        "sent": 0,
+        "foreground": true
+      },
+      {
+        "dispatch": 513,
+        "time": 1606116171
+      },
+      {
+        "message": 513,
+        "tick": 1606116265,
+        "extra": 100,
+        "source_ok": 1,
+        "device": 2,
+        "origin": 2,
+        "dispatching": 1,
+        "sent": 0,
+        "foreground": true
+      },
+      {
+        "injected": 1,
+        "released": 1
+      },
+      {
+        "dispatch": 514,
+        "time": 1606116578
+      },
+      {
+        "message": 514,
+        "tick": 1606116578,
+        "extra": 100,
+        "source_ok": 1,
+        "device": 2,
+        "origin": 2,
+        "dispatching": 1,
+        "sent": 0,
+        "foreground": true
+      },
+      {
+        "message": 6,
+        "tick": 1606120609,
+        "extra": 0,
+        "source_ok": 1,
+        "device": 0,
+        "origin": 0,
+        "dispatching": 0,
+        "sent": 0,
+        "foreground": false
+      }
+    ],
+    "last_sample": {
+      "foreground": true,
+      "clicks": 1,
+      "f24_down": 0,
+      "f24_up": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "wheel": 0,
+      "last_click_x": 1920,
+      "last_click_y": 1097,
+      "ctrl_held": false,
+      "left_held": false
+    }
+  },
+  "findings": {
+    "single_low_level_down_then_two_queued_downs": true,
+    "nouia_still_duplicates": true,
+    "explicit_activation_still_duplicates": true,
+    "responsive_pump_still_duplicates": true,
+    "third_party_loaded_dll_observed": false,
+    "exact_root_cause_proven": false,
+    "product_fix": false
+  },
+  "cleanup": {
+    "owned_processes": 0,
+    "remote_binaries_remaining": 0,
+    "original_service_running": true
+  }
+}
