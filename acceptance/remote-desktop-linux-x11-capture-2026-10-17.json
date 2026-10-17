@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-17",
+  "base_commit": "ba2330d",
+  "scope": "Production X11 capture backend only; Xvfb two-screen and existing Wayland VM capture regression. X11 input, greeter/session routing and system login remain incomplete.",
+  "worker_sha256": "19e0fc5153d96fc913f7c7ab38746ab844e64a76dbb992d526568cfd384d2c89",
+  "build": {
+    "cargo_jobs": 8,
+    "nested_jobs": 1,
+    "release_worker": true,
+    "full_desktop_rebuilt": false
+  },
+  "native_checks": [
+    {
+      "checks": 254,
+      "passed": true
+    },
+    {
+      "checks": 63,
+      "x_screens": 2,
+      "shared_images_reclaimed": 40
+    },
+    {
+      "passed": true,
+      "screens": [
+        {
+          "screen": "x11:0:screen",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "frames": 47,
+          "capture_decode_fps": 15.014915919838355,
+          "static_wait": true,
+          "color_changes": 44,
+          "sigkill_reclaimed_shared_memory": true,
+          "parent_eof_reclaimed_shared_memory": true
+        },
+        {
+          "screen": "x11:1:screen",
+          "dimensions": [
+            640,
+            480
+          ],
+          "frames": 47,
+          "capture_decode_fps": 14.99480232445303,
+          "static_wait": true,
+          "color_changes": 44,
+          "sigkill_reclaimed_shared_memory": true,
+          "parent_eof_reclaimed_shared_memory": true
+        }
+      ]
+    }
+  ],
+  "native_sanitizers": [
+    "address",
+    "undefined"
+  ],
+  "rust_media_tests_passed": 12,
+  "wayland_regression": {
+    "task_id": "88d9574b-509e-4486-8c17-2bced50d55d8",
+    "result": {
+      "dimensions": [
+        1314,
+        742
+      ],
+      "inventory": [
+        {
+          "id": "gnome:Virtual-1",
+          "name": "Unknown Display",
+          "x": 0,
+          "y": 0,
+          "desktop_width": 1314,
+          "desktop_height": 742,
+          "pixel_width": 1314,
+          "pixel_height": 742,
+          "scale_milli": 1000,
+          "rotation": "identity",
+          "primary": true
+        }
+      ],
+      "frames": 90,
+      "changed_samples": 89,
+      "decoded_fps_after_warmup": 13.796988819191597,
+      "changed_fps_after_warmup": 13.796988819191597,
+      "encoded_bytes": 404316,
+      "fixture_ticks": 190,
+      "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+      "pixel_bytes_saved": 0,
+      "worker_exit": 0
+    }
+  },
+  "locked_wayland_observation": {
+    "task_id": "396dca2e-ce15-4e11-9ac7-7065be25f243",
+    "result": {
+      "recovery_unit": "pab-rd-lock-a72eae73a25b",
+      "before": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "locked": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "yes"
+      },
+      "inventory_exit": 0,
+      "capture_exit": 1,
+      "capture_output_bytes": 0,
+      "capture_error": "media: CreateSession: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Session creation inhibited\n",
+      "restored": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "recovery_timer_stopped": true
+    }
+  },
+  "native_cleanup": {
+    "task_id": "0525e44e-2920-4646-9b5b-71e3c67c4aa2",
+    "result": {
+      "accounts": [],
+      "operator_databases": 0,
+      "owned_native_processes": [],
+      "config_candidates": [
+        "/etc/pixels-agent-bridge/config.toml"
+      ]
+    }
+  },
+  "rustdesk_reference_commit": "7aa98d43cf1962a7a29ec16ffef42974377ef11e",
+  "reference_scope": "Read local platform/linux.rs and server/wayland.rs for session and DRM route separation; no source code copied",
+  "source_sha256": {
+    "crates/desktop-media/native/linux/x11_capture.h": "971e234ac316eb5f0bd258a6050941dfdc731e5723afb69357b7304d6d1f5649",
+    "crates/desktop-media/native/linux/common.h": "749be2bbc0490a8b41005c3e383bef372f0e165fa458e690fe84d64bf23e61f7",
+    "crates/desktop-media/tests/native_linux_x11.cpp": "f2b493fcf3b45517954267aa72d806fe8c9092e805b5ac1bf76f3e678dc7b482",
+    "experiments/remote-desktop/verify_linux_x11.py": "abbf19160e2144e9a46ac49e1f169d812ee99ea6f0a31169c571a8a4ad64ea4a"
+  },
+  "pending": [
+    "X11 native input and kill-safe release",
+    "X11 real user/greeter capture and formal viewer",
+    "verified greeter helper supervision and session handoff",
+    "Wayland lock/login capture outside inhibited compositor API",
+    "transformed RandR geometry adapter",
+    "nine-way and sustained acceptance",
+    "candidate package rebuild and release"
+  ]
+}

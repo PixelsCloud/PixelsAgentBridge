@@ -117,7 +117,8 @@ def main():
         'Maintainer: Pixels <support@rgaa.vip>\nSection: net\nPriority: optional\n'
         'Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libgtk-3-0, libwebkit2gtk-4.1-0, '
         'libayatana-appindicator3-1, libxdo3, libpipewire-0.3-0, libepoxy0, libgbm1, libegl1, '
-        'libwayland-client0, libwayland-server0, libxcb1, systemd, util-linux, bash\n'
+        'libwayland-client0, libwayland-server0, libxcb1, libx11-6, libxext6, '
+        'libxrandr2, libxfixes3, libxdamage1, systemd, util-linux, bash\n'
         'Description: Pixels Agent Bridge desktop and device service\n'
         ' Native graphical client, remote terminal, MCP and offline document tools.\n', encoding='utf-8')
     for name in ['postinst','prerm','postrm']: shutil.copy2(SCRIPTS / name, control / name)

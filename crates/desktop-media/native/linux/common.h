@@ -122,6 +122,7 @@ struct Display {
     Geometry size;
     bool primary;
     uint32_t layout_serial;
-    std::string id() const { return "gnome:" + connector; }
+    std::string backend = "gnome";
+    std::string id() const { return backend + ":" + connector; }
 };
 }

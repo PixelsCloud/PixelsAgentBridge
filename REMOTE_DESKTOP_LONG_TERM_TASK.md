@@ -110,6 +110,14 @@ Windows 独立原生窗口，30 秒内识别到 408 个新画面；按完整预�
 持续运行和最终候选产物仍待验证。详见
 [Linux 网络显示性能](acceptance/remote-desktop-linux-presentation-2026-10-17.md)。
 
+后续 W5 X11 采集：新增 RandR 输出枚举、MIT-SHM 直接映射、光标合成和 Damage
+静帧等待；隔离 Xvfb 两个 X screen 的真实像素、解码和退出回收通过，包含
+1080p 约 15 FPS 采集/解码，317 项原生 sanitizer 检查及 12 项媒体库测试通过。
+现有 Wayland VM 回归通过。用户已授权 Linux 锁屏、注销、切换会话；实际锁屏
+确认 GNOME CreateSession 被 `Session creation inhibited` 拒绝，已恢复解锁。
+X11 input、greeter 路由和 Wayland 登录媒体仍未实现，不将此阶段计作系统登录。
+详见 [X11 采集与锁屏缺口](acceptance/remote-desktop-linux-x11-capture-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

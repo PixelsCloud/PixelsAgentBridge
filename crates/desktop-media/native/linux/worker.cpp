@@ -1,9 +1,10 @@
-// GNOME Wayland CPU fallback. Uses the existing compressed worker IPC; no
+// GNOME Wayland and local X11 CPU capture. Uses the existing compressed worker IPC; no
 // transport, authentication, session authority or application settings here.
 #include "capture.h"
 #include "input.h"
 #include "render.h"
 #include "host.h"
+#include "x11_capture.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
@@ -26,6 +27,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         if (argc == 3 && std::string(argv[1]) != "input") throw std::runtime_error("Unsupported Linux media operation");
         if (argc == 5 && (std::string(argv[1]) != "capture" || std::string(argv[4]) != "desktop"))
             throw std::runtime_error("Unsupported Linux media operation");
+        if (pab_linux::x11::selected()) {
+            pab_linux::x11::run(argc, argv); pw_deinit(); return 0;
+        }
         auto bus = pab_linux::session_bus();
         const auto found = pab_linux::displays(bus.get());
         if (argc == 2) pab_linux::inventory(found);
