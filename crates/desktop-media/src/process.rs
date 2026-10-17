@@ -9,6 +9,9 @@ use tokio::{
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command},
     sync::{Mutex, OwnedMutexGuard},
 };
+#[cfg(windows)]
+#[path = "windows_cursor.rs"]
+mod cursor;
 pub(crate) const MAGIC: u32 = 0x31424150;
 type AnyError = Box<dyn std::error::Error + Send + Sync>;
 pub(crate) fn media_error(error: impl std::fmt::Display) -> DesktopError {
@@ -94,6 +97,10 @@ pub struct NativeBackend {
     gate: Arc<Mutex<()>>,
     input_gate: Arc<Mutex<()>>,
     input_enabled: bool,
+    #[cfg(windows)]
+    cursor_gate: Arc<Mutex<()>>,
+    #[cfg(windows)]
+    capture: std::sync::Mutex<Option<std::sync::Weak<cursor::CaptureLease>>>,
 }
 impl NativeBackend {
     pub fn new(executable: PathBuf, prefix: Vec<String>) -> Self {
@@ -103,11 +110,17 @@ impl NativeBackend {
             gate: Arc::new(Mutex::new(())),
             input_gate: Arc::new(Mutex::new(())),
             input_enabled: false,
+            #[cfg(windows)]
+            cursor_gate: Arc::new(Mutex::new(())),
+            #[cfg(windows)]
+            capture: std::sync::Mutex::new(None),
         }
     }
     pub async fn idle(&self) {
         drop(self.gate.lock().await);
         drop(self.input_gate.lock().await);
+        #[cfg(windows)]
+        drop(self.cursor_gate.lock().await);
     }
     /// Only the dedicated interactive media helper enables OS input. Capture
     /// experiments and all other NativeBackend callers remain view-only.
@@ -123,6 +136,14 @@ impl NativeBackend {
 struct NativeSource {
     process: MediaChild,
     index: u64,
+    #[cfg(windows)]
+    capture: Arc<cursor::CaptureLease>,
+}
+#[cfg(windows)]
+impl Drop for NativeSource {
+    fn drop(&mut self) {
+        self.capture.ended.send_replace(true);
+    }
 }
 impl DesktopSource for NativeSource {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
@@ -161,6 +182,13 @@ impl DesktopSource for NativeSource {
     }
 }
 impl DesktopBackend for NativeBackend {
+    fn supports_cursor(&self) -> bool {
+        cfg!(windows)
+    }
+    #[cfg(windows)]
+    fn cursor(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopCursorSource>> {
+        Box::pin(cursor::open(self, config))
+    }
     fn supports_input(&self) -> bool {
         self.input_enabled
     }
@@ -250,7 +278,22 @@ impl DesktopBackend for NativeBackend {
             if (width, height) != (config.screen.pixel_width, config.screen.pixel_height) {
                 return Err(media_error("screen changed during source startup"));
             }
-            Ok(Box::new(NativeSource { process, index: 0 }) as Box<dyn DesktopSource>)
+            #[cfg(windows)]
+            let capture = {
+                let lease = Arc::new(cursor::CaptureLease::new(config));
+                *self
+                    .capture
+                    .lock()
+                    .map_err(|_| media_error("capture state unavailable"))? =
+                    Some(Arc::downgrade(&lease));
+                lease
+            };
+            Ok(Box::new(NativeSource {
+                process,
+                index: 0,
+                #[cfg(windows)]
+                capture,
+            }) as Box<dyn DesktopSource>)
         })
     }
 }

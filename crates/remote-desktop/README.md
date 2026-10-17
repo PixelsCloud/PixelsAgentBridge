@@ -95,8 +95,8 @@ Only backends opting in with `supports_cursor` advertise the optional
 this capability to the session; unknown/absent versions retain existing v2
 video/input behavior and do not open cursor streams. The Executor helper
 adapter now pairs a separate cursor socket with the capture's verified process
-and exact active configuration. Native OS cursor sampling and renderers are
-still pending; current production native backends do not advertise support.
+and exact active configuration. Windows now supplies native DXGI cursor
+snapshots. Mac/Linux separate sources and native viewer overlays are still pending.
 
 Each update binds session, generation and exact sequence. A new image has a
 monotonic generation-local ID; subsequent position/visibility updates reference
@@ -134,8 +134,8 @@ its paired cursor, including pending startup or a stationary snapshot wait.
 The optional capability follows the selected capture provider, so legacy or
 embedded-only providers cannot accidentally advertise separate cursor support.
 
-Remaining integration: collect platform cursor metadata, and overlay it in all
-native renderers with clipping, scaling and hidden-state cleanup. Tests using generated snapshots do not
+Remaining integration: collect Mac/Linux cursor metadata, and overlay snapshots
+in native renderers with clipping, scaling and hidden-state cleanup. Tests using generated snapshots do not
 demonstrate any visible cursor in the app.
 
 ## Verification

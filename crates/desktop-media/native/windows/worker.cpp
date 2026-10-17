@@ -1,5 +1,5 @@
-// Isolated native media worker. Only compressed
-// H.264 crosses anonymous pipes; no raw desktop pixels are persisted/read back.
+// Isolated native media worker. Compressed H.264 and bounded cursor snapshots
+// cross anonymous pipes; cursor sampling never reads back the desktop surface.
 #include "nvenc_encoder.h"
 #include "pattern_window.h"
 #include "d3d_presenter.h"
@@ -83,6 +83,8 @@ static void inventory(const std::vector<Display>& found) {
 }
 #include "input_worker.h"
 #include "input_fixture.h"
+#include "cursor_worker.h"
+#include "cursor_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
     for (size_t i = 0; i + 4 < bytes.size(); ++i) {
         if (!bytes[i] && !bytes[i+1] && bytes[i+2] == 1 && (bytes[i+3] & 31) == 5) return true;
@@ -278,6 +280,9 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     try {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (argc == 2 && std::string(argv[1]) == "cursor-shape-check") {
+            cursor_shape_check(); return 0;
+        }
         if (argc == 2 && std::string(argv[1]) == "input-recovery-check") {
             input_recovery_check(); return 0;
         }
@@ -297,6 +302,10 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         if (argc == 3 && std::string(argv[1]) == "input") {
             for (const auto& d : found) if (screen_id(d) == argv[2]) { input_worker(d); return 0; }
             throw std::runtime_error("Selected input screen disappeared");
+        }
+        if (argc == 3 && std::string(argv[1]) == "cursor") {
+            for (const auto& d : found) if (screen_id(d) == argv[2]) { cursor_worker(d); return 0; }
+            throw std::runtime_error("Selected cursor screen disappeared");
         }
         if (argc == 2 && std::string(argv[1]) == "inventory") { inventory(found); return 0; }
         if (argc == 4 && std::string(argv[1]) == "animate-display" && !found.empty()) {

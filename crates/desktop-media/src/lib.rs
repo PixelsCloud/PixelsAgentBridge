@@ -1,5 +1,5 @@
 //! Platform media workers. The authenticated session/transport crate contains
-//! no native FFI. Only compressed packets cross the private worker pipes.
+//! no native FFI. Compressed video and bounded cursor snapshots cross private pipes.
 mod input;
 #[cfg(target_os = "linux")]
 mod linux_view;

@@ -30,6 +30,24 @@ already-authenticated device session. Its ordinary window/screenshot queue is
 unaffected. Dropping a source kills its worker and the backend gate waits for
 process exit before another worker starts in that helper.
 
+On Windows, `NativeBackend::cursor` requires the exact active video configuration.
+Its cursor-only DXGI worker observes shape/position/visibility independently of
+video requests. It keeps only the latest snapshot, releases each desktop lease
+before pipe output, and never copies/maps/encodes the desktop texture. This uses
+an additional duplication client and GPU device; resource/performance impact
+still needs product acceptance under concurrent capture workloads. A cursor
+failure does not restart video or modify its direct NVENC path.
+
+DXGI pointer top-left is converted to a desktop-space hotspot. Separate drawing
+is hidden whenever DXGI says the hardware pointer is not visible, including
+when it is already embedded in video. Color shapes are converted to premultiplied
+BGRA; monochrome and masked-color shapes retain AND/XOR semantics. Shape and
+image buffers are bounded, with no position history. The video lease invalidates
+and reaps retained cursor sources even while idle. `cursor-shape-check` uses
+generated shapes without touching the OS pointer; the Windows cursor integration
+test includes an explicitly ignored real-GPU lifecycle check. Viewer overlays
+and Mac/Linux separate cursor sources remain pending.
+
 `NativeViewer::open_in_window` renders into a native child of the Desktop-owned
 window. The top 72 logical pixels belong to its controls. The surface preserves
 aspect ratio, resizes on DPI/window changes, retains one decoded sample for
@@ -72,7 +90,7 @@ frame is forced to IDR after configuring slices; no priming frame is transmitted
 
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
 NVIDIA hardware encoding, system D3D11 MFT decoding, SDR BT.709,
-no cursor channel yet, no complete macOS/Linux product backend. Windows native keyboard,
+cursor overlays and remaining macOS/Linux product acceptance. Windows native keyboard,
 mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
 capture and multi-monitor hotplug still require hardware acceptance.
