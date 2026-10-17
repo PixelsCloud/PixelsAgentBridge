@@ -140,7 +140,7 @@ export function MacosPermissionsPanel({ language }: { language: Language }) {
     return <div className="macos-permission-row" role="group" aria-label={title}>
       <span>{title}</span>
       <div className="macos-permission-row-status">
-        <Tag color={allowed ? "green" : "orange"}>{allowed ? text.normal : text.missing}</Tag>
+        <Tag color={allowed ? "green" : "orange"}>{allowed ? text.granted : text.missing}</Tag>
         {!allowed && <Button size="small" disabled={disabled} onClick={() => request(target, permission)}>{text.request}</Button>}
       </div>
     </div>;
@@ -169,6 +169,7 @@ export function MacosPermissionsPanel({ language }: { language: Language }) {
       <h3><AppWindow size={18} /><span>{text.desktop}</span>{more("desktop")}</h3>
       {row("desktop", "screen", text.screen, permissions.screenRecording)}
       {row("desktop", "accessibility", text.input, permissions.accessibility)}
+      <p className="macos-permission-note">{text.screenConsentNote}</p>
       {diskRow("desktop")}
     </section>
     <section className="macos-permission-program" aria-label={text.executor}>

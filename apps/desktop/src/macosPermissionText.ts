@@ -1,5 +1,6 @@
 export const macosPermissionText = {
   "zh-CN": {
+    granted: "已授权", screenConsentNote: "开始共享屏幕时，macOS 可能另外请求直接访问屏幕。请在 Pixels Agent Bridge 的系统提示中点击「允许」；此处的授权状态不代表这项确认已完成。",
     fileAccess: "文件访问", fileNote: "检测下载、文稿、桌面目录的实际访问能力；完全磁盘访问开关以系统设置为准。", configure: "设置权限", checking: "检测中", failed: "检测失败", restricted: "访问受限", notChecked: "未检测", timedOut: "检测超时，请完成系统授权后重试", enableTarget: "请在“完全磁盘访问”列表中开启：", manageDisk: "管理完全磁盘访问",
     more: "更多操作", notListed: "系统设置中找不到这个程序？",
     title: "macOS 权限", desktop: "Pixels Agent Bridge", executor: "pab-executor", executorNote: "Pixels 后台服务，也是我们的程序。",
@@ -11,6 +12,7 @@ export const macosPermissionText = {
     serviceRestarted: "已请求重启，请等待服务恢复。", checkFailed: "无法确认最新权限状态，请重试。", loadError: "无法读取程序路径。", notInstalled: "程序未找到，请检查安装。", settingsOpened: "已打开系统设置，请开启相应开关。",
   },
   "zh-TW": {
+    granted: "已授權", screenConsentNote: "開始分享螢幕時，macOS 可能另外要求直接存取螢幕。請在 Pixels Agent Bridge 的系統提示中點選「允許」；此處的授權狀態不代表這項確認已完成。",
     fileAccess: "檔案存取", fileNote: "檢測下載、文件、桌面目錄的實際存取能力；完整磁碟存取權開關以系統設定為準。", configure: "設定權限", checking: "檢測中", failed: "檢測失敗", restricted: "存取受限", notChecked: "尚未檢測", timedOut: "檢測逾時，請完成系統授權後再試", enableTarget: "請在「完整磁碟存取權」清單中開啟：", manageDisk: "管理完整磁碟存取權",
     more: "更多操作", notListed: "系統設定中找不到這個程式？",
     title: "macOS 權限", desktop: "Pixels Agent Bridge", executor: "pab-executor", executorNote: "Pixels 背景服務，也是我們的程式。",
@@ -22,6 +24,7 @@ export const macosPermissionText = {
     serviceRestarted: "已要求重新啟動，請等待服務恢復。", checkFailed: "無法確認最新權限狀態，請重試。", loadError: "無法讀取程式路徑。", notInstalled: "找不到程式，請檢查安裝。", settingsOpened: "已開啟系統設定，請開啟對應開關。",
   },
   en: {
+    granted: "Granted", screenConsentNote: "When screen sharing starts, macOS may also ask for direct screen access. Choose Allow in the system prompt for Pixels Agent Bridge. The permission status here does not confirm that this additional step is complete.",
     fileAccess: "File access", fileNote: "Checks access to Downloads, Documents and Desktop. The Full Disk Access switch is managed in System Settings.", configure: "Set permissions", checking: "Checking", failed: "Check failed", restricted: "Access restricted", notChecked: "Not checked", timedOut: "Check timed out. Complete system authorization and try again.", enableTarget: "In Full Disk Access, enable: ", manageDisk: "Manage Full Disk Access",
     more: "More options", notListed: "Program not listed in System Settings?",
     title: "macOS permissions", desktop: "Pixels Agent Bridge", executor: "pab-executor", executorNote: "The Pixels background service. This is also our program.",

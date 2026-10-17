@@ -635,6 +635,116 @@ mod tests {
             ended(pair, &backend).await;
         }
     }
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    #[ignore = "requires an isolated profile and coordinated signed Aqua session helper on the authorized Apple host"]
+    async fn macos_launchagent_native_media_reopens_and_retires() {
+        use pab_desktop_media::software::SoftwareDecoder;
+        let _lock = LOCK.lock().await;
+        let root = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::Machine)
+            .unwrap().root().canonicalize().unwrap();
+        assert!(root.starts_with("/private/tmp"));
+        assert!(root.file_name().unwrap().to_str().unwrap().starts_with("pab-helper-ipc-"));
+        assert!(super::super::local_port().unwrap() > 1024);
+        assert!(providers().lock().unwrap().is_empty());
+        // The coordinator supplies the same private profile to the real signed
+        // App through a fresh Aqua LaunchAgent. No installed service/token is used.
+        super::super::issue_local_access(&root.join(super::super::TOKEN_FILE)).unwrap();
+        struct Server(tokio::task::JoinHandle<()>);
+        impl Drop for Server { fn drop(&mut self) { self.0.abort(); } }
+        let _server = Server(super::super::spawn_local_service(root.clone()));
+        std::fs::write(root.join("server-ready"), b"ready").unwrap();
+        tokio::time::timeout(Duration::from_secs(30), async {
+            while providers().lock().unwrap().is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }).await.unwrap();
+        for cycle in 0..2 {
+            let screens = HelperMediaBackend.screens().await.unwrap();
+            let mut config = config();
+            config.screen = screens.into_iter().find(|screen| screen.primary).unwrap();
+            let width = config.screen.pixel_width as usize;
+            let height = config.screen.pixel_height as usize;
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let mut source = HelperMediaBackend.start(config.clone()).await.unwrap();
+            let mut decoded = 0;
+            for index in 0..30 {
+                let frame = tokio::time::timeout(WAIT, source.next_frame()).await.unwrap().unwrap();
+                if index == 0 { assert!(frame.keyframe); }
+                if let Some(pixels) = decoder.decode(&frame.bytes).unwrap() {
+                    assert_eq!(pixels.len(), width * height * 3 / 2);
+                    decoded += 1;
+                }
+            }
+            assert_eq!(decoded, 30);
+            let id = provider().await.unwrap().id;
+            let selected_screen = config.screen.id.clone();
+            let mut input = HelperMediaBackend.input(config).await.unwrap();
+            input.apply(pab_protocol::RemoteDesktopInput::ReleaseAll).await.unwrap();
+            let fixture = root.join("input-fixture.json");
+            if fixture.exists() {
+                use pab_protocol::{DesktopMouseButton, RemoteDesktopInput as Event};
+                let read = || serde_json::from_slice::<serde_json::Value>(&std::fs::read(&fixture).unwrap()).unwrap();
+                let state = read();
+                assert_eq!(state["focused"], true, "owned input fixture lost focus");
+                assert_eq!(state["screen_id"], selected_screen);
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64();
+                assert!((now - state["timestamp"].as_f64().unwrap()).abs() < 1.0, "stale fixture report");
+                let x = u16::try_from(state["x"].as_u64().unwrap()).unwrap();
+                let y = u16::try_from(state["y"].as_u64().unwrap()).unwrap();
+                for event in [
+                    Event::Move { x, y },
+                    Event::Button { x, y, button: DesktopMouseButton::Left, down: true },
+                    Event::Button { x, y, button: DesktopMouseButton::Left, down: false },
+                    Event::Key { virtual_key: 0x41, down: true },
+                    Event::Key { virtual_key: 0x41, down: false },
+                    Event::Wheel { delta: 120 },
+                    Event::Key { virtual_key: 0x10, down: true },
+                ] { input.apply(event).await.unwrap(); }
+                tokio::time::timeout(WAIT, async {
+                    while read()["shifted"] != true { tokio::time::sleep(Duration::from_millis(10)).await; }
+                }).await.unwrap();
+                if cycle == 0 { input.apply(Event::ReleaseAll).await.unwrap(); }
+            }
+            drop(input);
+            if fixture.exists() {
+                tokio::time::timeout(WAIT, async {
+                    loop {
+                        let state: serde_json::Value = serde_json::from_slice(&std::fs::read(&fixture).unwrap()).unwrap();
+                        if state["shift_up"].as_u64() == Some(cycle + 1) {
+                            for key in ["downs", "ups", "keys_down", "keys_up", "wheels", "shift_down"] {
+                                assert_eq!(state[key].as_u64(), Some(cycle + 1), "unexpected fixture count: {key}");
+                            }
+                            assert_eq!(state["last_key"], 0); // macOS virtual code for A.
+                            assert_eq!(state["shifted"], false);
+                            assert!((state["click_x"].as_f64().unwrap() - 100.0).abs() <= 2.0);
+                            assert!((state["click_y"].as_f64().unwrap() - 100.0).abs() <= 2.0);
+                            println!("Mac owned fixture cycle {cycle}: exact click/key/wheel counts and coordinates, Shift released via {}", if cycle == 0 { "ReleaseAll" } else { "input close" });
+                            break;
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                }).await.unwrap();
+            }
+            drop(source);
+            tokio::time::timeout(WAIT, async {
+                while providers().lock().unwrap().iter().any(|p| p.id == id) {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }).await.unwrap();
+            println!("Mac Aqua helper cycle {cycle}: {width}x{height}, {decoded} decoded frames, paired native release acknowledged, media registration retired");
+        }
+        std::fs::write(root.join("cycles-complete"), b"ready").unwrap();
+        tokio::time::timeout(Duration::from_secs(30), async {
+            while !root.join("helper-stopped").exists() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+            while !providers().lock().unwrap().is_empty() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }).await.unwrap();
+        println!("Mac Aqua helper stopped; all media registrations retired");
+    }
     #[cfg(target_os = "linux")]
     #[tokio::test]
     #[ignore = "requires active GNOME and sibling pab-linux-media-worker-cargo; run on the Linux VM"]
