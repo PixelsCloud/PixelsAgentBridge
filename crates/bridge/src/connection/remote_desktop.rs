@@ -6,7 +6,7 @@ impl AuthenticatedDeviceConnection {
         screen_id: Option<String>,
         fps: u16,
     ) -> Result<RemoteDesktopSession, BridgeError> {
-        match self
+        let cursor_version = match self
             .task_request(DeviceTaskRequest::GetEnvironment {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
             })
@@ -15,8 +15,9 @@ impl AuthenticatedDeviceConnection {
             DeviceTaskResponse::Environment {
                 context,
                 remote_desktop_schema_version: Some(pab_protocol::REMOTE_DESKTOP_SCHEMA_VERSION),
+                remote_desktop_cursor_schema_version,
                 ..
-            } if context.device_ref == self.device_ref => {}
+            } if context.device_ref == self.device_ref => remote_desktop_cursor_schema_version,
             _ => {
                 return Err(pab_remote_desktop::DesktopError::Rejected {
                     code: pab_protocol::DesktopErrorCode::Unsupported,
@@ -25,14 +26,15 @@ impl AuthenticatedDeviceConnection {
                 }
                 .into());
             }
-        }
+        };
         Ok(RemoteDesktopSession::open(
             self.connection.clone(),
             screen_id,
             fps,
             self.operation_timeout(),
         )
-        .await?)
+        .await?
+        .with_cursor_support(cursor_version))
     }
 }
 

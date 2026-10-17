@@ -162,6 +162,12 @@ pub enum RemoteDesktopRequest {
         session_id: RequestId,
         generation: u64,
     },
+    /// Additive cursor capability; old v2 Open/Control/Video wire stays intact.
+    Cursor {
+        version: u16,
+        session_id: RequestId,
+        generation: u64,
+    },
     Close {
         session_id: RequestId,
     },
@@ -184,6 +190,9 @@ pub enum RemoteDesktopReply {
         opened: DesktopOpened,
     },
     Ready,
+    CursorReady {
+        version: u16,
+    },
     Closed,
     Error {
         code: DesktopErrorCode,

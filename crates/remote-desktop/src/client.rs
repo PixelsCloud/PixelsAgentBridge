@@ -29,6 +29,61 @@ pub struct RemoteDesktopSession {
     presentation_valid: Arc<Mutex<bool>>,
     closed: bool,
     close_confirmed: bool,
+    cursor_version: Option<u16>,
+    generation_ended: watch::Sender<bool>,
+}
+/// A cursor reader never owns the desktop session. Selecting a different
+/// generation, closing or dropping its session invalidates this handle even
+/// when the caller keeps it alive. Drop closes only its cursor stream.
+pub struct RemoteDesktopCursor {
+    reader: Option<crate::DesktopCursorReader>,
+    keepalive: Option<PabFrameWriter>,
+    ended: watch::Receiver<bool>,
+    timeout: Duration,
+}
+impl RemoteDesktopCursor {
+    pub fn is_current(&self) -> bool {
+        self.reader.is_some()
+            && self.keepalive.is_some()
+            && !*self.ended.borrow()
+            && self.ended.has_changed().is_ok()
+    }
+    pub async fn next_update(&mut self) -> Result<crate::CursorUpdate> {
+        let result = if !self.is_current() {
+            Err(DesktopError::Closed)
+        } else {
+            let reader = self.reader.as_mut().ok_or(DesktopError::Closed)?;
+            let keepalive = &mut self.keepalive;
+            let timeout = self.timeout;
+            tokio::select! {
+                biased;
+                _ = self.ended.changed() => Err(DesktopError::Closed),
+                result = async {
+                    let update = reader.receive_after_idle(timeout).await?;
+                    // Consumption ACK bounds cursor history to one outstanding
+                    // update. Taking the writer also retires a cancelled partial
+                    // ACK; a later call cannot interpret/replay it as a new one.
+                    let mut writer = keepalive.take().ok_or(DesktopError::Closed)?;
+                    tokio::time::timeout(timeout, writer.write(&update.header.sequence.to_le_bytes(), 8))
+                        .await.map_err(|_| DesktopError::Timeout)??;
+                    *keepalive = Some(writer);
+                    Ok(update)
+                } => result,
+            }
+        };
+        // Invalidation can race an otherwise complete read. Never hand that
+        // old image to the renderer after the session has changed generation.
+        let result = if *self.ended.borrow() {
+            Err(DesktopError::Closed)
+        } else {
+            result
+        };
+        if result.is_err() {
+            self.reader = None;
+            self.keepalive = None;
+        }
+        result
+    }
 }
 /// Acknowledges only frames received in this generation. Closing or selecting
 /// another screen invalidates existing handles before accepting new output.
@@ -256,6 +311,8 @@ impl RemoteDesktopSession {
             presentation_valid: Arc::new(Mutex::new(true)),
             closed: false,
             close_confirmed: false,
+            cursor_version: None,
+            generation_ended: watch::channel(false).0,
         };
         session.attach_video().await?;
         cleanup.armed = false;
@@ -263,6 +320,56 @@ impl RemoteDesktopSession {
     }
     pub fn opened(&self) -> &DesktopOpened {
         &self.opened
+    }
+    /// The authenticated environment reply supplies this additive capability.
+    /// Unknown/absent versions retain existing v2 video and input behavior.
+    pub fn with_cursor_support(mut self, version: Option<u16>) -> Self {
+        self.cursor_version = version;
+        self
+    }
+    pub fn supports_cursor(&self) -> bool {
+        self.cursor_version == Some(DESKTOP_CURSOR_SCHEMA_VERSION)
+    }
+    /// One stream per generation. Obtain again after selecting/restarting a
+    /// screen. It may be read independently while video waits for changes.
+    pub async fn open_cursor(&self) -> Result<RemoteDesktopCursor> {
+        if self.closed
+            || self.worker.is_finished()
+            || self.video.is_none()
+            || *self.generation_ended.borrow()
+        {
+            return Err(DesktopError::Closed);
+        }
+        if !self.supports_cursor() {
+            return Err(DesktopError::reject(
+                DesktopErrorCode::Unsupported,
+                "device has no negotiated independent cursor capability",
+            ));
+        }
+        let config = self.opened.config.clone();
+        let mut cursor = stream(
+            &self.connection,
+            RemoteDesktopRequest::Cursor {
+                version: DESKTOP_CURSOR_SCHEMA_VERSION,
+                session_id: config.session_id,
+                generation: config.generation,
+            },
+            self.timeout,
+        )
+        .await?;
+        match response(&mut cursor, self.timeout).await? {
+            RemoteDesktopReply::CursorReady {
+                version: DESKTOP_CURSOR_SCHEMA_VERSION,
+            } => {}
+            _ => return Err(DesktopError::Protocol("unexpected cursor stream reply")),
+        }
+        let (keepalive, reader) = cursor.into_framed();
+        Ok(RemoteDesktopCursor {
+            reader: Some(crate::DesktopCursorReader::new(reader, config)?),
+            keepalive: Some(keepalive),
+            ended: self.generation_ended.subscribe(),
+            timeout: self.timeout,
+        })
     }
     pub fn connection_path(&self) -> Option<pab_transport::ConnectionPath> {
         self.connection.selected_path()
@@ -366,6 +473,7 @@ impl RemoteDesktopSession {
     pub async fn select_screen(&mut self, screen_id: String) -> Result<()> {
         validate_desktop_screen_id(&screen_id).map_err(DesktopError::Protocol)?;
         let previous = self.opened.config.clone();
+        self.generation_ended.send_replace(true);
         *self.presentation_valid.lock().unwrap() = false;
         self.presentations.send_replace(None);
         self.last_received = Arc::new(AtomicU64::new(0));
@@ -391,6 +499,7 @@ impl RemoteDesktopSession {
             return Err(DesktopError::Protocol("invalid screen switch generation"));
         }
         self.opened = opened;
+        self.generation_ended = watch::channel(false).0;
         self.attach_video().await
     }
     pub async fn close(&mut self) -> Result<()> {
@@ -398,6 +507,7 @@ impl RemoteDesktopSession {
             return Ok(());
         }
         self.closed = true;
+        self.generation_ended.send_replace(true);
         *self.presentation_valid.lock().unwrap() = false;
         self.video = None;
         self.video_keepalive = None;
@@ -414,6 +524,7 @@ impl RemoteDesktopSession {
 }
 impl Drop for RemoteDesktopSession {
     fn drop(&mut self) {
+        self.generation_ended.send_replace(true);
         *self.presentation_valid.lock().unwrap() = false;
         self.worker.abort();
         if !self.close_confirmed {

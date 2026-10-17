@@ -7,12 +7,13 @@ mod cursor_wire;
 pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};
 mod host;
 pub use host::{
-    DesktopBackend, DesktopConnectionGuard, DesktopHost, DesktopInputSink, DesktopSource,
-    MediaFrame, MediaFuture,
+    DesktopBackend, DesktopConnectionGuard, DesktopCursorSource, DesktopHost, DesktopInputSink,
+    DesktopSource, MediaFrame, MediaFuture,
 };
 mod client;
 pub use client::{
-    RemoteDesktopInputControl, RemoteDesktopPresentationControl, RemoteDesktopSession,
+    RemoteDesktopCursor, RemoteDesktopInputControl, RemoteDesktopPresentationControl,
+    RemoteDesktopSession,
 };
 
 use pab_protocol::DesktopErrorCode;

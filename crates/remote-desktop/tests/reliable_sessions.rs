@@ -13,6 +13,7 @@ use std::{
 };
 const WAIT: Duration = Duration::from_secs(5);
 mod cursor_wire;
+mod cursor_sessions;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
@@ -218,6 +219,7 @@ struct Harness {
     client: PabConnection,
     peer: PabConnection,
     task: tokio::task::JoinHandle<()>,
+    host: DesktopHost,
 }
 impl Drop for Harness {
     fn drop(&mut self) {
@@ -230,6 +232,7 @@ impl Harness {
         let (a, b, client, peer) = pair().await;
         let server = peer.clone();
         let host = global.for_connection();
+        let authority = host.clone();
         let task = tokio::spawn(async move {
             let _guard = host.connection_guard();
             loop {
@@ -268,6 +271,7 @@ impl Harness {
             client,
             peer,
             task,
+            host: authority,
         }
     }
     async fn request(&self, request: RemoteDesktopRequest) -> RemoteDesktopReply {

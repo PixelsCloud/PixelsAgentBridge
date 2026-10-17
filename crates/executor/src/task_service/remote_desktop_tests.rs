@@ -40,6 +40,7 @@ async fn remote_desktop_unavailable_is_additive_and_presence_keeps_working() {
         environment,
         DeviceTaskResponse::Environment {
             remote_desktop_schema_version: None,
+            remote_desktop_cursor_schema_version: None,
             terminal_schema_version: Some(2),
             desktop_terminal_schema_version: Some(1),
             ..
@@ -87,6 +88,36 @@ async fn remote_desktop_unavailable_is_additive_and_presence_keeps_working() {
 
 struct FixtureBackend;
 struct FixtureSource;
+struct FixtureCursor(Option<pab_protocol::DesktopVideoConfig>);
+impl pab_remote_desktop::DesktopCursorSource for FixtureCursor {
+    fn next_update(
+        &mut self,
+    ) -> pab_remote_desktop::MediaFuture<'_, pab_remote_desktop::CursorUpdate> {
+        Box::pin(async move {
+            let Some(config) = self.0.take() else {
+                return std::future::pending().await;
+            };
+            Ok(pab_remote_desktop::CursorUpdate {
+                header: pab_protocol::DesktopCursorHeader {
+                    version: pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION,
+                    session_id: config.session_id,
+                    generation: config.generation,
+                    sequence: 1,
+                    position: Some(pab_protocol::DesktopCursorPosition { x: 20, y: 30 }),
+                    image_id: 1,
+                    image: Some(pab_protocol::DesktopCursorImage {
+                        format: pab_protocol::DesktopCursorFormat::PremultipliedBgra,
+                        width: 1,
+                        height: 1,
+                        hotspot_x: 0,
+                        hotspot_y: 0,
+                    }),
+                },
+                bytes: vec![0, 0, 255, 255],
+            })
+        })
+    }
+}
 impl pab_remote_desktop::DesktopSource for FixtureSource {
     fn next_frame(
         &mut self,
@@ -103,6 +134,18 @@ impl pab_remote_desktop::DesktopSource for FixtureSource {
     }
 }
 impl pab_remote_desktop::DesktopBackend for FixtureBackend {
+    fn supports_cursor(&self) -> bool {
+        true
+    }
+    fn cursor(
+        &self,
+        config: pab_protocol::DesktopVideoConfig,
+    ) -> pab_remote_desktop::MediaFuture<'_, Box<dyn pab_remote_desktop::DesktopCursorSource>> {
+        Box::pin(async move {
+            Ok(Box::new(FixtureCursor(Some(config)))
+                as Box<dyn pab_remote_desktop::DesktopCursorSource>)
+        })
+    }
     fn screens(&self) -> pab_remote_desktop::MediaFuture<'_, Vec<pab_protocol::DesktopScreen>> {
         Box::pin(async {
             Ok(vec![pab_protocol::DesktopScreen {
@@ -163,16 +206,22 @@ async fn remote_desktop_backend_streams_through_task_service_without_changing_le
     assert!(matches!(
         env.receive_json(WAIT).await.unwrap(),
         DeviceTaskResponse::Environment {
-            remote_desktop_schema_version: Some(1),
+            remote_desktop_schema_version: Some(pab_protocol::REMOTE_DESKTOP_SCHEMA_VERSION),
+            remote_desktop_cursor_schema_version: Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION),
             terminal_schema_version: Some(2),
             ..
         }
     ));
     let mut viewer = pab_remote_desktop::RemoteDesktopSession::open(client.clone(), None, 15, WAIT)
         .await
-        .unwrap();
+        .unwrap()
+        .with_cursor_support(Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION));
     let frame = viewer.next_frame(WAIT).await.unwrap();
     assert_eq!(frame.bytes, vec![0x5a; 4097]);
+    let mut cursor = viewer.open_cursor().await.unwrap();
+    let image = cursor.next_update().await.unwrap();
+    assert_eq!(image.bytes, [0, 0, 255, 255]);
+    assert_eq!(image.header.generation, frame.header.generation);
     let mut legacy = client.open_bi(WAIT).await.unwrap();
     legacy
         .send_frame_json(
@@ -191,6 +240,7 @@ async fn remote_desktop_backend_streams_through_task_service_without_changing_le
     ));
     viewer.report_presented(&frame.header).unwrap();
     viewer.close().await.unwrap();
+    assert!(!cursor.is_current());
     serving.abort();
     let _ = serving.await;
 }

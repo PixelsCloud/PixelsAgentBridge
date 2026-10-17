@@ -12,6 +12,8 @@ use std::{
 };
 use tokio::sync::{Notify, watch};
 use tokio::time::Instant;
+#[path = "host_cursor.rs"]
+mod cursor;
 
 const HEARTBEAT_MS: u32 = 5000;
 const LEASE_MS: u32 = 15000;
@@ -28,6 +30,11 @@ pub struct MediaFrame {
 pub trait DesktopSource: Send {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame>;
 }
+/// Latest cursor snapshot, independent of video credit. Keep at most one image
+/// and position while blocked; drop must release all native cursor resources.
+pub trait DesktopCursorSource: Send {
+    fn next_update(&mut self) -> MediaFuture<'_, crate::CursorUpdate>;
+}
 /// Owns only this viewer's held keys/buttons. Drop must release them, including
 /// when apply is cancelled. Never replay events after an uncertain result.
 pub trait DesktopInputSink: Send {
@@ -40,6 +47,17 @@ pub trait DesktopBackend: Send + Sync {
     fn start(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopSource>>;
     fn supports_input(&self) -> bool {
         false
+    }
+    fn supports_cursor(&self) -> bool {
+        false
+    }
+    fn cursor(&self, _config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopCursorSource>> {
+        Box::pin(async {
+            Err(DesktopError::reject(
+                DesktopErrorCode::Unsupported,
+                "independent cursor is unavailable",
+            ))
+        })
     }
     fn input(&self, _config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopInputSink>> {
         Box::pin(async {
@@ -86,6 +104,8 @@ struct Generation {
     cancelled: watch::Sender<bool>,
     stopped: watch::Sender<bool>,
     claimed: AtomicBool,
+    cursor_claimed: AtomicBool,
+    cursor_stopped: watch::Sender<bool>,
     frame_ready: AtomicBool,
     progress: Mutex<(u64, u64)>, // sent, cumulatively presented
     credit: Notify,
@@ -111,6 +131,8 @@ impl Generation {
             cancelled: signal(),
             stopped: signal(),
             claimed: AtomicBool::new(false),
+            cursor_claimed: AtomicBool::new(false),
+            cursor_stopped: signal(),
             frame_ready: AtomicBool::new(false),
             progress: Mutex::new((0, 0)),
             credit: Notify::new(),
@@ -121,6 +143,12 @@ impl Generation {
         if !self.claimed.load(Ordering::SeqCst) {
             self.stopped.send_replace(true);
         }
+        if !self.cursor_claimed.load(Ordering::SeqCst) {
+            self.cursor_stopped.send_replace(true);
+        }
+    }
+    async fn wait_stopped(&self) {
+        tokio::join!(cancelled(&self.stopped), cancelled(&self.cursor_stopped));
     }
     fn acknowledge(&self, id: u64) -> Result<()> {
         let mut progress = self.progress.lock().unwrap();
@@ -203,6 +231,13 @@ impl DesktopHost {
             .as_ref()
             .map(|_| REMOTE_DESKTOP_SCHEMA_VERSION)
     }
+    pub fn supported_cursor_version(&self) -> Option<u16> {
+        self.shared
+            .backend
+            .as_ref()
+            .filter(|backend| backend.supports_cursor())
+            .map(|_| DESKTOP_CURSOR_SCHEMA_VERSION)
+    }
     pub fn connection_guard(&self) -> DesktopConnectionGuard {
         DesktopConnectionGuard(self.clone())
     }
@@ -224,7 +259,9 @@ impl DesktopHost {
         // Occupancy is retained until the video task has dropped its native
         // source. A new viewer must not race the previous capture worker's exit.
         if entry.state.lock().unwrap().as_ref().is_some_and(|ready| {
-            ready.video.claimed.load(Ordering::SeqCst) && !*ready.video.stopped.borrow()
+            (ready.video.claimed.load(Ordering::SeqCst) && !*ready.video.stopped.borrow())
+                || (ready.video.cursor_claimed.load(Ordering::SeqCst)
+                    && !*ready.video.cursor_stopped.borrow())
         }) {
             return;
         }
@@ -369,7 +406,7 @@ impl DesktopHost {
         // Retire that source before asking the same helper for a fresh layout.
         // Otherwise a static desktop can deadlock display switching.
         old.stop();
-        tokio::time::timeout(MEDIA_TIMEOUT, cancelled(&old.stopped))
+        tokio::time::timeout(MEDIA_TIMEOUT, old.wait_stopped())
             .await
             .map_err(|_| DesktopError::Timeout)?;
         let screens = tokio::time::timeout(MEDIA_TIMEOUT, backend.screens())
@@ -430,7 +467,7 @@ impl DesktopHost {
                             .as_ref()
                             .map(|state| state.video.clone());
                         if let Some(video) = video {
-                            tokio::time::timeout(MEDIA_TIMEOUT, cancelled(&video.stopped))
+                            tokio::time::timeout(MEDIA_TIMEOUT, video.wait_stopped())
                                 .await
                                 .map_err(|_| DesktopError::Timeout)?;
                         }
@@ -506,6 +543,16 @@ impl DesktopHost {
                     _ = cancelled(&video.cancelled) => {},
                     result = self.video(&video, stream, timeout) => result?,
                 }
+            }
+            RemoteDesktopRequest::Cursor {
+                version,
+                session_id,
+                generation,
+            } => {
+                self.serve_cursor(
+                    owner, account, version, session_id, generation, stream, timeout,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -797,7 +844,7 @@ struct VideoGuard {
 }
 impl Drop for VideoGuard {
     fn drop(&mut self) {
-        self.video.cancelled.send_replace(true);
+        self.video.stop();
         self.video.stopped.send_replace(true);
         let closing = *self.entry.cancelled.borrow();
         if closing {

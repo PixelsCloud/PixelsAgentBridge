@@ -87,6 +87,14 @@ AND/XOR 反色格式。protocol 68 项、会话单元 6 项、可靠流 17 项�
 完成，03.5 保留未完成。下一步与边界见
 [光标传输基础记录](acceptance/remote-desktop-cursor-wire-2026-10-17.md)。
 
+后续 W2 光标会话接入：Host/Client/Bridge/Executor 已复用现有身份、连接和
+generation 接入光标；旧 v2 视频格式保持，独立光标能力仅由支持的后端公告。
+最多一份未消费更新，与视频额度独立；切屏/关闭等待两类源释放，光标失败不
+关闭视频与输入。protocol 68、会话单元 6、可靠流 25、Bridge 2、Executor 2
+项通过。原生 helper/采样/渲染仍未接入，生产后端暂不公告光标能力；03.5
+保持未完成，下一步接独立 helper IPC。详见
+[光标会话记录](acceptance/remote-desktop-cursor-session-2026-10-17.md)。
+
 2026-10-17 W4 操作端进展：真实 Mac MCP/Desktop 已通过既有认证连接 90，
 AI 提示打开正式独立窗口。修复全尺寸 contentView 的标题栏偏移导致原生画面
 遮住工具栏；修复前可复现，8 项原生布局检查及真实窗口/全屏/恢复通过。

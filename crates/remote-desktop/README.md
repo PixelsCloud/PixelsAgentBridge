@@ -88,9 +88,14 @@ redacted. Never log serialized input or password text.
 ## Independent cursor framing (integration in progress)
 
 `DesktopCursorReader` / `DesktopCursorWriter` provide bounded framing on an
-existing reliable stream. They are not yet attached to `DesktopHost`, helper
-registration or native renderers, and do not advertise a new capability. The
-existing desktop schema and authentication/session behavior are unchanged.
+existing reliable stream. `DesktopHost` now attaches it to the existing owner,
+connection and generation, and `DesktopBackend::cursor` supplies snapshots.
+Only backends opting in with `supports_cursor` advertise the optional
+`remote_desktop_cursor_schema_version` environment field. The Bridge passes
+this capability to the session; unknown/absent versions retain existing v2
+video/input behavior and do not open cursor streams. Native helper adapters
+and renderers are still pending, so production backends currently keep the
+default unsupported cursor capability.
 
 Each update binds session, generation and exact sequence. A new image has a
 monotonic generation-local ID; subsequent position/visibility updates reference
@@ -110,11 +115,20 @@ cancelled IO retires the cursor stream without closing the shared connection.
 Shape metadata is validated before allocating a payload. Cursor images have no
 Debug implementation and must not be archived in logs.
 
-Remaining integration: negotiate cursor support through the existing session,
-bind the source to the selected helper/generation, keep one latest snapshot
-independent of video credit, collect platform cursor metadata, and overlay it in
-all native renderers with clipping, scaling and hidden-state cleanup. Framing
-tests alone do not demonstrate any visible cursor in the app.
+`RemoteDesktopSession::open_cursor` returns an independent reader with
+`next_update`. It consumes and acknowledges each update with an 8-byte
+little-endian sequence in the reverse framed direction. This confirms receipt
+and validation, not display. The host permits only one outstanding update;
+the source keeps its latest snapshot while waiting, independent of video
+credit. There is one cursor stream per video generation. Cursor stream errors
+preserve video and input; restart the generation to obtain a new cursor stream.
+Screen selection, close and session drop invalidate retained readers. Closing
+or changing a generation waits for both native video and cursor sources to end.
+
+Remaining integration: bind the source to the selected native helper, collect
+platform cursor metadata, and overlay it in all native renderers with clipping,
+scaling and hidden-state cleanup. Tests using generated snapshots do not
+demonstrate any visible cursor in the app.
 
 ## Verification
 
