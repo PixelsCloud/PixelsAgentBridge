@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-18",
+  "status": "implemented_live_acceptance_pending",
+  "base_commit": "47dace4",
+  "build": [
+    {
+      "stage": 0,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "stage": 1,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "stage": 2,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "artifact": "pab-desktop",
+      "sha256": "3d0e963a9923e4ae7f0bc0dac998c3a5f10122c0a17e4b946dced44482119b22",
+      "bytes": 24479584
+    },
+    {
+      "artifact": "pab-media-worker",
+      "sha256": "5ba047cbb27a53cdadbf8402398df2a2c1c1ee0fad4af42fd8979698394a8bfa",
+      "bytes": 1493120
+    },
+    {
+      "artifact": "examples/native_capture_check",
+      "sha256": "09faf08721fbb8899cf621a7733e7e075ccca2616ba16edf45b407c9e98d43ca",
+      "bytes": 1498624
+    },
+    {
+      "artifact": "examples/macos_host_check",
+      "sha256": "30044f1ad1f5aec032b3e782c842f27643844040776b796a6f66c62cb15d03bb",
+      "bytes": 2070928
+    },
+    {
+      "artifact": "examples/native_cursor_check",
+      "sha256": "01ed27dff1d764cc28290d743895fd5da8d42550c26858f770cd5973a90c20be",
+      "bytes": 1129136
+    }
+  ],
+  "pipe": {
+    "worker_sha256": "5ba047cbb27a53cdadbf8402398df2a2c1c1ee0fad4af42fd8979698394a8bfa",
+    "checks": [
+      {
+        "phase": "stale_geometry",
+        "rejected": true,
+        "exit_code": 1
+      },
+      {
+        "phase": "initial_then_eof",
+        "visible": false,
+        "shape": null,
+        "payload_bytes": 0,
+        "unrequested_updates": 0,
+        "exit_code": 1,
+        "shutdown_seconds": 0.013047707999999991
+      },
+      {
+        "phase": "initial_then_stop",
+        "visible": false,
+        "shape": null,
+        "payload_bytes": 0,
+        "unrequested_updates": 0,
+        "exit_code": 0,
+        "shutdown_seconds": 0.031216457999999947
+      }
+    ],
+    "video_frames_requested": 0,
+    "os_input_events": 0,
+    "live_shapes_acceptance": false
+  },
+  "bundle": {
+    "bundle": "/private/tmp/pab-mac-media-99f879354739/Pixels Cursor Source Test.app",
+    "source_sha256": "3d0e963a9923e4ae7f0bc0dac998c3a5f10122c0a17e4b946dced44482119b22",
+    "signed_sha256": "48b830de8e98e5d20436f78540beae3db4e1b8c45d839f9d4e0619904e678763",
+    "installed_app_modified": false,
+    "previous_authorized_bundles_modified": false
+  },
+  "source_hashes": {
+    "crates/desktop-media/native/macos/cursor_source.h": "b03bd414938f9b77aad66c56163c90bb7b3479ef7fc741f3e01acbc0f1738319",
+    "crates/desktop-media/native/macos/capture.h": "de15f16e2766732b3e244a8af3b1920892f8f321dda2445b89ae2c31d924d2bc",
+    "crates/desktop-media/native/macos/worker.mm": "35a70e54019b9d1d730f9027ff49eec3f38f9b645c3ff237f1a186a5feab8804",
+    "crates/desktop-media/src/process.rs": "92728d9089c3cba56c1d8f78bff3550cad1275c2e230370652a1bf234a14bdba",
+    "crates/desktop-media/src/cursor_source.rs": "853d13d36a083448729dec9b154304f819f6941a9aa70921f6638417921b21c7",
+    "apps/desktop/src-tauri/src/session_helper_macos_media.rs": "2712965e227766ab11b63866c0234859b16efcc3e747ccfbfca2bd06b45158b1"
+  },
+  "active_test_processes": [],
+  "windows_library_tests": 22,
+  "macos_library_tests": 23,
+  "generated_shapes": {
+    "color_channels": 48,
+    "max_allowed_channel_error": 2,
+    "invalid_geometry_rejected": 8,
+    "scale_checks": 3
+  },
+  "apple_probe": {
+    "logical_size": [
+      28,
+      40
+    ],
+    "bitmap_representation_size": [
+      280,
+      400
+    ],
+    "hotspot": [
+      5,
+      5
+    ],
+    "visibility_symbol": true,
+    "seed_symbol": true
+  },
+  "live_fixture": {
+    "passed": false,
+    "observed_locked": true,
+    "ordinary_aqua_session": true,
+    "failed_task_ids": [
+      "e71e4ea0-81c9-4354-9ead-fc8d3b5089d7",
+      "13194b64-672c-4c71-80d0-c11f0ef9e3a7",
+      "bc59579c-9ac8-49c0-a19f-8e7119806ced",
+      "f2e2cffb-169e-497b-b6c4-edd5b58dab2c",
+      "71c0d004-3070-4196-bb9b-bfac8dd7ec47"
+    ],
+    "guard_added": true
+  },
+  "build_task_id": "d0a63503-81ed-4e1f-a5c0-559a96600cf9",
+  "pending": [
+    "unlocked actual shape/motion/hide/show",
+    "video has no duplicate cursor",
+    "native_cursor_check real capture lease lifecycle",
+    "formal cross-platform viewer",
+    "old macOS API compatibility",
+    "CPU/resource and FPS acceptance",
+    "system login"
+  ]
+}

@@ -1,4 +1,4 @@
-//! Cursor-only DXGI worker. No desktop surface crosses this pipe. Cancellation
+//! Cursor-only native worker. No desktop surface crosses this pipe. Cancellation
 //! drops/reaps the worker; a retained cursor cannot extend its capture lease.
 use super::*;
 use std::time::Duration;

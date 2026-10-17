@@ -46,8 +46,28 @@ image buffers are bounded, with no position history. The video lease invalidates
 and reaps retained cursor sources even while idle. `cursor-shape-check` uses
 generated shapes without touching the OS pointer; the Windows cursor integration
 test includes an explicitly ignored real-GPU lifecycle check. Windows native
-viewer overlays are connected; Mac/Linux separate sources and overlays remain
-pending.
+viewer overlays are connected, as are the Mac Metal and Linux OpenGL overlays.
+Linux independent capture remains pending.
+
+The Mac backend now shares this cursor process/lease adapter and advertises it
+through the existing session helper. Its video worker selects
+`desktop-separate-cursor` (ScreenCaptureKit `showsCursor = NO`); direct diagnostic
+`desktop` capture retains its embedded cursor. The cursor worker observes
+`NSCursor.currentSystemCursor`, global Core Graphics position and visibility,
+without accessing video surfaces. It rasterizes the bounded NSImage at the
+selected display's capture scale, preserving logical size, hotspot and top-down
+premultiplied BGRA; a high-resolution TIFF representation is not its screen size.
+Only changed shapes cross the pipe. Display geometry changes retire the source.
+
+`CGCursorIsVisible` is a deprecated Apple API with no replacement; it is resolved
+at runtime and a missing symbol fails the optional cursor source. RustDesk's
+`CGSCurrentCursorSeed` optimization is also resolved at runtime, with pixel
+comparison when unavailable. A changing seed disables cache reuse without
+discarding an otherwise complete image snapshot. These compatibility paths and
+older macOS still need real-platform acceptance. Generated shape checks and the
+Mac build pass; live Mac source/video coexistence, hidden/shown/motion and retained
+lease teardown remain pending while the Apple test machine is locked. See
+`acceptance/remote-desktop-macos-cursor-source-2026-10-18.md` from the repo root.
 
 `NativeViewer::cursor_renderer()` returns a generation-owned independent
 submitter. Windows Desktop reads the remote cursor stream alongside video and

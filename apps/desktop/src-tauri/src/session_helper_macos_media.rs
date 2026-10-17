@@ -3,7 +3,7 @@
 use pab_desktop_media::NativeBackend;
 use pab_protocol::{DesktopErrorCode, DesktopScreen, DesktopVideoConfig, RemoteDesktopInput};
 use pab_remote_desktop::{
-    DesktopBackend, DesktopError, DesktopInputSink, DesktopSource, MediaFuture,
+    DesktopBackend, DesktopCursorSource, DesktopError, DesktopInputSink, DesktopSource, MediaFuture,
 };
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{Mutex, OwnedMutexGuard};
@@ -37,6 +37,12 @@ impl DesktopInputSink for Input {
     }
 }
 impl DesktopBackend for Backend {
+    fn supports_cursor(&self) -> bool {
+        self.media.supports_cursor()
+    }
+    fn cursor(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopCursorSource>> {
+        self.media.cursor(config)
+    }
     fn supports_input(&self) -> bool {
         true
     }

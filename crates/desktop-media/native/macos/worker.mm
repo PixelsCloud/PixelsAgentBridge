@@ -2,6 +2,7 @@
 // authenticated reliable transport. No application/network configuration here.
 #include "encoder.h"
 #include "capture.h"
+#include "cursor_source.h"
 #include "decoder.h"
 #include "presenter.h"
 #include "host.h"
@@ -42,21 +43,22 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
     const bool software = mode == "synthetic-software";
     const bool fail_initial = mode == "synthetic-fail-encoder-init";
     const bool fail_encode = mode == "synthetic-fail-encoder";
-    if (mode != "desktop" && mode != "synthetic" && !software && !fail_initial && !fail_encode)
+    const bool desktop = mode == "desktop" || mode == "desktop-separate-cursor";
+    if (!desktop && mode != "synthetic" && !software && !fail_initial && !fail_encode)
         throw std::runtime_error("Unknown capture mode");
     const auto start = Clock::now(); auto next = start;
     VideoEncoder encoder(display.width, display.height, fps, software, fail_initial, fail_encode);
     std::function<OwnedCF<CVPixelBufferRef>(Clock::time_point&)> source;
-    if (mode == "desktop") {
+    if (desktop) {
         if (@available(macOS 12.3, *)) {
-            const auto capture = std::make_shared<Capture>(display, fps);
+            const auto capture = std::make_shared<Capture>(display, fps, mode == "desktop");
             source = [capture](Clock::time_point& time) { return capture->next(time); };
         }
         else throw std::runtime_error("Remote screen capture requires macOS 12.3 or later");
     }
     fprintf(stderr, "media encoder=%s source=%s cpu_pixel_mappings_per_frame=%u\n",
         encoder.software() ? "openh264_software" : "videotoolbox_hardware",
-        mode.c_str(), (mode == "desktop" ? 0u : 1u) + (encoder.software() ? 1u : 0u));
+        mode.c_str(), (desktop ? 0u : 1u) + (encoder.software() ? 1u : 0u));
     write_value(magic); write_value(display.width); write_value(display.height);
     uint64_t index = 0;
     for (;;) { @autoreleasepool {
@@ -127,6 +129,13 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         try {
             const auto found = pab_mac::displays();
             if (argc == 2 && std::string(argv[1]) == "inventory") { pab_mac::inventory(found); return 0; }
+            if (argc == 3 && std::string(argv[1]) == "cursor") {
+                const auto id = pab_mac::number(argv[2], UINT32_MAX);
+                for (const auto& display : found) if (display.id == id) {
+                    pab_mac::cursor_worker(display); return 0;
+                }
+                throw std::runtime_error("Selected cursor display is unavailable");
+            }
             if (argc == 5 && std::string(argv[1]) == "capture") {
                 const auto id = pab_mac::number(argv[2], UINT32_MAX);
                 for (const auto& display : found) if (display.id == id) {

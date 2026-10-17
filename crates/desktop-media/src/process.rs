@@ -9,8 +9,8 @@ use tokio::{
     process::{Child, ChildStderr, ChildStdin, ChildStdout, Command},
     sync::{Mutex, OwnedMutexGuard},
 };
-#[cfg(windows)]
-#[path = "windows_cursor.rs"]
+#[cfg(any(windows, target_os = "macos"))]
+#[path = "cursor_source.rs"]
 mod cursor;
 pub(crate) const MAGIC: u32 = 0x31424150;
 type AnyError = Box<dyn std::error::Error + Send + Sync>;
@@ -97,9 +97,9 @@ pub struct NativeBackend {
     gate: Arc<Mutex<()>>,
     input_gate: Arc<Mutex<()>>,
     input_enabled: bool,
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     cursor_gate: Arc<Mutex<()>>,
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     capture: std::sync::Mutex<Option<std::sync::Weak<cursor::CaptureLease>>>,
 }
 impl NativeBackend {
@@ -110,16 +110,16 @@ impl NativeBackend {
             gate: Arc::new(Mutex::new(())),
             input_gate: Arc::new(Mutex::new(())),
             input_enabled: false,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             cursor_gate: Arc::new(Mutex::new(())),
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             capture: std::sync::Mutex::new(None),
         }
     }
     pub async fn idle(&self) {
         drop(self.gate.lock().await);
         drop(self.input_gate.lock().await);
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         drop(self.cursor_gate.lock().await);
     }
     /// Only the dedicated interactive media helper enables OS input. Capture
@@ -136,10 +136,10 @@ impl NativeBackend {
 struct NativeSource {
     process: MediaChild,
     index: u64,
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     capture: Arc<cursor::CaptureLease>,
 }
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 impl Drop for NativeSource {
     fn drop(&mut self) {
         self.capture.ended.send_replace(true);
@@ -183,9 +183,9 @@ impl DesktopSource for NativeSource {
 }
 impl DesktopBackend for NativeBackend {
     fn supports_cursor(&self) -> bool {
-        cfg!(windows)
+        cfg!(any(windows, target_os = "macos"))
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     fn cursor(&self, config: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopCursorSource>> {
         Box::pin(cursor::open(self, config))
     }
@@ -255,7 +255,11 @@ impl DesktopBackend for NativeBackend {
                     "capture".into(),
                     config.screen.id.clone(),
                     config.fps.to_string(),
-                    "desktop".into(),
+                    if cfg!(target_os = "macos") {
+                        "desktop-separate-cursor".into()
+                    } else {
+                        "desktop".into()
+                    },
                 ],
                 Some(permit),
             )
@@ -278,7 +282,7 @@ impl DesktopBackend for NativeBackend {
             if (width, height) != (config.screen.pixel_width, config.screen.pixel_height) {
                 return Err(media_error("screen changed during source startup"));
             }
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             let capture = {
                 let lease = Arc::new(cursor::CaptureLease::new(config));
                 *self
@@ -291,7 +295,7 @@ impl DesktopBackend for NativeBackend {
             Ok(Box::new(NativeSource {
                 process,
                 index: 0,
-                #[cfg(windows)]
+                #[cfg(any(windows, target_os = "macos"))]
                 capture,
             }) as Box<dyn DesktopSource>)
         })

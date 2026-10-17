@@ -72,7 +72,7 @@ class API_AVAILABLE(macos(12.3)) Capture {
     PABStreamOutput* __strong output_ = nil;
     dispatch_queue_t queue_;
 public:
-    Capture(const Display& display, unsigned fps) : display_(display) {
+    Capture(const Display& display, unsigned fps, bool embedded_cursor = true) : display_(display) {
         if (!CGPreflightScreenCaptureAccess())
             throw std::runtime_error("Screen Recording permission is required for this application");
         const auto content_ready = std::make_shared<Completion>();
@@ -93,7 +93,7 @@ public:
         config.width = display.width; config.height = display.height;
         config.minimumFrameInterval = CMTimeMake(1, fps);
         config.queueDepth = 3;
-        config.showsCursor = YES;
+        config.showsCursor = embedded_cursor;
         config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
         config.colorMatrix = kCGDisplayStreamYCbCrMatrix_ITU_R_709_2;
         config.colorSpaceName = kCGColorSpaceITUR_709;

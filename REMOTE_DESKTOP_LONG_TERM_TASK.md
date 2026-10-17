@@ -15,7 +15,7 @@ Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证�
 
 剩余重点开发集中在四块：
 
-1. Mac/Linux 独立光标采集，保持与现有视频是否包含光标的协商一致。
+1. Mac 独立光标源实机收口及 Linux 独立光标采集，保持与视频是否包含光标一致。
 2. 输入异常及多屏边界，尤其 90 首次激活的重复鼠标消息、混合 DPI/旋转/热插拔。
 3. 登录与会话边界：Mac 系统登录，Windows 开机未登录/UAC/用户切换等。
 4. 媒体积压降档、设备故障/弱网恢复及测试发现的问题。
@@ -24,6 +24,12 @@ Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证�
 2 小时观看、100 次开关和最终 8 小时稳定性；最后集成主线、验证三平台安装升级、
 旧业务和客户配置保留，发布 COS 并验证下载更新。不以单次编译或部分平台通过替代。
 本轮另发现 Linux 无障碍树查询期间 GTK/ATK critical 告警，发布前必须定位。
+
+本轮新增 Mac 独立光标采集及 helper 能力接入，复用已有光标通道和视频生命周期。
+视频采集关闭内嵌光标，形状按逻辑大小/屏幕缩放生成；生成形状检查、Windows 22 项
+和 Mac 23 项媒体单测及 Mac 完整 Desktop 构建通过。Apple 随后处于锁屏状态，
+真实源的移动/隐藏/视频共存及退出回收仍待解锁验证，不能关闭交付条目。见
+[Mac 光标源阶段记录](acceptance/remote-desktop-macos-cursor-source-2026-10-18.md)。
 
 ## 一次性执行任务：完成三平台远程桌面首版并发布
 
@@ -46,7 +52,7 @@ Windows/XRServer 的真实多屏要求不变，Mac 单屏性能、输入、锁�
 移动不上传形状、不增加整帧 CPU 回读。Apple GPU 112 组生成纹理检查通过，
 逐像素比较 7,864,320 点、最大量化误差 1；Windows/Mac 媒体单测 22/20 项通过。
 此前锁屏时宿主检查超时；用户恢复 Apple 后，四组宿主检查及 Mac→90 正式独立
-窗口光标、停止操作/光标源故障后的本地指针恢复通过。Mac/Linux 独立源、其他
+窗口光标、停止操作/光标源故障后的本地指针恢复通过。Mac 独立源已实现待实测，Linux 源、其他
 跨平台组合、登录及长期性能继续保持未完成。详见
 [Mac 光标渲染记录](acceptance/remote-desktop-macos-cursor-render-2026-10-17.md) 和
 [Mac 窗口复测](acceptance/remote-desktop-macos-cursor-product-2026-10-18.md)。
@@ -54,7 +60,7 @@ Windows/XRServer 的真实多屏要求不变，Mac 单屏性能、输入、锁�
 Linux 操作端也已接独立光标 ACK 与现有 OpenGL 视频着色器合成；Wayland 和
 XWayland 各 112 组 GPU 检查、约 786 万像素比较和 Rust GTK 宿主检查通过。
 Linux→90 正式窗口光标、停止操作/源故障后的本地指针恢复及重开恢复通过。
-Mac/Linux 独立源及持续性能仍待验收；VMware 驱动及 GTK/ATK 告警保留。见
+Mac 独立源实测、Linux 独立源及持续性能仍待完成；VMware 驱动及 GTK/ATK 告警保留。见
 [Linux 光标渲染记录](acceptance/remote-desktop-linux-cursor-render-2026-10-18.md) 和
 [Linux 产品窗口记录](acceptance/remote-desktop-linux-cursor-product-2026-10-18.md)。
 
