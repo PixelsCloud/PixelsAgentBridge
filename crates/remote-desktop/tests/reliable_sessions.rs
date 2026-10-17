@@ -15,6 +15,7 @@ const WAIT: Duration = Duration::from_secs(5);
 mod cursor_sessions;
 mod cursor_wire;
 mod flow_recovery;
+mod input_wire;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
@@ -63,6 +64,7 @@ struct Backend {
     maximum: Arc<AtomicUsize>,
     input_active: Arc<AtomicUsize>,
     input_held: Arc<AtomicUsize>,
+    input_applied: Arc<AtomicUsize>,
     wake: Option<Arc<tokio::sync::Notify>>,
     fail_after: Option<u64>,
     encode_delay: Option<Duration>,
@@ -70,6 +72,7 @@ struct Backend {
 struct InputSink {
     active: Arc<AtomicUsize>,
     held: Arc<AtomicUsize>,
+    applied: Arc<AtomicUsize>,
     wake: Option<Arc<tokio::sync::Notify>>,
 }
 impl Drop for InputSink {
@@ -81,6 +84,7 @@ impl Drop for InputSink {
 impl DesktopInputSink for InputSink {
     fn apply(&mut self, event: RemoteDesktopInput) -> MediaFuture<'_, ()> {
         Box::pin(async move {
+            self.applied.fetch_add(1, Ordering::SeqCst);
             match event {
                 RemoteDesktopInput::Key { down, .. } => {
                     self.held.store(usize::from(down), Ordering::SeqCst)
@@ -144,6 +148,7 @@ impl DesktopBackend for Backend {
             Ok(Box::new(InputSink {
                 active: self.input_active.clone(),
                 held: self.input_held.clone(),
+                applied: self.input_applied.clone(),
                 wake: self.wake.clone(),
             }) as Box<dyn DesktopInputSink>)
         })
