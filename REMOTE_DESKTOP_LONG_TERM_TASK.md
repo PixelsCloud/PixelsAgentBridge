@@ -29,6 +29,12 @@ Windows/XRServer 的真实多屏要求不变，Mac 单屏性能、输入、锁�
 [Mac 光标渲染记录](acceptance/remote-desktop-macos-cursor-render-2026-10-17.md) 和
 [Mac 窗口复测](acceptance/remote-desktop-macos-cursor-product-2026-10-18.md)。
 
+Linux 操作端也已接独立光标 ACK 与现有 OpenGL 视频着色器合成；Wayland 和
+XWayland 各 112 组 GPU 检查、约 786 万像素比较和 Rust GTK 宿主检查通过，
+本地 widget 指针恢复通过。真实 Linux 跨机器光标窗口、Mac/Linux 独立源及
+持续性能仍待验收；VMware 驱动告警保留。见
+[Linux 光标渲染记录](acceptance/remote-desktop-linux-cursor-render-2026-10-18.md)。
+
 当前 W5 注销回归发现：登录界面和新用户桌面启动期间，六次自动重试会过早
 耗尽；手动重连可恢复，但这不满足自动恢复要求。已改为有截止时间的退避恢复，
 三项单元测试、完整 Windows Desktop 构建和一次正式窗口注销登录回归通过；

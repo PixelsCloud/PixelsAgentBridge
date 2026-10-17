@@ -563,7 +563,7 @@ async fn stream(
         };
         // The cursor owns a separate remote stream and native submitter. It
         // must stay alive across a pending video read on a static desktop.
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         let cursor_source = if session.supports_cursor() {
             match session.open_cursor().await {
                 Ok(source) => Some(source),
@@ -575,13 +575,13 @@ async fn stream(
         } else {
             None
         };
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         let cursor_renderer = if cursor_source.is_some() {
             Some(viewer.cursor_renderer().map_err(StreamFailure::renderer)?)
         } else {
             None
         };
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         let cursor_work = async move {
             if let (Some(mut source), Some(mut renderer)) = (cursor_source, cursor_renderer) {
                 loop {
@@ -609,7 +609,7 @@ async fn stream(
             }
             std::future::pending::<Result<(), StreamFailure>>().await
         };
-        #[cfg(not(any(windows, target_os = "macos")))]
+        #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
         let cursor_work = std::future::pending::<Result<(), StreamFailure>>();
         publish(
             window,

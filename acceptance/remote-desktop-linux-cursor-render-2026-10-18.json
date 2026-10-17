@@ -1,0 +1,111 @@
+{
+  "recorded_at": "2026-10-18",
+  "base_commit": "2157ad3",
+  "scope": "Linux operator cursor renderer, generated GPU and GTK host checks; actual cross-machine cursor remains pending",
+  "machine": {
+    "os": "Ubuntu 22.04",
+    "compositor": "GNOME Wayland",
+    "renderer": "VMware SVGA3D"
+  },
+  "real_machine": {
+    "session": "299",
+    "session_type": "wayland",
+    "reports": [
+      {
+        "backend": "wayland",
+        "binary": "pab-linux-cursor-test",
+        "exit_code": 0,
+        "stdout": "{\"cases\":112,\"pixels\":7864320,\"max_error\":1,\"truncated_rejected\":80,\"local_widget_cursor_checks\":true,\"blank_reference_type\":-1,\"renderer\":\"SVGA3D; build: RELEASE;  LLVM;\"}\n",
+        "stderr": ""
+      },
+      {
+        "backend": "wayland",
+        "binary": "pab-linux-rust-host-test",
+        "exit_code": 0,
+        "stdout": "\nrunning 1 test\ntest gtk_host_decode_present_cancel_and_restore ... GTK cursor: color/mask/motion/hide/clear ACK, unchanged video count, closed owner passed\nRust GTK host: 8 generated frames, input enable/disable acknowledged, retired input mode waiter failed, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.70s\n\n",
+        "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\n"
+      },
+      {
+        "backend": "x11",
+        "binary": "pab-linux-cursor-test",
+        "exit_code": 0,
+        "stdout": "{\"cases\":112,\"pixels\":7864320,\"max_error\":1,\"truncated_rejected\":80,\"local_widget_cursor_checks\":true,\"blank_reference_type\":-2,\"renderer\":\"SVGA3D; build: RELEASE;  LLVM;\"}\n",
+        "stderr": ""
+      },
+      {
+        "backend": "x11",
+        "binary": "pab-linux-rust-host-test",
+        "exit_code": 0,
+        "stdout": "\nrunning 1 test\ntest gtk_host_decode_present_cancel_and_restore ... GTK cursor: color/mask/motion/hide/clear ACK, unchanged video count, closed owner passed\nRust GTK host: 8 generated frames, input enable/disable acknowledged, retired input mode waiter failed, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s\n\n",
+        "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\n"
+      }
+    ],
+    "hashes": {
+      "pab-linux-cursor-test": "dc7a7cf0048c938be04c292882accd6730aeb32afa5dd7b995bd180560b02bc1",
+      "pab-linux-rust-host-test": "4aa9de2f18a00541c32c08a905aaa2180ff1a506bad3117788b772548046f176"
+    },
+    "staged_root_removed": true
+  },
+  "failed_attempt": {
+    "session": "299",
+    "session_type": "wayland",
+    "reports": [
+      {
+        "backend": "wayland",
+        "binary": "pab-linux-cursor-test",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "Control pointer not hidden\n"
+      }
+    ],
+    "hashes": {
+      "pab-linux-cursor-test": "9ef62f337fd4434a1919ba40eac377ec3610786dce33d72d3667e12eeb043a41",
+      "pab-linux-rust-host-test": "4aa9de2f18a00541c32c08a905aaa2180ff1a506bad3117788b772548046f176"
+    },
+    "staged_root_removed": true
+  },
+  "failed_attempt_analysis": "Test expected GDK_BLANK_CURSOR enum on every backend. Public blank-cursor constructor returns type -1 on Wayland and -2 on X11. Compare against a blank reference on the same backend; product unchanged.",
+  "unit_tests": {
+    "linux": 21,
+    "failed": 0
+  },
+  "desktop_build": {
+    "exit_code": 0,
+    "sha256": "18ec538eb14dd3230ae2d8379f77c48fb64c79351eda7836e76faa6bc3b1882d",
+    "bytes": 45933128,
+    "cargo_jobs": 4,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "build_concurrency": {
+    "media_build_jobs": 8,
+    "media_nested_jobs": 1,
+    "full_desktop_jobs": 4,
+    "full_desktop_cpu_limit": 4,
+    "native_test_jobs": 1,
+    "observed_other_cargo_jobs_during_desktop_build": 4,
+    "combined_max": 9
+  },
+  "source_sha256": {
+    "apps/desktop/src-tauri/src/operator/remote_desktop.rs": "87faa008174eba932f323b122c20010ec2253ccb25cc8bacfff5e8941c56b4b1",
+    "crates/desktop-media/native/linux/cursor_overlay.h": "d37378711aec18175096a42c1530dd78df5fd7cf93afd23b3b70538c823d8193",
+    "crates/desktop-media/native/linux/host.h": "3bf3a6b9546df96b4fcf52fc9ef6af734c35f870413da3ac9c347b79c8db0908",
+    "crates/desktop-media/native/linux/presenter.h": "aa2ceb9a4925c3b1d2e0c8abe82ecea39222a4960306295a9b2247ae60e26160",
+    "crates/desktop-media/native/linux/video_shader.h": "2ad0d6ce9fea2a77955cb55dc88cebd52b2f29c5e3f322e67cbec0e807701553",
+    "crates/desktop-media/native/linux/viewer_input.h": "b5cfea7f988c35cf729f471bf37890ccf48aaaf53ef91922f382112556ff60af",
+    "crates/desktop-media/src/lib.rs": "621d02ebb98bd08fe90c97923fa49f3f98ce37fc493ccc04a3e4b03be6b8d48e",
+    "crates/desktop-media/src/linux_view.rs": "7ec6d48b202770ce8493072982a3f0ac6d104846781c0eb5f28d7a6c366b47de",
+    "crates/desktop-media/tests/linux_host.rs": "4985d26fd495b8992d9464be978908b78009a2dee92e635731f02f07d69bb1f0",
+    "crates/desktop-media/tests/native_linux_cursor.cpp": "a0acc4e0acbfc3d6a5064b79de502d5077480822a43bc4f8c4f23585aa474bcf"
+  },
+  "installed_apps_modified": false,
+  "services_modified": false,
+  "session_unchanged": true,
+  "pending": [
+    "actual Linux operator to Windows cursor window and pointer behavior",
+    "Mac/Linux independent cursor sources",
+    "login/multiple screens/input edge cases",
+    "performance and long-running resource stability"
+  ],
+  "full_goal_complete": false
+}

@@ -5,6 +5,8 @@
 #include <epoxy/gl.h>
 #include <array>
 #include "viewer_input.h"
+#include "cursor_overlay.h"
+#include "video_shader.h"
 
 namespace pab_linux {
 class Presenter {
@@ -13,6 +15,7 @@ class Presenter {
     GtkWidget* hosted_root_ = nullptr;
     GtkWidget* overlay_ = nullptr;
     std::unique_ptr<ViewInput> input_;
+    CursorOverlay cursor_;
     GdkFrameClock* clock_ = nullptr;
     gulong painted_signal_ = 0;
     GThread* thread_ = g_thread_self();
@@ -40,31 +43,8 @@ class Presenter {
     }
     void initialize() {
         if (program_) return;
-        static const char* vertex = R"(#version 150
-out vec2 uv;
-uniform int rotation;
-uniform vec2 visible_fraction;
-void main() {
-    vec2 p[4] = vec2[4](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1));
-    gl_Position = vec4(p[gl_VertexID],0,1);
-    vec2 t = vec2((p[gl_VertexID].x+1)*.5,(1-p[gl_VertexID].y)*.5);
-    if (rotation == 1) t = vec2(t.y,1-t.x);
-    else if (rotation == 2) t = vec2(1-t.x,1-t.y);
-    else if (rotation == 3) t = vec2(1-t.y,t.x);
-    uv = t * visible_fraction;
-})";
-        static const char* fragment = R"(#version 150
-in vec2 uv;
-out vec4 color;
-uniform sampler2D plane_y;
-uniform sampler2D plane_uv;
-void main() {
-    float y = (texture(plane_y,uv).r*255.0-16.0)/219.0;
-    vec2 c = (texture(plane_uv,uv).rg*255.0-vec2(128.0))/224.0;
-    color = vec4(y+1.5748*c.y,y-.187324*c.x-.468124*c.y,y+1.8556*c.x,1);
-})";
-        GLuint vs = shader(GL_VERTEX_SHADER, vertex), fs = 0;
-        try { fs = shader(GL_FRAGMENT_SHADER, fragment); }
+        GLuint vs = shader(GL_VERTEX_SHADER, video_vertex()), fs = 0;
+        try { fs = shader(GL_FRAGMENT_SHADER, video_fragment()); }
         catch (...) { glDeleteShader(vs); throw; }
         program_ = glCreateProgram(); glAttachShader(program_, vs); glAttachShader(program_, fs); glLinkProgram(program_);
         glDeleteShader(vs); glDeleteShader(fs);
@@ -116,6 +96,9 @@ void main() {
             glActiveTexture(GL_TEXTURE0+i); glBindTexture(GL_TEXTURE_2D, textures_[i]);
             glUniform1i(glGetUniformLocation(program_, i ? "plane_uv" : "plane_y"), i);
         }
+        const int drawable_height=gtk_widget_get_allocated_height(area_)*scale;
+        const auto parameters=cursor_.parameters(v,drawable_height,rotation_%2 ? height_ : width_,rotation_%2 ? width_ : height_);
+        cursor_.bind(program_,parameters,drawable_height);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         if (pending_ || verify_redraw_) verify_pixels(v);
         verify_redraw_ = false;
@@ -141,6 +124,7 @@ void main() {
     void drop_gl() noexcept {
         gtk_gl_area_make_current(GTK_GL_AREA(area_));
         if (!gtk_gl_area_get_error(GTK_GL_AREA(area_))) {
+            cursor_.release();
             glDeleteTextures(2, textures_); glDeleteVertexArrays(1, &vao_); if (program_) glDeleteProgram(program_);
         }
         textures_[0] = textures_[1] = vao_ = program_ = 0;
@@ -247,6 +231,13 @@ public:
     void present(const PabCodecBytes& nv12, uint64_t index) {
         poll_events(); submit(nv12,index);
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+    }
+    void cursor(const uint8_t* bytes, size_t size) {
+        poll_events(false); cursor_.update(bytes,size);
+        input_->cursor_tracking(cursor_.tracking());
+        // Cursor-only redraws keep the last uploaded NV12 textures and do not
+        // set pending_ or generate a new video presentation acknowledgement.
+        gtk_gl_area_queue_render(GTK_GL_AREA(area_));
     }
     uint64_t presented() const { return presented_; }
     void input_sink(std::function<bool(const InputPacket&)> sink) { poll_events(false); input_->sink(std::move(sink)); }

@@ -2,7 +2,7 @@
 //! Opt-in graphical integration; creates only an isolated test window.
 use pab_desktop_media::{LinuxNativeViewer, MainThreadDispatch};
 use pab_protocol::*;
-use pab_remote_desktop::VideoFrame;
+use pab_remote_desktop::{CursorUpdate, VideoFrame};
 use std::{
     ffi::c_void,
     sync::{
@@ -166,6 +166,80 @@ fn gtk_host_decode_present_cancel_and_restore() {
         until(|| task.is_finished());
         runtime.block_on(task).unwrap();
         until(|| gtk_bin_get_child(window) == root);
+        // Cursor updates use their own ACKs and cannot invent video frames.
+        let (cursor_config, mut cursor_frames) = fixture();
+        let frame = cursor_frames.remove(0);
+        let mut viewer = LinuxNativeViewer::create(window, &cursor_config, dispatch()).unwrap();
+        let mut cursor = viewer.cursor_renderer().unwrap();
+        assert!(viewer.cursor_renderer().is_err());
+        let mut presented = viewer.presentations();
+        let task = runtime.spawn(async move {
+            viewer.submit(&frame).await.unwrap();
+            assert_eq!(presented.next().await.unwrap().frame_id, 1);
+            for sequence in 1..=8 {
+                let image = sequence == 1 || sequence == 5;
+                let update = CursorUpdate {
+                    header: DesktopCursorHeader {
+                        version: DESKTOP_CURSOR_SCHEMA_VERSION,
+                        session_id: cursor_config.session_id,
+                        generation: cursor_config.generation,
+                        sequence,
+                        position: (sequence != 4 && sequence != 8).then_some(
+                            DesktopCursorPosition {
+                                x: 100 + sequence as i32 * 12,
+                                y: 100,
+                            },
+                        ),
+                        image_id: if sequence < 5 { 1 } else { 2 },
+                        image: image.then_some(DesktopCursorImage {
+                            format: if sequence == 1 {
+                                DesktopCursorFormat::PremultipliedBgra
+                            } else {
+                                DesktopCursorFormat::AndXorBgra
+                            },
+                            width: 16,
+                            height: 16,
+                            hotspot_x: 8,
+                            hotspot_y: 8,
+                        }),
+                    },
+                    bytes: if sequence == 1 {
+                        [0, 0, 180, 180].repeat(256)
+                    } else if sequence == 5 {
+                        [255, 255, 255, 0, 255, 255, 255, 0].repeat(256)
+                    } else {
+                        vec![]
+                    },
+                };
+                cursor.submit(&update).await.unwrap();
+                assert!(
+                    tokio::time::timeout(Duration::from_millis(80), presented.next())
+                        .await
+                        .is_err(),
+                    "cursor redraw inflated video presentations"
+                );
+            }
+            cursor.clear().await.unwrap();
+            assert!(
+                tokio::time::timeout(Duration::from_millis(80), presented.next())
+                    .await
+                    .is_err()
+            );
+            drop(viewer);
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), cursor.clear())
+                    .await
+                    .unwrap()
+                    .is_err(),
+                "cursor retained a closed viewer"
+            );
+        });
+        until(|| task.is_finished());
+        runtime.block_on(task).unwrap();
+        until(|| gtk_bin_get_child(window) == root);
+        println!(
+            "GTK cursor: color/mask/motion/hide/clear ACK, unchanged video count, closed owner passed"
+        );
         // Retire while input enable is queued on GTK. The waiter must fail
         // without needing the queued callback to run on a closing window.
         let (viewer, mut input) =

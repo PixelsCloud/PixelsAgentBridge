@@ -58,3 +58,10 @@ extern "C" bool pab_linux_view_input(void* view,bool enabled,char* error,size_t 
         static_cast<pab_linux::Presenter*>(view)->input_enabled(enabled);
     });
 }
+
+extern "C" bool pab_linux_view_cursor(void* view,const uint8_t* bytes,size_t size,char* error,size_t capacity) noexcept {
+    return pab_linux::host_call(error,capacity,[&] {
+        if (!view || !bytes || !size) throw std::runtime_error("Native cursor command missing");
+        static_cast<pab_linux::Presenter*>(view)->cursor(bytes,size);
+    });
+}
