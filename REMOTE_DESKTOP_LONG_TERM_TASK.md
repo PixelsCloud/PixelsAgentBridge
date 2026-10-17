@@ -188,6 +188,11 @@ LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功
 不是动态网络帧率或系统登录验收。另行通过真实 LaunchServices 显式打开窗口
 和再次打开复用同一 GUI PID 的回归。详见
 [Mac helper 启动与实际输入](acceptance/remote-desktop-macos-helper-startup-2026-10-17.md)。
+随后完成 Windows 正式独立窗口 → Apple 候选服务的首帧显示与关闭验证：真实
+1920×1080 桌面可见，AI 协助进入 active，关闭后回到 waiting。安装版不支持新
+媒体后端，与权限无关；隔离候选服务测试后已恢复原服务，安装文件/设备认证不变，
+临时服务、进程和认证副本已清理。此次未测动态帧率或网络输入，不关闭 W4。
+详见 [Windows → macOS 首帧记录](acceptance/remote-desktop-windows-to-macos-2026-10-17.md)。
 XRServer 四屏记录继续复用；最新只读检查仍有锁屏界面及其他后台任务，未重启
 服务，实际用户桌面的四屏点击验收等待解锁。
 
