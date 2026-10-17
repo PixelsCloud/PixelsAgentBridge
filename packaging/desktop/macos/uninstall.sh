@@ -3,12 +3,13 @@ set -euo pipefail
 [[ $(uname -s) == Darwin && $EUID -eq 0 && $# -eq 0 ]] || { echo 'usage: sudo bash uninstall.sh (macOS)' >&2; exit 2; }
 install_dir='/Library/Application Support/PixelsAgentBridge'
 app='/Applications/Pixels Agent Bridge.app'
+source "$(dirname "$0")/lifecycle.sh"
 if [[ -e $app ]]; then
     bundle_id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist")
     [[ $bundle_id == vip.rgaa.pab.desktop ]] || { echo 'Refusing to remove an unrelated application' >&2; exit 2; }
 fi
-if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&1; then
-    launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
+if login_domain=$(pab_loginwindow_domain) && launchctl print "$login_domain/com.pixelsagentbridge.login-helper" >/dev/null 2>&1; then
+    launchctl bootout "$login_domain/com.pixelsagentbridge.login-helper"
 fi
 while read -r uid; do
     for agent in com.pixelsagentbridge.desktop com.pixelsagentbridge.session-helper; do

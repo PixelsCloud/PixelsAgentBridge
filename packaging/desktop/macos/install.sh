@@ -105,9 +105,9 @@ chmod 644 "$upgrade/new-support/config.toml"
 
 # Stop launchd respawn before retiring the old executable paths.
 upgrade_step='停止旧版后台服务 / stopping old services'
-if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&1; then
-    launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
-    stopped_domains+=(loginwindow)
+if login_domain=$(pab_loginwindow_domain) && launchctl print "$login_domain/com.pixelsagentbridge.login-helper" >/dev/null 2>&1; then
+    launchctl bootout "$login_domain/com.pixelsagentbridge.login-helper"
+    stopped_domains+=("$login_domain")
     stopped_plists+=(/Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist)
 fi
 while read -r uid; do
@@ -154,6 +154,12 @@ if launchctl print "gui/$desktop_uid" >/dev/null 2>&1; then
             started_jobs+=("gui/$desktop_uid/$agent")
         fi
     done
+fi
+if login_domain=$(pab_loginwindow_domain); then
+    if ! launchctl print "$login_domain/com.pixelsagentbridge.login-helper" >/dev/null 2>&1; then
+        launchctl bootstrap "$login_domain" /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
+        started_jobs+=("$login_domain/com.pixelsagentbridge.login-helper")
+    fi
 fi
 committed=1
 printf '%s\n' 'Installed Pixels Agent Bridge. The desktop window opens at sign-in; grant Screen Recording and Accessibility in Settings.'
