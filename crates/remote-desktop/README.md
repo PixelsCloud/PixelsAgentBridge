@@ -85,6 +85,37 @@ changes and provide crash recovery; the session tests use fake sinks and do
 not demonstrate operating-system injection or recovery. Input Debug output is
 redacted. Never log serialized input or password text.
 
+## Independent cursor framing (integration in progress)
+
+`DesktopCursorReader` / `DesktopCursorWriter` provide bounded framing on an
+existing reliable stream. They are not yet attached to `DesktopHost`, helper
+registration or native renderers, and do not advertise a new capability. The
+existing desktop schema and authentication/session behavior are unchanged.
+
+Each update binds session, generation and exact sequence. A new image has a
+monotonic generation-local ID; subsequent position/visibility updates reference
+only the latest image and contain no pixel payload. Replacing a generation
+requires an initial image again. Images are at most 512 x 512: premultiplied BGRA
+or interleaved AND/XOR BGRA for classic inverted cursors, at most 2 MiB. The
+existing 64 KiB binary chunks and transport limits are retained.
+
+Positions describe the hotspot in the selected screen's desktop coordinate
+space, including negative origins. Image pixels use the already-oriented
+visible capture space; renderers must apply viewport scaling and hotspot offset
+without rotating the shape twice. The future capture integration must explicitly
+select embedded/separate/unavailable cursor handling to prevent double drawing.
+
+Static cursor streams may remain idle. Partial data has deadlines; failed or
+cancelled IO retires the cursor stream without closing the shared connection.
+Shape metadata is validated before allocating a payload. Cursor images have no
+Debug implementation and must not be archived in logs.
+
+Remaining integration: negotiate cursor support through the existing session,
+bind the source to the selected helper/generation, keep one latest snapshot
+independent of video credit, collect platform cursor metadata, and overlay it in
+all native renderers with clipping, scaling and hidden-state cleanup. Framing
+tests alone do not demonstrate any visible cursor in the app.
+
 ## Verification
 
 Run compilation sequentially, with no other build active and at most 10 total

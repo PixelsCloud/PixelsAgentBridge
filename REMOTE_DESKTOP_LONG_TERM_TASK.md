@@ -80,6 +80,13 @@ Windows worker，90 的 1080p 硬软混合、全软件和动态桌面均通过 1
 确认，不能计为解决。原安装服务保持，临时程序清理；不改变产品输入语义。
 详见 [Windows 控件与手势记录](acceptance/remote-desktop-windows-controls-2026-10-17.md)。
 
+后续 W2 独立光标基础：新增绑定 session/generation/sequence 的光标元数据与
+可靠流读写，形状变化传图像、移动/隐藏仅传位置，最大 512×512，支持预乘色彩与
+AND/XOR 反色格式。protocol 68 项、会话单元 6 项、可靠流 17 项通过；半包与
+取消不关闭通用连接。尚未接正式会话/helper、系统采集或渲染，不宣布光标功能
+完成，03.5 保留未完成。下一步与边界见
+[光标传输基础记录](acceptance/remote-desktop-cursor-wire-2026-10-17.md)。
+
 2026-10-17 W4 操作端进展：真实 Mac MCP/Desktop 已通过既有认证连接 90，
 AI 提示打开正式独立窗口。修复全尺寸 contentView 的标题栏偏移导致原生画面
 遮住工具栏；修复前可复现，8 项原生布局检查及真实窗口/全屏/恢复通过。

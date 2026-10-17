@@ -3,6 +3,8 @@
 //! are adapters; the shared connection, authentication and legacy streams stay intact.
 mod wire;
 pub use wire::{DesktopVideoReader, DesktopVideoWriter, VideoFrame};
+mod cursor_wire;
+pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};
 mod host;
 pub use host::{
     DesktopBackend, DesktopConnectionGuard, DesktopHost, DesktopInputSink, DesktopSource,

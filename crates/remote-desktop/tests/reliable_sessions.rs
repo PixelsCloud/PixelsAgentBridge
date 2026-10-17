@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 const WAIT: Duration = Duration::from_secs(5);
+mod cursor_wire;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
