@@ -4,7 +4,7 @@
 #include "input.h"
 #include "render.h"
 #include "host.h"
-#include "x11_capture.h"
+#include "x11_input.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
@@ -19,9 +19,12 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             pab_linux::render(pab_linux::number(argv[2],8192),pab_linux::number(argv[3],8192),pab_linux::number(argv[4],60),argv[5],rotation);
             pw_deinit(); return 0;
         }
-        // Input state belongs to compositor-owned per-client devices. Reaping
-        // the prior process closes its D-Bus peer; there is no global key journal.
-        if (argc == 2 && std::string(argv[1]) == "recover-input") { pw_deinit(); return 0; }
+        // GNOME owns per-client devices. XTEST needs the existing supervised
+        // recovery pass to release only this X server generation's held input.
+        if (argc == 2 && std::string(argv[1]) == "recover-input") {
+            if (pab_linux::x11::selected()) pab_linux::x11::recover();
+            pw_deinit(); return 0;
+        }
         if (argc != 2 && argc != 3 && argc != 5) throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop | input SCREEN_ID");
         if (argc == 2 && std::string(argv[1]) != "inventory") throw std::runtime_error("Unsupported Linux media operation");
         if (argc == 3 && std::string(argv[1]) != "input") throw std::runtime_error("Unsupported Linux media operation");

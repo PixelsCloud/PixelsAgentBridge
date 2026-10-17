@@ -118,6 +118,14 @@ Windows 独立原生窗口，30 秒内识别到 408 个新画面；按完整预�
 X11 input、greeter 路由和 Wayland 登录媒体仍未实现，不将此阶段计作系统登录。
 详见 [X11 采集与锁屏缺口](acceptance/remote-desktop-linux-x11-capture-2026-10-17.md)。
 
+后续 W5 X11 输入：XTEST 键鼠、目标 root 坐标映射、滚轮及崩溃释放已实现。
+两个实际 X screen 的按键/按钮事件、边缘/中心定位、EOF/半包/错误包/SIGKILL
+恢复通过，322 项 native sanitizer 检查和 12 项媒体库测试通过。真实 VM 的
+Xorg GDM 已采集并解码非空白首帧、完成四个输入 ACK；Wayland GDM 则在正确
+私有总线上确认采集被禁止。原用户 Wayland 会话和服务均已恢复，配置不变。
+greeter helper 监督、密码登录与正式窗口全链路继续待完成，不关闭 W5。
+详见 [X11 输入与实际 GDM 画面](acceptance/remote-desktop-linux-x11-input-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

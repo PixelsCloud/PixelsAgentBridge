@@ -85,6 +85,7 @@ fn main() {
             "xrandr",
             "xfixes",
             "xdamage",
+            "xtst",
         ] {
             let dependency = pkg_config::Config::new()
                 .probe(library)

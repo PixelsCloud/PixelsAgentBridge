@@ -237,16 +237,4 @@ inline void capture(Connection& connection, const Output& output, unsigned fps) 
         }
     }
 }
-inline void run(int argc, const char* const* argv) {
-    Connection connection; const auto found = outputs(connection);
-    if (argc == 2) {
-        std::vector<pab_linux::Display> displays;
-        for (const auto& output : found) displays.push_back(output.display);
-        inventory(displays); return;
-    }
-    const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& o) { return o.display.id() == argv[2]; });
-    if (selected == found.end()) throw std::runtime_error("Selected X11 display is unavailable");
-    if (argc == 3) throw std::runtime_error("X11 native input backend is not available yet");
-    capture(connection, *selected, number(argv[3], 60));
-}
 }

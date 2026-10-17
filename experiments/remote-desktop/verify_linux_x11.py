@@ -31,6 +31,7 @@ def main():
     env = os.environ.copy(); env.pop('WAYLAND_DISPLAY', None)
     env['XDG_SESSION_TYPE'] = 'x11'
     with tempfile.TemporaryDirectory(prefix='pab-x11-') as temp:
+        env['XDG_RUNTIME_DIR'] = temp
         log = open(pathlib.Path(temp)/'server.log', 'wb')
         server = subprocess.Popen(['Xvfb', '-displayfd', str(write_fd), '-nolisten', 'tcp',
             '-screen', '0', '1920x1080x24', '-screen', '1', '640x480x24'],
@@ -132,6 +133,8 @@ def main():
                             if child.poll() is None:child.kill()
                             child.wait(timeout=5)
                 print(json.dumps({'passed':True,'screens':results}),flush=True)
+                from verify_linux_x11_input import check_input
+                check_input(worker, env, screens)
             finally:x.XCloseDisplay(connection)
         finally:
             os.close(read_fd);server.terminate()

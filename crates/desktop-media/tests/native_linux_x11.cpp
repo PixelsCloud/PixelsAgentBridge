@@ -1,5 +1,5 @@
 // Run only on an isolated X server (verify_linux_x11.py owns it).
-#include "../native/linux/x11_capture.h"
+#include "../native/linux/x11_input.h"
 #include <cassert>
 
 template<class F> void rejects(F f) {
@@ -41,6 +41,25 @@ int main() {
     cursor.width = 513; rejects([&] { blend_cursor(image, output, cursor); }); ++checks;
     cursor.width = 2; cursor.pixels = nullptr; rejects([&] { blend_cursor(image, output, cursor); }); ++checks;
     pab_linux::x11::Connection connection;
+    const auto generation = server_generation(connection.get());
+    assert(!generation.empty()); ++checks;
+    {
+        Releases ledger(connection.get());
+        ledger.save(37, true); ledger.save(256, true);
+        assert(ledger.held(37) && ledger.held(256)); ++checks;
+        rejects([&] { Releases concurrent(connection.get()); }); ++checks;
+        // Storage-only crash simulation; no X input has been injected here.
+    }
+    {
+        Releases ledger(connection.get());
+        assert(ledger.held(37) && ledger.held(256)); ++checks;
+        ledger.save(37, false); ledger.save(256, false);
+    }
+    {
+        Releases ledger(connection.get());
+        for (unsigned i = 0; i < 261; ++i) assert(!ledger.held(i));
+        ++checks;
+    }
     const auto screens = outputs(connection);
     assert(screens.size() == 2); ++checks;
     assert(screens[0].display.id() != screens[1].display.id()); ++checks;
