@@ -234,19 +234,36 @@ public:
         } else window_ = parent.window;
         auto frame = parent.bounds;
         if (!owns_window_) {
+            // Full-size content views include the titlebar. Match the WebView's
+            // unobscured content area before reserving its 72-point toolbar.
+            frame = [parent convertRect:window_.contentLayoutRect fromView:nil];
             frame.size.height = std::max(0.0,frame.size.height-72);
             if (parent.flipped) frame.origin.y += 72;
         }
         view_ = [[PABMetalView alloc] initWithFrame:frame];
         view_->mediaInput.width = width; view_->mediaInput.height = height; view_->mediaInput.rotation = rotation;
-        view_.autoresizingMask = NSViewWidthSizable|NSViewHeightSizable;
+        if (owns_window_) view_.autoresizingMask = NSViewWidthSizable|NSViewHeightSizable;
+        else view_.translatesAutoresizingMaskIntoConstraints = NO;
         view_.wantsLayer = YES;
         CAMetalLayer* layer = (CAMetalLayer*)view_.layer;
         layer.device = device_; layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         layer.framebufferOnly = !verify_; layer.displaySyncEnabled = YES; layer.maximumDrawableCount = 3;
         OwnedCF<CGColorSpaceRef> color(CGColorSpaceCreateWithName(kCGColorSpaceITUR_709));
         layer.colorspace = color.get();
-        [parent addSubview:view_]; [view_ setNeedsLayout:YES];
+        [parent addSubview:view_];
+        if (!owns_window_) {
+            // The guide follows titlebar/fullscreen and window size changes;
+            // autoresizing alone keeps a stale top inset after those changes.
+            NSLayoutGuide* layout = window_.contentLayoutGuide;
+            [NSLayoutConstraint activateConstraints:@[
+                [view_.leadingAnchor constraintEqualToAnchor:layout.leadingAnchor],
+                [view_.trailingAnchor constraintEqualToAnchor:layout.trailingAnchor],
+                [view_.topAnchor constraintEqualToAnchor:layout.topAnchor constant:72],
+                [view_.bottomAnchor constraintEqualToAnchor:layout.bottomAnchor]
+            ]];
+            [parent layoutSubtreeIfNeeded];
+        }
+        [view_ setNeedsLayout:YES];
         if (owns_window_) {
             [window_ makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
             const auto deadline = Clock::now() + std::chrono::seconds(2);

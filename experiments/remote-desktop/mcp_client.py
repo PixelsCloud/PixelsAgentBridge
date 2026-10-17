@@ -10,9 +10,9 @@ import time
 
 
 class McpClient:
-    def __init__(self, executable: Path):
+    def __init__(self, executable: Path, arguments=()):
         self.process = subprocess.Popen(
-            [str(executable.resolve())], stdin=subprocess.PIPE,
+            [str(executable.resolve()), *map(str, arguments)], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8",
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
