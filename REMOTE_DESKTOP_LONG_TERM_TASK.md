@@ -3,6 +3,28 @@
 更新日期：2026-10-18。开发分支：`feat/remote-desktop-v1`。
 本文件是后续执行清单；架构约束见 [实现方案](REMOTE_DESKTOP_IMPLEMENTATION_PLAN.md)。
 
+## 当前进度与剩余开发（2026-10-18）
+
+清单仍为 53 条交付要求：9 条完整关闭，44 条未完整关闭。未关闭项包含已实现、
+部分平台已验收的工作，不能用 9/53 表示代码完成率，也不能把 44 条都当作待写功能。
+
+三平台普通桌面的主要采集/传输/原生显示及输入路径已实现；Windows 锁屏登录、
+Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证据。Windows 独立
+光标源与三平台显示已接通；Mac→Windows、Linux→Windows 的实际窗口光标、
+故障清除和重开恢复已通过。Mac 按已确认的单屏条件验收。
+
+剩余重点开发集中在四块：
+
+1. Mac/Linux 独立光标采集，保持与现有视频是否包含光标的协商一致。
+2. 输入异常及多屏边界，尤其 90 首次激活的重复鼠标消息、混合 DPI/旋转/热插拔。
+3. 登录与会话边界：Mac 系统登录，Windows 开机未登录/UAC/用户切换等。
+4. 媒体积压降档、设备故障/弱网恢复及测试发现的问题。
+
+随后仍需完成 AI 协助占用/账号切换等边界、九种平台组合、30 分钟混合业务、
+2 小时观看、100 次开关和最终 8 小时稳定性；最后集成主线、验证三平台安装升级、
+旧业务和客户配置保留，发布 COS 并验证下载更新。不以单次编译或部分平台通过替代。
+本轮另发现 Linux 无障碍树查询期间 GTK/ATK critical 告警，发布前必须定位。
+
 ## 一次性执行任务：完成三平台远程桌面首版并发布
 
 任务基线：`d9bbf8e`。本节是用户要求的一次性完整执行任务，下文 LT 编号仍作为
@@ -30,10 +52,11 @@ Windows/XRServer 的真实多屏要求不变，Mac 单屏性能、输入、锁�
 [Mac 窗口复测](acceptance/remote-desktop-macos-cursor-product-2026-10-18.md)。
 
 Linux 操作端也已接独立光标 ACK 与现有 OpenGL 视频着色器合成；Wayland 和
-XWayland 各 112 组 GPU 检查、约 786 万像素比较和 Rust GTK 宿主检查通过，
-本地 widget 指针恢复通过。真实 Linux 跨机器光标窗口、Mac/Linux 独立源及
-持续性能仍待验收；VMware 驱动告警保留。见
-[Linux 光标渲染记录](acceptance/remote-desktop-linux-cursor-render-2026-10-18.md)。
+XWayland 各 112 组 GPU 检查、约 786 万像素比较和 Rust GTK 宿主检查通过。
+Linux→90 正式窗口光标、停止操作/源故障后的本地指针恢复及重开恢复通过。
+Mac/Linux 独立源及持续性能仍待验收；VMware 驱动及 GTK/ATK 告警保留。见
+[Linux 光标渲染记录](acceptance/remote-desktop-linux-cursor-render-2026-10-18.md) 和
+[Linux 产品窗口记录](acceptance/remote-desktop-linux-cursor-product-2026-10-18.md)。
 
 当前 W5 注销回归发现：登录界面和新用户桌面启动期间，六次自动重试会过早
 耗尽；手动重连可恢复，但这不满足自动恢复要求。已改为有截止时间的退避恢复，

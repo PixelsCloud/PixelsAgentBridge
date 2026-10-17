@@ -1,0 +1,172 @@
+{
+  "recorded_at": "2026-10-18",
+  "source_commit": "d5e099a",
+  "operator": {
+    "platform": "Ubuntu 22.04 GNOME Wayland",
+    "screen_pixels": [
+      1314,
+      704
+    ],
+    "viewer_drawable": [
+      1244,
+      558
+    ],
+    "image_viewport_screen": [
+      196,
+      146,
+      992,
+      558
+    ]
+  },
+  "target": {
+    "platform": "Windows Server 2022",
+    "screen_pixels": [
+      1920,
+      1080
+    ],
+    "fixture_client": [
+      308,
+      211,
+      1304,
+      681
+    ]
+  },
+  "binaries_sha256": {
+    "pab-desktop": "18ec538eb14dd3230ae2d8379f77c48fb64c79351eda7836e76faa6bc3b1882d",
+    "pab-mcp": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d",
+    "linux_mcp_client.py": "0eb0d96721a5a4b074efff950217aaa56e0e9a2fa1b3b64be04a5b81d04e4140",
+    "run.py": "0983cdda60ebb02c8a00ee2d9d2b2dbdd4696844edefcf0c617f12f6e42cb9d2",
+    "accessibility.py": "d98a7e04d13159c2b6ae5a5b432b1d1edf9349d9b4349eca00c610038c00c96b"
+  },
+  "fresh_probes": [
+    {
+      "zone": 1,
+      "x": 609,
+      "y": 430,
+      "probe": "{\"run\": \"D:\\\\GoCloud\\\\PixelsAgentBridge-remote-desktop\\\\.build\\\\remote-desktop\\\\cursor-90-1d768b42636f\", \"action\": \"probe\"}\r\n{\"zone\":1,\"x\":799,\"y\":550,\"left\":308,\"top\":211,\"width\":1304,\"height\":681,\"visible\":true,\"clicks\":0,\"last_click_x\":-1,\"last_click_y\":-1,\"f24_down\":0,\"f24_up\":0,\"tick\":304}\r\r\n\r\n"
+    },
+    {
+      "zone": 0,
+      "x": 440,
+      "y": 430,
+      "probe": "{\"run\": \"D:\\\\GoCloud\\\\PixelsAgentBridge-remote-desktop\\\\.build\\\\remote-desktop\\\\cursor-90-1d768b42636f\", \"action\": \"probe\"}\r\n{\"zone\":0,\"x\":472,\"y\":550,\"left\":308,\"top\":211,\"width\":1304,\"height\":681,\"visible\":true,\"clicks\":0,\"last_click_x\":-1,\"last_click_y\":-1,\"f24_down\":0,\"f24_up\":0,\"tick\":365}\r\r\n\r\n"
+    },
+    {
+      "zone": 2,
+      "x": 777,
+      "y": 430,
+      "probe": "{\"run\": \"D:\\\\GoCloud\\\\PixelsAgentBridge-remote-desktop\\\\.build\\\\remote-desktop\\\\cursor-90-1d768b42636f\", \"action\": \"probe\"}\r\n{\"zone\":2,\"x\":1125,\"y\":550,\"left\":308,\"top\":211,\"width\":1304,\"height\":681,\"visible\":true,\"clicks\":0,\"last_click_x\":-1,\"last_click_y\":-1,\"f24_down\":0,\"f24_up\":0,\"tick\":426}\r\r\n\r\n"
+    },
+    {
+      "zone": 3,
+      "x": 945,
+      "y": 430,
+      "probe": "{\"run\": \"D:\\\\GoCloud\\\\PixelsAgentBridge-remote-desktop\\\\.build\\\\remote-desktop\\\\cursor-90-1d768b42636f\", \"action\": \"probe\"}\r\n{\"zone\":3,\"x\":1450,\"y\":550,\"left\":308,\"top\":211,\"width\":1304,\"height\":681,\"visible\":false,\"clicks\":0,\"last_click_x\":-1,\"last_click_y\":-1,\"f24_down\":0,\"f24_up\":0,\"tick\":488}\r\r\n\r\n"
+    }
+  ],
+  "cursor_fault": {
+    "killed_cursor_worker_pid": 28540,
+    "same_window_active_after_fault": true,
+    "input_after_fault": [
+      1450,
+      550
+    ],
+    "video_stripe_continued": true,
+    "local_pointer_restored_observed": true,
+    "measurement": {
+      "region": [
+        600,
+        420,
+        635,
+        452
+      ],
+      "cyan_pixels_before": 68,
+      "cyan_pixels_after_fault": 0,
+      "comparison_kind": "descriptive lossy H264 screenshot; not exact pixel equality"
+    }
+  },
+  "reopen": {
+    "default_view_only": true,
+    "different_window_label": true,
+    "new_cursor_worker_pid": 19076,
+    "input_after_reenable": [
+      1125,
+      550
+    ],
+    "and_xor_cursor_observed": true
+  },
+  "assistance_history": [
+    {
+      "status": "waiting",
+      "window_label": null,
+      "revision": 1
+    },
+    {
+      "status": "waiting",
+      "window_label": null,
+      "revision": 2
+    },
+    {
+      "status": "waiting",
+      "window_label": null,
+      "revision": 3
+    },
+    {
+      "status": "active",
+      "window_label": "desktop-viewer-eb1bbb1a-7466-40d6-8e79-0579678b5050",
+      "revision": 4
+    },
+    {
+      "status": "waiting",
+      "window_label": null,
+      "revision": 5
+    },
+    {
+      "status": "active",
+      "window_label": "desktop-viewer-18706ec8-ca96-4463-b2a9-036fc4778f1e",
+      "revision": 6
+    }
+  ],
+  "cleanup": {
+    "candidate_processes": 0,
+    "profile_and_copied_credentials_removed": true,
+    "assistance_cancelled": true,
+    "session_unchanged": true
+  },
+  "windows_cleanup": {
+    "original_service_restored": true,
+    "service": "Running",
+    "owned_processes": 0,
+    "held_release_flags": 0,
+    "staged_tasks_and_root_removed": true
+  },
+  "snapshot_sha256": {
+    "cursor-failure.h264": "3d4464b1cd92463ec97f16c58462d0acf7bacf10bbcfe3468208044ac91da7c2",
+    "first.h264": "8ffd5396d941a4731e7a07077fe0b6fe97329f99bbce747b79e2700d7882ad9e",
+    "fresh-zone0.h264": "04030b1f746930309c8a74b8131cee62254f3def7d2c7afe75af9a300d33a8af",
+    "fresh-zone1.h264": "89b198478dca27165c7e2ae916de027215179639d227ba9901a7ff7a356265fe",
+    "fresh-zone2.h264": "6a1d833de296dcbbf96688b0b9dadd650bc5a17c09f356ebc0ba597d49b3f7d1",
+    "fresh-zone3.h264": "2f3edccc02dc9248568081b2b7ed2b822863cee7c5a91dde174911b5234fb958",
+    "reopened-mask.h264": "d290b2ae2afedaf05d5ff20b412313877319a7a7a085783996fc25ea0de9e720",
+    "reopened-view-only.h264": "9e81fb7663e1a8d4c9ccb54d8c835bdd594c105e8f8681b8bec5fa959e3edfe9",
+    "stopped-control.h264": "526a91966abe00626296462e78b6cad7335ae43abdaec5b5311e23d1eb61b22a",
+    "zone0.h264": "630ac69448ad783009e6f8a5ab72f09c49992be891e5dd6275fb2198a52c163c",
+    "zone1.h264": "8ffd5396d941a4731e7a07077fe0b6fe97329f99bbce747b79e2700d7882ad9e",
+    "zone2.h264": "c2dd2a7531559406c4767546c8b42e0567e99d7a1fa932e64b1dee61eadf59dc",
+    "zone3.h264": "1ba66d810d8f5438c6daf95e09f71293738cb12c66f4ee8f60fe4c0721e63261"
+  },
+  "invalid_attempts": [
+    "First isolated connection lacked the 90 credential; imported only existing authorized 90 credential after matching control server, then removed its transfer file.",
+    "Initial move was not confirmed at source. Fixture then expired; zone0/zone1/zone2/zone3 screenshots excluded. One capture failed and its old file was fetched; excluded. Fresh round required successful capture and source zone confirmation."
+  ],
+  "warnings": [
+    "GTK/ATK critical diagnostics during accessibility traversal; root cause not proven, release follow-up required."
+  ],
+  "scope_limits": [
+    "No FPS measurement",
+    "No true multiple-monitor acceptance",
+    "Capture screenshot is decoded lossy H264, not exact product framebuffer readback",
+    "Ordinary single-screen Wayland operator only; does not close all Linux or cross-platform requirements"
+  ],
+  "full_goal_complete": false
+}
