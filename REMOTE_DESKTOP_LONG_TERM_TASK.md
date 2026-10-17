@@ -143,6 +143,13 @@ greeter helper 监督、密码登录与正式窗口全链路继续待完成，�
 进程/目录清零；未覆盖安装版。正式窗口密码登录、实际安装升级与 Wayland
 锁屏媒体仍待完成，详见 [Linux 监督与交接记录](acceptance/remote-desktop-linux-supervisor-2026-10-17.md)。
 
+后续 W5 正式登录：Windows 正式独立观看窗口已通过原 Wayland 用户桌面→锁定
+原会话并切至 Xorg GDM→窗口点击用户并输入系统密码→原会话解锁及画面自动
+恢复，返回后重置只查看。系统状态和实际显示采样均通过，未使用恢复脚本
+代替密码登录。原服务和配置已恢复；本机隔离 profile 删除被自动审批策略
+拦截，已记录为受限 ACL 下待清理。此结果不代表注销新登录或默认 Wayland
+锁屏媒体可用，详见 [Linux 正式窗口登录](acceptance/remote-desktop-linux-system-login-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
