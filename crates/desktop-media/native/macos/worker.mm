@@ -106,6 +106,12 @@ static void render(unsigned width, unsigned height, unsigned fps, unsigned rotat
         write_value(uint8_t(1)); write_value(index);
         before = Clock::now(); presenter.render(image.get(), index);
         render_us += std::chrono::duration<double,std::micro>(Clock::now()-before).count();
+        // Submission/command completion can precede, or fail to produce, a
+        // positively timestamped presentation. Keep this frame until it is
+        // actually shown, including static redraw after occlusion/restore.
+        // EOF still cancels a hidden standalone viewer through parent_alive.
+        while (presenter.displayed() <= index) { parent_alive(); idle(); pump(); }
+        if (presenter.displayed() != index + 1) throw std::runtime_error("Native presentation sequence changed");
         write_value(uint8_t(2)); write_value(index); ++expected;
     } }
 }

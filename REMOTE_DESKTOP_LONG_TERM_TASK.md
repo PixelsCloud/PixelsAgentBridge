@@ -155,12 +155,20 @@ greeter helper 监督、密码登录与正式窗口全链路继续待完成，�
 可用，但 PRIME 导出仍失败；只读 mmap 得到全黑画面，不能接入为可用后备。
 独立 uinput/虚拟机控制台恢复了 hy 的新 Wayland 会话；原程序/TOML 哈希
 不变，临时登录偏好、输入设备和恢复运行资源已清理。该恢复不是产品窗口
-新登录验收；默认 Wayland 登录采集与新内核回归仍待完成。详见
+新登录验收；新内核普通桌面的两轮媒体 IPC 和 helper 启停回归已通过，默认
+Wayland 登录采集仍待完成。详见
 [Linux DRM 驱动探测](acceptance/remote-desktop-linux-drm-driver-2026-10-17.md)。
 
-Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
-缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
-获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
+Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
+进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
+LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；
+未修改 TCC 或安装版。实际 1080p 桌面已完成 15/30 FPS 配置的硬件采集编码；
+这还不是动态网络显示验收。Metal 提交确认早于真实呈现的问题已修复：宿主
+按实际呈现回调确认，隐藏、静帧恢复和取消在默认/软件解码两组均通过。
+完整 Desktop 4 jobs 构建及 11 项媒体库测试通过；真实桌面码流经新签名包
+硬件/软件重放四组显示事件与实际呈现完全一致，临时 GUI、进程与原始画面
+文件已清理。网络产品窗口、真实输入和登录仍待完成。详见
+[Mac 权限归因与显示确认](acceptance/remote-desktop-macos-presentation-2026-10-17.md)。
 XRServer 四屏记录继续复用；最新只读检查仍有锁屏界面及其他后台任务，未重启
 服务，实际用户桌面的四屏点击验收等待解锁。
 

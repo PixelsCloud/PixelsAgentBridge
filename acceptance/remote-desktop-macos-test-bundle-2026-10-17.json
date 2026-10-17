@@ -16,6 +16,15 @@
     },
     "platform": "macos"
   },
+  "diagnostic_context": "Executor descendant in GUI bootstrap; TCC responsible process is Executor, not a LaunchServices-started App",
+  "launch_services_recheck": {
+    "screenRecording": true,
+    "accessibility": true,
+    "activeConsole": true,
+    "monitors": 1,
+    "same_signed_binary": true,
+    "tcc_modified": false
+  },
   "installed_app_modified": false,
   "tcc_modified": false
 }

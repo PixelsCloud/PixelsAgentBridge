@@ -9,8 +9,8 @@ use std::{
     io,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Condvar, Mutex,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -34,7 +34,12 @@ unsafe extern "C" {
         error: *mut c_char,
         capacity: usize,
     ) -> *mut c_void;
-    fn pab_mac_view_poll(view: *mut c_void, error: *mut c_char, capacity: usize) -> bool;
+    fn pab_mac_view_poll(
+        view: *mut c_void,
+        presented: *mut u64,
+        error: *mut c_char,
+        capacity: usize,
+    ) -> bool;
     fn pab_mac_view_input(
         view: *mut c_void,
         enabled: bool,
@@ -93,13 +98,20 @@ struct State {
     view: AtomicUsize,
     stopped: AtomicBool,
     poll_pending: AtomicBool,
+    displayed: AtomicU64,
+    wake: Condvar,
+    gate: Mutex<()>,
     dispatch: MainThreadDispatch,
     events: mpsc::Sender<Vec<u8>>,
     failure: watch::Sender<Option<String>>,
 }
 impl State {
-    fn fail(&self, error: impl Into<String>) {
+    fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
+        self.wake.notify_all();
+    }
+    fn fail(&self, error: impl Into<String>) {
+        self.stop();
         let mut error = Some(error.into());
         self.failure.send_if_modified(|current| {
             if current.is_some() {
@@ -134,6 +146,22 @@ impl State {
     }
     fn pointer(&self) -> *mut c_void {
         self.view.load(Ordering::Acquire) as *mut c_void
+    }
+    fn wait_presented(&self, index: u64) -> bool {
+        let Ok(mut guard) = self.gate.lock() else {
+            self.fail("native display gate failed");
+            return false;
+        };
+        while !self.stopped.load(Ordering::Acquire)
+            && self.displayed.load(Ordering::Acquire) <= index
+        {
+            let Ok((next, _)) = self.wake.wait_timeout(guard, Duration::from_millis(50)) else {
+                self.fail("native display gate failed");
+                return false;
+            };
+            guard = next;
+        }
+        !self.stopped.load(Ordering::Acquire)
     }
 }
 impl Drop for State {
@@ -198,6 +226,9 @@ impl MacNativeViewer {
             view: AtomicUsize::new(0),
             stopped: AtomicBool::new(false),
             poll_pending: AtomicBool::new(false),
+            displayed: AtomicU64::new(0),
+            wake: Condvar::new(),
+            gate: Mutex::new(()),
             dispatch,
             events,
             failure,
@@ -337,7 +368,7 @@ impl MacNativeViewer {
                     let mut error = [0; 512];
                     // SAFETY: retained surface and view stay alive for this
                     // main-thread draw. Native retains any pending GPU leases.
-                    if unsafe {
+                    if !unsafe {
                         pab_mac_view_render(
                             state.pointer(),
                             surface.0 as *mut c_void,
@@ -346,8 +377,6 @@ impl MacNativeViewer {
                             error.len(),
                         )
                     } {
-                        state.event(2, index);
-                    } else {
                         state.fail(message(&error));
                     }
                     drop(surface);
@@ -355,11 +384,17 @@ impl MacNativeViewer {
                     state.fail(error.to_string());
                     break;
                 }
+                // Retain one pending native surface rather than accumulating
+                // UI closures while hidden. The four-packet queue provides
+                // backpressure; cancellation wakes this worker without UI work.
+                if !state.wait_presented(index) {
+                    break;
+                }
             }
         });
         let weak = Arc::downgrade(&state);
         let timer = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(50));
+            let mut interval = tokio::time::interval(Duration::from_millis(8));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 interval.tick().await;
@@ -374,11 +409,26 @@ impl MacNativeViewer {
                 }
                 if let Err(error) = state.schedule(|state| {
                     let mut error = [0; 512];
+                    let mut count = 0;
                     // SAFETY: only the host main thread touches AppKit.
                     if !unsafe {
-                        pab_mac_view_poll(state.pointer(), error.as_mut_ptr(), error.len())
+                        pab_mac_view_poll(
+                            state.pointer(),
+                            &mut count,
+                            error.as_mut_ptr(),
+                            error.len(),
+                        )
                     } {
                         state.fail(message(&error));
+                    } else {
+                        let previous = state.displayed.load(Ordering::Acquire);
+                        if count < previous || count > previous + 1 {
+                            state.fail("native presentation sequence changed");
+                        } else if count > previous {
+                            state.event(2, count - 1);
+                            state.displayed.store(count, Ordering::Release);
+                            state.wake.notify_all();
+                        }
                     }
                     state.poll_pending.store(false, Ordering::Release);
                 }) {
@@ -424,7 +474,7 @@ impl MacNativeViewer {
 }
 impl Drop for MacNativeViewer {
     fn drop(&mut self) {
-        self.state.stopped.store(true, Ordering::Release);
+        self.state.stop();
         self.timer.abort();
         self.relay.abort();
         self.decode.abort();

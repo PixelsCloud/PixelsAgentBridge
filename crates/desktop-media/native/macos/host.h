@@ -37,8 +37,14 @@ void* pab_mac_view_new(void* window, unsigned width, unsigned height, unsigned r
     });
     return result;
 }
-bool pab_mac_view_poll(void* view, char* error, size_t capacity) noexcept {
-    return pab_mac::host_call(error,capacity,[&] { pab_mac::host_main(); static_cast<pab_mac::NativePresenter*>(view)->pump_events(); });
+bool pab_mac_view_poll(void* view, uint64_t* presented, char* error, size_t capacity) noexcept {
+    return pab_mac::host_call(error,capacity,[&] {
+        pab_mac::host_main();
+        if (!view || !presented) throw std::runtime_error("Native Metal view is missing");
+        auto& presenter = *static_cast<pab_mac::NativePresenter*>(view);
+        presenter.pump_events();
+        *presented = presenter.displayed();
+    });
 }
 bool pab_mac_view_input(void* view, bool enabled, char* error, size_t capacity) noexcept {
     return pab_mac::host_call(error,capacity,[&] { pab_mac::host_main(); static_cast<pab_mac::NativePresenter*>(view)->input_enabled(enabled); });
