@@ -16,6 +16,7 @@ pub struct ViewerStatus {
     error: Option<String>,
     opened: Option<DesktopOpened>,
     input_ready: bool,
+    frame_ready: bool,
     input_enabled: bool,
 }
 enum Command {
@@ -94,6 +95,7 @@ impl From<pab_bridge::RuntimeError> for StreamFailure {
 }
 struct Owner {
     code: DeviceCode,
+    initial_screen: Option<String>,
     account: String,
     runtime: Arc<BridgeRuntime>,
     stop: watch::Sender<bool>,
@@ -116,6 +118,18 @@ fn account() -> Result<String, String> {
         .ok_or_else(|| "login required to view a remote computer".into())
 }
 impl RemoteDesktopState {
+    pub(crate) async fn assistance_viewing(&self, label: &str, code: DeviceCode) -> bool {
+        let owners = self.windows.lock().await;
+        owners.get(label).is_some_and(|owner| {
+            owner.code == code
+                && account().ok().as_ref() == Some(&owner.account)
+                && !*owner.stop.borrow()
+                && {
+                    let status = owner.status.borrow();
+                    status.phase == "viewing" && status.frame_ready
+                }
+        })
+    }
     async fn owner(&self, window: &WebviewWindow) -> Result<Arc<Owner>, String> {
         let owner = self
             .windows
@@ -155,6 +169,18 @@ pub async fn desktop_viewer_window(
     if window.label() != "main" {
         return Err("only the main window can open a remote desktop".into());
     }
+    open_window(app, &state, &viewers, code, None, false)
+        .await
+        .map(|_| ())
+}
+pub(crate) async fn open_window(
+    app: tauri::AppHandle,
+    state: &OperatorState,
+    viewers: &RemoteDesktopState,
+    code: String,
+    initial_screen: Option<String>,
+    for_assistance: bool,
+) -> Result<String, String> {
     if !cfg!(any(windows, target_os = "macos", target_os = "linux")) {
         return Err("native remote desktop viewer is not available on this platform yet".into());
     }
@@ -166,8 +192,12 @@ pub async fn desktop_viewer_window(
         .await
         .map_err(|e| e.to_string())?
         .into_iter()
-        .find(|d| d.code == code)
-        .ok_or("device is not in the added device list")?;
+        .find(|d| d.code == code);
+    if saved.is_none() && !for_assistance {
+        return Err("device is not in the added device list".into());
+    }
+    // An authenticated MCP request need not add a permanent catalog entry.
+    // The viewer still establishes its own existing authenticated connection.
     let mut owners = viewers.windows.lock().await;
     for (label, owner) in owners.iter() {
         if owner.code == code
@@ -176,8 +206,26 @@ pub async fn desktop_viewer_window(
             && !*owner.stop.borrow()
         {
             if let Some(window) = app.get_webview_window(label) {
+                if for_assistance {
+                    let status = owner.status.borrow().clone();
+                    if status.input_enabled {
+                        if let Some(opened) = status.opened {
+                            owner
+                                .commands
+                                .try_send(Command::Input(false, InputGeneration::from(&opened)))
+                                .map_err(|_| "viewer is busy; retry opening assistance")?;
+                        }
+                    }
+                }
+                if let Some(screen) = initial_screen {
+                    owner
+                        .commands
+                        .try_send(Command::Screen(screen))
+                        .map_err(|_| "viewer is busy; retry opening assistance")?;
+                }
                 let _ = window.unminimize();
-                return window.set_focus().map_err(|e| e.to_string());
+                window.set_focus().map_err(|e| e.to_string())?;
+                return Ok(label.clone());
             }
         }
     }
@@ -190,6 +238,7 @@ pub async fn desktop_viewer_window(
     });
     let owner = Arc::new(Owner {
         code,
+        initial_screen,
         account,
         runtime,
         stop,
@@ -201,11 +250,11 @@ pub async fn desktop_viewer_window(
     owners.insert(label.clone(), owner);
     let title = format!(
         "Pixels · {} · {code}",
-        if saved.alias.is_empty() {
-            "远程桌面"
-        } else {
-            &saved.alias
-        }
+        saved
+            .as_ref()
+            .map(|s| s.alias.as_str())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("远程桌面")
     );
     let builder = WebviewWindowBuilder::new(
         &app,
@@ -226,17 +275,17 @@ pub async fn desktop_viewer_window(
     };
     match builder.build() {
         Ok(created) => {
-            let label = label.clone();
+            let closed_label = label.clone();
             created.on_window_event(move |event| {
                 if matches!(event, tauri::WindowEvent::Destroyed) {
                     let app = app.clone();
-                    let label = label.clone();
+                    let label = closed_label.clone();
                     tauri::async_runtime::spawn(async move {
                         app.state::<RemoteDesktopState>().close(&label).await;
                     });
                 }
             });
-            Ok(())
+            Ok(label)
         }
         Err(error) => {
             owners.remove(&label);
@@ -319,6 +368,7 @@ fn publish(
         opened,
         error,
         input_ready: false,
+        frame_ready: false,
         input_enabled: false,
     };
     owner.status.send_replace(status.clone());
@@ -353,7 +403,7 @@ async fn run(
     };
     let work = async {
         let mut fps = 15;
-        let mut screen = None;
+        let mut screen = owner.initial_screen.clone();
         let mut failures = 0u32;
         let mut software_decoder = false;
         loop {
@@ -549,6 +599,7 @@ async fn stream(
                     if !*ready.borrow() {
                         first_presented.get_or_insert_with(Instant::now);
                         ready.send_replace(true);
+                        owner.status.send_modify(|status| status.frame_ready = true);
                         publish_input(window, owner, supported, false);
                     }
                 }

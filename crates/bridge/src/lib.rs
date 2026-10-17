@@ -2,6 +2,7 @@
 
 mod config;
 mod connection;
+pub mod desktop_assistance;
 pub mod desktop_presence;
 pub mod mcp_tool_settings;
 pub mod output_text;

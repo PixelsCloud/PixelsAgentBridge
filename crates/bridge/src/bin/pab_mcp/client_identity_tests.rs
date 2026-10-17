@@ -17,7 +17,7 @@ async fn legacy_and_modern_clients_report_identity_before_any_tool_call() {
             let (reporter, reporting) = McpReporter::start_at(format!("ws://{}/ws/mcp", listener.local_addr().unwrap()));
             let server = McpServer {
                 tool_settings: Arc::new(Default::default()), runtime: Default::default(),
-                reporter, runtime_reporting: Default::default(), operations: Default::default(),
+                reporter, runtime_reporting: Default::default(), operations: Default::default(), assistance: Default::default(),
             };
             let (client_io, server_io) = tokio::io::duplex(256 * 1024);
             let serving = tokio::spawn(async move { server.serve(server_io).await.unwrap().waiting().await.unwrap(); });

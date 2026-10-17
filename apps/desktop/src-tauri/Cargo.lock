@@ -5456,6 +5456,7 @@ dependencies = [
  "toml_edit 0.25.15+spec-1.1.0",
  "tracing",
  "url",
+ "uuid",
  "webbrowser",
  "windows-sys 0.61.2",
  "xcap",

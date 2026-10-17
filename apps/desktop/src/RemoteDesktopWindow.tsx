@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./remoteDesktop.css";
+import type { Assistance } from "./DesktopAssistanceNotice";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
 type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
@@ -18,6 +19,19 @@ export default function RemoteDesktopWindow() {
   const [status, setStatus] = useState<Status>({ phase: "ready" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [assistance, setAssistance] = useState<Assistance[]>([]);
+  const [finishing, setFinishing] = useState(false);
+  useEffect(() => {
+    let active = true; let pending = false;
+    const refresh = async () => {
+      if (pending) return; pending = true;
+      try { const rows = await invoke<Assistance[]>("desktop_viewer_assistance"); if (active) setAssistance(rows); }
+      catch { if (active) setAssistance([]); }
+      finally { pending = false; }
+    };
+    void refresh(); const timer = window.setInterval(() => void refresh(), 1000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | undefined;
@@ -40,7 +54,17 @@ export default function RemoteDesktopWindow() {
   const phase = text[status.phase as keyof typeof text] || status.phase;
   return <main className="remote-desktop">
     <header className="remote-desktop-toolbar">
-      <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span></div>
+      <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span>
+        {assistance[0] && <button className="remote-desktop-assistance" disabled={finishing || status.phase !== "viewing"}
+          title={assistance[0].request.expected_action} onClick={() => {
+            const id = assistance[0].assistance_id;
+            setFinishing(true);
+            void invoke("desktop_viewer_assistance_complete", { id })
+              .then(() => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id)))
+              .catch((cause) => setError(String(cause)))
+              .finally(() => setFinishing(false));
+          }}>{english ? "Complete assistance" : "完成协助"}{assistance.length > 1 ? ` (${assistance.length})` : ""}: {assistance[0].request.expected_action}</button>}
+      </div>
       <div className="remote-desktop-controls">
         <select aria-label={text.screen} disabled={busy || status.phase !== "viewing"} value={opened?.config.screen.id || ""} onChange={(event) => void control({ screen: event.target.value })}>
           {!opened && <option value="">{text.screen}</option>}

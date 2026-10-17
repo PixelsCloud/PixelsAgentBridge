@@ -11,7 +11,7 @@ test("viewer uses stable screen IDs and bounded controls without frame or input 
   await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => !c.command.startsWith("plugin:")));
   expect(calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args)).toEqual([{ screen: "adapter:left" }, { fps: 30 }]);
-  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control"].includes(c.command))).toBe(true);
+  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control", "desktop_viewer_assistance"].includes(c.command))).toBe(true);
 });
 test("secure attention requires control and recovery never restores input automatically", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
@@ -55,4 +55,29 @@ test("control requires the first frame and resets to viewing on a new screen", a
   await expect(page.getByText("View only", { exact: true })).toBeVisible();
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
   expect(calls).toEqual([{ inputEnabled: true }, { screen: "adapter:left" }]);
+});
+test("assistance requires explicit completion and cannot complete during recovery", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await page.evaluate(() => { (window as any).fixture.assistance = [{ assistance_id: "first", status: "active", request: { expected_action: "Inspect generated UI" } }]; });
+  const complete = page.getByRole("button", { name: "Complete assistance: Inspect generated UI" });
+  await expect(complete).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_assistance_complete").length)).toBe(0);
+  await page.evaluate(() => (window as any).fixture.recover());
+  await expect(complete).toBeDisabled();
+  await page.evaluate(() => { (window as any).fixture.fail(); });
+  await page.getByRole("button", { name: "Reconnect" }).click();
+  await expect(complete).toBeEnabled();
+  await complete.click();
+  await expect(complete).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_assistance_complete").map((c: any) => c.args))).toEqual([{ id: "first" }]);
+});
+test("shared viewer identifies the request being completed and preserves the next request", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await page.evaluate(() => { (window as any).fixture.assistance = [
+    { assistance_id: "first", status: "active", request: { expected_action: "Inspect first dialog" } },
+    { assistance_id: "second", status: "active", request: { expected_action: "Inspect second dialog" } },
+  ]; });
+  await page.getByRole("button", { name: "Complete assistance (2): Inspect first dialog" }).click();
+  await expect(page.getByRole("button", { name: "Complete assistance: Inspect second dialog" })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_assistance_complete").map((c: any) => c.args))).toEqual([{ id: "first" }]);
 });

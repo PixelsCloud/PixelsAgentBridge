@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-17",
+  "implementation_base": "afe045d",
+  "scope": "W6 Windows local MCP to Desktop prompt lifecycle; not the complete remote-operation workflow",
+  "bridge_library_tests_passed": 96,
+  "mcp_binary_tests_passed": 43,
+  "frontend_fixture_tests_passed": 8,
+  "linux_desktop_build": {
+    "passed": true,
+    "runtime_not_yet_verified": true,
+    "sha256": "8ac8671c8c1b5a80daae33f4f7926fb7e893f5e5e24128375e03b6dbac4f0c76",
+    "bytes": 45336904,
+    "cargo_jobs": 8,
+    "nested_jobs": 1
+  },
+  "product": {
+    "passed": true,
+    "isolated_user_data": true,
+    "authenticated_target": "90",
+    "desktop_absent_reported": true,
+    "real_prompt_displayed": true,
+    "explicit_user_cancel_observed": true,
+    "replay_deduplicated": true,
+    "requester_exit_cancelled": true,
+    "wait_observed_expiry": true,
+    "wait_timeout_did_not_cancel": true,
+    "ai_cancel_observed": true,
+    "no_remote_viewer_opened": true,
+    "owned_processes_after_cleanup": 0,
+    "artifacts_sha256": {
+      "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97",
+      "pab-desktop.exe": "bdacbfad5580c64ca93a9fe68daa7ae08199706b12e0223f5d859c131f68e4e6"
+    }
+  },
+  "not_yet_accepted": [
+    "actual remote operation to explicit completion to AI recheck",
+    "real viewer reuse and target busy conflict",
+    "real product account and service switching",
+    "macOS and Linux product assistance workflows"
+  ]
+}

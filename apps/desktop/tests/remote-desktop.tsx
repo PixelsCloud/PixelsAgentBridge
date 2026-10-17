@@ -14,6 +14,7 @@ let inputReady = true, inputEnabled = false;
 const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled });
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false,
+  assistance: [] as any[],
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
   recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; fixture.emit(status()); },
@@ -29,6 +30,11 @@ const fixture = (window as any).fixture = {
     if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
     if (command.startsWith("plugin:")) return null;
     if (command === "desktop_viewer_start") return status();
+    if (command === "desktop_viewer_assistance") return fixture.assistance;
+    if (command === "desktop_viewer_assistance_complete") {
+      fixture.assistance = fixture.assistance.filter((row: any) => row.assistance_id !== args.id);
+      return null;
+    }
     if (command === "desktop_viewer_control") {
       if (fixture.reject) throw "Renderer is busy; retry shortly";
       fixture.emit({ phase: "switching", opened });

@@ -13,6 +13,8 @@ use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 #[path = "pab_mcp/account.rs"]
 mod mcp_account;
+#[path = "pab_mcp/assistance.rs"]
+mod mcp_assistance;
 #[path = "pab_mcp/browser.rs"]
 mod mcp_browser;
 #[path = "pab_mcp/catalog.rs"]
@@ -114,6 +116,7 @@ async fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         reporter: reporter.clone(),
         runtime_reporting: Default::default(),
         operations: Default::default(),
+        assistance: Default::default(),
     };
     let result = async {
         let service = server.clone().serve(stdio()).await?;
@@ -121,6 +124,7 @@ async fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;
+    server.assistance.shutdown().await;
     if let Some(operations) = server.operations.lock().await.take() {
         operations.shutdown().await;
     }
@@ -145,6 +149,7 @@ struct McpServer {
     reporter: McpReporter,
     runtime_reporting: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
     operations: Arc<tokio::sync::Mutex<Option<Arc<mcp_operations::OperationManager>>>>,
+    assistance: Arc<mcp_assistance::Manager>,
 }
 
 impl ServerHandler for McpServer {
@@ -227,6 +232,11 @@ impl ServerHandler for McpServer {
             Err(error)
         } else if request.name == "pab_list_devices" {
             mcp_tools::list_local_devices().await
+        } else if request.name == "pab_desktop_assistance" {
+            match mcp_assistance::parse(&arguments) {
+                Err(error) => Err(error),
+                Ok(args) => self.assistance.call(args, self).await,
+            }
         } else if mcp_operations::handles(&request.name) {
             match self.operation_manager().await {
                 Ok(manager) => manager.call(&request.name, &arguments).await,
@@ -363,14 +373,14 @@ impl ServerHandler for McpServer {
                 let id = arguments
                     .get("operation_id")
                     .or_else(|| arguments.get("request_id"));
-                let operation_ref = id.map(|id| if request.name == "pab_document_open" {
+                let operation_ref = id.filter(|_|request.name!="pab_desktop_assistance").map(|id| if request.name == "pab_document_open" {
                     json!({"device_code":arguments["device_code"],"operation_id":id,"kind":"document_open"})
                 } else {
                     json!({"device_code":arguments["device_code"],"operation_id":id})
                 });
                 let mut response = CallToolResult::structured(
                     json!({"error":{"code":code,"phase":error_phase,"message":error,
-                    "retry_action":if error_phase!="execution" {"correct_request"} else if id.is_some() {"query_original_operation"}else{"inspect_state_before_retry"}},"operation_ref":operation_ref}),
+                    "retry_action":if error_phase!="execution" {"correct_request"} else if request.name=="pab_desktop_assistance" {"retry_same_request_id_or_query_assistance"} else if id.is_some() {"query_original_operation"}else{"inspect_state_before_retry"}},"operation_ref":operation_ref}),
                 );
                 response.is_error = Some(true);
                 response.into()
@@ -470,7 +480,7 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 110);
+        assert_eq!(catalog.tools.len(), 111);
         let names = catalog
             .tools
             .iter()

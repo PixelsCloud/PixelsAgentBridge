@@ -92,6 +92,7 @@ impl ToolGroup {
                 "pab_terminate_process",
             ],
             Self::Desktop => &[
+                "pab_desktop_assistance",
                 "pab_list_apps",
                 "pab_launch_app",
                 "pab_open_file",

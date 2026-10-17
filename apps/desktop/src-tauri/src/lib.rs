@@ -23,6 +23,7 @@ pub fn macos_diagnostics() -> serde_json::Value {
 }
 mod browser_helper;
 mod browser_setup;
+mod desktop_assistance;
 mod device_account;
 mod github_login;
 mod mcp_reporting;
@@ -392,6 +393,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
+        .manage(desktop_assistance::AssistanceState::default())
         .manage(operator::OperatorState::new())
         .manage(operator::desktop_terminal::DesktopTerminalState::default())
         .manage(operator::remote_desktop::RemoteDesktopState::default())
@@ -431,6 +433,12 @@ pub fn run() {
                 .inner()
                 .clone();
             tauri::async_runtime::block_on(mcp_reporting::start(app.handle().clone(), reporting));
+            desktop_assistance::start(
+                app.handle().clone(),
+                app.state::<desktop_assistance::AssistanceState>()
+                    .inner()
+                    .clone(),
+            );
             let handle = app.handle().clone();
             let status = app.state::<LocalStatus>().inner().clone();
             tauri::async_runtime::spawn(watch_local_service(handle, status));
@@ -460,6 +468,12 @@ pub fn run() {
                 operator::remote_desktop::desktop_viewer_window,
                 operator::remote_desktop::desktop_viewer_start,
                 operator::remote_desktop::desktop_viewer_control,
+                desktop_assistance::desktop_assistance_pending,
+                desktop_assistance::desktop_assistance_displayed,
+                desktop_assistance::desktop_assistance_open,
+                desktop_assistance::desktop_assistance_cancel,
+                desktop_assistance::desktop_viewer_assistance,
+                desktop_assistance::desktop_viewer_assistance_complete,
                 operator::desktop_terminal::desktop_terminal_window,
                 operator::desktop_terminal::desktop_terminal_info,
                 operator::desktop_terminal::desktop_terminal_accounts,
@@ -559,7 +573,10 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen { .. } => tray::show_window(handle),
-            tauri::RunEvent::Exit => handle.state::<mcp_reporting::McpReportingState>().stop(),
+            tauri::RunEvent::Exit => {
+                handle.state::<mcp_reporting::McpReportingState>().stop();
+                handle.state::<desktop_assistance::AssistanceState>().stop();
+            }
             _ => {}
         });
 }

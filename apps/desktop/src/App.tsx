@@ -12,6 +12,7 @@ import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
 import { UpdateNotice } from "./UpdateNotice";
 import { BrowserHandoffNotice } from "./BrowserHandoffNotice";
+import { DesktopAssistanceNotice } from "./DesktopAssistanceNotice";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { AccountConnectionPanel, AccountLoginDialog } from "./AccountConnectionPanel";
 import type { ScopeStatus } from "./operatorTypes";
@@ -306,6 +307,7 @@ function App() {
         setLoginOpen(false);
         setView("me");
       }} />
+      <DesktopAssistanceNotice language={language} />
     </div>
     </AntdApp>
     </ConfigProvider>
