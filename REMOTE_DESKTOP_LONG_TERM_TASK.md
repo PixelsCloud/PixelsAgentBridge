@@ -64,6 +64,14 @@ AI 提示打开正式独立窗口。修复全尺寸 contentView 的标题栏偏�
 15 FPS 基线，平台矩阵、登录和持续运行不关闭。详见
 [Mac 操作端动态显示](acceptance/remote-desktop-macos-operator-presentation-2026-10-17.md)。
 
+后续 W4/W5/W6/W7 交叉验证：Mac 正式独立窗口已通过既有连接查看 Linux GNOME
+Wayland 会话 23，完成原生首帧、中心单击（每轴误差 <1 像素）、Ctrl 按下/抬起、
+只查看禁止输入、按住 Ctrl 关闭后远端自动释放，以及 AI waiting→active→
+completed/user_completed 和独立命令复核。原 Linux 服务/配置哈希、会话状态保持，
+临时媒体进程、profile、传输凭据已清理。仅为 1280×800 普通单屏操作，不把设置的
+15 FPS 当成动态性能，也不替代系统登录、其他矩阵方向或持续运行。详见
+[Mac → Linux 产品记录](acceptance/remote-desktop-macos-to-linux-2026-10-17.md)。
+
 2026-10-17 W5 采集阶段：确认 VM 实际为 GNOME Wayland，已实现并编译正式 Linux
 采集 worker，复用原有压缩帧管道和内置软件编解码。2 vCPU VM 在真实 1080p
 全屏动画下，正式 Cargo 产物完成 90 帧解码、89 次画面变化，预热后约 13.74 FPS；
