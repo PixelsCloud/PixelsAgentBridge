@@ -80,9 +80,13 @@ def tick():
 
 
 def report():
+    # Event counts remain historical: a key released while the lock screen
+    # owns focus need not deliver a release event to this window. Also record
+    # GDK's current modifier state, to check real Ctrl state after focus returns.
+    modifiers = Gdk.Keymap.get_for_display(window.get_display()).get_modifier_state()
     data = dict(ticks=ticks, draws=draws, elapsed=time.monotonic() - started,
                 width=area.get_allocated_width(), height=area.get_allocated_height(),
-                focused=window.is_active(), **counts)
+                focused=window.is_active(), ctrl_active=bool(modifiers & Gdk.ModifierType.CONTROL_MASK), **counts)
     pending = root / "fixture-next.json"
     pending.write_text(json.dumps(data), encoding="utf-8")
     pending.replace(root / "fixture.json")

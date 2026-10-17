@@ -10,6 +10,22 @@
 #include "dma_broker.h"
 #include <csignal>
 
+namespace pab_linux::dma {
+inline Fd awake_broker(GDBusConnection* bus, const std::string& connector) {
+    const bool wake = asleep(bus);
+    auto channel = connect_broker(connector, wake);
+    if (wake) await_awake(bus, [&] {
+        // The supervisor serves one exporter at a time. Retire the old socket
+        // before reusing the same authenticated, session-pinned broker path.
+        channel = Fd();
+        channel = connect_broker(connector, true);
+        power_on(bus);
+        fprintf(stderr, "media: retried display wake during capture startup\n");
+    });
+    return channel;
+}
+}
+
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     signal(SIGPIPE, SIG_IGN);
     if (argc == 5 && std::string(argv[1]) == "input-session") {
@@ -50,9 +66,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             const auto found = pab_linux::displays(bus.get());
             const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
             if (selected == found.end()) throw std::runtime_error("Selected DMA display is unavailable");
-            const bool wake = std::string(argv[5]) == "broker" && pab_linux::dma::asleep(bus.get());
-            auto channel = std::string(argv[5]) == "broker" ? pab_linux::dma::connect_broker(selected->connector, wake) : pab_linux::dma::Fd();
-            if (wake) pab_linux::dma::await_awake(bus.get());
+            auto channel = std::string(argv[5]) == "broker" ? pab_linux::dma::awake_broker(bus.get(), selected->connector) : pab_linux::dma::Fd();
             const auto fd = channel.get() >= 0 ? channel.get() : pab_linux::number(argv[5], 1048576);
             pab_linux::dma::capture(bus.get(), *selected, pab_linux::number(argv[3], 60), fd);
             pw_deinit(); return 0;
@@ -95,8 +109,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 if(separate)cursor=std::make_unique<pab_linux::CursorChannel>(argv[5],*selected);
                 const bool sleeping = pab_linux::dma::asleep(bus.get());
                 if (sleeping || pab_linux::dma::protected_screen(bus.get())) {
-                    auto channel = pab_linux::dma::connect_broker(selected->connector, sleeping);
-                    if (sleeping) pab_linux::dma::await_awake(bus.get());
+                    auto channel = pab_linux::dma::awake_broker(bus.get(), selected->connector);
                     pab_linux::dma::capture(bus.get(), *selected, fps, channel.get(),cursor?&cursor->state:nullptr);
                     pw_deinit(); return 0;
                 }
@@ -108,9 +121,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                     fprintf(stderr, "media: PipeWire start failed: %s; trying supervised DMA\n", error.what());
                     source.reset();
                     if(cursor)cursor->state.reset_before_capture();
-                    const bool wake = pab_linux::dma::asleep(bus.get());
-                    auto channel = pab_linux::dma::connect_broker(selected->connector, wake);
-                    if (wake) pab_linux::dma::await_awake(bus.get());
+                    auto channel = pab_linux::dma::awake_broker(bus.get(), selected->connector);
                     pab_linux::dma::capture(bus.get(), *selected, fps, channel.get(),cursor?&cursor->state:nullptr);
                 }
                 if (source) pab_linux::capture(*source, *selected, fps);

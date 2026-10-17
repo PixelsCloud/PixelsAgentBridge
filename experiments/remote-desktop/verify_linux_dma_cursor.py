@@ -143,15 +143,28 @@ def main():
                 peer.close(); peer = None
                 # Cursor production continues while the consumer requests no
                 # video and no cursor updates. Reconnect reads latest state.
-                fd_before = len(list(pathlib.Path(f"/proc/{source.pid}/fd").iterdir()))
+                def descriptor_samples():
+                    # The independent cursor sampler transiently owns a pair
+                    # of SCM_RIGHTS descriptors while reading each image.
+                    # Compare low-water marks across many sampling periods,
+                    # retaining every count instead of two arbitrary instants.
+                    counts = []
+                    for _ in range(30):
+                        counts.append(len(list(pathlib.Path(f"/proc/{source.pid}/fd").iterdir())))
+                        time.sleep(.007)
+                    return counts
+
+                fd_samples_before = descriptor_samples()
+                fd_before = min(fd_samples_before)
                 time.sleep(1)
                 peer = connect()
                 latest = cursor(peer)
                 video()
                 peer.close(); peer = None
                 time.sleep(.05)
-                fd_after = len(list(pathlib.Path(f"/proc/{source.pid}/fd").iterdir()))
-                assert fd_after <= fd_before, (fd_before, fd_after)
+                fd_samples_after = descriptor_samples()
+                fd_after = min(fd_samples_after)
+                assert fd_after <= fd_before, (fd_samples_before, fd_samples_after)
                 started = time.monotonic()
                 source.stdin.write(b"\x00")
                 assert source.wait(timeout=5) == 0
@@ -160,6 +173,7 @@ def main():
                 assert not endpoint.exists()
                 print(json.dumps(dict(screen=screen, initial_before_video=initial, recovered=recovered, latest=latest,
                     decoded_frames=frame_count, fd_before=fd_before, fd_after=fd_after,
+                    fd_samples_before=fd_samples_before, fd_samples_after=fd_samples_after,
                     stop_seconds=elapsed, cursor_socket_removed=True, worker_exit=source.returncode,
                     stderr=stderr, pixel_bytes_saved=0)), flush=True)
             finally:

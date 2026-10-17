@@ -25,11 +25,30 @@ inline bool asleep(GDBusConnection* bus) {
     const auto mode = g_variant_get_int32(power.get());
     return mode >= 1 && mode <= 3;
 }
-inline void await_awake(GDBusConnection* bus) {
+inline void power_on(GDBusConnection* bus) {
+    // Mutter exposes this temporary power state separately from idle policy.
+    // Activity can be accepted while power remains off during a lock change.
+    // Never write an unsupported (-1) state or alter persistent settings.
+    if (!asleep(bus)) return;
+    call(bus, "org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
+        "org.freedesktop.DBus.Properties", "Set",
+        g_variant_new("(ssv)", "org.gnome.Mutter.DisplayConfig", "PowerSaveMode", g_variant_new_int32(0)));
+}
+template<class RetryWake>
+inline void await_awake(GDBusConnection* bus, RetryWake retry_wake) {
     const auto deadline = Clock::now() + std::chrono::seconds(3);
+    auto next_wake = Clock::now() + std::chrono::milliseconds(750);
+    unsigned retries = 0;
     while (asleep(bus)) {
         parent_alive(); pump();
         if (Clock::now() >= deadline) throw std::runtime_error("Display did not wake");
+        // During GNOME's lock transition the first adopted input device can
+        // deliver its wake before the shield starts accepting activity. Retry
+        // only while power is still off; never accept stale scanout instead.
+        if (retries < 2 && Clock::now() >= next_wake) {
+            retry_wake(); ++retries;
+            next_wake = Clock::now() + std::chrono::milliseconds(750);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     // Power-on is asynchronous with the compositor's first visible repaint.
