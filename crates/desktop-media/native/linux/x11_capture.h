@@ -179,7 +179,7 @@ inline void blend_cursor(XImage& image, const Output& output, const XFixesCursor
         }
     }
 }
-inline void capture(Connection& connection, const Output& output, unsigned fps) {
+inline void capture(Connection& connection, const Output& output, unsigned fps, bool separate_cursor = false) {
     const auto& display = output.display;
     const PabVideoGeometry geometry(display.size.width, display.size.height);
     auto* d = connection.get(); int event, error;
@@ -207,13 +207,18 @@ inline void capture(Connection& connection, const Output& output, unsigned fps) 
             }
             while (XPending(d)) { XEvent e; XNextEvent(d, &e); changed = true; }
             if (Clock::now() < next) { std::this_thread::sleep_for(std::chrono::milliseconds(2)); continue; }
-            Cursor cursor(XFixesGetCursorImage(d));
-            connection.check();
-            if (!cursor) throw std::runtime_error("Cannot observe X11 cursor");
-            Window root, child; int rx, ry, wx, wy; unsigned mask;
-            const bool on_root = XQueryPointer(d, output.root, &root, &child, &rx, &ry, &wx, &wy, &mask);
-            const std::array<unsigned long, 3> stamp{on_root ? cursor->cursor_serial : 0,
-                on_root ? static_cast<unsigned long>(cursor->x) : 0, on_root ? static_cast<unsigned long>(cursor->y) : 0};
+            Cursor cursor;
+            bool on_root = false;
+            std::array<unsigned long, 3> stamp{};
+            if (!separate_cursor) {
+                cursor.reset(XFixesGetCursorImage(d));
+                connection.check();
+                if (!cursor) throw std::runtime_error("Cannot observe X11 cursor");
+                Window root, child; int rx, ry, wx, wy; unsigned mask;
+                on_root = XQueryPointer(d, output.root, &root, &child, &rx, &ry, &wx, &wy, &mask);
+                stamp = {on_root ? cursor->cursor_serial : 0,
+                    on_root ? static_cast<unsigned long>(cursor->x) : 0, on_root ? static_cast<unsigned long>(cursor->y) : 0};
+            }
             if (!changed && previous_cursor == stamp) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(16)); continue;
             }

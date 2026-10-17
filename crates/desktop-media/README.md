@@ -47,8 +47,8 @@ and reaps retained cursor sources even while idle. `cursor-shape-check` uses
 generated shapes without touching the OS pointer; the Windows cursor integration
 test includes an explicitly ignored real-GPU lifecycle check. Windows native
 viewer overlays are connected, as are the Mac Metal and Linux OpenGL overlays.
-Linux GNOME Wayland independent capture is connected; X11/DRM cursor sources
-and full product acceptance remain pending.
+Linux GNOME Wayland and X11 independent capture are connected; X11 system-hide
+visibility, DRM cursor planes and full product acceptance remain pending.
 
 The Mac backend now shares this cursor process/lease adapter and advertises it
 through the existing session helper. Its video worker selects
@@ -76,11 +76,28 @@ replacing pending video pixels. One immutable shape and latest position are read
 through a private per-capture Unix socket, restricted to the capture parent's
 PID/UID. There is no second capture, full-frame cursor readback or video-credit
 dependency. The Rust reader shares video cancellation, generation validation and
-bounded framing. X11 retains embedded capture; protected-desktop DRM fallback
+bounded framing. Protected-desktop DRM fallback
 reports independent cursor unavailability and keeps its existing video path.
 The real Ubuntu worker lease/reopen/motion checks passed; this does not establish
 formal viewer, X11, DRM cursor-plane or long-run acceptance. See
 `acceptance/remote-desktop-linux-cursor-source-2026-10-18.md`.
+
+On X11, a separate cursor worker shares the existing process/lease adapter.
+It uses its own X connection/process, keeping the process-global Xlib error
+handler away from the video/input connections. XFixes shape events update a
+bounded premultiplied BGRA image; pointer-only updates reuse that image. Video
+omits cursor blending in `desktop-separate-cursor` mode, and cursor movement
+does not generate encoded frames on a static desktop. XWayland is never used
+to represent a Wayland desktop. Transparent shapes and departure from the
+selected display/root hide the overlay; layout changes retire the cursor.
+
+XFixesHideCursor is an outstanding visibility limitation: the server continues
+to return the old image without notifying a shape change. It must not be
+reported as full hidden-cursor support. Disposable two-screen Xvfb checks cover
+the complete Desktop's worker pipe, lease/reopen/motion, cancellation, and video
+pixel comparison, not physical multi-monitor or formal remote-window acceptance.
+See `acceptance/remote-desktop-linux-x11-cursor-source-2026-10-18.md` and
+`experiments/remote-desktop/check_x11_cursor_source.py`.
 
 `NativeViewer::cursor_renderer()` returns a generation-owned independent
 submitter. Windows Desktop reads the remote cursor stream alongside video and

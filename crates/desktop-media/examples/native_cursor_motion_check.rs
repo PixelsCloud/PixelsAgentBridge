@@ -10,6 +10,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut args = std::env::args().skip(1);
     let executable = PathBuf::from(args.next().ok_or("worker required")?);
     let backend = NativeBackend::new(executable, args.collect()).with_input();
+    let result = run(&backend).await;
+    // Keep the runtime alive for worker reaping even if input startup fails
+    // before the motion/restore section (for example, no XDG_RUNTIME_DIR).
+    tokio::time::timeout(Duration::from_secs(5), backend.idle()).await?;
+    result
+}
+
+async fn run(backend: &NativeBackend) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     assert!(backend.supports_cursor() && backend.supports_input());
     let screen = backend
         .screens()

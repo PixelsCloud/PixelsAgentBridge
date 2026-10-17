@@ -286,6 +286,10 @@ impl DesktopBackend for NativeBackend {
                             .ok_or_else(|| media_error("cursor channel path is not UTF-8"))?
                             .into(),
                     );
+                } else if linux_cursor_channel::x11_selected()
+                    && config.screen.id.starts_with("x11:")
+                {
+                    args[3] = "desktop-separate-cursor".into();
                 }
                 args
             };

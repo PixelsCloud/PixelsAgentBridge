@@ -15,7 +15,7 @@ Linux 注销后登录恢复、AI 请求用户协助均有真实产品阶段证�
 
 剩余重点开发集中在四块：
 
-1. Mac/Linux 光标源的正式窗口收口，Linux X11/锁屏 DMA 光标开发；保持与视频是否包含光标一致。
+1. Mac/Linux 光标源的正式窗口收口，Linux X11 系统隐藏状态与锁屏 DMA 光标开发；保持与视频是否包含光标一致。
 2. 输入异常及多屏边界，尤其 90 首次激活的重复鼠标消息、混合 DPI/旋转/热插拔。
 3. 登录与会话边界：Mac 系统登录，Windows 开机未登录/UAC/用户切换等。
 4. 媒体积压降档、设备故障/弱网恢复及测试发现的问题。
@@ -36,6 +36,15 @@ Linux GNOME Wayland 源现已复用 PipeWire 光标元数据和独立本地读�
 Ubuntu 上正式内嵌 worker 的双代次/重开/退出回收，以及不请求编码视频帧时的
 光标移动合并检查通过；未打开正式远程窗口，X11、锁屏 DMA、真实隐藏/形状变化
 和长时间性能尚未验收。见 [Linux 光标源记录](acceptance/remote-desktop-linux-cursor-source-2026-10-18.md)。
+
+Linux X11 已接独立光标进程，复用视频生命周期，视频不再混合光标。完整 Desktop
+内嵌 worker 在隔离双 X screen 的 Xvfb 上通过形状/透明隐藏、位置合并、跨 root、
+双代次重开/回收、错误隔离，以及 2,359,296 个视频颜色通道比较（最大误差 2）；
+静止桌面的光标活动不产生视频帧。Linux 24/Windows 22 项媒体测试、完整 Linux
+构建、Ubuntu Wayland 生命周期/移动实机回归通过。XFixesHideCursor 仍返回旧图且
+不报告隐藏，已实际复现并保留为缺陷；Xvfb 不替代实际 Xorg、物理多屏或正式窗口
+验收，清单关闭数不变。Apple 只读复查仍锁屏，未做 GUI 操作。见
+[X11 光标源阶段记录](acceptance/remote-desktop-linux-x11-cursor-source-2026-10-18.md)。
 
 ## 一次性执行任务：完成三平台远程桌面首版并发布
 

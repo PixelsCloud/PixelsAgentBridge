@@ -1,5 +1,5 @@
 #pragma once
-#include "x11_capture.h"
+#include "x11_cursor.h"
 #include "input.h"
 #include <X11/extensions/XTest.h>
 #include <fcntl.h>
@@ -207,7 +207,8 @@ inline void run(int argc, const char* const* argv) {
     }
     const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& o) { return o.display.id() == argv[2]; });
     if (selected == found.end()) throw std::runtime_error("Selected X11 display is unavailable");
-    if (argc == 3) input(connection, *selected);
-    else capture(connection, *selected, number(argv[3],60));
+    if (argc == 3 && std::string(argv[1]) == "cursor") cursor_worker(connection, *selected);
+    else if (argc == 3) input(connection, *selected);
+    else capture(connection, *selected, number(argv[3],60), std::string(argv[4]) == "desktop-separate-cursor");
 }
 }

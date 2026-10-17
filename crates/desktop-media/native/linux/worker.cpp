@@ -70,14 +70,16 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             if (pab_linux::x11::selected()) pab_linux::x11::recover();
             pw_deinit(); return 0;
         }
-        const bool separate=argc==6 && std::string(argv[1])=="capture" && std::string(argv[4])=="desktop-separate-cursor";
+        const bool x11 = pab_linux::x11::selected();
+        const bool separate=(argc==6 || (x11 && argc==5)) && std::string(argv[1])=="capture" && std::string(argv[4])=="desktop-separate-cursor";
         if (argc != 2 && argc != 3 && argc != 5 && !separate) throw std::runtime_error("usage: media inventory | capture SCREEN_ID FPS desktop | input SCREEN_ID");
         if (argc == 2 && std::string(argv[1]) != "inventory") throw std::runtime_error("Unsupported Linux media operation");
-        if (argc == 3 && std::string(argv[1]) != "input" && std::string(argv[1]) != "input-uinput") throw std::runtime_error("Unsupported Linux media operation");
-        if (argc == 5 && (std::string(argv[1]) != "capture" || std::string(argv[4]) != "desktop"))
+        if (argc == 3 && std::string(argv[1]) != "input" && std::string(argv[1]) != "input-uinput" &&
+            !(x11 && std::string(argv[1]) == "cursor")) throw std::runtime_error("Unsupported Linux media operation");
+        if (argc == 5 && !separate && (std::string(argv[1]) != "capture" || std::string(argv[4]) != "desktop"))
             throw std::runtime_error("Unsupported Linux media operation");
-        if (pab_linux::x11::selected()) {
-            if(separate)throw std::runtime_error("Independent X11 cursor capture is not available");
+        if (x11) {
+            if(argc==6)throw std::runtime_error("X11 cursor uses its own worker");
             pab_linux::x11::run(argc, argv); pw_deinit(); return 0;
         }
         auto bus = pab_linux::session_bus();

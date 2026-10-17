@@ -23,9 +23,22 @@ impl Drop for Channel {
 }
 
 pub(super) fn supported() -> bool {
-    // XWayland cannot represent the whole Wayland desktop. X11 keeps embedded
-    // capture until its independent-source visibility behavior is validated.
-    std::env::var("XDG_SESSION_TYPE").as_deref() != Ok("x11")
-        && (std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
-            || std::env::var_os("WAYLAND_DISPLAY").is_some_and(|v| !v.is_empty()))
+    x11_selected()
+        || (std::env::var("XDG_SESSION_TYPE").as_deref() != Ok("x11")
+            && (std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("wayland")
+                || std::env::var_os("WAYLAND_DISPLAY").is_some_and(|v| !v.is_empty())))
+}
+
+pub(super) fn x11_selected() -> bool {
+    // Match the native worker. Never select XWayland for a Wayland desktop.
+    match std::env::var("XDG_SESSION_TYPE")
+        .ok()
+        .filter(|v| !v.is_empty())
+    {
+        Some(kind) => kind == "x11",
+        None => {
+            !std::env::var_os("WAYLAND_DISPLAY").is_some_and(|v| !v.is_empty())
+                && std::env::var_os("DISPLAY").is_some_and(|v| !v.is_empty())
+        }
+    }
 }

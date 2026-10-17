@@ -54,11 +54,15 @@ pub(super) async fn open(
     drop(lease);
     #[cfg(target_os = "linux")]
     {
-        let path = channel
-            .ok_or_else(|| media_error("independent cursor unavailable for this capture"))?;
-        return open_unix(backend, config, stopped, path).await;
+        if let Some(path) = channel {
+            return open_unix(backend, config, stopped, path).await;
+        }
+        if !super::linux_cursor_channel::x11_selected() || !config.screen.id.starts_with("x11:") {
+            return Err(media_error(
+                "independent cursor unavailable for this capture",
+            ));
+        }
     }
-    #[cfg(not(target_os = "linux"))]
     {
         let mut stopped = stopped;
         let start = async {
@@ -230,7 +234,6 @@ impl DesktopCursorSource for NativeCursor {
         })
     }
 }
-#[cfg(not(target_os = "linux"))]
 async fn run(
     mut process: MediaChild,
     config: DesktopVideoConfig,
@@ -261,7 +264,6 @@ async fn run(
         }
     }
 }
-#[cfg(not(target_os = "linux"))]
 async fn read_update(
     process: &mut MediaChild,
     config: &DesktopVideoConfig,
@@ -430,15 +432,13 @@ mod tests {
         ] {
             let (mut input, mut output) = tokio::io::duplex(1024);
             input.write_all(&bytes).await.unwrap();
-            assert!(
-                tokio::time::timeout(
-                    Duration::from_millis(200),
-                    read_packet(&mut output, &config(), 1, 0, Duration::from_secs(5))
-                )
-                .await
-                .unwrap()
-                .is_err()
-            );
+            assert!(tokio::time::timeout(
+                Duration::from_millis(200),
+                read_packet(&mut output, &config(), 1, 0, Duration::from_secs(5))
+            )
+            .await
+            .unwrap()
+            .is_err());
         }
     }
     #[tokio::test]
@@ -446,14 +446,12 @@ mod tests {
         let (input, mut output) = tokio::io::duplex(1024);
         let config = config();
         // No artificial update is generated on a stationary desktop.
-        assert!(
-            tokio::time::timeout(
-                Duration::from_millis(50),
-                read_packet(&mut output, &config, 1, 0, Duration::from_millis(20))
-            )
-            .await
-            .is_err()
-        );
+        assert!(tokio::time::timeout(
+            Duration::from_millis(50),
+            read_packet(&mut output, &config, 1, 0, Duration::from_millis(20))
+        )
+        .await
+        .is_err());
         // The owning task retires the process after cancelled IO. Use a fresh
         // pipe for partial-payload tests; never reuse an ambiguous live worker.
         drop(input);
