@@ -263,10 +263,18 @@ W5 已进一步确认 Wayland GDM 缺少用户 ScreenSaver 接口，改由核实
 均解码 30 帧，idle cookie 与进程回收通过；这只是采集组件，不代替正式窗口
 密码登录。用户回归虽然锁屏、密码和动态子项成功，却因一条 broker 错误整体
 失败，记录保留。独立跟踪把同类错误定位到已取消进程的 getpgid/ESRCH；修复后
-12 次取消及三轮动态采集通过。完整 Desktop 候选正在重建，接下来验收正式 GDM
-登录、原用户返回以及注销后的新会话。详见
+12 次取消及三轮动态采集通过。完整 Desktop 候选随后已重建；后续产品验收见下段。
+组件与取消诊断详见
 [Wayland GDM 采集](acceptance/remote-desktop-linux-gdm-wayland-capture-2026-10-17.md)和
 [broker 取消处理](acceptance/remote-desktop-linux-broker-cancel-2026-10-17.md)。
+
+后续正式 Windows 窗口已完成 Wayland GDM c13 密码登录并自动返回原会话 23，
+恢复只查看。登录前 37.65 秒空闲观察保持同一媒体会话/采集进程及操作状态；
+密码只提交一次，系统确认解锁发生在恢复操作之前，回滚计时器未触发。返回画面
+与原测试窗口像素对比通过，原服务/配置恢复，临时进程和凭据副本清理。前一轮
+因窗口被遮挡而无法验证显示的失败记录保留；误读主页面的状态样本也已排除。
+这仍是已有会话重新认证，注销后新建会话、开机登录和长稳未通过，W5 不关闭。
+详见 [Wayland GDM 正式窗口登录](acceptance/remote-desktop-linux-gdm-product-2026-10-17.md)。
 
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
