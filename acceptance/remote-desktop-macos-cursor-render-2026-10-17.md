@@ -68,8 +68,10 @@ xcrun clang++ -std=c++17 -O2 -fobjc-arc -fblocks -mmacosx-version-min=12.0 \
 没有替换本机或 Apple 安装版，没有更改 TCC。构建使用独立源码与缓存，Mac 4
 任务、Windows 回归 4 任务，同期总额 8；另一次单任务 Metal 检查时总额不超过 5。
 
-下一步：解锁后运行宿主检查；正式 Mac 独立窗口连接 Windows，逐像素复核远端
-光标及本地指针切换；随后补 Mac/Linux 独立光标源、登录桌面与持续性能。
+2026-10-18 后续：用户恢复 Apple 后，宿主四组检查和真实 Mac→90 窗口已复测
+通过；本地指针隐藏、停止操作与光标源退出后的恢复也通过。上述失败保留为
+历史记录。详情及 JPEG 证据限制见 [窗口复测记录](remote-desktop-macos-cursor-product-2026-10-18.md)。
+下一步补 Linux 操作端及 Mac/Linux 独立光标源、登录桌面与持续性能。
 
 API 依据：[Apple Metal 纹理接口](https://developer.apple.com/documentation/Metal/MTLTexture)、
 [AppKit cursor rect 重建](https://developer.apple.com/documentation/appkit/nsview/resetcursorrects())。

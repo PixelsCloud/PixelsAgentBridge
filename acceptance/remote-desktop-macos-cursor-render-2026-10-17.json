@@ -79,7 +79,8 @@
     "result": "timeout awaiting presentation",
     "subsequent_readonly_check": "CGSSessionScreenIsLocked=true",
     "accepted": false,
-    "retest_pending_unlock": true
+    "retest_pending_unlock": false,
+    "follow_up": "remote-desktop-macos-cursor-product-2026-10-18.json"
   },
   "build_jobs": {
     "macos": 4,
