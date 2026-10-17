@@ -10,6 +10,9 @@ use openh264::{
     formats::{YUVSlices, YUVSource},
 };
 type Error = Box<dyn std::error::Error + Send + Sync>;
+// Keep fine chroma residuals after desktop transitions. QP 20 still left
+// persistent color errors with different multi-slice boundaries.
+const SOFTWARE_QP: u8 = 14;
 
 fn dimensions(width: usize, height: usize) -> Result<usize, Error> {
     if width == 0
@@ -108,7 +111,7 @@ impl SoftwareEncoder {
             .complexity(Complexity::Low)
             .profile(Profile::Baseline)
             .rate_control_mode(RateControlMode::Off)
-            .qp(QpRange::new(20, 28))
+            .qp(QpRange::new(SOFTWARE_QP, SOFTWARE_QP))
             .adaptive_quantization(false)
             .background_detection(false)
             .vui(VuiConfig::bt709());
@@ -133,14 +136,16 @@ impl SoftwareEncoder {
             // slice even with num_threads(4). Prime it privately, then enable
             // independent slices; the first published frame must be a new IDR.
             self.encoder.encode(&source)?;
-            if p.width * p.height >= 65_536 {
+            {
                 use openh264_sys2::{
                     ENCODER_OPTION_SVC_ENCODE_PARAM_EXT, SEncParamExt, SM_FIXEDSLCNUM_SLICE,
                 };
                 let mut params = std::mem::MaybeUninit::<SEncParamExt>::zeroed();
                 // SAFETY: initialized encoder, correctly sized C parameter
                 // storage, unchanged dimensions/color/layers and buffer API.
-                // Fixed slice count is supported by this pinned upstream API.
+                // RC_OFF_MODE reads iDLayerQp, not iMinQp/iMaxQp. Apply the
+                // intended quality after lazy initialization, including small
+                // single-slice frames; otherwise the upstream default wins.
                 unsafe {
                     let api = self.encoder.raw_api();
                     if api.get_option(
@@ -151,15 +156,18 @@ impl SoftwareEncoder {
                         return Err("software encoder parameters unavailable".into());
                     }
                     let mut params = params.assume_init();
-                    params.iMultipleThreadIdc = 4;
-                    params.sSpatialLayers[0].sSliceArgument.uiSliceMode = SM_FIXEDSLCNUM_SLICE;
-                    params.sSpatialLayers[0].sSliceArgument.uiSliceNum = 4;
+                    params.sSpatialLayers[0].iDLayerQp = i32::from(SOFTWARE_QP);
+                    if p.width * p.height >= 65_536 {
+                        params.iMultipleThreadIdc = 4;
+                        params.sSpatialLayers[0].sSliceArgument.uiSliceMode = SM_FIXEDSLCNUM_SLICE;
+                        params.sSpatialLayers[0].sSliceArgument.uiSliceNum = 4;
+                    }
                     if api.set_option(
                         ENCODER_OPTION_SVC_ENCODE_PARAM_EXT,
                         (&mut params as *mut SEncParamExt).cast(),
                     ) != 0
                     {
-                        return Err("software encoder slice configuration failed".into());
+                        return Err("software encoder configuration failed".into());
                     }
                 }
             }
@@ -242,6 +250,57 @@ impl SoftwareDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn settled_color_is_stable_after_spatial_fade() {
+        // A real GNOME transition left this generated background with a
+        // persistent chroma shift. Exercise both single- and multi-slice paths.
+        // Check the original RGB error budget, not lossless YUV equality: a
+        // one-step chroma change does not map to one RGB step in BT.709.
+        for (width, height) in [(64, 48), (512, 288)] {
+            let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let mut bgra = vec![0; width * height * 4];
+            for index in 0..24 {
+                for (i, pixel) in bgra.chunks_exact_mut(4).enumerate() {
+                    let (col, row) = (i % width / 8, i / width / 8);
+                    let pattern = [
+                        ((col * 7 + row * 11) & 4) / 4 * 255,
+                        ((col * 3 ^ row * 13) & 2) / 2 * 255,
+                        ((col * 17 + row * 31) & 1) * 255,
+                    ];
+                    for (channel, target) in [74, 81, 20].into_iter().enumerate() {
+                        let phase = index.min(20);
+                        pixel[channel] =
+                            ((pattern[channel] * (20 - phase) + target * phase) / 20) as u8;
+                    }
+                    pixel[3] = 255;
+                }
+                let packet = encoder.encode_bgra(&bgra, width * 4).unwrap();
+                let decoded = decoder.decode(packet).unwrap().unwrap();
+                if index >= 20 {
+                    for y in [height / 3, height / 2, height * 3 / 4] {
+                        for x in [width / 4, width / 2, width * 3 / 4] {
+                            let uv = width * height + y / 2 * width + x / 2 * 2;
+                            let luma = (f64::from(decoded[y * width + x]) - 16.) * 255. / 219.;
+                            let cb = (f64::from(decoded[uv]) - 128.) * 255. / 224.;
+                            let cr = (f64::from(decoded[uv + 1]) - 128.) * 255. / 224.;
+                            let rgb = [
+                                luma + 1.5748 * cr,
+                                luma - 0.187324 * cb - 0.468124 * cr,
+                                luma + 1.8556 * cb,
+                            ];
+                            for (actual, wanted) in rgb.into_iter().zip([20., 81., 74.]) {
+                                assert!(
+                                    (actual - wanted).abs() <= 2.,
+                                    "settled color at {width}x{height}, frame {index}, ({x},{y}): {rgb:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     #[cfg(target_os = "linux")]
     #[test]
     fn owned_decode_reuses_allocation_and_matches_borrowed_pixels() {

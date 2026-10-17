@@ -6,7 +6,7 @@ edition = "2024"
 [workspace]
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "cdylib"]
 path = "lib.rs"
 
 [dependencies]
