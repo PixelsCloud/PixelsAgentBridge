@@ -103,6 +103,7 @@ def main():
         'usr/share/applications/pixels-agent-bridge.desktop': SCRIPTS / 'pixels-agent-bridge.desktop',
         'etc/xdg/autostart/pixels-agent-bridge.desktop': SCRIPTS / 'pixels-agent-bridge-autostart.desktop',
         'lib/systemd/system/pixels-agent-bridge-executor.service': SCRIPTS / 'pixels-agent-bridge-executor.service',
+        'lib/systemd/system/pixels-agent-bridge-media.service': SCRIPTS / 'pixels-agent-bridge-media.service',
         'usr/share/icons/hicolor/128x128/apps/pixels-agent-bridge.png': ROOT / 'apps/desktop/src-tauri/icons/128x128.png',
     }
     for name, source in entries.items():

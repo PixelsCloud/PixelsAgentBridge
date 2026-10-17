@@ -134,6 +134,15 @@ greeter helper 监督、密码登录与正式窗口全链路继续待完成，�
 真实会话交接、正式窗口密码登录及 Wayland 锁屏路径仍未完成。
 详见 [Linux 登录界面媒体 helper](acceptance/remote-desktop-linux-greeter-helper-2026-10-17.md)。
 
+后续 W5 自动监督：Linux root 媒体监督入口、经核实的图形环境交接、用户降权、
+父进程死亡回收和安装服务已接入。完整 Desktop 构建、16 项 OS-control 测试、
+安装脚本语法和 systemd 单元检查通过。真实 Wayland 用户→Xorg GDM→原用户的
+生产认证 IPC、采集解码、输入及旧通道撤销通过；独立 Xlib 确认切换时释放
+测试 Shift，修复此前 helper 未等待异步释放便退出的问题。监督进程被杀、
+重启清理及正常回收通过，最多一个受监督 helper。原会话和配置恢复，临时
+进程/目录清零；未覆盖安装版。正式窗口密码登录、实际安装升级与 Wayland
+锁屏媒体仍待完成，详见 [Linux 监督与交接记录](acceptance/remote-desktop-linux-supervisor-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

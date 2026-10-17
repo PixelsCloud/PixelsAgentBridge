@@ -3,17 +3,23 @@
 use pab_desktop_media::NativeBackend;
 use pab_os_control::execution::{LinuxGraphicalSession, process_user_identity};
 use std::time::Duration;
+use tokio::sync::oneshot;
 
-pub(crate) struct Task(tauri::async_runtime::JoinHandle<()>);
+pub(crate) struct Task {
+    task: tauri::async_runtime::JoinHandle<()>,
+    stop: Option<oneshot::Sender<()>>,
+}
 impl Task {
     pub(super) async fn shutdown(&mut self) {
-        self.0.abort();
-        let _ = (&mut self.0).await;
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        let _ = (&mut self.task).await;
     }
 }
 impl Drop for Task {
     fn drop(&mut self) {
-        self.0.abort();
+        self.task.abort();
     }
 }
 pub(crate) fn start() -> Result<Task, String> {
@@ -38,15 +44,31 @@ fn start_inner(media_only: bool) -> Result<Task, String> {
         vec!["--media-worker".into()],
     )
     .with_input();
-    Ok(Task(tauri::async_runtime::spawn(async move {
+    let (stop, mut stopped) = oneshot::channel();
+    let task = tauri::async_runtime::spawn(async move {
         loop {
-            if let Ok(Ok(session)) =
-                tokio::task::spawn_blocking(move || {
-                    if media_only { LinuxGraphicalSession::for_media_process(pid, uid) }
-                    else { LinuxGraphicalSession::for_process(pid, uid) }
-                })
-                    .await
+            if !matches!(stopped.try_recv(), Err(oneshot::error::TryRecvError::Empty)) {
+                break;
+            }
+            if let Ok(Ok(session)) = tokio::task::spawn_blocking(move || {
+                if media_only {
+                    LinuxGraphicalSession::for_media_process(pid, uid)
+                } else {
+                    LinuxGraphicalSession::for_process(pid, uid)
+                }
+            })
+            .await
             {
+                // Recover a prior process's persisted X11 releases before
+                // offering media. A live owner's file lock defers recovery.
+                if let Err(error) = backend.recover_input().await {
+                    tracing::debug!(%error, "Linux input recovery deferred");
+                    tokio::select! {
+                        _ = &mut stopped => break,
+                        _ = tokio::time::sleep(Duration::from_millis(500)) => {},
+                    }
+                    continue;
+                }
                 let switched = async {
                     loop {
                         tokio::time::sleep(Duration::from_millis(250)).await;
@@ -60,12 +82,25 @@ fn start_inner(media_only: bool) -> Result<Task, String> {
                         if let Err(error) = result { tracing::debug!(%error, "Linux media helper disconnected"); }
                     }
                     _ = switched => {}
+                    _ = &mut stopped => break,
                 }
                 // The process adapter's guard is released only after reaping
                 // the previous capture, including a cancelled pending read.
                 backend.idle().await;
             }
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            tokio::select! {
+                _ = &mut stopped => break,
+                _ = tokio::time::sleep(Duration::from_millis(500)) => {},
+            }
         }
-    })))
+        // Dropping the serving future closes native pipes. Input release and
+        // recovery run in a separate watchdog, so keep the helper alive until
+        // both gates drain before its supervisor reaps the process group.
+        // Startup recovery is also allowed to finish instead of being aborted.
+        backend.idle().await;
+    });
+    Ok(Task {
+        task,
+        stop: Some(stop),
+    })
 }

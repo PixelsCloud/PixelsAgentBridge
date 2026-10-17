@@ -6,6 +6,9 @@ set -euo pipefail
 install_dir=/opt/pixels-agent-bridge
 unit=pixels-agent-bridge-executor.service
 source "$(dirname "$0")/lifecycle.sh"
+if has_systemd && systemctl cat pixels-agent-bridge-media.service >/dev/null 2>&1; then
+    systemctl disable --now pixels-agent-bridge-media.service
+fi
 if has_systemd && systemctl cat "$unit" >/dev/null 2>&1; then
     systemctl disable --now "$unit"
 fi

@@ -676,6 +676,99 @@ mod tests {
             println!("Linux native helper cycle {cycle}: {width}x{height}, decoded, paired native input acknowledged, workers reaped, registration retired");
         }
     }
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    #[ignore = "requires isolated root systemd unit, sibling Desktop and coordinated GDM switch on the authorized Linux VM"]
+    async fn linux_supervisor_authenticated_media_retires_across_console_switch() {
+        use pab_desktop_media::software::SoftwareDecoder;
+        use pab_os_control::execution::{LinuxGraphicalSession, process_user_identity};
+        use pab_protocol::RemoteDesktopInput;
+        let _lock = LOCK.lock().await;
+        assert_eq!(process_user_identity(std::process::id()).unwrap().account_id, "uid:0");
+        let root = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::Machine).unwrap().root().to_path_buf();
+        assert_eq!(root.parent(), Some(std::path::Path::new("/run")));
+        assert!(root.file_name().unwrap().to_str().unwrap().starts_with("pab-rd-supervisor-ipc-"));
+        assert!(super::super::local_port().unwrap() > 1024);
+        assert_eq!(LinuxGraphicalSession::active_console().unwrap().uid(), 1000);
+        struct Server(tokio::task::JoinHandle<()>);
+        impl Drop for Server { fn drop(&mut self) { self.0.abort(); } }
+        let _server = Server(super::super::spawn_local_service(root.clone()));
+        let executable = std::env::current_exe().unwrap().parent().unwrap().join("pab-desktop");
+        let mut supervisor = tokio::process::Command::new(executable).arg("--media-supervisor")
+            .kill_on_drop(true).spawn().unwrap();
+        let phase = |name: &str| {
+            std::fs::write(root.join("phase.tmp"), name).unwrap();
+            std::fs::rename(root.join("phase.tmp"), root.join("phase")).unwrap();
+        };
+        async fn switched(uid: u32) {
+            tokio::time::timeout(Duration::from_secs(30), async {
+                loop {
+                    if LinuxGraphicalSession::active_console().is_ok_and(|s| s.uid() == uid) { break; }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }).await.unwrap();
+        }
+        let mut source = None;
+        let mut input: Option<Box<dyn pab_remote_desktop::DesktopInputSink>> = None;
+        for (index, uid, prefix) in [(0, 1000, "gnome:"), (1, 128, "x11:"), (2, 1000, "gnome:")] {
+            switched(uid).await;
+            if index == 1 {
+                // The external coordinator checks the real GDM session manager,
+                // not just logind's early active-seat notification. Xorg output
+                // geometry and the compositor can still change during startup.
+                tokio::time::timeout(Duration::from_secs(25), async {
+                    while !root.join("greeter-running").exists() {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                }).await.unwrap();
+            }
+            if let Some(mut old) = source.take() {
+                // An old provider cannot continue serving the new active seat.
+                let old: &mut Box<dyn DesktopSource> = &mut old;
+                assert!(tokio::time::timeout(WAIT, old.next_frame()).await.unwrap().is_err());
+            }
+            if let Some(mut old) = input.take() {
+                assert!(tokio::time::timeout(WAIT, old.apply(RemoteDesktopInput::ReleaseAll)).await.unwrap().is_err());
+            }
+            let screens = tokio::time::timeout(Duration::from_secs(25), async {
+                loop {
+                    if let Ok(screens) = HelperMediaBackend.screens().await {
+                        if screens.iter().any(|s| s.id.starts_with(prefix)) { break screens; }
+                    }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }).await.unwrap();
+            let mut selected = config();
+            selected.screen = screens.into_iter().find(|s| s.primary).unwrap();
+            let width = selected.screen.pixel_width as usize;
+            let height = selected.screen.pixel_height as usize;
+            let mut current = HelperMediaBackend.start(selected.clone()).await.unwrap();
+            let frame = tokio::time::timeout(WAIT, current.next_frame()).await.unwrap().unwrap();
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            assert!(frame.keyframe);
+            assert_eq!(decoder.decode(&frame.bytes).unwrap().unwrap().len(), width * height * 3 / 2);
+            let mut sink = HelperMediaBackend.input(selected).await.unwrap();
+            sink.apply(RemoteDesktopInput::ReleaseAll).await.unwrap();
+            if index == 1 {
+                // The coordinator independently observes this test-owned Shift
+                // and checks its release while leaving the greeter.
+                sink.apply(RemoteDesktopInput::Key { virtual_key: 0xa0, down: true }).await.unwrap();
+            }
+            println!("supervised authenticated phase {index}: uid={uid}, {width}x{height}, decoded, native input acknowledged");
+            source = Some(current); input = Some(sink);
+            phase(match index { 0 => "user-ready", 1 => "greeter-ready", _ => "returned-user" });
+        }
+        input.as_mut().unwrap().apply(RemoteDesktopInput::ReleaseAll).await.unwrap();
+        drop(input); drop(source);
+        let status = tokio::process::Command::new("/bin/kill")
+            .args(["-TERM", &supervisor.id().unwrap().to_string()]).status().await.unwrap();
+        assert!(status.success());
+        assert!(tokio::time::timeout(Duration::from_secs(10), supervisor.wait()).await.unwrap().unwrap().success());
+        tokio::time::timeout(WAIT, async {
+            while !providers().lock().unwrap().is_empty() { tokio::time::sleep(Duration::from_millis(20)).await; }
+        }).await.unwrap();
+        phase("complete");
+    }
     #[tokio::test]
     #[cfg_attr(target_os = "linux", ignore = "requires an active local graphical user; run on the Linux VM with --ignored")]
     async fn cancellation_during_start_or_static_capture_releases_helper() {

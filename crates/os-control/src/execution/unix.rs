@@ -147,6 +147,31 @@ impl PreparedUser {
         args: &[OsString],
         cwd: &Path,
     ) -> io::Result<UserProcess> {
+        self.spawn_configured(executable, args, cwd, |_| Ok(()))
+    }
+    #[cfg(target_os = "linux")]
+    pub fn spawn_linux_media(&self, executable: &Path, args: &[OsString],
+                            target: &super::LinuxMediaEnvironment, data: &Path, port: u16) -> io::Result<UserProcess> {
+        // Captured before fork. Set parent-death handling AFTER setuid because
+        // changing credentials clears PR_SET_PDEATHSIG on Linux.
+        let parent = unsafe { libc::getpid() };
+        self.spawn_configured(executable, args, &self.account.identity.home, |command| {
+            command.envs(target.values()).env("PATH", "/usr/local/bin:/usr/bin:/bin")
+                .env("PAB_DATA_DIR", data).env("PAB_LOCAL_IPC_PORT", port.to_string());
+            unsafe {
+                command.pre_exec(move || {
+                    if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                    if libc::getppid() != parent { return Err(io::Error::from_raw_os_error(libc::ESRCH)); }
+                    Ok(())
+                });
+            }
+            Ok(())
+        })
+    }
+    fn spawn_configured(&self, executable: &Path, args: &[OsString], cwd: &Path,
+                        configure: impl FnOnce(&mut Command) -> io::Result<()>) -> io::Result<UserProcess> {
         if lookup(self.account.uid)? != self.account || groups(&self.account)? != self.groups {
             return Err(io::Error::other(
                 "execution account changed; resolve a fresh context",
@@ -230,6 +255,7 @@ impl PreparedUser {
         }
         // chdir happens in the hook AFTER dropping privileges. A root-only cwd
         // must fail, even if the service itself can traverse that directory.
+        configure(&mut command)?;
         command.spawn().map(|child| UserProcess {
             child,
             exited: false,

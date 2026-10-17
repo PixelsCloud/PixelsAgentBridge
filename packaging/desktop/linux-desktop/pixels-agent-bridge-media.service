@@ -1,0 +1,20 @@
+[Unit]
+Description=Pixels Agent Bridge console media supervisor
+After=systemd-logind.service pixels-agent-bridge-executor.service
+Requires=pixels-agent-bridge-executor.service
+Wants=systemd-logind.service
+PartOf=pixels-agent-bridge-executor.service
+
+[Service]
+Type=simple
+ExecStart=/opt/pixels-agent-bridge/pab-desktop --media-supervisor
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillMode=mixed
+RuntimeDirectory=pixels-agent-bridge-media
+RuntimeDirectoryMode=0711
+UMask=0077
+
+[Install]
+WantedBy=pixels-agent-bridge-executor.service

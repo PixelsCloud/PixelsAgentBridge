@@ -27,6 +27,10 @@ tar -tzf "$source_dir/document-runtime-linux.tar.gz" | grep -Fx 'document-runtim
 install -d -m 755 /etc/pixels-agent-bridge
 "$source_dir/pab-executor" configure --config "$config_file" --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
 chmod 644 "$config_file"
+if has_systemd && systemctl cat pixels-agent-bridge-media.service >/dev/null 2>&1; then
+    # This archive removes the graphical binary; retire its companion first.
+    systemctl disable --now pixels-agent-bridge-media.service
+fi
 if has_systemd && systemctl cat "$unit" >/dev/null 2>&1; then
     systemctl stop "$unit"
     if [[ $mode == manual ]]; then systemctl disable "$unit"; fi

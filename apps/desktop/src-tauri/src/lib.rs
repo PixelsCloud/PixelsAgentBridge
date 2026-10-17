@@ -8,6 +8,8 @@ mod agent_integrations;
 mod desktop_input;
 #[cfg(target_os = "linux")]
 mod linux_launch;
+#[cfg(target_os = "linux")]
+mod linux_media_supervisor;
 #[cfg(target_os = "macos")]
 mod macos_launch;
 mod macos_permissions;
@@ -324,6 +326,10 @@ pub fn run_session_supervisor() -> Result<(), String> {
 #[cfg(windows)]
 pub fn run_media_supervisor() -> Result<(), String> {
     windows_session_supervisor::run_media_only()
+}
+#[cfg(target_os = "linux")]
+pub fn run_media_supervisor() -> Result<(), String> {
+    linux_media_supervisor::run()
 }
 
 pub fn run_session_helper() -> Result<(), String> {

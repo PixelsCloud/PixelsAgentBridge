@@ -10,8 +10,11 @@ install -d -m 700 /var/lib/pixels-agent-bridge
 if [[ -d /run/systemd/system ]]; then
     systemctl daemon-reload
     systemctl enable pixels-agent-bridge-executor.service
+    systemctl enable pixels-agent-bridge-media.service
     systemctl restart pixels-agent-bridge-executor.service
+    systemctl restart pixels-agent-bridge-media.service
     systemctl is-active --quiet pixels-agent-bridge-executor.service
+    systemctl is-active --quiet pixels-agent-bridge-media.service
 fi
 declare -A users=()
 if [[ -n ${SUDO_USER:-} && ${SUDO_USER} != root ]]; then users["$SUDO_USER"]=1; fi

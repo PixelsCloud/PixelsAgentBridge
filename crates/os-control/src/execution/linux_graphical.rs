@@ -12,6 +12,7 @@ type UidSession = unsafe extern "C" fn(libc::uid_t, *mut *mut c_char) -> c_int;
 type SessionTest = unsafe extern "C" fn(*const c_char) -> c_int;
 type SessionString = unsafe extern "C" fn(*const c_char, *mut *mut c_char) -> c_int;
 type SessionUid = unsafe extern "C" fn(*const c_char, *mut libc::uid_t) -> c_int;
+type SeatActive = unsafe extern "C" fn(*const c_char, *mut *mut c_char, *mut libc::uid_t) -> c_int;
 struct Api {
     _library: Library,
     pid_session: PidSession,
@@ -22,6 +23,7 @@ struct Api {
     class: SessionString,
     seat: SessionString,
     uid: SessionUid,
+    seat_active: SeatActive,
 }
 impl Api {
     fn load() -> Result<Self, String> {
@@ -47,6 +49,7 @@ impl Api {
                 class: symbol!("sd_session_get_class", SessionString),
                 seat: symbol!("sd_session_get_seat", SessionString),
                 uid: symbol!("sd_session_get_uid", SessionUid),
+                seat_active: symbol!("sd_seat_get_active", SeatActive),
                 _library: library,
             })
         }
@@ -80,6 +83,9 @@ fn string(call: impl FnOnce(*mut *mut c_char) -> c_int) -> io::Result<CString> {
     if value.to_bytes().is_empty() || value.to_bytes().len() > 1024 {
         return Err(io::Error::other("invalid logind session field"));
     }
+    value
+        .to_str()
+        .map_err(|_| io::Error::other("invalid logind text"))?;
     Ok(value.to_owned())
 }
 
@@ -92,6 +98,28 @@ pub struct LinuxGraphicalSession {
     class: CString,
 }
 impl LinuxGraphicalSession {
+    /// Observe the console seat without selecting a remote execution identity.
+    /// The media supervisor uses this only to launch the local session's helper.
+    pub fn active_console() -> io::Result<Self> {
+        let api = Api::get()?;
+        let mut uid = u32::MAX;
+        // SAFETY: constant NUL-terminated seat and writable output pointers.
+        let id = string(|out| unsafe { (api.seat_active)(c"seat0".as_ptr(), out, &mut uid) })?;
+        let session = Self::observe_session(api, id, uid, true)?;
+        if session.seat.as_bytes() != b"seat0" {
+            return Err(io::Error::other("console seat changed during observation"));
+        }
+        Ok(session)
+    }
+    pub fn uid(&self) -> u32 {
+        self.uid
+    }
+    pub fn id(&self) -> &str {
+        self.id.to_str().expect("validated logind text")
+    }
+    pub fn kind(&self) -> &str {
+        self.kind.to_str().expect("validated logind text")
+    }
     /// The UID must come from process_user_identity, never from registration or
     /// XDG_SESSION_ID. User-manager applications can live outside session.scope;
     /// only ENODATA permits fallback to logind's primary graphical user session.
@@ -122,6 +150,9 @@ impl LinuxGraphicalSession {
             }
             Err(e) => return Err(e),
         };
+        Self::observe_session(api, id, uid, media)
+    }
+    fn observe_session(api: &Api, id: CString, uid: u32, media: bool) -> io::Result<Self> {
         let mut observed_uid = u32::MAX;
         let status = unsafe { (api.uid)(id.as_ptr(), &mut observed_uid) };
         if status < 0 {
@@ -154,7 +185,9 @@ impl LinuxGraphicalSession {
         })
     }
     pub fn current(&self, pid: u32) -> bool {
-        Self::observe(pid, self.uid, self.class.as_bytes() == b"greeter").as_ref().ok()
+        Self::observe(pid, self.uid, self.class.as_bytes() == b"greeter")
+            .as_ref()
+            .ok()
             == Some(self)
     }
 }

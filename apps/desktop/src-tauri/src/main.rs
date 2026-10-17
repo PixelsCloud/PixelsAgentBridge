@@ -61,7 +61,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         Some("--media-supervisor") => {
             if let Err(error) = pab_desktop_lib::run_media_supervisor() {
                 eprintln!("pab-media-supervisor: {error}");
