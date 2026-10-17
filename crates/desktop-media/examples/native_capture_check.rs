@@ -1,6 +1,6 @@
 //! Opt-in native encoder interoperability check using generated quadrants.
 //! This measures encode/decode throughput, not actual desktop or display FPS.
-//! No frame bytes are written to disk. Run: native_capture_check WORKER 15|30.
+//! No frame bytes are written to disk. Run: native_capture_check WORKER 15|30 [MODE].
 use pab_desktop_media::{NativeBackend, software::SoftwareDecoder};
 use pab_protocol::DESKTOP_MAX_FRAME_BYTES;
 use pab_remote_desktop::DesktopBackend;
@@ -21,8 +21,18 @@ async fn main() -> Result<(), Error> {
 }
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() != 2 {
-        return Err("usage: native_capture_check WORKER 15|30".into());
+    if !(2..=3).contains(&args.len()) {
+        return Err("usage: native_capture_check WORKER 15|30 [synthetic mode]".into());
+    }
+    let mode = args.get(2).map(String::as_str).unwrap_or("synthetic");
+    if !matches!(
+        mode,
+        "synthetic"
+            | "synthetic-software"
+            | "synthetic-fail-encoder-init"
+            | "synthetic-fail-encoder"
+    ) {
+        return Err("only generated diagnostic sources are allowed".into());
     }
     let fps: u16 = args[1].parse()?;
     if !matches!(fps, 15 | 30) {
@@ -39,7 +49,7 @@ async fn run() -> Result<(), Error> {
     let mut decoder = SoftwareDecoder::new(width, height)?;
     let mut command = Command::new(&executable);
     command
-        .args(["capture", &screen.id, &fps.to_string(), "synthetic"])
+        .args(["capture", &screen.id, &fps.to_string(), mode])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -69,6 +79,9 @@ async fn run() -> Result<(), Error> {
         let key = output.read_u32_le().await?;
         if sampled < last_capture || key > 1 || (index == 0 && key != 1) {
             return Err("source timestamp/keyframe mismatch".into());
+        }
+        if mode == "synthetic-fail-encoder" && index == 2 && key != 1 {
+            return Err("encoder fallback must start with an independently decodable frame".into());
         }
         last_capture = sampled;
         let mut packet = vec![0; size];
@@ -110,7 +123,7 @@ async fn run() -> Result<(), Error> {
     let passed = rate > 12.0 && rate >= f64::from(fps) * 0.9;
     println!(
         "{}",
-        serde_json::json!({"passed":passed,"source":"synthetic","dimensions":[width,height],
+        serde_json::json!({"passed":passed,"source":mode,"dimensions":[width,height],
         "target_fps":fps,"encode_decode_fps":rate,"decoded":total,"pixel_checks":total*4,"max_yuv_error":maximum_error})
     );
     if !passed {

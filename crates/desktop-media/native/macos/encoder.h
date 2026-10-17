@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "../software_codec_ffi.h"
 
 namespace pab_mac {
 struct EncodedFrame { std::vector<uint8_t> bytes; bool key = false; };
@@ -139,6 +140,79 @@ public:
         if (!output_.completed || output_.frame.bytes.empty() || (index == 0 && !output_.frame.key))
             throw std::runtime_error("Encoder did not produce the requested frame");
         return std::move(output_.frame);
+    }
+};
+
+// The capture IOSurface goes directly to VT while hardware works. Only the
+// bundled fallback maps its NV12 planes; it never round-trips through RGB.
+class VideoEncoder {
+    std::unique_ptr<Encoder> hardware_;
+    void* software_ = nullptr;
+    PabVideoGeometry geometry_;
+    unsigned fps_;
+    bool fail_encode_;
+    void use_software() {
+        hardware_.reset();
+        software_ = pab_soft_encoder_new(geometry_.width, geometry_.height, static_cast<uint16_t>(fps_));
+        if (!software_) throw std::runtime_error("Software encoder initialization failed");
+    }
+public:
+    VideoEncoder(unsigned width, unsigned height, unsigned fps, bool software = false,
+        bool fail_initial = false, bool fail_encode = false)
+        : geometry_(width, height), fps_(fps), fail_encode_(fail_encode) {
+        if (!fps || fps > 60) throw std::runtime_error("Invalid encoder frame rate");
+        if (!software) {
+            try {
+                hardware_ = std::make_unique<Encoder>(width, height, fps);
+                if (fail_initial) throw std::runtime_error("Diagnostic encoder initialization failure");
+                return;
+            } catch (const std::exception& error) {
+                fprintf(stderr, "media hardware encoder initialization failed: %s; selecting software\n", error.what());
+            }
+        }
+        use_software();
+    }
+    ~VideoEncoder() { if (software_) pab_soft_encoder_drop(software_); }
+    bool software() const { return software_ != nullptr; }
+    EncodedFrame encode(CVPixelBufferRef image, uint64_t index) {
+        if (!image || CVPixelBufferGetWidth(image) != geometry_.width ||
+            CVPixelBufferGetHeight(image) != geometry_.height || CVPixelBufferGetPlaneCount(image) != 2 ||
+            CVPixelBufferGetPixelFormatType(image) != kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+            throw std::runtime_error("Encoder input changed; refresh generation");
+        if (hardware_) {
+            try {
+                auto frame = hardware_->encode(image, index);
+                if (fail_encode_ && index == 2) throw std::runtime_error("Diagnostic running encoder failure");
+                return frame;
+            } catch (const std::exception& error) {
+                fprintf(stderr, "media hardware encoder failed: %s; selecting software\n", error.what());
+                use_software();
+                fprintf(stderr, "media encoder fallback=openh264_software cpu_pixel_mappings_per_frame=1\n");
+            }
+        }
+        const size_t y_stride = CVPixelBufferGetBytesPerRowOfPlane(image, 0);
+        const size_t uv_stride = CVPixelBufferGetBytesPerRowOfPlane(image, 1);
+        const size_t y_rows = CVPixelBufferGetHeightOfPlane(image, 0);
+        const size_t uv_rows = CVPixelBufferGetHeightOfPlane(image, 1);
+        if (y_rows != geometry_.height || uv_rows != geometry_.coded_height / 2 ||
+            y_stride < geometry_.width || uv_stride < geometry_.coded_width ||
+            y_stride > (256u * 1024 * 1024) / y_rows || uv_stride > (256u * 1024 * 1024) / uv_rows)
+            throw std::runtime_error("Encoder NV12 plane bounds changed");
+        check(CVPixelBufferLockBaseAddress(image, kCVPixelBufferLock_ReadOnly), "Software capture mapping");
+        PabCodecBytes output{};
+        const bool ok = pab_soft_encode_nv12(software_,
+            static_cast<const uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(image, 0)), y_stride*y_rows, y_stride,
+            static_cast<const uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(image, 1)), uv_stride*uv_rows, uv_stride, &output);
+        check(CVPixelBufferUnlockBaseAddress(image, kCVPixelBufferLock_ReadOnly), "Software capture unmapping");
+        if (!ok || !output.data || !output.size || output.size > max_packet)
+            throw std::runtime_error("Software encode failed");
+        EncodedFrame frame;
+        frame.bytes.assign(output.data, output.data + output.size);
+        for (size_t i = 0; i + 4 < frame.bytes.size(); ++i) {
+            if (frame.bytes[i] == 0 && frame.bytes[i+1] == 0 && frame.bytes[i+2] == 0 &&
+                frame.bytes[i+3] == 1 && (frame.bytes[i+4] & 31) == 5) frame.key = true;
+        }
+        return frame;
     }
 };
 }

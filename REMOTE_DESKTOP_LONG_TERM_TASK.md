@@ -32,6 +32,13 @@ Windows/XRServer 的真实多屏要求不变，Mac 单屏性能、输入、锁�
 测试通过；未变更安装版、TCC 或用户会话。真实 Mac 锁屏登录仍待确认和验收，
 不能用这些脚本测试替代。见 [Mac 登录 helper 注册记录](acceptance/remote-desktop-macos-login-launchd-2026-10-17.md)。
 
+当前 W3/W4 进展：Mac 编码初始化及运行故障已接入内置 OpenH264 后备，正常
+IOSurface→VideoToolbox 路径不增加 CPU 像素映射；后备直接处理 NV12，偶数
+尺寸借用 Y 平面，仅拆分 UV。三平台媒体库测试、Mac 完整构建通过；四种编码
+情况在 Mac/Windows 硬软解码的 16 组原生呈现检查全部通过，1080p 生成图案
+约 14.76～15.26 FPS。真实采集与网络故障、较旧 macOS、系统登录仍待验收。
+详见 [Mac 编码后备记录](acceptance/remote-desktop-macos-encoder-fallback-2026-10-17.md)。
+
 | 工作包 | 要完成的工作 | 完成证据 | 对应清单 |
 | --- | --- | --- | --- |
 | W1 Windows 产品闭环 | 在正式独立窗口内从设备入口进入，连续完成观看、启用操作、SAS、锁屏登录与自动恢复；补启动取消、关闭、断线、helper/服务退出、账号/服务切换和旧业务并行清理 | 同一窗口连续测试记录；旧连接仍可执行终端/命令/传输；恢复后无旧输入和残留占用 | LT-01、LT-02、03.1、03.6、LT-05 |

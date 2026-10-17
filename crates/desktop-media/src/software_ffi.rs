@@ -60,6 +60,50 @@ unsafe extern "C" fn pab_soft_encode(
     .unwrap_or(false)
 }
 #[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_encode_nv12(
+    value: *mut SoftwareEncoder,
+    y: *const u8,
+    y_len: usize,
+    y_stride: usize,
+    uv: *const u8,
+    uv_len: usize,
+    uv_stride: usize,
+    output: *mut Bytes,
+) -> bool {
+    if value.is_null()
+        || y.is_null()
+        || uv.is_null()
+        || output.is_null()
+        || y_len > 256 * 1024 * 1024
+        || uv_len > 256 * 1024 * 1024
+    {
+        return false;
+    }
+    // SAFETY: the native worker holds a read-only CVPixelBuffer mapping and
+    // its exclusive encoder handle until this call returns. Extents are capped.
+    let (value, y, uv, output) = unsafe {
+        (
+            &mut *value,
+            std::slice::from_raw_parts(y, y_len),
+            std::slice::from_raw_parts(uv, uv_len),
+            &mut *output,
+        )
+    };
+    output.data = std::ptr::null();
+    output.len = 0;
+    catch_unwind(AssertUnwindSafe(|| {
+        match value.encode_nv12(y, y_stride, uv, uv_stride) {
+            Ok(packet) => {
+                output.data = packet.as_ptr();
+                output.len = packet.len();
+                true
+            }
+            Err(_) => false,
+        }
+    }))
+    .unwrap_or(false)
+}
+#[unsafe(no_mangle)]
 extern "C" fn pab_soft_decoder_new(width: u32, height: u32) -> *mut SoftwareDecoder {
     catch_unwind(|| {
         SoftwareDecoder::new(width as usize, height as usize)

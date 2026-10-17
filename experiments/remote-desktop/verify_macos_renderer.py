@@ -91,7 +91,9 @@ def capture(worker, folder, prefix):
         print(json.dumps({"fixture": destination.name, "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}), flush=True)
 
 
-def render(worker, folder, source, rotation, verify, decoder, lifecycle=False, redraw_only=False):
+def render(worker, folder, source, rotation, verify, decoder, lifecycle=False, redraw_only=False,
+           hardware_decoder_code=3):
+    assert hardware_decoder_code in (1, 3)  # Windows D3D11 or macOS VideoToolbox.
     width, height, fps, packets = fixture(folder / f"{source}.pabvideo")
     mode = "stream-verify" if verify else "stream"
     if decoder == "software":
@@ -115,7 +117,7 @@ def render(worker, folder, source, rotation, verify, decoder, lifecycle=False, r
                 if event == 4:
                     kind = read(process.stdout, 1)[0]
                     with condition:
-                        assert "decoder" not in state and kind in (2, 3)
+                        assert "decoder" not in state and kind in (2, hardware_decoder_code)
                         state["decoder"] = kind
                         condition.notify_all()
                 elif event in (1, 2):
@@ -176,7 +178,7 @@ def render(worker, folder, source, rotation, verify, decoder, lifecycle=False, r
             assert measured > 12 and measured >= fps * .9
         else:
             assert summary["displayed"] == 1
-        assert state["decoder"] == (3 if decoder == "hardware" else 2)
+        assert state["decoder"] == (hardware_decoder_code if decoder == "hardware" else 2)
         report["passed"] = True
     except Exception as error:
         report["error"] = repr(error)

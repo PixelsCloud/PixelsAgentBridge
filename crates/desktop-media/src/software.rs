@@ -107,6 +107,57 @@ impl Planar {
             }
         }
     }
+    fn nv12<'a>(
+        &'a mut self,
+        y: &'a [u8],
+        y_stride: usize,
+        uv: &[u8],
+        uv_stride: usize,
+    ) -> Result<YUVSlices<'a>, Error> {
+        let y_len = y_stride
+            .checked_mul(self.visible_height)
+            .ok_or("NV12 luma stride overflow")?;
+        let uv_len = uv_stride
+            .checked_mul(self.height / 2)
+            .ok_or("NV12 chroma stride overflow")?;
+        if y_stride < self.visible_width
+            || uv_stride < self.width
+            || y.len() < y_len
+            || uv.len() < uv_len
+        {
+            return Err("NV12 planes are truncated".into());
+        }
+        // OpenH264 accepts I420. Borrow the captured luma for even geometry;
+        // only separate interleaved chroma, without an NV12 -> RGB -> YUV trip.
+        for row in 0..self.height / 2 {
+            for col in 0..self.width / 2 {
+                let source = row * uv_stride + col * 2;
+                let target = row * (self.width / 2) + col;
+                self.u[target] = uv[source];
+                self.v[target] = uv[source + 1];
+            }
+        }
+        let (luma, stride) =
+            if self.width == self.visible_width && self.height == self.visible_height {
+                (&y[..y_len], y_stride)
+            } else {
+                for row in 0..self.height {
+                    let source = row.min(self.visible_height - 1) * y_stride;
+                    let target = &mut self.y[row * self.width..(row + 1) * self.width];
+                    target[..self.visible_width]
+                        .copy_from_slice(&y[source..source + self.visible_width]);
+                    if self.width != self.visible_width {
+                        target[self.visible_width] = target[self.visible_width - 1];
+                    }
+                }
+                (self.y.as_slice(), self.width)
+            };
+        Ok(YUVSlices::new(
+            (luma, &self.u, &self.v),
+            (self.width, self.height),
+            (stride, self.width / 2, self.width / 2),
+        ))
+    }
 }
 
 pub struct SoftwareEncoder {
@@ -151,11 +202,41 @@ impl SoftwareEncoder {
             (p.width, p.height),
             (p.width, p.width / 2, p.width / 2),
         );
-        if !self.initialized {
+        Self::encode_frame(
+            &mut self.encoder,
+            &mut self.packet,
+            &mut self.initialized,
+            &source,
+        )
+    }
+    /// Limited-range BT.709 NV12 from a mapped capture surface. The hardware
+    /// path never invokes this method. Both strides include full final rows.
+    pub fn encode_nv12(
+        &mut self,
+        y: &[u8],
+        y_stride: usize,
+        uv: &[u8],
+        uv_stride: usize,
+    ) -> Result<&[u8], Error> {
+        let source = self.planar.nv12(y, y_stride, uv, uv_stride)?;
+        Self::encode_frame(
+            &mut self.encoder,
+            &mut self.packet,
+            &mut self.initialized,
+            &source,
+        )
+    }
+    fn encode_frame<'a>(
+        encoder: &mut Encoder,
+        packet: &'a mut Vec<u8>,
+        initialized: &mut bool,
+        source: &YUVSlices<'_>,
+    ) -> Result<&'a [u8], Error> {
+        if !*initialized {
             // The wrapper initializes dimensions lazily, and forces a single
             // slice even with num_threads(4). Prime it privately, then enable
             // independent slices; the first published frame must be a new IDR.
-            self.encoder.encode(&source)?;
+            encoder.encode(source)?;
             {
                 use openh264_sys2::{
                     ENCODER_OPTION_SVC_ENCODE_PARAM_EXT, SEncParamExt, SM_FIXEDSLCNUM_SLICE,
@@ -167,7 +248,7 @@ impl SoftwareEncoder {
                 // intended quality after lazy initialization, including small
                 // single-slice frames; otherwise the upstream default wins.
                 unsafe {
-                    let api = self.encoder.raw_api();
+                    let api = encoder.raw_api();
                     if api.get_option(
                         ENCODER_OPTION_SVC_ENCODE_PARAM_EXT,
                         params.as_mut_ptr().cast(),
@@ -177,7 +258,8 @@ impl SoftwareEncoder {
                     }
                     let mut params = params.assume_init();
                     params.sSpatialLayers[0].iDLayerQp = i32::from(SOFTWARE_QP);
-                    if p.width * p.height >= 65_536 {
+                    let (width, height) = source.dimensions();
+                    if width * height >= 65_536 {
                         params.iMultipleThreadIdc = 4;
                         params.sSpatialLayers[0].sSliceArgument.uiSliceMode = SM_FIXEDSLCNUM_SLICE;
                         params.sSpatialLayers[0].sSliceArgument.uiSliceNum = 4;
@@ -191,15 +273,15 @@ impl SoftwareEncoder {
                     }
                 }
             }
-            self.encoder.force_intra_frame();
-            self.initialized = true;
+            encoder.force_intra_frame();
+            *initialized = true;
         }
-        self.packet.clear();
-        self.encoder.encode(&source)?.write_vec(&mut self.packet);
-        if self.packet.is_empty() || self.packet.len() > pab_protocol::DESKTOP_MAX_FRAME_BYTES {
+        packet.clear();
+        encoder.encode(source)?.write_vec(packet);
+        if packet.is_empty() || packet.len() > pab_protocol::DESKTOP_MAX_FRAME_BYTES {
             return Err("software encoder skipped a frame or exceeded the packet bound".into());
         }
-        Ok(&self.packet)
+        Ok(packet)
     }
 }
 
@@ -272,6 +354,93 @@ impl SoftwareDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nv12_borrows_even_luma_and_preserves_odd_edges_with_padded_strides() {
+        for (width, height) in [(64, 48), (63, 48), (64, 47), (63, 47)] {
+            let mut planar = Planar::new(width, height).unwrap();
+            let (cw, ch) = dimensions(width, height).unwrap();
+            let (ys, uvs) = (width + 13, cw + 10);
+            let mut y = vec![0xff; ys * height];
+            let mut uv = vec![0xff; uvs * (ch / 2)];
+            for row in 0..height {
+                for col in 0..width {
+                    y[row * ys + col] = (row + col) as u8;
+                }
+            }
+            for row in 0..ch / 2 {
+                for col in 0..cw / 2 {
+                    uv[row * uvs + col * 2] = (31 + row) as u8;
+                    uv[row * uvs + col * 2 + 1] = (97 + col) as u8;
+                }
+            }
+            let source = planar.nv12(&y, ys, &uv, uvs).unwrap();
+            if cw == width && ch == height {
+                assert_eq!(source.y().as_ptr(), y.as_ptr());
+            }
+            for row in 0..ch {
+                for col in 0..cw {
+                    assert_eq!(
+                        source.y()[row * source.strides().0 + col],
+                        (row.min(height - 1) + col.min(width - 1)) as u8
+                    );
+                }
+            }
+            for row in 0..ch / 2 {
+                for col in 0..cw / 2 {
+                    assert_eq!(source.u()[row * cw / 2 + col], (31 + row) as u8);
+                    assert_eq!(source.v()[row * cw / 2 + col], (97 + col) as u8);
+                }
+            }
+        }
+    }
+    #[test]
+    fn nv12_rejects_invalid_extents_before_reading() {
+        let mut p = Planar::new(63, 47).unwrap();
+        let y = vec![16; 64 * 47];
+        let uv = vec![128; 64 * 24];
+        assert!(p.nv12(&y, usize::MAX, &uv, 64).is_err());
+        assert!(p.nv12(&y, 64, &uv, usize::MAX).is_err());
+        assert!(p.nv12(&y, 62, &uv, 64).is_err());
+        assert!(p.nv12(&y, 64, &uv, 63).is_err());
+        assert!(p.nv12(&y[..y.len() - 1], 64, &uv, 64).is_err());
+        assert!(p.nv12(&y, 64, &uv[..uv.len() - 1], 64).is_err());
+        assert!(p.nv12(&y, 64, &uv, 64).is_ok());
+    }
+    #[test]
+    fn nv12_dynamic_encode_decode_preserves_limited_bt709_samples() {
+        for (width, height) in [(64, 48), (257, 129)] {
+            let (cw, ch) = dimensions(width, height).unwrap();
+            let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let (ys, uvs) = (width + 16, cw + 16);
+            let mut y = vec![0; ys * height];
+            let mut uv = vec![0; uvs * ch / 2];
+            for index in 0..8u8 {
+                let expected = [30 + index * 17, 50 + index * 11, 210 - index * 13];
+                for row in 0..height {
+                    y[row * ys..row * ys + width].fill(expected[0]);
+                }
+                for row in 0..ch / 2 {
+                    for col in 0..cw / 2 {
+                        uv[row * uvs + col * 2] = expected[1];
+                        uv[row * uvs + col * 2 + 1] = expected[2];
+                    }
+                }
+                let packet = encoder.encode_nv12(&y, ys, &uv, uvs).unwrap();
+                let output = decoder.decode(packet).unwrap().expect("no delayed frame");
+                for (x, row) in [(0, 0), (cw / 2, ch / 2), (cw - 1, ch - 1)] {
+                    let chroma = cw * ch + (row / 2) * cw + (x / 2) * 2;
+                    for (actual, expected) in
+                        [output[row * cw + x], output[chroma], output[chroma + 1]]
+                            .into_iter()
+                            .zip(expected)
+                    {
+                        assert!(actual.abs_diff(expected) <= 3, "{actual} versus {expected}");
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn settled_color_is_stable_after_spatial_fade() {
         // A real GNOME transition left this generated background with a

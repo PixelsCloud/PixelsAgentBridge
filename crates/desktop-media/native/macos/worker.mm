@@ -8,7 +8,7 @@
 #include <csignal>
 
 namespace pab_mac {
-// Opt-in diagnostic only. Actual screen capture never calls LockBaseAddress.
+// Opt-in diagnostic only. The hardware capture path never maps CPU pixels.
 static OwnedCF<CVPixelBufferRef> synthetic(unsigned width, unsigned height, uint64_t index) {
     NSDictionary* attributes = @{(__bridge NSString*)kCVPixelBufferIOSurfacePropertiesKey: @{}};
     CVPixelBufferRef image = nullptr;
@@ -39,9 +39,13 @@ static OwnedCF<CVPixelBufferRef> synthetic(unsigned width, unsigned height, uint
     return owned;
 }
 static void capture(const Display& display, unsigned fps, const std::string& mode) {
-    if (mode != "desktop" && mode != "synthetic") throw std::runtime_error("Unknown capture mode");
+    const bool software = mode == "synthetic-software";
+    const bool fail_initial = mode == "synthetic-fail-encoder-init";
+    const bool fail_encode = mode == "synthetic-fail-encoder";
+    if (mode != "desktop" && mode != "synthetic" && !software && !fail_initial && !fail_encode)
+        throw std::runtime_error("Unknown capture mode");
     const auto start = Clock::now(); auto next = start;
-    Encoder encoder(display.width, display.height, fps);
+    VideoEncoder encoder(display.width, display.height, fps, software, fail_initial, fail_encode);
     std::function<OwnedCF<CVPixelBufferRef>(Clock::time_point&)> source;
     if (mode == "desktop") {
         if (@available(macOS 12.3, *)) {
@@ -50,8 +54,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         }
         else throw std::runtime_error("Remote screen capture requires macOS 12.3 or later");
     }
-    fprintf(stderr, "media encoder=videotoolbox_hardware source=%s cpu_pixel_mappings_per_frame=%u\n",
-        mode.c_str(), mode == "desktop" ? 0 : 1);
+    fprintf(stderr, "media encoder=%s source=%s cpu_pixel_mappings_per_frame=%u\n",
+        encoder.software() ? "openh264_software" : "videotoolbox_hardware",
+        mode.c_str(), (mode == "desktop" ? 0u : 1u) + (encoder.software() ? 1u : 0u));
     write_value(magic); write_value(display.width); write_value(display.height);
     uint64_t index = 0;
     for (;;) { @autoreleasepool {
