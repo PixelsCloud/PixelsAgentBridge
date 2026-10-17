@@ -6,7 +6,7 @@ impl AuthenticatedDeviceConnection {
         screen_id: Option<String>,
         fps: u16,
     ) -> Result<RemoteDesktopSession, BridgeError> {
-        let cursor_version = match self
+        match self
             .task_request(DeviceTaskRequest::GetEnvironment {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
             })
@@ -15,9 +15,8 @@ impl AuthenticatedDeviceConnection {
             DeviceTaskResponse::Environment {
                 context,
                 remote_desktop_schema_version: Some(pab_protocol::REMOTE_DESKTOP_SCHEMA_VERSION),
-                remote_desktop_cursor_schema_version,
                 ..
-            } if context.device_ref == self.device_ref => remote_desktop_cursor_schema_version,
+            } if context.device_ref == self.device_ref => {}
             _ => {
                 return Err(pab_remote_desktop::DesktopError::Rejected {
                     code: pab_protocol::DesktopErrorCode::Unsupported,
@@ -26,15 +25,39 @@ impl AuthenticatedDeviceConnection {
                 }
                 .into());
             }
-        };
-        Ok(RemoteDesktopSession::open(
+        }
+        let session = RemoteDesktopSession::open(
             self.connection.clone(),
             screen_id,
             fps,
             self.operation_timeout(),
         )
-        .await?
-        .with_cursor_support(cursor_version))
+        .await?;
+        // Video Ready is sent after the capture starts. During session changes
+        // the old helper retires before its replacement registers; the initial
+        // environment can therefore report no cursor even though Open succeeds.
+        // Query again so optional support follows the actual active capture,
+        // including replacement by a legacy helper that embeds its cursor.
+        let cursor_version = match self
+            .task_request(DeviceTaskRequest::GetEnvironment {
+                schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            })
+            .await
+        {
+            Ok(DeviceTaskResponse::Environment {
+                context,
+                remote_desktop_schema_version: Some(pab_protocol::REMOTE_DESKTOP_SCHEMA_VERSION),
+                remote_desktop_cursor_schema_version,
+                ..
+            }) if context.device_ref == self.device_ref => remote_desktop_cursor_schema_version,
+            _ => {
+                // Cursor discovery must not discard working video/input, nor
+                // reuse an earlier capability from a different helper.
+                tracing::debug!("desktop cursor capability refresh unavailable");
+                None
+            }
+        };
+        Ok(session.with_cursor_support(cursor_version))
     }
 }
 
@@ -42,6 +65,7 @@ impl AuthenticatedDeviceConnection {
 mod tests {
     use super::*;
     use std::time::Duration;
+    include!("remote_desktop_tests.rs");
     #[tokio::test]
     async fn old_device_is_rejected_before_opening_any_desktop_stream() {
         let (_a, _b, client, server) = test_connection_pair().await;

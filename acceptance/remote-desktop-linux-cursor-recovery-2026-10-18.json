@@ -1,0 +1,194 @@
+{
+  "date": "2026-10-18",
+  "baseline": "478fcfe",
+  "scope": "Windows viewer to GNOME Wayland single screen; not system-password login or X11 acceptance",
+  "before": {
+    "transitions": [
+      {
+        "action": "lock",
+        "seconds": 2.486389100085944,
+        "samples": 7,
+        "phase": "viewing",
+        "input_enabled": false,
+        "old_session": "18db6573-94cf-4c88-901e-64ec85c2e22b",
+        "new_session": "658193b4-4f2a-4034-9435-83a87e2c8964"
+      },
+      {
+        "action": "unlock",
+        "seconds": 2.527940500061959,
+        "samples": 7,
+        "phase": "viewing",
+        "input_enabled": false,
+        "old_session": "658193b4-4f2a-4034-9435-83a87e2c8964",
+        "new_session": "d2986826-fdac-4643-b355-b25af334e529"
+      },
+      {
+        "action": "relock",
+        "seconds": 2.4602149000857025,
+        "samples": 7,
+        "phase": "viewing",
+        "input_enabled": false,
+        "old_session": "d2986826-fdac-4643-b355-b25af334e529",
+        "new_session": "9a98228b-52db-4ae7-8ac6-e4bf00e7c55c"
+      }
+    ],
+    "initial_cyan_pixels": 900,
+    "unlocked_cyan_pixels": 0
+  },
+  "after": {
+    "transitions": [
+      {
+        "action": "lock",
+        "seconds": 2.602079600095749,
+        "samples": 7,
+        "phase": "viewing",
+        "input_enabled": false,
+        "old_session": "c1a161f9-fa8a-4dcf-b06b-900f98311ba3",
+        "new_session": "e85f9edf-ae11-4f2c-952a-39a696af9228"
+      },
+      {
+        "action": "unlock",
+        "seconds": 2.568027100060135,
+        "samples": 7,
+        "phase": "viewing",
+        "input_enabled": false,
+        "old_session": "e85f9edf-ae11-4f2c-952a-39a696af9228",
+        "new_session": "bfb17cf5-f307-429d-b2c2-ad1de381cd03"
+      }
+    ],
+    "steps": [
+      {
+        "step": "initial",
+        "parent": 264420,
+        "native_position": [
+          618,
+          604
+        ],
+        "expected_remote": [
+          492.0619516289006,
+          421.9501792935073
+        ],
+        "cyan_pixels": 900
+      },
+      {
+        "step": "locked",
+        "parent": 264420,
+        "native_position": [
+          412,
+          516
+        ],
+        "expected_remote": [
+          328.0346227206836,
+          351.8915388723583
+        ],
+        "cyan_pixels": null
+      },
+      {
+        "step": "restored",
+        "parent": 264420,
+        "native_position": [
+          618,
+          604
+        ],
+        "expected_remote": [
+          492.0619516289006,
+          421.9501792935073
+        ],
+        "cyan_pixels": 900
+      }
+    ],
+    "shapes": [
+      {
+        "shape": "arrow",
+        "bright_pixels": 96,
+        "colors": 100,
+        "expected_remote": [
+          164.00729381246663,
+          421.9501792935073
+        ],
+        "fixture": {
+          "x": 164.0078125,
+          "y": 421.94921875,
+          "shape": "arrow",
+          "clicks": 0,
+          "releases": 0,
+          "held": false,
+          "updated": 1792263803.7043893,
+          "width": 1314,
+          "height": 704,
+          "focused": true
+        }
+      },
+      {
+        "shape": "text",
+        "bright_pixels": 33,
+        "colors": 33,
+        "expected_remote": [
+          820.918013275349,
+          421.9501792935073
+        ],
+        "fixture": {
+          "x": 820.91796875,
+          "y": 421.94921875,
+          "shape": "text",
+          "clicks": 0,
+          "releases": 0,
+          "held": false,
+          "updated": 1792263805.3260264,
+          "width": 1314,
+          "height": 704,
+          "focused": true
+        }
+      },
+      {
+        "shape": "hidden",
+        "bright_pixels": 0,
+        "colors": 1,
+        "expected_remote": [
+          1148.972671091783,
+          421.9501792935073
+        ],
+        "fixture": {
+          "x": 1148.97265625,
+          "y": 421.94921875,
+          "shape": "hidden",
+          "clicks": 0,
+          "releases": 0,
+          "held": false,
+          "updated": 1792263806.8424926,
+          "width": 1314,
+          "height": 704,
+          "focused": true
+        }
+      }
+    ],
+    "windows_desktop_sha256": "0b33e2c964122d76049cb49b53be9814de269ca4eb2e103f01fa4fb1e7e808f5",
+    "linux_binaries_unchanged": true
+  },
+  "tests": {
+    "regression_before": "failed: false vs expected true",
+    "targeted_passed": 4,
+    "bridge_passed": 99,
+    "bridge_seconds": 17.43,
+    "build_jobs": 4
+  },
+  "cleanup": {
+    "original_service_active": true,
+    "session_restored": true,
+    "owned_processes": [],
+    "input_devices": [],
+    "stage_removed": true,
+    "fixture_removed": true,
+    "rollback_trigger": "",
+    "local_owned_processes": 0,
+    "local_sensitive_files_removed": 7
+  },
+  "limitations": [
+    "No FPS or long-duration claim",
+    "No X11 HideCursor resolution",
+    "No macOS cursor source acceptance",
+    "No full multi-screen acceptance",
+    "Native wake timing failure retained",
+    "WebView close command denied; owned test process stopped by launcher"
+  ]
+}
