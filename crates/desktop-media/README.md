@@ -45,8 +45,27 @@ BGRA; monochrome and masked-color shapes retain AND/XOR semantics. Shape and
 image buffers are bounded, with no position history. The video lease invalidates
 and reaps retained cursor sources even while idle. `cursor-shape-check` uses
 generated shapes without touching the OS pointer; the Windows cursor integration
-test includes an explicitly ignored real-GPU lifecycle check. Viewer overlays
-and Mac/Linux separate cursor sources remain pending.
+test includes an explicitly ignored real-GPU lifecycle check. Windows native
+viewer overlays are connected; Mac/Linux separate sources and overlays remain
+pending.
+
+`NativeViewer::cursor_renderer()` returns a generation-owned independent
+submitter. Windows Desktop reads the remote cursor stream alongside video and
+input; source errors clear the last image while preserving the session. A local
+partial pipe failure instead retires that renderer generation. Cursor commands
+share only the serialized native pipe write, not the pending video read/decoder
+acknowledgment. Private event 6 confirms cursor consumption and cannot grant
+video credit or increment displayed-video FPS.
+
+The GPU overlay blends premultiplied colors directly onto the output; AND/XOR
+shapes copy only their clipped background rectangle to a GPU texture. No output
+pixels are read by the CPU. Position/visibility changes reuse the shape, retain
+one decoded frame for static repaint, and clip to the visible screen rather
+than its letterbox. Viewport scaling, desktop/capture coordinate ratios and
+hotspots are applied without rotating the cursor shape again. The local pointer
+is hidden only over a controlled viewport with an active remote cursor stream;
+view-only mode and cursor-source failure restore its normal pointer. The shader
+uses the Windows D3DCompiler library and adds no downloaded runtime component.
 
 `NativeViewer::open_in_window` renders into a native child of the Desktop-owned
 window. The top 72 logical pixels belong to its controls. The surface preserves
@@ -90,7 +109,7 @@ frame is forced to IDR after configuring slices; no priming frame is transmitted
 
 Current limitations, still tracked in `REMOTE_DESKTOP_LONG_TERM_TASK.md`:
 NVIDIA hardware encoding, system D3D11 MFT decoding, SDR BT.709,
-cursor overlays and remaining macOS/Linux product acceptance. Windows native keyboard,
+Mac/Linux cursor overlays and remaining platform acceptance. Windows native keyboard,
 mouse and held-input recovery are implemented and tested on 90.
 GPU rotation is pixel-tested in all four orientations; actual rotated monitor
 capture and multi-monitor hotplug still require hardware acceptance.

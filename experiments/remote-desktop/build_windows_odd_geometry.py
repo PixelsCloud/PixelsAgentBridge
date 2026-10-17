@@ -20,7 +20,7 @@ if not kernel.GetProcessAffinityMask(handle, ctypes.byref(allowed), ctypes.byref
 if not kernel.SetProcessAffinityMask(handle, allowed.value & -allowed.value):
     raise ctypes.WinError(ctypes.get_last_error())
 
-libraries = tuple(name + '.lib' for name in ('dxguid', 'gdi32', 'mfplat', 'mfuuid', 'wmcodecdspuuid', 'ole32', 'shcore', 'shell32', 'advapi32'))
+libraries = tuple(name + '.lib' for name in ('d3dcompiler', 'dxguid', 'gdi32', 'mfplat', 'mfuuid', 'wmcodecdspuuid', 'ole32', 'shcore', 'shell32', 'advapi32'))
 vendor = Path(__file__).resolve().parents[2]/'crates/desktop-media/native/vendor'
 for kind in ('presenter', 'encoder'):
     build_probe(f'windows_odd_{kind}.cpp', f'windows-odd-{kind}', vendor, libraries)

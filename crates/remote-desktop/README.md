@@ -96,7 +96,8 @@ this capability to the session; unknown/absent versions retain existing v2
 video/input behavior and do not open cursor streams. The Executor helper
 adapter now pairs a separate cursor socket with the capture's verified process
 and exact active configuration. Windows now supplies native DXGI cursor
-snapshots. Mac/Linux separate sources and native viewer overlays are still pending.
+snapshots, and Windows Desktop consumes them through its GPU overlay alongside
+video and input. Mac/Linux separate sources and overlays are still pending.
 
 Each update binds session, generation and exact sequence. A new image has a
 monotonic generation-local ID; subsequent position/visibility updates reference
@@ -134,9 +135,10 @@ its paired cursor, including pending startup or a stationary snapshot wait.
 The optional capability follows the selected capture provider, so legacy or
 embedded-only providers cannot accidentally advertise separate cursor support.
 
-Remaining integration: collect Mac/Linux cursor metadata, and overlay snapshots
-in native renderers with clipping, scaling and hidden-state cleanup. Tests using generated snapshots do not
-demonstrate any visible cursor in the app.
+Remaining integration: collect Mac/Linux cursor metadata and add their native
+overlays, then verify real product sessions, multiple displays, login desktops
+and sustained video-plus-cursor performance. Generated GPU pixel checks and
+native-window tests do not replace these machine acceptance runs.
 
 ## Verification
 

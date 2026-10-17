@@ -3,7 +3,10 @@
 use pab_protocol::{DESKTOP_MAX_IN_FLIGHT, DesktopFrameHeader};
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
 };
 use tokio::{
     io::{AsyncRead, AsyncReadExt},
@@ -15,6 +18,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 struct Progress {
     decoder: Option<&'static str>,
     consumed: u64,
+    cursor_consumed: u64,
     presented: Option<DesktopFrameHeader>,
     summary: Option<serde_json::Value>,
     error: Option<String>,
@@ -23,6 +27,50 @@ pub(crate) struct Renderer {
     pending: Arc<Mutex<VecDeque<DesktopFrameHeader>>>,
     progress: watch::Receiver<Progress>,
     task: tokio::task::JoinHandle<()>,
+    cursor_issued: Arc<AtomicU64>,
+    cursor_claimed: AtomicBool,
+}
+pub(crate) struct CursorAcknowledgements {
+    issued: Arc<AtomicU64>,
+    progress: watch::Receiver<Progress>,
+}
+impl CursorAcknowledgements {
+    pub(crate) fn prepare(&self) -> Result<u64, Error> {
+        let state = self.progress.borrow();
+        if let Some(error) = &state.error {
+            return Err(error.clone().into());
+        }
+        if state.summary.is_some() || self.progress.has_changed().is_err() {
+            return Err("native cursor renderer ended".into());
+        }
+        let last = self.issued.load(Ordering::Acquire);
+        if state.cursor_consumed != last {
+            return Err("previous native cursor submission incomplete".into());
+        }
+        let next = last
+            .checked_add(1)
+            .ok_or("native cursor sequence exhausted")?;
+        self.issued.store(next, Ordering::Release);
+        Ok(next)
+    }
+    pub(crate) async fn consumed(&mut self, sequence: u64) -> Result<(), Error> {
+        loop {
+            let state = self.progress.borrow_and_update().clone();
+            if let Some(error) = state.error {
+                return Err(error.into());
+            }
+            if state.cursor_consumed == sequence {
+                return Ok(());
+            }
+            if state.summary.is_some() {
+                return Err("native cursor renderer finished".into());
+            }
+            self.progress
+                .changed()
+                .await
+                .map_err(|_| "native cursor renderer closed")?;
+        }
+    }
 }
 /// Independent output notification, including when no new desktop frame arrives.
 pub struct NativePresentations {
@@ -55,8 +103,10 @@ impl Renderer {
         let pending = Arc::new(Mutex::new(VecDeque::new()));
         let (sender, progress) = watch::channel(Progress::default());
         let queue = pending.clone();
+        let cursor_issued = Arc::new(AtomicU64::new(0));
+        let issued = cursor_issued.clone();
         let task = tokio::spawn(async move {
-            if let Err(error) = receive(output, queue, &sender).await {
+            if let Err(error) = receive(output, queue, issued, &sender).await {
                 sender.send_modify(|state| state.error = Some(error.to_string()));
             }
         });
@@ -64,7 +114,18 @@ impl Renderer {
             pending,
             progress,
             task,
+            cursor_issued,
+            cursor_claimed: AtomicBool::new(false),
         }
+    }
+    pub(crate) fn cursor(&self) -> Result<CursorAcknowledgements, Error> {
+        if self.cursor_claimed.swap(true, Ordering::AcqRel) {
+            return Err("cursor renderer already attached".into());
+        }
+        Ok(CursorAcknowledgements {
+            issued: self.cursor_issued.clone(),
+            progress: self.progress.clone(),
+        })
     }
     pub(crate) fn presentations(&self) -> NativePresentations {
         NativePresentations {
@@ -136,6 +197,7 @@ impl Drop for Renderer {
 async fn receive(
     mut output: impl AsyncRead + Unpin,
     pending: Arc<Mutex<VecDeque<DesktopFrameHeader>>>,
+    cursor_issued: Arc<AtomicU64>,
     sender: &watch::Sender<Progress>,
 ) -> Result<(), Error> {
     let mut state = Progress::default();
@@ -201,6 +263,15 @@ async fn receive(
                 output.read_exact(&mut message).await?;
                 return Err(String::from_utf8(message)?.into());
             }
+            6 => {
+                let sequence = output.read_u64_le().await?;
+                if state.cursor_consumed.checked_add(1) != Some(sequence)
+                    || sequence > cursor_issued.load(Ordering::Acquire)
+                {
+                    return Err("native renderer acknowledged an unsubmitted cursor".into());
+                }
+                state.cursor_consumed = sequence;
+            }
             _ => return Err("invalid native renderer event".into()),
         }
         sender.send_replace(state.clone());
@@ -216,6 +287,56 @@ mod tests {
         io::{AsyncWriteExt, DuplexStream},
         time::timeout,
     };
+
+    #[tokio::test]
+    async fn cursor_consumption_never_grants_video_credit_or_displayed_frames() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        let mut cursor = renderer.cursor().unwrap();
+        assert!(renderer.cursor().is_err());
+        let sequence = cursor.prepare().unwrap();
+        assert_eq!(sequence, 1);
+        assert!(cursor.prepare().is_err());
+        event(&mut pipe, 6, sequence).await;
+        cursor.consumed(sequence).await.unwrap();
+        let mut presentations = renderer.presentations();
+        assert!(
+            timeout(Duration::from_millis(40), presentations.next())
+                .await
+                .is_err()
+        );
+        assert!(
+            timeout(Duration::from_millis(40), renderer.consumed(1))
+                .await
+                .is_err()
+        );
+        renderer.enqueue(header(1)).await.unwrap();
+        event(&mut pipe, 1, 0).await;
+        event(&mut pipe, 2, 0).await;
+        renderer.consumed(1).await.unwrap();
+        assert_eq!(presentations.next().await.unwrap().frame_id, 1);
+        let sequence = cursor.prepare().unwrap();
+        event(&mut pipe, 6, sequence).await;
+        cursor.consumed(sequence).await.unwrap();
+        event(&mut pipe, 3, 1).await;
+        pipe.write_u64_le(0).await.unwrap();
+        pipe.write_u32_le(0).await.unwrap();
+        assert_eq!(renderer.summary().await.unwrap()["displayed"], 1);
+    }
+    #[tokio::test]
+    async fn unsubmitted_cursor_confirmation_is_rejected() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        event(&mut pipe, 6, 1).await;
+        assert!(
+            timeout(Duration::from_secs(1), renderer.summary())
+                .await
+                .unwrap()
+                .unwrap_err()
+                .to_string()
+                .contains("unsubmitted cursor")
+        );
+    }
 
     #[tokio::test]
     async fn bounded_native_failure_wakes_pending_consumption() {

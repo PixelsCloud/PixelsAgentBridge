@@ -7,6 +7,7 @@ class ViewerInput {
     unsigned buttons_ = 0;
 public:
     bool available = false;
+    bool enabled() const { return enabled_; }
     void emit(uint8_t kind, uint16_t x = 0, uint16_t y = 0, uint16_t value = 0, bool down = false) {
         const uint8_t bytes[8]{kind, uint8_t(x), uint8_t(x >> 8), uint8_t(y), uint8_t(y >> 8),
             uint8_t(value), uint8_t(value >> 8), uint8_t(down)};

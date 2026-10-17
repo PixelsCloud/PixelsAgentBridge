@@ -117,6 +117,7 @@ fn main() {
         .compile("pab_desktop_media");
     for library in [
         "d3d11",
+        "d3dcompiler",
         "dxgi",
         "dxguid",
         "user32",

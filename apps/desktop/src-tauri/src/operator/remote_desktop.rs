@@ -561,6 +561,56 @@ async fn stream(
                 return Err(error);
             }
         };
+        // The cursor owns a separate remote stream and native submitter. It
+        // must stay alive across a pending video read on a static desktop.
+        #[cfg(windows)]
+        let cursor_source = if session.supports_cursor() {
+            match session.open_cursor().await {
+                Ok(source) => Some(source),
+                Err(_) => {
+                    tracing::debug!("independent remote cursor unavailable for this generation");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        #[cfg(windows)]
+        let cursor_renderer = if cursor_source.is_some() {
+            Some(viewer.cursor_renderer().map_err(StreamFailure::renderer)?)
+        } else {
+            None
+        };
+        #[cfg(windows)]
+        let cursor_work = async move {
+            if let (Some(mut source), Some(mut renderer)) = (cursor_source, cursor_renderer) {
+                loop {
+                    let update = match source.next_update().await {
+                        Ok(update) => update,
+                        Err(_) => {
+                            // Remote cursor failure is independent of video and
+                            // input. Erase its last image and leave the viewer.
+                            tokio::time::timeout(Duration::from_secs(5), renderer.clear())
+                                .await
+                                .map_err(|_| {
+                                    StreamFailure::renderer("native cursor clear timed out")
+                                })?
+                                .map_err(StreamFailure::renderer)?;
+                            break;
+                        }
+                    };
+                    // A local partial pipe write cannot be reused. Such an
+                    // error retires this native generation, like video IO.
+                    tokio::time::timeout(Duration::from_secs(5), renderer.submit(&update))
+                        .await
+                        .map_err(|_| StreamFailure::renderer("native cursor submission timed out"))?
+                        .map_err(StreamFailure::renderer)?;
+                }
+            }
+            std::future::pending::<Result<(), StreamFailure>>().await
+        };
+        #[cfg(not(windows))]
+        let cursor_work = std::future::pending::<Result<(), StreamFailure>>();
         publish(
             window,
             owner,
@@ -663,6 +713,7 @@ async fn stream(
         let outcome = tokio::select! {
             result = video => result.map(|_| None),
             result = interaction => result,
+            result = cursor_work => result.map(|_| None),
         };
         drop(viewer);
         let command = match outcome {

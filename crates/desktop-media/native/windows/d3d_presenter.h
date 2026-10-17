@@ -6,6 +6,7 @@
 #include <thread>
 #include "viewer_input.h"
 #include "../software_codec_ffi.h"
+#include "cursor_overlay.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -16,6 +17,8 @@ inline std::array<float, 4> test_color(uint64_t frame, unsigned quadrant) {
 }
 
 class NativePresenter {
+    CursorOverlay cursor_;
+    bool cursor_tracking_ = false;
     ViewerInput input_;
     static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
         auto* self = reinterpret_cast<NativePresenter*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -23,6 +26,7 @@ class NativePresenter {
             self = static_cast<NativePresenter*>(reinterpret_cast<CREATESTRUCTW*>(lparam)->lpCreateParams);
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
+        if (self && message == WM_SETCURSOR && LOWORD(lparam) == HTCLIENT && self->refresh_local_cursor()) return TRUE;
         if (self && self->input_.message(window, message, wparam, lparam, self->viewport_)) return 0;
         return DefWindowProcW(window, message, wparam, lparam);
     }
@@ -56,9 +60,24 @@ class NativePresenter {
     ComPtr<ID3D11Texture2D> pixel_;
     UINT width_ = 0, height_ = 0;
     UINT output_width_ = 960, output_height_ = 540;
+    bool refresh_local_cursor() {
+        POINT point{};
+        if (!GetCursorPos(&point) || WindowFromPoint(point) != window_) return false;
+        ScreenToClient(window_, &point);
+        const bool remote = cursor_tracking_ && input_.enabled() && PtInRect(&viewport_,point);
+        SetCursor(remote ? nullptr : LoadCursorW(nullptr,IDC_ARROW));
+        return true;
+    }
 public:
+    void cursor_update(const std::vector<uint8_t>& packet) {
+        cursor_.update(device_.Get(), packet);
+        cursor_tracking_ = !packet.empty() && packet.front() == 1;
+        refresh_local_cursor();
+        // Repaint the retained sample without inventing a video presentation.
+        if (retained_.sample) render(retained_, retained_index_, false);
+    }
     void input_available(bool available) { input_.available = available; }
-    void input_enabled(bool enabled) { input_.enable(window_, enabled); }
+    void input_enabled(bool enabled) { input_.enable(window_, enabled); refresh_local_cursor(); }
     uint64_t submitted = 0, displayed = 0, pixel_checks = 0;
     unsigned max_color_error = 0;
     uint64_t stats_disjoint = 0;
@@ -67,6 +86,8 @@ public:
     NativePresenter(const NativePresenter&) = delete;
     NativePresenter& operator=(const NativePresenter&) = delete;
     ~NativePresenter() {
+        cursor_tracking_ = false;
+        refresh_local_cursor();
         input_.release(window_);
         pixel_.Reset();
         processor_.Reset();
@@ -156,6 +177,7 @@ public:
         WNDCLASSW cls{};
         cls.lpfnWndProc = window_proc;
         cls.hInstance = GetModuleHandleW(nullptr);
+        cls.hCursor = LoadCursorW(nullptr,IDC_ARROW);
         cls.lpszClassName = L"PixelsRemoteDesktopSurface";
         if (!RegisterClassW(&cls) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
             throw std::runtime_error("Cannot register viewer window");
@@ -347,6 +369,8 @@ public:
                     " RGB=" + std::to_string(actual[0]) + "," + std::to_string(actual[1]) + "," + std::to_string(actual[2]));
             }
         }
+        cursor_.draw(device_.Get(), context_.Get(), backbuffer.Get(), viewport_,
+            rotation_ % 2 ? height_ : width_, rotation_ % 2 ? width_ : height_);
         const auto hr = swapchain_->Present(1, 0);
         if (hr == DXGI_STATUS_OCCLUDED) { occluded_ = true; presenting_ = false; return; }
         check(hr, "Present decoded frame");

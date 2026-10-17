@@ -410,6 +410,14 @@ impl NativeViewer {
     pub fn presentations(&self) -> crate::renderer::NativePresentations {
         self.renderer.presentations()
     }
+    #[cfg(windows)]
+    pub fn cursor_renderer(&self) -> std::result::Result<crate::NativeCursorRenderer, AnyError> {
+        Ok(crate::NativeCursorRenderer::new(
+            &self.process.input,
+            self.config.clone(),
+            self.renderer.cursor()?,
+        ))
+    }
     /// Submit compressed data with bounded decoder backpressure. Rendering is
     /// reported independently by presentations(); consumption is never a video ACK.
     pub async fn submit(&mut self, frame: &VideoFrame) -> std::result::Result<(), AnyError> {

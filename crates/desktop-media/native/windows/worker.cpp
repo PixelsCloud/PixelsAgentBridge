@@ -85,6 +85,7 @@ static void inventory(const std::vector<Display>& found) {
 #include "input_fixture.h"
 #include "cursor_worker.h"
 #include "cursor_fixture.h"
+#include "cursor_overlay_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
     for (size_t i = 0; i + 4 < bytes.size(); ++i) {
         if (!bytes[i] && !bytes[i+1] && bytes[i+2] == 1 && (bytes[i+3] & 31) == 5) return true;
@@ -183,6 +184,7 @@ static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, uns
     write_value(uint32_t(2)); // Version of the private event protocol, not network framing.
     write_value(uint8_t(4)); write_value(uint8_t(decoder.software() ? 2 : 1));
     uint64_t expected = 0;
+    uint64_t cursor_sequence = 0;
     std::deque<std::pair<LONGLONG, uint64_t>> pending;
     auto last_output = Clock::now();
     const auto consume = [&](DecodedFrame& frame) {
@@ -201,6 +203,15 @@ static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, uns
     };
     while (true) {
         const auto size = read_value<uint32_t>(&presenter, drain_ready);
+        if (size == UINT32_MAX-1) {
+            const auto length = read_value<uint32_t>(&presenter, drain_ready);
+            if (length < 9 || length > max_cursor_bytes+64) throw std::runtime_error("Invalid cursor render packet");
+            const auto sequence = read_value<uint64_t>(&presenter, drain_ready);
+            if (cursor_sequence == UINT64_MAX || sequence != cursor_sequence+1) throw std::runtime_error("Invalid cursor render sequence");
+            std::vector<uint8_t> packet(length-8); read_bytes(packet.data(),static_cast<uint32_t>(packet.size()),&presenter,drain_ready);
+            presenter.cursor_update(packet); cursor_sequence = sequence;
+            write_value(uint8_t(6)); write_value(sequence); continue;
+        }
         if (interactive && size == UINT32_MAX) {
             const auto enabled = read_value<uint8_t>(&presenter, drain_ready);
             if (enabled > 1) throw std::runtime_error("Invalid viewer input mode");
@@ -282,6 +293,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         if (argc == 2 && std::string(argv[1]) == "cursor-shape-check") {
             cursor_shape_check(); return 0;
+        }
+        if (argc == 2 && std::string(argv[1]) == "cursor-overlay-check") {
+            cursor_overlay_check(); return 0;
         }
         if (argc == 2 && std::string(argv[1]) == "input-recovery-check") {
             input_recovery_check(); return 0;

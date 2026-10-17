@@ -113,6 +113,14 @@ Windows 源已公告能力，原生窗口叠加、Mac/Linux 独立源和真实�
 验收仍待完成；03.5 不关闭。详见
 [Windows 光标源记录](acceptance/remote-desktop-windows-cursor-source-2026-10-17.md)。
 
+后续 W2 Windows 光标显示：Desktop 每个代次已并行接入独立光标读取与原生
+GPU 叠加，彩色透明混合和 AND/XOR 均不回读桌面；形状不变时复用纹理，
+光标确认不占视频额度或增加视频帧率。源失败清除光标并保留视频；本地半包
+失败退出该渲染代次。22 项媒体单元、原生形状检查和 3 项 GPU/窗口测试通过，
+包含 30 组逐像素比较、硬软解码静帧更新及最大光标图像与视频并发传输。
+真实产品光标与输入模式切换、持续性能、Mac/Linux 源及显示仍待验收；03.5
+不关闭。详见 [Windows 光标显示记录](acceptance/remote-desktop-windows-cursor-render-2026-10-17.md)。
+
 2026-10-17 W4 操作端进展：真实 Mac MCP/Desktop 已通过既有认证连接 90，
 AI 提示打开正式独立窗口。修复全尺寸 contentView 的标题栏偏移导致原生画面
 遮住工具栏；修复前可复现，8 项原生布局检查及真实窗口/全屏/恢复通过。

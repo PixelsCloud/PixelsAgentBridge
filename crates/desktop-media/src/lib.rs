@@ -5,10 +5,14 @@ mod input;
 mod linux_view;
 #[cfg(target_os = "linux")]
 pub use linux_view::{LinuxNativeViewer, MainThreadDispatch};
+#[cfg(windows)]
+mod cursor_renderer;
 #[cfg(target_os = "macos")]
 mod macos_view;
 mod process;
 mod renderer;
+#[cfg(windows)]
+pub use cursor_renderer::NativeCursorRenderer;
 #[cfg(target_os = "macos")]
 pub use macos_view::{MacNativeViewer, MainThreadDispatch};
 pub mod software;
