@@ -77,8 +77,15 @@ fn start_inner(media_only: bool) -> Result<Task, String> {
                         }
                     }
                 };
+                let serve = async {
+                    if media_only {
+                        pab_executor::local_ipc::media::serve_supervised_helper(&backend).await
+                    } else {
+                        pab_executor::local_ipc::media::serve_helper(&backend).await
+                    }
+                };
                 tokio::select! {
-                    result = pab_executor::local_ipc::media::serve_helper(&backend) => {
+                    result = serve => {
                         if let Err(error) = result { tracing::debug!(%error, "Linux media helper disconnected"); }
                     }
                     _ = switched => {}

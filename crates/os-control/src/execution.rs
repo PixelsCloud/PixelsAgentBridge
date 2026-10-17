@@ -19,6 +19,10 @@ pub use linux_graphical::LinuxGraphicalSession;
 mod linux_media_environment;
 #[cfg(target_os = "linux")]
 pub use linux_media_environment::LinuxMediaEnvironment;
+#[cfg(target_os = "linux")]
+mod linux_media_dma;
+#[cfg(target_os = "linux")]
+pub use linux_media_dma::LinuxMediaDmaBroker;
 
 #[cfg(unix)]
 mod unix;

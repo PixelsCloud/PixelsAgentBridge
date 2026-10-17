@@ -218,6 +218,18 @@ W5 后续已加入原生 DRM 导出、SCM_RIGHTS 帧通道、普通用户 EGL �
 完成活动会话 supervisor 路由、重开/唤醒、登录输入和 DRM 多屏变换。详见
 [Linux DMA 原生组件](acceptance/remote-desktop-linux-dma-native-2026-10-17.md)。
 
+W5 已进一步接入 supervisor 的本地 DMA broker 和 PipeWire 启动失败后的采集
+后备；通过活动会话、内核 peer 身份和 pidfd 固定导出来源，图像转换/编码仍由
+普通用户执行。Linux 新连接优先使用系统媒体 helper，退出后回退到 GUI helper，
+不增加远程认证步骤。清理相关 Cargo 产物后以最多 8 jobs 重建，生产 broker 与
+用户启动器的隔离实机测试连续两次打开 DMA，1280×800 各 90 帧、89 次变化，
+约 14.383 / 14.730 FPS；同产物 PipeWire 回归约 13.910 FPS，均通过明确的
+12 FPS 本地采集/解码门槛。实机现有身份挑战下，两个模拟媒体提供者的优先选择
+与退出回退测试通过。源码/构建快照/产物绑定及清理记录已保存，原服务和配置
+保持。完整 supervisor → NativeBackend → 远程窗口、实际拒绝后的自动后备、
+唤醒、锁屏输入、GDM 登录、DRM 多屏变换和稳定性仍需验收；W5 不关闭。详见
+[Linux DMA 会话通道与 helper 路由](acceptance/remote-desktop-linux-dma-broker-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

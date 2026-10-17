@@ -29,8 +29,10 @@ def main():
     parser.add_argument("codec_library", type=pathlib.Path)
     parser.add_argument("--embedded", action="store_true")
     parser.add_argument("--dma-fd", type=int)
+    parser.add_argument("--dma-broker", action="store_true")
     args = parser.parse_args()
     assert args.dma_fd is None or (args.dma_fd >= 3 and os.geteuid() != 0)
+    assert not (args.dma_broker and args.dma_fd is not None)
     worker = args.worker.resolve(strict=True)
     command = [str(worker)] + (["--media-worker"] if args.embedded else [])
     library = ctypes.CDLL(str(args.codec_library.resolve(strict=True)))
@@ -69,7 +71,9 @@ def main():
             if not context.pending():
                 break
             context.iteration(False)
-    capture = ["capture-dma" if args.dma_fd is not None else "capture", screen["id"], "15", "desktop"]
+    capture = ["capture-dma" if args.dma_fd is not None or args.dma_broker else "capture", screen["id"], "15", "desktop"]
+    if args.dma_broker:
+        capture.append("broker")
     if args.dma_fd is not None:
         capture.append(str(args.dma_fd))
     source = subprocess.Popen(command + capture, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -115,13 +119,15 @@ def main():
         changed = sum(a != b for a,b in zip(samples, samples[1:]))
         # Exclude a one-second warmup and count actual decoded changing frames.
         elapsed = times[-1] - times[15]
+        changed_fps = sum(a != b for a,b in zip(samples[15:],samples[16:]))/elapsed
         print(json.dumps({"dimensions":[width,height], "inventory":screens, "frames":len(samples),
             "changed_samples":changed, "decoded_fps_after_warmup":74/elapsed,
-            "changed_fps_after_warmup":sum(a != b for a,b in zip(samples[15:],samples[16:]))/elapsed,
+            "changed_fps_after_warmup":changed_fps,
             "encoded_bytes":total_bytes, "fixture_ticks":tick[0], "stderr":stderr,
             "pixel_bytes_saved":0, "worker_exit":source.returncode, "consumer_uid":os.geteuid(),
-            "source":"dma" if args.dma_fd is not None else "pipewire"}))
+            "source":"dma" if args.dma_fd is not None or args.dma_broker else "pipewire"}))
         assert changed >= 85, "Animation did not produce distinct desktop frames"
+        assert changed_fps >= 12, "Local changing-frame capture/decode rate fell below 12 FPS"
     finally:
         if source.poll() is None:
             source.kill()

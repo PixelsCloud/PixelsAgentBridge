@@ -22,6 +22,7 @@ fn providers() -> &'static Mutex<Vec<Arc<Provider>>> {
 }
 struct Provider {
     id: u64,
+    supervised: bool,
     sender: mpsc::Sender<Request>,
     retired: AtomicBool,
     identity: Arc<helper_identity::VerifiedMediaHelper>,
@@ -99,9 +100,12 @@ async fn provider() -> Result<Arc<Provider>, LocalIpcError> {
                 .lock()
                 .map_err(|_| LocalIpcError::Protocol)?
                 .iter()
-                .rev()
-                .find(|p| !p.sender.is_closed() && !p.retired.load(Ordering::Acquire))
-                .cloned()
+                .enumerate()
+                .filter(|(_, p)| !p.sender.is_closed() && !p.retired.load(Ordering::Acquire))
+                // Preserve actual registration order within each class, even
+                // when concurrent identity challenges finish out of ID order.
+                .max_by_key(|(order, p)| (p.supervised, *order))
+                .map(|(_, p)| p.clone())
             {
                 return Ok(provider);
             }
@@ -237,6 +241,9 @@ pub(super) async fn serve_registered(
         .map_err(|_| LocalIpcError::Protocol)?
         .push(Arc::new(Provider {
             id,
+            // Routing preference only, after the existing authenticated peer
+            // challenge. This hint grants no extra permission or capability.
+            supervised: cfg!(target_os = "linux") && frame["supervised"].as_bool().unwrap_or(false),
             sender,
             retired: AtomicBool::new(false),
             identity: identity.clone(),
@@ -353,14 +360,28 @@ async fn read_control<S: AsyncRead + AsyncWrite + Unpin, T: serde::de::Deseriali
 pub async fn serve_helper(backend: &dyn DesktopBackend) -> Result<(), LocalIpcError> {
     serve_helper_socket(connect_local().await?, backend, true).await
 }
+/// Prefer the Linux system supervisor's media helper for new sessions, retaining
+/// the GUI helper as a fallback when the system helper is unavailable.
+#[cfg(target_os = "linux")]
+pub async fn serve_supervised_helper(backend: &dyn DesktopBackend) -> Result<(), LocalIpcError> {
+    serve_helper_socket_with_role(connect_local().await?, backend, true, true).await
+}
 async fn serve_helper_socket(
-    mut socket: LocalSocket,
+    socket: LocalSocket,
     backend: &dyn DesktopBackend,
     connect_input: bool,
 ) -> Result<(), LocalIpcError> {
+    serve_helper_socket_with_role(socket, backend, connect_input, false).await
+}
+async fn serve_helper_socket_with_role(
+    mut socket: LocalSocket,
+    backend: &dyn DesktopBackend,
+    connect_input: bool,
+    supervised: bool,
+) -> Result<(), LocalIpcError> {
     send_json(
         &mut socket,
-        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input()}),
+        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised}),
     )
     .await?;
     let provider_id = tokio::time::timeout(AUTH_TIMEOUT, async {
@@ -583,6 +604,9 @@ mod tests {
         }
     }
     async fn pair(backend: Arc<dyn DesktopBackend>) -> Pair {
+        pair_with_role(backend, false).await
+    }
+    async fn pair_with_role(backend: Arc<dyn DesktopBackend>, supervised: bool) -> Pair {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
@@ -595,9 +619,46 @@ mod tests {
         });
         let helper = tokio::spawn(async move {
             let (socket, _) = connect_async(format!("ws://{address}")).await.unwrap();
-            let _ = serve_helper_socket(socket, backend.as_ref(), false).await;
+            let _ = serve_helper_socket_with_role(socket, backend.as_ref(), false, supervised).await;
         });
         Pair { server, helper }
+    }
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    #[ignore = "requires an active local graphical user on the Linux VM"]
+    async fn supervised_media_wins_over_later_gui_and_falls_back_after_retirement() {
+        let _lock = LOCK.lock().await;
+        assert!(providers().lock().unwrap().is_empty());
+        let supervised = Arc::new(Backend::default());
+        let system_pair = pair_with_role(supervised.clone(), true).await;
+        HelperMediaBackend.screens().await.unwrap();
+        let selected = provider().await.unwrap().id;
+        assert!(provider().await.unwrap().supervised);
+        let gui = Arc::new(Backend::default());
+        let gui_pair = pair(gui.clone()).await;
+        tokio::time::timeout(WAIT, async {
+            while providers().lock().unwrap().len() != 2 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.unwrap();
+        assert_eq!(provider().await.unwrap().id, selected);
+        let mut source = HelperMediaBackend.start(config()).await.unwrap();
+        assert_eq!(source.next_frame().await.unwrap().bytes.len(), 200_013);
+        count(&supervised, 1).await;
+        count(&gui, 0).await;
+        drop(source);
+        tokio::time::timeout(WAIT, async {
+            while !system_pair.server.is_finished() || !system_pair.helper.is_finished() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.unwrap();
+        count(&supervised, 0).await;
+        assert!(!provider().await.unwrap().supervised);
+        let mut fallback = HelperMediaBackend.start(config()).await.unwrap();
+        assert_eq!(fallback.next_frame().await.unwrap().bytes.len(), 200_013);
+        count(&gui, 1).await;
+        drop(fallback);
+        ended(gui_pair, &gui).await;
     }
     async fn count(backend: &Backend, expected: usize) {
         tokio::time::timeout(WAIT, async {

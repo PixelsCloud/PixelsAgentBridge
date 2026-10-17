@@ -7,12 +7,20 @@
 #include "x11_input.h"
 #include "drm_export.h"
 #include "dma_capture.h"
+#include "dma_broker.h"
 #include <csignal>
 
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     signal(SIGPIPE, SIG_IGN);
-    // Internal inherited-descriptor entry points. Normal capture selection is
-    // unchanged until the session supervisor owns and authorizes the channel.
+    if (argc == 5 && std::string(argv[1]) == "export-session") {
+        try {
+            pab_linux::dma::export_session(pab_linux::number(argv[2], INT32_MAX),
+                pab_linux::number(argv[3], 1048576), pab_linux::number(argv[4], 1048576));
+            return 0;
+        } catch (const std::exception& error) { fprintf(stderr, "media: %s\n", error.what()); return 1; }
+        catch (...) { return 1; }
+    }
+    // Explicit inherited-descriptor entry point retained for native checks.
     if (argc == 7 && std::string(argv[1]) == "export-dma") {
         try {
             const std::string mode = argv[2];
@@ -31,7 +39,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             const auto found = pab_linux::displays(bus.get());
             const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
             if (selected == found.end()) throw std::runtime_error("Selected DMA display is unavailable");
-            pab_linux::dma::capture(bus.get(), *selected, pab_linux::number(argv[3], 60), pab_linux::number(argv[5], 1048576));
+            auto channel = std::string(argv[5]) == "broker" ? pab_linux::dma::connect_broker(selected->connector) : pab_linux::dma::Fd();
+            const auto fd = channel.get() >= 0 ? channel.get() : pab_linux::number(argv[5], 1048576);
+            pab_linux::dma::capture(bus.get(), *selected, pab_linux::number(argv[3], 60), fd);
             pw_deinit(); return 0;
         }
         if (argc == 8 && std::string(argv[1]) == "render") {
@@ -62,7 +72,20 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             const auto selected = std::find_if(found.begin(), found.end(), [&](const auto& d) { return d.id() == argv[2]; });
             if (selected == found.end()) throw std::runtime_error("Selected display is unavailable");
             if (argc == 3) pab_linux::input(bus.get(), *selected);
-            else pab_linux::capture(bus.get(), *selected, pab_linux::number(argv[3], 60));
+            else {
+                const auto fps = pab_linux::number(argv[3], 60);
+                auto source = std::make_unique<pab_linux::Capture>(bus.get(), *selected, fps);
+                try { source->start(); }
+                catch (const std::exception& error) {
+                    // No compressed header/frame has been published yet. Close
+                    // the denied PipeWire session before choosing the fallback.
+                    fprintf(stderr, "media: PipeWire start failed: %s; trying supervised DMA\n", error.what());
+                    source.reset();
+                    auto channel = pab_linux::dma::connect_broker(selected->connector);
+                    pab_linux::dma::capture(bus.get(), *selected, fps, channel.get());
+                }
+                if (source) pab_linux::capture(*source, *selected, fps);
+            }
         }
         status = 0;
     } catch (const std::exception& error) { fprintf(stderr, "media: %s\n", error.what()); }

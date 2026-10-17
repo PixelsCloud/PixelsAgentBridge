@@ -214,8 +214,7 @@ inline bool keyframe(const PabCodecBytes& packet) {
     }
     return false;
 }
-inline void capture(GDBusConnection* bus, const Display& display, unsigned fps) {
-    Capture source(bus, display, fps); source.start();
+inline void capture(Capture& source, const Display& display, unsigned fps) {
     Encoder encoder(pab_soft_encoder_new(display.size.width, display.size.height, fps));
     if (!encoder) throw std::runtime_error("Cannot initialize bundled software encoder");
     fprintf(stderr, "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n");
@@ -238,5 +237,9 @@ inline void capture(GDBusConnection* bus, const Display& display, unsigned fps) 
         write_value(uint32_t(key)); write_bytes(frame.bytes.data, frame.bytes.size);
         ++index; next = std::max(next + std::chrono::microseconds(1000000 / fps), Clock::now());
     }
+}
+inline void capture(GDBusConnection* bus, const Display& display, unsigned fps) {
+    Capture source(bus, display, fps); source.start();
+    capture(source, display, fps);
 }
 }

@@ -88,6 +88,24 @@ impl LinuxMediaEnvironment {
     pub fn session(&self) -> &LinuxGraphicalSession {
         &self.session
     }
+    /// Pin the observed compositor process before a privileged media child can
+    /// duplicate its DRM descriptor. A reused numeric PID must never suffice.
+    pub fn pin_process(&self) -> io::Result<(u32, std::os::fd::OwnedFd)> {
+        use std::os::fd::{FromRawFd, OwnedFd};
+        if !self.current() {
+            return Err(io::Error::other("media compositor changed"));
+        }
+        // SAFETY: pidfd_open takes only scalar arguments and returns a new fd.
+        let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, self.pid, 0) };
+        if raw < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let descriptor = unsafe { OwnedFd::from_raw_fd(raw as _) };
+        if !self.current() {
+            return Err(io::Error::other("media compositor changed while pinning"));
+        }
+        Ok((self.pid, descriptor))
+    }
     pub fn current(&self) -> bool {
         LinuxGraphicalSession::active_console().as_ref().ok() == Some(&self.session)
             && crate::process_identity(self.pid).as_ref().ok() == Some(&self.marker)

@@ -1,6 +1,9 @@
-//! Root service lifecycle only. Capture, codecs and input run as the verified
-//! active console user/greeter; application execution keeps its existing route.
-use pab_os_control::execution::{LinuxMediaEnvironment, PreparedUser, UserProcess};
+//! Root service lifecycle and bounded DRM descriptor export. Image conversion,
+//! codecs and ordinary input run as the verified active console user/greeter;
+//! application execution keeps its existing route.
+use pab_os_control::execution::{
+    LinuxMediaDmaBroker, LinuxMediaEnvironment, PreparedUser, UserProcess,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -23,6 +26,7 @@ struct Owner {
 struct Worker {
     target: LinuxMediaEnvironment,
     process: UserProcess,
+    dma: Option<LinuxMediaDmaBroker>,
     _profile: tempfile::TempDir,
 }
 
@@ -88,6 +92,19 @@ fn start(executable: &Path, target: LinuxMediaEnvironment) -> io::Result<Worker>
     fs::set_permissions(profile.path(), fs::Permissions::from_mode(0o711))?;
     let port = pab_executor::local_ipc::local_port().map_err(io::Error::other)?;
     let process = user.spawn_linux_media(executable, &target, &data, port)?;
+    let dma = match LinuxMediaDmaBroker::new(
+        &profile.path().join("dma.sock"),
+        target.clone(),
+        executable,
+        vec!["--media-worker".into()],
+        process.id(),
+    ) {
+        Ok(broker) => Some(broker),
+        Err(error) => {
+            tracing::warn!(%error, "Linux DMA fallback unavailable; ordinary media remains active");
+            None
+        }
+    };
     tracing::info!(
         session = target.session().id(),
         uid = owner.uid,
@@ -97,10 +114,14 @@ fn start(executable: &Path, target: LinuxMediaEnvironment) -> io::Result<Worker>
     Ok(Worker {
         target,
         process,
+        dma,
         _profile: profile,
     })
 }
 async fn stop(worker: &mut Worker) -> io::Result<()> {
+    if let Some(mut broker) = worker.dma.take() {
+        broker.stop()?;
+    }
     if worker.process.try_wait()?.is_some() {
         return Ok(());
     }
@@ -245,6 +266,11 @@ pub fn run() -> Result<(), String> {
                 Ok(_) => Ok(()),
                 Err(error) => Err(error),
             };
+            if let Some(broker) = worker.as_mut().and_then(|w| w.dma.as_mut()) {
+                if let Err(error) = broker.poll() {
+                    tracing::debug!(%error, "Linux DMA request retired");
+                }
+            }
             let error = result.err().map(|e| e.to_string());
             if error != last_error {
                 if let Some(error) = &error {
