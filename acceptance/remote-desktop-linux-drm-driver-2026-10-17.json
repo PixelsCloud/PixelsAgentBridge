@@ -1,0 +1,159 @@
+{
+  "date": "2026-10-17",
+  "baseline": "cf1988c",
+  "product_wayland_login_capture_passed": false,
+  "probe_results": {
+    "old_kernel_inventory": {
+      "task_id": "e37fb7db-2418-4bb8-b239-8440c6ef3c7a",
+      "output": [
+        {
+          "card": 0,
+          "vmwgfx_readback_zero_clips": true,
+          "drm_master": false,
+          "readback_errno": 13
+        },
+        {
+          "card": 0,
+          "prime_cap_available": true,
+          "prime_cap": 3
+        },
+        {
+          "card": 0,
+          "crtc": 42,
+          "x": 0,
+          "y": 0,
+          "width": 1314,
+          "height": 742,
+          "fb": 113
+        },
+        {
+          "card": 0,
+          "plane": 34,
+          "crtc": 42,
+          "fb": 113,
+          "fb2_errno": 19
+        },
+        {
+          "card": 0,
+          "plane": 36,
+          "crtc": 42,
+          "fb": 112,
+          "width": 64,
+          "height": 64,
+          "format": 875713089,
+          "modifier": 0,
+          "buffers": [
+            {
+              "index": 0,
+              "pitch": 256,
+              "offset": 0,
+              "exported": true,
+              "errno": 0,
+              "bytes": 16384
+            }
+          ]
+        }
+      ]
+    },
+    "new_kernel_inventory": {
+      "task_id": "d9210707-dda7-40fa-a9a8-68c9fb614ee7",
+      "output": [
+        {
+          "card": 0,
+          "vmwgfx_readback_zero_clips": true,
+          "drm_master": false,
+          "readback_errno": 13
+        },
+        {
+          "card": 0,
+          "prime_cap_available": true,
+          "prime_cap": 3
+        },
+        {
+          "card": 0,
+          "crtc": 42,
+          "x": 0,
+          "y": 0,
+          "width": 1280,
+          "height": 800,
+          "fb": 110
+        },
+        {
+          "card": 0,
+          "plane": 34,
+          "crtc": 42,
+          "fb": 110,
+          "width": 1280,
+          "height": 800,
+          "format": 875713112,
+          "modifier": 0,
+          "buffers": [
+            {
+              "index": 0,
+              "pitch": 5120,
+              "offset": 0,
+              "exported": false,
+              "errno": 2,
+              "bytes": -1,
+              "map_dumb_errno": 0,
+              "map_dumb_offset": 4320251904
+            }
+          ]
+        },
+        {
+          "card": 0,
+          "plane": 36,
+          "crtc": 42,
+          "fb": 111,
+          "width": 64,
+          "height": 64,
+          "format": 875713089,
+          "modifier": 0,
+          "buffers": [
+            {
+              "index": 0,
+              "pitch": 256,
+              "offset": 0,
+              "exported": true,
+              "errno": 0,
+              "bytes": 16384,
+              "map_dumb_errno": 0,
+              "map_dumb_offset": 4328452096
+            }
+          ]
+        }
+      ]
+    },
+    "new_kernel_mapped_probe": {
+      "task_id": "592365c9-f1df-45c7-9f9b-57222defccf7",
+      "output": [
+        {
+          "width": 1280,
+          "height": 800,
+          "nonzero_channels": 0,
+          "rgb_fnv1a": "dff2e40b0a1ba325",
+          "mapped_read_only": true,
+          "drm_master": false
+        }
+      ]
+    }
+  },
+  "binaries": {
+    "inventory_sha256": "44cbd723dc00f1e7138341ee6cbca759ddc8e9a253f1ab7d5dc3e1f85f27fbc6",
+    "mapped_probe_sha256": "f5a307373dc1a398b630a9a709d570d4a89264e7d0fbf7fcbda2dc14e6cc7042"
+  },
+  "restoration": {
+    "graphical_session": "23",
+    "uid": 1000,
+    "type": "wayland",
+    "active": true,
+    "locked": false,
+    "executor": "active",
+    "installed_config_and_binary_hashes_preserved": true,
+    "gdm_override_removed": true,
+    "temporary_keyboard_removed": true,
+    "runtime_removed": true,
+    "remaining_test_processes": 0,
+    "product_login_acceptance": false
+  }
+}

@@ -5,9 +5,29 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <vmwgfx_drm.h>
+
+/* A zero-clip VMW readback performs no frame transfer. It checks whether this
+ * independent fd can use the driver fallback, without creating a framebuffer,
+ * borrowing the compositor's fd, becoming master, or changing display state. */
+static void inspect_vmware_readback(int fd, unsigned card) {
+    drmVersionPtr version = drmGetVersion(fd);
+    if (!version) return;
+    const int vmware = version->name_len == 6 && !memcmp(version->name, "vmwgfx", 6);
+    drmFreeVersion(version);
+    if (!vmware) return;
+    struct drm_vmw_present_readback_arg request = {0};
+    errno = 0;
+    int result = drmIoctl(fd, DRM_IOW(DRM_COMMAND_BASE + DRM_VMW_PRESENT_READBACK,
+                                    struct drm_vmw_present_readback_arg), &request);
+    const int saved = result ? errno : 0;
+    printf("{\"card\":%u,\"vmwgfx_readback_zero_clips\":true,\"drm_master\":%s,\"readback_errno\":%d}\n",
+           card, drmIsMaster(fd) ? "true" : "false", saved);
+}
 
 static void inspect_framebuffer(int fd, unsigned card, unsigned plane, unsigned crtc, unsigned fb_id) {
     errno = 0;
@@ -27,9 +47,14 @@ static void inspect_framebuffer(int fd, unsigned card, unsigned plane, unsigned 
         int result = drmPrimeHandleToFD(fd, fb->handles[i], DRM_CLOEXEC, &dma);
         int saved_errno = result ? errno : 0;
         off_t size = dma >= 0 ? lseek(dma, 0, SEEK_END) : -1;
-        printf("%s{\"index\":%u,\"pitch\":%u,\"offset\":%u,\"exported\":%s,\"errno\":%d,\"bytes\":%jd}",
+        /* Offset lookup only: still no mmap or pixels read by this inventory. */
+        struct drm_mode_map_dumb mapping = { .handle = fb->handles[i] };
+        errno = 0;
+        int map_result = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mapping);
+        const int map_errno = map_result ? errno : 0;
+        printf("%s{\"index\":%u,\"pitch\":%u,\"offset\":%u,\"exported\":%s,\"errno\":%d,\"bytes\":%jd,\"map_dumb_errno\":%d,\"map_dumb_offset\":%" PRIu64 "}",
                emitted++ ? "," : "", i, fb->pitches[i], fb->offsets[i],
-               result == 0 ? "true" : "false", saved_errno, (intmax_t)size);
+               result == 0 ? "true" : "false", saved_errno, (intmax_t)size, map_errno, (uint64_t)mapping.offset);
         if (dma >= 0) close(dma);
     }
     puts("]}");
@@ -58,6 +83,7 @@ int main(void) {
             continue;
         }
         ++opened;
+        inspect_vmware_readback(fd, card);
         uint64_t prime = 0;
         int prime_ok = drmGetCap(fd, DRM_CAP_PRIME, &prime) == 0;
         printf("{\"card\":%u,\"prime_cap_available\":%s,\"prime_cap\":%" PRIu64 "}\n", card, prime_ok ? "true" : "false", prime);

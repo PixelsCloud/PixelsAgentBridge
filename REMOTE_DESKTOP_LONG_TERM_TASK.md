@@ -150,6 +150,14 @@ greeter helper 监督、密码登录与正式窗口全链路继续待完成，�
 拦截，已记录为受限 ACL 下待清理。此结果不代表注销新登录或默认 Wayland
 锁屏媒体可用，详见 [Linux 正式窗口登录](acceptance/remote-desktop-linux-system-login-2026-10-17.md)。
 
+后续 W5 Wayland 驱动探测：按已有授权重启 VM，启用系统已安装且默认选择的
+6.8.0-138 内核，未安装内核或修改启动配置。主平面 GETFB2 从 ENODEV 变为
+可用，但 PRIME 导出仍失败；只读 mmap 得到全黑画面，不能接入为可用后备。
+独立 uinput/虚拟机控制台恢复了 hy 的新 Wayland 会话；原程序/TOML 哈希
+不变，临时登录偏好、输入设备和恢复运行资源已清理。该恢复不是产品窗口
+新登录验收；默认 Wayland 登录采集与新内核回归仍待完成。详见
+[Linux DRM 驱动探测](acceptance/remote-desktop-linux-drm-driver-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
