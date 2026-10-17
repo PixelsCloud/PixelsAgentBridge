@@ -1,0 +1,1143 @@
+{
+  "date": "2026-10-17",
+  "baseline": "ff51a6c",
+  "source": "experiments/remote-desktop/windows_control_fixture.cpp",
+  "source_sha256": "9f2e645a4f278c95784c5fe522355668aaffa78cb11a78393fd72de7d3d6d6ea",
+  "binary_sha256": "bec9e6a5f3a1e30b9ca61d9ced9c336413dd152c8ce2bfe841496459233e27d7",
+  "build_jobs": 1,
+  "product_changed": false,
+  "installed_service_unchanged": true,
+  "temporary_remote_binary_removed": true,
+  "status": "unresolved_activation_input_sequence",
+  "remote_target": "90 Windows Server 2022, Administrator session 2",
+  "remote_cases": [
+    {
+      "mode": "batch-button-self",
+      "task_id": "dfe97f68-c674-4233-893b-108f2a721d5a",
+      "observed_messages": [
+        513,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": false,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163786500,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 163786500,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163786562,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-button-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 3,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 1,
+        "actions": 1,
+        "checked": 0,
+        "drag_starts": 0,
+        "drag_ends": 0,
+        "held_moves": 0,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": false,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    },
+    {
+      "mode": "batch-checkbox-self",
+      "task_id": "c1a6c3e2-9d66-48b1-b0b5-281020d9da88",
+      "observed_messages": [
+        513,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": false,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163791687,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 163791687,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163791734,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-checkbox-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 3,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 1,
+        "actions": 1,
+        "checked": 1,
+        "drag_starts": 0,
+        "drag_ends": 0,
+        "held_moves": 0,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": false,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    },
+    {
+      "mode": "batch-doubleclick-self",
+      "task_id": "ac2fbe4d-0685-4e28-adb4-bc68918ed3d9",
+      "observed_messages": [
+        513,
+        515,
+        514,
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "sequence_consistent": false,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163796875,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 163796875,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163796921,
+          "extra": 1346454083
+        },
+        {
+          "message": 513,
+          "time": 163796984,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163797046,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-doubleclick-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 6,
+        "injected": true,
+        "raw_down": 2,
+        "raw_up": 2,
+        "double_click": 1,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 3,
+        "drag_ends": 2,
+        "held_moves": 1,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": false,
+        "sequence_ok": false,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    },
+    {
+      "mode": "batch-drag-self",
+      "task_id": "61f9fd9f-52f5-459f-8aac-6c35a456b53f",
+      "observed_messages": [
+        513,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": false,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163802078,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 163802078,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163802281,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-drag-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 8,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 1,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 2,
+        "drag_ends": 1,
+        "held_moves": 6,
+        "last_up": [
+          250,
+          80
+        ],
+        "actions_ok": false,
+        "sequence_ok": false,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    },
+    {
+      "mode": "focused-doubleclick-self",
+      "task_id": "941350b5-8419-4476-b253-47bf6a451521",
+      "observed_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163807343,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163807390,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 163807453,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163807500,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "focused-doubleclick-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 4,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 2,
+        "double_click": 1,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 2,
+        "drag_ends": 2,
+        "held_moves": 0,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    },
+    {
+      "mode": "focused-drag-self",
+      "task_id": "a2db2592-8c1e-4300-8888-ef4592e7034a",
+      "observed_messages": [
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 163812578,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 163812781,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "focused-drag-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 7,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 0,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 1,
+        "drag_ends": 1,
+        "held_moves": 5,
+        "last_up": [
+          250,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": "failed"
+    }
+  ],
+  "local_cases": [
+    {
+      "mode": "button-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631558812,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631558859,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "button-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 2,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 0,
+        "actions": 1,
+        "checked": 0,
+        "drag_starts": 0,
+        "drag_ends": 0,
+        "held_moves": 0,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    },
+    {
+      "mode": "checkbox-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631563906,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631563953,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "checkbox-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 2,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 0,
+        "actions": 1,
+        "checked": 1,
+        "drag_starts": 0,
+        "drag_ends": 0,
+        "held_moves": 0,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    },
+    {
+      "mode": "doubleclick-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631569031,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631569093,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 1631569156,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631569203,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "doubleclick-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 4,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 2,
+        "double_click": 1,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 2,
+        "drag_ends": 2,
+        "held_moves": 1,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    },
+    {
+      "mode": "drag-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631574187,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631574421,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "drag-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 7,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 0,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 1,
+        "drag_ends": 1,
+        "held_moves": 5,
+        "last_up": [
+          250,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    },
+    {
+      "mode": "batch-doubleclick-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514,
+        515,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631579281,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631579343,
+          "extra": 1346454083
+        },
+        {
+          "message": 515,
+          "time": 1631579406,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631579453,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-doubleclick-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 6,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 2,
+        "double_click": 1,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 2,
+        "drag_ends": 2,
+        "held_moves": 1,
+        "last_up": [
+          150,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    },
+    {
+      "mode": "batch-drag-self",
+      "task_id": null,
+      "observed_messages": [
+        513,
+        514
+      ],
+      "expected_messages": [
+        513,
+        514
+      ],
+      "sequence_consistent": true,
+      "raw_message_events": [
+        {
+          "message": 513,
+          "time": 1631584406,
+          "extra": 1346454083
+        },
+        {
+          "message": 514,
+          "time": 1631584609,
+          "extra": 1346454083
+        }
+      ],
+      "observation": {
+        "mode": "batch-drag-self",
+        "initially_active": false,
+        "active_at_input": false,
+        "submitted": 8,
+        "injected": true,
+        "raw_down": 1,
+        "raw_up": 1,
+        "double_click": 0,
+        "actions": 0,
+        "checked": 0,
+        "drag_starts": 1,
+        "drag_ends": 1,
+        "held_moves": 6,
+        "last_up": [
+          250,
+          80
+        ],
+        "actions_ok": true,
+        "sequence_ok": true,
+        "left_held": false
+      },
+      "left_held": false,
+      "recorded_exit_state": 0
+    }
+  ],
+  "earlier_movement_comparison": {
+    "source_sha256": "d907be05e0e5ae59780734b80db6d93a6d6116aca2896c2c00e2ff0ad448ac5e",
+    "binary_sha256": "49d6b67368e69b0ab059bfcd4c1ec5c8edb1323ab814126d9c11c953c6349387",
+    "note": "Raw message sequences are independently compared; earlier action-only passed fields are deliberately not treated as full acceptance.",
+    "cases": [
+      {
+        "mode": "button-self",
+        "task_id": "6bf98d41-3d87-419a-865e-b3607950435d",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163461843,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163461843,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163461890,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "button-self",
+          "initially_active": false,
+          "submitted": 2,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 1,
+          "checked": 0,
+          "drag_starts": 0,
+          "drag_ends": 0,
+          "held_moves": 0,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "succeeded"
+      },
+      {
+        "mode": "checkbox-self",
+        "task_id": "3c782c14-b38b-4c10-89e5-fc4b5452bfa8",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163467046,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163467046,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163467093,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "checkbox-self",
+          "initially_active": false,
+          "submitted": 2,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 1,
+          "checked": 1,
+          "drag_starts": 0,
+          "drag_ends": 0,
+          "held_moves": 0,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "succeeded"
+      },
+      {
+        "mode": "doubleclick-self",
+        "task_id": "65d60e1d-96f6-46cc-bf5b-d19c6254094d",
+        "observed_messages": [
+          513,
+          515,
+          514,
+          513,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514,
+          515,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163472265,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163472265,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163472328,
+            "extra": 1346454083
+          },
+          {
+            "message": 513,
+            "time": 163472390,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163472437,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "doubleclick-self",
+          "initially_active": false,
+          "submitted": 4,
+          "injected": true,
+          "raw_down": 2,
+          "raw_up": 2,
+          "double_click": 1,
+          "actions": 0,
+          "checked": 0,
+          "drag_starts": 3,
+          "drag_ends": 2,
+          "held_moves": 1,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "failed"
+      },
+      {
+        "mode": "drag-self",
+        "task_id": "80ad8d9b-9ab8-4f05-a1e3-95b6e15cb0b6",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163477453,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163477453,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163477656,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "drag-self",
+          "initially_active": false,
+          "submitted": 7,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 0,
+          "checked": 0,
+          "drag_starts": 2,
+          "drag_ends": 1,
+          "held_moves": 6,
+          "last_up": [
+            250,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "failed"
+      },
+      {
+        "mode": "separate-button-self",
+        "task_id": "5c698b95-5b49-4b9b-b64d-8eb38a06af45",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163482734,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163482734,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163482796,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "separate-button-self",
+          "initially_active": false,
+          "submitted": 3,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 1,
+          "checked": 0,
+          "drag_starts": 0,
+          "drag_ends": 0,
+          "held_moves": 0,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "succeeded"
+      },
+      {
+        "mode": "separate-checkbox-self",
+        "task_id": "3253bc03-39e9-4740-9c42-42ed5e6a0a11",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163487953,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163487953,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163488015,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "separate-checkbox-self",
+          "initially_active": false,
+          "submitted": 3,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 1,
+          "checked": 1,
+          "drag_starts": 0,
+          "drag_ends": 0,
+          "held_moves": 0,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "succeeded"
+      },
+      {
+        "mode": "separate-doubleclick-self",
+        "task_id": "c8500fa1-b821-43aa-8752-6ea05900e6ec",
+        "observed_messages": [
+          513,
+          515,
+          514,
+          513,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514,
+          515,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163493140,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163493140,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163493187,
+            "extra": 1346454083
+          },
+          {
+            "message": 513,
+            "time": 163493250,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163493312,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "separate-doubleclick-self",
+          "initially_active": false,
+          "submitted": 5,
+          "injected": true,
+          "raw_down": 2,
+          "raw_up": 2,
+          "double_click": 1,
+          "actions": 0,
+          "checked": 0,
+          "drag_starts": 3,
+          "drag_ends": 2,
+          "held_moves": 1,
+          "last_up": [
+            150,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "failed"
+      },
+      {
+        "mode": "separate-drag-self",
+        "task_id": "5937b5c7-8e09-44db-800e-156cd07b65a2",
+        "observed_messages": [
+          513,
+          515,
+          514
+        ],
+        "expected_messages": [
+          513,
+          514
+        ],
+        "sequence_consistent": false,
+        "raw_message_events": [
+          {
+            "message": 513,
+            "time": 163498343,
+            "extra": 1346454083
+          },
+          {
+            "message": 515,
+            "time": 163498343,
+            "extra": 1346454083
+          },
+          {
+            "message": 514,
+            "time": 163498546,
+            "extra": 1346454083
+          }
+        ],
+        "observation": {
+          "mode": "separate-drag-self",
+          "initially_active": false,
+          "submitted": 8,
+          "injected": true,
+          "raw_down": 1,
+          "raw_up": 1,
+          "double_click": 1,
+          "actions": 0,
+          "checked": 0,
+          "drag_starts": 2,
+          "drag_ends": 1,
+          "held_moves": 6,
+          "last_up": [
+            250,
+            80
+          ],
+          "left_held": false
+        },
+        "left_held": false,
+        "recorded_exit_state": "failed"
+      }
+    ]
+  },
+  "limitations": [
+    "Standalone SendInput diagnosis, not a new product/network input acceptance.",
+    "Standard button/checkbox performed one action despite extra double-click message.",
+    "Attempted SetForegroundWindow restored event sequence but foreground query remained false; focused test gate fails.",
+    "Root cause and fix unresolved; no product deduplication or forced activation introduced.",
+    "XRServer provided four monitor entries but no available desktop_user context; no four-screen input run in this stage."
+  ]
+}
