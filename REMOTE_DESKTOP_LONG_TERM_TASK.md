@@ -159,6 +159,11 @@ greeter helper 监督、密码登录与正式窗口全链路继续待完成，�
 Wayland 登录采集仍待完成。详见
 [Linux DRM 驱动探测](acceptance/remote-desktop-linux-drm-driver-2026-10-17.md)。
 
+后续诊断取得活动合成器的有效 master 描述符，零区域读回成功、一个像素读回
+仍为 EINVAL；独立描述符 CPU 同步成功后主画面仍全黑。已排除「仅缺 master」
+这一解释，但可交付的 Wayland 登录采集仍未解决。实验画面已清理，原服务、
+配置与活动用户会话保持正常；没有把黑帧映射接入产品。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

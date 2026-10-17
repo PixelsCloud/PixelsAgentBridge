@@ -58,3 +58,25 @@ LockedHint=no。临时键盘销毁；GDM 偏好、恢复目录和定时器已清
 每轮均回收 worker 和注册；Desktop 媒体 helper 隔离启动与 SIGTERM 退出正常。
 这没有复测动态网络帧率。W5 仍需解决可交付的 Wayland 登录采集与输入路径，
 并重新完成产品窗口验收。其他工作包继续按长期任务推进。
+
+## 后续：有效 master 与 CPU 同步检查
+
+基线 `c6943e7`，仍为 6.8.0-138、会话 23 的正常 Wayland 桌面。本节是新增
+诊断，与上文只打开独立 DRM 描述符的实验分开记录。
+
+root 诊断通过 pidfd 复制活动 UID 1000 GNOME Shell 的 card0 描述符。
+`drmIsMaster` 为 true，零区域 readback 成功；对主平面 fb108 的一个像素
+执行 readback 仍返回 EINVAL (22)。未申请/释放 master、未切换显示模式，
+未在共享描述符上创建或关闭 GEM/fence 句柄；复制的描述符和 pidfd 均已关闭。
+因此失败不能只归因于独立描述符缺少 DRM master，具体驱动根因仍未确认。
+
+映射探针增加可选 `vmw-sync` 参数：先核对驱动名称，再在自身描述符和句柄上
+执行只读 CPU 同步，允许合成器继续提交命令；EBUSY 每 10 ms 重试，最多 200 次。
+同步最终成功（errno 0），1280×800 主平面仍为 RGB 全零，FNV-1a 仍为
+`dff2e40b0a1ba325`。任务 `5b3d41ae-94e9-4aa9-9ae1-e8d899fb8fde`；
+探针 SHA-256 `b2aaa69356a1c8f8ab5260585126ee82f49b88e73765c1d313b928169eeab435`。
+同一容器以 1 CPU、`-Wall -Wextra -Werror` 编译通过。
+
+两份实验 PPM 已删除。再次核对：会话 23 active/unlocked、原 Executor active、
+安装二进制和 TOML 哈希不变、临时进程和恢复资源为零。**此路径仍未通过画面
+采集验收，也未接入产品；同步调用成功不代表像素有效。**

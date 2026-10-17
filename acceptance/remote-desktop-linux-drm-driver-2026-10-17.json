@@ -155,5 +155,62 @@
     "runtime_removed": true,
     "remaining_test_processes": 0,
     "product_login_acceptance": false
+  },
+  "followup": {
+    "baseline": "c6943e7",
+    "active_session": "23",
+    "bounded_master_readback": {
+      "active_session": "23",
+      "bounded_readback_probe": [
+        {
+          "pid": 3409,
+          "fd": 9,
+          "duplicate_errno": 0,
+          "master": true,
+          "zero_clip_readback": 0,
+          "readback_errno": 0,
+          "one_pixel_readback": -22,
+          "one_pixel_errno": 22,
+          "fb": 108
+        }
+      ],
+      "master_requested": false,
+      "modeset": false,
+      "mapped_pixels": false
+    },
+    "cpu_sync": {
+      "task_id": "5b3d41ae-94e9-4aa9-9ae1-e8d899fb8fde",
+      "output": {
+        "width": 1280,
+        "height": 800,
+        "nonzero_channels": 0,
+        "rgb_fnv1a": "dff2e40b0a1ba325",
+        "mapped_read_only": true,
+        "drm_master": false,
+        "vmw_sync_requested": true,
+        "vmw_sync_errno": 0
+      },
+      "probe_sha256": "b2aaa69356a1c8f8ab5260585126ee82f49b88e73765c1d313b928169eeab435"
+    },
+    "restoration": {
+      "kernel": "6.8.0-138-generic",
+      "active_session": "23",
+      "state": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "executor": "active",
+      "installed_hashes_preserved": true,
+      "gdm_override_removed": true,
+      "restoration_runtime_removed": true,
+      "temporary_keyboard_removed": true,
+      "test_processes": [],
+      "rollback_units": ""
+    },
+    "owned_pixel_files_removed": true,
+    "product_capture_passed": false
   }
 }

@@ -12,14 +12,17 @@
 #include <drm_fourcc.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
+#include <vmwgfx_drm.h>
 
 int main(int argc, char **argv) {
-    if (argc != 4 || strncmp(argv[1], "/dev/dri/card", 13) || argv[3][0] != '/') return 2;
+    if ((argc != 4 && argc != 5) || strncmp(argv[1], "/dev/dri/card", 13) || argv[3][0] != '/') return 2;
+    const int sync_cpu = argc == 5 && !strcmp(argv[4], "vmw-sync");
+    if (argc == 5 && !sync_cpu) return 2;
     char *end = NULL; unsigned long plane_id = strtoul(argv[2], &end, 10);
     if (!plane_id || !end || *end || plane_id > UINT32_MAX) return 2;
     int status = 1, output = -1, fd = open(argv[1], O_RDONLY | O_CLOEXEC);
     drmModePlanePtr plane = NULL; drmModeFB2Ptr fb = NULL;
-    void *data = MAP_FAILED; size_t bytes = 0;
+    void *data = MAP_FAILED; size_t bytes = 0; int sync_errno = 0;
     if (fd < 0) goto done;
     if (drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) goto done;
     plane = drmModeGetPlane(fd, (uint32_t)plane_id);
@@ -32,6 +35,24 @@ int main(int argc, char **argv) {
     uint64_t extent = (uint64_t)fb->offsets[0] + (uint64_t)fb->pitches[0] * fb->height;
     if (extent > 64 * 1024 * 1024) { errno = EOVERFLOW; goto done; }
     bytes = (size_t)extent;
+    if (sync_cpu) {
+        drmVersionPtr version = drmGetVersion(fd);
+        int vmware = version && version->name_len == 6 && !memcmp(version->name, "vmwgfx", 6);
+        if (version) drmFreeVersion(version);
+        if (!vmware) { errno = ENOTSUP; goto done; }
+        /* Nonblocking read synchronization on our own descriptor/handle. The
+         * allow_cs flag does not inhibit compositor command submission. */
+        struct drm_vmw_synccpu_arg sync = {
+            .op = drm_vmw_synccpu_grab,
+            .flags = drm_vmw_synccpu_read | drm_vmw_synccpu_allow_cs | drm_vmw_synccpu_dontblock,
+            .handle = fb->handles[0],
+        };
+        for (unsigned attempt = 0; attempt < 200; ++attempt) {
+            sync_errno = drmCommandWrite(fd, DRM_VMW_SYNCCPU, &sync, sizeof(sync)) ? errno : 0;
+            if (sync_errno != EBUSY) break;
+            usleep(10000);
+        }
+    }
     struct drm_mode_map_dumb mapping = { .handle = fb->handles[0] };
     if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mapping)) goto done;
     data = mmap(NULL, bytes, PROT_READ, MAP_SHARED, fd, (off_t)mapping.offset);
@@ -58,8 +79,8 @@ int main(int argc, char **argv) {
     }
     free(row);
     if (fclose(file)) goto done;
-    printf("{\"width\":%u,\"height\":%u,\"nonzero_channels\":%" PRIu64 ",\"rgb_fnv1a\":\"%016" PRIx64 "\",\"mapped_read_only\":true,\"drm_master\":%s}\n",
-           fb->width, fb->height, nonzero, hash, drmIsMaster(fd) ? "true" : "false");
+    printf("{\"width\":%u,\"height\":%u,\"nonzero_channels\":%" PRIu64 ",\"rgb_fnv1a\":\"%016" PRIx64 "\",\"mapped_read_only\":true,\"drm_master\":%s,\"vmw_sync_requested\":%s,\"vmw_sync_errno\":%d}\n",
+           fb->width, fb->height, nonzero, hash, drmIsMaster(fd) ? "true" : "false", sync_cpu ? "true" : "false", sync_errno);
     status = 0;
 done:
     if (status) fprintf(stderr, "mapped probe failed: %s\n", strerror(errno));
