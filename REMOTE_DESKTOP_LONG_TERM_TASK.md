@@ -72,6 +72,14 @@ completed/user_completed 和独立命令复核。原 Linux 服务/配置哈希�
 15 FPS 当成动态性能，也不替代系统登录、其他矩阵方向或持续运行。详见
 [Mac → Linux 产品记录](acceptance/remote-desktop-macos-to-linux-2026-10-17.md)。
 
+后续反向验证：Linux GNOME Wayland 正式窗口已连接 Mac，独立 VM 截图确认实际
+首帧与 AppKit 测试窗口。单击定位 (100,100)、A 键、只查看禁止点击、按住 Shift
+关闭后的远端释放，以及协助 completed/user_completed、wait 复核标志和后续
+命令复核均通过。Mac 候选服务 native user 命令返回 UID 501，补齐临时可执行文件
+可遍历布局的检查。两端测试进程、私有 profile 和 Mac 临时服务已清理，安装版
+未覆盖；系统登录、多屏、动态性能及持续运行不由此关闭。详见
+[Linux → Mac 产品记录](acceptance/remote-desktop-linux-to-macos-2026-10-17.md)。
+
 2026-10-17 W5 采集阶段：确认 VM 实际为 GNOME Wayland，已实现并编译正式 Linux
 采集 worker，复用原有压缩帧管道和内置软件编解码。2 vCPU VM 在真实 1080p
 全屏动画下，正式 Cargo 产物完成 90 帧解码、89 次画面变化，预热后约 13.74 FPS；
