@@ -1,5 +1,6 @@
 //! Keep the launchd helper hidden and route every GUI launch to one window.
 use std::{
+    cell::Cell,
     fs::{File, OpenOptions, TryLockError},
     io,
     os::unix::{fs::OpenOptionsExt, net::UnixDatagram},
@@ -7,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use objc2::{MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSApplicationDelegate};
 use objc2_foundation::{NSNotification, NSObject, NSObjectProtocol};
 
@@ -110,6 +111,7 @@ define_class!(
     // main thread and the delegate is retained until the helper event loop ends.
     #[unsafe(super = NSObject)]
     #[thread_kind = MainThreadOnly]
+    #[ivars = Cell<bool>]
     pub struct HelperDelegate;
 
     unsafe impl NSObjectProtocol for HelperDelegate {}
@@ -122,8 +124,18 @@ define_class!(
 
         #[unsafe(method(applicationOpenUntitledFile:))]
         fn open_untitled(&self, app: &NSApplication) -> bool {
-            open_gui(app);
+            // AppKit sends an initial open-application event even when launchd
+            // starts a headless helper directly. It is not a user GUI request.
+            // Forward later explicit opens; Finder reopens have their own path.
+            if self.ivars().get() {
+                open_gui(app);
+            }
             true
+        }
+
+        #[unsafe(method(applicationDidFinishLaunching:))]
+        fn finished_launching(&self, _notification: &NSNotification) {
+            self.ivars().set(true);
         }
 
         #[unsafe(method(applicationDidBecomeActive:))]
@@ -137,7 +149,8 @@ define_class!(
 impl HelperDelegate {
     pub fn new(main: MainThreadMarker) -> Retained<Self> {
         // SAFETY: NSObject's init takes no arguments and returns this object.
-        unsafe { msg_send![Self::alloc(main), init] }
+        let this = Self::alloc(main).set_ivars(Cell::new(false));
+        unsafe { msg_send![super(this), init] }
     }
 }
 

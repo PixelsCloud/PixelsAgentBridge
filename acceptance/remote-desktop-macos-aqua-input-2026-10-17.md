@@ -75,3 +75,7 @@ helper 均为零；安装版没有替换。测试不将画面码流写入文件�
 
 这是 Apple 本机正式 helper/原生输入链路的阶段验收，不替代 Windows↔Apple
 产品独立窗口、锁屏/LoginWindow、多屏、九方向矩阵或稳定性验收。W4 保持未完成。
+
+后续用户已完成系统确认；最终找到并修复 helper 启动时误开 GUI 的问题，
+实际输入两轮通过。此文保留当时结果，最新证据见
+[Mac helper 启动与实际输入](remote-desktop-macos-helper-startup-2026-10-17.md)。

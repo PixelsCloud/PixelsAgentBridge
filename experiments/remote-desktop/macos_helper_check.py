@@ -34,6 +34,13 @@ env=os.environ.copy();env.update(PAB_DATA_DIR=str(root),PAB_LOCAL_IPC_PORT=str(p
 plist=root/'helper.plist'
 plist.write_bytes(plistlib.dumps({'Label':label,'ProgramArguments':[str(app),'--session-helper'],'LimitLoadToSessionType':'Aqua','RunAtLoad':True,'EnvironmentVariables':{'PAB_DATA_DIR':str(root),'PAB_LOCAL_IPC_PORT':str(port)},'StandardOutPath':str(root/'helper.out'),'StandardErrorPath':str(root/'helper.err')}))
 report={'root':str(root),'port':port,'signed_app_sha256':hashlib.sha256(app.read_bytes()).hexdigest(),'test_sha256':build['sha256'],'helper_started':False}
+
+def observe_candidate_roles():
+ for line in subprocess.check_output(['/bin/ps','-axo','pid=,command='],text=True).splitlines():
+  parts=line.strip().split(None,1)
+  if len(parts)==2 and (parts[1]==str(app) or parts[1].startswith(str(app)+' ')):
+   # Only this test candidate, never another application's command line.
+   report.setdefault('candidate_roles',{})[parts[0]]=parts[1][len(str(app)):].strip()
 def alive(pid):
  if not pid:return False
  try:os.kill(pid,0);return True
@@ -41,6 +48,7 @@ def alive(pid):
 def wait_file(name,timeout):
  deadline=time.monotonic()+timeout
  while not (root/name).exists():
+  observe_candidate_roles()
   assert server.poll() is None,'Server exited before '+name
   assert time.monotonic()<deadline,'Timeout waiting for '+name
   time.sleep(.1)
@@ -81,6 +89,7 @@ try:
   assert report['test_exit_code']==0,'Native helper test failed'
   events=(root/'fixture-events.log').read_text()
   assert 'bundle=vip.rgaa.pab.desktop ' not in events,'Media worker stole focus'
+  assert all(role for role in report.get('candidate_roles',{}).values()),'Helper unexpectedly launched a GUI'
   report['media_worker_stole_focus']=False
   report['passed']=True
 except Exception as e:

@@ -181,6 +181,13 @@ LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功
 后台激活策略试验没有解决问题，已撤回；权限页改为「已授权」并说明额外确认。
 实际输入、重复提示与授权恢复尚未通过，W4 不关闭。详见
 [Mac Aqua helper 与输入阶段记录](acceptance/remote-desktop-macos-aqua-input-2026-10-17.md)。
+用户完成确认后的复测定位到另一个根因：Aqua helper 在启动阶段将 AppKit
+自动发送的 open-untitled 事件转发为 GUI，额外主窗口抢走焦点。修复后，同一
+签名、同一路径候选包的两轮 1080p 硬件采集/解码和精确鼠标、键盘、滚轮计数
+通过，ReleaseAll/输入关闭释放 Shift，进程及注册清空；未再误开 GUI。该结果
+不是动态网络帧率或系统登录验收。另行通过真实 LaunchServices 显式打开窗口
+和再次打开复用同一 GUI PID 的回归。详见
+[Mac helper 启动与实际输入](acceptance/remote-desktop-macos-helper-startup-2026-10-17.md)。
 XRServer 四屏记录继续复用；最新只读检查仍有锁屏界面及其他后台任务，未重启
 服务，实际用户桌面的四屏点击验收等待解锁。
 

@@ -65,8 +65,8 @@ int main(int argc, const char **argv) {
             double ny=(globalY-bounds.origin.y)*65535.0/(bounds.size.height-1);
             NSRunningApplication *front=NSWorkspace.sharedWorkspace.frontmostApplication;
             if (front.processIdentifier!=lastFront) {
-                fprintf(stderr,"front_pid=%d bundle=%s active=%d key=%d\n",front.processIdentifier,
-                    (front.bundleIdentifier ?: @"unbundled").UTF8String,app.active,window.keyWindow);
+                fprintf(stderr,"front_pid=%d bundle=%s policy=%ld active=%d key=%d\n",front.processIdentifier,
+                    (front.bundleIdentifier ?: @"unbundled").UTF8String,(long)front.activationPolicy,app.active,window.keyWindow);
                 fflush(stderr);lastFront=front.processIdentifier;
             }
             NSDictionary *record=@{@"pid":@(getpid()), @"focused":@((BOOL)(window.keyWindow && app.active)),
