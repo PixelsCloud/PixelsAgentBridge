@@ -102,6 +102,14 @@ profile 已清理。两个方向均为普通 GNOME 会话，不能代替系统�
 详见
 [Linux 正式产品记录](acceptance/remote-desktop-linux-product-2026-10-17.md)。
 
+后续 W3/W5 动态显示：Linux 2 vCPU VM 的 1080p 全屏变化，经正式网络连接到
+Windows 独立原生窗口，30 秒内识别到 408 个新画面；按完整预热后时间计算约
+13.555 FPS，最长无新画面约 105 毫秒。采样直接读取实际显示的帧编号和反码，
+无效校验为 0，不将重复显示计入。原 Linux 分辨率、服务和配置均已恢复，临时
+进程和 profile 已清理。本项关闭这组网络基线的动态性能缺口，弱网、其他平台、
+持续运行和最终候选产物仍待验证。详见
+[Linux 网络显示性能](acceptance/remote-desktop-linux-presentation-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。
