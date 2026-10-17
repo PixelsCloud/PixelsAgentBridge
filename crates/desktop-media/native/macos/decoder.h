@@ -191,7 +191,10 @@ class VideoDecoder {
     }
 public:
     VideoDecoder(unsigned width, unsigned height, unsigned fps, bool software, bool fail_initial_decoder = false)
-        : width_(width), height_(height), fps_(fps), force_software_(software), fail_initial_decoder_(fail_initial_decoder) {}
+        : width_(width), height_(height), fps_(fps), force_software_(software), fail_initial_decoder_(fail_initial_decoder) {
+        const PabVideoGeometry geometry(width, height);
+        width_ = geometry.coded_width; height_ = geometry.coded_height;
+    }
     ~VideoDecoder() { if (software_) pab_soft_decoder_drop(software_); }
     bool software() const { return software_ != nullptr; }
     OwnedCF<CVPixelBufferRef> decode(const std::vector<uint8_t>& packet, uint64_t index) {

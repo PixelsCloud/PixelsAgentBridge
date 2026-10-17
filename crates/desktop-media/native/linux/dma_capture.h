@@ -100,8 +100,7 @@ public:
 inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, int socket) {
     if (geteuid() == 0) throw std::runtime_error("DMA conversion must run as the graphical user");
     channel(socket);
-    if ((display.size.width & 1) || (display.size.height & 1))
-        throw std::runtime_error("Software DMA capture requires even dimensions");
+    const PabVideoGeometry geometry(display.size.width, display.size.height);
     GnomeGuard guard(bus, display); LockedScreenAwake awake(bus); ImageReader reader;
     Encoder encoder(pab_soft_encoder_new(display.size.width, display.size.height, fps));
     if (!encoder) throw std::runtime_error("Cannot initialize DMA software encoder");

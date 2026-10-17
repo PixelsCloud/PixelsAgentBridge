@@ -147,8 +147,7 @@ public:
         if (!session_.empty()) { try { session_call("Stop"); } catch (...) {} }
     }
     void start() {
-        if ((display_.size.width & 1) || (display_.size.height & 1))
-            throw std::runtime_error("Linux software capture currently requires even display dimensions");
+        const PabVideoGeometry geometry(display_.size.width, display_.size.height);
         auto version = call(bus_, "org.gnome.Mutter.ScreenCast", "/org/gnome/Mutter/ScreenCast",
             "org.freedesktop.DBus.Properties", "Get", g_variant_new("(ss)", "org.gnome.Mutter.ScreenCast", "Version"), G_VARIANT_TYPE("(v)"));
         auto boxed = child(version.get(), 0); Variant value(g_variant_get_variant(boxed.get()));

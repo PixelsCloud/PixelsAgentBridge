@@ -62,7 +62,7 @@ void pab_mac_view_drop(void* view) noexcept {
 void* pab_mac_decoder_new(unsigned width, unsigned height, unsigned fps, bool software, char* error, size_t capacity) noexcept {
     void* result = nullptr;
     pab_mac::host_call(error,capacity,[&] {
-        if (!width || !height || width%2 || height%2 || width>8192 || height>8192 || uint64_t(width)*height>33554432 || !fps || fps>60)
+        if (!fps || fps>60)
             throw std::runtime_error("Invalid decoder geometry");
         result = new pab_mac::VideoDecoder(width,height,fps,software);
     });

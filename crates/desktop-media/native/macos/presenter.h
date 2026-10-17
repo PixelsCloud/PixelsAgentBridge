@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "viewer_input.h"
+#include "../software_codec_ffi.h"
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/CATransaction.h>
@@ -69,6 +70,7 @@ class NativePresenter {
     uint64_t last_index_ = 0;
     uint64_t submission_ = 0;
     unsigned width_, height_, rotation_;
+    PabVideoGeometry geometry_;
     bool verify_, owns_window_ = false, last_verified_ = false;
     Clock::time_point next_redraw_{};
     std::shared_ptr<DisplayStats> stats_ = std::make_shared<DisplayStats>();
@@ -96,10 +98,10 @@ class NativePresenter {
         lease->image = OwnedCF<CVPixelBufferRef>(CVPixelBufferRetain(image));
         CVMetalTextureRef y = nullptr, uv = nullptr;
         check(CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cache_.get(), image, nullptr,
-            MTLPixelFormatR8Unorm, width_, height_, 0, &y), "Metal luma view");
+            MTLPixelFormatR8Unorm, geometry_.coded_width, geometry_.coded_height, 0, &y), "Metal luma view");
         lease->y = OwnedCF<CVMetalTextureRef>(y);
         check(CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cache_.get(), image, nullptr,
-            MTLPixelFormatRG8Unorm, width_/2, height_/2, 1, &uv), "Metal chroma view");
+            MTLPixelFormatRG8Unorm, geometry_.coded_width/2, geometry_.coded_height/2, 1, &uv), "Metal chroma view");
         lease->uv = OwnedCF<CVMetalTextureRef>(uv);
         const double rotated_w = rotation_ % 2 ? height_ : width_, rotated_h = rotation_ % 2 ? width_ : height_;
         const double scale = std::min(drawable.texture.width/rotated_w, drawable.texture.height/rotated_h);
@@ -115,6 +117,8 @@ class NativePresenter {
         if (!command || !render) throw std::runtime_error("Metal render command unavailable");
         [render setRenderPipelineState:pipeline_]; [render setViewport:viewport];
         [render setVertexBytes:&rotation_ length:sizeof(rotation_) atIndex:0];
+        const float visible_fraction[2] = {float(width_)/geometry_.coded_width, float(height_)/geometry_.coded_height};
+        [render setVertexBytes:visible_fraction length:sizeof(visible_fraction) atIndex:1];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->y.get()) atIndex:0];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->uv.get()) atIndex:1];
         [render drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -184,9 +188,9 @@ public:
     double drawable_us = 0, gpu_wait_us = 0;
     uint64_t draw_count = 0;
     NativePresenter(unsigned width, unsigned height, unsigned rotation, bool verify, NSView* parent = nil)
-        : width_(width), height_(height), rotation_(rotation), verify_(verify) {
+        : width_(width), height_(height), rotation_(rotation), geometry_(width,height), verify_(verify) {
         require_main();
-        if (!width || !height || width%2 || height%2 || rotation > 3) throw std::runtime_error("Invalid view geometry");
+        if (rotation > 3) throw std::runtime_error("Invalid view geometry");
         device_ = MTLCreateSystemDefaultDevice();
         queue_ = [device_ newCommandQueue];
         if (!device_ || !queue_) throw std::runtime_error("Metal device unavailable");
@@ -194,13 +198,13 @@ public:
             #include <metal_stdlib>
             using namespace metal;
             struct Vertex { float4 position [[position]]; float2 uv; };
-            vertex Vertex video_vertex(uint id [[vertex_id]], constant uint& rotation [[buffer(0)]]) {
+            vertex Vertex video_vertex(uint id [[vertex_id]], constant uint& rotation [[buffer(0)]], constant float2& visible_fraction [[buffer(1)]]) {
                 const float2 positions[4] = {float2(-1,-1), float2(1,-1), float2(-1,1), float2(1,1)};
                 float2 uv = float2((id & 1) ? 1 : 0, (id & 2) ? 0 : 1);
                 if (rotation == 1) uv = float2(uv.y, 1-uv.x);
                 else if (rotation == 2) uv = 1-uv;
                 else if (rotation == 3) uv = float2(1-uv.y, uv.x);
-                return {float4(positions[id],0,1), uv};
+                return {float4(positions[id],0,1), uv * visible_fraction};
             }
             fragment float4 video_fragment(Vertex in [[stage_in]], texture2d<float> y [[texture(0)]], texture2d<float> uv [[texture(1)]]) {
                 constexpr sampler filter(coord::normalized, address::clamp_to_edge, filter::linear);

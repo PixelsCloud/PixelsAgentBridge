@@ -181,7 +181,7 @@ inline void blend_cursor(XImage& image, const Output& output, const XFixesCursor
 }
 inline void capture(Connection& connection, const Output& output, unsigned fps) {
     const auto& display = output.display;
-    if (display.size.width % 2 || display.size.height % 2) throw std::runtime_error("Software capture requires even dimensions");
+    const PabVideoGeometry geometry(display.size.width, display.size.height);
     auto* d = connection.get(); int event, error;
     if (!XDamageQueryExtension(d, &event, &error) || !XFixesQueryExtension(d, &event, &error))
         throw std::runtime_error("X11 Damage and XFixes are required");

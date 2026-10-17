@@ -118,18 +118,23 @@ mod check {
             }
         }
     }
-    fn fixture() -> (DesktopVideoConfig, Vec<VideoFrame>) {
+    fn fixture(odd: bool) -> (DesktopVideoConfig, Vec<VideoFrame>) {
         let data = include_bytes!("../tests/fixtures/apple-low-latency.pabvideo");
         let number = |p: usize| u32::from_le_bytes(data[p..p + 4].try_into().unwrap());
+        let (width, height) = if odd {
+            (1297, 753)
+        } else {
+            (number(8), number(12))
+        };
         let screen = DesktopScreen {
             id: "fixture".into(),
             name: "Generated pixels".into(),
             x: 0,
             y: 0,
-            desktop_width: number(8),
-            desktop_height: number(12),
-            pixel_width: number(8),
-            pixel_height: number(12),
+            desktop_width: width,
+            desktop_height: height,
+            pixel_width: width,
+            pixel_height: height,
             scale_milli: 1000,
             rotation: DesktopRotation::Identity,
             primary: true,
@@ -142,6 +147,34 @@ mod check {
             color: DesktopColor::Bt709Limited,
             fps: 15,
         };
+        if odd {
+            let (w, h) = (width as usize, height as usize);
+            let mut encoder = pab_desktop_media::software::SoftwareEncoder::new(w, h, 15).unwrap();
+            let mut pixels = vec![255u8; w * h * 4];
+            let mut frames = Vec::new();
+            for index in 0..8 {
+                for y in 1..h - 1 {
+                    for x in 1..w - 1 {
+                        let value = 40 + index * 12;
+                        pixels[(y * w + x) * 4..(y * w + x) * 4 + 3].fill(value);
+                    }
+                }
+                let bytes = encoder.encode_bgra(&pixels, w * 4).unwrap().to_vec();
+                frames.push(VideoFrame {
+                    header: DesktopFrameHeader {
+                        version: REMOTE_DESKTOP_SCHEMA_VERSION,
+                        session_id: config.session_id,
+                        generation: 1,
+                        frame_id: u64::from(index) + 1,
+                        capture_time_us: u64::from(index) * 66666,
+                        keyframe: index == 0,
+                        payload_bytes: bytes.len() as u32,
+                    },
+                    bytes,
+                });
+            }
+            return (config, frames);
+        }
         let mut offset = 24;
         let mut frames = Vec::new();
         for index in 0..number(20) {
@@ -221,8 +254,8 @@ mod check {
                 .build()
                 .unwrap();
             let entered = runtime.enter();
-            for software in [false, true] {
-                let (config, frames) = fixture();
+            for (software, odd) in [(false, false), (true, false), (false, true), (true, true)] {
+                let (config, frames) = fixture(odd);
                 let count = frames.len();
                 let (mut viewer, _input) =
                     MacNativeViewer::create(window, &config, software, ui.dispatch.clone())
@@ -241,7 +274,7 @@ mod check {
                 ui.until(|| task.is_finished());
                 runtime.block_on(task).unwrap();
                 ui.pump();
-                let (config, mut frames) = fixture();
+                let (config, mut frames) = fixture(odd);
                 let frame = frames.remove(0);
                 argument(window, c"orderOut:", std::ptr::null_mut());
                 ui.pump();
@@ -273,7 +306,7 @@ mod check {
                 // clean runtime shutdown below detects a stranded blocking job.
                 argument(window, c"orderOut:", std::ptr::null_mut());
                 ui.pump();
-                let (config, mut frames) = fixture();
+                let (config, mut frames) = fixture(odd);
                 let frame = frames.remove(0);
                 let (mut viewer, _input) =
                     MacNativeViewer::create(window, &config, software, ui.dispatch.clone())
@@ -294,7 +327,7 @@ mod check {
                 argument(window, c"makeKeyAndOrderFront:", std::ptr::null_mut());
                 boolean(app, c"activateIgnoringOtherApps:", true);
                 println!(
-                    "AppKit host: software={software}, frames={count}, hidden ACK withheld, static restore, pending-frame cancellation passed"
+                    "AppKit host: software={software}, odd={odd}, frames={count}, hidden ACK withheld, static restore, pending-frame cancellation passed"
                 );
             }
             drop(entered);

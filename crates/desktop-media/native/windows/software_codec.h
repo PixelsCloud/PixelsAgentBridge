@@ -12,6 +12,7 @@ class CaptureEncoder {
     ComPtr<ID3D11Device> device_;
     ComPtr<ID3D11DeviceContext> context_;
     ComPtr<ID3D11Texture2D> readback_;
+    ComPtr<ID3D11Texture2D> padded_;
     UINT width_, height_, fps_;
     bool fail_encoder_ = false;
     double readback_ms_ = 0, codec_ms_ = 0;
@@ -19,6 +20,7 @@ class CaptureEncoder {
     void initialize_software() {
         // Retire NVENC's retained surface/session before constructing fallback.
         hardware_.reset();
+        padded_.Reset();
         D3D11_TEXTURE2D_DESC description{};
         description.Width = width_; description.Height = height_;
         description.MipLevels = description.ArraySize = description.SampleDesc.Count = 1;
@@ -32,9 +34,22 @@ class CaptureEncoder {
 public:
     CaptureEncoder(ID3D11Device* device, UINT width, UINT height, UINT fps, bool force_software, bool fail_encoder = false)
         : device_(device), width_(width), height_(height), fps_(fps), fail_encoder_(fail_encoder) {
+        const PabVideoGeometry geometry(width, height);
         if (!force_software) {
             auto candidate = std::make_unique<Encoder>();
-            try { candidate->initialize(device,width,height,fps); hardware_ = std::move(candidate); }
+            try {
+                candidate->initialize(device,geometry.coded_width,geometry.coded_height,fps);
+                if (width != geometry.coded_width || height != geometry.coded_height) {
+                    D3D11_TEXTURE2D_DESC description{};
+                    description.Width = geometry.coded_width; description.Height = geometry.coded_height;
+                    description.MipLevels = description.ArraySize = description.SampleDesc.Count = 1;
+                    description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+                    description.Usage = D3D11_USAGE_DEFAULT;
+                    check(device->CreateTexture2D(&description,nullptr,&padded_), "Padded GPU capture texture");
+                    device->GetImmediateContext(&context_);
+                }
+                hardware_ = std::move(candidate);
+            }
             catch (const std::exception&) {} // Native RAII retires partial GPU setup before fallback.
         }
         if (fail_encoder_ && !hardware_) throw std::runtime_error("Fault test requires a working hardware encoder");
@@ -49,10 +64,31 @@ public:
             << " mean_conversion_encode_ms=" << codec_ms_/frames_ << '\n';
     }
     void encode(ID3D11Texture2D* texture, uint64_t index, std::vector<uint8_t>& packet) {
+        D3D11_TEXTURE2D_DESC description{}; texture->GetDesc(&description);
+        if (description.Width != width_ || description.Height != height_ || description.Format != DXGI_FORMAT_B8G8R8A8_UNORM || description.ArraySize != 1 || description.SampleDesc.Count != 1)
+            throw std::runtime_error("Capture texture changed");
         if (hardware_) {
             try {
                 if (fail_encoder_ && index == 2) throw std::runtime_error("Injected encoder failure");
-                hardware_->encode(texture,index,nullptr,&packet); return;
+                // Even surfaces still register directly. Odd surfaces require
+                // GPU-only edge padding; no CPU readback or conversion.
+                if (padded_) {
+                    const D3D11_BOX image{0,0,0,width_,height_,1};
+                    context_->CopySubresourceRegion(padded_.Get(),0,0,0,0,texture,0,&image);
+                    if (width_ & 1) {
+                        const D3D11_BOX edge{width_-1,0,0,width_,height_,1};
+                        context_->CopySubresourceRegion(padded_.Get(),0,width_,0,0,texture,0,&edge);
+                    }
+                    if (height_ & 1) {
+                        const D3D11_BOX edge{0,height_-1,0,width_,height_,1};
+                        context_->CopySubresourceRegion(padded_.Get(),0,0,height_,0,texture,0,&edge);
+                        if (width_ & 1) {
+                            const D3D11_BOX corner{width_-1,height_-1,0,width_,height_,1};
+                            context_->CopySubresourceRegion(padded_.Get(),0,width_,height_,0,texture,0,&corner);
+                        }
+                    }
+                }
+                hardware_->encode(padded_ ? padded_.Get() : texture,index,nullptr,&packet); return;
             } catch (const std::exception&) {
                 initialize_software();
                 // Its first published output is a new SPS/PPS + IDR. No failed
@@ -60,11 +96,8 @@ public:
                 std::cerr << "media encoder fallback=openh264_software readback_per_frame=1\n";
             }
         }
-        D3D11_TEXTURE2D_DESC description{}; texture->GetDesc(&description);
-        if (description.Width != width_ || description.Height != height_ || description.Format != DXGI_FORMAT_B8G8R8A8_UNORM || description.ArraySize != 1 || description.SampleDesc.Count != 1)
-            throw std::runtime_error("Software capture texture changed");
         // This copy/readback exists only in the software fallback. The hardware
-        // branch above still directly registers the captured texture with NVENC.
+        // branch above registers a GPU surface with NVENC.
         const auto started = Clock::now();
         context_->CopyResource(readback_.Get(),texture);
         D3D11_MAPPED_SUBRESOURCE mapped{};
@@ -91,12 +124,14 @@ class VideoDecoder {
 public:
     VideoDecoder(ID3D11Device* device, UINT width, UINT height, UINT fps, bool force_software)
         : device_(device), width_(width), height_(height) {
+        const PabVideoGeometry geometry(width, height);
+        width_ = geometry.coded_width; height_ = geometry.coded_height;
         if (!force_software) {
-            try { hardware_ = std::make_unique<HardwareDecoder>(device,width,height,fps); }
+            try { hardware_ = std::make_unique<HardwareDecoder>(device,width_,height_,fps); }
             catch (const std::exception&) {}
         }
         if (!hardware_) {
-            software_ = pab_soft_decoder_new(width,height);
+            software_ = pab_soft_decoder_new(width_,height_);
             if (!software_) throw std::runtime_error("Software decoder initialization failed");
         }
     }

@@ -31,7 +31,9 @@ pub struct DesktopScreen {
     pub y: i32,
     pub desktop_width: u32,
     pub desktop_height: u32,
-    /// Unrotated capture/encoded texture size. Rotation maps it onto the desktop.
+    /// Unrotated visible capture size. H.264 4:2:0 rounds each encoded dimension
+    /// up to even, padding only the right/bottom edge. Presenters crop that edge
+    /// before rotation; input coordinates always refer to this visible image.
     pub pixel_width: u32,
     pub pixel_height: u32,
     pub scale_milli: u32,

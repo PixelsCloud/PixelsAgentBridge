@@ -5,6 +5,7 @@
 #include <deque>
 #include <thread>
 #include "viewer_input.h"
+#include "../software_codec_ffi.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -44,6 +45,12 @@ class NativePresenter {
     ComPtr<ID3D11VideoContext> video_context_;
     ComPtr<ID3D11VideoProcessorEnumerator> enumerator_;
     ComPtr<ID3D11VideoProcessor> processor_;
+    // Some video drivers round an NV12 source rectangle down to chroma
+    // boundaries. Convert the entire coded surface before cropping odd visible
+    // dimensions in RGB. This stays on the GPU and is absent for even sources.
+    ComPtr<ID3D11Texture2D> crop_rgb_;
+    ComPtr<ID3D11VideoProcessorEnumerator> crop_enumerator_;
+    ComPtr<ID3D11VideoProcessor> crop_processor_;
     ComPtr<IDXGISwapChain2> swapchain_;
     ComPtr<ID3D11Query> finished_;
     ComPtr<ID3D11Texture2D> pixel_;
@@ -190,7 +197,8 @@ public:
         D3D11_VIDEO_PROCESSOR_CONTENT_DESC content{};
         content.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
         content.InputFrameRate = content.OutputFrameRate = {fps, 1};
-        content.InputWidth = width; content.InputHeight = height;
+        const PabVideoGeometry geometry(width, height);
+        content.InputWidth = geometry.coded_width; content.InputHeight = geometry.coded_height;
         content.OutputWidth = output_width_; content.OutputHeight = output_height_;
         content.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
         check(video_->CreateVideoProcessorEnumerator(&content, &enumerator_), "Create video processor enumerator");
@@ -224,6 +232,28 @@ public:
         output_color.RGB_Range = 0; // full RGB
         video_context_->VideoProcessorSetStreamColorSpace(processor_.Get(), 0, &input_color);
         video_context_->VideoProcessorSetOutputColorSpace(processor_.Get(), &output_color);
+        if (width != geometry.coded_width || height != geometry.coded_height) {
+            check(enumerator_->CheckVideoProcessorFormat(desc.Format, &flags), "Check RGB crop input");
+            if (!(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT)) throw std::runtime_error("RGB crop input unsupported");
+            D3D11_TEXTURE2D_DESC rgb{};
+            rgb.Width = geometry.coded_width; rgb.Height = geometry.coded_height;
+            rgb.MipLevels = rgb.ArraySize = rgb.SampleDesc.Count = 1;
+            rgb.Format = desc.Format; rgb.Usage = D3D11_USAGE_DEFAULT;
+            rgb.BindFlags = D3D11_BIND_RENDER_TARGET;
+            check(device->CreateTexture2D(&rgb, nullptr, &crop_rgb_), "Create GPU crop surface");
+            content.OutputWidth = content.InputWidth; content.OutputHeight = content.InputHeight;
+            check(video_->CreateVideoProcessorEnumerator(&content, &crop_enumerator_), "Create crop conversion enumerator");
+            check(video_->CreateVideoProcessor(crop_enumerator_.Get(), 0, &crop_processor_), "Create crop conversion processor");
+            RECT coded{0, 0, static_cast<LONG>(geometry.coded_width), static_cast<LONG>(geometry.coded_height)};
+            video_context_->VideoProcessorSetStreamFrameFormat(crop_processor_.Get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
+            video_context_->VideoProcessorSetStreamAutoProcessingMode(crop_processor_.Get(), 0, FALSE);
+            video_context_->VideoProcessorSetStreamSourceRect(crop_processor_.Get(), 0, TRUE, &coded);
+            video_context_->VideoProcessorSetStreamDestRect(crop_processor_.Get(), 0, TRUE, &coded);
+            video_context_->VideoProcessorSetOutputTargetRect(crop_processor_.Get(), TRUE, &coded);
+            video_context_->VideoProcessorSetStreamColorSpace(crop_processor_.Get(), 0, &input_color);
+            video_context_->VideoProcessorSetOutputColorSpace(crop_processor_.Get(), &output_color);
+            video_context_->VideoProcessorSetStreamColorSpace(processor_.Get(), 0, &output_color);
+        }
         D3D11_QUERY_DESC query{D3D11_QUERY_EVENT, 0};
         check(device->CreateQuery(&query, &finished_), "Create GPU completion query");
         if (verify) {
@@ -258,8 +288,20 @@ public:
         D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC input{};
         input.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
         input.Texture2D.ArraySlice = frame.subresource;
+        if (crop_rgb_) {
+            ComPtr<ID3D11VideoProcessorInputView> coded_source;
+            check(video_->CreateVideoProcessorInputView(frame.texture.Get(), crop_enumerator_.Get(), &input, &coded_source), "Coded decoder input view");
+            D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC rgb_output{};
+            rgb_output.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+            ComPtr<ID3D11VideoProcessorOutputView> rgb_destination;
+            check(video_->CreateVideoProcessorOutputView(crop_rgb_.Get(), crop_enumerator_.Get(), &rgb_output, &rgb_destination), "GPU crop output view");
+            D3D11_VIDEO_PROCESSOR_STREAM conversion{};
+            conversion.Enable = TRUE; conversion.pInputSurface = coded_source.Get();
+            check(video_context_->VideoProcessorBlt(crop_processor_.Get(), rgb_destination.Get(), 0, 1, &conversion), "Convert coded NV12 before RGB crop");
+            input.Texture2D.ArraySlice = 0;
+        }
         ComPtr<ID3D11VideoProcessorInputView> source;
-        check(video_->CreateVideoProcessorInputView(frame.texture.Get(), enumerator_.Get(), &input, &source), "Decoder texture input view");
+        check(video_->CreateVideoProcessorInputView(crop_rgb_ ? crop_rgb_.Get() : frame.texture.Get(), enumerator_.Get(), &input, &source), "Decoder texture input view");
         D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC output{};
         output.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
         ComPtr<ID3D11VideoProcessorOutputView> destination;

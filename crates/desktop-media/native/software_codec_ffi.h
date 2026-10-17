@@ -1,6 +1,23 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
+
+// Screen/config dimensions remain visible pixels. H.264 4:2:0 pads only the
+// right/bottom odd edge; all presenters crop before rotation/input mapping.
+struct PabVideoGeometry {
+    uint32_t width, height;
+    uint32_t coded_width, coded_height;
+    explicit PabVideoGeometry(uint32_t w, uint32_t h) : width(w), height(h) {
+        if (!w || !h || w > 8192 || h > 8192)
+            throw std::runtime_error("Video dimensions outside bounds");
+        coded_width = (w + 1) & ~uint32_t(1);
+        coded_height = (h + 1) & ~uint32_t(1);
+        if (uint64_t(coded_width) * coded_height > 33554432)
+            throw std::runtime_error("Padded video dimensions outside bounds");
+    }
+    size_t nv12_bytes() const { return size_t(coded_width) * coded_height * 3 / 2; }
+};
 
 // Private Rust ABI: handles are uniquely owned; output borrows codec storage
 // until the next call or drop. Never pass either pointer over process/network IPC.

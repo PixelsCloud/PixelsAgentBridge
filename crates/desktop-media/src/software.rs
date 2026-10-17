@@ -14,21 +14,21 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 // persistent color errors with different multi-slice boundaries.
 const SOFTWARE_QP: u8 = 14;
 
-fn dimensions(width: usize, height: usize) -> Result<usize, Error> {
+fn dimensions(width: usize, height: usize) -> Result<(usize, usize), Error> {
     if width == 0
         || height == 0
-        || width % 2 != 0
-        || height % 2 != 0
         || width > 8192
         || height > 8192
-        || width * height > 33_554_432
+        || (width + 1) / 2 * 2 * ((height + 1) / 2 * 2) > 33_554_432
     {
-        return Err("software H.264 requires bounded even dimensions".into());
+        return Err("software H.264 dimensions exceed bounds".into());
     }
-    Ok(width * height)
+    Ok(((width + 1) & !1, (height + 1) & !1))
 }
 
 struct Planar {
+    visible_width: usize,
+    visible_height: usize,
     width: usize,
     height: usize,
     y: Vec<u8>,
@@ -37,10 +37,13 @@ struct Planar {
 }
 impl Planar {
     fn new(width: usize, height: usize) -> Result<Self, Error> {
-        let pixels = dimensions(width, height)?;
+        let (coded_width, coded_height) = dimensions(width, height)?;
+        let pixels = coded_width * coded_height;
         Ok(Self {
-            width,
-            height,
+            visible_width: width,
+            visible_height: height,
+            width: coded_width,
+            height: coded_height,
             y: vec![0; pixels],
             u: vec![0; pixels / 4],
             v: vec![0; pixels / 4],
@@ -48,12 +51,22 @@ impl Planar {
     }
     fn bgra(&mut self, input: &[u8], stride: usize) -> Result<(), Error> {
         let minimum = stride
-            .checked_mul(self.height - 1)
-            .and_then(|n| n.checked_add(self.width * 4))
+            .checked_mul(self.visible_height - 1)
+            .and_then(|n| n.checked_add(self.visible_width * 4))
             .ok_or("BGRA stride overflow")?;
-        if stride < self.width * 4 || input.len() < minimum {
+        if stride < self.visible_width * 4 || input.len() < minimum {
             return Err("BGRA buffer is truncated".into());
         }
+        // Preserve the even-size hot path. Odd images replicate edge pixels
+        // while converting, without allocating/copying an extra BGRA image.
+        if self.width == self.visible_width && self.height == self.visible_height {
+            self.convert::<false>(input, stride);
+        } else {
+            self.convert::<true>(input, stride);
+        }
+        Ok(())
+    }
+    fn convert<const PAD: bool>(&mut self, input: &[u8], stride: usize) {
         // Limited-range BT.709, integer coefficients scaled by 65536. Chroma
         // averages the 2x2 source block, including all rows and their padding.
         // The dependency's convenience RGB conversion uses a different matrix.
@@ -62,7 +75,15 @@ impl Planar {
                 let mut rgb = [0i32; 3];
                 for dy in 0..2 {
                     for dx in 0..2 {
-                        let p = (row + dy) * stride + (col + dx) * 4;
+                        let (source_y, source_x) = if PAD {
+                            (
+                                (row + dy).min(self.visible_height - 1),
+                                (col + dx).min(self.visible_width - 1),
+                            )
+                        } else {
+                            (row + dy, col + dx)
+                        };
+                        let p = source_y * stride + source_x * 4;
                         let (r, g, b) = (
                             i32::from(input[p + 2]),
                             i32::from(input[p + 1]),
@@ -85,7 +106,6 @@ impl Planar {
                     (128 + ((28784 * r - 26145 * g - 2639 * b + 32768) >> 16)).clamp(16, 240) as u8;
             }
         }
-        Ok(())
     }
 }
 
@@ -191,7 +211,8 @@ pub struct SoftwareDecoder {
 }
 impl SoftwareDecoder {
     pub fn new(width: usize, height: usize) -> Result<Self, Error> {
-        let pixels = dimensions(width, height)?;
+        let (width, height) = dimensions(width, height)?;
+        let pixels = width * height;
         Ok(Self {
             decoder: Decoder::new()?,
             width,
@@ -199,7 +220,8 @@ impl SoftwareDecoder {
             nv12: vec![0; pixels * 3 / 2],
         })
     }
-    /// CPU NV12, tightly packed, limited BT.709 as required by the session.
+    /// CPU NV12, tightly packed at the dimensions rounded up to even, limited
+    /// BT.709. The presenter crops to the session's original visible dimensions.
     /// None means no decoded output yet; it must never grant presentation credit.
     pub fn decode(&mut self, packet: &[u8]) -> Result<Option<&[u8]>, Error> {
         if packet.is_empty() || packet.len() > pab_protocol::DESKTOP_MAX_FRAME_BYTES {
@@ -413,8 +435,73 @@ mod tests {
             assert!(p.bgra(&padded, 7).is_err());
             assert!(p.bgra(&padded, usize::MAX).is_err());
         }
-        assert!(SoftwareEncoder::new(63, 48, 15).is_err());
+        assert!(SoftwareEncoder::new(0, 48, 15).is_err());
         assert!(SoftwareDecoder::new(8192, 8192).is_err());
+    }
+    #[test]
+    fn odd_source_edges_are_replicated_without_reading_stride_padding() {
+        let mut p = Planar::new(3, 3).unwrap();
+        let stride = 20;
+        // The last row deliberately omits padding; every unused byte is poison.
+        let mut bgra = vec![77; stride * 2 + 12];
+        for y in 0..3 {
+            for x in 0..3 {
+                let value = if x == 2 || y == 2 { 255 } else { 0 };
+                bgra[y * stride + x * 4..y * stride + x * 4 + 4]
+                    .copy_from_slice(&[value, value, value, 255]);
+            }
+        }
+        p.bgra(&bgra, stride).unwrap();
+        assert_eq!((p.width, p.height), (4, 4));
+        assert_eq!(
+            p.y,
+            [
+                16, 16, 235, 235, 16, 16, 235, 235, 235, 235, 235, 235, 235, 235, 235, 235
+            ]
+        );
+        assert_eq!(p.u, [128; 4]);
+        assert_eq!(p.v, [128; 4]);
+        assert!(p.bgra(&bgra[..bgra.len() - 1], stride).is_err());
+        assert!(dimensions(usize::MAX, 1).is_err());
+        assert_eq!(dimensions(1, 1).unwrap(), (2, 2));
+        assert_eq!(dimensions(8191, 4095).unwrap(), (8192, 4096));
+        assert!(dimensions(8191, 4097).is_err());
+    }
+    #[test]
+    fn odd_h264_retains_last_visible_row_and_column() {
+        for (width, height) in [(63, 48), (64, 47), (1297, 753)] {
+            let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let stride = width * 4 + 12;
+            let mut source = vec![77; (height - 1) * stride + width * 4];
+            for y in 0..height {
+                for x in 0..width {
+                    let value = if x == width - 1 || y == height - 1 {
+                        255
+                    } else {
+                        0
+                    };
+                    source[y * stride + x * 4..y * stride + x * 4 + 4]
+                        .copy_from_slice(&[value, value, value, 255]);
+                }
+            }
+            let (cw, ch) = dimensions(width, height).unwrap();
+            for _ in 0..3 {
+                let packet = encoder.encode_bgra(&source, stride).unwrap();
+                let image = decoder.decode(packet).unwrap().unwrap();
+                assert_eq!(image.len(), cw * ch * 3 / 2);
+                for y in 0..height {
+                    assert!(image[y * cw + width - 1] > 210, "last column lost");
+                }
+                for x in 0..width {
+                    assert!(image[(height - 1) * cw + x] > 210, "last row lost");
+                }
+                assert!(
+                    image[(height / 2) * cw + width / 2] < 40,
+                    "image scaled or shifted"
+                );
+            }
+        }
     }
     #[test]
     fn changing_frames_round_trip_without_skips_or_stale_pixels() {

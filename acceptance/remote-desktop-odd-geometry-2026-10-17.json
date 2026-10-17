@@ -1,0 +1,1113 @@
+{
+  "base_commit": "9e3b49de6019a4ab0ebc5dcb0bf9800742691f18",
+  "source_sha256": {
+    "crates/desktop-media/examples/macos_host_check.rs": "0402728a819e40f4341b3201dd952c0008c733475384d48b3cfaa795a9f3819d",
+    "crates/desktop-media/native/linux/capture.h": "60425d69171b155710f2693125a0c3fcb9706490de4ecc6d18b185eced28097b",
+    "crates/desktop-media/native/linux/dma_capture.h": "8366fcbd48d1e6021c62bcd6680eef267d6099e3049c27759cd8d6f7832b7d59",
+    "crates/desktop-media/native/linux/presenter.h": "62c7121c66c0589a5ea26ec626438b1e391411fcd8a76ba3cfdd6894b7f6ac06",
+    "crates/desktop-media/native/linux/x11_capture.h": "01e82b059a504e2107d5bf08a3daa249b1e5ea94affb70905f5b7983aee5d6cc",
+    "crates/desktop-media/native/macos/decoder.h": "032871dc11a62c6f33fa44455612d0219fb9c311604ef1c7c9ed5809e765a8cc",
+    "crates/desktop-media/native/macos/host.h": "520cad07a70faec374708a19f75755d27391300b74c908d5222f0b3601921f08",
+    "crates/desktop-media/native/macos/presenter.h": "5909eb0d26be3eb8542d6eb0d0b726c1169607beb481b71ecf98d583bc0a0248",
+    "crates/desktop-media/native/software_codec_ffi.h": "bc133059fa56eb8196edf544f95ed31b85178dab8e28445a200dc3743ffe247a",
+    "crates/desktop-media/native/windows/d3d_presenter.h": "19fb4e61b412746a759c20b919f147af8932964645c92f349df8be1495893d3b",
+    "crates/desktop-media/native/windows/software_codec.h": "2d2ef11933a2d136ab98ee6aa816a0567f5e8387e6860d686730557b85573aeb",
+    "crates/desktop-media/src/software.rs": "0fac64203f7fb9e4a905db388b17646cd57b3ca8a1558c4ec9c6290cc3b850da",
+    "crates/protocol/src/remote_desktop.rs": "be1a588ecfa2bc13babbdf1c8cba441c95a93a11f1e1a9f1ac695db3c40486ec",
+    "experiments/remote-desktop/build_windows_odd_geometry.py": "bb3b81489801dad2b75e54ce0830b4b85f67d533261e4637006c3044d7f197f8",
+    "experiments/remote-desktop/linux_edge_fixture.py": "11c3ea31934c35c215e09d333d6d0cbd4237e1064f1bd4bbab38c0a1e9212c91",
+    "experiments/remote-desktop/verify_windows_odd_encoder.py": "ed7d59fce2066a57dc814cf8028c357758409b80ec004757c58c30314d536b49",
+    "experiments/remote-desktop/windows_odd_encoder.cpp": "9c86f3d009a2ddf9258295366172890b3057c7a848b12e94e18e7109a6240579",
+    "experiments/remote-desktop/windows_odd_presenter.cpp": "447bc19d4167100c1b1fba534b6e0ed8252ebf6e706f4f325252230e8a5514f8"
+  },
+  "native_baseline": [
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        67,
+        255,
+        68,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 1,
+      "red": [
+        255,
+        67,
+        255,
+        255,
+        255,
+        67,
+        67,
+        69,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        67,
+        255,
+        255,
+        67,
+        69,
+        67,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 3,
+      "red": [
+        67,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        69,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 0,
+      "red": [
+        255,
+        67,
+        255,
+        255,
+        255,
+        67,
+        67,
+        68,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        67,
+        255,
+        255,
+        67,
+        69,
+        67,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 2,
+      "red": [
+        67,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        69,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        67,
+        255,
+        69,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 0,
+      "red": [
+        255,
+        67,
+        255,
+        67,
+        67,
+        68,
+        67,
+        68,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 1,
+      "red": [
+        255,
+        67,
+        67,
+        255,
+        255,
+        67,
+        69,
+        69,
+        67,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 2,
+      "red": [
+        67,
+        255,
+        67,
+        255,
+        255,
+        67,
+        69,
+        67,
+        69,
+        67
+      ],
+      "passed": false
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 3,
+      "red": [
+        67,
+        255,
+        255,
+        67,
+        255,
+        69,
+        67,
+        67,
+        69,
+        67
+      ],
+      "passed": false
+    }
+  ],
+  "native_fixed": [
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 474,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 474,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 664,
+      "height": 473,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 0,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 1,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 2,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    },
+    {
+      "width": 663,
+      "height": 473,
+      "rotation": 3,
+      "red": [
+        255,
+        255,
+        255,
+        255,
+        255,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "passed": true
+    }
+  ],
+  "initial_product": {
+    "edges": {
+      "source_dimensions": [
+        1297,
+        752
+      ],
+      "surface_dimensions": [
+        1297,
+        752
+      ],
+      "scale": 1,
+      "points": {
+        "top": [
+          648,
+          0
+        ],
+        "bottom": [
+          648,
+          751
+        ],
+        "left": [
+          0,
+          376
+        ],
+        "right": [
+          1296,
+          376
+        ],
+        "corner": [
+          1296,
+          751
+        ],
+        "inside_right": [
+          1295,
+          376
+        ],
+        "inside_bottom": [
+          648,
+          750
+        ],
+        "center": [
+          648,
+          376
+        ]
+      },
+      "rgb": {
+        "top": [
+          230,
+          255,
+          255
+        ],
+        "bottom": [
+          230,
+          255,
+          255
+        ],
+        "left": [
+          229,
+          255,
+          255
+        ],
+        "right": [
+          19,
+          81,
+          74
+        ],
+        "corner": [
+          230,
+          255,
+          255
+        ],
+        "inside_right": [
+          19,
+          81,
+          74
+        ],
+        "inside_bottom": [
+          38,
+          77,
+          75
+        ],
+        "center": [
+          19,
+          81,
+          74
+        ]
+      },
+      "passed": false
+    },
+    "source_edges": {
+      "width": 1297,
+      "height": 752,
+      "coded_width": 1298,
+      "coded_height": 752,
+      "luma": {
+        "right": 235,
+        "padding": 235,
+        "inside_right": 74,
+        "bottom": 235,
+        "center": 74
+      }
+    },
+    "artifacts": {
+      "windows_artifacts": {
+        "pab-desktop.exe": "629865cc44f6319a044d1ef69795b87a67f43b7b1bda922b84d189dc5f7a7526",
+        "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+      }
+    },
+    "cleanup": {
+      "stage_removed": true,
+      "fixture_removed": true
+    }
+  },
+  "fixed_product": {
+    "edges": {
+      "source_dimensions": [
+        1297,
+        752
+      ],
+      "surface_dimensions": [
+        1297,
+        752
+      ],
+      "scale": 1,
+      "points": {
+        "top": [
+          648,
+          0
+        ],
+        "bottom": [
+          648,
+          751
+        ],
+        "left": [
+          0,
+          376
+        ],
+        "right": [
+          1296,
+          376
+        ],
+        "corner": [
+          1296,
+          751
+        ],
+        "inside_right": [
+          1295,
+          376
+        ],
+        "inside_bottom": [
+          648,
+          750
+        ],
+        "center": [
+          648,
+          376
+        ]
+      },
+      "rgb": {
+        "top": [
+          230,
+          255,
+          255
+        ],
+        "bottom": [
+          230,
+          255,
+          255
+        ],
+        "left": [
+          229,
+          255,
+          255
+        ],
+        "right": [
+          243,
+          255,
+          255
+        ],
+        "corner": [
+          249,
+          255,
+          255
+        ],
+        "inside_right": [
+          31,
+          78,
+          72
+        ],
+        "inside_bottom": [
+          38,
+          77,
+          75
+        ],
+        "center": [
+          19,
+          81,
+          74
+        ]
+      },
+      "passed": true
+    },
+    "artifacts": {
+      "windows_artifacts": {
+        "pab-desktop.exe": "69536ab268af831d6d72ca226fc8e84587a948b5333c2b12a95db306f6db7d70",
+        "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+      }
+    },
+    "operation": {
+      "stage": "/tmp/pab-formal-linux-3c8e60b4336e",
+      "transfer": "/tmp/pab-formal-upload-3c8e60b4336e",
+      "prefix": "pab-formal-linux-3c8e60b4336e",
+      "fixture": "/tmp/pab-linux-viewer-3c8e60b4336e",
+      "hashes": {
+        "pab-desktop": "4cbd6bedad6f0e2d4021539284a35e4708c0f18a02696842e34db577cd4612f3",
+        "pab-executor": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+        "manager.py": "2dd16f8c17f837e292fb8f99155cfceaec4bb29fccb45f7c50ea4cf5deff00f3",
+        "fixture.py": "4da9dbccce2bcb973fa8ac02b549d85a040a3f69701f0783db3adde8f84fa0e4"
+      }
+    },
+    "fixture": {
+      "clicks": 3,
+      "releases": 3,
+      "left_held": false,
+      "points": [
+        [
+          1296.0,
+          376.0
+        ],
+        [
+          647.98828125,
+          751.0
+        ],
+        [
+          1296.0,
+          751.0
+        ]
+      ],
+      "width": 1297,
+      "height": 752,
+      "focused": true,
+      "updated": 1792239031.994524
+    },
+    "expected_clicks": [
+      [
+        1296,
+        376
+      ],
+      [
+        648,
+        751
+      ],
+      [
+        1296,
+        751
+      ]
+    ],
+    "maximum_coordinate_error": 0.01171875,
+    "recovery": {
+      "original": {
+        "session": "191",
+        "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+        "properties": {
+          "MainPID": "43501",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 19:51:56 CST] ; stop_time=[n/a] ; pid=43501 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        },
+        "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+        "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+        "staged_sha256": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+        "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+      },
+      "restored": {
+        "original_service_restored": true,
+        "properties": {
+          "MainPID": "44895",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 20:10:32 CST] ; stop_time=[n/a] ; pid=44895 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        }
+      },
+      "owned_processes": [],
+      "input_devices": [],
+      "fixture": {
+        "clicks": 3,
+        "releases": 3,
+        "left_held": false,
+        "points": [
+          [
+            1296.0,
+            376.0
+          ],
+          [
+            647.98828125,
+            751.0
+          ],
+          [
+            1296.0,
+            751.0
+          ]
+        ],
+        "width": 1297,
+        "height": 752,
+        "focused": true,
+        "updated": 1792239031.994524
+      },
+      "runtime_removed": true,
+      "session_state_restored": true,
+      "rollback_trigger": ""
+    },
+    "remote_cleanup": {
+      "stage_removed": true,
+      "fixture_removed": true
+    }
+  },
+  "gpu_encoder": [
+    {
+      "visible": [
+        1298,
+        754
+      ],
+      "coded": [
+        1298,
+        754
+      ],
+      "frames": [
+        {
+          "right": 235,
+          "bottom": 234,
+          "corner": 236,
+          "padded_corner": 236,
+          "inside_right": 72,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        }
+      ],
+      "passed": true
+    },
+    {
+      "visible": [
+        1297,
+        754
+      ],
+      "coded": [
+        1298,
+        754
+      ],
+      "frames": [
+        {
+          "right": 236,
+          "bottom": 234,
+          "corner": 235,
+          "padded_corner": 234,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        }
+      ],
+      "passed": true
+    },
+    {
+      "visible": [
+        1298,
+        753
+      ],
+      "coded": [
+        1298,
+        754
+      ],
+      "frames": [
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 233,
+          "inside_right": 72,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 234,
+          "padded_corner": 234,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        }
+      ],
+      "passed": true
+    },
+    {
+      "visible": [
+        1297,
+        753
+      ],
+      "coded": [
+        1298,
+        754
+      ],
+      "frames": [
+        {
+          "right": 236,
+          "bottom": 235,
+          "corner": 236,
+          "padded_corner": 234,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 236,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        },
+        {
+          "right": 235,
+          "bottom": 235,
+          "corner": 235,
+          "padded_corner": 235,
+          "inside_right": 71,
+          "inside_bottom": 71,
+          "center": 71
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "builds": {
+    "linux": {
+      "exit_code": 0,
+      "sha256": "4cbd6bedad6f0e2d4021539284a35e4708c0f18a02696842e34db577cd4612f3",
+      "bytes": 45976920,
+      "cargo_jobs": 8,
+      "nested_jobs": 1,
+      "fresh_media": false
+    },
+    "windows_log": "   Compiling pab-desktop-media v0.1.0 (D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\crates\\desktop-media)\n   Compiling pab-desktop v1.2.49 (D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\apps\\desktop\\src-tauri)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 51s\n",
+    "mac_task": "d288c874-7a33-4658-8c45-a4689942dfae",
+    "mac_output": "{\"stage\": 0, \"exit_code\": 0, \"jobs\": 4}\n   Compiling iroh-relay v1.2.0 (/private/tmp/pab-mac-media-99f879354739/source/vendor/iroh-relay)\n   Compiling pab-desktop-media v0.1.0 (/private/tmp/pab-mac-media-99f879354739/source/crates/desktop-media)\n   Compiling pab-protocol v1.2.48 (/private/tmp/pab-mac-media-99f879354739/source/crates/protocol)\n   Compiling iroh v1.2.0\n   Compiling pab-transport v1.2.48 (/private/tmp/pab-mac-media-99f879354739/source/crates/transport)\n   Compiling pab-remote-desktop v0.1.0 (/private/tmp/pab-mac-media-99f879354739/source/crates/remote-desktop)\n    Finished `release` profile [optimized] target(s) in 25.00s\n     Running unittests src/lib.rs (/private/tmp/pab-mac-media-99f879354739/desktop-target/release/deps/pab_desktop_media-9842b1fbfeeed7c3)\n\nrunning 14 tests\ntest software::tests::bt709_primary_colors_padding_and_truncation ... ok\ntest renderer::tests::truncated_worker_event_wakes_pending_submission_and_output ... ok\ntest renderer::tests::bounded_native_failure_wakes_pending_consumption ... ok\ntest renderer::tests::unexpected_or_unconsumed_output_and_incomplete_drain_fail ... ok\ntest software::tests::odd_source_edges_are_replicated_without_reading_stride_padding ... ok\ntest renderer::tests::decoder_path_is_reported_and_cannot_change_within_generation ... ok\ntest viewer_input::tests::motion_channel_race_cannot_discard_key_release_or_mode_barrier ... ok\ntest viewer_input::tests::motion_bursts_preserve_releases_and_overflow_fails_closed ... ok\ntest software::tests::changing_frames_round_trip_without_skips_or_stale_pixels ... ok\ntest software::tests::apple_low_latency_stream_has_immediate_ordered_pixels ... ok\ntest renderer::tests::delayed_decoder_output_is_bounded_and_does_not_grant_presentation_credit ... ok\ntest software::tests::multi_slice_stream_starts_with_independently_decodable_frame ... ok\ntest software::tests::odd_h264_retains_last_visible_row_and_column ... ok\ntest software::tests::settled_color_is_stable_after_spatial_fade ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s\n\n\n{\"stage\": 1, \"exit_code\": 0, \"jobs\": 4}\n   Compiling pab-desktop-media v0.1.0 (/private/tmp/pab-mac-media-99f879354739/source/crates/desktop-media)\n    Finished `release` profile [optimized] target(s) in 1.76s\n\n{\"stage\": 2, \"exit_code\": 0, \"jobs\": 4}\nf879354739/source/crates/desktop-control/src/ui_macos.rs:60:9\n   |\n60 |         kAXErrorNoValue => \"attribute_unavailable\",\n   |         ^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_NO_VALUE`\n\nwarning: constant in pattern `kAXErrorInvalidUIElement` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:181:13\n    |\n181 |             kAXErrorInvalidUIElement => \"window or accessibility element is no longer valid\",\n    |             ^^^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_INVALID_UIELEMENT`\n\nwarning: constant in pattern `kAXErrorCannotComplete` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:182:13\n    |\n182 |             kAXErrorCannotComplete => \"application did not complete the accessibility request\",\n    |             ^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_CANNOT_COMPLETE`\n\nwarning: constant in pattern `kAXErrorAttributeUnsupported` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:183:13\n    |\n183 |             kAXErrorAttributeUnsupported => {\n    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_ATTRIBUTE_UNSUPPORTED`\n\nwarning: constant in pattern `kAXErrorActionUnsupported` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:186:13\n    |\n186 |             kAXErrorActionUnsupported => \"application does not support this accessibility action\",\n    |             ^^^^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_ACTION_UNSUPPORTED`\n\nwarning: constant in pattern `kAXErrorNotImplemented` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:187:13\n    |\n187 |             kAXErrorNotImplemented => {\n    |             ^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_NOT_IMPLEMENTED`\n\nwarning: constant in pattern `kAXErrorAPIDisabled` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:190:13\n    |\n190 |             kAXErrorAPIDisabled => \"accessibility API is disabled or permission is unavailable\",\n    |             ^^^^^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_APIDISABLED`\n\nwarning: constant in pattern `kAXErrorNoValue` should have an upper case name\n   --> /private/tmp/pab-mac-media-99f879354739/source/crates/desktop-control/src/macos/mod.rs:191:13\n    |\n191 |             kAXErrorNoValue => \"accessibility attribute has no value\",\n    |             ^^^^^^^^^^^^^^^ help: convert the identifier to upper case: `K_AXERROR_NO_VALUE`\n\nwarning: `pab-desktop-control` (lib) generated 14 warnings\nwarning: unused variable: `exe`\n   --> src/browser_helper.rs:259:9\n    |\n259 |     let exe = std::env::current_exe().map_err(|e| e.to_string())?;\n    |         ^^^ help: if this is intentional, prefix it with an underscore: `_exe`\n    |\n    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `pab-desktop` (lib) generated 1 warning (run `cargo fix --lib -p pab-desktop` to apply 1 suggestion)\n    Finished `release` profile [optimized] target(s) in 4m 30s\n\n[{\"stage\": 0, \"exit_code\": 0, \"jobs\": 4}, {\"stage\": 1, \"exit_code\": 0, \"jobs\": 4}, {\"stage\": 2, \"exit_code\": 0, \"jobs\": 4}, {\"artifact\": \"pab-desktop\", \"sha256\": \"2d6f3914f7b350047910786773c99ad66b4f56b401617a5124a79a903ca5b376\", \"bytes\": 23907376}, {\"artifact\": \"examples/macos_host_check\", \"sha256\": \"fd322548a04f70494aaf2f587266fd252995dfb6e6a91f2297387cb6679ec469\", \"bytes\": 1580896}]\n"
+  },
+  "unit_tests": {
+    "windows": "   Compiling pab-protocol v1.2.48 (D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\crates\\protocol)\n   Compiling pab-desktop-media v0.1.0 (D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\crates\\desktop-media)\n   Compiling pab-remote-desktop v0.1.0 (D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\crates\\remote-desktop)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 33.15s\n     Running unittests src\\lib.rs (.build\\remote-desktop\\desktop-check\\debug\\deps\\pab_desktop_media-7513351b0650023f.exe)\n\nrunning 14 tests\ntest software::tests::odd_source_edges_are_replicated_without_reading_stride_padding ... ok\ntest software::tests::bt709_primary_colors_padding_and_truncation ... ok\ntest viewer_input::tests::motion_channel_race_cannot_discard_key_release_or_mode_barrier ... ok\ntest renderer::tests::truncated_worker_event_wakes_pending_submission_and_output ... ok\ntest renderer::tests::bounded_native_failure_wakes_pending_consumption ... ok\ntest renderer::tests::unexpected_or_unconsumed_output_and_incomplete_drain_fail ... ok\ntest renderer::tests::decoder_path_is_reported_and_cannot_change_within_generation ... ok\ntest viewer_input::tests::motion_bursts_preserve_releases_and_overflow_fails_closed ... ok\ntest software::tests::changing_frames_round_trip_without_skips_or_stale_pixels ... ok\ntest renderer::tests::delayed_decoder_output_is_bounded_and_does_not_grant_presentation_credit ... ok\ntest software::tests::multi_slice_stream_starts_with_independently_decodable_frame ... ok\ntest software::tests::apple_low_latency_stream_has_immediate_ordered_pixels ... ok\ntest software::tests::odd_h264_retains_last_visible_row_and_column ... ok\ntest software::tests::settled_color_is_stable_after_spatial_fade ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s\n\n",
+    "linux": "   Compiling iroh-relay v1.2.0 (/source/vendor/iroh-relay)\n   Compiling pab-protocol v1.2.48 (/source/crates/protocol)\n   Compiling iroh v1.2.0\n   Compiling pab-transport v1.2.48 (/source/crates/transport)\n   Compiling pab-remote-desktop v0.1.0 (/source/crates/remote-desktop)\n   Compiling pab-desktop-media v0.1.0 (/source/crates/desktop-media)\n    Finished `release` profile [optimized] target(s) in 37.03s\n     Running unittests src/lib.rs (/target/release/deps/pab_desktop_media-adb74f7ebfdd2409)\n\nrunning 15 tests\ntest renderer::tests::bounded_native_failure_wakes_pending_consumption ... ok\ntest renderer::tests::decoder_path_is_reported_and_cannot_change_within_generation ... ok\ntest renderer::tests::truncated_worker_event_wakes_pending_submission_and_output ... ok\ntest renderer::tests::unexpected_or_unconsumed_output_and_incomplete_drain_fail ... ok\ntest software::tests::bt709_primary_colors_padding_and_truncation ... ok\ntest software::tests::odd_source_edges_are_replicated_without_reading_stride_padding ... ok\ntest viewer_input::tests::motion_bursts_preserve_releases_and_overflow_fails_closed ... ok\ntest viewer_input::tests::motion_channel_race_cannot_discard_key_release_or_mode_barrier ... ok\ntest software::tests::changing_frames_round_trip_without_skips_or_stale_pixels ... ok\ntest software::tests::multi_slice_stream_starts_with_independently_decodable_frame ... ok\ntest renderer::tests::delayed_decoder_output_is_bounded_and_does_not_grant_presentation_credit ... ok\ntest software::tests::apple_low_latency_stream_has_immediate_ordered_pixels ... ok\ntest software::tests::settled_color_is_stable_after_spatial_fade ... ok\ntest software::tests::odd_h264_retains_last_visible_row_and_column ... ok\ntest software::tests::owned_decode_reuses_allocation_and_matches_borrowed_pixels ... ok\n\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s\n\n"
+  },
+  "mac_host": {
+    "task_id": "57885a43-c58c-4d3b-b4c9-0fb2a39c0fc3",
+    "output": "AppKit host: software=false, odd=false, frames=8, hidden ACK withheld, static restore, pending-frame cancellation passed\nAppKit host: software=true, odd=false, frames=8, hidden ACK withheld, static restore, pending-frame cancellation passed\nAppKit host: software=false, odd=true, frames=8, hidden ACK withheld, static restore, pending-frame cancellation passed\nAppKit host: software=true, odd=true, frames=8, hidden ACK withheld, static restore, pending-frame cancellation passed\n",
+    "example_sha256": "5361ab9a8554763d60b5e8ae1b037610cafb9fd64048a53850da664ad4633b91"
+  },
+  "limits": [
+    "Mac/Linux exact odd-edge pixels and physical odd-resolution multiscreen remain unverified",
+    "Mac odd source capture remains unsupported by hardware encoder",
+    "No new FPS, weak-network or soak claim",
+    "No integration, installation or COS release performed"
+  ]
+}

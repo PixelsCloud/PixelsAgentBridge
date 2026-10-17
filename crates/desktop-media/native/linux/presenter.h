@@ -17,6 +17,7 @@ class Presenter {
     gulong painted_signal_ = 0;
     GThread* thread_ = g_thread_self();
     unsigned width_, height_, rotation_;
+    PabVideoGeometry geometry_;
     bool verify_, closed_ = false, uploaded_ = false, pending_ = false, drawn_ = false;
     bool verify_redraw_ = false;
     uint64_t draws_ = 0, painted_ = 0;
@@ -42,6 +43,7 @@ class Presenter {
         static const char* vertex = R"(#version 150
 out vec2 uv;
 uniform int rotation;
+uniform vec2 visible_fraction;
 void main() {
     vec2 p[4] = vec2[4](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(1,1));
     gl_Position = vec4(p[gl_VertexID],0,1);
@@ -49,7 +51,7 @@ void main() {
     if (rotation == 1) t = vec2(t.y,1-t.x);
     else if (rotation == 2) t = vec2(1-t.x,1-t.y);
     else if (rotation == 3) t = vec2(1-t.y,t.x);
-    uv = t;
+    uv = t * visible_fraction;
 })";
         static const char* fragment = R"(#version 150
 in vec2 uv;
@@ -76,7 +78,7 @@ void main() {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexImage2D(GL_TEXTURE_2D, 0, i ? GL_RG8 : GL_R8, width_ / (i ? 2 : 1), height_ / (i ? 2 : 1),
+            glTexImage2D(GL_TEXTURE_2D, 0, i ? GL_RG8 : GL_R8, geometry_.coded_width / (i ? 2 : 1), geometry_.coded_height / (i ? 2 : 1),
                 0, i ? GL_RG : GL_RED, GL_UNSIGNED_BYTE, nullptr);
         }
         if (glGetError() != GL_NO_ERROR) throw std::runtime_error("Native texture allocation failed");
@@ -108,6 +110,8 @@ void main() {
         auto v = viewport(width_, height_, rotation_, gtk_widget_get_allocated_width(area_)*scale, gtk_widget_get_allocated_height(area_)*scale);
         glViewport(v.x, v.y, v.width, v.height); glUseProgram(program_); glBindVertexArray(vao_);
         glUniform1i(glGetUniformLocation(program_, "rotation"), rotation_);
+        glUniform2f(glGetUniformLocation(program_, "visible_fraction"),
+            float(width_)/geometry_.coded_width, float(height_)/geometry_.coded_height);
         for (unsigned i = 0; i < 2; ++i) {
             glActiveTexture(GL_TEXTURE0+i); glBindTexture(GL_TEXTURE_2D, textures_[i]);
             glUniform1i(glGetUniformLocation(program_, i ? "plane_uv" : "plane_y"), i);
@@ -147,8 +151,8 @@ void main() {
     }
 public:
     Presenter(unsigned width, unsigned height, unsigned rotation, bool verify, bool fullscreen = false, GtkWidget* host = nullptr)
-        : width_(width), height_(height), rotation_(rotation), verify_(verify) {
-        if (!width || !height || width%2 || height%2 || width>8192 || height>8192 || uint64_t(width)*height>33554432 || rotation>3)
+        : width_(width), height_(height), rotation_(rotation), geometry_(width,height), verify_(verify) {
+        if (rotation>3)
             throw std::runtime_error("Invalid native renderer geometry");
         if (host) {
             if (!GTK_IS_WINDOW(host) || !gtk_widget_get_realized(host) || fullscreen || verify)
@@ -229,13 +233,13 @@ public:
     }
     void submit(const PabCodecBytes& nv12, uint64_t index) {
         poll_events(false); initialize();
-        if (pending_ || index != presented_ || !nv12.data || nv12.size != uint64_t(width_)*height_*3/2)
+        if (pending_ || index != presented_ || !nv12.data || nv12.size != geometry_.nv12_bytes())
             throw std::runtime_error("Invalid decoded native frame");
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, textures_[0]);
-        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width_,height_,GL_RED,GL_UNSIGNED_BYTE,nv12.data);
+        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,geometry_.coded_width,geometry_.coded_height,GL_RED,GL_UNSIGNED_BYTE,nv12.data);
         glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, textures_[1]);
-        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width_/2,height_/2,GL_RG,GL_UNSIGNED_BYTE,nv12.data+size_t(width_)*height_);
+        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,geometry_.coded_width/2,geometry_.coded_height/2,GL_RG,GL_UNSIGNED_BYTE,nv12.data+size_t(geometry_.coded_width)*geometry_.coded_height);
         if (glGetError() != GL_NO_ERROR) throw std::runtime_error("Native NV12 upload failed");
         index_ = index; uploaded_ = true; pending_ = true; drawn_ = false;
         gtk_gl_area_queue_render(GTK_GL_AREA(area_));
