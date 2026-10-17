@@ -239,6 +239,16 @@ Wayland 已完成一次熄屏→自动唤醒→密码框→单次密码提交解
 远程窗口中的连续登录、GDM/会话切换、真实多屏及稳定性仍待验收，不关闭 W5。
 详见 [Linux 虚拟输入与锁屏登录](acceptance/remote-desktop-linux-uinput-login-2026-10-17.md)。
 
+随后 W5 正式产品验证已通过一次 Windows 独立窗口→GNOME Wayland 锁屏密码解锁：
+真实系统媒体 supervisor 配对既有认证连接，普通桌面→锁屏时钟/密码框→单次
+密码输入→桌面恢复均在同一窗口内完成，没有手动重连，恢复后回到仅查看。
+清理之前 logind 已确认解锁，回滚计时器未触发；实际返回画面与原测试图案吻合。
+但锁屏等待中观察到多个会话自动重建，原因尚未确认，**锁屏持续观看稳定性仍
+未通过**。临时 Linux 服务、进程和目录已恢复/清理，本次 Windows 测试 profile
+及凭据副本也已删除。继续定位等待期间的恢复原因，再补 Wayland GDM 与注销/
+新会话；不关闭 W5/W7。详见
+[Linux Wayland 正式窗口登录](acceptance/remote-desktop-linux-wayland-window-login-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；
