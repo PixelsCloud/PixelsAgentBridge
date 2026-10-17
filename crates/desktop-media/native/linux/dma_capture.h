@@ -30,6 +30,44 @@ inline void await_awake(GDBusConnection* bus) {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     parent_alive();
 }
+// The locked GNOME screen normally blanks again after a short idle timeout.
+// Keep its idle watches inhibited only for this locked capture's lifetime;
+// ordinary viewing retains the user's normal automatic lock behavior.
+class LockedScreenAwake {
+    GDBusConnection* bus_;
+    uint32_t cookie_ = 0;
+    bool held_ = false;
+public:
+    explicit LockedScreenAwake(GDBusConnection* bus) : bus_(bus) {
+        if (!screen_locked(bus_)) return;
+        try {
+            auto result = call(bus_, "org.gnome.SessionManager", "/org/gnome/SessionManager",
+                "org.gnome.SessionManager", "Inhibit",
+                g_variant_new("(susu)", "Pixels Agent Bridge", 0u,
+                    "Viewing the locked remote desktop", 8u), G_VARIANT_TYPE("(u)"));
+            cookie_ = g_variant_get_uint32(child(result.get(), 0).get());
+            held_ = true;
+            fprintf(stderr, "media: locked-screen idle inhibition acquired\n");
+        } catch (const std::exception& error) {
+            // An unsupported session manager must not hide an otherwise
+            // available frame; the existing stale-scanout guard still applies.
+            fprintf(stderr, "media: locked-screen idle inhibition unavailable: %s\n", error.what());
+        }
+    }
+    LockedScreenAwake(const LockedScreenAwake&) = delete;
+    LockedScreenAwake& operator=(const LockedScreenAwake&) = delete;
+    ~LockedScreenAwake() {
+        if (!held_) return;
+        try {
+            call(bus_, "org.gnome.SessionManager", "/org/gnome/SessionManager",
+                "org.gnome.SessionManager", "Uninhibit", g_variant_new("(u)", cookie_));
+        } catch (...) {
+            // GNOME also retires this connection's cookie when the dedicated
+            // capture worker exits, including SIGKILL or a broken parent pipe.
+            fprintf(stderr, "media: releasing locked-screen inhibition on worker exit\n");
+        }
+    }
+};
 class GnomeGuard {
     GDBusConnection* bus_;
     Display display_;
@@ -59,7 +97,7 @@ inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, 
     channel(socket);
     if ((display.size.width & 1) || (display.size.height & 1))
         throw std::runtime_error("Software DMA capture requires even dimensions");
-    GnomeGuard guard(bus, display); ImageReader reader;
+    GnomeGuard guard(bus, display); LockedScreenAwake awake(bus); ImageReader reader;
     Encoder encoder(pab_soft_encoder_new(display.size.width, display.size.height, fps));
     if (!encoder) throw std::runtime_error("Cannot initialize DMA software encoder");
     write_value(magic); write_value(display.size.width); write_value(display.size.height);

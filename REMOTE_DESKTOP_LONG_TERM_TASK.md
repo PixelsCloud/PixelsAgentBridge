@@ -249,6 +249,15 @@ Wayland 已完成一次熄屏→自动唤醒→密码框→单次密码提交解
 新会话；不关闭 W5/W7。详见
 [Linux Wayland 正式窗口登录](acceptance/remote-desktop-linux-wayland-window-login-2026-10-17.md)。
 
+上述锁屏等待重连已定位到 GNOME 再次空闲熄屏：旧产物在 26.926 秒因电源状态
+变为 3 退出。现在仅锁屏 DMA 采集持有 SessionManager idle 抑制，普通桌面不持有。
+候选实机 35 秒持续采集、正常关闭/SIGKILL/解锁释放、一次密码解锁及三轮普通
+桌面动态回归通过；正式独立窗口 74.206 秒保持同一媒体会话和采集进程，操作状态
+不重置，随后单次密码登录自动返回桌面。原服务恢复、临时进程/输入设备/凭据
+副本清理均通过。旧二进制加外部抑制的对照实验在后续 DMA 回归超时，仍保留失败。
+本轮解决已复现的空闲重连，不替代长稳、Wayland GDM、注销后新会话和安装升级；
+W5/W7 仍开放。详见 [Linux 锁屏空闲修复](acceptance/remote-desktop-linux-lock-idle-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；

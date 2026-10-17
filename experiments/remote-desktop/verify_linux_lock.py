@@ -29,7 +29,10 @@ def main():
     parser.add_argument('worker', type=pathlib.Path)
     parser.add_argument('--embedded', action='store_true')
     parser.add_argument('--uinput', action='store_true')  # Shared isolated wrapper.
+    parser.add_argument('--idle-seconds', type=int, default=0)
+    parser.add_argument('--check-idle-inhibitor', action='store_true')
     args = parser.parse_args()
+    assert 0 <= args.idle_seconds <= 40
     worker = args.worker.resolve(strict=True)
     assert worker.parent.parent == pathlib.Path('/tmp') and worker.parent.name.startswith('pab-uinput-')
     stage = worker.parent
@@ -53,6 +56,11 @@ def main():
         return call('org.gnome.Mutter.DisplayConfig', '/org/gnome/Mutter/DisplayConfig',
                     'org.freedesktop.DBus.Properties', 'Get',
                     GLib.Variant('(ss)', ('org.gnome.Mutter.DisplayConfig', 'PowerSaveMode')))[0]
+    def inhibitors():
+        paths = call('org.gnome.SessionManager', '/org/gnome/SessionManager',
+                     'org.gnome.SessionManager', 'GetInhibitors')[0]
+        return [path for path in paths if call('org.gnome.SessionManager', path,
+                'org.gnome.SessionManager.Inhibitor', 'GetAppId')[0] == 'Pixels Agent Bridge']
     def pump(seconds=.02):
         end = time.monotonic() + seconds
         while time.monotonic() < end:
@@ -126,13 +134,41 @@ def main():
     window.connect('draw', draw); window.show_all(); window.fullscreen(); window.present()
     try:
         assert not locked()
+        if args.check_idle_inhibitor: assert not inhibitors(), 'Another Pixels inhibitor is active'
         pump(.5)
         call('org.gnome.ScreenSaver', '/org/gnome/ScreenSaver', 'org.gnome.ScreenSaver', 'Lock')
         until(lambda: locked() and power() in (1, 2, 3), 10, 'Session did not lock and power off')
         report['locked_power'] = power()
         capture = spawn('capture')  # Automatic wake + DMA, no explicit DMA switch.
+        if args.check_idle_inhibitor: assert len(inhibitors()) == 1
         observe(capture, 'lock')
         report['automatic_wake'] = power() == 0 and locked()
+        if args.idle_seconds:
+            start = time.monotonic(); last_sample = -1; frames = 0
+            samples = []; report['idle_samples'] = samples
+            report['idle_requested_seconds'] = args.idle_seconds
+            report['idle_completed'] = False
+            try:
+                while time.monotonic() - start < args.idle_seconds:
+                    elapsed = time.monotonic() - start
+                    if int(elapsed) != last_sample:
+                        samples.append({'seconds': round(elapsed, 3), 'power': power(),
+                                        'locked': locked(), 'frames': frames})
+                        last_sample = int(elapsed)
+                    frame(capture); frames += 1
+                report['idle_completed'] = True
+            finally:
+                samples.append({'seconds': round(time.monotonic()-start, 3), 'power': power(),
+                                'locked': locked(), 'frames': frames, 'capture_exit': capture.poll()})
+        if args.check_idle_inhibitor:
+            capture.stdin.write(b'\x00'); assert capture.wait(timeout=5) == 0
+            until(lambda: not inhibitors(), 5, 'Normal close leaked the idle inhibitor')
+            report['normal_close_released_inhibitor'] = True
+            capture = spawn('capture'); assert len(inhibitors()) == 1
+            capture.kill(); capture.wait(timeout=5)
+            until(lambda: not inhibitors(), 5, 'Worker crash leaked the idle inhibitor')
+            report['sigkill_released_inhibitor'] = True
+            capture = spawn('capture'); assert len(inhibitors()) == 1
         input_child = spawn('input')  # Automatic locked-session input backend.
         key(input_child, 0x0D, True); key(input_child, 0x0D, False)
         pump(.5)
@@ -178,7 +214,13 @@ def main():
         assert b'source=drm_dma' in tail[1], 'Automatic lock capture did not use supervised DMA'
         report['locked_capture_source'] = tail[1].decode(errors='replace')
         report['old_generation_retired'] = True
+        if args.check_idle_inhibitor:
+            until(lambda: not inhibitors(), 5, 'Unlock leaked the idle inhibitor')
+            report['unlock_released_inhibitor'] = True
         fresh = spawn('capture')
+        if args.check_idle_inhibitor:
+            assert not inhibitors(), 'Ordinary viewing inhibited automatic lock'
+            report['ordinary_capture_not_inhibited'] = True
         assert max(frame(fresh)) - min(frame(fresh)) > 60
         fresh.stdin.write(b'\x00'); fresh.wait(timeout=5)
         diagnostic = fresh.stderr.read().decode(errors='replace')
