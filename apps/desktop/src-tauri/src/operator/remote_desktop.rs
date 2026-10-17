@@ -1,7 +1,9 @@
 use super::*;
+#[cfg(target_os = "linux")]
+use pab_desktop_media::LinuxNativeViewer as NativeViewer;
 #[cfg(target_os = "macos")]
 use pab_desktop_media::MacNativeViewer as NativeViewer;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 use pab_desktop_media::NativeViewer;
 use pab_protocol::DesktopOpened;
 use std::time::{Duration, Instant};
@@ -153,7 +155,7 @@ pub async fn desktop_viewer_window(
     if window.label() != "main" {
         return Err("only the main window can open a remote desktop".into());
     }
-    if !cfg!(any(windows, target_os = "macos")) {
+    if !cfg!(any(windows, target_os = "macos", target_os = "linux")) {
         return Err("native remote desktop viewer is not available on this platform yet".into());
     }
     let account = account()?;
@@ -672,12 +674,12 @@ async fn open_native_viewer(
     (NativeViewer, pab_desktop_media::NativeViewerInput),
     Box<dyn std::error::Error + Send + Sync>,
 > {
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         let _ = window;
         NativeViewer::open_interactive_with_software(path, prefix, config, parent, software).await
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
         let _ = (path, prefix, parent);
         let app = window.app_handle().clone();
@@ -694,6 +696,7 @@ async fn open_native_viewer(
                 return;
             }
             let _entered = runtime.enter();
+            #[cfg(target_os = "macos")]
             let result = host
                 .ns_window()
                 .map_err(|error| {
@@ -704,6 +707,26 @@ async fn open_native_viewer(
                     // no raw address comes from a webview or remote message.
                     unsafe { NativeViewer::create(parent, &config, software, dispatch) }
                 });
+            #[cfg(target_os = "linux")]
+            let result = {
+                use gtk::glib::object::ObjectType;
+                let _ = software; // Linux currently uses the bundled software decoder.
+                host.gtk_window()
+                    .map_err(|error| {
+                        Box::<dyn std::error::Error + Send + Sync>::from(error.to_string())
+                    })
+                    .and_then(|parent| {
+                        // SAFETY: this live host-owned GtkWindow is obtained on
+                        // the GTK main thread; its pointer never crosses IPC.
+                        unsafe {
+                            NativeViewer::create_interactive(
+                                parent.as_ptr().cast(),
+                                &config,
+                                dispatch,
+                            )
+                        }
+                    })
+            };
             // If startup was cancelled while queued, dropping this result also
             // retires its native view and input sink on the owning thread.
             let _ = sender.send(result);

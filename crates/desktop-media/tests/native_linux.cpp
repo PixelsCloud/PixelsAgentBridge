@@ -73,5 +73,25 @@ int main() {
     rejects([] { viewport(0,1080,0,960,600); }); ++checked;
     rejects([] { viewport(1920,1080,4,960,600); }); ++checked;
     rejects([] { viewport(1920,1080,0,0,600); }); ++checked;
+    for (unsigned rotation=0;rotation<4;++rotation) {
+        for (int scale : {1,2,3}) {
+            const int w=961*scale,h=601*scale;
+            const auto v=viewport(1920,1080,rotation,w,h); const auto top=h-v.y-v.height;
+            uint16_t x=1,y=1;
+            assert(viewer_position(1920,1080,rotation,w,h,v.x,top,false,x,y) && x==0 && y==0); ++checked;
+            assert(viewer_position(1920,1080,rotation,w,h,v.x+v.width-1,top+v.height-1,false,x,y) && x==65535 && y==65535); ++checked;
+            assert(!viewer_position(1920,1080,rotation,w,h,v.x-1,top,false,x,y)); ++checked;
+            assert(viewer_position(1920,1080,rotation,w,h,-100,-100,true,x,y) && x==0 && y==0); ++checked;
+            assert(viewer_position(1920,1080,rotation,w,h,w+100,h+100,true,x,y) && x==65535 && y==65535); ++checked;
+        }
+    }
+    uint16_t x=0,y=0;
+    assert(!viewer_position(1920,1080,0,960,600,std::numeric_limits<double>::quiet_NaN(),0,false,x,y)); ++checked;
+    for (unsigned vk=8;vk<=0xe2;++vk) {
+        if (vk==0x10 || vk==0x11 || vk==0x12) continue;
+        unsigned code=0; try { code=evdev_key(vk); } catch (...) { continue; }
+        assert(windows_key(code+8)==vk); ++checked;
+    }
+    assert(windows_key(KEY_KPENTER+8)==0x0d && windows_key(0)==0 && windows_key(KEY_MAX+9)==0); ++checked;
     printf("{\"checks\":%u,\"passed\":true}\n", checked);
 }

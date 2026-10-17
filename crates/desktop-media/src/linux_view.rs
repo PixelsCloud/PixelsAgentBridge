@@ -1,13 +1,17 @@
 //! In-process GTK view. The host owns the main loop; decoding never re-enters
 //! GTK. One uploaded frame waits for after-paint before the next submission.
-use crate::{NativePresentations, renderer::Renderer, software::SoftwareDecoder};
+use crate::{
+    NativePresentations, NativeViewerInput, renderer::Renderer, software::SoftwareDecoder,
+    viewer_input::InputSink,
+};
 use pab_protocol::{DesktopRotation, DesktopVideoConfig};
 use pab_remote_desktop::VideoFrame;
 use std::{
     ffi::{CStr, c_char, c_void},
     io,
+    panic::{AssertUnwindSafe, catch_unwind},
     sync::{
-        Arc, Condvar, Mutex,
+        Arc, Condvar, Mutex, Weak,
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         mpsc as blocking,
     },
@@ -45,6 +49,39 @@ unsafe extern "C" {
         capacity: usize,
     ) -> bool;
     fn pab_linux_view_drop(view: *mut c_void);
+    fn pab_linux_view_set_input(
+        view: *mut c_void,
+        context: *mut c_void,
+        callback: extern "C" fn(*mut c_void, *const u8) -> bool,
+        drop: extern "C" fn(*mut c_void),
+        error: *mut c_char,
+        capacity: usize,
+    ) -> bool;
+    fn pab_linux_view_input(
+        view: *mut c_void,
+        enabled: bool,
+        error: *mut c_char,
+        capacity: usize,
+    ) -> bool;
+}
+extern "C" fn input(context: *mut c_void, bytes: *const u8) -> bool {
+    catch_unwind(AssertUnwindSafe(|| {
+        if context.is_null() || bytes.is_null() {
+            return false;
+        }
+        // SAFETY: the native sink owns the boxed Arc and borrows eight bytes
+        // only during this call. Typed contents are never retained in logs.
+        let sink = unsafe { &*context.cast::<Arc<InputSink>>() };
+        sink.emit(unsafe { *bytes.cast::<[u8; 8]>() })
+    }))
+    .unwrap_or(false)
+}
+extern "C" fn drop_input(context: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: native takes ownership once, including registration failure.
+        let sink = unsafe { Box::from_raw(context.cast::<Arc<InputSink>>()) };
+        sink.fail();
+    }));
 }
 fn message(bytes: &[c_char; 512]) -> String {
     // SAFETY: the buffer is zero initialized and the native ABI NUL-terminates.
@@ -62,11 +99,17 @@ struct State {
     dispatch: MainThreadDispatch,
     events: mpsc::Sender<Vec<u8>>,
     failure: watch::Sender<Option<String>>,
+    input_failure: Mutex<Option<Weak<InputSink>>>,
 }
 impl State {
     fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         self.wake.notify_all();
+        if let Ok(sink) = self.input_failure.lock() {
+            if let Some(sink) = sink.as_ref().and_then(Weak::upgrade) {
+                sink.fail();
+            }
+        }
     }
     fn fail(&self, error: impl Into<String>) {
         self.stop();
@@ -146,6 +189,55 @@ pub struct LinuxNativeViewer {
     decode: tokio::task::JoinHandle<()>,
 }
 impl LinuxNativeViewer {
+    /// Create the GTK view and its existing bounded input bridge.
+    ///
+    /// # Safety
+    /// Same GTK main-thread, host pointer and dispatch contract as `create`.
+    pub unsafe fn create_interactive(
+        window: *mut c_void,
+        config: &DesktopVideoConfig,
+        dispatch: MainThreadDispatch,
+    ) -> Result<(Self, NativeViewerInput), Error> {
+        // SAFETY: forwarded unchanged from this constructor's caller.
+        let view = unsafe { Self::create(window, config, dispatch) }?;
+        let weak = Arc::downgrade(&view.state);
+        let (native_input, sink) = NativeViewerInput::from_callback(Arc::new(move |enabled| {
+            let state = weak
+                .upgrade()
+                .ok_or_else(|| io::Error::other("native GTK view closed"))?;
+            state.schedule(move |state| {
+                let mut error = [0; 512];
+                // SAFETY: schedule holds State and uses the GTK main thread.
+                if !unsafe {
+                    pab_linux_view_input(state.pointer(), enabled, error.as_mut_ptr(), error.len())
+                } {
+                    state.fail(message(&error));
+                }
+            })
+        }));
+        *view
+            .state
+            .input_failure
+            .lock()
+            .map_err(|_| "native input state failed")? = Some(Arc::downgrade(&sink));
+        let context = Box::into_raw(Box::new(sink)).cast();
+        let mut error = [0; 512];
+        // SAFETY: construction is on GTK main. Native owns context immediately,
+        // including failure; its destructor releases the boxed input sink.
+        if !unsafe {
+            pab_linux_view_set_input(
+                view.state.pointer(),
+                context,
+                input,
+                drop_input,
+                error.as_mut_ptr(),
+                error.len(),
+            )
+        } {
+            return Err(message(&error).into());
+        }
+        Ok((view, native_input))
+    }
     /// Create on the host GTK main thread within an entered Tokio runtime.
     ///
     /// # Safety
@@ -170,6 +262,7 @@ impl LinuxNativeViewer {
             dispatch,
             events,
             failure,
+            input_failure: Mutex::new(None),
         });
         let rotation = match config.screen.rotation {
             DesktopRotation::Identity => 0,

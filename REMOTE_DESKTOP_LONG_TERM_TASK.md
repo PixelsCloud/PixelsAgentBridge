@@ -84,6 +84,13 @@ VM 自建窗口的 10 项实际操作/释放测试、70 项带 ASan/UBSan 的原
 入口及操作端原生输入尚未接入。VM 的 SVGA 释放诊断在纯 GTK 对照程序也复现，
 仍保留后续持续资源观察要求。详见 [Linux 宿主阶段记录](acceptance/remote-desktop-linux-host-2026-10-17.md)。
 
+后续 W5 操作端进展：正式 Linux Tauri 窗口已接入原生显示和键鼠，模式启停确认、
+失焦/隐藏释放、旋转/黑边坐标已实现。Wayland/XWayland 各四方向真实输入通过；
+修复 X11 首次滚轮丢失，X11 使用离散滚轮，Wayland 保留平滑路径。338 项宿主、
+254 项 sanitizer 边界、12 项媒体库及双后端 Rust 桥接通过，完整 Linux Desktop
+和 Windows 检查通过。实际 Tauri 网络连接、Linux 系统登录与持续性能仍待验收，
+不关闭 W5。详见 [Linux 操作端输入记录](acceptance/remote-desktop-linux-viewer-input-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

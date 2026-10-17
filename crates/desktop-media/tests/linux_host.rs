@@ -148,9 +148,12 @@ fn gtk_host_decode_present_cancel_and_restore() {
         let entered = runtime.enter();
         let (config, frames) = fixture();
         let count = frames.len();
-        let mut viewer = LinuxNativeViewer::create(window, &config, dispatch()).unwrap();
+        let (mut viewer, mut input) =
+            LinuxNativeViewer::create_interactive(window, &config, dispatch()).unwrap();
         let mut presentations = viewer.presentations();
         let task = runtime.spawn(async move {
+            input.set_enabled(true).await.unwrap();
+            input.set_enabled(false).await.unwrap();
             for frame in frames {
                 viewer.submit(&frame).await.unwrap();
                 assert_eq!(
@@ -162,6 +165,24 @@ fn gtk_host_decode_present_cancel_and_restore() {
         });
         until(|| task.is_finished());
         runtime.block_on(task).unwrap();
+        until(|| gtk_bin_get_child(window) == root);
+        // Retire while input enable is queued on GTK. The waiter must fail
+        // without needing the queued callback to run on a closing window.
+        let (viewer, mut input) =
+            LinuxNativeViewer::create_interactive(window, &config, dispatch()).unwrap();
+        let mut enabling = std::pin::pin!(input.set_enabled(true));
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        assert!(std::future::Future::poll(enabling.as_mut(), &mut context).is_pending());
+        drop(viewer);
+        assert!(
+            runtime
+                .block_on(async {
+                    tokio::time::timeout(Duration::from_secs(2), enabling)
+                        .await
+                        .unwrap()
+                })
+                .is_err()
+        );
         until(|| gtk_bin_get_child(window) == root);
         let (_, frames) = fixture();
         // A malformed generation is rejected before it enters the renderer.
@@ -260,7 +281,7 @@ fn gtk_host_decode_present_cancel_and_restore() {
         // A leaked blocking decoder would prevent normal runtime shutdown.
         drop(runtime);
         println!(
-            "Rust GTK host: {count} generated frames, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped"
+            "Rust GTK host: {count} generated frames, input enable/disable acknowledged, retired input mode waiter failed, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped"
         );
     }
 }

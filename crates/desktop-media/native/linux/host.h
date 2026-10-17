@@ -41,3 +41,20 @@ extern "C" bool pab_linux_view_poll(void* view, uint64_t* presented, char* error
 extern "C" void pab_linux_view_drop(void* view) noexcept {
     delete static_cast<pab_linux::Presenter*>(view);
 }
+extern "C" bool pab_linux_view_set_input(void* view,void* context,bool(*callback)(void*,const uint8_t*),
+                                          void(*drop)(void*),char* error,size_t capacity) noexcept {
+    if (!drop) { pab_linux::host_error(error,capacity,"Native input context destructor missing"); return false; }
+    const std::shared_ptr<void> owned(context,drop);
+    return pab_linux::host_call(error,capacity,[&] {
+        if (!view || !callback) throw std::runtime_error("Native input view missing");
+        static_cast<pab_linux::Presenter*>(view)->input_sink([owned,callback](const pab_linux::InputPacket& packet) {
+            return callback(owned.get(),packet.data());
+        });
+    });
+}
+extern "C" bool pab_linux_view_input(void* view,bool enabled,char* error,size_t capacity) noexcept {
+    return pab_linux::host_call(error,capacity,[&] {
+        if (!view) throw std::runtime_error("Native input view missing");
+        static_cast<pab_linux::Presenter*>(view)->input_enabled(enabled);
+    });
+}

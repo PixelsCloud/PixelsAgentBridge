@@ -4,22 +4,15 @@
 #include <gtk/gtk.h>
 #include <epoxy/gl.h>
 #include <array>
+#include "viewer_input.h"
 
 namespace pab_linux {
-struct Viewport { int x, y, width, height; };
-inline Viewport viewport(unsigned frame_width, unsigned frame_height, unsigned rotation, int width, int height) {
-    if (!frame_width || !frame_height || rotation > 3 || width <= 0 || height <= 0)
-        throw std::runtime_error("Invalid native viewport");
-    const auto w = rotation % 2 ? frame_height : frame_width, h = rotation % 2 ? frame_width : frame_height;
-    const double scale = std::min(double(width) / w, double(height) / h);
-    const auto dw = std::max(1, int(std::lround(w * scale))), dh = std::max(1, int(std::lround(h * scale)));
-    return {(width - dw) / 2, (height - dh) / 2, dw, dh};
-}
 class Presenter {
     GtkWidget* window_ = nullptr;
     GtkWidget* area_ = nullptr;
     GtkWidget* hosted_root_ = nullptr;
     GtkWidget* overlay_ = nullptr;
+    std::unique_ptr<ViewInput> input_;
     GdkFrameClock* clock_ = nullptr;
     gulong painted_signal_ = 0;
     GThread* thread_ = g_thread_self();
@@ -178,6 +171,7 @@ public:
         g_signal_connect(area_, "render", G_CALLBACK(draw_callback), this);
         g_signal_connect(area_, "destroy", G_CALLBACK(destroyed), this);
         g_signal_connect(area_, "unrealize", G_CALLBACK(unrealized), this);
+        input_ = std::make_unique<ViewInput>(area_,window_,width_,height_,rotation_);
         if (hosted_root_) {
             // The WebKit content keeps the toolbar and its existing state.
             // Only this generation's GL overlay is removed on retirement.
@@ -202,6 +196,7 @@ public:
     Presenter(const Presenter&) = delete;
     Presenter& operator=(const Presenter&) = delete;
     ~Presenter() {
+        input_.reset();
         if (clock_) {
             if (g_signal_handler_is_connected(clock_, painted_signal_)) g_signal_handler_disconnect(clock_, painted_signal_);
             g_object_unref(clock_);
@@ -250,6 +245,8 @@ public:
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
     }
     uint64_t presented() const { return presented_; }
+    void input_sink(std::function<bool(const InputPacket&)> sink) { poll_events(false); input_->sink(std::move(sink)); }
+    void input_enabled(bool value) { poll_events(false); input_->enable(value); }
     uint64_t checks() const { return checks_; }
     unsigned max_error() const { return max_error_; }
     const char* renderer() { current(); return reinterpret_cast<const char*>(glGetString(GL_RENDERER)); }

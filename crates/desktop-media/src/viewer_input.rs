@@ -29,7 +29,7 @@ pub struct NativeViewerInput {
 }
 enum Control {
     Pipe(Arc<Mutex<ChildStdin>>),
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     Callback(Arc<dyn Fn(bool) -> io::Result<()> + Send + Sync>),
 }
 pub(crate) struct InputSink {
@@ -121,7 +121,7 @@ impl NativeViewerInput {
             pending: None,
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     pub(crate) fn from_callback(
         control: Arc<dyn Fn(bool) -> io::Result<()> + Send + Sync>,
     ) -> (Self, Arc<InputSink>) {
@@ -145,7 +145,7 @@ impl NativeViewerInput {
                     .write_all(&[255, 255, 255, 255, u8::from(enabled)])
                     .await?;
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
             Control::Callback(apply) => apply(enabled)?,
         }
         // Native ACK is ordered after all events from the previous mode. Drain
