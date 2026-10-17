@@ -126,6 +126,14 @@ Xorg GDM 已采集并解码非空白首帧、完成四个输入 ACK；Wayland GD
 greeter helper 监督、密码登录与正式窗口全链路继续待完成，不关闭 W5。
 详见 [X11 输入与实际 GDM 画面](acceptance/remote-desktop-linux-x11-input-2026-10-17.md)。
 
+后续 W5 greeter helper：新增仅供媒体的活动 greeter 身份观察和 Linux
+`--media-helper`，普通应用/命令路由保持原样。完整 Linux Desktop 构建和 2 项
+身份策略测试通过；实际 GDM Xorg 的独立原生输入状态、两轮经内核身份验证的
+采集/解码/输入 IPC、worker 回收及注册撤销通过，原 Wayland 用户桌面同项回归
+通过。原会话/配置已恢复，临时进程和恢复目录为零。自动 helper 监督与安装、
+真实会话交接、正式窗口密码登录及 Wayland 锁屏路径仍未完成。
+详见 [Linux 登录界面媒体 helper](acceptance/remote-desktop-linux-greeter-helper-2026-10-17.md)。
+
 Apple 已准备沿用现有发布签名的隔离测试 App，未替换安装版。GUI 会话内诊断仍
 缺屏幕录制和辅助功能授权，已向用户请求在系统设置开启；不能将签名一致当作已
 获授权。诊断见 [Mac 测试包状态](acceptance/remote-desktop-macos-test-bundle-2026-10-17.json)。

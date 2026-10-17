@@ -134,7 +134,7 @@ pub(super) async fn verify_media(
         let Some(uid) = uid else { return Ok(None); };
         let pid = verified.pid;
         verified.graphical = tokio::task::spawn_blocking(move || {
-            pab_os_control::execution::LinuxGraphicalSession::for_process(pid, uid).ok()
+            pab_os_control::execution::LinuxGraphicalSession::for_media_process(pid, uid).ok()
         }).await.map_err(|_| LocalIpcError::Protocol)?;
         return Ok(verified.current().then_some(verified));
     }

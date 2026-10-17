@@ -21,10 +21,13 @@ pub fn run() -> Result<(), String> {
         .and_then(|argument| argument.strip_prefix("--desktop=").map(str::to_owned));
     let applications_only = std::env::args().nth(1).as_deref() == Some("--application-helper");
     let media_only = std::env::args().nth(1).as_deref() == Some("--media-helper");
-    if media_only
-        && (!cfg!(windows) || !matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")))
-    {
-        return Err("media helper requires a Windows interactive desktop".into());
+    if media_only {
+        let supported = (cfg!(windows)
+            && matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")))
+            || (cfg!(target_os = "linux") && expected_desktop.is_none());
+        if !supported {
+            return Err("media helper requires a supported interactive session".into());
+        }
     }
     if applications_only && (!cfg!(windows) || expected_desktop.as_deref() != Some("Default")) {
         return Err("application helper requires the Windows Default desktop".into());
@@ -104,11 +107,14 @@ pub fn run() -> Result<(), String> {
     }
     #[cfg(target_os = "linux")]
     return tauri::async_runtime::block_on(async {
-        let mut media = linux_media::start()?;
+        let mut media = if media_only { linux_media::start_media_only()? } else { linux_media::start()? };
         use tokio::signal::unix::{SignalKind, signal};
         let mut termination = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
         let result = tokio::select! {
-            result = run_forever(expected_desktop, applications_only) => result,
+            result = async {
+                if media_only { std::future::pending::<Result<(), String>>().await }
+                else { run_forever(expected_desktop, applications_only).await }
+            } => result,
             _ = termination.recv() => Ok(()),
         };
         media.shutdown().await;

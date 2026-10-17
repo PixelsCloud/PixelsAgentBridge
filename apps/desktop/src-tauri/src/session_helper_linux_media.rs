@@ -17,6 +17,14 @@ impl Drop for Task {
     }
 }
 pub(crate) fn start() -> Result<Task, String> {
+    start_inner(false)
+}
+/// A headless login-screen helper registers media only. GUI and application
+/// helpers retain the user-only observation above.
+pub(crate) fn start_media_only() -> Result<Task, String> {
+    start_inner(true)
+}
+fn start_inner(media_only: bool) -> Result<Task, String> {
     let pid = std::process::id();
     let identity = process_user_identity(pid).map_err(|e| e.to_string())?;
     let uid = identity
@@ -33,7 +41,10 @@ pub(crate) fn start() -> Result<Task, String> {
     Ok(Task(tauri::async_runtime::spawn(async move {
         loop {
             if let Ok(Ok(session)) =
-                tokio::task::spawn_blocking(move || LinuxGraphicalSession::for_process(pid, uid))
+                tokio::task::spawn_blocking(move || {
+                    if media_only { LinuxGraphicalSession::for_media_process(pid, uid) }
+                    else { LinuxGraphicalSession::for_process(pid, uid) }
+                })
                     .await
             {
                 let switched = async {

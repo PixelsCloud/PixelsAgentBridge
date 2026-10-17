@@ -89,12 +89,22 @@ pub struct LinuxGraphicalSession {
     uid: u32,
     kind: CString,
     seat: CString,
+    class: CString,
 }
 impl LinuxGraphicalSession {
     /// The UID must come from process_user_identity, never from registration or
     /// XDG_SESSION_ID. User-manager applications can live outside session.scope;
     /// only ENODATA permits fallback to logind's primary graphical user session.
     pub fn for_process(pid: u32, uid: u32) -> io::Result<Self> {
+        Self::observe(pid, uid, false)
+    }
+    /// Media may belong to the active local login screen. This does not expose
+    /// the greeter as an application/command execution user or grant access to
+    /// another session. UID/PID and logind facts remain independently observed.
+    pub fn for_media_process(pid: u32, uid: u32) -> io::Result<Self> {
+        Self::observe(pid, uid, true)
+    }
+    fn observe(pid: u32, uid: u32, media: bool) -> io::Result<Self> {
         let pid = libc::pid_t::try_from(pid)
             .ok()
             .filter(|p| *p > 0)
@@ -129,6 +139,7 @@ impl LinuxGraphicalSession {
             remote,
             kind.as_bytes(),
             class.as_bytes(),
+            media,
         ) {
             return Err(io::Error::other(
                 "process is outside the active local graphical user session",
@@ -139,10 +150,12 @@ impl LinuxGraphicalSession {
             uid,
             kind,
             seat,
+            class,
         })
     }
     pub fn current(&self, pid: u32) -> bool {
-        Self::for_process(pid, self.uid).as_ref().ok() == Some(self)
+        Self::observe(pid, self.uid, self.class.as_bytes() == b"greeter").as_ref().ok()
+            == Some(self)
     }
 }
 fn eligible(
@@ -152,13 +165,14 @@ fn eligible(
     remote: c_int,
     kind: &[u8],
     class: &[u8],
+    media: bool,
 ) -> bool {
     expected_uid != 0
         && uid == expected_uid
         && active > 0
         && remote == 0
         && matches!(kind, b"x11" | b"wayland")
-        && class == b"user"
+        && (class == b"user" || (media && class == b"greeter"))
 }
 #[cfg(test)]
 mod tests {
@@ -166,7 +180,7 @@ mod tests {
     #[test]
     fn graphical_observation_requires_live_matching_local_user_session() {
         for kind in [b"x11".as_slice(), b"wayland"] {
-            assert!(eligible(1000, 1000, 1, 0, kind, b"user"));
+            assert!(eligible(1000, 1000, 1, 0, kind, b"user", false));
         }
         for (uid, active, remote, kind, class) in [
             (1001, 1, 0, b"wayland".as_slice(), b"user".as_slice()),
@@ -177,8 +191,27 @@ mod tests {
             (1000, 1, 0, b"tty", b"user"),
             (1000, 1, 0, b"wayland", b"greeter"),
         ] {
-            assert!(!eligible(1000, uid, active, remote, kind, class));
+            assert!(!eligible(1000, uid, active, remote, kind, class, false));
         }
-        assert!(!eligible(0, 0, 1, 0, b"wayland", b"user"));
+        assert!(!eligible(0, 0, 1, 0, b"wayland", b"user", false));
+    }
+    #[test]
+    fn login_screen_is_media_only_and_still_requires_active_matching_local_identity() {
+        for kind in [b"x11".as_slice(), b"wayland"] {
+            assert!(eligible(128, 128, 1, 0, kind, b"greeter", true));
+            assert!(!eligible(128, 128, 1, 0, kind, b"greeter", false));
+        }
+        for (uid, active, remote, kind, class) in [
+            (1000, 1, 0, b"x11".as_slice(), b"greeter".as_slice()),
+            (128, 0, 0, b"x11", b"greeter"),
+            (128, -1, 0, b"x11", b"greeter"),
+            (128, 1, 1, b"x11", b"greeter"),
+            (128, 1, -1, b"x11", b"greeter"),
+            (128, 1, 0, b"tty", b"greeter"),
+            (128, 1, 0, b"x11", b"background"),
+        ] {
+            assert!(!eligible(128, uid, active, remote, kind, class, true));
+        }
+        assert!(!eligible(0, 0, 1, 0, b"x11", b"greeter", true));
     }
 }
