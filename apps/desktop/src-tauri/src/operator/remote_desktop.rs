@@ -9,6 +9,7 @@ use pab_protocol::DesktopOpened;
 use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::sync::{mpsc, watch};
+mod recovery;
 
 #[derive(Clone, Default, Serialize)]
 pub struct ViewerStatus {
@@ -405,6 +406,7 @@ async fn run(
         let mut fps = 15;
         let mut screen = owner.initial_screen.clone();
         let mut failures = 0u32;
+        let mut first_failure = None;
         let mut software_decoder = false;
         loop {
             // Input and SAS belong to the previous generation. Never replay
@@ -458,10 +460,13 @@ async fn run(
                         .is_some_and(|at: Instant| at.elapsed() >= Duration::from_secs(5))
                     {
                         failures = 0;
+                        first_failure = None;
                     }
-                    if error.recoverable && failures < 6 {
-                        let delay = Duration::from_millis((250u64 << failures).min(2000));
-                        failures += 1;
+                    if error.recoverable
+                        && let Some(delay) =
+                            recovery::retry_delay(&mut first_failure, failures, Instant::now())
+                    {
+                        failures = failures.saturating_add(1);
                         publish(&window, &owner, "reconnecting", None, None);
                         tokio::time::sleep(delay).await;
                         continue;
@@ -486,6 +491,7 @@ async fn run(
                         }
                     }
                     failures = 0;
+                    first_failure = None;
                 }
             }
         }
