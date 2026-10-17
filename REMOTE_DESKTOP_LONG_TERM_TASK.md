@@ -276,6 +276,13 @@ W5 已进一步确认 Wayland GDM 缺少用户 ScreenSaver 接口，改由核实
 这仍是已有会话重新认证，注销后新建会话、开机登录和长稳未通过，W5 不关闭。
 详见 [Wayland GDM 正式窗口登录](acceptance/remote-desktop-linux-gdm-product-2026-10-17.md)。
 
+随后补测真实注销：旧会话 23 退出，自动出现 Wayland GDM c14；同一正式窗口
+单次密码登录创建新会话 191，自动恢复只查看。新会话单击、Ctrl 与只查看禁止
+点击通过，原服务/配置恢复、临时资源清理。但重建测试窗口后的 RGB 对比红通道
+平均误差 2.11/255 超过原定 2/255，整轮仍未通过，不以登录子项覆盖图像失败。
+下一步隔离源像素、编解码与呈现的色差；W5/W7/W8 保持未完成。详见
+[Linux 注销后新会话登录](acceptance/remote-desktop-linux-logout-login-2026-10-17.md)。
+
 Apple 授权检查已更正：原诊断虽然处于 GUI bootstrap，但从 Executor 启动的
 进程仍被 TCC 归因至后台 Executor，不能据此判定 App 缺少权限。通过
 LaunchServices 启动同一签名测试 App 后，实测屏幕录制和辅助功能均为 true；
