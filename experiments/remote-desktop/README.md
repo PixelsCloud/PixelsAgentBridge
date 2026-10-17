@@ -38,6 +38,13 @@ python experiments/remote-desktop/build_dxgi_probe.py
 
 ## 构建约束
 
+Mac 实际产品窗口的合成画面观察工具及只含生成帧编号的可复核样本见
+[操作端显示验收](../../acceptance/remote-desktop-macos-operator-presentation-2026-10-17.md)。
+`analyze_macos_presentation.py` 可在本机离线复核；不会重写原始测试的通过/失败。
+`macos_sample_presentation.py` 必须配合已有授权的固定 App 和当前产品窗口使用，
+会增加一次屏幕采集/编解码负载。`windows_display_fixture.cpp` 会在前台覆盖主屏
+显示生成动画 120 秒，仅限已授权测试机器；不得当作无界后台工具启动。
+
 编译前检查机器是否已有其他会话在构建。单次 Cargo 最多 `-j 10`，嵌套 native 构建限制为 1；所有同时运行的编译合计不能超过 10。Windows 构建进程及其子进程限制在至多 10 个可用逻辑处理器。不要覆盖通用构建脚本、全局环境变量或已安装 Pixels。
 
 源码下载与构建产物放在 `.build/remote-desktop/`，不提交到仓库。引用第三方配置保留其规定格式，新增项目自有配置用 TOML。后续移植源码需固定版本并保留来源和许可。

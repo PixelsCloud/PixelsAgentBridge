@@ -1,0 +1,198 @@
+{
+  "date": "2026-10-17",
+  "baseline": "0f1167c",
+  "operator": {
+    "os": "macOS 27.0.1 arm64",
+    "display": "1920x1080 primary, scale 1x",
+    "desktop_signed_sha256": "34ed9891d8320930dea616951826f53f066d4cb4935b6fdb45f75820066b1073"
+  },
+  "target": {
+    "name": "90",
+    "os": "Windows Server 2022 x86_64",
+    "display": "1920x1080 primary",
+    "staged_artifacts": {
+      "pab-executor.exe": {
+        "sha256": "f788fe26e6cfcccc0b34e55527934d1283a8abf65773c031243cf79df279d8c1",
+        "bytes": 64072192
+      },
+      "pab-desktop.exe": {
+        "sha256": "941c76f50cdb4659f6c05da34bb4b05f43be0fe3cb13ff5b7aaadde96b4f6918",
+        "bytes": 75468800
+      },
+      "pab-media-worker.exe": {
+        "sha256": "93c7044f53add21ebeed276b13755ada768a5eb9e26d6c9f0d1f646bcd7248ed",
+        "bytes": 682496
+      }
+    }
+  },
+  "fixture": {
+    "sha256": "7cf3b4753b182d09bcd739793c89a2a636b2a30dbcd40e1d6ce3e2094f23e52c",
+    "source": "experiments/remote-desktop/windows_display_fixture.cpp",
+    "requested_fps": 30,
+    "max_seconds": 120
+  },
+  "observer": {
+    "sha256": "0b79609ca753eae1015866411ff961a869f22154707f72ad220755cd230920dd",
+    "requested_fps": 60,
+    "pixel_storage": false,
+    "additional_local_capture_encode_decode_load": true
+  },
+  "reports": [
+    {
+      "raw_file": "acceptance/remote-desktop-macos-operator-presentation-2026-10-17/15-window.json",
+      "sha256": "9934dcc7e0529357e055e922f30397845bd33a6babbbbc722b22d330990a8da7",
+      "task_id": "63e36585-cea1-4ab1-8c13-fc228332a443",
+      "task_state": "succeeded",
+      "started_at_unix_ms": 1792218906847,
+      "finished_at_unix_ms": 1792218937393,
+      "original_passed": true,
+      "original_checks": {
+        "steady_receipt_rate_above_12": true,
+        "invalid_samples_at_most_5_percent": true,
+        "observer_receipt_rate_at_least_30": true
+      },
+      "failed_original_checks": [],
+      "seconds": 30.001998,
+      "capture_span_seconds": 29.980759,
+      "samples": 1405,
+      "observer_receipt_hz": 46.83021444105156,
+      "invalid_samples": 0,
+      "repeated_samples": 961,
+      "unique_observed_codes": 444,
+      "steady_receipt_fps": 14.998890082133922,
+      "observed_transitions_per_second": 14.765683272160741,
+      "longest_observed_gap_seconds": 0.0948012079999998,
+      "limitations": "Sampled composed images under observer load; no exact refresh, end-to-end latency, or unobserved-frame loss claim."
+    },
+    {
+      "raw_file": "acceptance/remote-desktop-macos-operator-presentation-2026-10-17/30-fullscreen-observer-guard.json",
+      "sha256": "10577fbbcb081901c81246e2e1f63d76e557ea638f7ccce7562aabd52fc7f1bb",
+      "task_id": "0912df42-44e5-4a89-8479-df4bc70c0945",
+      "task_state": "failed",
+      "started_at_unix_ms": 1792219009010,
+      "finished_at_unix_ms": 1792219039519,
+      "original_passed": false,
+      "original_checks": {
+        "steady_receipt_rate_above_12": true,
+        "invalid_samples_at_most_5_percent": true,
+        "observer_receipt_rate_at_least_30": false
+      },
+      "failed_original_checks": [
+        "observer_receipt_rate_at_least_30"
+      ],
+      "seconds": 30.017632166000002,
+      "capture_span_seconds": 30.00021,
+      "samples": 899,
+      "observer_receipt_hz": 29.949064437476455,
+      "invalid_samples": 0,
+      "repeated_samples": 0,
+      "unique_observed_codes": 899,
+      "steady_receipt_fps": 30.017434356094043,
+      "observed_transitions_per_second": 29.915750683930874,
+      "longest_observed_gap_seconds": 0.05842124999999987,
+      "limitations": "Sampled composed images under observer load; no exact refresh, end-to-end latency, or unobserved-frame loss claim."
+    }
+  ],
+  "captures": [
+    {
+      "name": "perfMacBefore",
+      "sha256": "31664705b9b6792e450ac81730942f63d40be5cd233426ea0b6497780fec5a67",
+      "capture": {
+        "captured_at_unix_ms": 1792218847265,
+        "desktop_rect": {
+          "height": 760,
+          "width": 1100,
+          "x": 410,
+          "y": 80
+        },
+        "format": "jpeg",
+        "height": 760,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 410,
+        "origin_y": 80,
+        "quality": 85,
+        "resized": false,
+        "source_height": 760,
+        "source_width": 1100,
+        "width": 1100,
+        "window_ref": "65776619-59d2-4fd2-b8fe-10addcdd63de"
+      }
+    },
+    {
+      "name": "perfMacDuring",
+      "sha256": "f455df7c8749a61dc3d5737d9d634c9576e064c3f9e75123b6252978266984b2",
+      "capture": {
+        "captured_at_unix_ms": 1792218928045,
+        "desktop_rect": {
+          "height": 760,
+          "width": 1100,
+          "x": 410,
+          "y": 80
+        },
+        "format": "jpeg",
+        "height": 760,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 410,
+        "origin_y": 80,
+        "quality": 85,
+        "resized": false,
+        "source_height": 760,
+        "source_width": 1100,
+        "width": 1100,
+        "window_ref": "65776619-59d2-4fd2-b8fe-10addcdd63de"
+      }
+    },
+    {
+      "name": "perfMac30Full",
+      "sha256": "c8ad507097035d64df681c631a1d88073fb1fbbf4d30c1ae9c2881e9bbe305ca",
+      "capture": {
+        "captured_at_unix_ms": 1792219026187,
+        "desktop_rect": {
+          "height": 1080,
+          "width": 1920,
+          "x": 0,
+          "y": 0
+        },
+        "format": "jpeg",
+        "height": 1080,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 0,
+        "origin_y": 0,
+        "quality": 85,
+        "resized": false,
+        "source_height": 1080,
+        "source_width": 1920,
+        "width": 1920,
+        "window_ref": "65776619-59d2-4fd2-b8fe-10addcdd63de"
+      }
+    }
+  ],
+  "cleanup": {
+    "windows_task_id": "4dbe4fce-dea0-4733-8849-0a6e33c85160",
+    "windows": {
+      "service": "Running",
+      "original_path_verified": true,
+      "stage_exists": false,
+      "remaining_tasks": 0
+    },
+    "mac_operator_task_id": "d5b2fd69-d210-4797-b368-bf527f455ce9",
+    "mac_operator_task_state": "succeeded",
+    "mac_probe_task_id": "64b249bd-1afa-4936-be50-fe40123c54be",
+    "mac": {
+      "candidate_processes": 0,
+      "mcp_request_cancelled": true,
+      "observer_processes": 0
+    }
+  },
+  "scope": "Mac product operator viewing Windows 90 through existing authenticated transport; ordinary desktop only. No new target input in this measurement.",
+  "remaining": [
+    "30 FPS original observer-rate guard failed; original failure preserved",
+    "multiscreen and other platform combinations",
+    "Mac OS login",
+    "long-running and weak-network acceptance",
+    "final integrated packages and upgrades"
+  ]
+}
