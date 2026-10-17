@@ -13,6 +13,8 @@ use std::sync::atomic::AtomicBool;
 use tokio::sync::Notify;
 #[path = "local_ipc_media_input.rs"]
 pub(super) mod input;
+#[path = "local_ipc_media_cursor.rs"]
+pub(super) mod cursor;
 
 const VERSION: u16 = 1;
 static PROVIDERS: OnceLock<Mutex<Vec<Arc<Provider>>>> = OnceLock::new();
@@ -29,6 +31,8 @@ struct Provider {
     active_config: Mutex<Option<DesktopVideoConfig>>,
     input_supported: bool,
     input: Mutex<Option<Arc<input::InputProvider>>>,
+    cursor_supported: bool,
+    cursor: Mutex<Option<Arc<cursor::CursorProvider>>>,
     ended: tokio::sync::watch::Sender<bool>,
 }
 struct Registration(u64);
@@ -133,10 +137,36 @@ async fn request(
     result.await.map_err(|_| LocalIpcError::Closed)?
 }
 
-/// Supported implementation is advertised independently of transient helper
-/// availability. Failure here is a media error, not a device connection error.
+/// Baseline video/input support is independent of transient helper availability.
+/// Optional cursor support follows the selected helper's version. Failure here
+/// is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
+    fn supports_cursor(&self) -> bool {
+        // Keep an active capture's capability when another helper registers.
+        // Otherwise match capture routing, including supervised preference.
+        // An older/embedded-only helper must not advertise a separate cursor.
+        providers()
+            .lock()
+            .ok()
+            .and_then(|providers| {
+                providers.iter().enumerate()
+                    .filter(|(_, p)| !p.sender.is_closed() && !p.retired.load(Ordering::Acquire))
+                    .max_by_key(|(order, p)| (
+                        p.active_config.lock().ok().is_some_and(|config| config.is_some()),
+                        p.supervised,
+                        *order,
+                    ))
+                    .map(|(_, p)| p.cursor_supported)
+            })
+            .unwrap_or(false)
+    }
+    fn cursor(
+        &self,
+        config: DesktopVideoConfig,
+    ) -> MediaFuture<'_, Box<dyn pab_remote_desktop::DesktopCursorSource>> {
+        Box::pin(cursor::open(config))
+    }
     fn supports_input(&self) -> bool { cfg!(any(windows, target_os = "macos", target_os = "linux")) }
     fn input(
         &self,
@@ -250,6 +280,9 @@ pub(super) async fn serve_registered(
             active_config: Mutex::new(None),
             input_supported: frame["input_supported"].as_bool().unwrap_or(false),
             input: Mutex::new(None),
+            cursor_supported: frame["cursor_schema_version"].as_u64()
+                == Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION.into()),
+            cursor: Mutex::new(None),
             ended: tokio::sync::watch::channel(false).0,
         }));
     CHANGED.notify_waiters();
@@ -369,19 +402,20 @@ pub async fn serve_supervised_helper(backend: &dyn DesktopBackend) -> Result<(),
 async fn serve_helper_socket(
     socket: LocalSocket,
     backend: &dyn DesktopBackend,
-    connect_input: bool,
+    connect_auxiliary: bool,
 ) -> Result<(), LocalIpcError> {
-    serve_helper_socket_with_role(socket, backend, connect_input, false).await
+    serve_helper_socket_with_role(socket, backend, connect_auxiliary, false).await
 }
 async fn serve_helper_socket_with_role(
     mut socket: LocalSocket,
     backend: &dyn DesktopBackend,
-    connect_input: bool,
+    connect_auxiliary: bool,
     supervised: bool,
 ) -> Result<(), LocalIpcError> {
     send_json(
         &mut socket,
-        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised}),
+        &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised,
+            "cursor_schema_version": backend.supports_cursor().then_some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION)}),
     )
     .await?;
     let provider_id = tokio::time::timeout(AUTH_TIMEOUT, async {
@@ -404,7 +438,11 @@ async fn serve_helper_socket_with_role(
     tokio::select! {
         result = serve_media_requests(socket, backend) => result,
         result = async {
-            if connect_input { input::serve_helper(backend, provider_id).await }
+            if connect_auxiliary { input::serve_helper(backend, provider_id).await }
+            else { std::future::pending().await }
+        } => result,
+        result = async {
+            if connect_auxiliary { cursor::serve_helper(backend, provider_id).await }
             else { std::future::pending().await }
         } => result,
     }
@@ -485,6 +523,10 @@ fn unavailable_local(error: DesktopError) -> LocalIpcError {
 #[cfg(all(test, any(windows, target_os = "macos", target_os = "linux")))]
 mod tests {
     use super::*;
+    mod cursor_tests {
+        use super::*;
+        include!("local_ipc_media_cursor_tests.rs");
+    }
     use pab_protocol::{DesktopCodec, DesktopColor, DesktopRotation, RequestId};
     use std::sync::atomic::AtomicUsize;
     static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());

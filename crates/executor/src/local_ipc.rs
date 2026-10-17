@@ -996,6 +996,9 @@ async fn handle_connection(
                     Some("register_media_input_helper") if registration.0.is_none() => {
                         return media::input::serve_registered(socket, frame).await;
                     }
+                    Some("register_media_cursor_helper") if registration.0.is_none() => {
+                        return media::cursor::serve_registered(socket, frame).await;
+                    }
                     Some("register_window_helper") if registration.0.is_none() => {
                         let identity=helper_identity::verify(&mut socket,&frame).await?;
                         let applications_only = frame["applications_only"].as_bool().unwrap_or(false);

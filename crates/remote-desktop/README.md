@@ -93,9 +93,10 @@ connection and generation, and `DesktopBackend::cursor` supplies snapshots.
 Only backends opting in with `supports_cursor` advertise the optional
 `remote_desktop_cursor_schema_version` environment field. The Bridge passes
 this capability to the session; unknown/absent versions retain existing v2
-video/input behavior and do not open cursor streams. Native helper adapters
-and renderers are still pending, so production backends currently keep the
-default unsupported cursor capability.
+video/input behavior and do not open cursor streams. The Executor helper
+adapter now pairs a separate cursor socket with the capture's verified process
+and exact active configuration. Native OS cursor sampling and renderers are
+still pending; current production native backends do not advertise support.
 
 Each update binds session, generation and exact sequence. A new image has a
 monotonic generation-local ID; subsequent position/visibility updates reference
@@ -125,9 +126,16 @@ preserve video and input; restart the generation to obtain a new cursor stream.
 Screen selection, close and session drop invalidate retained readers. Closing
 or changing a generation waits for both native video and cursor sources to end.
 
-Remaining integration: bind the source to the selected native helper, collect
-platform cursor metadata, and overlay it in all native renderers with clipping,
-scaling and hidden-state cleanup. Tests using generated snapshots do not
+The helper cursor socket uses one pull request at a time. Static video cannot
+block it or input. Both ends validate image bounds, session/generation, sequence
+and image references; pixels use bounded binary chunks. Dropping/cancelling a
+cursor request closes only its socket and source. Capture retirement also ends
+its paired cursor, including pending startup or a stationary snapshot wait.
+The optional capability follows the selected capture provider, so legacy or
+embedded-only providers cannot accidentally advertise separate cursor support.
+
+Remaining integration: collect platform cursor metadata, and overlay it in all
+native renderers with clipping, scaling and hidden-state cleanup. Tests using generated snapshots do not
 demonstrate any visible cursor in the app.
 
 ## Verification
