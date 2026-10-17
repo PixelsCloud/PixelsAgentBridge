@@ -391,8 +391,11 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 Desktop 提示、复用独立窗口和明确完成入口。8 项存储生命周期测试包含在 Bridge
 96 项通过测试中，MCP 43 项和界面 8 项通过。隔离的真实 Windows MCP/Desktop
 已验证无 Desktop、实际提示、用户取消、AI 取消、等待超时、请求过期、重复去重
-及请求方退出清理；没有自动打开远端窗口。真实远端操作→完成→AI 复核、占用、
-产品账号切换及跨平台运行继续验收，W6 不关闭。详见
+及请求方退出清理；没有自动打开远端窗口。后续真实 Windows 闭环已通过：用户
+主动打开、首帧进入 active、启用操作、预先聚焦测试窗口的严格单击、明确完成、
+AI 复核，以及窗口复用/恢复只查看、取消保留窗口、关闭回到 waiting。90 首次
+激活窗口的重复按下已在独立 SendInput 自测复现，根因待查，未作为修复关闭。
+占用、产品账号切换及跨平台运行继续验收，W6 不关闭。详见
 [AI 协助阶段记录](acceptance/remote-desktop-assistance-2026-10-17.md)。
 
 - [x] **08.1** 增加 `pab_desktop_assistance`：`request/status/wait/cancel`。请求包含
