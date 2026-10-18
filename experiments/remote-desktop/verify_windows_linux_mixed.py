@@ -134,7 +134,10 @@ for p in pathlib.Path('/proc').iterdir():
 animation=json.loads((fixture/'animation.json').read_text())
 assert time.time()-animation['updated']<2
 assert not (stage/'state/restored.json').exists()
-print(json.dumps(dict(processes=rows,animation=animation,cpu_tick_hz=os.sysconf('SC_CLK_TCK'))))
+system=dict(cpu_count=os.cpu_count(),stat=pathlib.Path('/proc/stat').read_text(),load=pathlib.Path('/proc/loadavg').read_text())
+system['memory']={k:v.strip() for k,v in (line.split(':',1) for line in pathlib.Path('/proc/meminfo').read_text().splitlines()) if k in ('MemTotal','MemAvailable','SwapTotal','SwapFree','Dirty')}
+system['pressure']={p.name:p.read_text() for p in pathlib.Path('/proc/pressure').iterdir() if p.name in ('cpu','memory','io')}
+print(json.dumps(dict(processes=rows,animation=animation,cpu_tick_hz=os.sysconf('SC_CLK_TCK'),system=system)))
 '''.replace('STAGE', repr(stage)).replace('FIXTURE', repr(fixture))
 client, password = ssh.connect()
 source = root / 'mixed-payload.bin'
@@ -216,7 +219,9 @@ try:
             status = until(ready)
             assert status['opened']['config']['session_id'] == session and not status['input_enabled']
             assert status['decoder'] == 'd3d11_hardware'
-            row = {'index': round_number, 'elapsed': round_start-start}
+            row = {'index': round_number, 'elapsed': round_start-start, 'passed': False}
+            row['remote_before'] = json.loads(ssh.run(client, password, remote_script, 10))
+            report['rounds'].append(row); save()
             # Sample actual presentations WHILE old business runs, not afterwards.
             found = windows(); assert len(found) == 1
             was_top = bool(u.GetWindowLongW(found[0], -20) & 8)
@@ -233,19 +238,21 @@ try:
                 row['terminal_marker'] = terminal(c, round_number)
                 row['download'] = transfer(c, 'pab_download_file', remote_file, str(destination))
                 assert hashlib.sha256(destination.read_bytes()).hexdigest() == digest
-                assert sampler.wait(timeout=20) == 0, 'Inspect actual presentation sample'
-                row['presentation'] = json.loads(sample_path.read_text())
+                sample_status = sampler.wait(timeout=20)
+                row['local'] = local_resources()
+                row['remote'] = json.loads(ssh.run(client, password, remote_script, 10))
+                if sample_path.exists():
+                    row['presentation'] = json.loads(sample_path.read_text())
+                assert sample_status == 0, 'Inspect actual presentation sample'
                 assert row['presentation']['passed']
             finally:
                 if sampler.poll() is None:
                     sampler.terminate(); sampler.wait(timeout=5)
                 assert u.SetWindowPos(found[0], W.HWND(-1 if was_top else -2), 0, 0, 0, 0, 0x13)
-            row['local'] = local_resources()
-            row['remote'] = json.loads(ssh.run(client, password, remote_script, 10))
             assert any(x['worker'] == 'capture' for x in row['remote']['processes'])
             status = until(ready)
             assert status['opened']['config']['session_id'] == session and not status['input_enabled']
-            report['rounds'].append(row); save()
+            row['passed'] = True; save()
             print(json.dumps({'round': round_number, 'elapsed': time.monotonic()-start,
                               'actual_fps': row['presentation']['steady_fps']}), flush=True)
             while time.monotonic()-round_start < 30 and time.monotonic()-start < a.seconds:

@@ -60,6 +60,40 @@ unsafe extern "C" fn pab_soft_encode(
     .unwrap_or(false)
 }
 #[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_prepare_bgra(
+    value: *mut SoftwareEncoder, data: *const u8, len: usize, stride: usize,
+) -> bool {
+    if value.is_null() || data.is_null() || len > 256 * 1024 * 1024 {
+        return false;
+    }
+    // SAFETY: the unique handle and validated capture mapping remain live
+    // during conversion. The encoder retains only its own converted planes.
+    let (value, input) = unsafe { (&mut *value, std::slice::from_raw_parts(data, len)) };
+    catch_unwind(AssertUnwindSafe(|| value.prepare_bgra(input, stride).is_ok()))
+        .unwrap_or(false)
+}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_encode_prepared(
+    value: *mut SoftwareEncoder, output: *mut Bytes,
+) -> bool {
+    if value.is_null() || output.is_null() {
+        return false;
+    }
+    // SAFETY: native RAII owns the live handle exclusively and provides a
+    // writable result. No source capture allocation is accessed here.
+    let (value, output) = unsafe { (&mut *value, &mut *output) };
+    output.data = std::ptr::null();
+    output.len = 0;
+    catch_unwind(AssertUnwindSafe(|| match value.encode_prepared_bgra() {
+        Ok(packet) => {
+            output.data = packet.as_ptr();
+            output.len = packet.len();
+            true
+        }
+        Err(_) => false,
+    })).unwrap_or(false)
+}
+#[unsafe(no_mangle)]
 unsafe extern "C" fn pab_soft_encode_nv12(
     value: *mut SoftwareEncoder,
     y: *const u8,

@@ -165,6 +165,7 @@ pub struct SoftwareEncoder {
     planar: Planar,
     packet: Vec<u8>,
     initialized: bool,
+    prepared_bgra: bool,
 }
 impl SoftwareEncoder {
     pub fn new(width: usize, height: usize, fps: u16) -> Result<Self, Error> {
@@ -191,11 +192,26 @@ impl SoftwareEncoder {
             planar,
             packet: Vec::new(),
             initialized: false,
+            prepared_bgra: false,
         })
     }
     /// The returned Annex-B access unit stays valid until the next encode.
     pub fn encode_bgra(&mut self, input: &[u8], stride: usize) -> Result<&[u8], Error> {
+        self.prepare_bgra(input, stride)?;
+        self.encode_prepared_bgra()
+    }
+    /// Convert into the existing owned planes. No source pointer survives this
+    /// call, so a capture pool buffer can be returned before codec work starts.
+    pub(crate) fn prepare_bgra(&mut self, input: &[u8], stride: usize) -> Result<(), Error> {
+        self.prepared_bgra = false;
         self.planar.bgra(input, stride)?;
+        self.prepared_bgra = true;
+        Ok(())
+    }
+    pub(crate) fn encode_prepared_bgra(&mut self) -> Result<&[u8], Error> {
+        if !std::mem::take(&mut self.prepared_bgra) {
+            return Err("software frame has not been prepared".into());
+        }
         let p = &self.planar;
         let source = YUVSlices::new(
             (&p.y, &p.u, &p.v),
@@ -218,6 +234,7 @@ impl SoftwareEncoder {
         uv: &[u8],
         uv_stride: usize,
     ) -> Result<&[u8], Error> {
+        self.prepared_bgra = false;
         let source = self.planar.nv12(y, y_stride, uv, uv_stride)?;
         Self::encode_frame(
             &mut self.encoder,
@@ -354,6 +371,87 @@ impl SoftwareDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prepared_bgra_owns_converted_pixels_after_capture_buffer_is_reused() {
+        let (width, height) = (63, 47);
+        let mut direct = SoftwareEncoder::new(width, height, 15).unwrap();
+        let mut split = SoftwareEncoder::new(width, height, 15).unwrap();
+        for index in 0..8 {
+            let mut pixels = [31 + index * 7, 190 - index * 9, 55 + index * 13, 255]
+                .repeat(width * height);
+            let expected = direct.encode_bgra(&pixels, width * 4).unwrap().to_vec();
+            split.prepare_bgra(&pixels, width * 4).unwrap();
+            pixels.fill(0xff);
+            drop(pixels);
+            assert_eq!(split.encode_prepared_bgra().unwrap(), expected);
+            assert!(split.encode_prepared_bgra().is_err());
+        }
+    }
+    #[test]
+    fn failed_preparation_or_nv12_switch_cannot_encode_old_bgra() {
+        let mut encoder = SoftwareEncoder::new(64, 48, 15).unwrap();
+        let pixels = vec![127; 64 * 48 * 4];
+        assert!(encoder.encode_prepared_bgra().is_err());
+        encoder.prepare_bgra(&pixels, 256).unwrap();
+        assert!(encoder.prepare_bgra(&pixels[..31], 256).is_err());
+        assert!(encoder.encode_prepared_bgra().is_err());
+        encoder.prepare_bgra(&pixels, 256).unwrap();
+        assert!(encoder.encode_nv12(&[], 64, &[], 64).is_err());
+        assert!(encoder.encode_prepared_bgra().is_err());
+        assert!(!encoder.encode_bgra(&pixels, 256).unwrap().is_empty());
+    }
+    /// Diagnostic only: generated desktop bars isolate conversion and codec
+    /// cost from compositor, capture, transport and presentation scheduling.
+    #[test]
+    #[ignore = "manual timing on the target hardware; not a display FPS acceptance test"]
+    fn profile_1080p_software_pipeline() {
+        use std::time::Instant;
+        let (width, height) = (1920, 1080);
+        let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+        let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+        let mut pixels = vec![0u8; width * height * 4];
+        let mut samples = Vec::new();
+        for index in 0..90 {
+            for y in 0..height {
+                for x in 0..width {
+                    let phase = (index * 3 + (x / 120) * 10 + (y / 90) * 10) % 128;
+                    let p = (y * width + x) * 4;
+                    pixels[p..p + 4].copy_from_slice(&[
+                        89, ((128 - phase) * 255 / 128) as u8,
+                        (phase * 255 / 128) as u8, 255,
+                    ]);
+                }
+            }
+            let started = Instant::now();
+            encoder.planar.bgra(&pixels, width * 4).unwrap();
+            let converted = Instant::now();
+            let p = &encoder.planar;
+            let source = YUVSlices::new(
+                (&p.y, &p.u, &p.v), (p.width, p.height),
+                (p.width, p.width / 2, p.width / 2),
+            );
+            let packet = SoftwareEncoder::encode_frame(
+                &mut encoder.encoder, &mut encoder.packet, &mut encoder.initialized, &source,
+            ).unwrap();
+            let encoded = Instant::now();
+            let bytes = packet.len();
+            assert!(decoder.decode(packet).unwrap().is_some());
+            let decoded = Instant::now();
+            if index >= 15 {
+                samples.push(serde_json::json!({
+                    "conversion_ms": (converted-started).as_secs_f64()*1000.0,
+                    "encode_ms": (encoded-converted).as_secs_f64()*1000.0,
+                    "decode_ms": (decoded-encoded).as_secs_f64()*1000.0,
+                    "bytes": bytes,
+                }));
+            }
+        }
+        println!("{}", serde_json::json!({
+            "dimensions": [width, height], "warmup_frames": 15,
+            "sample_frames": samples.len(), "source": "generated changing bars",
+            "display_fps_measured": false, "samples": samples,
+        }));
+    }
     #[test]
     fn nv12_borrows_even_luma_and_preserves_odd_edges_with_padded_strides() {
         for (width, height) in [(64, 48), (63, 48), (64, 47), (63, 47)] {

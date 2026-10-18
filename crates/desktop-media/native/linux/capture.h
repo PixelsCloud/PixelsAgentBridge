@@ -219,20 +219,29 @@ public:
     Encoded next(void* encoder) {
         for (;;) {
             parent_alive(); pump();
+            Encoded result{{nullptr, 0}, {}};
+            bool prepared = false;
             {
                 PwLock lock(loop_); ensure_valid();
                 if (pending_) {
-                    // Keep the PW pool buffer owned and the loop locked during
-                    // CPU conversion/encoding. remove_buffer cannot unmap it.
-                    // Release before any IPC write so network backpressure can
-                    // never retain a queue of old raw frames or block PW cleanup.
+                    // Only conversion needs the capture mapping. Return this
+                    // pool buffer before encoding the existing owned YUV planes,
+                    // so PipeWire can receive fresh frames during codec work.
                     auto view = frame_view(pending_->buffer, display_.size.width, display_.size.height);
-                    Encoded result{{nullptr, 0}, sampled_};
-                    const bool ok = pab_soft_encode(encoder, view.data, view.size, view.stride, &result.bytes);
+                    result.sampled = sampled_;
+                    prepared = pab_soft_prepare_bgra(encoder, view.data, view.size, view.stride);
                     pw_stream_queue_buffer(stream_, pending_); pending_ = nullptr;
-                    if (!ok || !result.bytes.size || result.bytes.size > max_packet) throw std::runtime_error("Software encoding failed");
-                    return result;
+                    if (!prepared) throw std::runtime_error("Software conversion failed");
                 }
+            }
+            if (prepared) {
+                const bool ok = pab_soft_encode_prepared(encoder, &result.bytes);
+                // A layout change/disconnect during encoding retires this
+                // generation; never publish its now-stale frame.
+                { PwLock lock(loop_); ensure_valid(); }
+                if (!ok || !result.bytes.size || result.bytes.size > max_packet)
+                    throw std::runtime_error("Software encoding failed");
+                return result;
             }
             // A static desktop does not synthesize duplicate frames.
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
