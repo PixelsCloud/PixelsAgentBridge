@@ -14,6 +14,7 @@ struct Screen {
     HWND window = nullptr;
     unsigned index = 0, clicks = 0, ups = 0, ctrl_down = 0, ctrl_up = 0;
     POINT last{-1, -1};
+    bool quadrants = false;
 };
 LRESULT CALLBACK procedure(HWND h, UINT m, WPARAM w, LPARAM l) {
     auto* s = reinterpret_cast<Screen*>(GetWindowLongPtrW(h, GWLP_USERDATA));
@@ -27,6 +28,14 @@ LRESULT CALLBACK procedure(HWND h, UINT m, WPARAM w, LPARAM l) {
             RECT rect{}; GetClientRect(h, &rect);
             HBRUSH brush = CreateSolidBrush(s->index == 0 ? RGB(28, 112, 68) : RGB(36, 76, 164));
             FillRect(dc, &rect, brush); DeleteObject(brush);
+            if (s->quadrants) {
+                const COLORREF colors[] = {RGB(180,40,40), RGB(40,180,40), RGB(40,40,180), RGB(180,180,40)};
+                for (int q=0;q<4;++q) {
+                    RECT area{(q%2)*rect.right/2, (q/2)*rect.bottom/2,
+                        (q%2+1)*rect.right/2, (q/2+1)*rect.bottom/2};
+                    brush=CreateSolidBrush(colors[q]);FillRect(dc,&area,brush);DeleteObject(brush);
+                }
+            }
             SetBkMode(dc, TRANSPARENT); SetTextColor(dc, RGB(255,255,255));
             const std::wstring label = L"Pixels generated screen " + std::to_wstring(s->index + 1);
             TextOutW(dc, 50, 50, label.c_str(), int(label.size()));
@@ -43,7 +52,8 @@ LRESULT CALLBACK procedure(HWND h, UINT m, WPARAM w, LPARAM l) {
     return DefWindowProcW(h,m,w,l);
 }
 int main(int argc, char** argv) {
-    if (argc != 3 || std::string(argv[1]) != "--two-screens") return 2;
+    const bool quadrants = argc==4 && std::string(argv[3])=="--quadrants";
+    if ((argc != 3 && !quadrants) || std::string(argv[1]) != "--two-screens") return 2;
     const std::string value(argv[2]);
     if (value.empty() || value.size()>3 || value.find_first_not_of("0123456789")!=std::string::npos) return 2;
     const unsigned seconds=std::stoul(value); if (seconds<5 || seconds>180) return 2;
@@ -60,7 +70,7 @@ int main(int argc, char** argv) {
     cls.lpszClassName=L"PixelsTwoScreenAcceptance";
     if (!RegisterClassW(&cls)) return 4;
     for (unsigned i=0;i<screens.size();++i) {
-        auto& s=screens[i];s.index=i;const auto& r=s.monitor.rcMonitor;
+        auto& s=screens[i];s.index=i;s.quadrants=quadrants;const auto& r=s.monitor.rcMonitor;
         s.window=CreateWindowExW(WS_EX_TOPMOST,cls.lpszClassName,L"Pixels generated two-screen acceptance",
             WS_POPUP,r.left,r.top,r.right-r.left,r.bottom-r.top,nullptr,nullptr,cls.hInstance,&s);
         if (!s.window) { for(auto& other:screens) if(other.window) DestroyWindow(other.window); return 5; }

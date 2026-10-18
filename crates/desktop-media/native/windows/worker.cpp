@@ -112,7 +112,12 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
     if (!synthetic) {
         check(display.output->DuplicateOutput(device.Get(), &duplication), "DuplicateOutput");
         DXGI_OUTDUPL_DESC description{}; duplication->GetDesc(&description);
-        if (description.ModeDesc.Width != width || description.ModeDesc.Height != height)
+        // DXGI's mode is in desktop orientation; acquired textures remain in
+        // native orientation. Comparing the mode to encoder dimensions rejects
+        // every 90/270-degree display even when its layout has not changed.
+        if (description.ModeDesc.Width != UINT(rect.right-rect.left)
+            || description.ModeDesc.Height != UINT(rect.bottom-rect.top)
+            || description.Rotation != display.screen.Rotation)
             throw std::runtime_error("Screen changed; refresh generation");
         if (mode == "animate") {
             pattern = std::make_unique<PatternWindow>(); pattern->initialize(device.Get(), rect);

@@ -5,6 +5,8 @@
 // its returned index. Existing active Parsec displays prohibit a lease.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <iomanip>
@@ -62,7 +64,9 @@ void snapshot(const char* phase) {
 int main(int argc, char** argv) {
     const bool probe = argc == 2 && std::string(argv[1]) == "--probe";
     unsigned duration = 0;
-    if (argc == 3 && std::string(argv[1]) == "--lease-seconds") {
+    const bool portrait = argc == 5 && std::string(argv[3]) == "--layout"
+        && std::string(argv[4]) == "left-portrait";
+    if ((argc == 3 || portrait) && std::string(argv[1]) == "--lease-seconds") {
         const std::string value(argv[2]);
         if (value.empty() || value.size() > 3 || value.find_first_not_of("0123456789") != std::string::npos) return 2;
         duration = std::stoul(value);
@@ -70,12 +74,16 @@ int main(int argc, char** argv) {
     if (!probe && (duration < 5 || duration > 120)) return 2;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     snapshot("before");
-    for (const auto& row : outputs()) {
+    const auto initial = outputs();
+    for (const auto& row : initial) {
         if (!probe && row.description.find(L"Parsec") != std::wstring::npos
             && (row.flags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)) {
             std::cerr << "Existing active Parsec display; lease refused\n"; return 3;
         }
     }
+    if (portrait && std::count_if(initial.begin(), initial.end(), [](const Output& row) {
+        return row.flags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
+    }) != 1) { std::cerr << "Layout test requires exactly one original display\n"; return 3; }
     HANDLE driver = parsec_vdd::OpenDeviceHandle(&parsec_vdd::VDD_ADAPTER_GUID);
     if (!driver || driver == INVALID_HANDLE_VALUE) return 4;
     const int version = parsec_vdd::VddVersion(driver);
@@ -86,20 +94,80 @@ int main(int argc, char** argv) {
     const int index = parsec_vdd::VddAddDisplay(driver);
     if (index < 0 || index >= 16) { parsec_vdd::CloseDeviceHandle(driver); return 6; }
     std::cout << "{\"added_index\":" << index << ",\"lease_seconds\":" << duration << "}\n" << std::flush;
+    // Driver keepalive must continue while Windows applies a display mode.
+    std::atomic<bool> updating{true};
+    std::thread keepalive([&] {
+        while (updating.load()) {
+            parsec_vdd::VddUpdate(driver);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    });
+    Output temporary{};
+    bool mode_attempted = false;
+    int result = 0;
+    if (portrait) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
+        while (std::chrono::steady_clock::now() < deadline) {
+            std::vector<Output> added;
+            for (const auto& row : outputs()) {
+                if (!(row.flags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)) continue;
+                const bool was_active = std::any_of(initial.begin(), initial.end(), [&](const Output& old) {
+                    return old.name == row.name && (old.flags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP);
+                });
+                if (!was_active) added.push_back(row);
+            }
+            if (added.size() == 1 && added[0].has_mode
+                && added[0].description.find(L"Parsec") != std::wstring::npos
+                && !(added[0].flags & DISPLAY_DEVICE_PRIMARY_DEVICE)) { temporary = added[0]; break; }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (temporary.name.empty() || temporary.mode.dmDisplayOrientation != DMDO_DEFAULT) result = 7;
+        else {
+            auto desired = temporary.mode;
+            std::swap(desired.dmPelsWidth, desired.dmPelsHeight);
+            desired.dmDisplayOrientation = DMDO_90;
+            const auto primary = std::find_if(initial.begin(), initial.end(), [](const Output& row) {
+                return row.flags & DISPLAY_DEVICE_PRIMARY_DEVICE;
+            });
+            if (primary == initial.end() || !primary->has_mode) result = 7;
+            else {
+                desired.dmPosition.x = primary->mode.dmPosition.x - LONG(desired.dmPelsWidth);
+                desired.dmPosition.y = primary->mode.dmPosition.y;
+                desired.dmFields = DM_POSITION | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYORIENTATION;
+                const LONG tested = ChangeDisplaySettingsExW(temporary.name.c_str(), &desired, nullptr, CDS_TEST, nullptr);
+                std::cout << "{\"layout_test\":" << tested << "}\n" << std::flush;
+                if (tested != DISP_CHANGE_SUCCESSFUL) result = 7;
+                else {
+                    mode_attempted = true;
+                    const LONG applied = ChangeDisplaySettingsExW(temporary.name.c_str(), &desired, nullptr, 0, nullptr);
+                    std::cout << "{\"layout_apply\":" << applied << "}\n" << std::flush;
+                    if (applied != DISP_CHANGE_SUCCESSFUL) result = 7;
+                    snapshot("layout");
+                }
+            }
+        }
+    }
     const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(duration);
     auto next_snapshot = std::chrono::steady_clock::now();
-    while (std::chrono::steady_clock::now() < end) {
-        parsec_vdd::VddUpdate(driver);
+    while (!result && std::chrono::steady_clock::now() < end) {
         if (std::chrono::steady_clock::now() >= next_snapshot) {
             snapshot("leased");
             next_snapshot += std::chrono::seconds(2);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+    if (mode_attempted) {
+        // Restore only the newly added output, without persisting registry changes.
+        temporary.mode.dmFields = DM_POSITION | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYORIENTATION;
+        const LONG restored = ChangeDisplaySettingsExW(temporary.name.c_str(), &temporary.mode, nullptr, 0, nullptr);
+        std::cout << "{\"layout_restore\":" << restored << "}\n" << std::flush;
+        if (restored != DISP_CHANGE_SUCCESSFUL) result = 8;
+    }
+    updating.store(false); keepalive.join();
     parsec_vdd::VddRemoveDisplay(driver, index);
     parsec_vdd::CloseDeviceHandle(driver);
     std::cout << "{\"remove_requested_index\":" << index << "}\n" << std::flush;
     std::this_thread::sleep_for(std::chrono::seconds(3));
     snapshot("after");
-    return 0; // Caller must compare actual before/after topology, not this exit code.
+    return result; // Caller must compare actual before/after topology, not this exit code.
 }
