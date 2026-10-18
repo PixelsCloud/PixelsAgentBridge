@@ -106,9 +106,28 @@ checksum and every Debug binary before embedding them. The resulting
 WSS control and HTTPS Relay URLs by default; use `--control-url` and
 `--relay-url` to target another deployment. It uses the same `install.ps1` and
 `uninstall.ps1` as the ZIP, creates an all-users Start menu entry, and appears
-in Windows Installed Apps. It asks before enabling service-generated
-Ctrl+Alt+Delete when the machine policy does not already allow it. This Debug
+in Windows Installed Apps. It automatically enables service-generated
+Ctrl+Alt+Delete when the machine policy does not already allow it; inability to
+change this optional policy warns without blocking installation. This Debug
 installer is not code-signed.
+Windows installation and removal save separate per-attempt stage/error logs in
+`%ProgramData%\PixelsAgentBridge\logs\setup`, falling back to
+`%TEMP%\PixelsAgentBridge-InstallerLogs` if needed. PowerShell output is saved in
+an adjacent transcript. Successful retries preserve earlier failures. Lock
+initialization errors use the new coordinator when the legacy object is unusable.
+Interactive setup offers forced takeover of verified previous Pixels installers;
+unattended setup accepts `/S /FORCE`. Service stop/start requests and native
+commands have deadlines. See `windows/INSTALL-WINDOWS.txt` for encoding, UAC limits
+and retention. Run `python packaging/desktop/test_installer_diagnostics.py` on
+Windows with bundled NSIS to exercise real lock conflicts/failures, log fallback,
+PowerShell output and retry preservation using disposable fixtures. It also
+compiles the production NSIS script without running it or changing an installed
+application.
+From elevated Windows PowerShell 5.1, run
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/desktop/windows/test-installer-recovery.ps1`
+to verify policy preparation/denial, native argument preservation, forced
+termination of a real unresponsive disposable service and runtime process
+ownership. Only uniquely named test services and workspace fixtures are changed.
 For Windows integration testing, always deploy the complete Debug archive and
 run its `install.ps1`. Verify the archive checksum before installation, then
 check the installed service, session supervisor, and desktop app together.
@@ -143,8 +162,9 @@ the same deployment settings used by the desktop are loaded before MCP starts.
 Run `install.ps1` from an elevated PowerShell window with the
 WSS control URL, and HTTPS Relay URL. Installation starts the Executor as a
 LocalSystem Windows service and installs `run-app.ps1` as the single interface
-entry point. Windows policy `SoftwareSASGeneration` must allow services (value
-1 or 3); the installer checks this before replacing an existing installation.
+entry point. Windows policy `SoftwareSASGeneration` should allow services (value
+1 or 3) for remote Ctrl+Alt+Delete. The installer attempts to enable this policy;
+an unavailable policy does not prevent installation or upgrade.
 Run the installer again from an unpacked newer archive to upgrade. It stops
 the installed Executor and desktop processes before replacing their binaries,
 then restarts the Executor. Reopen the desktop with `run-app.ps1` afterward.

@@ -59,7 +59,8 @@ def package_windows():
         )),
         *(scripts / "windows" / name for name in (
             "install.ps1", "run-app.ps1", "launch-app.ps1",
-            "run-session-supervisor.ps1", "uninstall.ps1", "INSTALL-WINDOWS.txt", "THIRD-PARTY-NOTICES.txt"
+            "run-session-supervisor.ps1", "uninstall.ps1", "installer-logging.ps1",
+            "installer-recovery.ps1", "INSTALL-WINDOWS.txt", "THIRD-PARTY-NOTICES.txt"
         )),
     ]
     for file in files:
