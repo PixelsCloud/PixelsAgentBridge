@@ -217,6 +217,7 @@ try:
             round_number += 1
             round_start = time.monotonic()
             status = until(ready)
+            report['last_status'] = status
             assert status['opened']['config']['session_id'] == session and not status['input_enabled']
             assert status['decoder'] == 'd3d11_hardware'
             row = {'index': round_number, 'elapsed': round_start-start, 'passed': False}
@@ -251,6 +252,7 @@ try:
                 assert u.SetWindowPos(found[0], W.HWND(-1 if was_top else -2), 0, 0, 0, 0, 0x13)
             assert any(x['worker'] == 'capture' for x in row['remote']['processes'])
             status = until(ready)
+            report['last_status'] = status
             assert status['opened']['config']['session_id'] == session and not status['input_enabled']
             row['passed'] = True; save()
             print(json.dumps({'round': round_number, 'elapsed': time.monotonic()-start,

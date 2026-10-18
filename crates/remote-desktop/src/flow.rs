@@ -101,7 +101,15 @@ impl VideoFlow {
         while self.flights.front().is_some_and(|frame| frame.id <= id) {
             self.flights.pop_front();
         }
+        let first_presentation = self.acknowledged == 0;
         self.acknowledged = id;
+        if first_presentation {
+            // The first presentation includes viewer/decoder startup. Keep
+            // the bounded credit window during that wait, but do not treat
+            // this one-time delay as the steady-state consumer capacity.
+            // A slow peer will fill the window again and adapt normally.
+            self.credit_wait_since = None;
+        }
         let under_pressure = self.credit_wait_since.is_some_and(|since| {
             now.saturating_duration_since(since) > self.period.max(Duration::from_millis(100))
         });
@@ -153,6 +161,10 @@ mod tests {
         let start = Instant::now();
         let mut now = start;
         let mut flow = VideoFlow::new(30);
+        flow.begin_capture(now);
+        flow.begin_send(now).unwrap();
+        flow.acknowledge(1, now + Duration::from_millis(10)).unwrap();
+        now += flow.nominal_period;
         for _ in 0..4 {
             flow.begin_capture(now);
             flow.begin_send(now).unwrap();
@@ -160,7 +172,7 @@ mod tests {
         }
         assert!(flow.capture_at(now).is_none());
         now += Duration::from_millis(900);
-        flow.acknowledge(4, now).unwrap();
+        flow.acknowledge(5, now).unwrap();
         assert!(flow.capture_at(now).is_some());
         assert_eq!(flow.period, Duration::from_millis(225));
         let slow_period = flow.period;
@@ -172,6 +184,32 @@ mod tests {
             assert!(flow.period <= slow_period && flow.period >= flow.nominal_period);
         }
         assert_eq!(flow.period, flow.nominal_period);
+    }
+
+    #[test]
+    fn first_presentation_startup_does_not_throttle_but_subsequent_pressure_does() {
+        let start = Instant::now();
+        let mut flow = VideoFlow::new(15);
+        for n in 0..DESKTOP_MAX_IN_FLIGHT {
+            let now = start + flow.nominal_period * n as u32;
+            flow.begin_capture(now);
+            flow.begin_send(now).unwrap();
+        }
+        let full = start + flow.nominal_period * DESKTOP_MAX_IN_FLIGHT as u32;
+        assert!(flow.capture_at(full).is_none());
+        assert!(flow.begin_send(full).is_err());
+        let first = full + Duration::from_secs(2);
+        flow.acknowledge(1, first).unwrap();
+        assert!(flow.capture_at(first).unwrap() <= first);
+        assert_eq!(flow.period, flow.nominal_period);
+        flow.begin_capture(first);
+        flow.begin_send(first).unwrap();
+        assert!(flow.capture_at(first).is_none());
+        let second = first + Duration::from_secs(1);
+        flow.acknowledge(2, second).unwrap();
+        assert!(flow.capture_at(second).is_some());
+        assert!(flow.period > flow.nominal_period);
+        assert!(flow.flights.len() < DESKTOP_MAX_IN_FLIGHT as usize);
     }
 
     #[test]
