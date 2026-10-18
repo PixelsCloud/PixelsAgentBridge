@@ -89,11 +89,20 @@ def until(fn, seconds=20):
         time.sleep(.1)
 
 def ready():
-    s = ui('status')
-    if s is None:
+    trace = ui('trace')
+    if trace is None:
         return None
+    report['status_trace'] = trace
+    s = trace['current']
+    report['last_status'] = s
     assert not s.get('error'), s
     return s if s['phase'] == 'viewing' and s['frame_ready'] else None
+
+
+def unchanged_view_only(status, expected_session):
+    observed = status['opened']['config']['session_id']
+    assert observed == expected_session, f'Video session changed: {expected_session} -> {observed}'
+    assert not status['input_enabled'], 'Input enabled during view-only mixed test'
 
 def close_viewer():
     found = windows()
@@ -218,7 +227,7 @@ try:
             round_start = time.monotonic()
             status = until(ready)
             report['last_status'] = status
-            assert status['opened']['config']['session_id'] == session and not status['input_enabled']
+            unchanged_view_only(status, session)
             assert status['decoder'] == 'd3d11_hardware'
             row = {'index': round_number, 'elapsed': round_start-start, 'passed': False}
             row['remote_before'] = json.loads(ssh.run(client, password, remote_script, 10))
@@ -253,7 +262,7 @@ try:
             assert any(x['worker'] == 'capture' for x in row['remote']['processes'])
             status = until(ready)
             report['last_status'] = status
-            assert status['opened']['config']['session_id'] == session and not status['input_enabled']
+            unchanged_view_only(status, session)
             row['passed'] = True; save()
             print(json.dumps({'round': round_number, 'elapsed': time.monotonic()-start,
                               'actual_fps': row['presentation']['steady_fps']}), flush=True)

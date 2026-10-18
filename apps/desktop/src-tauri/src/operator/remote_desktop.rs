@@ -447,6 +447,15 @@ async fn run(
                 Ok(true) => continue,
                 Ok(false) => break,
                 Err(error) => {
+                    // Automatic recovery clears the UI error. Keep its cause
+                    // in the existing diagnostic log before replacing status.
+                    tracing::warn!(
+                        window = window.label(),
+                        renderer = error.renderer,
+                        recoverable = error.recoverable,
+                        error = %error.message,
+                        "remote desktop stream failed"
+                    );
                     if error.renderer && !software_decoder {
                         // Decode/render failure gets one software attempt in a
                         // fresh, view-only session. Network/auth failures never
