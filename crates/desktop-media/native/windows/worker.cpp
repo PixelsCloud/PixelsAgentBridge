@@ -316,7 +316,20 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
     presenter.input_available(interactive);
     presenter.initialize(device.Get(), width, height, fps, display.screen.DesktopCoordinates, true, verify, parent, rotation);
     write_value(magic);
-    if (streaming) { render_stream(decoder, presenter, fps, interactive); return; }
+    if (streaming) {
+        try { render_stream(decoder, presenter, fps, interactive); }
+        catch (const std::exception& error) {
+            // Preserve the same cause on the presentation pipe: either reader
+            // can observe process termination first.
+            const std::string message = std::string(error.what()).substr(0, 512);
+            try {
+                write_value(uint8_t(5)); write_value(uint16_t(message.size()));
+                write_bytes(message.data(), static_cast<uint32_t>(message.size()));
+            } catch (...) {} // A closed parent pipe must not replace the cause.
+            throw;
+        }
+        return;
+    }
     uint64_t expected = 0;
     while (true) {
         const auto size = read_value<uint32_t>(&presenter);
@@ -349,6 +362,9 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
     }
 }
 extern "C" int pab_media_main(int argc, const char* const* argv) {
+    const bool interactive_errors = argc >= 6 && std::string(argv[1]) == "render" &&
+        (std::string(argv[5]) == "interactive" || std::string(argv[5]) == "stream-interactive" ||
+         std::string(argv[5]) == "interactive-software" || std::string(argv[5]) == "stream-interactive-software");
     try {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         if (argc == 2 && std::string(argv[1]) == "cursor-win32-check") {
@@ -438,5 +454,20 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 mode == "interactive" || mode == "stream-interactive", streaming, software); return 0;
         }
         throw std::runtime_error("usage: stream-media inventory | capture SCREEN_ID FPS synthetic|desktop|animate | render WIDTH HEIGHT FPS normal|verify");
-    } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
+    } catch (const std::exception& e) {
+        if (interactive_errors) {
+            // stderr is the input event pipe in interactive mode. Plain text
+            // here used to become an invalid input packet, hiding the actual
+            // renderer failure behind a generic pipe-closed error.
+            const std::string message = std::string(e.what()).substr(0, 512);
+            const uint16_t length = static_cast<uint16_t>(message.size());
+            const uint8_t header[8]{7, uint8_t(length), uint8_t(length >> 8), 0, 0, 0, 0, 0};
+            DWORD written = 0;
+            if (WriteFile(GetStdHandle(STD_ERROR_HANDLE), header, sizeof(header), &written, nullptr) && written == sizeof(header))
+                WriteFile(GetStdHandle(STD_ERROR_HANDLE), message.data(), length, &written, nullptr);
+        } else {
+            std::cerr << e.what() << '\n';
+        }
+        return 1;
+    }
 }

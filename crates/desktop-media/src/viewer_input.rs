@@ -10,7 +10,7 @@ use std::{
     },
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::{ChildStderr, ChildStdin},
     sync::{Mutex, mpsc, watch},
 };
@@ -36,11 +36,21 @@ pub(crate) struct InputSink {
     index: AtomicU64,
     events: mpsc::Sender<Stamped>,
     movement: watch::Sender<Option<Stamped>>,
-    failure: watch::Sender<bool>,
+    failure: watch::Sender<Option<String>>,
 }
 impl InputSink {
     pub(crate) fn fail(&self) {
-        self.failure.send_replace(true);
+        self.fail_with("native input event pipe ended or overflowed".into());
+    }
+    fn fail_with(&self, message: String) {
+        self.failure.send_if_modified(|failure| {
+            if failure.is_some() {
+                false
+            } else {
+                *failure = Some(message);
+                true
+            }
+        });
     }
     pub(crate) fn emit(&self, packet: [u8; 8]) -> bool {
         let Some(event) = decode(packet) else {
@@ -54,7 +64,7 @@ impl InputSink {
             self.fail();
             return false;
         };
-        if *self.failure.borrow() || self.events.is_closed() || self.movement.is_closed() {
+        if self.failure.borrow().is_some() || self.events.is_closed() || self.movement.is_closed() {
             return false;
         }
         let stamped = (previous + 1, event);
@@ -69,7 +79,7 @@ impl InputSink {
     fn channel() -> (Arc<Self>, Inbox) {
         let (events, receive) = mpsc::channel(64);
         let (movement, moves) = watch::channel(None);
-        let (failure, failed) = watch::channel(false);
+        let (failure, failed) = watch::channel(None);
         (
             Arc::new(Self {
                 index: AtomicU64::new(0),
@@ -89,7 +99,7 @@ impl InputSink {
 struct Inbox {
     events: mpsc::Receiver<Stamped>,
     movement: watch::Receiver<Option<Stamped>>,
-    failed: watch::Receiver<bool>,
+    failed: watch::Receiver<Option<String>>,
     consumed: u64,
 }
 impl Drop for NativeViewerInput {
@@ -100,20 +110,9 @@ impl Drop for NativeViewerInput {
     }
 }
 impl NativeViewerInput {
-    pub(crate) fn new(input: Arc<Mutex<ChildStdin>>, mut pipe: ChildStderr) -> Self {
+    pub(crate) fn new(input: Arc<Mutex<ChildStdin>>, pipe: ChildStderr) -> Self {
         let (sink, inbox) = InputSink::channel();
-        let reader = tokio::spawn(async move {
-            loop {
-                let mut packet = [0; 8];
-                if pipe.read_exact(&mut packet).await.is_err() {
-                    break;
-                }
-                if !sink.emit(packet) {
-                    break;
-                }
-            }
-            sink.fail();
-        });
+        let reader = tokio::spawn(read_events(pipe, sink));
         Self {
             input: Control::Pipe(input),
             inbox,
@@ -178,13 +177,44 @@ impl NativeViewerInput {
         }
     }
 }
+async fn read_events(mut pipe: impl AsyncRead + Unpin, sink: Arc<InputSink>) {
+    loop {
+        let mut packet = [0; 8];
+        if pipe.read_exact(&mut packet).await.is_err() {
+            break;
+        }
+        if packet[0] == 7 {
+            // An interactive Windows worker uses stderr for binary events, so
+            // exceptions must be framed too. Never treat diagnostic bytes as
+            // keyboard input, and never allocate from an unbounded length.
+            let length = usize::from(u16::from_le_bytes([packet[1], packet[2]]));
+            if !(1..=512).contains(&length) || packet[3..].iter().any(|&v| v != 0) {
+                break;
+            }
+            let mut message = vec![0; length];
+            if let Ok(Ok(_)) = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                pipe.read_exact(&mut message),
+            )
+            .await
+            {
+                if let Ok(message) = String::from_utf8(message) {
+                    sink.fail_with(format!("native viewer failed: {message}"));
+                }
+            }
+            break;
+        }
+        if !sink.emit(packet) {
+            break;
+        }
+    }
+    sink.fail();
+}
 impl Inbox {
     async fn next_raw(&mut self) -> io::Result<Event> {
         loop {
-            if *self.failed.borrow() {
-                return Err(io::Error::other(
-                    "native input event pipe ended or overflowed",
-                ));
+            if let Some(message) = self.failed.borrow().as_ref() {
+                return Err(io::Error::other(message.clone()));
             }
             let stamped = tokio::select! {
                 biased;
@@ -214,6 +244,49 @@ impl Inbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn worker_failure_survives_eof_and_rejects_pending_input() {
+        let (mut writer, reader) = tokio::io::duplex(1024);
+        let (sink, mut inbox) = InputSink::channel();
+        let task = tokio::spawn(read_events(reader, sink));
+        writer.write_all(&[4, 0, 0, 0, 0, 65, 0, 1]).await.unwrap();
+        let message = b"Presentation statistics stalled";
+        writer
+            .write_all(&[7, message.len() as u8, 0, 0, 0, 0, 0, 0])
+            .await
+            .unwrap();
+        writer.write_all(message).await.unwrap();
+        drop(writer);
+        task.await.unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                inbox.next_raw().await.unwrap_err().to_string(),
+                "native viewer failed: Presentation statistics stalled"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn invalid_or_truncated_failure_packets_fail_without_delivering_input() {
+        for packet in [
+            vec![7, 0, 0, 0, 0, 0, 0, 0],
+            vec![7, 1, 2, 0, 0, 0, 0, 0], // Over 512 bytes.
+            vec![7, 1, 0, 1, 0, 0, 0, 0, b'x'],
+            vec![7, 2, 0, 0, 0, 0, 0, 0, b'x'],
+            vec![7, 1, 0, 0, 0, 0, 0, 0, 255], // Invalid UTF-8.
+        ] {
+            let (mut writer, reader) = tokio::io::duplex(1024);
+            let (sink, mut inbox) = InputSink::channel();
+            writer.write_all(&packet).await.unwrap();
+            drop(writer);
+            read_events(reader, sink).await;
+            assert_eq!(
+                inbox.next_raw().await.unwrap_err().to_string(),
+                "native input event pipe ended or overflowed"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn motion_bursts_preserve_releases_and_overflow_fails_closed() {
@@ -246,7 +319,7 @@ mod tests {
     async fn motion_channel_race_cannot_discard_key_release_or_mode_barrier() {
         let (events, receive) = mpsc::channel(4);
         let (moves, movement) = watch::channel(None);
-        let (_failure, failed) = watch::channel(false);
+        let (_failure, failed) = watch::channel(None);
         let mut inbox = Inbox {
             events: receive,
             movement,
