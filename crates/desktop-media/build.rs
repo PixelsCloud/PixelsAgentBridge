@@ -104,7 +104,7 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
-    // One translation unit; no nested parallel build or network downloads.
+    // Sequential native builds; no nested parallel build or network downloads.
     cc::Build::new()
         .cpp(true)
         .std("c++17")
@@ -115,7 +115,19 @@ fn main() {
         .define("UNICODE", None)
         .define("_UNICODE", None)
         .compile("pab_desktop_media");
+    // C++/WinRT requires C++20 with current MSVC. Keep it out of the worker TU.
+    cc::Build::new()
+        .cpp(true)
+        .std("c++20")
+        .include("native/windows")
+        .file("native/windows/wgc_capture.cpp")
+        .flag_if_supported("/EHsc")
+        .flag_if_supported("/permissive-")
+        .define("UNICODE", None)
+        .define("_UNICODE", None)
+        .compile("pab_desktop_wgc");
     for library in [
+        "windowsapp",
         "d3d11",
         "d3dcompiler",
         "dxgi",

@@ -4,6 +4,7 @@
 #include "pattern_window.h"
 #include "d3d_presenter.h"
 #include "software_codec.h"
+#include "wgc_capture.h"
 #include <d3d11_1.h>
 #include <shellscalingapi.h>
 #include <algorithm>
@@ -92,15 +93,35 @@ static bool idr(const std::vector<uint8_t>& bytes) {
     }
     return false;
 }
+static void validate_wgc_desktop(const Display& selected) {
+    // WGC is only a fallback on the same ordinary desktop. A lock, session
+    // switch or monitor change must still go through generation recovery.
+    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
+    if (!desktop) throw std::runtime_error("Active capture desktop unavailable");
+    std::wstring active;
+    try { active = desktop_name(desktop); } catch (...) { CloseDesktop(desktop); throw; }
+    CloseDesktop(desktop);
+    if (active != L"Default" || desktop_name(GetThreadDesktop(GetCurrentThreadId())) != active)
+        throw std::runtime_error("Capture desktop changed; renew generation");
+    for (const auto& current : displays()) if (screen_id(current) == screen_id(selected)) {
+        if (EqualRect(&selected.screen.DesktopCoordinates, &current.screen.DesktopCoordinates)
+            && current.screen.Rotation == selected.screen.Rotation
+            && current.screen.Monitor == selected.screen.Monitor) return;
+        break;
+    }
+    throw std::runtime_error("Screen changed; refresh generation");
+}
 static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder) {
     const bool synthetic = mode == "synthetic";
     if (!synthetic && mode != "desktop" && mode != "animate") throw std::runtime_error("Unknown source mode");
+    std::unique_ptr<WgcRuntime> wgc_runtime; // Released after the shared device.
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
         D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
         nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context), "Capture device");
     ComPtr<IDXGIOutputDuplication> duplication;
+    std::unique_ptr<WgcCapture> wgc;
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> target;
     ComPtr<ID3D11DeviceContext1> context1;
@@ -161,9 +182,26 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                     if (!PeekNamedPipe(GetStdHandle(STD_INPUT_HANDLE), nullptr, 0, nullptr, &available, nullptr))
                         throw std::runtime_error("Parent ended while waiting for desktop changes");
                     if (pattern) pattern->draw(context.Get(), index);
+                    if (wgc) {
+                        validate_wgc_desktop(display);
+                        texture = wgc->next(100);
+                        if (!texture) continue;
+                        // Do not encode a frame obtained across a desktop or
+                        // geometry transition during the bounded wait.
+                        validate_wgc_desktop(display);
+                        break;
+                    }
                     DXGI_OUTDUPL_FRAME_INFO info{}; ComPtr<IDXGIResource> resource;
                     const auto hr = duplication->AcquireNextFrame(100, &info, &resource);
                     if (hr == DXGI_ERROR_WAIT_TIMEOUT) continue;
+                    if (hr == DXGI_ERROR_ACCESS_LOST) {
+                        validate_wgc_desktop(display);
+                        duplication.Reset();
+                        wgc_runtime = std::make_unique<WgcRuntime>();
+                        wgc = std::make_unique<WgcCapture>(device.Get(), display, fps);
+                        std::cerr << "media capture=wgc_gpu readback_per_frame=0\n";
+                        continue;
+                    }
                     check(hr, "AcquireNextFrame");
                     if (!info.LastPresentTime.QuadPart || info.LastPresentTime.QuadPart == last_present) {
                         duplication->ReleaseFrame(); continue;
