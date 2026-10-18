@@ -38,6 +38,18 @@ python experiments/remote-desktop/build_dxgi_probe.py
 
 ## 构建约束
 
+持续观看/混合测试使用 `verify_windows_linux_mixed.py --seconds`，单次最长
+28800 秒。Linux 动态画面 fixture 可限时运行至 32400 秒，给部署和回收留出
+时间；远端服务回滚期限必须覆盖所选测试时长，不能只延长本机 driver。
+`windows_gpu_resources.py --profile <私有测试目录> --seconds <时长>` 每约
+30 秒读取该 Desktop 及子进程的 GPU 内存计数，独占创建结果文件，结束后退出。
+应在观看开始时启动；缺少计数、仅观察到 WebView 或关闭后的数据均不能证明
+活动视频显存稳定。现有控制台会话、真实呈现采样和资源清理要求仍然适用。
+
+Windows 呈现采样遇到帧编号倒退或采样循环异常时，先保存失败原因、已有帧编号
+及触发倒退的生成图案像素，再以失败退出；不保存完整桌面。每段报告独占创建，
+不会覆盖原失败样本，帧序与 >12 FPS 验收条件不变。
+
 Mac 实际产品窗口的合成画面观察工具及只含生成帧编号的可复核样本见
 [操作端显示验收](../../acceptance/remote-desktop-macos-operator-presentation-2026-10-17.md)。
 `analyze_macos_presentation.py` 可在本机离线复核；不会重写原始测试的通过/失败。

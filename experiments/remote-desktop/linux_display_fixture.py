@@ -26,7 +26,7 @@ def main():
     parser.add_argument('--seconds', type=int, default=180)
     parser.add_argument('--inhibit-idle', action='store_true', help='Temporary session idle inhibitor for a bounded long-run fixture')
     args = parser.parse_args()
-    assert 10 <= args.seconds <= 9000
+    assert 10 <= args.seconds <= 32400
     root = args.root.resolve(strict=True)
     assert root.parent == pathlib.Path('/tmp') and root.name.startswith('pab-linux-viewer-')
     assert root.stat().st_uid == os.getuid() and os.getuid() == 1000

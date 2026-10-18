@@ -26,7 +26,7 @@ p.add_argument('--ssh-helper', type=pathlib.Path, required=True)
 p.add_argument('--code', required=True)
 p.add_argument('--seconds', type=int, default=1800)
 a = p.parse_args()
-assert len(a.code) == 9 and a.code.isdecimal() and 60 <= a.seconds <= 7200
+assert len(a.code) == 9 and a.code.isdecimal() and 60 <= a.seconds <= 28800
 root = a.profile.resolve(strict=True)
 base = pathlib.Path(__file__).resolve().parent
 operation = json.loads((a.remote_run / 'operation.json').read_text())

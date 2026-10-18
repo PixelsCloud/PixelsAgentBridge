@@ -302,7 +302,10 @@ async fn authenticate(
                         });
                     }
                     Err(PabConnectionError::Timeout) => continue,
-                    Err(_) => break,
+                    Err(error) => {
+                        tracing::info!(%error, "authenticated device connection ended");
+                        break;
+                    }
                 },
             }
         }
