@@ -258,6 +258,10 @@ pub(super) async fn serve_registered(
             .await?
             .ok_or(LocalIpcError::Authentication)?,
     );
+    // Video control and compressed chunks are separate WebSocket messages.
+    // Do not let TCP coalesce a small message behind a delayed loopback ACK.
+    // This socket is dedicated to authenticated media, not the shared IPC.
+    socket.get_ref().set_nodelay(true)?;
     let id = NEXT_PROVIDER_ID.fetch_add(1, Ordering::Relaxed);
     let (sender, mut requests) = mpsc::channel(1);
     let _registration = Registration(id);
@@ -412,6 +416,9 @@ async fn serve_helper_socket_with_role(
     connect_auxiliary: bool,
     supervised: bool,
 ) -> Result<(), LocalIpcError> {
+    if let MaybeTlsStream::Plain(stream) = socket.get_ref() {
+        stream.set_nodelay(true)?;
+    }
     send_json(
         &mut socket,
         &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised,

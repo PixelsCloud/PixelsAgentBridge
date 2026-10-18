@@ -5,6 +5,7 @@ original layout in finally, and saves only generated fixture metadata. A 12-bit
 frame number and its complement are rendered in large black/white cells; a
 viewer-side sampler can reject occlusion/tearing instead of counting stale frames.
 """
+import argparse
 import json
 import os
 import pathlib
@@ -20,7 +21,13 @@ from gi.repository import Gio, GLib, Gtk
 
 
 def main():
-    root = pathlib.Path(sys.argv[1]).resolve(strict=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('root', type=pathlib.Path)
+    parser.add_argument('--seconds', type=int, default=180)
+    parser.add_argument('--inhibit-idle', action='store_true', help='Temporary session idle inhibitor for a bounded long-run fixture')
+    args = parser.parse_args()
+    assert 10 <= args.seconds <= 9000
+    root = args.root.resolve(strict=True)
     assert root.parent == pathlib.Path('/tmp') and root.name.startswith('pab-linux-viewer-')
     assert root.stat().st_uid == os.getuid() and os.getuid() == 1000
     os.umask(0o077)
@@ -60,7 +67,15 @@ def main():
     report = {'before_mode': current[0][0], 'test_mode': target[0],
               'persistent': False, 'dimensions': [1920, 1080]}
     window = None
+    idle_cookie = None
     try:
+        if args.inhibit_idle:
+            idle_cookie = bus.call_sync('org.gnome.SessionManager', '/org/gnome/SessionManager',
+                'org.gnome.SessionManager', 'Inhibit',
+                GLib.Variant('(susu)', ('pixels-remote-desktop-acceptance', 0,
+                    'Bounded generated remote desktop measurement', 8)),
+                GLib.VariantType('(u)'), Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+            report['temporary_idle_inhibitor'] = True
         apply(target[0])
         window = Gtk.Window(title='Pixels generated 1080p presentation fixture')
         area = Gtk.DrawingArea()
@@ -88,7 +103,7 @@ def main():
         def tick():
             counter[0] += 1
             area.queue_draw()
-            if (root / 'animation-stop').exists() or time.monotonic() - start > 180:
+            if (root / 'animation-stop').exists() or time.monotonic() - start > args.seconds:
                 Gtk.main_quit()
                 return False
             return True
@@ -124,6 +139,10 @@ def main():
             if m[6].get('is-current')] == [current[0][0]]
         (root / 'animation-result.json').write_text(json.dumps(report))
         print(json.dumps(report), flush=True)
+        if idle_cookie is not None:
+            bus.call_sync('org.gnome.SessionManager', '/org/gnome/SessionManager',
+                'org.gnome.SessionManager', 'Uninhibit', GLib.Variant('(u)', (idle_cookie,)),
+                None, Gio.DBusCallFlags.NONE, 5000, None)
     assert report['restored']
 
 

@@ -17,6 +17,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('profile', type=pathlib.Path)
     p.add_argument('--seconds', type=int, default=30)
+    p.add_argument('--output', type=pathlib.Path, help='Unique result path for repeated bounded samples')
     args = p.parse_args()
     assert 10 <= args.seconds <= 60
     owner = json.loads((args.profile / 'process.json').read_text())['pid']
@@ -133,7 +134,7 @@ def main():
               'warmup_seconds': 3, 'steady_fps': rate,
               'longest_presentation_gap_seconds': longest_gap, 'events': events,
               'passed': rate > 12 and invalid <= samples * .05 and samples/duration >= 30}
-    (args.profile/'presentation.json').write_text(json.dumps(report, indent=2))
+    (args.output or args.profile/'presentation.json').write_text(json.dumps(report, indent=2))
     print(json.dumps({k:v for k,v in report.items() if k != 'events'}), flush=True)
     assert report['passed'], 'Actual presentation threshold not met'
 
