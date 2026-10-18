@@ -25,6 +25,8 @@ p.add_argument('--remote-run', type=pathlib.Path, required=True)
 p.add_argument('--ssh-helper', type=pathlib.Path, required=True)
 p.add_argument('--code', required=True)
 p.add_argument('--seconds', type=int, default=1800)
+p.add_argument('--capture-method', choices=('window', 'desktop'), default='window',
+               help='desktop temporarily keeps this isolated viewer topmost and checks visible pixels')
 a = p.parse_args()
 assert len(a.code) == 9 and a.code.isdecimal() and 60 <= a.seconds <= 28800
 root = a.profile.resolve(strict=True)
@@ -39,6 +41,7 @@ spec = importlib.util.spec_from_file_location('private_ssh', a.ssh_helper.resolv
 ssh = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ssh)
 report = {'requested_seconds': a.seconds, 'device_code': a.code, 'rounds': [],
+          'capture_method': a.capture_method,
           'artifacts': {n: hashlib.sha256((root/n).read_bytes()).hexdigest() for n in ('pab-desktop.exe', 'pab-mcp.exe')},
           'remote_artifacts': operation['hashes']}
 result_path = root / 'mixed-result.json'
@@ -232,7 +235,11 @@ try:
         assert status['opened']['config']['screen']['pixel_width'] == 1920
         assert status['opened']['config']['screen']['pixel_height'] == 1080
         found = windows(); assert len(found) == 1
-        assert u.SetWindowPos(found[0], None, 20, 40, 720, 600, 0x14)
+        # Only our own bounded viewer becomes topmost. Closing it also removes
+        # that state; no other application's window or process is changed.
+        insert_after = W.HWND(-1) if a.capture_method == 'desktop' else None
+        flags = 0x10 if a.capture_method == 'desktop' else 0x14
+        assert u.SetWindowPos(found[0], insert_after, 20, 40, 720, 600, flags)
         report['session_id'] = session
         opened = tool(c, 'pab_open_terminal', {'device_code': a.code})
         terminal_id = opened['session_id']
@@ -255,7 +262,7 @@ try:
             sample_path = root / f'mixed-presentation-{round_number:03d}.json'
             with (root/f'mixed-presentation-{round_number:03d}.log').open('wb') as log:
                 sampler = subprocess.Popen([sys.executable, str(base/'windows_sample_presentation.py'),
-                    str(root), '--seconds', '10', '--capture-method', 'window', '--output', str(sample_path)], stdout=log, stderr=log,
+                    str(root), '--seconds', '10', '--capture-method', a.capture_method, '--output', str(sample_path)], stdout=log, stderr=log,
                     creationflags=subprocess.CREATE_NO_WINDOW)
             try:
                 row['upload'] = transfer(c, 'pab_upload_file', str(source), remote_file)

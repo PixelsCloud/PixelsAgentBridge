@@ -147,8 +147,11 @@ def main():
                 # No decoder-side callbacks or frame counters are consulted.
                 assert u.PrintWindow(surfaces[0], memory, 2), 'Owned window capture failed'
             else:
+                assert all(u.WindowFromPoint(W.POINT(x, y)) == surfaces[0] for x, y in points), 'Desktop sample occluded before capture'
                 assert g.BitBlt(memory, 0, 0, w, h, screen, left, top_y, 0x00CC0020 | 0x40000000)
             assert g.GdiFlush(), 'GDI flush failed'
+            if args.capture_method == 'desktop':
+                assert all(u.WindowFromPoint(W.POINT(x, y)) == surfaces[0] for x, y in points), 'Desktop sample occluded after capture'
             captured_at = time.perf_counter()
             capture_elapsed = captured_at - capture_started
             capture_calls += 1
