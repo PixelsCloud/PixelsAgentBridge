@@ -258,6 +258,8 @@ impl DesktopBackend for NativeBackend {
         Box::pin(async move {
             config.validate().map_err(media_error)?;
             let permit = self.gate.clone().lock_owned().await;
+            #[cfg(windows)]
+            let capture_token = RequestId::new().to_string();
             #[cfg(target_os = "linux")]
             let channel = if self.supports_cursor() && config.screen.id.starts_with("gnome:") {
                 Some(linux_cursor_channel::Channel::new().map_err(media_error)?)
@@ -274,6 +276,12 @@ impl DesktopBackend for NativeBackend {
                     "desktop".into()
                 },
             ];
+            #[cfg(windows)]
+            let args = {
+                let mut args = args;
+                args.push(capture_token.clone());
+                args
+            };
             #[cfg(target_os = "linux")]
             let args = {
                 let mut args = args;
@@ -318,6 +326,8 @@ impl DesktopBackend for NativeBackend {
             let capture = {
                 let lease = Arc::new(cursor::CaptureLease::new(
                     config,
+                    #[cfg(windows)]
+                    capture_token,
                     #[cfg(target_os = "linux")]
                     channel,
                 ));

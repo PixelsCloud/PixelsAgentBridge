@@ -14,6 +14,7 @@ struct CursorImage {
     }
 };
 static constexpr uint32_t max_cursor_bytes = 512 * 512 * 8;
+#include "win32_cursor.h"
 static CursorImage cursor_image(const DXGI_OUTDUPL_POINTER_SHAPE_INFO& shape,
     const std::vector<uint8_t>& raw) {
     const bool mono = shape.Type == DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME;
@@ -69,7 +70,7 @@ static int32_t cursor_coordinate(LONG origin, LONG top_left, uint32_t hotspot) {
     if (value < INT32_MIN || value > INT32_MAX) throw std::runtime_error("Cursor coordinate overflow");
     return int32_t(value);
 }
-static void cursor_worker(const Display& display) {
+static void cursor_worker(const Display& display, const std::string& capture_token = {}) {
     const auto expected_x = read_value<int32_t>(), expected_y = read_value<int32_t>();
     const auto expected_width = read_value<uint32_t>(), expected_height = read_value<uint32_t>();
     const auto expected_rotation = read_value<uint32_t>();
@@ -80,12 +81,19 @@ static void cursor_worker(const Display& display) {
     if (expected_x != rect.left || expected_y != rect.top || expected_width != uint32_t(rect.right-rect.left) ||
         expected_height != uint32_t(rect.bottom-rect.top) || expected_rotation != rotation)
         throw std::runtime_error("Cursor layout changed; refresh generation");
+    std::unique_ptr<CaptureEvents> coordination;
+    if (!capture_token.empty()) coordination = std::make_unique<CaptureEvents>(capture_token, false);
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
-    check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
-        &device, nullptr, &context), "Cursor device");
     ComPtr<IDXGIOutputDuplication> duplication;
-    check(display.output->DuplicateOutput(device.Get(), &duplication), "Cursor DuplicateOutput");
+    if (!coordination || !coordination->active()) {
+        check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
+            &device, nullptr, &context), "Cursor device");
+        const auto duplicated = display.output->DuplicateOutput(device.Get(), &duplication);
+        if (duplicated == DXGI_ERROR_ACCESS_LOST && coordination) {
+            validate_wgc_desktop(display); coordination->request();
+        } else check(duplicated, "Cursor DuplicateOutput");
+    }
     write_value(magic); write_value(uint32_t(1));
     CursorImage image;
     POINT top_left{};
@@ -93,6 +101,15 @@ static void cursor_worker(const Display& display) {
     int32_t x = 0, y = 0;
     bool visible = false, requested = false, dirty = false, initialized = false;
     auto next_poll = Clock::now();
+    bool win32 = false;
+    HCURSOR last_cursor = nullptr;
+    auto next_shape = Clock::now(), next_validation = Clock::now();
+    auto fallback_deadline = Clock::now() + std::chrono::seconds(5);
+    const auto request_fallback = [&] {
+        validate_wgc_desktop(display);
+        coordination->request(); duplication.Reset();
+        fallback_deadline = Clock::now() + std::chrono::seconds(5);
+    };
     while (true) {
         DWORD available = 0;
         if (!PeekNamedPipe(GetStdHandle(STD_INPUT_HANDLE), nullptr, 0, nullptr, &available, nullptr)) return;
@@ -105,9 +122,40 @@ static void cursor_worker(const Display& display) {
         // Bound native sampling without a busy loop on high-refresh desktops.
         std::this_thread::sleep_until(next_poll);
         next_poll = Clock::now() + std::chrono::milliseconds(8);
-        {
+        if (coordination && coordination->active()) {
+            if (!win32) {
+                validate_wgc_desktop(display); duplication.Reset();
+                win32 = true; dirty = true; initialized = false;
+            }
+            if (Clock::now() >= next_validation) {
+                validate_wgc_desktop(display);
+                next_validation = Clock::now() + std::chrono::milliseconds(100);
+            }
+            CURSORINFO info{}; info.cbSize = sizeof(info);
+            if (!GetCursorInfo(&info)) throw std::runtime_error("System cursor unavailable");
+            const bool next_visible = (info.flags & CURSOR_SHOWING) && info.hCursor && PtInRect(&rect, info.ptScreenPos);
+            dirty = dirty || !initialized || visible != next_visible;
+            visible = next_visible;
+            if (visible) {
+                if (last_cursor != info.hCursor || Clock::now() >= next_shape || !image.format) {
+                    auto next = win32_cursor_image(info.hCursor);
+                    if (!(image == next)) {
+                        if (image_id == UINT64_MAX) throw std::runtime_error("Cursor image sequence exhausted");
+                        image = std::move(next); ++image_id; dirty = true;
+                    }
+                    last_cursor = info.hCursor;
+                    next_shape = Clock::now() + std::chrono::milliseconds(100);
+                }
+                dirty = dirty || x != info.ptScreenPos.x || y != info.ptScreenPos.y;
+                x = info.ptScreenPos.x; y = info.ptScreenPos.y;
+            }
+            initialized = true;
+        } else if (duplication) {
             DXGI_OUTDUPL_FRAME_INFO info{}; ComPtr<IDXGIResource> resource;
             const auto hr = duplication->AcquireNextFrame(16, &info, &resource);
+            if (hr == DXGI_ERROR_ACCESS_LOST && coordination) {
+                request_fallback(); continue;
+            }
             if (hr != DXGI_ERROR_WAIT_TIMEOUT) {
                 check(hr, "Cursor AcquireNextFrame");
                 FrameLease lease{duplication.Get()};
@@ -146,6 +194,8 @@ static void cursor_worker(const Display& display) {
                 dirty = dirty || shape_changed;
                 initialized = true;
             }
+        } else if (Clock::now() >= fallback_deadline) {
+            throw std::runtime_error("Video capture fallback timed out");
         } // Always release the desktop lease before any potentially blocked pipe write.
         if (requested && dirty && initialized) {
             if (sequence == UINT64_MAX) throw std::runtime_error("Cursor sequence exhausted");

@@ -7,17 +7,22 @@ use tokio::sync::watch;
 pub(super) struct CaptureLease {
     config: DesktopVideoConfig,
     pub(super) ended: watch::Sender<bool>,
+    #[cfg(windows)]
+    capture_token: String,
     #[cfg(target_os = "linux")]
     pub(super) channel: Option<super::linux_cursor_channel::Channel>,
 }
 impl CaptureLease {
     pub(super) fn new(
         config: DesktopVideoConfig,
+        #[cfg(windows)] capture_token: String,
         #[cfg(target_os = "linux")] channel: Option<super::linux_cursor_channel::Channel>,
     ) -> Self {
         Self {
             config,
             ended: watch::channel(false).0,
+            #[cfg(windows)]
+            capture_token,
             #[cfg(target_os = "linux")]
             channel,
         }
@@ -47,6 +52,8 @@ pub(super) async fn open(
         .filter(|lease| lease.config == config && !*lease.ended.borrow())
         .ok_or(DesktopError::Closed)?;
     let stopped = lease.ended.subscribe();
+    #[cfg(windows)]
+    let capture_token = lease.capture_token.clone();
     #[cfg(target_os = "linux")]
     let channel = lease.channel.as_ref().map(|channel| channel.path.clone());
     // Do not hold a strong lease: dropping video must invalidate this cursor,
@@ -67,13 +74,13 @@ pub(super) async fn open(
         let mut stopped = stopped;
         let start = async {
             let permit = backend.cursor_gate.clone().lock_owned().await;
-            let mut process = MediaChild::spawn(
-                &backend.executable,
-                &backend.prefix,
-                &["cursor".into(), config.screen.id.clone()],
-                Some(permit),
-            )
-            .map_err(media_error)?;
+            #[allow(unused_mut)]
+            let mut args = vec!["cursor".into(), config.screen.id.clone()];
+            #[cfg(windows)]
+            args.push(capture_token);
+            let mut process =
+                MediaChild::spawn(&backend.executable, &backend.prefix, &args, Some(permit))
+                    .map_err(media_error)?;
             {
                 let mut input = process.input.lock().await;
                 input

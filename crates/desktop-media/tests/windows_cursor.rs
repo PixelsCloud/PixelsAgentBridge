@@ -46,6 +46,21 @@ fn generated_dxgi_shapes_preserve_masks_alpha_padding_and_hotspots() {
     );
 }
 
+#[test]
+fn generated_win32_shapes_match_os_compositing_and_capture_events_expire() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_pab-media-worker"))
+        .arg("cursor-win32-check")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout)
+        .starts_with("win32 cursor and capture event checks="));
+}
+
 #[tokio::test]
 #[ignore = "requires Windows interactive GPU desktop; only reads cursor metadata, no OS input"]
 async fn native_cursor_is_bound_to_video_and_reaps_while_retained() {

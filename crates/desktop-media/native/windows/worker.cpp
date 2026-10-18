@@ -5,6 +5,7 @@
 #include "d3d_presenter.h"
 #include "software_codec.h"
 #include "wgc_capture.h"
+#include "capture_events.h"
 #include <d3d11_1.h>
 #include <shellscalingapi.h>
 #include <algorithm>
@@ -84,8 +85,10 @@ static void inventory(const std::vector<Display>& found) {
 }
 #include "input_worker.h"
 #include "input_fixture.h"
+static void validate_wgc_desktop(const Display& selected);
 #include "cursor_worker.h"
 #include "cursor_fixture.h"
+#include "win32_cursor_fixture.h"
 #include "cursor_overlay_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
     for (size_t i = 0; i + 4 < bytes.size(); ++i) {
@@ -111,10 +114,13 @@ static void validate_wgc_desktop(const Display& selected) {
     }
     throw std::runtime_error("Screen changed; refresh generation");
 }
-static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder) {
+static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder,
+    const std::string& capture_token = {}) {
     const bool synthetic = mode == "synthetic";
     if (!synthetic && mode != "desktop" && mode != "animate") throw std::runtime_error("Unknown source mode");
     std::unique_ptr<WgcRuntime> wgc_runtime; // Released after the shared device.
+    std::unique_ptr<CaptureEvents> coordination;
+    if (!capture_token.empty()) coordination = std::make_unique<CaptureEvents>(capture_token, true);
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
@@ -154,13 +160,27 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         check(device->CreateRenderTargetView(texture.Get(), nullptr, &target), "Synthetic target");
     }
     CaptureEncoder encoder(device.Get(), width, height, fps, force_software, fail_encoder);
+    const auto switch_wgc = [&] {
+        if (wgc) return;
+        if (synthetic) throw std::runtime_error("Synthetic capture cannot change backend");
+        validate_wgc_desktop(display);
+        duplication.Reset();
+        wgc_runtime = std::make_unique<WgcRuntime>();
+        wgc = std::make_unique<WgcCapture>(device.Get(), display, fps);
+        if (coordination) coordination->activate();
+        std::cerr << "media capture=wgc_gpu readback_per_frame=0\n";
+    };
+    const auto coordinate = [&] {
+        if (coordination && coordination->requested()) switch_wgc();
+    };
     std::cerr << "media encoder=" << (encoder.software() ? "openh264_software readback_per_frame=1" : "nvenc_gpu readback_per_frame=0") << '\n';
     write_value(magic); write_value(width); write_value(height);
     const auto start = Clock::now(); auto next = start;
     uint64_t index = 0;
     LONGLONG last_present = 0;
     while (true) {
-        const auto command = read_value<uint8_t>();
+        // Cursor recovery must also work while video has no consumption credit.
+        const auto command = read_value<uint8_t>(nullptr, coordinate);
         if (command == 0) { if (mode != "desktop") encoder.report(); return; }
         if (command != 1) throw std::runtime_error("Invalid capture command");
         std::this_thread::sleep_until(next);
@@ -182,6 +202,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                     if (!PeekNamedPipe(GetStdHandle(STD_INPUT_HANDLE), nullptr, 0, nullptr, &available, nullptr))
                         throw std::runtime_error("Parent ended while waiting for desktop changes");
                     if (pattern) pattern->draw(context.Get(), index);
+                    coordinate();
                     if (wgc) {
                         validate_wgc_desktop(display);
                         texture = wgc->next(100);
@@ -195,11 +216,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                     const auto hr = duplication->AcquireNextFrame(100, &info, &resource);
                     if (hr == DXGI_ERROR_WAIT_TIMEOUT) continue;
                     if (hr == DXGI_ERROR_ACCESS_LOST) {
-                        validate_wgc_desktop(display);
-                        duplication.Reset();
-                        wgc_runtime = std::make_unique<WgcRuntime>();
-                        wgc = std::make_unique<WgcCapture>(device.Get(), display, fps);
-                        std::cerr << "media capture=wgc_gpu readback_per_frame=0\n";
+                        switch_wgc();
                         continue;
                     }
                     check(hr, "AcquireNextFrame");
@@ -334,6 +351,9 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
 extern "C" int pab_media_main(int argc, const char* const* argv) {
     try {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (argc == 2 && std::string(argv[1]) == "cursor-win32-check") {
+            win32_cursor_check(); return 0;
+        }
         if (argc == 2 && std::string(argv[1]) == "cursor-shape-check") {
             cursor_shape_check(); return 0;
         }
@@ -360,8 +380,10 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             for (const auto& d : found) if (screen_id(d) == argv[2]) { input_worker(d); return 0; }
             throw std::runtime_error("Selected input screen disappeared");
         }
-        if (argc == 3 && std::string(argv[1]) == "cursor") {
-            for (const auto& d : found) if (screen_id(d) == argv[2]) { cursor_worker(d); return 0; }
+        if ((argc == 3 || argc == 4) && std::string(argv[1]) == "cursor") {
+            for (const auto& d : found) if (screen_id(d) == argv[2]) {
+                cursor_worker(d, argc == 4 ? argv[3] : ""); return 0;
+            }
             throw std::runtime_error("Selected cursor screen disappeared");
         }
         if (argc == 2 && std::string(argv[1]) == "inventory") { inventory(found); return 0; }
@@ -379,14 +401,14 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             }
             return 0;
         }
-        if (argc == 5 && std::string(argv[1]) == "capture") {
+        if ((argc == 5 || argc == 6) && std::string(argv[1]) == "capture") {
             std::string mode(argv[4]);
             const bool fail_encoder = mode.size() > 13 && mode.compare(mode.size()-13,13,"-fail-encoder") == 0;
             if (fail_encoder) mode.resize(mode.size()-13);
             const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
             if (software) mode.resize(mode.size()-9);
             for (const auto& d : found) if (screen_id(d) == argv[2]) {
-                capture(d, number(argv[3],60),mode,software,fail_encoder); return 0;
+                capture(d, number(argv[3],60),mode,software,fail_encoder,argc == 6 ? argv[5] : ""); return 0;
             }
             throw std::runtime_error("Selected screen disappeared");
         }

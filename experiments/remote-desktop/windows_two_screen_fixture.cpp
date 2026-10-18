@@ -67,6 +67,7 @@ int main(int argc, char** argv) {
     if (screens.size()!=2) return 3;
     std::sort(screens.begin(),screens.end(),[](const Screen& a,const Screen& b){return a.monitor.rcMonitor.left<b.monitor.rcMonitor.left;});
     WNDCLASSW cls{}; cls.hInstance=GetModuleHandleW(nullptr); cls.lpfnWndProc=procedure;
+    cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);
     cls.lpszClassName=L"PixelsTwoScreenAcceptance";
     if (!RegisterClassW(&cls)) return 4;
     for (unsigned i=0;i<screens.size();++i) {
