@@ -3,6 +3,19 @@
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 
 namespace pab_mac {
+// A background capture is user-requested work even though its worker owns no
+// visible window. Keep App Nap from deferring it for this capture's lifetime;
+// this does not hold the display awake or prevent normal idle system sleep.
+class CaptureActivity {
+    id __strong token_;
+public:
+    CaptureActivity() : token_([NSProcessInfo.processInfo
+        beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
+        reason:@"Remote desktop capture"]) {}
+    ~CaptureActivity() { if (token_) [NSProcessInfo.processInfo endActivity:token_]; }
+    CaptureActivity(const CaptureActivity&) = delete;
+    CaptureActivity& operator=(const CaptureActivity&) = delete;
+};
 struct CaptureState {
     std::mutex mutex;
     OwnedCF<CVPixelBufferRef> latest;
@@ -66,6 +79,7 @@ inline void wait_completion(const std::shared_ptr<Completion>& state, const char
     throw std::runtime_error(std::string(operation) + " timed out");
 }
 class API_AVAILABLE(macos(12.3)) Capture {
+    CaptureActivity activity_;
     Display display_;
     std::shared_ptr<CaptureState> state_ = std::make_shared<CaptureState>();
     SCStream* __strong stream_ = nil;
