@@ -386,7 +386,10 @@ pub(super) async fn serve_helper_socket(
                         backend
                             .cursor(config)
                             .await
-                            .map_err(|_| LocalIpcError::Protocol)?,
+                            .map_err(|error| {
+                                tracing::warn!(%error, "native cursor source startup failed");
+                                LocalIpcError::Protocol
+                            })?,
                     );
                     Ok((CursorReply::Started, None))
                 }
@@ -396,7 +399,10 @@ pub(super) async fn serve_helper_socket(
                         .unwrap()
                         .next_update()
                         .await
-                        .map_err(|_| LocalIpcError::Protocol)?;
+                        .map_err(|error| {
+                            tracing::warn!(%error, "native cursor source update failed");
+                            LocalIpcError::Protocol
+                        })?;
                     let state = state.as_mut().ok_or(LocalIpcError::Protocol)?;
                     if state.size(&update.header)? != update.bytes.len() {
                         return Err(LocalIpcError::Protocol);

@@ -578,8 +578,8 @@ async fn stream(
         let cursor_source = if session.supports_cursor() {
             match session.open_cursor().await {
                 Ok(source) => Some(source),
-                Err(_) => {
-                    tracing::debug!("independent remote cursor unavailable for this generation");
+                Err(error) => {
+                    tracing::warn!(%error, "independent remote cursor unavailable for this generation");
                     None
                 }
             }
@@ -598,7 +598,8 @@ async fn stream(
                 loop {
                     let update = match source.next_update().await {
                         Ok(update) => update,
-                        Err(_) => {
+                        Err(error) => {
+                            tracing::warn!(%error, "independent remote cursor source ended");
                             // Remote cursor failure is independent of video and
                             // input. Erase its last image and leave the viewer.
                             tokio::time::timeout(Duration::from_secs(5), renderer.clear())

@@ -1,0 +1,2121 @@
+{
+  "stage": "service-90-a18cb76dfa8f",
+  "profile": "dual-screen-product-97d450f908e0",
+  "desktop_sha256": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+  "steps": [
+    {
+      "name": "open",
+      "time": 1792340510.006185,
+      "result": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "initial",
+      "time": 1792340512.486147,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "9b8960c4-3184-4b87-aac6-5882b7009364",
+            "generation": 1,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "portrait_ready",
+      "time": 1792340513.4566264,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "9b8960c4-3184-4b87-aac6-5882b7009364",
+            "generation": 2,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "portrait_picture",
+      "time": 1792340514.3521225,
+      "picture": {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340514310675700.png",
+        "colors": [
+          {
+            "x": 680,
+            "y": 258,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 969,
+            "y": 258,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 680,
+            "y": 773,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 969,
+            "y": 773,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 1650,
+        "client_height": 1032,
+        "capture_method": "owned-window"
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340519.2571428,
+      "fraction": [
+        0.25,
+        0.25
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 1650,
+        "client_height": 1032,
+        "local_x": 680,
+        "local_y": 258
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -540,
+        "cursor_y": 960,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -810,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": -810,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340523.372263,
+      "fraction": [
+        0.75,
+        0.25
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 1650,
+        "client_height": 1032,
+        "local_x": 969,
+        "local_y": 258
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -810,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": -810,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -272,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 2,
+            "ups": 2,
+            "last_x": -272,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340527.4935317,
+      "fraction": [
+        0.25,
+        0.75
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 1650,
+        "client_height": 1032,
+        "local_x": 680,
+        "local_y": 773
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -272,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 2,
+            "ups": 2,
+            "last_x": -272,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -810,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 3,
+            "ups": 3,
+            "last_x": -810,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340531.4959598,
+      "fraction": [
+        0.75,
+        0.75
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 1650,
+        "client_height": 1032,
+        "local_x": 969,
+        "local_y": 773
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -810,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 3,
+            "ups": 3,
+            "last_x": -810,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -272,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 4,
+            "ups": 4,
+            "last_x": -272,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "resize",
+      "time": 1792340531.6367815,
+      "result": {
+        "original_width": 1672,
+        "original_height": 1196,
+        "width": 960,
+        "height": 760
+      }
+    },
+    {
+      "name": "portrait_picture",
+      "time": 1792340533.3425713,
+      "picture": {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340533304104100.png",
+        "colors": [
+          {
+            "x": 385,
+            "y": 149,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 552,
+            "y": 149,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 385,
+            "y": 446,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 552,
+            "y": 446,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 938,
+        "client_height": 596,
+        "capture_method": "owned-window"
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340537.5291443,
+      "fraction": [
+        0.25,
+        0.25
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 938,
+        "client_height": 596,
+        "local_x": 385,
+        "local_y": 149
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -541,
+        "cursor_y": 961,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 4,
+            "ups": 4,
+            "last_x": -272,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -809,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 5,
+            "ups": 5,
+            "last_x": -809,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340541.669735,
+      "fraction": [
+        0.75,
+        0.25
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 938,
+        "client_height": 596,
+        "local_x": 552,
+        "local_y": 149
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -809,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 5,
+            "ups": 5,
+            "last_x": -809,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -270,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 6,
+            "ups": 6,
+            "last_x": -270,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340545.7288437,
+      "fraction": [
+        0.25,
+        0.75
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 938,
+        "client_height": 596,
+        "local_x": 385,
+        "local_y": 446
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -270,
+        "cursor_y": 480,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 6,
+            "ups": 6,
+            "last_x": -270,
+            "last_y": 480,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -809,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 7,
+            "ups": 7,
+            "last_x": -809,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792340549.8609576,
+      "fraction": [
+        0.75,
+        0.75
+      ],
+      "event": {
+        "submitted": true,
+        "client_width": 938,
+        "client_height": 596,
+        "local_x": 552,
+        "local_y": 446
+      },
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -809,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 7,
+            "ups": 7,
+            "last_x": -809,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -270,
+        "cursor_y": 1438,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 8,
+            "ups": 8,
+            "last_x": -270,
+            "last_y": 1438,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "cursor_pixels",
+      "time": 1792340560.2851126,
+      "result": {
+        "passed": true,
+        "observations": [
+          {
+            "bbox": [
+              33,
+              60,
+              37,
+              66
+            ],
+            "changed_pixels": 13
+          },
+          {
+            "bbox": [
+              67,
+              60,
+              70,
+              67
+            ],
+            "changed_pixels": 12
+          },
+          {
+            "bbox": null,
+            "changed_pixels": 0
+          }
+        ],
+        "expected_shift": 33.4
+      }
+    },
+    {
+      "name": "held_ctrl",
+      "time": 1792340562.395533,
+      "probe": {
+        "ctrl_held": true,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -541,
+        "cursor_y": 961,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 8,
+            "ups": 8,
+            "last_x": -270,
+            "last_y": 1438,
+            "ctrl_down": 1,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "primary_return",
+      "time": 1792340563.762329,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "9b8960c4-3184-4b87-aac6-5882b7009364",
+            "generation": 3,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "released",
+      "time": 1792340565.4791906,
+      "probe": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -541,
+        "cursor_y": 961,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 8,
+            "ups": 8,
+            "last_x": -270,
+            "last_y": 1438,
+            "ctrl_down": 1,
+            "ctrl_up": 1
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "passed",
+      "time": 1792340565.4797583,
+      "passed": true
+    }
+  ],
+  "restored": {
+    "service": "Running",
+    "restored": true,
+    "held_release_flags": 0,
+    "owned": [],
+    "tasks": [
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-fixture",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-foreman",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-helper",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-lease2",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-pattern",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-restore",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7f94ac0ebea4-twoscreen2",
+        "State": 3
+      }
+    ],
+    "errors": {}
+  },
+  "cleaned": true,
+  "fixture_last": {
+    "ctrl_held": false,
+    "left_held": false,
+    "cursor_known": true,
+    "cursor_flags": 1,
+    "cursor_shape": true,
+    "cursor_x": 960,
+    "cursor_y": 540,
+    "screens": [
+      {
+        "index": 0,
+        "visible": false,
+        "x": -1080,
+        "y": 0,
+        "width": 1080,
+        "height": 1920,
+        "clicks": 8,
+        "ups": 8,
+        "last_x": -270,
+        "last_y": 1438,
+        "ctrl_down": 1,
+        "ctrl_up": 1
+      },
+      {
+        "index": 1,
+        "visible": true,
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "clicks": 0,
+        "ups": 0,
+        "last_x": -1,
+        "last_y": -1,
+        "ctrl_down": 0,
+        "ctrl_up": 0
+      }
+    ]
+  },
+  "max_clicks": 8,
+  "layout_restore": [
+    {
+      "layout_restore": 0
+    },
+    {
+      "remove_requested_index": 0
+    }
+  ],
+  "layout_final": {
+    "phase": "after",
+    "outputs": [
+      {
+        "name": "\\\\.\\DISPLAY1",
+        "description": "NVIDIA GeForce RTX 4090",
+        "flags": 5,
+        "active": true,
+        "mode_known": true,
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY2",
+        "description": "NVIDIA GeForce RTX 4090",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY3",
+        "description": "NVIDIA GeForce RTX 4090",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY4",
+        "description": "NVIDIA GeForce RTX 4090",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY5",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY6",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY7",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY8",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY9",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY10",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY11",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY12",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY13",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY14",
+        "description": "GameViewer Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY47",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY48",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY49",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY50",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY51",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY52",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY53",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY54",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY55",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY56",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY57",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY58",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY59",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY60",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY61",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      },
+      {
+        "name": "\\\\.\\DISPLAY62",
+        "description": "Parsec Virtual Display Adapter",
+        "flags": 0,
+        "active": false,
+        "mode_known": false,
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0,
+        "rotation": 0
+      }
+    ]
+  },
+  "hashes": {
+    "lease2.stdout": "1f80cb99f130b6b4e695bb253720fd332599449bfa1e143723bb82724baf1f71",
+    "lease2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "twoscreen2.stdout": "99ffa7cb87c36a946d537b6530bed890b5b3f0ee16c0042183a55abf525d08a2",
+    "twoscreen2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "portrait-cursor-pixels.json": {
+    "samples": [
+      {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340550855633500.png",
+        "colors": [
+          {
+            "x": 385,
+            "y": 149,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 552,
+            "y": 149,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 385,
+            "y": 446,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 552,
+            "y": 446,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 938,
+        "client_height": 596,
+        "capture_method": "owned-window",
+        "requested": [
+          0.5,
+          0.5
+        ],
+        "fixture": {
+          "ctrl_held": false,
+          "left_held": false,
+          "cursor_known": true,
+          "cursor_flags": 1,
+          "cursor_shape": true,
+          "cursor_x": -541,
+          "cursor_y": 961,
+          "screens": [
+            {
+              "index": 0,
+              "visible": true,
+              "x": -1080,
+              "y": 0,
+              "width": 1080,
+              "height": 1920,
+              "clicks": 8,
+              "ups": 8,
+              "last_x": -270,
+              "last_y": 1438,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            },
+            {
+              "index": 1,
+              "visible": true,
+              "x": 0,
+              "y": 0,
+              "width": 1920,
+              "height": 1080,
+              "clicks": 0,
+              "ups": 0,
+              "last_x": -1,
+              "last_y": -1,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            }
+          ]
+        }
+      },
+      {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340553370256000.png",
+        "colors": [
+          {
+            "x": 385,
+            "y": 149,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 552,
+            "y": 149,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 385,
+            "y": 446,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 552,
+            "y": 446,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 938,
+        "client_height": 596,
+        "capture_method": "owned-window",
+        "requested": [
+          0.3,
+          0.3
+        ],
+        "fixture": {
+          "ctrl_held": false,
+          "left_held": false,
+          "cursor_known": true,
+          "cursor_flags": 1,
+          "cursor_shape": true,
+          "cursor_x": -757,
+          "cursor_y": 577,
+          "screens": [
+            {
+              "index": 0,
+              "visible": true,
+              "x": -1080,
+              "y": 0,
+              "width": 1080,
+              "height": 1920,
+              "clicks": 8,
+              "ups": 8,
+              "last_x": -270,
+              "last_y": 1438,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            },
+            {
+              "index": 1,
+              "visible": true,
+              "x": 0,
+              "y": 0,
+              "width": 1920,
+              "height": 1080,
+              "clicks": 0,
+              "ups": 0,
+              "last_x": -1,
+              "last_y": -1,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            }
+          ]
+        }
+      },
+      {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340555990336200.png",
+        "colors": [
+          {
+            "x": 385,
+            "y": 149,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 552,
+            "y": 149,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 385,
+            "y": 446,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 552,
+            "y": 446,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 938,
+        "client_height": 596,
+        "capture_method": "owned-window",
+        "requested": [
+          0.4,
+          0.3
+        ],
+        "fixture": {
+          "ctrl_held": false,
+          "left_held": false,
+          "cursor_known": true,
+          "cursor_flags": 1,
+          "cursor_shape": true,
+          "cursor_x": -648,
+          "cursor_y": 577,
+          "screens": [
+            {
+              "index": 0,
+              "visible": true,
+              "x": -1080,
+              "y": 0,
+              "width": 1080,
+              "height": 1920,
+              "clicks": 8,
+              "ups": 8,
+              "last_x": -270,
+              "last_y": 1438,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            },
+            {
+              "index": 1,
+              "visible": true,
+              "x": 0,
+              "y": 0,
+              "width": 1920,
+              "height": 1080,
+              "clicks": 0,
+              "ups": 0,
+              "last_x": -1,
+              "last_y": -1,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            }
+          ]
+        }
+      },
+      {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-97d450f908e0\\portrait-window-1792340558554564600.png",
+        "colors": [
+          {
+            "x": 385,
+            "y": 149,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 552,
+            "y": 149,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 385,
+            "y": 446,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 552,
+            "y": 446,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 938,
+        "client_height": 596,
+        "capture_method": "owned-window",
+        "requested": [
+          0.5,
+          0.5
+        ],
+        "fixture": {
+          "ctrl_held": false,
+          "left_held": false,
+          "cursor_known": true,
+          "cursor_flags": 1,
+          "cursor_shape": true,
+          "cursor_x": -541,
+          "cursor_y": 961,
+          "screens": [
+            {
+              "index": 0,
+              "visible": true,
+              "x": -1080,
+              "y": 0,
+              "width": 1080,
+              "height": 1920,
+              "clicks": 8,
+              "ups": 8,
+              "last_x": -270,
+              "last_y": 1438,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            },
+            {
+              "index": 1,
+              "visible": true,
+              "x": 0,
+              "y": 0,
+              "width": 1920,
+              "height": 1080,
+              "clicks": 0,
+              "ups": 0,
+              "last_x": -1,
+              "last_y": -1,
+              "ctrl_down": 0,
+              "ctrl_up": 0
+            }
+          ]
+        }
+      }
+    ],
+    "roi": [
+      368,
+      119,
+      462,
+      268
+    ],
+    "observations": [
+      {
+        "bbox": [
+          33,
+          60,
+          37,
+          66
+        ],
+        "changed_pixels": 13
+      },
+      {
+        "bbox": [
+          67,
+          60,
+          70,
+          67
+        ],
+        "changed_pixels": 12
+      },
+      {
+        "bbox": null,
+        "changed_pixels": 0
+      }
+    ],
+    "expected_shift": 33.4,
+    "passed": true
+  },
+  "date_local": "2026-10-19",
+  "base": "5f4e3f3 plus cursor error logging",
+  "manifest": {
+    "pab-executor.exe": "252223ac81648750057610a66d8df12dafc479f3bde1b02755bacbed44e9f009",
+    "pab-desktop.exe": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+    "pab-media-worker.exe": "467cb4d071552f6f80317bd1ef27df9538632aaa35169f255e2023d21b40fb82"
+  },
+  "proxy_crash": {
+    "old_processes": [
+      {
+        "ProcessId": 6880,
+        "ParentProcessId": 1876,
+        "SessionId": 2,
+        "CreationDate": "/Date(1792340583235)/"
+      },
+      {
+        "ProcessId": 26968,
+        "ParentProcessId": 6880,
+        "SessionId": 2,
+        "CreationDate": "/Date(1792340583253)/"
+      }
+    ],
+    "old_processes_reaped": true,
+    "terminated_only_proxy": true
+  },
+  "proxy_recovery": {
+    "phase": "viewing",
+    "error": null,
+    "opened": {
+      "config": {
+        "session_id": "a33f6e67-b3ea-4f8d-92c1-837b62d0be49",
+        "generation": 1,
+        "screen": {
+          "id": "0:81493:\\\\.\\DISPLAY1",
+          "name": "\\\\.\\DISPLAY1",
+          "x": 0,
+          "y": 0,
+          "desktop_width": 1920,
+          "desktop_height": 1080,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "scale_milli": 1000,
+          "rotation": "identity",
+          "primary": true
+        },
+        "codec": "h264_annex_b",
+        "color": "bt709_limited",
+        "fps": 15
+      },
+      "screens": [
+        {
+          "id": "0:81493:\\\\.\\DISPLAY1",
+          "name": "\\\\.\\DISPLAY1",
+          "x": 0,
+          "y": 0,
+          "desktop_width": 1920,
+          "desktop_height": 1080,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "scale_milli": 1000,
+          "rotation": "identity",
+          "primary": true
+        },
+        {
+          "id": "0:81493:\\\\.\\DISPLAY47",
+          "name": "\\\\.\\DISPLAY47",
+          "x": -1080,
+          "y": 0,
+          "desktop_width": 1080,
+          "desktop_height": 1920,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "scale_milli": 1000,
+          "rotation": "clockwise90",
+          "primary": false
+        }
+      ],
+      "heartbeat_ms": 5000,
+      "lease_ms": 15000,
+      "input_supported": true
+    },
+    "input_ready": true,
+    "frame_ready": true,
+    "input_enabled": false,
+    "decoder": "d3d11_hardware"
+  },
+  "local_driver_exit": 0,
+  "steps_exit": 0,
+  "result": "PASS for bounded portrait/window/cursor/input/recovery round",
+  "notes": [
+    "Only current desktop-check/debug binaries staged; local and remote Desktop hashes match.",
+    "Earlier source absence used obsolete Executor without cursor capability; its evidence remains in artifact audit.",
+    "Eight exact down/up pairs on portrait, primary zero clicks, maximum coordinate error 2 pixels.",
+    "Cursor pixel changes 13 and 12 at the two positions; shift 34 pixels against expected 33.4. Moving out of ROI leaves zero stale pixels.",
+    "Ctrl held before screen switch, released afterward; new generation read-only.",
+    "Only capture proxy terminated; both old process IDs disappeared and new session returned read-only with ready video/input.",
+    "This static fixture round does not measure dynamic FPS, long stability, mixed DPI, non-admin user or additional platform combinations."
+  ]
+}
