@@ -1,6 +1,7 @@
 """Sample generated frame codes from an owned, visible native viewer surface.
 
-Reads the desktop compositor through a small GDI rectangle, not decoder events.
+Reads either the desktop compositor or the owned window's composed content,
+not decoder events. Window capture permits unrelated windows to cover the viewer.
 Only generated frame-code pixels, IDs and times are saved. Requires the generated 1080p pattern from
 linux_display_fixture.py or macos_display_fixture.m; rejects invalid
 complementary cells and backwards frame IDs.
@@ -18,6 +19,7 @@ def main():
     p.add_argument('profile', type=pathlib.Path)
     p.add_argument('--seconds', type=int, default=30)
     p.add_argument('--output', type=pathlib.Path, help='Unique result path for repeated bounded samples')
+    p.add_argument('--capture-method', choices=('desktop', 'window'), default='desktop')
     args = p.parse_args()
     assert 10 <= args.seconds <= 60
     result_path = args.output or args.profile / 'presentation.json'
@@ -36,6 +38,9 @@ def main():
     fn(u, 'GetClassNameW', C.c_int, W.HWND, W.LPWSTR, C.c_int)
     fn(u, 'GetWindowRect', W.BOOL, W.HWND, C.POINTER(W.RECT))
     fn(u, 'IsWindowVisible', W.BOOL, W.HWND)
+    fn(u, 'GetAncestor', W.HWND, W.HWND, W.UINT)
+    fn(u, 'IsIconic', W.BOOL, W.HWND)
+    fn(u, 'PrintWindow', W.BOOL, W.HWND, W.HDC, W.UINT)
     fn(u, 'GetDC', W.HDC, W.HWND)
     fn(u, 'ReleaseDC', C.c_int, W.HWND, W.HDC)
     fn(g, 'CreateCompatibleDC', W.HDC, W.HDC)
@@ -62,6 +67,10 @@ def main():
         return True
     u.EnumWindows(top, 0)
     assert len(surfaces) == 1 and u.IsWindowVisible(surfaces[0])
+    surface_pid = W.DWORD(); u.GetWindowThreadProcessId(surfaces[0], C.byref(surface_pid))
+    parent_window = u.GetAncestor(surfaces[0], 2)
+    parent_pid = W.DWORD(); u.GetWindowThreadProcessId(parent_window, C.byref(parent_pid))
+    assert parent_pid.value == owner
     bounds = W.RECT(); assert u.GetWindowRect(surfaces[0], C.byref(bounds))
     width, height = bounds.right - bounds.left, bounds.bottom - bounds.top
     scale = min(width / 1920, height / 1080)
@@ -83,6 +92,8 @@ def main():
         return hits
     left, top_y = min(x for x, y in points), min(y for x, y in points)
     w, h = max(x for x, y in points) - left + 1, max(y for x, y in points) - top_y + 1
+    if args.capture_method == 'window':
+        left, top_y, w, h = bounds.left, bounds.top, width, height
 
     class Header(C.Structure):
         _fields_ = [('size', W.DWORD), ('width', W.LONG), ('height', W.LONG),
@@ -108,9 +119,17 @@ def main():
     start = time.perf_counter(); next_sample = start; last = None
     try:
         while time.perf_counter() - start < args.seconds:
+            current_pid = W.DWORD(); u.GetWindowThreadProcessId(surfaces[0], C.byref(current_pid))
+            assert current_pid.value == surface_pid.value and u.GetAncestor(surfaces[0], 2) == parent_window, 'Native surface ownership changed'
             fresh = W.RECT(); assert u.GetWindowRect(surfaces[0], C.byref(fresh))
             assert bytes(fresh) == bytes(bounds), 'Viewer moved during measurement'
-            assert g.BitBlt(memory, 0, 0, w, h, screen, left, top_y, 0x00CC0020 | 0x40000000)
+            assert u.IsWindowVisible(surfaces[0]) and not u.IsIconic(u.GetAncestor(surfaces[0], 2)), 'Viewer hidden or minimized'
+            if args.capture_method == 'window':
+                # PW_RENDERFULLCONTENT captures this HWND's composed image.
+                # No decoder-side callbacks or frame counters are consulted.
+                assert u.PrintWindow(surfaces[0], memory, 2), 'Owned window capture failed'
+            else:
+                assert g.BitBlt(memory, 0, 0, w, h, screen, left, top_y, 0x00CC0020 | 0x40000000)
             assert g.GdiFlush(), 'GDI flush failed'
             values = []
             for offset in offsets:
@@ -155,10 +174,12 @@ def main():
     rate = len(steady) / (duration - 3) if duration > 3 else 0
     times = [min(3, duration)] + [e[0] for e in steady] + [duration]
     longest_gap = max(b-a for a, b in zip(times, times[1:]))
-    report = {'method': 'actual composed native surface, 12-bit generated frame code with complement',
+    report = {'method': ('desktop-visible pixels' if args.capture_method == 'desktop' else 'owned native window composed pixels') + ', 12-bit generated frame code with complement',
+              'capture_method': args.capture_method,
               'started_unix_ms': started_unix_ms, 'finished_unix_ms': round(time.time() * 1000),
               'source_dimensions': [1920,1080], 'surface_dimensions': [width,height],
               'surface_hwnd': surfaces[0], 'desktop_pid': owner,
+              'surface_pid': surface_pid.value, 'parent_hwnd': parent_window,
               'surface_screen_bounds': [bounds.left,bounds.top,bounds.right,bounds.bottom],
               'sample_points': points, 'first_invalid_sample': first_invalid,
               'first_nonmonotonic_sample': first_nonmonotonic,

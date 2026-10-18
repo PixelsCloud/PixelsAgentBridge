@@ -252,12 +252,10 @@ try:
             report['rounds'].append(row); save()
             # Sample actual presentations WHILE old business runs, not afterwards.
             found = windows(); assert len(found) == 1
-            was_top = bool(u.GetWindowLongW(found[0], -20) & 8)
-            assert u.SetWindowPos(found[0], W.HWND(-1), 0, 0, 0, 0, 0x13)
             sample_path = root / f'mixed-presentation-{round_number:03d}.json'
             with (root/f'mixed-presentation-{round_number:03d}.log').open('wb') as log:
                 sampler = subprocess.Popen([sys.executable, str(base/'windows_sample_presentation.py'),
-                    str(root), '--seconds', '10', '--output', str(sample_path)], stdout=log, stderr=log,
+                    str(root), '--seconds', '10', '--capture-method', 'window', '--output', str(sample_path)], stdout=log, stderr=log,
                     creationflags=subprocess.CREATE_NO_WINDOW)
             try:
                 row['upload'] = transfer(c, 'pab_upload_file', str(source), remote_file)
@@ -277,7 +275,6 @@ try:
             finally:
                 if sampler.poll() is None:
                     sampler.terminate(); sampler.wait(timeout=5)
-                assert u.SetWindowPos(found[0], W.HWND(-1 if was_top else -2), 0, 0, 0, 0, 0x13)
             assert any(x['worker'] == 'capture' for x in row['remote']['processes'])
             status = until(ready)
             report['last_status'] = status
