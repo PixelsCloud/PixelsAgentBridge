@@ -86,6 +86,7 @@ def main():
     pixels = (C.c_ubyte * (w*h*4)).from_address(bits.value)
     offsets = [((y-top_y)*w+x-left)*4 for x, y in points]
     events, invalid, samples, repeated = [], 0, 0, 0
+    first_invalid = None
     start = time.perf_counter(); next_sample = start; last = None
     try:
         while time.perf_counter() - start < args.seconds:
@@ -106,7 +107,12 @@ def main():
                     if last is not None: assert 0 < (number-last) % 4096 < 2048, 'Nonmonotonic presentation'
                     events.append([time.perf_counter()-start, number]); last = number
                 else: repeated += 1
-            else: invalid += 1
+            else:
+                invalid += 1
+                if first_invalid is None:
+                    first_invalid = {'elapsed': time.perf_counter()-start,
+                                     'bits': values,
+                                     'bgr': [list(pixels[offset:offset+3]) for offset in offsets]}
             next_sample += 1/60
             time.sleep(max(0, next_sample-time.perf_counter()))
     finally:
@@ -120,6 +126,8 @@ def main():
     longest_gap = max(b-a for a, b in zip(times, times[1:]))
     report = {'method': 'actual composed native surface, 12-bit generated frame code with complement',
               'source_dimensions': [1920,1080], 'surface_dimensions': [width,height],
+              'surface_screen_bounds': [bounds.left,bounds.top,bounds.right,bounds.bottom],
+              'sample_points': points, 'first_invalid_sample': first_invalid,
               'seconds': duration, 'samples': samples, 'invalid_samples': invalid,
               'repeated_samples': repeated, 'unique_presentations': len(events),
               'warmup_seconds': 3, 'steady_fps': rate,
