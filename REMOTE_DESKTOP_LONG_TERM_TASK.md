@@ -16,6 +16,13 @@ helper。新增原始 QUIC 消息检查覆盖重复/跳号、过期代次、不�
 操作登录或改变权限。详见 [输入验证与剩余工作报告](acceptance/remote-desktop-input-audit-2026-10-18.md)。
 下文各轮“9 条关闭”等数字为当轮历史状态，保留原记录。
 
+最新 Linux 无障碍定位：正式 Desktop 四轮隔离复现确认 AT-SPI 缓存访问已销毁
+按钮的 GtkButtonAccessible，widget 与状态集合均为 NULL。无远程连接、未构造
+Presenter 的自有按钮销毁对照也复现同一告警。普通窗口、画面嵌入和八次重挂载
+对照没有触发该告警；不据此修改媒体生命周期。已保存复现工具及调用栈，产品中
+具体销毁/缓存时序及处置仍待完成，关闭数不变。见
+[Linux 无障碍定位](acceptance/remote-desktop-linux-accessibility-2026-10-18.md)。
+
 最新 Linux 锁屏启动修复：旧版立即锁屏的 `Display did not wake` 已再次复现。
 增加有界唤醒重试与 Mutter 即时电源恢复；定向“首次点亮后再关屏”约 1.19 秒
 恢复，视频/光标及资源回收通过。11 项隔离 D-Bus 检查、25 项媒体单测、完整
