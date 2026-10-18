@@ -1,5 +1,10 @@
 #pragma once
 #include "presenter.h"
+#include "accessibility.h"
+
+extern "C" bool pab_linux_accessibility_initialize() noexcept {
+    return pab_linux::accessibility::initialize();
+}
 
 // Private in-process ABI. The host obtains its GtkWindow on the GTK main
 // thread; raw pointers are never accepted over IPC or from a webview.

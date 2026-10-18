@@ -25,7 +25,19 @@ use tokio::{
 type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type MainThreadDispatch =
     Arc<dyn Fn(Box<dyn FnOnce() + Send>) -> Result<(), String> + Send + Sync>;
+
+/// Repair the affected GTK 3 button accessibility state callback, if needed.
+/// Returns whether the process-local compatibility override is installed.
+///
+/// # Safety
+/// Call on the GUI main thread before constructing GTK widgets or starting
+/// other threads that use GTK. Subsequent calls must remain on that thread.
+pub unsafe fn initialize_linux_accessibility() -> bool {
+    // SAFETY: the caller guarantees initialization precedes concurrent GTK use.
+    unsafe { pab_linux_accessibility_initialize() }
+}
 unsafe extern "C" {
+    fn pab_linux_accessibility_initialize() -> bool;
     fn pab_linux_view_new(
         host: *mut c_void,
         width: u32,

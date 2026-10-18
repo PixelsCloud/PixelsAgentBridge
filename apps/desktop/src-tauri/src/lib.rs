@@ -377,6 +377,13 @@ pub fn run() {
             return;
         }
     };
+    #[cfg(target_os = "linux")]
+    {
+        // The GUI entry point runs on the main thread, before Tauri creates
+        // any GTK windows. Media/session helper entry points do not use this.
+        let installed = unsafe { pab_desktop_media::initialize_linux_accessibility() };
+        tracing::debug!(installed, "checked GTK button accessibility compatibility");
+    }
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     let context = {

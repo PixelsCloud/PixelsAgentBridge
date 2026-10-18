@@ -4,7 +4,9 @@ mod input;
 #[cfg(target_os = "linux")]
 mod linux_view;
 #[cfg(target_os = "linux")]
-pub use linux_view::{LinuxCursorRenderer, LinuxNativeViewer, MainThreadDispatch};
+pub use linux_view::{
+    LinuxCursorRenderer, LinuxNativeViewer, MainThreadDispatch, initialize_linux_accessibility,
+};
 #[cfg(windows)]
 mod cursor_renderer;
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]

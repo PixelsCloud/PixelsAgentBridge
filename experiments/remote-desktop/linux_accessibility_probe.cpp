@@ -7,13 +7,59 @@
 
 using namespace pab_linux;
 int main(int argc, char** argv) {
-    if (argc != 2 || (std::string(argv[1]) != "baseline" && std::string(argv[1]) != "host" && std::string(argv[1]) != "cycle" && std::string(argv[1]) != "retired-button")) return 2;
+    std::string guarded_mode;
+    if (argc == 2 && std::string(argv[1]).find("guard-") == 0) {
+        const bool installed = pab_linux_accessibility_initialize();
+        printf("{\"compatibility_installed\":%s}\n", installed ? "true" : "false");
+        guarded_mode = std::string(argv[1]).substr(6);
+        argv[1] = guarded_mode.data();
+    }
+    if (argc != 2 || (std::string(argv[1]) != "baseline" && std::string(argv[1]) != "host" && std::string(argv[1]) != "cycle" && std::string(argv[1]) != "retired-button"
+        && std::string(argv[1]) != "visible-first" && std::string(argv[1]) != "configured-first"
+        && std::string(argv[1]) != "header-late" && std::string(argv[1]) != "header-ready")) return 2;
     if (!gtk_init_check(nullptr, nullptr)) return 3;
     auto* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     g_object_ref_sink(window);
     gtk_window_set_title(GTK_WINDOW(window), "Pixels accessibility diagnostic");
     gtk_window_set_default_size(GTK_WINDOW(window), 640, 400);
+    // Match the decoration/visibility order used by the Linux window builder.
+    // No retained accessibility reference or explicit widget destruction here.
+    if (std::string(argv[1]) == "visible-first") {
+        gtk_widget_show(window);
+        gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+    } else if (std::string(argv[1]) == "configured-first") {
+        gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+        gtk_widget_show(window);
+    }
     auto* root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    std::vector<AtkObject*> header_accessibles;
+    const bool header_late = std::string(argv[1]) == "header-late";
+    const bool header_ready = std::string(argv[1]) == "header-ready";
+    if (header_late || header_ready) {
+        if (header_ready) gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+        auto* header = gtk_header_bar_new();
+        gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header), TRUE);
+        gtk_header_bar_set_decoration_layout(GTK_HEADER_BAR(header),
+            gtk_window_get_resizable(GTK_WINDOW(window)) ? "menu:minimize,maximize,close" : "menu:minimize,close");
+        auto* box = gtk_event_box_new();
+        gtk_container_add(GTK_CONTAINER(box), header);
+        gtk_window_set_titlebar(GTK_WINDOW(window), box);
+        // Retain the same button accessibility references an AT-SPI cache can
+        // hold during initialization, without changing button lifetime.
+        std::vector<GtkWidget*> queue{header};
+        while (!queue.empty()) {
+            auto* widget = queue.back(); queue.pop_back();
+            if (GTK_IS_BUTTON(widget)) header_accessibles.push_back(ATK_OBJECT(g_object_ref(gtk_widget_get_accessible(widget))));
+            if (GTK_IS_CONTAINER(widget)) gtk_container_forall(GTK_CONTAINER(widget), +[](GtkWidget* child, gpointer data) {
+                static_cast<std::vector<GtkWidget*>*>(data)->push_back(child);
+            }, &queue);
+        }
+        g_signal_connect(window, "notify::resizable", G_CALLBACK(+[](GObject* object, GParamSpec*, gpointer data) {
+            gtk_header_bar_set_decoration_layout(GTK_HEADER_BAR(data), gtk_window_get_resizable(GTK_WINDOW(object))
+                ? "menu:minimize,maximize,close" : "menu:minimize,close");
+        }), header);
+        if (header_late) gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+    }
     GtkWidget* retired_button = nullptr;
     AtkObject* retained_accessible = nullptr;
     if (std::string(argv[1]) == "retired-button") {
@@ -46,6 +92,12 @@ int main(int argc, char** argv) {
         }
     }
     printf("{\"ready\":true,\"pid\":%d,\"mode\":\"%s\"}\n", int(getpid()), argv[1]); fflush(stdout);
+    for (auto* accessible : header_accessibles) {
+        auto* states = atk_object_ref_state_set(accessible);
+        printf("{\"header_reference\":true,\"widget_null\":%s,\"state_null\":%s}\n",
+            gtk_accessible_get_widget(GTK_ACCESSIBLE(accessible)) ? "false" : "true", states ? "false" : "true");
+        if (states) g_object_unref(states);
+    }
     const auto end = Clock::now() + std::chrono::seconds(8);
     const auto retire_at = Clock::now() + std::chrono::seconds(2);
     auto transition = Clock::now() + std::chrono::milliseconds(500);
@@ -74,6 +126,7 @@ int main(int argc, char** argv) {
     }
     if (view) pab_linux_view_drop(view);
     if (retained_accessible) g_object_unref(retained_accessible);
+    for (auto* accessible : header_accessibles) g_object_unref(accessible);
     gtk_widget_destroy(window); g_object_unref(window);
     printf("{\"finished\":%s,\"cycles\":%u}\n", exit_code ? "false" : "true", cycles);
     return exit_code;
