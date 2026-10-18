@@ -6,6 +6,16 @@ use tokio::sync::broadcast;
 
 use super::{TaskService, TaskServiceError, error_response};
 
+#[cfg(test)]
+#[derive(Default)]
+pub(super) struct CatchUpTestGate {
+    reached: tokio::sync::Notify,
+    resume: tokio::sync::Notify,
+}
+
+#[cfg(test)]
+mod tests;
+
 impl TaskService {
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn subscribe_stream(
@@ -25,26 +35,23 @@ impl TaskService {
             stream.send_json(&response, timeout).await?;
             return Ok(());
         }
-        self.catch_up(
-            initiated_by,
-            task_ref,
-            &mut event_seq,
-            &mut stdout_offset,
-            &mut stderr_offset,
-            &mut stream,
-            timeout,
-        )
-        .await?;
-        let snapshot = self.store.get_task(initiated_by, task_ref).await?;
-        if snapshot.state.is_terminal()
-            && snapshot.output.stdout.complete
-            && snapshot.output.stderr.complete
-        {
+        let complete = self
+            .catch_up(
+                initiated_by,
+                task_ref,
+                &mut event_seq,
+                &mut stdout_offset,
+                &mut stderr_offset,
+                &mut stream,
+                timeout,
+            )
+            .await?;
+        if complete {
             stream.finish_send(timeout).await?;
             return Ok(());
         }
         loop {
-            match changes.recv().await {
+            let complete = match changes.recv().await {
                 Ok(change) if change.task_ref == task_ref => {
                     self.catch_up(
                         initiated_by,
@@ -55,9 +62,9 @@ impl TaskService {
                         &mut stream,
                         timeout,
                     )
-                    .await?;
+                    .await?
                 }
-                Ok(_) => {}
+                Ok(_) => continue,
                 Err(broadcast::error::RecvError::Lagged(_)) => {
                     self.catch_up(
                         initiated_by,
@@ -68,15 +75,11 @@ impl TaskService {
                         &mut stream,
                         timeout,
                     )
-                    .await?;
+                    .await?
                 }
                 Err(broadcast::error::RecvError::Closed) => break,
-            }
-            let snapshot = self.store.get_task(initiated_by, task_ref).await?;
-            if snapshot.state.is_terminal()
-                && snapshot.output.stdout.complete
-                && snapshot.output.stderr.complete
-            {
+            };
+            if complete {
                 stream.finish_send(timeout).await?;
                 return Ok(());
             }
@@ -95,7 +98,7 @@ impl TaskService {
         stderr_offset: &mut u64,
         stream: &mut PabBiStream,
         timeout: Duration,
-    ) -> Result<(), TaskServiceError> {
+    ) -> Result<bool, TaskServiceError> {
         loop {
             for event in self
                 .store
@@ -132,6 +135,12 @@ impl TaskService {
             {
                 continue;
             }
+            // Only the snapshot actually sent can authorize EOF. Re-reading
+            // the store afterwards can observe completion that the subscriber
+            // has never received, including its final output and events.
+            let complete = snapshot.state.is_terminal()
+                && snapshot.output.stdout.complete
+                && snapshot.output.stderr.complete;
             stream
                 .send_frame_json(
                     &DeviceTaskResponse::CaughtUp {
@@ -140,7 +149,15 @@ impl TaskService {
                     timeout,
                 )
                 .await?;
-            return Ok(());
+            #[cfg(test)]
+            {
+                let gate = self.subscription_test_gate.lock().await.take();
+                if let Some(gate) = gate {
+                    gate.reached.notify_one();
+                    gate.resume.notified().await;
+                }
+            }
+            return Ok(complete);
         }
     }
 

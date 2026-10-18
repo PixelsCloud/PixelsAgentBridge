@@ -89,6 +89,8 @@ pub(crate) struct TaskService {
     #[cfg(test)]
     hash_test_gate: Arc<Mutex<Option<Arc<filesystem_hash::HashTestGate>>>>,
     #[cfg(test)]
+    subscription_test_gate: Arc<Mutex<Option<Arc<subscription::CatchUpTestGate>>>>,
+    #[cfg(test)]
     bulk_test_gate: Arc<Mutex<Option<Arc<filesystem_bulk::BulkTestGate>>>>,
     bulk_slots: Arc<tokio::sync::Semaphore>,
     bulk_jobs: Arc<Mutex<HashMap<pab_protocol::RequestId, filesystem_bulk::BulkJob>>>,
@@ -232,6 +234,8 @@ impl TaskService {
             documents: document::DocumentCache::default(),
             #[cfg(test)]
             hash_test_gate: Arc::new(Mutex::new(None)),
+            #[cfg(test)]
+            subscription_test_gate: Arc::new(Mutex::new(None)),
             #[cfg(test)]
             bulk_test_gate: Arc::new(Mutex::new(None)),
             bulk_slots: Arc::new(tokio::sync::Semaphore::new(4)),

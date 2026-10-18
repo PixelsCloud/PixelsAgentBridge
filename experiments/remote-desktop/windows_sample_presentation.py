@@ -92,6 +92,7 @@ def main():
     first_invalid = None
     first_nonmonotonic = None
     failure = None
+    started_unix_ms = round(time.time() * 1000)
     start = time.perf_counter(); next_sample = start; last = None
     try:
         while time.perf_counter() - start < args.seconds:
@@ -141,6 +142,7 @@ def main():
     times = [min(3, duration)] + [e[0] for e in steady] + [duration]
     longest_gap = max(b-a for a, b in zip(times, times[1:]))
     report = {'method': 'actual composed native surface, 12-bit generated frame code with complement',
+              'started_unix_ms': started_unix_ms, 'finished_unix_ms': round(time.time() * 1000),
               'source_dimensions': [1920,1080], 'surface_dimensions': [width,height],
               'surface_screen_bounds': [bounds.left,bounds.top,bounds.right,bounds.bottom],
               'sample_points': points, 'first_invalid_sample': first_invalid,
