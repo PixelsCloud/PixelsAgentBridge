@@ -138,16 +138,23 @@ pub(crate) async fn desktop_assistance_displayed(
     window: WebviewWindow,
     state: State<'_, AssistanceState>,
     id: Uuid,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     if window.label() != "main" {
         return Err("only main may acknowledge a prompt".into());
     }
     let store = state.store().await?;
+    // The WebView can finish its modal animation while its native window is
+    // hidden or minimized. Leave delivery pending until the prompt is visible.
+    if !window.is_visible().map_err(|e| e.to_string())?
+        || window.is_minimized().map_err(|e| e.to_string())?
+    {
+        return Ok(false);
+    }
     store
         .displayed(state.0.instance, id)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(true)
 }
 #[tauri::command]
 pub(crate) async fn desktop_assistance_open(

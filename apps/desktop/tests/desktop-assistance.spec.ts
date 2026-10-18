@@ -1,5 +1,48 @@
 import { expect, test } from "@playwright/test";
 
+test("a hidden native window keeps delivery pending and acknowledges after restoration", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/desktop-assistance.html");
+  await page.evaluate(() => {
+    const fixture = (window as any).fixture;
+    fixture.nativeVisible = false;
+    fixture.requests = [{ ...fixture.requests[0], assistance_id: "hidden" }];
+  });
+  const acknowledgments = () => page.evaluate(() => (window as any).fixture.calls.filter(
+    (c: any) => c.command === "desktop_assistance_displayed" && c.args.id === "hidden",
+  ).length);
+  await expect.poll(acknowledgments).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const before = await acknowledgments();
+  await page.evaluate(() => { (window as any).fixture.nativeVisible = true; });
+  await expect.poll(acknowledgments).toBeGreaterThan(before);
+  const confirmed = await acknowledgments();
+  // Observe two retry intervals: delivery should stop probing after acceptance.
+  await page.waitForTimeout(2200);
+  expect(await acknowledgments()).toBe(confirmed);
+  expect(await page.evaluate(() => (window as any).fixture.calls.some(
+    (c: any) => /open|complete/.test(c.command),
+  ))).toBe(false);
+});
+
+test("a delayed delivery acknowledgment is not duplicated and a failure can recover", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/desktop-assistance.html");
+  await page.evaluate(() => {
+    const fixture = (window as any).fixture;
+    fixture.hold = ["desktop_assistance_displayed:delayed"];
+    fixture.requests = [{ ...fixture.requests[0], assistance_id: "delayed" }];
+  });
+  await expect.poll(() => page.evaluate(() => Boolean((window as any).fixture.deferred["desktop_assistance_displayed:delayed"]))).toBe(true);
+  await page.waitForTimeout(2200);
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter(
+    (c: any) => c.command === "desktop_assistance_displayed" && c.args.id === "delayed",
+  ).length)).toBe(1);
+  await page.evaluate(() => (window as any).fixture.deferred["desktop_assistance_displayed:delayed"].reject("Transient IPC failure"));
+  await expect(page.getByRole("alert")).toHaveText("Could not update the assistance request.");
+  await page.evaluate(() => { (window as any).fixture.hold = []; });
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
+
 for (const oldCommand of ["desktop_assistance_open", "desktop_assistance_cancel", "desktop_assistance_displayed"]) {
   test(`late ${oldCommand} failure cannot change a replacement prompt`, async ({ page }) => {
     await page.goto("http://127.0.0.1:1429/tests/desktop-assistance.html");

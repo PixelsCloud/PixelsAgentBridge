@@ -32,6 +32,34 @@ export function DesktopAssistanceNotice({ language }: { language: Language }) {
 function AssistancePrompt({ current, language }: { current: Assistance; language: Language }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [opened, setOpened] = useState(false);
+  const [deliveryFailed, setDeliveryFailed] = useState(false);
+  useEffect(() => {
+    if (!opened) return;
+    let active = true;
+    let pending = false;
+    let acknowledged = false;
+    const acknowledge = async () => {
+      if (!active || pending || acknowledged || document.hidden) return;
+      pending = true;
+      try {
+        const displayed = await invoke<boolean>("desktop_assistance_displayed", { id: current.assistance_id });
+        if (active) {
+          acknowledged = displayed;
+          setDeliveryFailed(false);
+        }
+      } catch { if (active) setDeliveryFailed(true); }
+      finally { pending = false; }
+    };
+    void acknowledge();
+    const timer = window.setInterval(() => void acknowledge(), 1000);
+    document.addEventListener("visibilitychange", acknowledge);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", acknowledge);
+    };
+  }, [opened, current.assistance_id]);
   const t = language === "en"
     ? { title: "AI requests your help", reason: "Reason", action: "Please help with", open: "Open remote desktop", cancel: "Decline", hint: "The window opens in view-only mode. When finished, choose Complete assistance in that window.", failed: "Could not update the assistance request." }
     : language === "zh-TW"
@@ -45,11 +73,11 @@ function AssistancePrompt({ current, language }: { current: Assistance; language
   }
   return <Modal open title={t.title}
     closable={false} mask={{ closable: false }} keyboard={false}
-    afterOpenChange={(open) => { if (open) void invoke("desktop_assistance_displayed", { id: current.assistance_id }).catch(() => setError(t.failed)); }}
+    afterOpenChange={setOpened}
     footer={<><Button disabled={busy} onClick={() => void act("desktop_assistance_cancel")}>{t.cancel}</Button><Button type="primary" loading={busy} onClick={() => void act("desktop_assistance_open")}>{t.open}</Button></>}>
     <p>{formatDeviceCode(current.request.device_code)}</p>
     <p><strong>{t.reason}</strong></p><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{current.request.reason}</p>
     <p><strong>{t.action}</strong></p><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{current.request.expected_action}</p>
-    <p>{t.hint}</p>{error && <p role="alert">{error}</p>}
+    <p>{t.hint}</p>{(error || deliveryFailed) && <p role="alert">{error || t.failed}</p>}
   </Modal>;
 }

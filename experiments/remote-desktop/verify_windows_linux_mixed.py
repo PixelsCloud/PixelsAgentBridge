@@ -125,6 +125,23 @@ def local_resources():
             pass
     return rows
 
+def local_system_resources():
+    # Host load matters when the operator also hosts a test VM. Keep executable
+    # names only; command lines can contain unrelated work or credentials.
+    compilers = []
+    for proc in psutil.process_iter(['pid', 'name']):
+        if (proc.info['name'] or '').lower() in {
+            'cargo.exe', 'rustc.exe', 'cl.exe', 'link.exe', 'cmake.exe', 'ninja.exe',
+        }:
+            compilers.append(proc.info)
+    return {'at_unix_ms': round(time.time() * 1000),
+            'monotonic_seconds': time.monotonic(),
+            'cpu_count': psutil.cpu_count(),
+            'cpu_times': psutil.cpu_times()._asdict(),
+            'memory_available': psutil.virtual_memory().available,
+            'compiler_processes': compilers}
+
+
 remote_script = '''import json,pathlib,time,os
 stage=pathlib.Path(STAGE);fixture=pathlib.Path(FIXTURE)
 assert stage.is_dir() and not stage.is_symlink()
@@ -231,6 +248,7 @@ try:
             assert status['decoder'] == 'd3d11_hardware'
             row = {'index': round_number, 'elapsed': round_start-start, 'passed': False}
             row['remote_before'] = json.loads(ssh.run(client, password, remote_script, 10))
+            row['local_system_before'] = local_system_resources()
             report['rounds'].append(row); save()
             # Sample actual presentations WHILE old business runs, not afterwards.
             found = windows(); assert len(found) == 1
@@ -249,6 +267,7 @@ try:
                 row['download'] = transfer(c, 'pab_download_file', remote_file, str(destination))
                 assert hashlib.sha256(destination.read_bytes()).hexdigest() == digest
                 sample_status = sampler.wait(timeout=20)
+                row['local_system_after'] = local_system_resources()
                 row['local'] = local_resources()
                 row['remote'] = json.loads(ssh.run(client, password, remote_script, 10))
                 if sample_path.exists():

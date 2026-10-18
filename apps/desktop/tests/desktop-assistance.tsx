@@ -6,6 +6,7 @@ const fixture = (window as any).fixture = {
   requests: [{ assistance_id: "first", status: "waiting", request: { device_code: "123456789", reason: "Generated UI needs help", expected_action: "Inspect the generated dialog" } }],
   deferred: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
   hold: [] as string[],
+  nativeVisible: true,
 };
 (window as any).__TAURI_INTERNALS__ = {
   invoke: async (command: string, args: unknown) => {
@@ -15,6 +16,7 @@ const fixture = (window as any).fixture = {
     if (fixture.hold.includes(key)) {
       return new Promise<void>((resolve, reject) => { fixture.deferred[key] = { resolve, reject }; });
     }
+    if (command === "desktop_assistance_displayed") return fixture.nativeVisible;
     if (command === "desktop_assistance_cancel") fixture.requests = [];
     if (command === "desktop_assistance_open") fixture.requests = fixture.requests.map((row: any) => ({ ...row, status: "active" }));
     return null;
