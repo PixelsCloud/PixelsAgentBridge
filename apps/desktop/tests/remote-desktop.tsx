@@ -16,6 +16,8 @@ const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: i
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false,
   assistance: [] as any[],
+  holdCompletion: [] as string[],
+  deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
   decoder(value: string | null) { decoder = value; fixture.emit(status()); },
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
@@ -34,6 +36,9 @@ const fixture = (window as any).fixture = {
     if (command === "desktop_viewer_start") return status();
     if (command === "desktop_viewer_assistance") return fixture.assistance;
     if (command === "desktop_viewer_assistance_complete") {
+      if (fixture.holdCompletion.includes(args.id)) {
+        await new Promise<void>((resolve, reject) => { fixture.deferredCompletion[args.id] = { resolve, reject }; });
+      }
       fixture.assistance = fixture.assistance.filter((row: any) => row.assistance_id !== args.id);
       return null;
     }

@@ -21,7 +21,6 @@ export default function RemoteDesktopWindow() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [assistance, setAssistance] = useState<Assistance[]>([]);
-  const [finishing, setFinishing] = useState(false);
   useEffect(() => {
     let active = true; let pending = false;
     const refresh = async () => {
@@ -61,15 +60,9 @@ export default function RemoteDesktopWindow() {
     <header className="remote-desktop-toolbar">
       <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span>
         {status.phase === "viewing" && decoder && <span className="remote-desktop-decoder">{decoder}</span>}
-        {assistance[0] && <button className="remote-desktop-assistance" disabled={finishing || status.phase !== "viewing"}
-          title={assistance[0].request.expected_action} onClick={() => {
-            const id = assistance[0].assistance_id;
-            setFinishing(true);
-            void invoke("desktop_viewer_assistance_complete", { id })
-              .then(() => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id)))
-              .catch((cause) => setError(String(cause)))
-              .finally(() => setFinishing(false));
-          }}>{english ? "Complete assistance" : "完成协助"}{assistance.length > 1 ? ` (${assistance.length})` : ""}: {assistance[0].request.expected_action}</button>}
+        {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
+          request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
+          onComplete={(id) => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id))} />}
       </div>
       <div className="remote-desktop-controls">
         <select aria-label={text.screen} disabled={busy || status.phase !== "viewing"} value={opened?.config.screen.id || ""} onChange={(event) => void control({ screen: event.target.value })}>
@@ -89,4 +82,28 @@ export default function RemoteDesktopWindow() {
       {(error || status.error) ? <p role="alert">{error || status.error}</p> : <p>{status.phase === "ended" ? text.ended : text.waiting}</p>}
     </section>
   </main>;
+}
+
+// Completion belongs to a request, not the lifetime of the shared viewer. A
+// cancelled/expired request's delayed reply must not disable or error the next.
+function AssistanceCompletion({ request, count, viewing, onComplete }: {
+  request: Assistance; count: number; viewing: boolean; onComplete: (id: string) => void;
+}) {
+  const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState("");
+  async function complete() {
+    setFinishing(true); setError("");
+    try {
+      await invoke("desktop_viewer_assistance_complete", { id: request.assistance_id });
+      onComplete(request.assistance_id);
+    } catch (cause) { setError(String(cause)); }
+    finally { setFinishing(false); }
+  }
+  return <>
+    {error && <span role="alert" title={error}>{error}</span>}
+    <button className="remote-desktop-assistance" disabled={finishing || !viewing}
+      title={request.request.expected_action} onClick={() => void complete()}>
+      {english ? "Complete assistance" : "完成协助"}{count > 1 ? ` (${count})` : ""}: {request.request.expected_action}
+    </button>
+  </>;
 }

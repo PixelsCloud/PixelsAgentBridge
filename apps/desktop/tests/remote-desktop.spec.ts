@@ -97,3 +97,58 @@ test("shared viewer identifies the request being completed and preserves the nex
   await expect(page.getByRole("button", { name: "Complete assistance: Inspect second dialog" })).toBeVisible();
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_assistance_complete").map((c: any) => c.args))).toEqual([{ id: "first" }]);
 });
+
+test("replacement assistance can complete while an old completion is pending", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.assistance = [{ assistance_id: "old", status: "active", request: { expected_action: "Old request" } }];
+    f.holdCompletion = ["old"];
+  });
+  await page.getByRole("button", { name: "Complete assistance: Old request" }).click();
+  await page.evaluate(() => { (window as any).fixture.assistance = [{ assistance_id: "new", status: "active", request: { expected_action: "New request" } }]; });
+  const replacement = page.getByRole("button", { name: "Complete assistance: New request" });
+  await expect(replacement).toBeEnabled();
+  await replacement.click();
+  await expect(replacement).toHaveCount(0);
+  await page.evaluate(() => (window as any).fixture.deferredCompletion.old.resolve());
+  await expect(page.locator(".remote-desktop-assistance")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_assistance_complete").map((c: any) => c.args.id))).toEqual(["old", "new"]);
+});
+
+test("late failure of an old completion cannot replace the new request status", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.assistance = [{ assistance_id: "old", status: "active", request: { expected_action: "Old request" } }];
+    f.holdCompletion = ["old"];
+  });
+  await page.getByRole("button", { name: "Complete assistance: Old request" }).click();
+  await page.evaluate(() => { (window as any).fixture.assistance = [{ assistance_id: "new", status: "active", request: { expected_action: "New request" } }]; });
+  const replacement = page.getByRole("button", { name: "Complete assistance: New request" });
+  await expect(replacement).toBeVisible();
+  await page.evaluate(() => (window as any).fixture.deferredCompletion.old.reject("Old request expired"));
+  await expect(replacement).toBeEnabled();
+  await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("status")).toHaveText("Connected");
+});
+
+test("current completion failure stays visible above the native surface and can retry", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.assistance = [{ assistance_id: "current", status: "active", request: { expected_action: "Current request" } }];
+    f.holdCompletion = ["current"];
+  });
+  const complete = page.getByRole("button", { name: "Complete assistance: Current request" });
+  await complete.click();
+  await expect(complete).toBeDisabled();
+  await page.evaluate(() => (window as any).fixture.deferredCompletion.current.reject("Could not complete current request"));
+  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not complete current request");
+  await expect(complete).toBeEnabled();
+  await page.evaluate(() => { (window as any).fixture.holdCompletion = []; });
+  await complete.click();
+  await expect(complete).toHaveCount(0);
+  await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+});
