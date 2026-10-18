@@ -1,0 +1,1018 @@
+{
+  "date": "2026-10-18",
+  "baseline": "097dd77",
+  "scope": "Windows operator to Windows 90, physical primary and temporary Parsec secondary, equal DPI, 1080p",
+  "artifacts": {
+    "pab-parsec-display.exe": "b9012f9cb563a7f913f37cd577504cd4f1163bd1fd6603d3eb211259f302aa20",
+    "pab-two-screen-fixture.exe": "381d8a783ca11327ba633028b54685d65dd5705271dc07dc1384e5f9fc716149",
+    "lease2.ps1": "603f5fe89025905e8300262cec78c80b210ecdbea0dc033c411219a2cd1d7b17",
+    "twoscreen2.ps1": "a34d9f48cad542eb521099f337284bfb4ad089e9e1423a63d73d3ca999818ab3"
+  },
+  "desktop_sha256": "2f328f6ad2eabeeb7373e4d84607216c38960ddbf9da91710ced0ca98d05d5e0",
+  "steps": [
+    {
+      "name": "primary_ready",
+      "time": 1792303574.877854,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+            "generation": 1,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "image_pixel": [
+        28,
+        112,
+        67
+      ],
+      "image_sha256": "4d70f847143965de4f067bca4b1216a363621f7948ec9ac6976733ee54748b8e"
+    },
+    {
+      "name": "click_observed",
+      "time": 1792303579.027356,
+      "index": 0,
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792303579.0277617,
+      "index": 0,
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "secondary_ready",
+      "time": 1792303580.5804129,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+            "generation": 2,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "image_pixel": [
+        36,
+        75,
+        164
+      ],
+      "image_sha256": "325329465b32d48e2880991bfb41072dcf851ce7d5ad4cdefd42e57febd175f0"
+    },
+    {
+      "name": "click_observed",
+      "time": 1792303584.7975366,
+      "index": 1,
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 2880,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "click",
+      "time": 1792303584.7979536,
+      "index": 1,
+      "before": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      },
+      "after": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 2880,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "held_ctrl",
+      "time": 1792303586.919789,
+      "probe": {
+        "ctrl_held": true,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 2880,
+            "last_y": 540,
+            "ctrl_down": 1,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "primary_again",
+      "time": 1792303588.4771907,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+            "generation": 3,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "image_pixel": [
+        28,
+        112,
+        67
+      ],
+      "image_sha256": "77c50311b857f7dd65f4317850028a29da3538f3a217c86ee56a636efed4a0ab"
+    },
+    {
+      "name": "switch_released_ctrl",
+      "time": 1792303590.1425178,
+      "probe": {
+        "ctrl_held": false,
+        "left_held": false,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 960,
+            "last_y": 540,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 1920,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 1,
+            "ups": 1,
+            "last_x": 2880,
+            "last_y": 540,
+            "ctrl_down": 1,
+            "ctrl_up": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "secondary_wait_hotplug",
+      "time": 1792303591.7008674,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+            "generation": 4,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "image_pixel": [
+        36,
+        75,
+        164
+      ],
+      "image_sha256": "b926e25afff825c609a4b0e7924bf6f5e6c4bcc150e79704443aa10b19fdf3f9"
+    }
+  ],
+  "hotplug": {
+    "passed": true,
+    "initial": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+          "generation": 4,
+          "screen": {
+            "id": "0:81493:\\\\.\\DISPLAY15",
+            "name": "\\\\.\\DISPLAY15",
+            "x": 1920,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": false
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "0:81493:\\\\.\\DISPLAY1",
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          {
+            "id": "0:81493:\\\\.\\DISPLAY15",
+            "name": "\\\\.\\DISPLAY15",
+            "x": 1920,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": false
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware"
+    },
+    "held_before_removal": {
+      "ctrl_held": true,
+      "left_held": false,
+      "screens": [
+        {
+          "index": 0,
+          "visible": true,
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "clicks": 1,
+          "ups": 1,
+          "last_x": 960,
+          "last_y": 540,
+          "ctrl_down": 0,
+          "ctrl_up": 0
+        },
+        {
+          "index": 1,
+          "visible": true,
+          "x": 1920,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "clicks": 1,
+          "ups": 1,
+          "last_x": 2880,
+          "last_y": 540,
+          "ctrl_down": 2,
+          "ctrl_up": 1
+        }
+      ]
+    },
+    "after_removal": {
+      "ctrl_held": false,
+      "left_held": false,
+      "screens": [
+        {
+          "index": 0,
+          "visible": true,
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "clicks": 1,
+          "ups": 1,
+          "last_x": 960,
+          "last_y": 540,
+          "ctrl_down": 0,
+          "ctrl_up": 1
+        },
+        {
+          "index": 1,
+          "visible": false,
+          "x": 1920,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "clicks": 1,
+          "ups": 1,
+          "last_x": 2880,
+          "last_y": 540,
+          "ctrl_down": 2,
+          "ctrl_up": 1
+        }
+      ]
+    }
+  },
+  "recovery_samples": [
+    {
+      "time": 1792303671.7351575,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "a517d646-ae3a-423c-aef4-18e485913db9",
+            "generation": 4,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY15",
+              "name": "\\\\.\\DISPLAY15",
+              "x": 1920,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": true,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "time": 1792303672.531021,
+      "status": {
+        "phase": "reconnecting",
+        "error": null,
+        "opened": null,
+        "input_ready": false,
+        "frame_ready": false,
+        "input_enabled": false,
+        "decoder": null
+      }
+    },
+    {
+      "time": 1792303673.3207998,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "433bd160-6766-4789-aa71-4b84744fb5fb",
+            "generation": 1,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    }
+  ],
+  "recovered_pixel": [
+    28,
+    112,
+    67
+  ],
+  "lease_samples": 55,
+  "fixture_samples": 600,
+  "final_fixture": {
+    "ctrl_held": false,
+    "left_held": false,
+    "screens": [
+      {
+        "index": 0,
+        "visible": true,
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "clicks": 1,
+        "ups": 1,
+        "last_x": 960,
+        "last_y": 540,
+        "ctrl_down": 0,
+        "ctrl_up": 1
+      },
+      {
+        "index": 1,
+        "visible": false,
+        "x": 1920,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "clicks": 1,
+        "ups": 1,
+        "last_x": 2880,
+        "last_y": 540,
+        "ctrl_down": 2,
+        "ctrl_up": 1
+      }
+    ]
+  },
+  "original_topology": [
+    {
+      "name": "\\\\.\\DISPLAY1",
+      "description": "NVIDIA GeForce RTX 4090",
+      "flags": 5,
+      "active": true,
+      "mode_known": true,
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "rotation": 0
+    }
+  ],
+  "restored_topology": [
+    {
+      "name": "\\\\.\\DISPLAY1",
+      "description": "NVIDIA GeForce RTX 4090",
+      "flags": 5,
+      "active": true,
+      "mode_known": true,
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "rotation": 0
+    }
+  ],
+  "evidence_sha256": {
+    "lease2.stdout": "cd7a25a89b68569570f2fef5c509e1105c4ac68d8cb0755f5dbc8cea2712c123",
+    "lease2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "twoscreen2.stdout": "39f3029ad32892fa8cdcd24fe329ce6f0088e649fad04d3af9c28566ab998cde",
+    "twoscreen2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "cleanup": {
+    "original_service_running": true,
+    "restored_marker": true,
+    "staged_processes": 0,
+    "held_release_flags": 0,
+    "remote_stage_removed": true,
+    "owned_scheduled_tasks_removed": true,
+    "local_candidate_processes": 0
+  },
+  "limits": [
+    "No actual FPS measurement in this round",
+    "No mixed DPI, rotation, negative origin or cross-platform multi-screen coverage",
+    "First round task output was stale; input assertions excluded",
+    "Recovered screenshot partially occluded; only unobscured generated-color pixel used",
+    "Initial base64 log retrieval truncated; replaced with dedicated binary downloads and verified remote SHA256"
+  ]
+}
