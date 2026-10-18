@@ -1,7 +1,7 @@
 import ctypes,json,pathlib,subprocess,sys,time
 from ctypes import wintypes as W
 import psutil
-from PIL import ImageGrab
+from windows_owned_surface import capture
 import argparse,importlib.util
 parser=argparse.ArgumentParser(description="Open/view/close an isolated Windows-to-Linux product viewer 100 times. Requires a staged candidate, generated fullscreen fixture and separately armed rollback.")
 parser.add_argument('--profile',type=pathlib.Path,required=True)
@@ -58,21 +58,14 @@ def close():
  until(lambda:not windows()[0] and ui('closed','viewer'))
 def pixels():
  parents,surfaces=windows();assert len(parents)==len(surfaces)==1
- parent,surface=parents[0],surfaces[0];rect=W.RECT();origin=W.POINT()
- was_top=bool(u.GetWindowLongW(parent,-20)&8)
- try:
-  # Fit our own window into a visible area; do not move another session's UI.
-  assert u.SetWindowPos(parent,W.HWND(-1),20,40,720,600,0x10)
-  time.sleep(.25)
-  assert u.GetClientRect(surface,ctypes.byref(rect)) and u.ClientToScreen(surface,ctypes.byref(origin))
-  rgb=[]
-  for fx,fy in ((.3,.5),(.5,.7),(.7,.5)):
-   x=origin.x+round(rect.right*fx);y=origin.y+round(rect.bottom*fy)
-   assert u.WindowFromPoint(W.POINT(x,y))==surface,'Sample occluded by a different local window'
-   im=ImageGrab.grab(bbox=(x,y,x+1,y+1),all_screens=True).convert('RGB');rgb.append(im.getpixel((0,0)))
-  assert all(max(abs(c-e) for c,e in zip(p,(20,82,74)))<=3 for p in rgb),rgb
-  return rgb
- finally:assert u.SetWindowPos(parent,W.HWND(-1 if was_top else -2),0,0,0,0,0x13)
+ parent,surface=parents[0],surfaces[0]
+ assert u.SetWindowPos(parent,None,20,40,720,600,0x14)
+ time.sleep(.25)
+ im=capture(surface,owner)
+ rgb=[im.getpixel((round(im.width*fx),round(im.height*fy)))
+      for fx,fy in ((.3,.5),(.5,.7),(.7,.5))]
+ assert all(max(abs(c-e) for c,e in zip(p,(20,82,74)))<=3 for p in rgb),rgb
+ return rgb
 def local():
  info=process.memory_info()
  children=[]
@@ -91,7 +84,8 @@ def remote():
 def retired():
  r=remote()
  return r if not any(p['worker'] for p in r['processes']) else None
-record={'count_requested':100,'cycles':[],'device_code':args.code}
+record={'count_requested':100,'cycles':[],'device_code':args.code,
+        'pixel_method':'owned native window composed pixels'}
 assert not (root/'reopen-cycles.json').exists(),'Preserve the previous run before starting a new one'
 def save(): (root/'reopen-cycles.json').write_text(json.dumps(record,indent=2))
 try:

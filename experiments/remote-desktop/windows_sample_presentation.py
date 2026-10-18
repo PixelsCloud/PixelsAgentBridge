@@ -14,6 +14,20 @@ import pathlib
 import time
 
 
+def threshold_failures(failure, rate, invalid, samples, duration):
+    """Keep observation validity separate from observed video throughput."""
+    reasons = []
+    if failure is not None:
+        reasons.append('sampling_exception')
+    if rate <= 12:
+        reasons.append('observed_fps_not_above_12')
+    if invalid > samples * .05:
+        reasons.append('invalid_frame_codes_above_5_percent')
+    if duration <= 0 or samples / duration < 30:
+        reasons.append('sampling_rate_below_30_hz')
+    return reasons
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('profile', type=pathlib.Path)
@@ -115,6 +129,9 @@ def main():
     first_invalid = None
     first_nonmonotonic = None
     failure = None
+    capture_calls = capture_seconds = slow_capture_calls = 0
+    max_capture_seconds = max_sample_gap_seconds = 0
+    previous_sample_at = None
     started_unix_ms = round(time.time() * 1000)
     start = time.perf_counter(); next_sample = start; last = None
     try:
@@ -124,6 +141,7 @@ def main():
             fresh = W.RECT(); assert u.GetWindowRect(surfaces[0], C.byref(fresh))
             assert bytes(fresh) == bytes(bounds), 'Viewer moved during measurement'
             assert u.IsWindowVisible(surfaces[0]) and not u.IsIconic(u.GetAncestor(surfaces[0], 2)), 'Viewer hidden or minimized'
+            capture_started = time.perf_counter()
             if args.capture_method == 'window':
                 # PW_RENDERFULLCONTENT captures this HWND's composed image.
                 # No decoder-side callbacks or frame counters are consulted.
@@ -131,6 +149,15 @@ def main():
             else:
                 assert g.BitBlt(memory, 0, 0, w, h, screen, left, top_y, 0x00CC0020 | 0x40000000)
             assert g.GdiFlush(), 'GDI flush failed'
+            captured_at = time.perf_counter()
+            capture_elapsed = captured_at - capture_started
+            capture_calls += 1
+            capture_seconds += capture_elapsed
+            slow_capture_calls += capture_elapsed > 1/60
+            max_capture_seconds = max(max_capture_seconds, capture_elapsed)
+            if previous_sample_at is not None:
+                max_sample_gap_seconds = max(max_sample_gap_seconds, captured_at - previous_sample_at)
+            previous_sample_at = captured_at
             values = []
             for offset in offsets:
                 rgb = pixels[offset:offset+3]
@@ -174,6 +201,7 @@ def main():
     rate = len(steady) / (duration - 3) if duration > 3 else 0
     times = [min(3, duration)] + [e[0] for e in steady] + [duration]
     longest_gap = max(b-a for a, b in zip(times, times[1:]))
+    reasons = threshold_failures(failure, rate, invalid, samples, duration)
     report = {'method': ('desktop-visible pixels' if args.capture_method == 'desktop' else 'owned native window composed pixels') + ', 12-bit generated frame code with complement',
               'capture_method': args.capture_method,
               'started_unix_ms': started_unix_ms, 'finished_unix_ms': round(time.time() * 1000),
@@ -185,10 +213,16 @@ def main():
               'first_nonmonotonic_sample': first_nonmonotonic,
               'failure': None if failure is None else type(failure).__name__ + ': ' + str(failure),
               'seconds': duration, 'samples': samples, 'invalid_samples': invalid,
+              'sample_hz': samples/duration if duration > 0 else 0,
+              'threshold_failures': reasons,
+              'capture_timing': {'calls': capture_calls, 'total_seconds': capture_seconds,
+                                 'max_seconds': max_capture_seconds,
+                                 'calls_above_60_hz_budget': slow_capture_calls,
+                                 'max_sample_gap_seconds': max_sample_gap_seconds},
               'repeated_samples': repeated, 'unique_presentations': len(events),
               'warmup_seconds': 3, 'steady_fps': rate,
               'longest_presentation_gap_seconds': longest_gap, 'events': events,
-              'passed': failure is None and rate > 12 and invalid <= samples * .05 and samples/duration >= 30}
+              'passed': not reasons}
     with result_path.open('x', encoding='utf-8') as output:
         json.dump(report, output, indent=2)
     print(json.dumps({k:v for k,v in report.items() if k != 'events'}), flush=True)

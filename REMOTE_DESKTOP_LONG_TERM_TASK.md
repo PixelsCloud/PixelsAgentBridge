@@ -5,6 +5,18 @@
 
 ## 当前进度与剩余开发（2026-10-19）
 
+本轮持续验证：Windows→Linux 1080p 前 36 轮混合业务通过，显示采样
+12.84～14.71 FPS（平均 14.40），同一视频/终端及媒体 helper 跨过 600 秒。
+第 37 轮观测 10.27 FPS，采样频率也降至 29.37 Hz；同时本机出现其他编译
+进程，原因尚不能唯一归因。30 分钟未通过，保留失败并补采集耗时诊断。
+独立 guest 的 Busy 与关闭后首帧接手通过；不是同账号双 Desktop 验收。
+Linux 原服务、配置、会话和布局均恢复，临时资源清理。详见
+[混合验证与采样负载](acceptance/remote-desktop-mixed-sampling-load-2026-10-19.md)。
+Apple 当前源码的 30 项媒体单测、完整 Desktop/Executor release 构建通过，
+未替换已授权 App 或申请权限；见
+[Apple 构建记录](acceptance/remote-desktop-macos-matched-build-2026-10-19.md)。
+完整关闭数仍为 11/53；下列早期轮次保留为历史诊断，不替代本轮结论。
+
 最新 90 竖屏定位：正式窗口在 WGC 支持查询处报 `bad allocation`。
 同会话只读身份对照确认：SYSTEM 进程（包括临时模拟用户）返回 `0x8007000e`，
 用户进程成功。已实现仅将普通桌面 capture/cursor 放到会话用户子进程的候选，
