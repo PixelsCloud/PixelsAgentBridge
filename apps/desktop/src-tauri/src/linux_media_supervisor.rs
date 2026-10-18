@@ -245,6 +245,17 @@ pub fn run() -> Result<(), String> {
     if unsafe { libc::geteuid() } != 0 {
         return Err("media supervisor requires the system service".into());
     }
+    // This dedicated service does not enter normal Desktop startup. Read the
+    // same Executor configuration before resolving its machine token directory;
+    // operator preferences belong to the interactive Desktop, not this service.
+    let (_, values) = pab_service_config::client::startup(
+        pab_service_config::client::Role::Executor,
+        std::env::args_os().skip(1),
+    )?;
+    for (key, value) in values {
+        // Called directly from main, before logging or the async runtime starts.
+        unsafe { std::env::set_var(key, value) };
+    }
     let _lock = lock().map_err(|e| e.to_string())?;
     let paths = pab_agent_core::DataPaths::for_scope(pab_agent_core::DataScope::Machine)
         .map_err(|e| e.to_string())?;
