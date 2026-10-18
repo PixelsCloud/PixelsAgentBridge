@@ -12,6 +12,9 @@
 独立 guest 的 Busy 与关闭后首帧接手通过；不是同账号双 Desktop 验收。
 Linux 原服务、配置、会话和布局均恢复，临时资源清理。详见
 [混合验证与采样负载](acceptance/remote-desktop-mixed-sampling-load-2026-10-19.md)。
+随后同产物 60.22 秒短测通过，约 14.51 FPS；关闭画面后原终端、命令和上传
+下载通过。新计时确认同步窗口采样平均约 33.16 ms，自身贴近 30 Hz 门槛；
+需要改善测量余量，不能将短测算作长稳通过。原失败数据及恢复证据均保留。
 Apple 当前源码的 30 项媒体单测、完整 Desktop/Executor release 构建通过，
 未替换已授权 App 或申请权限；见
 [Apple 构建记录](acceptance/remote-desktop-macos-matched-build-2026-10-19.md)。

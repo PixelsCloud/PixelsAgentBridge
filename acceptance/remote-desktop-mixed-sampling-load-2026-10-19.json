@@ -6113,5 +6113,112 @@
   "sampler_used_in_run": {
     "source_commit": "90adfbc",
     "path": "experiments/remote-desktop/windows_sample_presentation.py"
+  },
+  "short_timing_comparison": {
+    "source_commit": "6380189",
+    "profile": "mixed-product-02fc8a845a9c",
+    "passed": true,
+    "elapsed_seconds": 60.22490629999811,
+    "artifacts": {
+      "pab-desktop.exe": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+      "pab-mcp.exe": "f2a76f70dbb5c1947c1e027db530141ee973be239ca43a5b09eef33096b2ce93"
+    },
+    "remote_artifacts": {
+      "pab-desktop": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+      "pab-executor": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+      "manager.py": "12462f57c3d26f4fe362584be73b4a8865a8d577d61ec48185f7e62b770f9822",
+      "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
+    },
+    "rounds": [
+      {
+        "round": 1,
+        "fps": 14.509193252445474,
+        "sample_hz": 30.009893494198113,
+        "threshold_failures": [],
+        "capture_timing": {
+          "calls": 301,
+          "total_seconds": 9.980966799957969,
+          "max_seconds": 0.035298800001328345,
+          "calls_above_60_hz_budget": 301,
+          "max_sample_gap_seconds": 0.035417200000665616
+        },
+        "compiler_processes_before": [],
+        "compiler_processes_after": []
+      },
+      {
+        "round": 2,
+        "fps": 14.518297203574777,
+        "sample_hz": 30.023088952333296,
+        "threshold_failures": [],
+        "capture_timing": {
+          "calls": 301,
+          "total_seconds": 9.978422000080172,
+          "max_seconds": 0.035005900004762225,
+          "calls_above_60_hz_budget": 301,
+          "max_sample_gap_seconds": 0.03509180000401102
+        },
+        "compiler_processes_before": [],
+        "compiler_processes_after": []
+      }
+    ],
+    "post_close_checks": {
+      "terminal_after_video_close": "__PAB_MIXED_9999__",
+      "command_after_video_close": "d779d7b3-5eb7-4980-81e9-8b4e79b64e72",
+      "upload_after_video_close": "3e6a392e-f003-4c29-9c25-60c877319e3e",
+      "download_after_video_close": "4a38d277-8c83-4ebc-8411-ca40119d8c1a"
+    },
+    "cleanup": {
+      "original": {
+        "session": "2",
+        "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+        "properties": {
+          "MainPID": "81687",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 00:56:53 CST] ; stop_time=[n/a] ; pid=81687 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        },
+        "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+        "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+        "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+        "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+      },
+      "restored": {
+        "original_service_restored": true,
+        "properties": {
+          "MainPID": "82771",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 01:03:54 CST] ; stop_time=[n/a] ; pid=82771 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        }
+      },
+      "owned_processes": [],
+      "input_devices": [],
+      "session_restored": true,
+      "rollback_trigger": "",
+      "stage_removed": true,
+      "fixture_removed": true
+    },
+    "layout_cleanup": {
+      "layout": {
+        "before_mode": "1694x1102@59.997711181640625",
+        "test_mode": "1920x1080@60",
+        "persistent": false,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "temporary_idle_inhibitor": true,
+        "generated_ticks": 3523,
+        "restored": true
+      },
+      "payload_removed": true
+    },
+    "raw_result_sha256": "1c1a6a97125ddb9a993dc7bdff69acf095a4c3ae3a27c5abc88e47dfe5c13a7b",
+    "driver_exit_code": 0,
+    "desktop_driver_exit_code": 0
   }
 }
