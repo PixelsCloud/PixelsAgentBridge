@@ -12,6 +12,8 @@ use tokio::{
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 #[path = "cursor_source.rs"]
 mod cursor;
+#[path = "diagnostics.rs"]
+mod diagnostics;
 #[cfg(target_os = "linux")]
 #[path = "linux_cursor_channel.rs"]
 mod linux_cursor_channel;
@@ -29,6 +31,7 @@ pub struct MediaChild {
     input: Arc<Mutex<ChildStdin>>,
     output: Option<ChildStdout>,
     events: Option<ChildStderr>,
+    diagnostics: Option<diagnostics::Diagnostics>,
     permit: Option<OwnedMutexGuard<()>>,
 }
 impl MediaChild {
@@ -54,28 +57,42 @@ impl MediaChild {
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(if interactive {
-                Stdio::piped()
-            } else {
-                Stdio::inherit()
-            })
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
         #[cfg(windows)]
         command.creation_flags(0x08000000); // No console; the render window is created explicitly.
         let mut child = command.spawn()?;
+        let stderr = child.stderr.take().unwrap();
+        let (events, diagnostics) = if interactive {
+            (Some(stderr), None)
+        } else {
+            (None, Some(diagnostics::Diagnostics::start(stderr)))
+        };
         Ok(Self {
             input: Arc::new(Mutex::new(child.stdin.take().unwrap())),
             output: child.stdout.take(),
-            events: child.stderr.take(),
+            events,
+            diagnostics,
             child: Some(child),
             permit,
         })
     }
     async fn ready(&mut self) -> std::io::Result<()> {
-        if self.output.as_mut().unwrap().read_u32_le().await? != MAGIC {
+        let magic = match self.output.as_mut().unwrap().read_u32_le().await {
+            Ok(value) => value,
+            Err(error) => return Err(self.failure(error).await),
+        };
+        if magic != MAGIC {
             return Err(std::io::Error::other("media IPC version mismatch"));
         }
         Ok(())
+    }
+    async fn failure(&mut self, error: impl std::fmt::Display) -> std::io::Error {
+        let message = match self.diagnostics.as_mut() {
+            Some(diagnostics) => diagnostics.context(error).await,
+            None => error.to_string(),
+        };
+        std::io::Error::other(message)
     }
 }
 impl Drop for MediaChild {
@@ -180,7 +197,10 @@ impl DesktopSource for NativeSource {
                     keyframe: key == 1,
                 })
             };
-            operation.await.map_err(media_error)
+            match operation.await {
+                Ok(frame) => Ok(frame),
+                Err(error) => Err(media_error(self.process.failure(error).await)),
+            }
         })
     }
 }
@@ -246,7 +266,9 @@ impl DesktopBackend for NativeBackend {
                 .map_err(media_error)?
                 .success()
             {
-                return Err(media_error("screen inventory failed"));
+                return Err(media_error(
+                    process.failure("screen inventory failed").await,
+                ));
             }
             let screens: Vec<DesktopScreen> =
                 serde_json::from_slice(&bytes).map_err(media_error)?;

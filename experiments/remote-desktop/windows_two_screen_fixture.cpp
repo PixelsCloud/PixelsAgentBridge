@@ -88,8 +88,13 @@ int main(int argc, char** argv) {
             }
         }
         if(std::chrono::steady_clock::now()>=next) {
+            CURSORINFO cursor{};cursor.cbSize=sizeof(cursor);
+            const bool cursor_known=GetCursorInfo(&cursor)!=FALSE;
             std::cout<<"{\"ctrl_held\":"<<((GetAsyncKeyState(VK_CONTROL)&0x8000)?"true":"false")
-                <<",\"left_held\":"<<((GetAsyncKeyState(VK_LBUTTON)&0x8000)?"true":"false")<<",\"screens\":[";
+                <<",\"left_held\":"<<((GetAsyncKeyState(VK_LBUTTON)&0x8000)?"true":"false")
+                <<",\"cursor_known\":"<<(cursor_known?"true":"false")
+                <<",\"cursor_flags\":"<<cursor.flags<<",\"cursor_shape\":"<<(cursor.hCursor?"true":"false")
+                <<",\"cursor_x\":"<<cursor.ptScreenPos.x<<",\"cursor_y\":"<<cursor.ptScreenPos.y<<",\"screens\":[";
             for(unsigned i=0;i<screens.size();++i){const auto& s=screens[i];const auto& r=s.monitor.rcMonitor;
                 std::cout<<(i?",":"")<<"{\"index\":"<<i<<",\"visible\":"<<(s.window&&IsWindowVisible(s.window)?"true":"false")
                     <<",\"x\":"<<r.left<<",\"y\":"<<r.top<<",\"width\":"<<r.right-r.left<<",\"height\":"<<r.bottom-r.top

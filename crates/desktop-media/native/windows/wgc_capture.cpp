@@ -9,8 +9,8 @@
 
 namespace capture = winrt::Windows::Graphics::Capture;
 namespace {
-[[noreturn]] void capture_error(const winrt::hresult_error& error) {
-    check(error.code().value, "Windows Graphics Capture");
+[[noreturn]] void capture_error(const winrt::hresult_error& error, const char* stage = "Windows Graphics Capture") {
+    check(error.code().value, stage);
     throw std::runtime_error("Windows Graphics Capture failed");
 }
 }
@@ -30,6 +30,7 @@ struct WgcCapture::Impl {
     ComPtr<ID3D11Texture2D> rotated;
     ComPtr<ID3D11Query> finished;
     UINT desktop_width = 0, desktop_height = 0;
+    const char* stage = "allocation";
 
     ~Impl() {
         // Close each independently, including partially initialized sessions.
@@ -39,8 +40,10 @@ struct WgcCapture::Impl {
     }
 
     void initialize(ID3D11Device* source, const Display& display, unsigned fps) {
+        stage = "support query";
         if (!capture::GraphicsCaptureSession::IsSupported())
             throw std::runtime_error("Windows Graphics Capture unavailable");
+        stage = "device setup";
         device = source;
         device->GetImmediateContext(&context);
         // Free-threaded capture and the encoder share this device/context.
@@ -52,7 +55,9 @@ struct WgcCapture::Impl {
         winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice rt_device{nullptr};
         check(CreateDirect3D11DeviceFromDXGIDevice(dxgi.Get(),
             reinterpret_cast<IInspectable**>(winrt::put_abi(rt_device))), "Capture WinRT device");
+        stage = "monitor activation factory";
         const auto interop = winrt::get_activation_factory<capture::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
+        stage = "monitor creation";
         check(interop->CreateForMonitor(display.screen.Monitor,
             winrt::guid_of<capture::GraphicsCaptureItem>(), winrt::put_abi(item)), "Capture monitor");
         const auto& rect = display.screen.DesktopCoordinates;
@@ -60,10 +65,14 @@ struct WgcCapture::Impl {
         desktop_height = rect.bottom - rect.top;
         if (item.Size().Width != desktop_width || item.Size().Height != desktop_height)
             throw std::runtime_error("Screen changed; refresh generation");
+        stage = "frame pool creation";
         pool = capture::Direct3D11CaptureFramePool::CreateFreeThreaded(rt_device,
             winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, item.Size());
+        stage = "session creation";
         session = pool.CreateCaptureSession(item);
+        stage = "cursor exclusion";
         session.IsCursorCaptureEnabled(false); // Existing independent cursor stream.
+        stage = "rotation setup";
         const auto rotation = display.screen.Rotation;
         if (rotation != DXGI_MODE_ROTATION_IDENTITY && rotation != DXGI_MODE_ROTATION_UNSPECIFIED) {
             // WGC is already desktop-oriented. Undo rotation on the GPU so the
@@ -114,6 +123,7 @@ struct WgcCapture::Impl {
             D3D11_QUERY_DESC query{D3D11_QUERY_EVENT, 0};
             check(device->CreateQuery(&query, &finished), "Capture rotation completion");
         }
+        stage = "capture start";
         session.StartCapture();
     }
 
@@ -172,7 +182,11 @@ WgcCapture::WgcCapture(ID3D11Device* device, const Display& display, unsigned fp
     try {
         impl_ = std::make_unique<Impl>();
         impl_->initialize(device, display, fps);
-    } catch (const winrt::hresult_error& error) { capture_error(error); }
+    } catch (const winrt::hresult_error& error) {
+        capture_error(error, impl_ ? impl_->stage : "WGC allocation");
+    } catch (const std::exception& error) {
+        throw std::runtime_error(std::string("WGC ") + (impl_ ? impl_->stage : "allocation") + ": " + error.what());
+    }
 }
 WgcCapture::~WgcCapture() = default;
 ComPtr<ID3D11Texture2D> WgcCapture::next(unsigned timeout_ms) {

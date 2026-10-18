@@ -1,0 +1,633 @@
+{
+  "date": "2026-10-18",
+  "baseline": "6fa414f",
+  "stage": "service-90-56951e6d6b85",
+  "profile": "dual-screen-product-7aefa74a1054",
+  "availability": {
+    "target": "90",
+    "desktop_contexts": [
+      {
+        "session_id": "2",
+        "available": true
+      }
+    ],
+    "state": {
+      "service_pid": 21000,
+      "service_state": "Running",
+      "children": [],
+      "desktop_sessions": [
+        {
+          "Id": 7092,
+          "SessionId": 1
+        },
+        {
+          "Id": 20620,
+          "SessionId": 2
+        }
+      ]
+    },
+    "read_only": true
+  },
+  "desktop_sha256": "38925075567203678708c0516d21235e96716321e3d1dfe27f610b1ac83ed53a",
+  "steps": [
+    {
+      "name": "open",
+      "time": 1792325992.3166254,
+      "result": {
+        "accepted": true
+      }
+    },
+    {
+      "name": "initial",
+      "time": 1792325994.7705479,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "b2d5d3a3-c4bf-4fc3-bc08-d365c39525e5",
+            "generation": 1,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "error",
+      "time": 1792326019.933473,
+      "kind": "AssertionError",
+      "detail": "Viewer not ready: {\"phase\": \"reconnecting\", \"error\": null, \"opened\": null, \"input_ready\": false, \"frame_ready\": false, \"input_enabled\": false, \"decoder\": null}"
+    }
+  ],
+  "desktop_log": [
+    "2026-10-18T12:19:39.098218Z ERROR pab_desktop_lib::mcp_reporting: could not start Desktop MCP reporting service error=Only one usage of each socket address (protocol/network address/port) is normally permitted. (os error 10048)",
+    "2026-10-18T12:19:55.475028Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:19:56.320034Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:19:57.400799Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:19:58.988395Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:01.575671Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:04.138799Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:06.836483Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:09.481308Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:12.079644Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:14.668272Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:17.245696Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:19.854881Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:22.556195Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:25.179895Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:27.752331Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:30.572164Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:33.325309Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:36.038531Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:38.770720Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:41.543394Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:44.240064Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:46.952090Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:49.540040Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:52.116489Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:54.694226Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:20:57.349314Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)",
+    "2026-10-18T12:21:00.075528Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-924dcf37-a463-4359-b421-784ee7ac526d\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)"
+  ],
+  "helper_log_tail": [
+    "C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:00:45.813881Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:00:45.821007Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:06:01.468958Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:06:01.476392Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:16:46.782632Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:16:46.790237Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:28:18.603917Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T06:28:18.611278Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T07:09:07.299220Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T07:09:07.305764Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T12:19:51.954455Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "2026-10-18T12:19:51.961221Z  INFO pab_logging: file logging ready path=C:\\Windows\\system32\\config\\systemprofile\\AppData\\Local\\PixelsAgentBridge\\logs\\media-helper.log",
+    "",
+    "C:\\ProgramData\\PixelsAgentBridge\\logs\\executor.log",
+    "",
+    "2026-10-18T12:20:29.540741Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:32.172837Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:34.769477Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:37.351821Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:39.946649Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:42.530336Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:45.282346Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:47.863642Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:50.460527Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:53.260042Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local device service: local device service: remote desktop MediaUnavailable: unexpected end of file",
+    "",
+    "2026-10-18T12:20:54.004941Z  INFO pab_transport::connection: PAB connection path selected selected_path=\"relay\"",
+    "",
+    "2026-10-18T12:20:54.035002Z  INFO pab_transport::connection: PAB connection path selected selected_path=\"direct\""
+  ],
+  "remote_fixture": {
+    "samples": 600,
+    "no_clicks_or_keys": true,
+    "layout_records": 69,
+    "layout_final": {
+      "phase": "after",
+      "outputs": [
+        {
+          "name": "\\\\.\\DISPLAY1",
+          "description": "NVIDIA GeForce RTX 4090",
+          "flags": 5,
+          "active": true,
+          "mode_known": true,
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY2",
+          "description": "NVIDIA GeForce RTX 4090",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY3",
+          "description": "NVIDIA GeForce RTX 4090",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY4",
+          "description": "NVIDIA GeForce RTX 4090",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY5",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY6",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY7",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY8",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY9",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY10",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY11",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY12",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY13",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY14",
+          "description": "GameViewer Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY47",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY48",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY49",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY50",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY51",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY52",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY53",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY54",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY55",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY56",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY57",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY58",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY59",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY60",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY61",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        },
+        {
+          "name": "\\\\.\\DISPLAY62",
+          "description": "Parsec Virtual Display Adapter",
+          "flags": 0,
+          "active": false,
+          "mode_known": false,
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0
+        }
+      ]
+    },
+    "lease_restore_events": [
+      {
+        "layout_restore": 0
+      },
+      {
+        "remove_requested_index": 0
+      }
+    ],
+    "hashes": {
+      "lease2.stdout.poststop": "1f80cb99f130b6b4e695bb253720fd332599449bfa1e143723bb82724baf1f71",
+      "lease2.stderr.poststop": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "twoscreen2.stdout.poststop": "b822323f73a5a14210b6dc72fbf209dc69d2fe75c37937480a0030c2af136adf",
+      "twoscreen2.stderr.poststop": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "restoration": {
+    "service": "Running",
+    "restored": true,
+    "held_release_flags": 0,
+    "owned": [],
+    "tasks": [
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-fixture",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-foreman",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-helper",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-lease2",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-pattern",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-restore",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-33307760f9ad-twoscreen2",
+        "State": 3
+      }
+    ],
+    "errors": {}
+  },
+  "stage_cleaned": true,
+  "handles": {
+    "desktop": {
+      "id": 50859,
+      "exit_code": 0
+    },
+    "steps": {
+      "id": 83734,
+      "exit_code": 1
+    }
+  },
+  "limits": [
+    "Primary screen reached view-only with hardware decoding; portrait switch did not reach frame/input ready.",
+    "No click, keyboard or cursor pixel steps were performed; no presentation-FPS claim.",
+    "Original source stderr was not preserved by the helper; native failure cause remains unproven.",
+    "Initial log hash query failed while fixture output was open. Preserved that operation; post-stop download used distinct paths and SHA256 verification."
+  ]
+}

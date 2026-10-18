@@ -284,14 +284,21 @@ async fn read_update(
         .write_u8(1)
         .await
         .map_err(media_error)?;
-    read_packet(
+    let result = read_packet(
         process.output.as_mut().unwrap(),
         config,
         sequence,
         image_id,
         Duration::from_secs(5),
     )
-    .await
+    .await;
+    match result {
+        Err(DesktopError::Rejected {
+            code: DesktopErrorCode::MediaUnavailable,
+            message,
+        }) => Err(media_error(process.failure(message).await)),
+        result => result,
+    }
 }
 async fn read_packet(
     output: &mut (impl tokio::io::AsyncRead + Unpin),
@@ -439,13 +446,15 @@ mod tests {
         ] {
             let (mut input, mut output) = tokio::io::duplex(1024);
             input.write_all(&bytes).await.unwrap();
-            assert!(tokio::time::timeout(
-                Duration::from_millis(200),
-                read_packet(&mut output, &config(), 1, 0, Duration::from_secs(5))
-            )
-            .await
-            .unwrap()
-            .is_err());
+            assert!(
+                tokio::time::timeout(
+                    Duration::from_millis(200),
+                    read_packet(&mut output, &config(), 1, 0, Duration::from_secs(5))
+                )
+                .await
+                .unwrap()
+                .is_err()
+            );
         }
     }
     #[tokio::test]
@@ -453,12 +462,14 @@ mod tests {
         let (input, mut output) = tokio::io::duplex(1024);
         let config = config();
         // No artificial update is generated on a stationary desktop.
-        assert!(tokio::time::timeout(
-            Duration::from_millis(50),
-            read_packet(&mut output, &config, 1, 0, Duration::from_millis(20))
-        )
-        .await
-        .is_err());
+        assert!(
+            tokio::time::timeout(
+                Duration::from_millis(50),
+                read_packet(&mut output, &config, 1, 0, Duration::from_millis(20))
+            )
+            .await
+            .is_err()
+        );
         // The owning task retires the process after cancelled IO. Use a fresh
         // pipe for partial-payload tests; never reuse an ambiguous live worker.
         drop(input);

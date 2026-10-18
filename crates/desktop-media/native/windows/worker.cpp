@@ -84,6 +84,7 @@ static void inventory(const std::vector<Display>& found) {
     std::cout << "]\n";
 }
 #include "input_worker.h"
+#include "user_capture.h"
 #include "input_fixture.h"
 static void validate_wgc_desktop(const Display& selected);
 #include "cursor_worker.h"
@@ -163,11 +164,19 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
     const auto switch_wgc = [&] {
         if (wgc) return;
         if (synthetic) throw std::runtime_error("Synthetic capture cannot change backend");
-        validate_wgc_desktop(display);
-        duplication.Reset();
-        wgc_runtime = std::make_unique<WgcRuntime>();
-        wgc = std::make_unique<WgcCapture>(device.Get(), display, fps);
-        if (coordination) coordination->activate();
+        const char* stage = "desktop validation";
+        try {
+            validate_wgc_desktop(display);
+            duplication.Reset();
+            stage = "runtime initialization";
+            wgc_runtime = std::make_unique<WgcRuntime>();
+            stage = "capture initialization";
+            wgc = std::make_unique<WgcCapture>(device.Get(), display, fps);
+            stage = "cursor coordination";
+            if (coordination) coordination->activate();
+        } catch (const std::exception& error) {
+            throw std::runtime_error(std::string("WGC fallback ") + stage + ": " + error.what());
+        }
         std::cerr << "media capture=wgc_gpu readback_per_frame=0\n";
     };
     const auto coordinate = [&] {
@@ -366,6 +375,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         (std::string(argv[5]) == "interactive" || std::string(argv[5]) == "stream-interactive" ||
          std::string(argv[5]) == "interactive-software" || std::string(argv[5]) == "stream-interactive-software");
     try {
+        if (const auto result = user_capture::run(argc, argv)) return *result;
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         if (argc == 2 && std::string(argv[1]) == "cursor-win32-check") {
             win32_cursor_check(); return 0;

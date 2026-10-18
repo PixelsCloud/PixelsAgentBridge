@@ -141,6 +141,8 @@ fn main() {
         "shcore",
         "shell32",
         "advapi32",
+        "userenv",
+        "wtsapi32",
     ] {
         println!("cargo:rustc-link-lib={library}");
     }
