@@ -32,6 +32,7 @@ def main():
     fn(u, 'EnumWindows', W.BOOL, callback, W.LPARAM)
     fn(u, 'EnumChildWindows', W.BOOL, W.HWND, callback, W.LPARAM)
     fn(u, 'GetWindowThreadProcessId', W.DWORD, W.HWND, C.POINTER(W.DWORD))
+    fn(u, 'WindowFromPoint', W.HWND, W.POINT)
     fn(u, 'GetClassNameW', C.c_int, W.HWND, W.LPWSTR, C.c_int)
     fn(u, 'GetWindowRect', W.BOOL, W.HWND, C.POINTER(W.RECT))
     fn(u, 'IsWindowVisible', W.BOOL, W.HWND)
@@ -69,6 +70,17 @@ def main():
     points = [(round(origin[0] + (240 + i * 96) * scale),
                round(origin[1] + (200 + row * 96) * scale))
               for row in range(2) for i in range(16)]
+
+    def window_hits():
+        # Failure-only metadata helps distinguish an occluding local window
+        # from damaged/incorrect video. Never inspect another window's title.
+        hits = []
+        for x, y in points:
+            hwnd = u.WindowFromPoint(W.POINT(x, y))
+            pid = W.DWORD(); u.GetWindowThreadProcessId(hwnd, C.byref(pid))
+            name = C.create_unicode_buffer(256); u.GetClassNameW(hwnd, name, 256)
+            hits.append({'hwnd': hwnd, 'pid': pid.value, 'class': name.value})
+        return hits
     left, top_y = min(x for x, y in points), min(y for x, y in points)
     w, h = max(x for x, y in points) - left + 1, max(y for x, y in points) - top_y + 1
 
@@ -116,6 +128,7 @@ def main():
                             'previous_number': last, 'number': number,
                             'modular_delta': (number-last) % 4096, 'bits': values,
                             'bgr': [list(pixels[offset:offset+3]) for offset in offsets],
+                            'window_hits': window_hits(),
                         }
                         raise AssertionError('Nonmonotonic presentation')
                     events.append([time.perf_counter()-start, number]); last = number
@@ -125,7 +138,8 @@ def main():
                 if first_invalid is None:
                     first_invalid = {'elapsed': time.perf_counter()-start,
                                      'bits': values,
-                                     'bgr': [list(pixels[offset:offset+3]) for offset in offsets]}
+                                     'bgr': [list(pixels[offset:offset+3]) for offset in offsets],
+                                     'window_hits': window_hits()}
             next_sample += 1/60
             time.sleep(max(0, next_sample-time.perf_counter()))
     except BaseException as error:
@@ -144,6 +158,7 @@ def main():
     report = {'method': 'actual composed native surface, 12-bit generated frame code with complement',
               'started_unix_ms': started_unix_ms, 'finished_unix_ms': round(time.time() * 1000),
               'source_dimensions': [1920,1080], 'surface_dimensions': [width,height],
+              'surface_hwnd': surfaces[0], 'desktop_pid': owner,
               'surface_screen_bounds': [bounds.left,bounds.top,bounds.right,bounds.bottom],
               'sample_points': points, 'first_invalid_sample': first_invalid,
               'first_nonmonotonic_sample': first_nonmonotonic,

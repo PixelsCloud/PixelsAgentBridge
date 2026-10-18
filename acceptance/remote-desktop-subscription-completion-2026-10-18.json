@@ -380,7 +380,7 @@
     }
   },
   "fixed_product_mixed_acceptance": {
-    "status": "running; not accepted",
+    "status": "failed: first presentation sample has no valid generated frame codes",
     "profile": "mixed-product-163a14c41d05",
     "stage": "formal-linux-login-d91b34dca5d1",
     "requested_seconds": 1800,
@@ -389,6 +389,930 @@
       "pab-executor": "2a3148d65ec71229db6f26736c9305b5cf0ffccbedb8c619a01cf3f9eec9d51c",
       "manager.py": "be1b549e646d68480b2dccb601ca863e4d2eb838fdd97938ef3f306786a9b4fb",
       "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
-    }
+    },
+    "raw_sha256": "fc7a6dee8959efe1d9104f8f6a71fc8dd67eae76e82c049572640e26ed448397",
+    "passed": false,
+    "first_round_operations_completed": true,
+    "presentation": {
+      "method": "actual composed native surface, 12-bit generated frame code with complement",
+      "started_unix_ms": 1792321102241,
+      "finished_unix_ms": 1792321112243,
+      "source_dimensions": [
+        1920,
+        1080
+      ],
+      "surface_dimensions": [
+        698,
+        436
+      ],
+      "surface_screen_bounds": [
+        31,
+        193,
+        729,
+        629
+      ],
+      "sample_points": [
+        [
+          118,
+          287
+        ],
+        [
+          153,
+          287
+        ],
+        [
+          188,
+          287
+        ],
+        [
+          223,
+          287
+        ],
+        [
+          258,
+          287
+        ],
+        [
+          293,
+          287
+        ],
+        [
+          328,
+          287
+        ],
+        [
+          363,
+          287
+        ],
+        [
+          397,
+          287
+        ],
+        [
+          432,
+          287
+        ],
+        [
+          467,
+          287
+        ],
+        [
+          502,
+          287
+        ],
+        [
+          537,
+          287
+        ],
+        [
+          572,
+          287
+        ],
+        [
+          607,
+          287
+        ],
+        [
+          642,
+          287
+        ],
+        [
+          118,
+          322
+        ],
+        [
+          153,
+          322
+        ],
+        [
+          188,
+          322
+        ],
+        [
+          223,
+          322
+        ],
+        [
+          258,
+          322
+        ],
+        [
+          293,
+          322
+        ],
+        [
+          328,
+          322
+        ],
+        [
+          363,
+          322
+        ],
+        [
+          397,
+          322
+        ],
+        [
+          432,
+          322
+        ],
+        [
+          467,
+          322
+        ],
+        [
+          502,
+          322
+        ],
+        [
+          537,
+          322
+        ],
+        [
+          572,
+          322
+        ],
+        [
+          607,
+          322
+        ],
+        [
+          642,
+          322
+        ]
+      ],
+      "first_invalid_sample": {
+        "elapsed": 0.01751950000107172,
+        "bits": [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "bgr": [
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            25,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            25,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            215,
+            0
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            25,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            24,
+            255
+          ],
+          [
+            0,
+            215,
+            0
+          ]
+        ]
+      },
+      "first_nonmonotonic_sample": null,
+      "failure": null,
+      "seconds": 10.00156330000027,
+      "samples": 600,
+      "invalid_samples": 600,
+      "repeated_samples": 0,
+      "unique_presentations": 0,
+      "warmup_seconds": 3,
+      "steady_fps": 0.0,
+      "longest_presentation_gap_seconds": 7.001563300000271,
+      "events": [],
+      "passed": false
+    },
+    "separate_view_only_diagnostic": {
+      "sha256": "6d10d24d0e5ce7160f09a2c036b023c21953ad2ef9d4888a92038a04caff0274",
+      "closed": true,
+      "rounds": [
+        {
+          "index": 1,
+          "exit_code": 0,
+          "sample": {
+            "method": "actual composed native surface, 12-bit generated frame code with complement",
+            "started_unix_ms": 1792321201637,
+            "finished_unix_ms": 1792321261646,
+            "source_dimensions": [
+              1920,
+              1080
+            ],
+            "surface_dimensions": [
+              698,
+              436
+            ],
+            "surface_screen_bounds": [
+              31,
+              193,
+              729,
+              629
+            ],
+            "sample_points": [
+              [
+                118,
+                287
+              ],
+              [
+                153,
+                287
+              ],
+              [
+                188,
+                287
+              ],
+              [
+                223,
+                287
+              ],
+              [
+                258,
+                287
+              ],
+              [
+                293,
+                287
+              ],
+              [
+                328,
+                287
+              ],
+              [
+                363,
+                287
+              ],
+              [
+                397,
+                287
+              ],
+              [
+                432,
+                287
+              ],
+              [
+                467,
+                287
+              ],
+              [
+                502,
+                287
+              ],
+              [
+                537,
+                287
+              ],
+              [
+                572,
+                287
+              ],
+              [
+                607,
+                287
+              ],
+              [
+                642,
+                287
+              ],
+              [
+                118,
+                322
+              ],
+              [
+                153,
+                322
+              ],
+              [
+                188,
+                322
+              ],
+              [
+                223,
+                322
+              ],
+              [
+                258,
+                322
+              ],
+              [
+                293,
+                322
+              ],
+              [
+                328,
+                322
+              ],
+              [
+                363,
+                322
+              ],
+              [
+                397,
+                322
+              ],
+              [
+                432,
+                322
+              ],
+              [
+                467,
+                322
+              ],
+              [
+                502,
+                322
+              ],
+              [
+                537,
+                322
+              ],
+              [
+                572,
+                322
+              ],
+              [
+                607,
+                322
+              ],
+              [
+                642,
+                322
+              ]
+            ],
+            "first_invalid_sample": null,
+            "first_nonmonotonic_sample": null,
+            "failure": null,
+            "seconds": 60.00876440000138,
+            "samples": 3597,
+            "invalid_samples": 0,
+            "repeated_samples": 2718,
+            "unique_presentations": 879,
+            "warmup_seconds": 3,
+            "steady_fps": 14.629329521128506,
+            "longest_presentation_gap_seconds": 0.13208469999881345,
+            "passed": true
+          }
+        },
+        {
+          "index": 2,
+          "exit_code": 0,
+          "sample": {
+            "method": "actual composed native surface, 12-bit generated frame code with complement",
+            "started_unix_ms": 1792321261874,
+            "finished_unix_ms": 1792321321881,
+            "source_dimensions": [
+              1920,
+              1080
+            ],
+            "surface_dimensions": [
+              698,
+              436
+            ],
+            "surface_screen_bounds": [
+              31,
+              193,
+              729,
+              629
+            ],
+            "sample_points": [
+              [
+                118,
+                287
+              ],
+              [
+                153,
+                287
+              ],
+              [
+                188,
+                287
+              ],
+              [
+                223,
+                287
+              ],
+              [
+                258,
+                287
+              ],
+              [
+                293,
+                287
+              ],
+              [
+                328,
+                287
+              ],
+              [
+                363,
+                287
+              ],
+              [
+                397,
+                287
+              ],
+              [
+                432,
+                287
+              ],
+              [
+                467,
+                287
+              ],
+              [
+                502,
+                287
+              ],
+              [
+                537,
+                287
+              ],
+              [
+                572,
+                287
+              ],
+              [
+                607,
+                287
+              ],
+              [
+                642,
+                287
+              ],
+              [
+                118,
+                322
+              ],
+              [
+                153,
+                322
+              ],
+              [
+                188,
+                322
+              ],
+              [
+                223,
+                322
+              ],
+              [
+                258,
+                322
+              ],
+              [
+                293,
+                322
+              ],
+              [
+                328,
+                322
+              ],
+              [
+                363,
+                322
+              ],
+              [
+                397,
+                322
+              ],
+              [
+                432,
+                322
+              ],
+              [
+                467,
+                322
+              ],
+              [
+                502,
+                322
+              ],
+              [
+                537,
+                322
+              ],
+              [
+                572,
+                322
+              ],
+              [
+                607,
+                322
+              ],
+              [
+                642,
+                322
+              ]
+            ],
+            "first_invalid_sample": null,
+            "first_nonmonotonic_sample": null,
+            "failure": null,
+            "seconds": 60.006750600001396,
+            "samples": 3598,
+            "invalid_samples": 0,
+            "repeated_samples": 2725,
+            "unique_presentations": 873,
+            "warmup_seconds": 3,
+            "steady_fps": 14.542137400828802,
+            "longest_presentation_gap_seconds": 0.14327059999777703,
+            "passed": true
+          }
+        },
+        {
+          "index": 3,
+          "exit_code": 0,
+          "sample": {
+            "method": "actual composed native surface, 12-bit generated frame code with complement",
+            "started_unix_ms": 1792321322098,
+            "finished_unix_ms": 1792321382101,
+            "source_dimensions": [
+              1920,
+              1080
+            ],
+            "surface_dimensions": [
+              698,
+              436
+            ],
+            "surface_screen_bounds": [
+              31,
+              193,
+              729,
+              629
+            ],
+            "sample_points": [
+              [
+                118,
+                287
+              ],
+              [
+                153,
+                287
+              ],
+              [
+                188,
+                287
+              ],
+              [
+                223,
+                287
+              ],
+              [
+                258,
+                287
+              ],
+              [
+                293,
+                287
+              ],
+              [
+                328,
+                287
+              ],
+              [
+                363,
+                287
+              ],
+              [
+                397,
+                287
+              ],
+              [
+                432,
+                287
+              ],
+              [
+                467,
+                287
+              ],
+              [
+                502,
+                287
+              ],
+              [
+                537,
+                287
+              ],
+              [
+                572,
+                287
+              ],
+              [
+                607,
+                287
+              ],
+              [
+                642,
+                287
+              ],
+              [
+                118,
+                322
+              ],
+              [
+                153,
+                322
+              ],
+              [
+                188,
+                322
+              ],
+              [
+                223,
+                322
+              ],
+              [
+                258,
+                322
+              ],
+              [
+                293,
+                322
+              ],
+              [
+                328,
+                322
+              ],
+              [
+                363,
+                322
+              ],
+              [
+                397,
+                322
+              ],
+              [
+                432,
+                322
+              ],
+              [
+                467,
+                322
+              ],
+              [
+                502,
+                322
+              ],
+              [
+                537,
+                322
+              ],
+              [
+                572,
+                322
+              ],
+              [
+                607,
+                322
+              ],
+              [
+                642,
+                322
+              ]
+            ],
+            "first_invalid_sample": null,
+            "first_nonmonotonic_sample": null,
+            "failure": null,
+            "seconds": 60.00269820000176,
+            "samples": 3600,
+            "invalid_samples": 0,
+            "repeated_samples": 2728,
+            "unique_presentations": 872,
+            "warmup_seconds": 3,
+            "steady_fps": 14.508085162887507,
+            "longest_presentation_gap_seconds": 0.1310154999991937,
+            "passed": true
+          }
+        }
+      ]
+    },
+    "restoration": [
+      {
+        "original": {
+          "session": "2",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "properties": {
+            "MainPID": "52610",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 18:44:47 CST] ; stop_time=[n/a] ; pid=52610 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          },
+          "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+          "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "staged_sha256": "2a3148d65ec71229db6f26736c9305b5cf0ffccbedb8c619a01cf3f9eec9d51c",
+          "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+        },
+        "restored": {
+          "original_service_restored": true,
+          "properties": {
+            "MainPID": "54902",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 19:04:23 CST] ; stop_time=[n/a] ; pid=54902 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          }
+        },
+        "owned_processes": [],
+        "input_devices": [],
+        "session_restored": true,
+        "rollback_trigger": "",
+        "stage_removed": true,
+        "fixture_removed": true
+      }
+    ],
+    "layout": {
+      "layout": {
+        "before_mode": "1694x1102@59.997711181640625",
+        "test_mode": "1920x1080@60",
+        "persistent": false,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "temporary_idle_inhibitor": true,
+        "generated_ticks": 11462,
+        "restored": true
+      },
+      "payload_removed": true
+    },
+    "local_processes_collected": {
+      "driver_exit": 1,
+      "diagnostic_exit": 0,
+      "desktop_exit": 0,
+      "media_observer_exit": 0,
+      "gpu_observer_exit": 0
+    },
+    "limits": "No long-run conclusion; invalid presentation cause remains unproven, no window-hit metadata in this failed sample"
   }
 }
