@@ -85,29 +85,34 @@ pub(super) struct VerifiedMediaHelper {
     pid: u32,
     marker: String,
     #[cfg(target_os = "linux")]
+    process: pab_os_control::execution::LinuxProcessWatch,
+    #[cfg(target_os = "linux")]
     graphical: Option<pab_os_control::execution::LinuxGraphicalSession>,
 }
 impl VerifiedMediaHelper {
     pub fn same_process(&self, other: &Self) -> bool {
-        let same = self.pid == other.pid && self.marker == other.marker && self.native == other.native;
+        let same = self.pid == other.pid && self.native == other.native;
         #[cfg(target_os = "linux")]
-        { same && self.graphical == other.graphical }
+        { same && self.process == other.process && self.graphical == other.graphical }
         #[cfg(not(target_os = "linux"))]
-        { same }
+        { same && self.marker == other.marker }
     }
     pub fn current(&self) -> bool {
-        let current = pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
-            && process_user_identity(self.pid).ok().as_ref() == Some(&self.native);
         #[cfg(target_os = "linux")]
-        { current && self.graphical.as_ref().is_some_and(|session| session.current(self.pid)) }
+        { self.process.user_identity().ok().as_ref() == Some(&self.native)
+            && self.graphical.as_ref().is_some_and(|session| session.current(self.pid)) }
         #[cfg(not(target_os = "linux"))]
-        { current }
+        { pab_os_control::process_identity(self.pid).ok().as_ref() == Some(&self.marker)
+            && process_user_identity(self.pid).ok().as_ref() == Some(&self.native) }
     }
     pub async fn wait_retired(&self) {
         #[cfg(target_os = "linux")]
         loop {
             tokio::time::sleep(Duration::from_millis(250)).await;
-            if !self.current() { return; }
+            if !self.current() {
+                tracing::warn!(pid = self.pid, "Linux media helper verification retired");
+                return;
+            }
         }
         #[cfg(not(target_os = "linux"))]
         std::future::pending::<()>().await;
@@ -163,6 +168,8 @@ async fn verify_process(
     if !cfg!(any(windows, target_os = "macos", target_os = "linux")) {
         return Ok(None);
     }
+    #[cfg(target_os = "linux")]
+    let process = pab_os_control::execution::LinuxProcessWatch::observe(pid)?;
     let (native, marker) = tokio::task::spawn_blocking(move || {
         let marker = pab_os_control::process_identity(pid).map_err(std::io::Error::other)?;
         let native = process_user_identity(pid)?;
@@ -184,11 +191,17 @@ async fn verify_process(
     {
         return Err(LocalIpcError::Protocol);
     }
+    #[cfg(target_os = "linux")]
+    if process.user_identity().ok().as_ref() != Some(&native) {
+        return Err(LocalIpcError::Protocol);
+    }
     peer.write_u8(1).await?;
     Ok(Some(VerifiedMediaHelper {
         native,
         pid,
         marker,
+        #[cfg(target_os = "linux")]
+        process,
         #[cfg(target_os = "linux")]
         graphical: None,
     }))

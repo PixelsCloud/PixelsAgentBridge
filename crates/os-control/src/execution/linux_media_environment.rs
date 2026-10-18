@@ -1,6 +1,6 @@
 //! Observe only the graphical environment needed by an unprivileged media
 //! helper. Never source a login script or copy service/process secrets wholesale.
-use super::{LinuxGraphicalSession, PreparedUser, UserProcess};
+use super::{LinuxGraphicalSession, LinuxProcessWatch, PreparedUser, UserProcess};
 use std::{
     collections::BTreeMap,
     ffi::OsString,
@@ -14,7 +14,7 @@ use std::{
 pub struct LinuxMediaEnvironment {
     session: LinuxGraphicalSession,
     pid: u32,
-    marker: String,
+    process: LinuxProcessWatch,
     values: BTreeMap<String, String>,
 }
 impl LinuxMediaEnvironment {
@@ -64,7 +64,7 @@ impl LinuxMediaEnvironment {
         ))
     }
     fn from_process(session: LinuxGraphicalSession, pid: u32, runtime: &str) -> io::Result<Self> {
-        let marker = crate::process_identity(pid).map_err(io::Error::other)?;
+        let process = LinuxProcessWatch::observe(pid)?;
         if LinuxGraphicalSession::for_media_process(pid, session.uid())? != session {
             return Err(io::Error::other(
                 "graphical environment belongs to another session",
@@ -84,7 +84,7 @@ impl LinuxMediaEnvironment {
         Ok(Self {
             session,
             pid,
-            marker,
+            process,
             values,
         })
     }
@@ -94,16 +94,10 @@ impl LinuxMediaEnvironment {
     /// Pin the observed compositor process before a privileged media child can
     /// duplicate its DRM descriptor. A reused numeric PID must never suffice.
     pub fn pin_process(&self) -> io::Result<(u32, std::os::fd::OwnedFd)> {
-        use std::os::fd::{FromRawFd, OwnedFd};
         if !self.current() {
             return Err(io::Error::other("media compositor changed"));
         }
-        // SAFETY: pidfd_open takes only scalar arguments and returns a new fd.
-        let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, self.pid, 0) };
-        if raw < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        let descriptor = unsafe { OwnedFd::from_raw_fd(raw as _) };
+        let descriptor = self.process.duplicate_fd()?;
         if !self.current() {
             return Err(io::Error::other("media compositor changed while pinning"));
         }
@@ -111,7 +105,7 @@ impl LinuxMediaEnvironment {
     }
     pub fn current(&self) -> bool {
         LinuxGraphicalSession::active_console().as_ref().ok() == Some(&self.session)
-            && crate::process_identity(self.pid).as_ref().ok() == Some(&self.marker)
+            && self.process.current()
             && fs::metadata(format!("/proc/{}", self.pid))
                 .is_ok_and(|m| m.uid() == self.session.uid())
             && self.session.current(self.pid)

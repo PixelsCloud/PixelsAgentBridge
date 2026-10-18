@@ -16,6 +16,10 @@ mod linux_graphical;
 #[cfg(target_os = "linux")]
 pub use linux_graphical::LinuxGraphicalSession;
 #[cfg(target_os = "linux")]
+mod linux_process_watch;
+#[cfg(target_os = "linux")]
+pub use linux_process_watch::LinuxProcessWatch;
+#[cfg(target_os = "linux")]
 mod linux_media_environment;
 #[cfg(target_os = "linux")]
 pub use linux_media_environment::LinuxMediaEnvironment;

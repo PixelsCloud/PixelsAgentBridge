@@ -188,10 +188,16 @@ impl LinuxGraphicalSession {
         })
     }
     pub fn current(&self, pid: u32) -> bool {
-        Self::observe(pid, self.uid, self.class.as_bytes() == b"greeter")
-            .as_ref()
-            .ok()
-            == Some(self)
+        self.check_current(pid).is_ok()
+    }
+    /// Preserve the observation error for lifecycle diagnostics. Callers must
+    /// still retire media on any failure, just as with the boolean check.
+    pub fn check_current(&self, pid: u32) -> io::Result<()> {
+        let observed = Self::observe(pid, self.uid, self.class.as_bytes() == b"greeter")?;
+        if observed != *self {
+            return Err(io::Error::other("graphical session identity changed"));
+        }
+        Ok(())
     }
 }
 fn eligible(

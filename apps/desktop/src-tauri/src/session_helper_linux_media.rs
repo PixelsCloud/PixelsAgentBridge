@@ -72,7 +72,8 @@ fn start_inner(media_only: bool) -> Result<Task, String> {
                 let switched = async {
                     loop {
                         tokio::time::sleep(Duration::from_millis(250)).await;
-                        if !session.current(pid) {
+                        if let Err(error) = session.check_current(pid) {
+                            tracing::info!(%error, session = session.id(), "Linux media graphical session retired");
                             break;
                         }
                     }
@@ -86,7 +87,7 @@ fn start_inner(media_only: bool) -> Result<Task, String> {
                 };
                 tokio::select! {
                     result = serve => {
-                        if let Err(error) = result { tracing::debug!(%error, "Linux media helper disconnected"); }
+                        if let Err(error) = result { tracing::warn!(%error, "Linux media helper disconnected"); }
                     }
                     _ = switched => {}
                     _ = &mut stopped => break,

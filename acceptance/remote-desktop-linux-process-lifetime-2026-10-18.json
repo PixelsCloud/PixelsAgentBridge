@@ -1,0 +1,2049 @@
+{
+  "date": "2026-10-18",
+  "baseline": "780fa76",
+  "cases": [
+    {
+      "label": "network_interruption",
+      "profile": "mixed-product-b1b88fb45c20",
+      "stage": "formal-linux-login-8d5b5fa254da",
+      "raw_sha256": "18fa28699577ae99c59d7128e2d9e77287c094a34fad2bb32e76494b09926510",
+      "requested_seconds": 1800,
+      "passed": false,
+      "artifacts": {
+        "pab-desktop.exe": "5293404b5edf3c55eb57bb89b0e1adf29dc3e68d5d3c40ef9b8997762614c5e9",
+        "pab-mcp.exe": "ed7b37bb02d4890a4c36b9525a186c20957d9ff9b02da71ed7279f5a62b57f3e"
+      },
+      "remote_artifacts": {
+        "pab-desktop": "538a3aa84311d93d58ff140234ddb16c72cb1b62f2527f853b8a12a9ee60509c",
+        "pab-executor": "535801e5f79806ae2ca28c417e59c36e0cfab6286f94337ced31598d8cc35d8a",
+        "manager.py": "2613fa7c61869d2cb3787d33f2b5e159bc09a2bffd6a1dc4ac80247b639991fd",
+        "fixture.py": "5ee8c0a9260b9a5d5569ce9c9152d9b5c93340418aeff939ef55213b5d9093e1"
+      },
+      "rounds": [
+        {
+          "index": 1,
+          "elapsed": 7.700000423938036e-06,
+          "passed": true,
+          "steady_fps": 14.701160518176899,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 40310,
+              "mode": "executor",
+              "worker": null,
+              "fds": 33,
+              "rss_kib": 83484,
+              "threads": 9,
+              "cpu_ticks": 90
+            },
+            {
+              "pid": 40320,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 48048,
+              "threads": 3,
+              "cpu_ticks": 33
+            },
+            {
+              "pid": 40327,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51856,
+              "threads": 3,
+              "cpu_ticks": 14
+            },
+            {
+              "pid": 40534,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234676,
+              "threads": 11,
+              "cpu_ticks": 839
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "elapsed": 30.116762499998003,
+          "passed": true,
+          "steady_fps": 14.570943359015539,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 40310,
+              "mode": "executor",
+              "worker": null,
+              "fds": 33,
+              "rss_kib": 83840,
+              "threads": 10,
+              "cpu_ticks": 197
+            },
+            {
+              "pid": 40320,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 48048,
+              "threads": 3,
+              "cpu_ticks": 52
+            },
+            {
+              "pid": 40327,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51856,
+              "threads": 3,
+              "cpu_ticks": 33
+            },
+            {
+              "pid": 40534,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234676,
+              "threads": 11,
+              "cpu_ticks": 3054
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "elapsed": 60.34601549999934,
+          "passed": true,
+          "steady_fps": 13.982372223587955,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 40310,
+              "mode": "executor",
+              "worker": null,
+              "fds": 33,
+              "rss_kib": 83876,
+              "threads": 9,
+              "cpu_ticks": 313
+            },
+            {
+              "pid": 40320,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 48048,
+              "threads": 3,
+              "cpu_ticks": 73
+            },
+            {
+              "pid": 40327,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51856,
+              "threads": 3,
+              "cpu_ticks": 52
+            },
+            {
+              "pid": 40534,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234676,
+              "threads": 11,
+              "cpu_ticks": 5311
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "elapsed": 90.51252399999794,
+          "passed": false,
+          "steady_fps": null,
+          "invalid_samples": null,
+          "operations_completed": false,
+          "processes": [
+            {
+              "pid": 40310,
+              "mode": "executor",
+              "worker": null,
+              "fds": 33,
+              "rss_kib": 83876,
+              "threads": 7,
+              "cpu_ticks": 386
+            },
+            {
+              "pid": 40320,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 48048,
+              "threads": 3,
+              "cpu_ticks": 87
+            },
+            {
+              "pid": 40327,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51856,
+              "threads": 3,
+              "cpu_ticks": 65
+            },
+            {
+              "pid": 40534,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234676,
+              "threads": 11,
+              "cpu_ticks": 6778
+            }
+          ]
+        }
+      ],
+      "status_trace": {
+        "current": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "b3bcf74b-4170-4fbd-b2a2-c45d387502e2",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        },
+        "events": [
+          {
+            "at_unix_ms": 1792316494513,
+            "source": "event",
+            "status": {
+              "phase": "connecting",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316494513,
+            "source": "snapshot",
+            "status": {
+              "phase": "ready",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316494708,
+            "source": "snapshot",
+            "status": {
+              "phase": "connecting",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316495276,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "b3bcf74b-4170-4fbd-b2a2-c45d387502e2",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316495328,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "b3bcf74b-4170-4fbd-b2a2-c45d387502e2",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": false,
+              "decoder": "d3d11_hardware"
+            }
+          }
+        ],
+        "dropped": 0
+      },
+      "last_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "b3bcf74b-4170-4fbd-b2a2-c45d387502e2",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "failure": "PAB connection operation timed out",
+      "media-lifecycle-log.json": {
+        "started_remote": 1792316502.9238381,
+        "finished_remote": 1792316839.1934052,
+        "stage_present": true,
+        "observed_files": [
+          "/run/pixels-agent-bridge-media/helper-6cSNDd/data/logs/media-helper.log",
+          "/var/lib/pixels-agent-bridge/logs/executor.log",
+          "/var/lib/pixels-agent-bridge/logs/media-supervisor.log"
+        ],
+        "records": [
+          {
+            "observed_remote_unix_ms": 1792316502925,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:41:25.694728Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper started session=\"2\" uid=1000 pid=40327"
+          },
+          {
+            "observed_remote_unix_ms": 1792316614872,
+            "path": "/run/pixels-agent-bridge-media/helper-6cSNDd/data/logs/media-helper.log",
+            "line": "2026-10-18T09:43:34.794855Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=WebSocket protocol error: Connection reset without closing handshake"
+          },
+          {
+            "observed_remote_unix_ms": 1792316838693,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:47:18.396278Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper reaped session=\"2\""
+          }
+        ],
+        "local_started": 1792316482.5440032,
+        "local_finished": 1792316819.0319717
+      },
+      "clock-offset-start.json": [
+        {
+          "local_before": 1792316562.1984591,
+          "local_after": 1792316562.446271,
+          "remote": 1792316582.6104057,
+          "offset_lower_seconds": 20.164134740829468,
+          "offset_upper_seconds": 20.411946535110474
+        },
+        {
+          "local_before": 1792316562.4462748,
+          "local_after": 1792316562.5821824,
+          "remote": 1792316582.7410645,
+          "offset_lower_seconds": 20.15888214111328,
+          "offset_upper_seconds": 20.294789791107178
+        },
+        {
+          "local_before": 1792316562.582186,
+          "local_after": 1792316562.7047489,
+          "remote": 1792316582.8680937,
+          "offset_lower_seconds": 20.163344860076904,
+          "offset_upper_seconds": 20.285907745361328
+        }
+      ],
+      "restoration": [
+        {
+          "original": {
+            "session": "2",
+            "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+            "properties": {
+              "MainPID": "39347",
+              "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 17:26:45 CST] ; stop_time=[n/a] ; pid=39347 ; code=(null) ; status=0/0 }",
+              "ActiveState": "active",
+              "SubState": "running",
+              "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+              "DropInPaths": ""
+            },
+            "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+            "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+            "staged_sha256": "535801e5f79806ae2ca28c417e59c36e0cfab6286f94337ced31598d8cc35d8a",
+            "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+          },
+          "restored": {
+            "original_service_restored": true,
+            "properties": {
+              "MainPID": "41688",
+              "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 17:47:18 CST] ; stop_time=[n/a] ; pid=41688 ; code=(null) ; status=0/0 }",
+              "ActiveState": "active",
+              "SubState": "running",
+              "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+              "DropInPaths": ""
+            }
+          },
+          "owned_processes": [],
+          "input_devices": [],
+          "session_restored": true,
+          "rollback_trigger": "",
+          "stage_removed": true,
+          "fixture_removed": true
+        }
+      ],
+      "layout": {
+        "layout": {
+          "before_mode": "1694x1102@59.997711181640625",
+          "test_mode": "1920x1080@60",
+          "persistent": false,
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "temporary_idle_inhibitor": true,
+          "generated_ticks": 10338,
+          "restored": true
+        },
+        "payload_removed": true
+      },
+      "desktop_errors": [
+        "2026-10-18T09:43:14.622907Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-cf8a250d-a6e5-4ed8-87cd-812657dd6d4b\" renderer=false recoverable=true error=PAB stream failed: connection lost",
+        "2026-10-18T09:43:16.815347Z  WARN iroh::socket::transports::relay::actor: Lost connection to relay server: Ping timeout",
+        "2026-10-18T09:43:19.830398Z  WARN iroh::socket::transports::relay::actor: Failed to connect to relay server: unable to connect: deadline has elapsed",
+        "2026-10-18T09:43:22.865992Z  WARN iroh::socket::transports::relay::actor: Failed to connect to relay server: unable to connect: deadline has elapsed",
+        "2026-10-18T09:43:25.917780Z  WARN iroh::socket::transports::relay::actor: Failed to connect to relay server: unable to connect: deadline has elapsed",
+        "2026-10-18T09:43:29.003905Z  WARN iroh::socket::transports::relay::actor: Failed to connect to relay server: unable to connect: deadline has elapsed",
+        "2026-10-18T09:43:31.094016Z  WARN iroh::socket::transports::relay::actor: Failed to connect to relay server: unable to connect: deadline has elapsed"
+      ],
+      "sample_fps": {
+        "min": 13.982372223587955,
+        "max": 14.701160518176899,
+        "mean": 14.41815870026013
+      }
+    },
+    {
+      "label": "lifecycle_diagnostic",
+      "profile": "mixed-product-d744c6ed4eea",
+      "stage": "formal-linux-login-b0a48ed4650c",
+      "raw_sha256": "e411f01b97d077b9a06c0abaa815591c7cf87e2714a1cecb99c1523df7a6b218",
+      "requested_seconds": 1800,
+      "passed": false,
+      "artifacts": {
+        "pab-desktop.exe": "5293404b5edf3c55eb57bb89b0e1adf29dc3e68d5d3c40ef9b8997762614c5e9",
+        "pab-mcp.exe": "ed7b37bb02d4890a4c36b9525a186c20957d9ff9b02da71ed7279f5a62b57f3e"
+      },
+      "remote_artifacts": {
+        "pab-desktop": "538a3aa84311d93d58ff140234ddb16c72cb1b62f2527f853b8a12a9ee60509c",
+        "pab-executor": "535801e5f79806ae2ca28c417e59c36e0cfab6286f94337ced31598d8cc35d8a",
+        "manager.py": "4cbc2495052299440ca06863ebc7ad779cbfe8016654cb502d7a29e3fd17bccf",
+        "fixture.py": "5ee8c0a9260b9a5d5569ce9c9152d9b5c93340418aeff939ef55213b5d9093e1"
+      },
+      "rounds": [
+        {
+          "index": 1,
+          "elapsed": 4.800000169780105e-06,
+          "passed": true,
+          "steady_fps": 14.123805541560204,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 83176,
+              "threads": 9,
+              "cpu_ticks": 107
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 38
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 16
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 872
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "elapsed": 30.051233899997897,
+          "passed": true,
+          "steady_fps": 13.555620394228018,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 83780,
+              "threads": 11,
+              "cpu_ticks": 237
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 61
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 37
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 3134
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "elapsed": 60.14183789999879,
+          "passed": true,
+          "steady_fps": 13.713761652680468,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 84148,
+              "threads": 9,
+              "cpu_ticks": 379
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 83
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 60
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 5579
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "elapsed": 90.1720951999996,
+          "passed": true,
+          "steady_fps": 14.678978786006743,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 84484,
+              "threads": 10,
+              "cpu_ticks": 502
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 103
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 79
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 7826
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "elapsed": 120.39351239999814,
+          "passed": true,
+          "steady_fps": 14.558763902707746,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 84976,
+              "threads": 9,
+              "cpu_ticks": 618
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 123
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 98
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 10092
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "elapsed": 150.61521019999782,
+          "passed": true,
+          "steady_fps": 14.697392741031157,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85308,
+              "threads": 9,
+              "cpu_ticks": 726
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 143
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 116
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 12329
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "elapsed": 180.8246829999989,
+          "passed": true,
+          "steady_fps": 14.683211842826484,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85308,
+              "threads": 10,
+              "cpu_ticks": 836
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 162
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 135
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 14613
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "elapsed": 210.84216699999888,
+          "passed": true,
+          "steady_fps": 14.569648784762318,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85316,
+              "threads": 10,
+              "cpu_ticks": 944
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 181
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 153
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 16819
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "elapsed": 241.05707459999758,
+          "passed": true,
+          "steady_fps": 14.570718352984281,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85328,
+              "threads": 9,
+              "cpu_ticks": 1050
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 199
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 171
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 19030
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "elapsed": 271.2874112999998,
+          "passed": true,
+          "steady_fps": 14.424308633247913,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85520,
+              "threads": 9,
+              "cpu_ticks": 1156
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 218
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 189
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 21263
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "elapsed": 301.42110010000033,
+          "passed": true,
+          "steady_fps": 14.426218100228665,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 85520,
+              "threads": 9,
+              "cpu_ticks": 1285
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 241
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 209
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 23615
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "elapsed": 331.5254638999977,
+          "passed": true,
+          "steady_fps": 14.40207325972561,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86280,
+              "threads": 9,
+              "cpu_ticks": 1421
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 263
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 230
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 26030
+            }
+          ]
+        },
+        {
+          "index": 13,
+          "elapsed": 361.77086979999876,
+          "passed": true,
+          "steady_fps": 14.568931040395595,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86280,
+              "threads": 10,
+              "cpu_ticks": 1543
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 284
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 248
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 28369
+            }
+          ]
+        },
+        {
+          "index": 14,
+          "elapsed": 391.803533899998,
+          "passed": true,
+          "steady_fps": 14.404966010767817,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86280,
+              "threads": 9,
+              "cpu_ticks": 1669
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 305
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 267
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 30723
+            }
+          ]
+        },
+        {
+          "index": 15,
+          "elapsed": 421.94228920000023,
+          "passed": true,
+          "steady_fps": 14.273745138684898,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86280,
+              "threads": 10,
+              "cpu_ticks": 1799
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 325
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 287
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 33076
+            }
+          ]
+        },
+        {
+          "index": 16,
+          "elapsed": 452.02131969999755,
+          "passed": true,
+          "steady_fps": 13.695750472559975,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86288,
+              "threads": 9,
+              "cpu_ticks": 1925
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 347
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 308
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 35385
+            }
+          ]
+        },
+        {
+          "index": 17,
+          "elapsed": 482.06828010000027,
+          "passed": true,
+          "steady_fps": 14.54501378746118,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86288,
+              "threads": 10,
+              "cpu_ticks": 2051
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 370
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 329
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 37698
+            }
+          ]
+        },
+        {
+          "index": 18,
+          "elapsed": 512.1946491999988,
+          "passed": true,
+          "steady_fps": 14.284600903106965,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86424,
+              "threads": 12,
+              "cpu_ticks": 2174
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 391
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 348
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 40036
+            }
+          ]
+        },
+        {
+          "index": 19,
+          "elapsed": 542.3205096999991,
+          "passed": true,
+          "steady_fps": 14.119227204211333,
+          "invalid_samples": 0,
+          "operations_completed": true,
+          "processes": [
+            {
+              "pid": 41990,
+              "mode": "executor",
+              "worker": null,
+              "fds": 34,
+              "rss_kib": 86480,
+              "threads": 10,
+              "cpu_ticks": 2301
+            },
+            {
+              "pid": 42000,
+              "mode": "--media-supervisor",
+              "worker": null,
+              "fds": 15,
+              "rss_kib": 47812,
+              "threads": 3,
+              "cpu_ticks": 412
+            },
+            {
+              "pid": 42007,
+              "mode": "--media-helper",
+              "worker": null,
+              "fds": 18,
+              "rss_kib": 51840,
+              "threads": 3,
+              "cpu_ticks": 370
+            },
+            {
+              "pid": 42230,
+              "mode": "--media-worker",
+              "worker": "capture",
+              "fds": 34,
+              "rss_kib": 234736,
+              "threads": 11,
+              "cpu_ticks": 42367
+            }
+          ]
+        }
+      ],
+      "status_trace": {
+        "current": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "8d6d9686-e56c-497f-bb47-40c8612bec3c",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        },
+        "events": [
+          {
+            "at_unix_ms": 1792316913052,
+            "source": "event",
+            "status": {
+              "phase": "connecting",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316913052,
+            "source": "snapshot",
+            "status": {
+              "phase": "ready",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316913257,
+            "source": "snapshot",
+            "status": {
+              "phase": "connecting",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316913750,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "c5daa955-2f5e-4727-99ad-cb865a5f0e4c",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792316913832,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "c5daa955-2f5e-4727-99ad-cb865a5f0e4c",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": false,
+              "decoder": "d3d11_hardware"
+            }
+          },
+          {
+            "at_unix_ms": 1792317477247,
+            "source": "event",
+            "status": {
+              "phase": "reconnecting",
+              "error": null,
+              "opened": null,
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792317478046,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "8d6d9686-e56c-497f-bb47-40c8612bec3c",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "decoder": null
+            }
+          },
+          {
+            "at_unix_ms": 1792317478098,
+            "source": "event",
+            "status": {
+              "phase": "viewing",
+              "error": null,
+              "opened": {
+                "config": {
+                  "session_id": "8d6d9686-e56c-497f-bb47-40c8612bec3c",
+                  "generation": 1,
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "codec": "h264_annex_b",
+                  "color": "bt709_limited",
+                  "fps": 15
+                },
+                "screens": [
+                  {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1920,
+                    "desktop_height": 1080,
+                    "pixel_width": 1920,
+                    "pixel_height": 1080,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  }
+                ],
+                "heartbeat_ms": 5000,
+                "lease_ms": 15000,
+                "input_supported": true
+              },
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": false,
+              "decoder": "d3d11_hardware"
+            }
+          }
+        ],
+        "dropped": 0
+      },
+      "last_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "8d6d9686-e56c-497f-bb47-40c8612bec3c",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      },
+      "failure": "AssertionError: Video session changed: c5daa955-2f5e-4727-99ad-cb865a5f0e4c -> 8d6d9686-e56c-497f-bb47-40c8612bec3c",
+      "media-lifecycle-log.json": {
+        "started_remote": 1792316913.4217925,
+        "finished_remote": 1792317536.7018373,
+        "stage_present": true,
+        "observed_files": [
+          "/run/pixels-agent-bridge-media/helper-2kbgm1/data/logs/media-helper.log",
+          "/run/pixels-agent-bridge-media/helper-pR1LTR/data/logs/media-helper.log",
+          "/var/lib/pixels-agent-bridge/logs/executor.log",
+          "/var/lib/pixels-agent-bridge/logs/media-supervisor.log"
+        ],
+        "records": [
+          {
+            "observed_remote_unix_ms": 1792316913423,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:48:17.197039Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper started session=\"2\" uid=1000 pid=42007"
+          },
+          {
+            "observed_remote_unix_ms": 1792317497536,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:58:17.436725Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper reaped session=\"2\""
+          },
+          {
+            "observed_remote_unix_ms": 1792317497536,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:58:17.443243Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper started session=\"2\" uid=1000 pid=43986"
+          },
+          {
+            "observed_remote_unix_ms": 1792317497536,
+            "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+            "line": "2026-10-18T09:58:17.403653Z  WARN pab_executor::session: task stream failed error=remote desktop MediaUnavailable: local WebSocket closed"
+          },
+          {
+            "observed_remote_unix_ms": 1792317507079,
+            "path": "/run/pixels-agent-bridge-media/helper-pR1LTR/data/logs/media-helper.log",
+            "line": "2026-10-18T09:58:26.922290Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=local WebSocket closed"
+          },
+          {
+            "observed_remote_unix_ms": 1792317536200,
+            "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+            "line": "2026-10-18T09:58:56.089252Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper reaped session=\"2\""
+          }
+        ],
+        "local_started": 1792316892.997079,
+        "local_finished": 1792317516.5375948
+      },
+      "clock-offset-start.json": [
+        {
+          "local_before": 1792316935.5143769,
+          "local_after": 1792316935.9193616,
+          "remote": 1792316956.074267,
+          "offset_lower_seconds": 20.154905319213867,
+          "offset_upper_seconds": 20.559890031814575
+        },
+        {
+          "local_before": 1792316935.919367,
+          "local_after": 1792316936.118972,
+          "remote": 1792316956.2906027,
+          "offset_lower_seconds": 20.17163062095642,
+          "offset_upper_seconds": 20.371235609054565
+        },
+        {
+          "local_before": 1792316936.1189754,
+          "local_after": 1792316936.2494743,
+          "remote": 1792316956.4198644,
+          "offset_lower_seconds": 20.170390129089355,
+          "offset_upper_seconds": 20.300889015197754
+        }
+      ],
+      "clock-offset-end.json": [
+        {
+          "local_before": 1792317513.4904838,
+          "local_after": 1792317513.7301352,
+          "remote": 1792317533.9037237,
+          "offset_lower_seconds": 20.173588514328003,
+          "offset_upper_seconds": 20.4132399559021
+        },
+        {
+          "local_before": 1792317513.730145,
+          "local_after": 1792317513.8468888,
+          "remote": 1792317534.0201938,
+          "offset_lower_seconds": 20.17330503463745,
+          "offset_upper_seconds": 20.290048837661743
+        },
+        {
+          "local_before": 1792317513.8468919,
+          "local_after": 1792317513.9629207,
+          "remote": 1792317534.1361494,
+          "offset_lower_seconds": 20.17322874069214,
+          "offset_upper_seconds": 20.289257526397705
+        }
+      ],
+      "restoration": [
+        {
+          "original": {
+            "session": "2",
+            "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+            "properties": {
+              "MainPID": "41688",
+              "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 17:47:18 CST] ; stop_time=[n/a] ; pid=41688 ; code=(null) ; status=0/0 }",
+              "ActiveState": "active",
+              "SubState": "running",
+              "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+              "DropInPaths": ""
+            },
+            "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+            "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+            "staged_sha256": "535801e5f79806ae2ca28c417e59c36e0cfab6286f94337ced31598d8cc35d8a",
+            "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+          },
+          "restored": {
+            "original_service_restored": true,
+            "properties": {
+              "MainPID": "44245",
+              "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 17:58:56 CST] ; stop_time=[n/a] ; pid=44245 ; code=(null) ; status=0/0 }",
+              "ActiveState": "active",
+              "SubState": "running",
+              "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+              "DropInPaths": ""
+            }
+          },
+          "owned_processes": [],
+          "input_devices": [],
+          "session_restored": true,
+          "rollback_trigger": "",
+          "stage_removed": true,
+          "fixture_removed": true
+        }
+      ],
+      "layout": {
+        "layout": {
+          "before_mode": "1694x1102@59.997711181640625",
+          "test_mode": "1920x1080@60",
+          "persistent": false,
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "temporary_idle_inhibitor": true,
+          "generated_ticks": 18693,
+          "restored": true
+        },
+        "payload_removed": true
+      },
+      "desktop_errors": [
+        "2026-10-18T09:57:57.247234Z  WARN pab_desktop_lib::operator::remote_desktop: remote desktop stream failed window=\"desktop-viewer-7753db83-e244-4d52-a891-5519ae4d191c\" renderer=false recoverable=true error=PAB stream failed: stream finished early (0 bytes read)"
+      ],
+      "sample_fps": {
+        "min": 13.555620394228018,
+        "max": 14.697392741031157,
+        "mean": 14.33140718679881
+      }
+    }
+  ],
+  "complete_requirements": 10,
+  "total_requirements": 53,
+  "source_sha256": {
+    "crates/os-control/src/execution/linux_process_watch.rs": "4894014a3925c0dfe62a8bc7281eb66b7beae2b13a8aa2a2679158e19fc4b59a",
+    "crates/os-control/src/execution/linux_media_environment.rs": "e963f121b6396e62d7e40f8795b9a8f20bb0441804b8c5a361d195d6ddfee47f",
+    "crates/os-control/src/execution/linux_graphical.rs": "951d4d86a6a19fba591990f1489a7c418a316644e0b3b53e844e553933837cf2",
+    "crates/os-control/src/execution.rs": "482049b51fa05829c77e82c834cde39ec9e17b725d881ef3d62249b65b8aa023",
+    "crates/os-control/src/linux.rs": "ad15a839cb93a62c06585aaffd00ee8f942125a6f77cdb2b39563c7967a3063e",
+    "crates/executor/src/local_ipc_helper_identity.rs": "9c5bc033336163b01f8a2175713157c2a0561be4ab75f9025ef43b4028f9f259",
+    "apps/desktop/src-tauri/src/session_helper_linux_media.rs": "85414fa5f9d212b5d89449314eecc5b8c83db191e1b8de8227c85f400a57f497"
+  },
+  "fixed_candidate_pending": {
+    "profile": "mixed-product-1d3473466792",
+    "stage": "formal-linux-login-4d802fac7122",
+    "hashes": {
+      "pab-desktop": "1432cceda8fd48bcf07c276c3b793903c68703e9e271e446d1d5133d6d9990c4",
+      "pab-executor": "68348f3dcb3289b912289db79c78707e3ac20192bfdf4b20c16c275d457c514a",
+      "manager.py": "b9262ec451f95a1554f15e2e16fcb00763f81747388c4238d9ac23cffa7d8079",
+      "fixture.py": "5ee8c0a9260b9a5d5569ce9c9152d9b5c93340418aeff939ef55213b5d9093e1"
+    }
+  },
+  "media-lifecycle_build": {
+    "exit_code": 0,
+    "sha256": "538a3aa84311d93d58ff140234ddb16c72cb1b62f2527f853b8a12a9ee60509c",
+    "bytes": 46854728,
+    "cargo_jobs": 3,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "process-watch_build": {
+    "exit_code": 0,
+    "sha256": "1432cceda8fd48bcf07c276c3b793903c68703e9e271e446d1d5133d6d9990c4",
+    "bytes": 46854728,
+    "cargo_jobs": 3,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "media_ipc_regressions": [
+    {
+      "sha256": "c1d5d08e13c489f0c076018dadbab350f2bd26b3267f29a7819768ccc6e105dc",
+      "tests": [
+        {
+          "test": "verified_helper_transfers_bounded_binary_and_retires_on_idle_drop",
+          "exit_code": 0,
+          "stdout": "\nrunning 1 test\ntest local_ipc::media::tests::verified_helper_transfers_bounded_binary_and_retires_on_idle_drop ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.07s\n\n",
+          "stderr": "Running as unit: pab-media-ipc-b61bec04b9b9-0.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 86ms\nCPU time consumed: 29ms\n"
+        },
+        {
+          "test": "cancellation_during_start_or_static_capture_releases_helper",
+          "exit_code": 0,
+          "stdout": "\nrunning 1 test\ntest local_ipc::media::tests::cancellation_during_start_or_static_capture_releases_helper ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.44s\n\n",
+          "stderr": "Running as unit: pab-media-ipc-b61bec04b9b9-1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 454ms\nCPU time consumed: 21ms\n"
+        },
+        {
+          "test": "paired_input_works_during_static_capture_and_releases_on_socket_close",
+          "exit_code": 0,
+          "stdout": "\nrunning 1 test\ntest local_ipc::media::tests::paired_input_works_during_static_capture_and_releases_on_socket_close ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.21s\n\n",
+          "stderr": "Running as unit: pab-media-ipc-b61bec04b9b9-2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 224ms\nCPU time consumed: 18ms\n"
+        },
+        {
+          "test": "supervised_media_wins_over_later_gui_and_falls_back_after_retirement",
+          "exit_code": 0,
+          "stdout": "\nrunning 1 test\ntest local_ipc::media::tests::supervised_media_wins_over_later_gui_and_falls_back_after_retirement ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 209 filtered out; finished in 0.06s\n\n",
+          "stderr": "Running as unit: pab-media-ipc-b61bec04b9b9-3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 73ms\nCPU time consumed: 24ms\n"
+        }
+      ],
+      "remote_removed": true
+    }
+  ]
+}
