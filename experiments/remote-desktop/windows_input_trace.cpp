@@ -34,6 +34,7 @@ thread_local UINT dispatching = 0;
 unsigned trace_sequence = 0;
 bool external_sender = false;
 bool initialize_active = false, reset_active = false;
+bool normal_show = false;
 bool pointer_button(UINT message) {
     return message == WM_LBUTTONDOWN || message == WM_LBUTTONUP || message == WM_LBUTTONDBLCLK;
 }
@@ -100,7 +101,19 @@ LRESULT WINAPI trace_dispatch(const MSG* message) {
 }
 
 BOOL WINAPI trace_show(HWND window, int command) {
+    if (normal_show && window == parent_window) {
+        STARTUPINFOW startup{sizeof(startup)};
+        GetStartupInfoW(&startup);
+        command = SW_SHOWNORMAL;
+        std::cout << "{\"normal_show\":true,\"startup_flags\":" << startup.dwFlags
+            << ",\"startup_show\":" << startup.wShowWindow << "}\n";
+    }
     const BOOL result = ShowWindow(window, command);
+    if (normal_show && window == parent_window) {
+        std::cout << "{\"normal_show_state\":true,\"thread_active_own\":"
+            << (GetActiveWindow() == window ? "true" : "false")
+            << ",\"foreground_own\":" << (GetForegroundWindow() == window ? "true" : "false") << "}\n";
+    }
     if (initialize_active && window == parent_window) {
         const HWND previous = GetForegroundWindow();
         SetActiveWindow(window);
@@ -170,6 +183,10 @@ int main(int argc, char** argv) {
     if (mode.find("external-") == 0) {
         external_sender = true;
         mode = mode.substr(9);
+    }
+    if (mode.find("normal-show-") == 0) {
+        normal_show = true;
+        mode = mode.substr(12);
     }
     if (mode.find("active-only-") == 0 || mode.find("active-reset-") == 0) {
         initialize_active = true;
