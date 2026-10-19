@@ -1,12 +1,18 @@
 #!/bin/bash
 # Sourced by install.sh and uninstall.sh. Never match an Agent host's name.
 
-# LoginWindow is a session type, not a launchctl domain target. Resolve the
-# root user's current audit session and verify that its login domain exists.
-# A logged-in Mac normally has no active LoginWindow domain; the LaunchAgent
-# plist will be loaded by the OS when that session is created later.
+# Prefer the live LoginWindow target. Its audit session can differ from user/0
+# (observed on macOS 27), so the root user's ASID cannot identify it reliably.
+# Retain the numeric-domain fallback for systems without this target, only
+# while root owns the console. With no live domain the OS loads the LaunchAgent
+# plist when a LoginWindow session is created later.
 pab_loginwindow_domain() {
     local info asid domain
+    if launchctl print loginwindow >/dev/null 2>&1; then
+        printf '%s\n' loginwindow
+        return 0
+    fi
+    [[ $(stat -f '%u' /dev/console 2>/dev/null) == 0 ]] || return 1
     info=$(launchctl print user/0 2>/dev/null) || return 1
     asid=$(printf '%s\n' "$info" | awk '/^[[:space:]]*asid = [0-9]+[[:space:]]*$/ {print $3; exit}')
     case "$asid" in ''|*[!0-9]*) return 1 ;; esac

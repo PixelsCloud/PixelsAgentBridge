@@ -76,6 +76,82 @@ launchctl() {
                     'gui/501/com.pixelsagentbridge.session-helper', 'gui/501/com.pixelsagentbridge.desktop'])
 
     @unittest.skipUnless(BASH, 'bash required')
+    def test_mac_loginwindow_alias_wins_over_unrelated_root_audit_session(self):
+        helper = (ROOT / 'macos/lifecycle.sh').read_text(encoding='utf-8')
+        result = subprocess.run([BASH, '-s'], input='''set -eu
+launchctl() {
+    [[ $1 == print ]] || return 90
+    case "$2" in
+        loginwindow) printf '    asid = 102243\n' ;;
+        user/0) printf '    asid = 100004\n' ;;
+        login/100004) return 0 ;;
+        *) return 125 ;;
+    esac
+}
+stat() { printf '0\n'; }
+''' + helper + '\npab_loginwindow_domain\n', text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'loginwindow')
+
+    @unittest.skipUnless(BASH, 'bash required')
+    def test_mac_root_audit_fallback_does_not_target_a_logged_in_console(self):
+        helper = (ROOT / 'macos/lifecycle.sh').read_text(encoding='utf-8')
+        for console_uid in ['0', '501', 'unknown']:
+            result = subprocess.run([BASH, '-s', '--', console_uid], input='''set -eu
+fixture_uid=$1
+stat() { printf '%s\n' "$fixture_uid"; }
+launchctl() {
+    [[ $1 == print ]] || return 90
+    case "$2" in
+        user/0) printf '    asid = 100004\n' ;;
+        login/100004) return 0 ;;
+        *) return 125 ;;
+    esac
+}
+''' + helper + '\nif domain=$(pab_loginwindow_domain); then echo "$domain"; else echo absent; fi\n',
+                text=True, capture_output=True)
+            with self.subTest(console_uid=console_uid):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), 'login/100004' if console_uid == '0' else 'absent')
+
+    @unittest.skipUnless(BASH, 'bash required')
+    def test_mac_loginwindow_alias_is_used_for_install_upgrade_and_uninstall(self):
+        helper = (ROOT / 'macos/lifecycle.sh').read_text(encoding='utf-8')
+        install = (ROOT / 'macos/install.sh').read_text(encoding='utf-8')
+        startup = install.split('started_jobs+=(system/com.pixelsagentbridge.executor)\n', 1)[1].split('\ncommitted=1', 1)[0]
+        for name, initially_loaded in [('install.sh', False), ('install.sh', True), ('uninstall.sh', True)]:
+            script = (ROOT / 'macos' / name).read_text(encoding='utf-8')
+            start = script.index('if login_domain=$(pab_loginwindow_domain)')
+            stop = script[start:script.index('\nwhile read -r uid; do', start)]
+            action = stop + ('\n' + startup + '\nstopped_domains=(); stopped_plists=()\n' + startup
+                             if name == 'install.sh' else '')
+            result = subprocess.run([BASH, '-s', '--', str(int(initially_loaded))], input='''set -eu
+loaded=$1; desktop_uid=501; stopped_domains=(); stopped_plists=(); started_jobs=()
+launchctl() {
+    if [[ $1 == print ]]; then
+        case "$2" in
+            loginwindow) printf '    asid = 102243\n' ;;
+            loginwindow/com.pixelsagentbridge.login-helper) [[ $loaded == 1 ]] ;;
+            user/0) printf '    asid = 100004\n' ;;
+            *) return 125 ;;
+        esac
+    elif [[ $1 == bootout && $2 == loginwindow/com.pixelsagentbridge.login-helper ]]; then
+        [[ $loaded == 1 ]] || return 42
+        loaded=0; echo "stop:$2"
+    elif [[ $1 == bootstrap && $2 == loginwindow && $3 == /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist ]]; then
+        [[ $loaded == 0 ]] || return 43
+        loaded=1; echo "start:$2/com.pixelsagentbridge.login-helper"
+    else return 90; fi
+}
+''' + helper + '\n' + action, text=True, capture_output=True)
+            with self.subTest(script=name, initially_loaded=initially_loaded):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = ['stop:loginwindow/com.pixelsagentbridge.login-helper'] if initially_loaded else []
+                if name == 'install.sh':
+                    expected.append('start:loginwindow/com.pixelsagentbridge.login-helper')
+                self.assertEqual(result.stdout.splitlines(), expected)
+
+    @unittest.skipUnless(BASH, 'bash required')
     def test_mac_loginwindow_domain_requires_a_live_numeric_audit_session(self):
         helper = (ROOT / 'macos/lifecycle.sh').read_text(encoding='utf-8')
         for asid, live, expected in [('100004', True, 'login/100004'),
@@ -85,6 +161,7 @@ launchctl() {
             result = subprocess.run([BASH, '-s', '--', asid, str(int(live))],
                 input='''set -eu
 fixture_asid=$1; fixture_live=$2
+stat() { printf '0\n'; }
 launchctl() {
     [[ $1 == print ]] || return 90
     if [[ $2 == user/0 ]]; then printf '    asid = %s\n' "$fixture_asid"
@@ -106,6 +183,7 @@ launchctl() {
             block = script[start:script.index('\nwhile read -r uid; do', start)]
             result = subprocess.run([BASH, '-s'], input='''set -eu
 stopped_domains=(); stopped_plists=()
+stat() { printf '0\n'; }
 launchctl() {
     if [[ $1 == print ]]; then
         case "$2" in
@@ -128,6 +206,7 @@ launchctl() {
         block = script.split('started_jobs+=(system/com.pixelsagentbridge.executor)\n', 1)[1].split('\ncommitted=1', 1)[0]
         result = subprocess.run([BASH, '-s'], input='''set -eu
 desktop_uid=501; stopped_domains=(); stopped_plists=(); started_jobs=(); loaded=0
+stat() { printf '0\n'; }
 launchctl() {
     if [[ $1 == print ]]; then
         case "$2" in

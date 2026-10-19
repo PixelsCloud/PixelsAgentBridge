@@ -4,14 +4,14 @@
 Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必验与交付阻塞范围；
 其余七个方向继续按实际证据验收。Apple 按单屏处理，多屏不作为本轮阻塞。
 
-最新核对：2026-10-19，记录截至 `9960e7b`；原表基线为 `a4a58d8`。
-本次仅核对文档，没有重新运行平台组合，也不关闭 LT-07.6。各记录的产物哈希分别
+最新核对：2026-10-19，补充 Apple 重复注销及启动域修复；原表基线为 `a4a58d8`。
+本轮没有关闭 LT-07.6。各记录的产物哈希分别
 有效，不能混成一份已经通过全部功能的发布包。被控端登录通过不能计为反向操作端通过。
 
 | 操作端 → 被控端 | 已有正式产品窗口证据 | 仍缺的主要证据 |
 | --- | --- | --- |
 | Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[锁屏密码登录](remote-desktop-lock-login-2026-10-17.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md) | 混合 DPI、普通非管理员、完整输入及首次激活重复消息边界；开机/UAC/用户切换、最终候选动态基准与长稳 |
-| Windows → macOS | [Apple 单屏输入、独立光标、协助占用及恢复](remote-desktop-macos-activity-input-assistance-2026-10-18.md)；[锁屏密码登录](remote-desktop-macos-lock-login-2026-10-19.md)；[注销后 LoginWindow 密码登录和画面恢复](remote-desktop-macos-logout-login-2026-10-19.md) | 最终候选动态有效 FPS、完整输入与长稳；开机登录及下次注销/重启是否重复权限确认；正式安装 helper 链路。单屏不宣称多屏通过 |
+| Windows → macOS | [Apple 单屏输入、独立光标、协助占用及恢复](remote-desktop-macos-activity-input-assistance-2026-10-18.md)；[锁屏密码登录](remote-desktop-macos-lock-login-2026-10-19.md)；[注销后 LoginWindow 密码登录和画面恢复](remote-desktop-macos-logout-login-2026-10-19.md)；[重复注销、真实重启密码登录及自动恢复，未再次授权](remote-desktop-macos-login-startup-followup-2026-10-19.md) | 最终候选动态有效 FPS、完整输入与长稳；正式安装 helper 链路。重启结果来自隔离候选包，不代替安装升级。单屏不宣称多屏通过 |
 | Windows → Linux | [原生窗口、输入及网络恢复](remote-desktop-product-flow-recovery-2026-10-18.md)；[Xorg GDM 密码登录](remote-desktop-linux-system-login-2026-10-17.md)；[既有 Wayland 注销登录自动恢复](remote-desktop-login-recovery-2026-10-17.md)；[新候选锁屏密码登录、双 Desktop 接手、AI 完成、60 秒混合及关闭后原业务](remote-desktop-login-occupancy-assistance-2026-10-19.md) | 新候选注销/开机与反复会话切换；普通 Xorg 完整产品、复杂多屏和输入法；30 分钟混合及长期资源验证 |
 | macOS → Windows | [Apple 正式窗口接收 90 光标、移动输入、只查看与故障隔离](remote-desktop-macos-cursor-product-2026-10-18.md) | 新候选完整键盘/鼠标、动态 FPS、多屏、Windows 系统登录与长期负载 |
 | macOS → macOS | 未验证；用户于 2026-10-19 确认本轮跳过 | 不作为本轮交付阻塞项，不记为通过 |
