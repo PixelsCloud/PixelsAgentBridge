@@ -9,6 +9,8 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 本轮没有关闭 LT-07.6。各记录的产物哈希分别
 有效，不能混成一份已经通过全部功能的发布包。被控端登录通过不能计为反向操作端通过。
 
+追加核对（2026-10-20）：[最新采集与恢复](remote-desktop-display-wake-recovery-2026-10-20.md) 补 Windows→Mac 新包持续锁屏/登录、1080p 实际 14.687 FPS，以及 Windows→Linux 新 helper 非零预算和解除限速实际恢复 14.533 FPS；其余方向不因此记为通过。
+
 | 操作端 → 被控端 | 已有正式产品窗口证据 | 仍缺的主要证据 |
 | --- | --- | --- |
 | Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md)；[普通应用输入、注销、重启恢复、普通用户、UAC 与会话切换](remote-desktop-windows-input-login-2026-10-19.md)；[100%/125% 双屏四次点击与 active 清理](remote-desktop-active-switch-mixed-dpi-2026-10-19.md)；[普通启动首次点击](remote-desktop-windows-normal-show-2026-10-19.md) | 混合 DPI 的更多尺寸/光标组合、完整输入及特殊不激活夹具首次消息边界；最终候选反复切换、安装链路、动态基准与长稳 |
@@ -27,7 +29,7 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 
 下一轮执行顺序与结束条件统一见[长期任务的后续安排](../REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。Windows 离线自动重连及最小化释放已有修复，Linux Wayland 登录和普通 Xorg/X11 基本输入已有证据。Apple 已有被控端开机登录证据直接保留，后续重点是操作端缺项、性能与最终安装链路。各方向测试产物分别记录，不合并为同一最终发布包。
 
-本轮已补 Windows→Linux 普通 Xorg、Linux X11→Windows/Mac 基本输入及 Windows 最小化释放修复，随后补 Windows active/服务设置切换及 90 混合 DPI 基本坐标。[客户端私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md) 已实现并完成 Windows 真实隔离启动；[正式 helper 转发与 90 实际限速](remote-desktop-helper-budget-weak-network-2026-10-19.md) 已记录降档及恢复。随后[最新 helper 新窗口验证](remote-desktop-helper-window-first-frame-2026-10-19.md) 补 Windows→Linux 1306×768 实际显示 14.696 FPS，以及实际 350 kbit/s UDP policing 下新视频 session 约 2.119 秒出首帧；不是 1080p 或受限条件 >12 FPS 通过。Windows→Mac 最新 helper 修复在线但不活跃显示器后显示锁屏；Mac 动态 FPS、非零预算及动态恢复、RTT/路径变化仍待验收。原服务已恢复，临时运行目录及限速已清理。其余 Apple 操作端、完整输入、X11 恢复和 Mac/Linux active/通知继续按原清单补缺，固定候选后做安装与稳定性。已有未受影响的证据直接复用；Linux→Linux 仍按用户要求跳过。
+本轮已补普通 Xorg/X11 输入、Windows 最小化释放、active/服务切换及 90 混合 DPI；[私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md) 和[正式 helper 转发及 90 限速恢复](remote-desktop-helper-budget-weak-network-2026-10-19.md) 有记录。[新窗口](remote-desktop-helper-window-first-frame-2026-10-19.md) 补 Linux 1306×768 实际 14.696 FPS、受限新 session 首帧；[最新验收](remote-desktop-display-wake-recovery-2026-10-20.md) 又补 Linux 同 session 非零预算/恢复 14.533 FPS及 Mac 新包持续锁屏、登录、1080p 实际 14.687 FPS。仍缺 Mac 实际非零预算、RTT/路径、积压退代恢复及其他方向的原输入/窗口/资源缺项。原服务、限速及专属运行目录已恢复清理。Apple 操作端、X11 恢复和 Mac/Linux active/通知按原清单补缺；既有未受影响的证据复用，同平台双端豁免保持。
 
 较早 Windows → Linux 测试曾被窗口遮挡中断，记录保留在
 [当轮验收](remote-desktop-window-capture-2026-10-18.md)。最新 58 轮约 29 分钟

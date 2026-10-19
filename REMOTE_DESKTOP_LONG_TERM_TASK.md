@@ -1,6 +1,6 @@
 # 远程桌面与 AI 人工协助：长期开发任务
 
-核对日期：2026-10-19。开发分支：`feat/remote-desktop-v1`。代码与验收记录核对至 `3d0b23d`，包括 helper 码率转发、90 实际限速、Linux 原生预算运行与软件编码容量修复：
+核对日期：2026-10-20。开发分支：`feat/remote-desktop-v1`。代码与验收记录包括 `3d0b23d` 软件容量、`592b13a` Mac 在线显示器修复，以及本轮采集期间显示器唤醒和实际恢复记录：
 `8e41278` 修复 Mac 登录域识别并记录重启登录，`211c44b` 修复远程终端底部遮挡。
 各平台测试产物以各自验收记录的哈希为准。Windows 已修复重启离线重连提前结束和最小化未释放输入；Linux Wayland 登录与普通 Xorg/X11 基本输入均有实测。未更新本机安装版或发布。
 
@@ -36,7 +36,7 @@
 | 主线集成准备 | 已合入 main 5972c2d 安装修复，相关 18 项检查通过；尚未进行最终生产安装升级 | [Mac 输入、光标与协助](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md) |
 | 客户端默认服务配置 | 统一为不上 Git 的编译 TOML；公开安装默认空值、客户覆盖优先，空构建后台待配置、Desktop 设置及 MCP 真实隔离启动通过；安装脚本检查通过，三平台正式安装仍待验收 | [私有默认值与空配置](acceptance/remote-desktop-client-defaults-2026-10-19.md) |
 | 编码码率反馈 | 补通正式 helper 的预算转发并兼容旧端；90 实际 350 kbps 限速，窗口显示 14.85→4.99→14.70 FPS，切屏保留降档后恢复默认；限速时命令/PTY 通过。Linux 新原生采集预算循环 90/90 解码、13.36 FPS | [Helper 与实限速](acceptance/remote-desktop-helper-budget-weak-network-2026-10-19.md)、[原生短测](acceptance/remote-desktop-adaptive-bitrate-2026-10-19.md) |
-| 最新 helper 与新 session 首帧 | Linux 正式窗口 1306×768 实际显示 14.696 FPS、0 无效帧码；350 kbit/s UDP policing 实际命中并丢弃超额包，新视频 session 约 2.119 秒出首帧，受限显示 1.709 FPS。Mac 修复在线但不活跃显示器后，新 helper 正式窗口显示锁屏；两端预算能力协商正常 | [新窗口与首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)；Mac 动态 FPS、非零预算/动态恢复与 RTT 仍待验收 |
+| 最新 helper 与新 session 首帧 | Linux 正式窗口 1306×768 实际显示 14.696 FPS；实际 350 kbit/s UDP policing 下，新视频 session 约 2.119 秒出首帧。随后补同 session 非零预算→默认、实际恢复 14.533 FPS。Mac 新包锁屏 45 秒无重连、密码登录、1920×1080 实际 14.687 FPS，关窗释放两项捕获电源断言 | [新窗口与首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[持续锁屏与恢复](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)；Mac 非零预算、RTT/路径等剩余边界仍未关闭 |
 
 Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；同一 App 的 Aqua 权限
 不代表该场景无需确认。随后同一 App 再次注销登录通过，未再次提示；安装脚本的活动登录域识别已修复。
@@ -59,7 +59,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 ### 剩余工作的性质
 
-- **代码与待补边界**：06.1 已补通 helper 预算转发，90 实际限速、generation 切换保留预算及恢复默认通过；Linux 新 helper 正式窗口、低带宽新视频 session 首帧已补。Mac 在线但不活跃显示器判断已修复并显示锁屏。Mac 动态 FPS、最新 helper 非零预算变化、解除限速后的动态恢复与 RTT/路径变化仍须检查；当前不改变编码尺寸，若码率/节奏不足再做必要尺寸调整。09.4 的私有编译 TOML、公开空安装配置和覆盖优先级已实现并完成 Windows 隔离启动，正式跨平台安装及客户新服务仍待验收。
+- **代码与待补边界**：06.1 helper 转发、90 限速/恢复、Linux 新 helper 非零预算及同 session 解除限速恢复已补。Mac 在线显示器与采集期间熄屏保护已修复，持续锁屏、登录和 1080p 动态 >12 FPS 通过。仍缺 Mac 实际非零预算、RTT/路径变化及积压退代后的完整恢复，不将它们改写为整个媒体模块未开发。09.4 的私有编译 TOML、公开空安装配置和覆盖优先级已实现，正式跨平台安装及客户新服务仍待验收。
 - **需定位的问题**：04.2/04.5 的 Windows 未初始化活动窗口夹具仍有重复消息边界；普通启动及真实记事本均通过。消息取出/回调和普通 ShowWindow 启动的对照已补，尚无证据应修改产品点击行为；保留特殊边界，不重复同样的诊断代替其他开发。
 - **已有实现、待补验收**：输入/多屏剩余组合、AI 异常清理、操作端登录缺项、七方向最终候选性能、弱网恢复与安装升级。三平台被控端已有的锁屏、注销、重启登录证据直接复用；最终包回归放在 09.x，不把整个登录功能反复列为待开发。
 - **待交付**：主线集成、三平台候选包、安装及旧业务回归、持续运行、COS 与升级验证。终端修复和 Mac 启动修复均已提交，但还未进入本轮正式发布包。
@@ -71,7 +71,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 | 顺序 | 剩余编号 | 已有实现与证据 | 本组只补的缺口 |
 | --- | --- | --- | --- |
 | 1. 窗口与输入 | 03.1、03.2、03.4、03.5、03.6、04.2、04.3、04.4、04.5 | 独立窗口、原生显示、基本键鼠、稳定 ID、负原点/竖屏/混合 DPI 基本坐标、Windows 最小化释放均已实现并有记录 | 各平台菜单重复聚焦/全屏与恢复、X11 最小化恢复聚焦、剩余完整键位/输入法与拖出释放、动态布局/光标组合。特殊不激活夹具只保留诊断，不据此修改已通过的普通点击 |
-| 2. 媒体与弱网 | 02.3、06.1、06.2、06.3、06.4、06.5、06.6 | Direct/Relay、90 动态 >12 FPS 与实际限速降档/恢复；Linux 最新 helper 正式窗口 1306×768 达 14.696 FPS、低带宽新视频 session 首帧；Mac 最新 helper 修复后显示锁屏；复杂软件帧修复已进入两平台构建 | Mac 动态 FPS、最新 helper 非零预算变化及解除限速后的动态恢复、RTT/路径变化、未覆盖故障/硬件与最终候选资源/性能。编码尺寸变化仅在原降档不足时才考虑，不新增无条件开发项 |
+| 2. 媒体与弱网 | 02.3、06.1、06.2、06.3、06.4、06.5、06.6 | Direct/Relay、90 动态 >12 FPS 与限速恢复；Linux 最新 helper 低带宽新 session 首帧、非零预算和同 session 恢复 14.533 FPS；Mac 新包锁屏 45 秒、登录、1080p 动态 14.687 FPS及捕获断言释放；复杂软件帧修复已有构建 | Mac 实际非零预算、RTT/路径变化、积压退代后的完整恢复、未覆盖故障/硬件与最终候选资源/性能。编码尺寸变化仅在原降档不足时才考虑，不新增无条件开发项 |
 | 3. 生命周期与 AI | 01.6、02.6、05.4、08.3、08.4、08.5、08.6 | helper 生命周期、旧输入拒绝、单查看者、协助闭环、Windows active 取消/崩溃/过期和实际设置页切换清理已实现并有实测；删除设备已有 runtime 断连与凭据移除入口 | 剩余 helper 故障、Mac/Linux 原生隐藏/最小化通知及 active、设备离线/删除的产品联动、另一实际账号和新服务使用。按实际场景补证据，不重做 Windows 正常闭环 |
 | 4. 操作端与平台缺项 | 07.2、07.3、07.5、07.6 | 七个必验方向均有正式窗口证据；三平台被控端登录已分别通过；Mac/Linux 操作端基本显示/输入已接入 | Apple 操作端、X11/Wayland 操作端尚未覆盖的完整输入、目标登录、窗口和动态显示。Mac 单屏及两项同平台双端跳过继续有效，不重开已关闭的被控端接入工作 |
 | 5. 稳定性 | 06.7 | 60 秒混合与已有短测有效；约 29 分钟的中断按用户说明属于环境变化 | 固定候选后 30 分钟混合与 100 次开关；2/8 小时仍按用户安排留到晚上，不自动启动 |
@@ -89,7 +89,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 ### 当前完成的收尾与下一步
 
 1. 已复现并修复高熵软件帧 native error 3；BGRA/NV12、首次及已有帧后的恢复、预算变化、新解码器首帧、原颜色与码量恢复的定向回归通过，见[软件编码容量修复](acceptance/remote-desktop-software-capacity-recovery-2026-10-19.md)。不将其记为新三平台窗口或性能通过。
-2. 第 2/4 组已补最新 helper 正式窗口及 Linux 低带宽新视频 session 首帧，见[本轮记录](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)。接着只补 Mac 动态显示、非零预算与动态恢复、RTT/路径缺项；第 1/3 组只运行尚未覆盖的输入、窗口和协助场景。已有服务切换、被控端登录及正常多屏结果直接保留。
+2. 第 2/4 组已补新 helper 窗口、Linux 受限首帧与非零预算/恢复，以及 Mac 新包持续锁屏、登录和动态显示，见[最新收尾](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)。已通过的条件不重做；接着补第 1/3 组尚缺的窗口/输入/协助，以及原媒体清单的 Mac 非零预算、RTT/路径与退代恢复缺项。已有服务切换、被控端登录和普通多屏证据保留。
 3. 代码缺口处理完后固定三平台候选，再进入第 5/6 组，不在阶段性临时构建上反复开展完整安装与长测。
 
 ### 当前检查点与后续验收边界
@@ -349,7 +349,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **06.1** 将原型的固定帧率/码率改为有界调度；根据积压和消费反馈调码率、帧率
   或编码尺寸。编码尺寸变更必须更新配置及坐标变换，不能改变输入目标位置。
-  核对状态（2026-10-19）：**部分完成**。有界调度与正式 helper 预算转发已实现。90 实际 350 kbps 显示 14.85→4.99→14.70 FPS，切屏保留预算后恢复；会话库 13 项、loopback 36 项及 Linux 原生预算循环通过。最新 Linux 正式窗口显示 14.696 FPS、受限新视频 session 约 2.119 秒出首帧；Mac 最新 helper 修复后显示锁屏，两端协商预算能力。见[新窗口与首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)。仍缺 Mac 动态 FPS、最新 helper 非零预算变化、解除限速后的动态恢复及 RTT/路径变化；没有改变编码尺寸。高熵错误已[修复](acceptance/remote-desktop-software-capacity-recovery-2026-10-19.md)，不重复挂账；既有[90 实限速](acceptance/remote-desktop-helper-budget-weak-network-2026-10-19.md)与[原生短测](acceptance/remote-desktop-adaptive-bitrate-2026-10-19.md)保留。
+  核对状态（2026-10-20）：**部分完成**。有界调度、helper 转发、会话库 13 项、loopback 36 项及既有 90 限速/恢复保留。Linux 最新 helper 新 session 受限首帧已补；同 session 实测预算 3000000→0、采集约 1.143→15 FPS，解除限速后实际显示 14.533 FPS。Mac 新包 1080p 动态 14.687 FPS通过，实际非零预算仍缺；RTT/路径及退代恢复继续归本条相关缺项，编码尺寸未改。见[最新恢复](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)、[首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[90 实限速](acceptance/remote-desktop-helper-budget-weak-network-2026-10-19.md)。高熵错误已[修复](acceptance/remote-desktop-software-capacity-recovery-2026-10-19.md)，不重复挂账。
 
 - [ ] **06.2** 仅在采集/编码前丢弃过时待处理画面；不随意丢弃 H.264 参考帧。
   严重积压时结束旧视频 generation，用新配置和关键帧恢复，保留共享连接。
@@ -357,7 +357,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **06.3** 处理 DXGI access lost、设备移除、硬编失败、解码格式变化、屏幕睡眠、
   睡眠唤醒、连接路径变化。重试有间隔、有上限后的明确提示，避免无限忙循环。
-  核对状态（2026-10-19）：**部分完成**。编解码后备、WGC 与用户采集恢复、Linux 唤醒已有结果；本轮修复 Mac 锁屏时在线但不活跃显示器被误判布局变化，原生回归与正式锁屏显示通过。GPU 设备丢失及剩余故障仍待验证。见[本轮修复](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[编解码故障后备](acceptance/remote-desktop-codec-recovery-2026-10-17.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
+  核对状态（2026-10-20）：**部分完成**。既有编解码后备、WGC/用户采集恢复和 Linux 唤醒保留。Mac 在线显示器检查之外，又修复锁屏熄屏导致 SCK 持续采集中断，45 秒同会话、登录及关窗释放通过。GPU 设备丢失与其他故障仍待验收。见[显示器唤醒修复](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)、[在线枚举](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[后备](acceptance/remote-desktop-codec-recovery-2026-10-17.md)。
 
 - [ ] **06.4** 固定编解码协商与后备策略。优先复用已证实的 Windows 直纹理路径，
   验证 Intel/AMD；无硬编的机器有可部署的软件路线。按固定 RustDesk/hwcodec
@@ -366,12 +366,12 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **06.5** 覆盖直连、强制 Relay、不同 RTT、限速、断流与恢复，记录视频延迟及
   并行旧业务的变化。带宽不足时明确降档，不无界缓存或反复播放过时画面。
-  核对状态（2026-10-19）：**部分完成**。直连/Relay、定向断流与短时限速已有证据；新增 Linux 在实际 UDP policing 生效后新建视频 session 的首帧与持续新画面，受限帧率不算 >12 FPS。持续 RTT/带宽变化、路径迁移、解除限速动态恢复与并行旧业务完整压力仍待验收。见[受限首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[正式连接验收](acceptance/remote-desktop-product-2026-10-16.md)、[窗口与断流恢复](acceptance/remote-desktop-product-flow-recovery-2026-10-18.md)。
+  核对状态（2026-10-20）：**部分完成**。直连/Relay、定向断流、Linux 受限新 session 首帧已有证据；最新 helper 同 session 非零预算及解除限速实际恢复 14.533 FPS 已补。另一次积压超时结束旧代次的观察被脚本中断，不计恢复通过；不据此改传输。持续 RTT/路径迁移、退代恢复及完整并行业务压力仍缺。见[最新恢复](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)、[受限首帧](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)、[既有断流](acceptance/remote-desktop-product-flow-recovery-2026-10-18.md)。
 
 - [ ] **06.6** 分解测量采集/编码/传输/解码/显示帧数、码率、进程 CPU、内存、显存、
   复制路径及输入反馈。跨机器时间戳不能直接相减；记录时钟误差或采用可验证的
   同时钟测量，区分接收后显示耗时与端到端耗时。
-  核对状态（2026-10-19）：**部分完成**。已有像素帧码、分段耗时与复制路径记录；本轮 Linux 最新 helper 正式窗口 1306×768 实际显示 14.696 FPS、598 次采样无无效帧码，见[新窗口记录](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)。不是 1080p 或七方向最终候选性能通过；Mac 动态 FPS、资源曲线及输入反馈尚未完整收齐。
+  核对状态（2026-10-20）：**部分完成**。像素帧码、分段耗时和复制路径已有记录；Linux 新 helper 1306×768 正常 14.696、解除限速恢复 14.533 FPS；Mac 新包 1920×1080 实际 14.687 FPS，均无无效帧码。见[最新显示](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)。不代替七方向最终候选动态基准、资源曲线与输入反馈缺项。
 
 - [ ] **06.7** 执行 30 分钟功能混合测试、2 小时持续运行、反复开关 100 次及发布前
   8 小时稳定性测试；检查资源平台期、孤儿进程、残留占用和恢复后的首帧。
@@ -385,7 +385,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [x] **07.1 macOS 被控端**：适配原生采集资源、VideoToolbox 编码及多屏布局，
   验证直接资源传递/必要转换；接入现有 Aqua/LoginWindow helper 和输入路由。
-  核对状态（2026-10-19 复核）：**已关闭（用户确认的单屏范围）**。ScreenCaptureKit 的 CVPixelBuffer/IOSurface 引用直接交给 VideoToolbox；原有输入、Aqua/LoginWindow、注销和重启登录证据保留，见[Mac 输入、光标与协助](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md)、[启动跟进](acceptance/remote-desktop-macos-login-startup-followup-2026-10-19.md)。本轮补最新 helper 锁屏显示并修复在线显示器判断，见[新包记录](acceptance/remote-desktop-helper-window-first-frame-2026-10-19.md)。不宣称多屏、动态 >12 FPS 或本轮密码登录通过；性能归 06.6，正式安装归 09.3。
+  核对状态（2026-10-20）：**已关闭（用户确认的单屏范围）**。ScreenCaptureKit 资源直交 VideoToolbox；原有 Aqua/LoginWindow、注销和重启证据保留。最新包补持续锁屏 45 秒、密码登录、1080p 动态 14.687 FPS及捕获电源断言释放，见[本轮记录](acceptance/remote-desktop-display-wake-recovery-2026-10-20.md)。原有[输入](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md)与[启动跟进](acceptance/remote-desktop-macos-login-startup-followup-2026-10-19.md)不重做；多屏仍按用户范围豁免，最终资源性能归 06.6，正式安装归 09.3。
 
 - [ ] **07.2 macOS 操作端**：原生硬解及显示，窗口、缩放、光标、键盘映射；在 Apple
   实机完成普通桌面、锁屏、系统登录和会话切换。权限缺失时能说明并恢复。

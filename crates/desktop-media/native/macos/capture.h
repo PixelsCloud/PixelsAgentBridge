@@ -1,11 +1,12 @@
 #pragma once
 #include "common.h"
+#include "display_activity.h"
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 
 namespace pab_mac {
 // A background capture is user-requested work even though its worker owns no
-// visible window. Keep App Nap from deferring it for this capture's lifetime;
-// this does not hold the display awake or prevent normal idle system sleep.
+// visible window. Keep App Nap from deferring it for this capture's lifetime.
+// Display wakefulness is managed separately by CaptureDisplayActivity.
 class CaptureActivity {
     id __strong token_;
 public:
@@ -80,6 +81,7 @@ inline void wait_completion(const std::shared_ptr<Completion>& state, const char
 }
 class API_AVAILABLE(macos(12.3)) Capture {
     CaptureActivity activity_;
+    std::unique_ptr<CaptureDisplayActivity> display_activity_;
     Display display_;
     std::shared_ptr<CaptureState> state_ = std::make_shared<CaptureState>();
     SCStream* __strong stream_ = nil;
@@ -89,6 +91,7 @@ public:
     Capture(const Display& display, unsigned fps, bool embedded_cursor = true) : display_(display) {
         if (!CGPreflightScreenCaptureAccess())
             throw std::runtime_error("Screen Recording permission is required for this application");
+        display_activity_ = std::make_unique<CaptureDisplayActivity>();
         const auto content_ready = std::make_shared<Completion>();
         // The callback can outlive a timeout; its captured storage is owned.
         struct Shareable { SCShareableContent* __strong value = nil; };

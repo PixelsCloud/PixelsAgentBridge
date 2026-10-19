@@ -57,6 +57,7 @@ fn main() {
             "CoreMedia",
             "CoreVideo",
             "IOSurface",
+            "IOKit",
             "Metal",
             "QuartzCore",
         ] {
