@@ -27,7 +27,7 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 
 下一轮执行顺序与结束条件统一见[长期任务的后续安排](../REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。Windows 离线自动重连及最小化释放已有修复，Linux Wayland 登录和普通 Xorg/X11 基本输入已有证据。Apple 已有被控端开机登录证据直接保留，后续重点是操作端缺项、性能与最终安装链路。各方向测试产物分别记录，不合并为同一最终发布包。
 
-本轮已补 Windows→Linux 普通 Xorg、Linux X11→Windows/Mac 基本输入及 Windows 最小化释放修复，随后补 Windows active/服务设置切换及 90 混合 DPI 基本坐标。原服务与专属环境已恢复清理。[客户端私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md) 已实现并完成 Windows 真实隔离启动；[编码码率反馈](remote-desktop-adaptive-bitrate-2026-10-19.md) 已接入并通过本机优化原生短测，尚未做真实弱网及 Mac/Linux 新代码运行，不替代七方向最终候选验收。接着补上述验证、Apple 操作端、完整键位/输入法、X11 窗口恢复及 Mac/Linux active/通知，固定候选后做正式安装与稳定性。历史结果只在对应代码与条件未受影响时复用；Linux→Linux 仍按用户要求跳过。
+本轮已补 Windows→Linux 普通 Xorg、Linux X11→Windows/Mac 基本输入及 Windows 最小化释放修复，随后补 Windows active/服务设置切换及 90 混合 DPI 基本坐标。原服务与专属环境已恢复清理。[客户端私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md) 已实现并完成 Windows 真实隔离启动；[编码码率反馈](remote-desktop-adaptive-bitrate-2026-10-19.md) 已接入，并补通[正式 helper 转发、90 实际限速及切屏延续](remote-desktop-helper-budget-weak-network-2026-10-19.md)。90 实际显示 14.85→4.99→14.70 FPS，限速时命令/PTY 通过；Linux 新原生预算循环 90/90 解码、13.36 FPS。Mac/Linux 新窗口、完整新 session 重连首帧及 RTT 仍待验收，不替代七方向最终候选。接着补上述验证、Apple 操作端、完整键位/输入法、X11 窗口恢复及 Mac/Linux active/通知，固定候选后做正式安装与稳定性。历史结果只在对应代码与条件未受影响时复用；Linux→Linux 仍按用户要求跳过。
 
 较早 Windows → Linux 测试曾被窗口遮挡中断，记录保留在
 [当轮验收](remote-desktop-window-capture-2026-10-18.md)。最新 58 轮约 29 分钟
