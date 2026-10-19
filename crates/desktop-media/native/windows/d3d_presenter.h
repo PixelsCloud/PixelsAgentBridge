@@ -7,6 +7,7 @@
 #include "viewer_input.h"
 #include "../software_codec_ffi.h"
 #include "cursor_overlay.h"
+#include "presentation_history.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -37,9 +38,7 @@ class NativePresenter {
     bool was_minimized_ = false;
     bool occluded_ = false;
     bool presenting_ = false;
-    // Present statistics can arrive several refresh intervals after submission
-    // in a composed child window. Do not serialize decoding behind that delay.
-    std::deque<std::pair<UINT, bool>> pending_presents_;
+    PresentationHistory pending_presents_;
     RECT viewport_{};
     unsigned rotation_ = 0;
     HANDLE latency_ = nullptr;
@@ -104,11 +103,7 @@ public:
         check(result, "Get actual presentation statistics");
         // Only count a specifically observed present ID. A skipped ID is not
         // evidence of a displayed frame; neither are Present calls or repaints.
-        while (!pending_presents_.empty() && pending_presents_.front().first <= stats.PresentCount) {
-            const auto present = pending_presents_.front();
-            pending_presents_.pop_front();
-            if (present.first == stats.PresentCount && present.second) ++displayed;
-        }
+        displayed += pending_presents_.observed(stats.PresentCount);
     }
     void finish() {
         const auto deadline = Clock::now() + std::chrono::seconds(2);
@@ -117,7 +112,10 @@ public:
             if (IsIconic(parent_ ? parent_ : window_) || occluded_) {
                 pending_presents_.clear(); return;
             }
-            if (Clock::now() > deadline) throw std::runtime_error("Final presentation was not confirmed");
+            // Statistics can stop when the display powers down. Dropping an
+            // unconfirmed observation preserves honest counts and bounded
+            // shutdown; it does not indicate a decode/render failure.
+            if (Clock::now() > deadline) { pending_presents_.clear(); return; }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
@@ -296,13 +294,9 @@ public:
         // displayed FPS. Holding only the latest decoder sample is bounded.
         if (IsIconic(parent_ ? parent_ : window_)) return;
         presenting_ = true;
-        const auto queue_deadline = Clock::now() + std::chrono::seconds(2);
-        while (pending_presents_.size() >= 3) {
-            pump();
-            if (IsIconic(parent_ ? parent_ : window_)) { presenting_ = false; return; }
-            if (Clock::now() > queue_deadline) throw std::runtime_error("Presentation statistics stalled");
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+        // The swapchain latency handle bounds real queued work. Statistics
+        // may lag or disappear independently (power/fullscreen transitions);
+        // never wait for telemetry before submitting the next frame.
         if (WaitForSingleObject(latency_, 2000) != WAIT_OBJECT_0)
             throw std::runtime_error("Presentation queue wait timed out");
         ComPtr<ID3D11Texture2D> backbuffer;
@@ -380,7 +374,7 @@ public:
         if (count) ++submitted;
         UINT present_id = 0;
         check(swapchain_->GetLastPresentCount(&present_id), "Get submitted present ID");
-        pending_presents_.emplace_back(present_id, count);
+        pending_presents_.submitted(present_id, count);
         observe_presentations();
         presenting_ = false;
     }

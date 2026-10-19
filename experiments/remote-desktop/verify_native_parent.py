@@ -22,6 +22,14 @@ def main():
     parser.add_argument('--rotation', choices=['0', '90', '180', '270'], default='0')
     args = parser.parse_args()
     user = ctypes.WinDLL('user32', use_last_error=True)
+    user.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    user.OpenInputDesktop.restype = wintypes.HANDLE
+    user.CloseDesktop.argtypes = [wintypes.HANDLE]
+    active_desktop = user.OpenInputDesktop(0, False, 1)
+    if not active_desktop:
+        raise RuntimeError('Native presentation acceptance needs an unlocked interactive desktop '
+                           f'(OpenInputDesktop error {ctypes.get_last_error()})')
+    user.CloseDesktop(active_desktop)
     user.SetProcessDpiAwarenessContext.argtypes = [wintypes.HANDLE]
     user.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
     user.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,

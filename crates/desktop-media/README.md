@@ -133,9 +133,11 @@ window. The top 72 logical pixels belong to its controls. The surface preserves
 aspect ratio, resizes on DPI/window changes, retains one decoded sample for
 static repaint, and counts only confirmed presentations as displayed frames.
 Minimized frames are decoded/consumed but are not counted as displayed FPS.
-Presentation statistics are observed asynchronously, with at most three pending
-IDs; only specifically observed IDs count. A render acknowledgment confirms
-consumption/submission, not physical display. `finish()` drains statistics.
+Presentation statistics retain at most three pending IDs; only specifically
+observed IDs count. Missing observations evict old IDs without counting them or
+blocking rendering. The swapchain latency handle bounds actual GPU submissions.
+A render acknowledgment confirms consumption/submission, not physical display.
+`finish()` polls statistics for at most two seconds, then discards unconfirmed IDs.
 
 The production render pipe uses version 2 events: decoder acceptance and
 decoded/rendered consumption are separate. `NativeViewer::submit()` waits for
