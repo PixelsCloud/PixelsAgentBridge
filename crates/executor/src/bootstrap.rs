@@ -18,6 +18,13 @@ use thiserror::Error;
 use crate::{ExecutorConfig, ExecutorConfigError, credential::DeviceCredential};
 
 pub async fn bootstrapped_config() -> Result<ExecutorConfig, BootstrapError> {
+    if pab_service_config::client::is_unconfigured() {
+        // Keep the installed service/local IPC alive. Applying configuration
+        // still requires the documented service restart; never create a device
+        // identity or contact a fallback server while no server is configured.
+        tracing::info!("Executor is waiting for server configuration; edit config.toml and restart the service");
+        std::future::pending::<()>().await;
+    }
     if env::var_os("PAB_DEVICE_ID").is_some() {
         return ExecutorConfig::from_env().map_err(Into::into);
     }

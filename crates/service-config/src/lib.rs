@@ -1,7 +1,11 @@
 //! TOML configuration shared by the services and installed applications.
+#[cfg(test)]
+#[path = "../build_support.rs"]
+mod build_support;
 pub mod client;
 pub mod operator;
 pub mod preferences;
+mod server_urls;
 use serde::{Deserialize, de::DeserializeOwned};
 use std::{
     ffi::OsString,

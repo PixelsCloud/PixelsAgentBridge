@@ -28,14 +28,24 @@ cp .build/linux-target-bullseye/$Profile/pab-executor .build/linux-target-bullse
 "@
 $buildScript = $buildScript.Replace("`r`n", "`n")
 
+$defaultsArguments = @()
+if (Test-Path Env:PAB_CLIENT_DEFAULTS_FILE) {
+    if (-not $env:PAB_CLIENT_DEFAULTS_FILE) { throw 'PAB_CLIENT_DEFAULTS_FILE must name a TOML file' }
+    $defaultsFile = [IO.Path]::GetFullPath($env:PAB_CLIENT_DEFAULTS_FILE)
+    if (-not (Test-Path -LiteralPath $defaultsFile -PathType Leaf)) { throw 'Private client defaults TOML not found' }
+    $defaultsArguments = @('--mount', "type=bind,source=$defaultsFile,target=/run/pab-client-defaults.toml,readonly",
+                          '--env', 'PAB_CLIENT_DEFAULTS_FILE=/run/pab-client-defaults.toml')
+}
+# The default .env/client-defaults.toml is available through the existing source
+# bind mount; an explicit host path is mounted read-only, never copied into an image.
 & docker run --rm --mount $mount --workdir /src `
     --env CARGO_HOME=/src/.build/linux-cargo-home `
     --env CARGO_TARGET_DIR=/src/.build/linux-target-bullseye `
     --cpus 10 `
     --env CARGO_BUILD_JOBS=8 `
-    --env CMAKE_BUILD_PARALLEL_LEVEL=2 `
+    --env CMAKE_BUILD_PARALLEL_LEVEL=1 `
     --env PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin `
-    $image sh -c $buildScript
+    @defaultsArguments $image sh -c $buildScript
 if ($LASTEXITCODE -ne 0) {
     throw 'Linux program build failed'
 }

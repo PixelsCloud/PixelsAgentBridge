@@ -8,10 +8,12 @@ if [[ ${1:-} == --no-service ]]; then mode=manual; shift; fi
 [[ $(uname -s) == Linux ]] || { echo 'This package requires Linux' >&2; exit 2; }
 install_dir=/opt/pixels-agent-bridge
 config_file=/etc/pixels-agent-bridge/config.toml
-control_url=${1:-wss://pab.rgaa.vip/control}
-relay_url=${2:-https://pab-relay.rgaa.vip}
-[[ $control_url == wss://?* ]] || { echo 'Control URL must use wss://' >&2; exit 2; }
-[[ $relay_url == https://?* ]] || { echo 'Relay URL must use https://' >&2; exit 2; }
+control_url=${1:-}
+relay_url=${2:-}
+if [[ -n $control_url || -n $relay_url ]]; then
+    [[ $control_url == wss://?* ]] || { echo 'Control URL must use wss://' >&2; exit 2; }
+    [[ $relay_url == https://?* ]] || { echo 'Relay URL must use https://' >&2; exit 2; }
+fi
 source_dir=$(cd "$(dirname "$0")" && pwd)
 unit=pixels-agent-bridge-executor.service
 for name in pab-mcp pab-executor pab-document-worker document-runtime-linux.tar.gz run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh INSTALL-LINUX.txt; do

@@ -14,7 +14,7 @@ CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve
 TAURI_TARGET = CARGO_TARGET if 'CARGO_TARGET_DIR' in os.environ else ROOT / 'apps/desktop/src-tauri/target'
 CARGO_JOBS = max(1, min(10, int(os.environ.get('CARGO_BUILD_JOBS', '10'))))
 os.environ['CARGO_BUILD_JOBS'] = str(CARGO_JOBS)
-os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = str(CARGO_JOBS)
+os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = '1'
 
 
 def run(command, cwd=ROOT):

@@ -50,8 +50,8 @@ Pixels 自定义的程序配置统一使用 TOML。安装器在首次安装时�
 - macOS: `/Library/Application Support/PixelsAgentBridge/config.toml`
 - Linux: `/etc/pixels-agent-bridge/config.toml`
 
-control_url = "wss://pab.rgaa.vip/control"
-relay_urls = ["https://pab-relay.rgaa.vip"]
+control_url = ""
+relay_urls = []
 
 [executor]
 # device_name = "my-device"
@@ -59,6 +59,8 @@ relay_urls = ["https://pab-relay.rgaa.vip"]
 # data_dir = "/var/lib/pixels-agent-bridge"
 
 修改安装配置后重启后台服务，并重新启动 Desktop/MCP。Desktop 设置页保存的服务器地址为用户数据目录下的 operator-server.toml，MCP 工具开关为 mcp-tools.toml。用户服务器设置覆盖安装默认值；显式 --config PATH 使用指定 TOML，并跳过用户服务器覆盖。安装参数只用于首次安装，已有配置请直接编辑 TOML。
+
+安装配置空值使用本地编译时 `.env/client-defaults.toml` 提供的默认服务，设置输入框不回显该默认值。开源构建没有私有文件时等待配置，客户可填写自己的完整地址对。详见[配置规则](CONFIGURATION.md)。
 
 旧 settings.json/settings.env 由安装器迁移；旧 operator-server.json 和 mcp-tools.json 在首次读取时迁移。已有 TOML 优先，格式错误会报错，不回退到旧配置。设备身份、登录凭据、数据库和发布清单属于运行数据，保留原格式。
 
@@ -78,7 +80,7 @@ sudo apt install ./pixels-agent-bridge-desktop-linux-x86_64-VERSION.deb
 
 ### 服务器版一行安装
 
-Linux x86_64 服务器可用下面一行命令安装后台设备服务和 MCP。支持 Ubuntu 20.04 及以上、Debian 11 及以上（glibc 2.31+），需要 root 或 sudo 权限；默认连接官方服务。脚本会下载正式版本并验证签名、校验和及运行库，再安装服务。
+Linux x86_64 服务器可用下面一行命令安装后台设备服务和 MCP。支持 Ubuntu 20.04 及以上、Debian 11 及以上（glibc 2.31+），需要 root 或 sudo 权限；使用发行包中编译的默认服务，没有默认值时等待配置。脚本会下载正式版本并验证签名、校验和及运行库，再安装服务。
 
 curl -fsSL https://agent.rgaa.vip/install.sh | bash
 

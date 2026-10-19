@@ -16,6 +16,17 @@ Unicode true
 !ifndef RELAY_URL
     !error "RELAY_URL is required"
 !endif
+!if "${CONTROL_URL}" == ""
+    !if "${RELAY_URL}" != ""
+        !error "Server URLs must be supplied together"
+    !endif
+    !define SERVER_ARGUMENTS ""
+!else
+    !if "${RELAY_URL}" == ""
+        !error "Server URLs must be supplied together"
+    !endif
+    !define SERVER_ARGUMENTS '-ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}"'
+!endif
 !ifndef APP_ICON
     !error "APP_ICON is required"
 !endif
@@ -152,7 +163,7 @@ Section "Install"
     StrCpy $SetupPhase "install_service"
     StrCpy $SetupMessage "starting_powershell log=$SetupLog.powershell.log"
     Call PabSetupLog
-    nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" -ControlUrl "${CONTROL_URL}" -RelayUrl "${RELAY_URL}" -InstallRoot "$INSTDIR" -InstallerLogPath "$SetupLog"'
+    nsExec::ExecToLog '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\payload\install.ps1" ${SERVER_ARGUMENTS} -InstallRoot "$INSTDIR" -InstallerLogPath "$SetupLog"'
     Pop $0
     StrCpy $SetupMessage "powershell_exit=$0"
     Call PabSetupLog

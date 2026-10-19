@@ -1,9 +1,9 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$ControlUrl,
+    [AllowEmptyString()]
+    [string]$ControlUrl = '',
 
-    [Parameter(Mandatory = $true)]
-    [string]$RelayUrl,
+    [AllowEmptyString()]
+    [string]$RelayUrl = '',
 
     [string]$InstallRoot,
     [string]$InstallerLogPath
@@ -180,10 +180,11 @@ function Stop-PabRuntimeProcesses {
 }
 
 Set-PabInstallerStage 'validate_inputs'
-if (-not $ControlUrl.StartsWith('wss://')) {
+if ([bool]$ControlUrl -ne [bool]$RelayUrl) { throw 'Fill in both server URLs, or leave both empty' }
+if ($ControlUrl -and -not $ControlUrl.StartsWith('wss://')) {
     throw 'ControlUrl must use wss://'
 }
-if (-not $RelayUrl.StartsWith('https://')) {
+if ($RelayUrl -and -not $RelayUrl.StartsWith('https://')) {
     throw 'RelayUrl must use https://'
 }
 Set-PabInstallerStage 'check_administrator'

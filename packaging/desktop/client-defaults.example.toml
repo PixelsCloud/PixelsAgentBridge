@@ -1,0 +1,5 @@
+# Copy to the ignored .env/client-defaults.toml before building all client binaries.
+# A missing file produces a public build with no server defaults.
+# Fill in a paired WSS control URL and one or more HTTPS relay URLs locally.
+control_url = ""
+relay_urls = []

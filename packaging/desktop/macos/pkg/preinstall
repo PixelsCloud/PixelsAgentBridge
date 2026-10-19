@@ -3,11 +3,11 @@ set -euo pipefail
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 package_dir=$(cd "$(dirname "$0")" && pwd)
 source "$package_dir/failure-dialog.sh"
-source "$package_dir/package.env"
 [[ ${3:-/} == / ]] || { pab_report_failure '请选择当前系统磁盘安装。/ Install on the running system volume only.'; exit 1; }
 native_arch=x86_64
 if [[ $(sysctl -n hw.optional.arm64 2>/dev/null || true) == 1 ]]; then native_arch=arm64; fi
-[[ $native_arch == "$PAB_PKG_ARCH" ]] || { pab_report_failure "安装包架构不匹配，请使用 $native_arch 安装包。/ Use the $native_arch installer for this Mac."; exit 1; }
+package_arch=$(/usr/bin/lipo -archs "$package_dir/payload/pab-executor")
+[[ $native_arch == "$package_arch" ]] || { pab_report_failure "安装包架构不匹配，请使用 $native_arch 安装包。/ Use the $native_arch installer for this Mac."; exit 1; }
 desktop_user=$(stat -f '%Su' /dev/console)
 [[ $desktop_user != root && $desktop_user != loginwindow && $desktop_user != _mbsetupuser ]] || {
     pab_report_failure '请先登录普通 macOS 桌面账户，再重新安装。/ Sign in to a normal macOS desktop account before installing.'; exit 1;

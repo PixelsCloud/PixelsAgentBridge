@@ -302,11 +302,14 @@ def compile_production_script(stage):
     from build_nsis import CONTENTS
     for name in CONTENTS:
         (payload / name).write_bytes(b'compile-only fixture; never execute this installer')
-    result = run([COMPILER, '/V2', '/INPUTCHARSET', 'UTF8', f'/DPAYLOAD_DIR={payload}',
-        f'/DOUTPUT_FILE={stage / "production-compile-only.exe"}', '/DCONTROL_URL=wss://invalid.example/control',
-        '/DRELAY_URL=https://invalid.example', f'/DAPP_ICON={ROOT / "apps/desktop/src-tauri/icons/icon.ico"}',
-        '/DBUILD_PROFILE=test', '/DAPP_VERSION=0.0.0', WINDOWS / 'setup.nsi'])
-    assert result.returncode == 0, result.stdout + result.stderr
+    for variant, control, relay in [('custom', 'wss://invalid.example/control', 'https://invalid.example'),
+                                    ('empty', '', '')]:
+        result = run([COMPILER, '/V2', '/INPUTCHARSET', 'UTF8', f'/DPAYLOAD_DIR={payload}',
+            f'/DOUTPUT_FILE={stage / ("production-compile-only-" + variant + ".exe")}',
+            '/DCONTROL_URL=' + control, '/DRELAY_URL=' + relay,
+            f'/DAPP_ICON={ROOT / "apps/desktop/src-tauri/icons/icon.ico"}',
+            '/DBUILD_PROFILE=test', '/DAPP_VERSION=0.0.0', WINDOWS / 'setup.nsi'])
+        assert result.returncode == 0, result.stdout + result.stderr
 
 
 def main():

@@ -11,7 +11,6 @@ import html
 import json
 from pathlib import Path, PurePosixPath
 import plistlib
-import shlex
 import shutil
 import subprocess
 import sys
@@ -27,8 +26,8 @@ SCRIPTS = ROOT / "packaging/desktop/macos"
 PACKAGES = ROOT / ".build/packages"
 APP = "Pixels Agent Bridge.app"
 IDENTIFIER = "vip.rgaa.pab.desktop.installer"
-CONTROL_URL = "wss://pab.rgaa.vip/control"
-RELAY_URL = "https://pab-relay.rgaa.vip"
+CONTROL_URL = ""
+RELAY_URL = ""
 REQUIRED = {
     "THIRD-PARTY-NOTICES.txt",
     "browser-runtime-macos.tar.gz",
@@ -50,6 +49,8 @@ def digest(path):
 
 
 def checked_url(value, scheme):
+    if not value:
+        return ""
     parsed = urlsplit(value)
     if (parsed.scheme != scheme or not parsed.hostname or parsed.username is not None
             or parsed.password is not None or parsed.fragment
@@ -115,14 +116,21 @@ def verify_binaries(payload, architecture):
 
 
 def prepare_scripts(destination, arch, control_url, relay_url):
+    if arch not in ("arm64", "x86_64") or bool(control_url) != bool(relay_url):
+        raise ValueError("invalid architecture or incomplete server URL pair")
+    checked_url(control_url, "wss")
+    checked_url(relay_url, "https")
     for name in ("preinstall", "postinstall", "failure-dialog.sh"):
         (destination / name).write_bytes((SCRIPTS / "pkg" / name).read_bytes().replace(b"\r\n", b"\n"))
         (destination / name).chmod(0o755)
         subprocess.run(["/bin/bash", "-n", str(destination / name)], check=True)
     shutil.copyfile(SCRIPTS / "pkg/failure-dialog.applescript", destination / "failure-dialog.applescript")
-    values = {"PAB_PKG_ARCH": arch,
-              "PAB_CONTROL_URL": control_url, "PAB_RELAY_URL": relay_url}
-    (destination / "package.env").write_text("".join(f"{k}={shlex.quote(v)}\n" for k, v in values.items()))
+    # This is application-owned configuration, consumed only by the native
+    # TOML parser. Never source customer URL values as shell code.
+    relays = [relay_url] if relay_url else []
+    (destination / "package.toml").write_text(
+        'control_url = ' + json.dumps(control_url, ensure_ascii=False) + '\nrelay_urls = '
+        + json.dumps(relays, ensure_ascii=False) + '\n', encoding="utf-8")
 
 
 def main():
@@ -134,6 +142,8 @@ def main():
     parser.add_argument("--packages-dir", type=Path, default=PACKAGES)
     parser.add_argument("--sign", help="Developer ID Installer identity; omit for an unsigned test package")
     args = parser.parse_args()
+    if bool(args.control_url) != bool(args.relay_url):
+        parser.error("supply both server URLs, or leave both empty")
     if sys.platform != "darwin" or sys.version_info < (3, 12):
         parser.error("run on macOS using Python 3.12 or newer")
     control = checked_url(args.control_url, "wss")

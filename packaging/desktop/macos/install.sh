@@ -1,13 +1,20 @@
 #!/bin/bash
 set -euo pipefail
-[[ $(uname -s) == Darwin && $EUID -eq 0 && $# -eq 2 ]] || {
-    echo 'usage (macOS): sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL' >&2; exit 2;
+[[ $(uname -s) == Darwin && $EUID -eq 0 && ( $# -eq 0 || $# -eq 2 ) ]] || {
+    echo 'usage (macOS): sudo bash install.sh [WSS_CONTROL_URL HTTPS_RELAY_URL | --defaults PATH.toml]' >&2; exit 2;
 }
-control_url=$1
-relay_url=$2
-[[ $control_url == wss://?* && $relay_url == https://?* && $control_url != *[$'\r\n\t ']* && $relay_url != *[$'\r\n\t ']* ]] || {
-    echo 'Use wss:// control and https:// relay URLs without whitespace' >&2; exit 2;
-}
+server_args=()
+if [[ ${1:-} == --defaults ]]; then
+    [[ -f $2 ]] || { echo 'Missing installer defaults TOML' >&2; exit 2; }
+    server_args=(--defaults "$2")
+elif [[ $# -eq 2 ]]; then
+    control_url=$1
+    relay_url=$2
+    [[ $control_url == wss://?* && $relay_url == https://?* && $control_url != *[$'\r\n\t ']* && $relay_url != *[$'\r\n\t ']* ]] || {
+        echo 'Use wss:// control and https:// relay URLs without whitespace' >&2; exit 2;
+    }
+    server_args=(--control-url "$control_url" --relay-url "$relay_url")
+fi
 desktop_user=${SUDO_USER:-}
 [[ -n $desktop_user && $desktop_user != root ]] || { echo 'Run sudo from the desktop user account' >&2; exit 2; }
 desktop_uid=$(id -u "$desktop_user")
@@ -100,7 +107,7 @@ if [[ -f $source_dir/THIRD-PARTY-NOTICES.txt ]]; then
     install -m 644 "$source_dir/THIRD-PARTY-NOTICES.txt" "$upgrade/new-support/THIRD-PARTY-NOTICES.txt"
 fi
 "$upgrade/new-support/pab-executor" configure --config "$upgrade/new-support/config.toml" \
-    --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
+    --previous "$install_dir" ${server_args[@]+"${server_args[@]}"}
 chmod 644 "$upgrade/new-support/config.toml"
 
 # Stop launchd respawn before retiring the old executable paths.

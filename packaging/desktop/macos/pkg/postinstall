@@ -4,7 +4,6 @@ export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 package_dir=$(cd "$(dirname "$0")" && pwd)
 # Revalidate immediately before mutation (the active user may have logged out).
 /bin/bash "$package_dir/preinstall" "$@"
-source "$package_dir/package.env"
 source "$package_dir/failure-dialog.sh"
 desktop_user=$(stat -f '%Su' /dev/console)
 # Installer runs as root and does not set SUDO_USER. The active console account,
@@ -12,7 +11,7 @@ desktop_user=$(stat -f '%Su' /dev/console)
 export SUDO_USER="$desktop_user"
 log_file=$(mktemp "$package_dir/upgrade-log.XXXXXX")
 if /bin/bash "$package_dir/payload/install.sh" \
-    "$PAB_CONTROL_URL" "$PAB_RELAY_URL" >"$log_file" 2>&1; then
+    --defaults "$package_dir/package.toml" >"$log_file" 2>&1; then
     cat "$log_file"
     rm -f "$log_file"
 else

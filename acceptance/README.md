@@ -1,5 +1,8 @@
 # Tool acceptance
 
+Client build defaults, public unconfigured startup and customer TOML precedence:
+[2026-10-19 configuration report](remote-desktop-client-defaults-2026-10-19.md).
+
 Linux DMA video/cursor multiplexing, production worker checks and the remaining
 rapid-lock wake failure are recorded in
 [the 2026-10-18 cursor stream report](remote-desktop-linux-dma-cursor-stream-2026-10-18.md).
