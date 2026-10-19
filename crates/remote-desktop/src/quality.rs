@@ -6,6 +6,7 @@ const BUDGETS: [u32; 6] = [0, 3_000_000, 1_500_000, 750_000, 350_000, 150_000];
 const DOWN_INTERVAL: Duration = Duration::from_secs(2);
 const UP_INTERVAL: Duration = Duration::from_secs(10);
 
+#[derive(Clone)]
 pub(crate) struct EncodingQuality {
     level: usize,
     changed: Option<Instant>,

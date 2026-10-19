@@ -36,6 +36,12 @@ async fn pressure_changes_encoder_budget_and_quality_is_owned_generation_bound_a
     assert!(quality.snapshot().await.is_err());
     assert!(matches!(server.request(query).await,
         RemoteDesktopReply::Error { code: DesktopErrorCode::StaleGeneration, .. }));
+    let replacement = viewer.next_frame(WAIT).await.unwrap();
+    assert_eq!(replacement.header.generation, 2);
+    assert_eq!(replacement.header.frame_id, 1);
+    let inherited = viewer.quality_control().snapshot().await.unwrap();
+    assert_eq!(inherited.encoder_target_bps, Some(3_000_000));
+    assert!(inherited.capture_fps_milli < 15_000);
     viewer.close().await.unwrap();
     server.legacy().await;
 }

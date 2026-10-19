@@ -73,6 +73,10 @@ async fn decoder_pipeline_latency_is_not_mistaken_for_growing_network_backlog() 
 async fn healthy_cadence(encode_delay: Option<Duration>) {
     let global = DesktopHost::new(Some(Arc::new(Backend {
         encode_delay,
+        // Isolate pacing from unoptimized QUIC bulk-encryption throughput.
+        // The default 512 KiB fixture remains in the large-frame/credit tests;
+        // actual native 1080p display throughput is a separate acceptance gate.
+        frame_bytes: Some(16 * 1024),
         ..Default::default()
     })));
     let server = Harness::new(&global).await;
@@ -87,7 +91,8 @@ async fn healthy_cadence(encode_delay: Option<Duration>) {
         viewer.report_presented(&frame.header).unwrap();
     }
     let rate = 24.0 / start.elapsed().as_secs_f64();
-    assert!(rate > 12.0 && rate < 16.0, "fixture delivery FPS {rate}");
+    let quality = viewer.quality_control().snapshot().await.unwrap();
+    assert!(rate > 12.0 && rate < 16.0, "fixture delivery FPS {rate}; quality={quality:?}");
     viewer.close().await.unwrap();
 }
 

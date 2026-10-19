@@ -455,8 +455,10 @@ impl DesktopHost {
         if *entry.cancelled.borrow() {
             return Err(DesktopError::Closed);
         }
+        let successor = Generation::new(opened.config.clone());
+        *successor.progress.lock().unwrap() = old.progress.lock().unwrap().restart(opened.config.fps);
         *entry.state.lock().unwrap() = Some(Ready {
-            video: Generation::new(opened.config.clone()),
+            video: successor,
         });
         Ok(opened)
     }

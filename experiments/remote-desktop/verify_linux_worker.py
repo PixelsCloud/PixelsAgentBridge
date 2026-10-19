@@ -30,6 +30,8 @@ def main():
     parser.add_argument("--embedded", action="store_true")
     parser.add_argument("--dma-fd", type=int)
     parser.add_argument("--dma-broker", action="store_true")
+    parser.add_argument("--budget-cycle", action="store_true",
+                        help="Apply 1.5 Mbps then restore while decoding every frame")
     args = parser.parse_args()
     assert args.dma_fd is None or (args.dma_fd >= 3 and os.geteuid() != 0)
     assert not (args.dma_broker and args.dma_fd is not None)
@@ -81,6 +83,8 @@ def main():
     if args.dma_fd is not None:
         os.close(args.dma_fd)  # Only the capture child retains the channel.
     total_bytes = 0
+    bytes_by_phase = [0, 0, 0]
+    budgets = []
     samples = []
     times = []
     previous = -1
@@ -101,6 +105,11 @@ def main():
     try:
         assert struct.unpack("<III", read(12)) == (0x31424150, width, height)
         for i in range(90):
+            if args.budget_cycle and i in (30, 60):
+                budget = 1_500_000 if i == 30 else 0
+                source.stdin.write(struct.pack("<BI", 2, budget))
+                assert struct.unpack("<I", read(4))[0] == 0x31424150, "Budget update was not applied"
+                budgets.append(budget)
             source.stdin.write(b"\x01")
             size, index, captured, key = struct.unpack("<IQQI", read(24))
             assert 0 < size <= 16 * 1024 * 1024 and index == i
@@ -113,6 +122,7 @@ def main():
             samples.append(tuple(pixels.data[y * width + x] for y in (height//4, height*3//4) for x in (width//4, width*3//4)))
             times.append(time.monotonic())
             total_bytes += size
+            bytes_by_phase[i // 30] += size
         source.stdin.write(b"\x00")
         assert source.wait(timeout=5) == 0
         stderr = source.stderr.read(4000).decode(errors="replace")
@@ -124,8 +134,10 @@ def main():
             "changed_samples":changed, "decoded_fps_after_warmup":74/elapsed,
             "changed_fps_after_warmup":changed_fps,
             "encoded_bytes":total_bytes, "fixture_ticks":tick[0], "stderr":stderr,
+            "budget_updates":budgets, "encoded_bytes_by_phase":bytes_by_phase,
             "pixel_bytes_saved":0, "worker_exit":source.returncode, "consumer_uid":os.geteuid(),
-            "source":"dma" if args.dma_fd is not None or args.dma_broker else "pipewire"}))
+            "source":"dma" if args.dma_fd is not None or args.dma_broker else
+                     "x11" if screen["id"].startswith("x11:") else "pipewire"}))
         assert changed >= 85, "Animation did not produce distinct desktop frames"
         assert changed_fps >= 12, "Local changing-frame capture/decode rate fell below 12 FPS"
     finally:

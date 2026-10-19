@@ -61,6 +61,7 @@ fn config() -> DesktopVideoConfig {
 #[derive(Default)]
 struct Backend {
     budget: Option<Arc<AtomicU32>>,
+    frame_bytes: Option<usize>,
     active: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     maximum: Arc<AtomicUsize>,
@@ -103,6 +104,7 @@ impl DesktopInputSink for InputSink {
 }
 struct Source {
     budget: Option<Arc<AtomicU32>>,
+    frame_bytes: usize,
     backend: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     number: u64,
@@ -143,7 +145,7 @@ impl DesktopSource for Source {
             self.number += 1;
             self.produced.fetch_add(1, Ordering::SeqCst);
             Ok(MediaFrame {
-                bytes: vec![self.marker; 512 * 1024 + 13],
+                bytes: vec![self.marker; self.frame_bytes],
                 capture_time_us: self.number * 66667,
                 keyframe: self.number == 1,
             })
@@ -174,6 +176,7 @@ impl DesktopBackend for Backend {
             self.maximum.fetch_max(count, Ordering::SeqCst);
             Ok(Box::new(Source {
                 budget: self.budget.clone(),
+                frame_bytes: self.frame_bytes.unwrap_or(512 * 1024 + 13),
                 backend: self.active.clone(),
                 produced: self.produced.clone(),
                 number: 0,

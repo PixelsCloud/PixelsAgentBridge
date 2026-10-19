@@ -17,6 +17,7 @@ pub(super) mod input;
 pub(super) mod cursor;
 
 const VERSION: u16 = 1;
+const ENCODING_BUDGET_VERSION: u16 = 1;
 static PROVIDERS: OnceLock<Mutex<Vec<Arc<Provider>>>> = OnceLock::new();
 static CHANGED: Notify = Notify::const_new();
 fn providers() -> &'static Mutex<Vec<Arc<Provider>>> {
@@ -32,6 +33,7 @@ struct Provider {
     input_supported: bool,
     input: Mutex<Option<Arc<input::InputProvider>>>,
     cursor_supported: bool,
+    encoding_budget_supported: bool,
     cursor: Mutex<Option<Arc<cursor::CursorProvider>>>,
     ended: tokio::sync::watch::Sender<bool>,
 }
@@ -58,6 +60,7 @@ enum Operation {
     Screens,
     Start { config: DesktopVideoConfig },
     Next,
+    EncodingBudget { bits_per_second: u32 },
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
@@ -66,6 +69,7 @@ enum Reply {
         screens: Vec<DesktopScreen>,
     },
     Started,
+    EncodingBudget { bits_per_second: Option<u32> },
     Frame {
         bytes: usize,
         capture_time_us: u64,
@@ -78,6 +82,7 @@ enum Reply {
 enum Response {
     Screens(Vec<DesktopScreen>),
     Started,
+    EncodingBudget(Option<u32>),
     Frame(MediaFrame),
 }
 struct Request {
@@ -202,6 +207,15 @@ impl DesktopBackend for HelperMediaBackend {
             .map_err(unavailable)?
             {
                 Response::Started => {
+                    // Old helpers keep the original start/next wire format.
+                    // Only negotiate the extra operation after an explicit hint.
+                    let encoding_budget = if provider.encoding_budget_supported {
+                        match request(&provider, Operation::EncodingBudget { bits_per_second: 0 }, None)
+                            .await.map_err(unavailable)? {
+                            Response::EncodingBudget(budget) => budget,
+                            _ => return Err(unavailable("invalid media encoding budget reply")),
+                        }
+                    } else { None };
                     *provider
                         .active_config
                         .lock()
@@ -210,6 +224,7 @@ impl DesktopBackend for HelperMediaBackend {
                     Ok(Box::new(HelperSource {
                         provider,
                         _stop: stop,
+                        encoding_budget,
                     }) as Box<dyn DesktopSource>)
                 }
                 _ => Err(unavailable("invalid media start reply")),
@@ -220,6 +235,7 @@ impl DesktopBackend for HelperMediaBackend {
 struct HelperSource {
     provider: Arc<Provider>,
     _stop: oneshot::Sender<()>,
+    encoding_budget: Option<u32>,
 }
 impl Drop for HelperSource {
     fn drop(&mut self) {
@@ -231,6 +247,20 @@ impl Drop for HelperSource {
     }
 }
 impl DesktopSource for HelperSource {
+    fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
+    fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
+        Box::pin(async move {
+            if self.encoding_budget.is_none() {
+                return Err(DesktopError::Rejected { code: pab_protocol::DesktopErrorCode::Unsupported,
+                    message: "media helper encoding budgets are unavailable".into() });
+            }
+            match request(&self.provider, Operation::EncodingBudget { bits_per_second }, None)
+                .await.map_err(unavailable)? {
+                Response::EncodingBudget(budget) => { self.encoding_budget = budget; Ok(()) },
+                _ => Err(unavailable("invalid media encoding budget reply")),
+            }
+        })
+    }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
             match request(&self.provider, Operation::Next, None)
@@ -286,6 +316,8 @@ pub(super) async fn serve_registered(
             input: Mutex::new(None),
             cursor_supported: frame["cursor_schema_version"].as_u64()
                 == Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION.into()),
+            encoding_budget_supported: frame["encoding_budget_version"].as_u64()
+                == Some(ENCODING_BUDGET_VERSION.into()),
             cursor: Mutex::new(None),
             ended: tokio::sync::watch::channel(false).0,
         }));
@@ -352,6 +384,10 @@ async fn exchange(
             Ok(Response::Screens(screens))
         }
         (Operation::Start { .. }, Reply::Started) => Ok(Response::Started),
+        (Operation::EncodingBudget { bits_per_second: requested },
+            Reply::EncodingBudget { bits_per_second })
+            if bits_per_second.is_none_or(|value| value == *requested) =>
+            Ok(Response::EncodingBudget(bits_per_second)),
         (
             Operation::Next,
             Reply::Frame {
@@ -422,6 +458,7 @@ async fn serve_helper_socket_with_role(
     send_json(
         &mut socket,
         &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised,
+            "encoding_budget_version": ENCODING_BUDGET_VERSION,
             "cursor_schema_version": backend.supports_cursor().then_some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION)}),
     )
     .await?;
@@ -494,6 +531,14 @@ async fn serve_media_requests(
                         Some(frame.bytes),
                     ))
                 }
+                Operation::EncodingBudget { bits_per_second }
+                    if bits_per_second == 0 || (150_000..=16_000_000).contains(&bits_per_second) => {
+                    let source = source.as_mut().ok_or(LocalIpcError::Protocol)?;
+                    if source.encoding_budget().is_some_and(|current| current != bits_per_second) {
+                        source.set_encoding_budget(bits_per_second).await.map_err(unavailable_local)?;
+                    }
+                    Ok((Reply::EncodingBudget { bits_per_second: source.encoding_budget() }, None))
+                }
                 _ => Err(LocalIpcError::Protocol),
             }
         };
@@ -530,6 +575,10 @@ fn unavailable_local(error: DesktopError) -> LocalIpcError {
 #[cfg(all(test, any(windows, target_os = "macos", target_os = "linux")))]
 mod tests {
     use super::*;
+    mod quality_tests {
+        use super::*;
+        include!("local_ipc_media_quality_tests.rs");
+    }
     mod cursor_tests {
         use super::*;
         include!("local_ipc_media_cursor_tests.rs");
@@ -656,12 +705,16 @@ mod tests {
         pair_with_role(backend, false).await
     }
     async fn pair_with_role(backend: Arc<dyn DesktopBackend>, supervised: bool) -> Pair {
+        pair_with_budget_hint(backend, supervised, true).await
+    }
+    async fn pair_with_budget_hint(backend: Arc<dyn DesktopBackend>, supervised: bool, budget_hint: bool) -> Pair {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
             let mut socket = accept_async_with_config(stream, None).await.unwrap();
-            let frame: Value = read_control(&mut socket).await.unwrap();
+            let mut frame: Value = read_control(&mut socket).await.unwrap();
+            if !budget_hint { frame.as_object_mut().unwrap().remove("encoding_budget_version"); }
             // Exercise the real kernel PID/account challenge. HMAC handshake
             // is independently covered by existing local_ipc tests.
             let _ = serve_registered(socket, frame).await;

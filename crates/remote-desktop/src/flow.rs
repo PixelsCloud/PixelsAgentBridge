@@ -41,6 +41,17 @@ impl VideoFlow {
         }
     }
 
+    /// A screen/codec generation retires its frames and credit history, but the
+    /// same viewer still consumes the same connection. Apply its established
+    /// budget before the replacement encoder produces its first keyframe.
+    pub(crate) fn restart(&self, fps: u16) -> Self {
+        let mut fresh = Self::new(fps);
+        fresh.period = self.period.max(fresh.nominal_period);
+        fresh.last_adjustment = self.last_adjustment;
+        fresh.quality = self.quality.clone();
+        fresh
+    }
+
     /// None means no credit. A timestamp in the past is immediately eligible;
     /// after a long static interval there is no accumulated burst allowance.
     pub(crate) fn capture_at(&mut self, now: Instant) -> Option<Instant> {
@@ -150,6 +161,27 @@ impl VideoFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restarting_preserves_capacity_without_reusing_old_frame_credit() {
+        let now = Instant::now();
+        let mut old = VideoFlow::new(15);
+        old.period = Duration::from_millis(250);
+        old.quality.pressure(now);
+        for _ in 0..DESKTOP_MAX_IN_FLIGHT { old.begin_send(now).unwrap(); }
+        assert!(old.capture_at(now).is_none());
+        let mut fresh = old.restart(30);
+        assert_eq!(fresh.encoding_budget(), 3_000_000);
+        assert_eq!(fresh.capture_fps_milli(), 4_000);
+        assert_eq!(fresh.backlog_deadline(), None);
+        assert_eq!(fresh.capture_at(now), Some(now));
+        assert!(fresh.acknowledge(1, now).is_err());
+        assert_eq!(fresh.begin_send(now).unwrap(), 1);
+        fresh.acknowledge(1, now + Duration::from_millis(20)).unwrap();
+        assert_eq!(fresh.encoding_budget(), 3_000_000);
+        assert!(fresh.period >= fresh.nominal_period);
+        assert_eq!(old.flights.len(), DESKTOP_MAX_IN_FLIGHT as usize);
+    }
 
     #[test]
     fn nominal_rate_rounding_never_reports_a_false_quality_reduction() {
