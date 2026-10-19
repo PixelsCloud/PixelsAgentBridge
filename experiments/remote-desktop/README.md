@@ -101,3 +101,24 @@ python experiments/remote-desktop/verify_loopback_probe.py --capture --display 0
 本机 RTX 3060 与 90 RTX 4090 的 1080p 本地闭环已通过，证据见 [实验记录](RESULTS-2026-10-16.md) 和 [验收数据](../../acceptance/remote-desktop-loopback-2026-10-16.json)。这一阶段尚未接入网络、Desktop 产品入口、多屏切换/旋转、输入、锁屏、软编后备或 Mac/Linux 媒体路径。固定尺寸和颜色契约仅适用于本实验，不能作为生产协议省略 generation、色彩与屏幕布局协商的依据。
 
 系统接口参考：[H.264 解码器](https://learn.microsoft.com/en-us/windows/win32/medfound/h-264-video-decoder)、[D3D11 解码资源交接](https://learn.microsoft.com/en-us/windows/win32/medfound/supporting-direct3d-11-video-decoding-in-media-foundation)、[可见区域](https://learn.microsoft.com/en-us/windows/win32/medfound/picture-aspect-ratio)、[显示统计](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_frame_statistics)。
+
+## Windows 活动协助的真实进程验收
+
+`assistance_active_acceptance.py` 使用已有的隔离测试资料与已暂存的被控端，覆盖
+active 工具取消、请求方崩溃、Desktop 崩溃重启及过期；不会安装程序或发送远端输入。
+需要 Python `psutil`、本目录 `mcp_client.py` 及 Desktop 的 Playwright 依赖。
+
+```powershell
+python experiments/remote-desktop/assistance_active_acceptance.py --profile .build/remote-desktop/<isolated-profile> --code <device-code>
+```
+
+profile 必须位于本工作区 `.build/remote-desktop/`，包含自己的 `config.toml`、
+`pab-desktop.exe`、`pab-mcp.exe` 及已有授权数据；不能传安装目录。39100 端口必须空闲。
+Desktop 必须是启用正式内置前端的候选，被控端也须已有对应媒体 helper；这些准备不由
+脚本代办。脚本只结束自己启动的 Desktop/MCP 及其专属媒体/WebView 子进程，报告保存
+在新的私有 `.build` 目录；不读取、保存实际画面或用户输入。
+
+Windows 凭据槽属于系统凭据库：仅复制账号文件不能隔离实际退出/服务切换时的令牌
+删除。做该类测试须先建立独立测试 slot，保持原用户的 slot/令牌不变。服务器切换后
+恢复私有资料也必须维持 revision 单调增长，不能把旧 revision 写回后计为产品故障。
+本轮实际结果与精确范围见[active、服务切换与混合 DPI 验收](../../acceptance/remote-desktop-active-switch-mixed-dpi-2026-10-19.md)。

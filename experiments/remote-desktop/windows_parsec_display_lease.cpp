@@ -71,7 +71,9 @@ int main(int argc, char** argv) {
         if (value.empty() || value.size() > 3 || value.find_first_not_of("0123456789") != std::string::npos) return 2;
         duration = std::stoul(value);
     }
-    if (!probe && (duration < 5 || duration > 120)) return 2;
+    // A mixed-DPI acceptance includes a Settings round trip and coordinate
+    // checks. Keep the display strictly temporary, with a ten-minute ceiling.
+    if (!probe && (duration < 5 || duration > 600)) return 2;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     snapshot("before");
     const auto initial = outputs();
