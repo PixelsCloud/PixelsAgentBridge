@@ -99,9 +99,15 @@ struct Display {
     unsigned width, height, scale_milli;
     bool primary;
 };
+inline bool display_current(const Display& display) {
+    // A locked or sleeping Aqua session can report an online display as
+    // inactive. Only disconnection or changed geometry retires this layout.
+    return CGDisplayIsOnline(display.id) &&
+        CGRectEqualToRect(CGDisplayBounds(display.id), display.bounds);
+}
 inline std::vector<Display> displays() {
     CGDirectDisplayID ids[33]; uint32_t count = 0;
-    check(CGGetActiveDisplayList(33, ids, &count), "Active displays");
+    check(CGGetOnlineDisplayList(33, ids, &count), "Online displays");
     if (!count || count > 32) throw std::runtime_error("Display count outside bounds");
     std::vector<Display> result;
     for (uint32_t i = 0; i < count; ++i) {
@@ -119,7 +125,7 @@ inline std::vector<Display> displays() {
             throw std::runtime_error("Display geometry outside bounds");
         // ScreenCaptureKit delivers the image already oriented. Its texture
         // therefore has identity rotation even for a physically rotated screen.
-        result.push_back({ids[i], bounds, unsigned(w), unsigned(h), unsigned(std::lround(scale * 1000)), i == 0});
+        result.push_back({ids[i], bounds, unsigned(w), unsigned(h), unsigned(std::lround(scale * 1000)), CGDisplayIsMain(ids[i]) != 0});
     }
     return result;
 }

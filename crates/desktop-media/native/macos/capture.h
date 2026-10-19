@@ -129,7 +129,7 @@ public:
     OwnedCF<CVPixelBufferRef> next(Clock::time_point& sampled) {
         for (;;) {
             parent_alive();
-            if (!CGDisplayIsActive(display_.id) || !CGRectEqualToRect(CGDisplayBounds(display_.id), display_.bounds))
+            if (!display_current(display_))
                 throw std::runtime_error("Screen changed; refresh generation");
             {
                 std::lock_guard<std::mutex> lock(state_->mutex);
