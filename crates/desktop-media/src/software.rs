@@ -168,6 +168,7 @@ pub struct SoftwareEncoder {
     prepared_bgra: bool,
     encoding_budget: u32,
     fps: u16,
+    bounded_slices: bool,
 }
 impl SoftwareEncoder {
     pub fn new(width: usize, height: usize, fps: u16) -> Result<Self, Error> {
@@ -176,16 +177,17 @@ impl SoftwareEncoder {
             return Err("invalid software encoder frame rate".into());
         }
         Ok(Self {
-            encoder: Self::encoder(fps, 0)?,
+            encoder: Self::encoder(fps, 0, false)?,
             planar,
             packet: Vec::new(),
             initialized: false,
             prepared_bgra: false,
             encoding_budget: 0,
             fps,
+            bounded_slices: false,
         })
     }
-    fn encoder(fps: u16, budget: u32) -> Result<Encoder, Error> {
+    fn encoder(fps: u16, budget: u32, bounded_slices: bool) -> Result<Encoder, Error> {
         // Full quality preserves the established path. A requested budget
         // switches rate control but never permits hidden frame skipping.
         let config = EncoderConfig::new()
@@ -201,6 +203,13 @@ impl SoftwareEncoder {
             .background_detection(false)
             .vui(VuiConfig::bt709());
         let config = if budget == 0 { config } else { config.bitrate(BitRate::from_bps(budget)) };
+        // Keep ordinary desktop quality/slicing unchanged. Only a codec that
+        // exhausted its native bitstream buffer uses size-limited NAL units.
+        let config = if bounded_slices {
+            config.max_slice_len(8192)
+        } else {
+            config
+        };
         Ok(Encoder::with_api_config(OpenH264API::from_source(), config)?)
     }
     pub fn set_encoding_budget(&mut self, bits_per_second: u32) -> Result<(), Error> {
@@ -211,7 +220,7 @@ impl SoftwareEncoder {
             // OpenH264 can accept an RC-mode update without changing the
             // running rate controller. Replace only the codec; retain owned
             // conversion planes and publish SPS/PPS + IDR on the next frame.
-            let replacement = Self::encoder(self.fps, bits_per_second)?;
+            let replacement = Self::encoder(self.fps, bits_per_second, self.bounded_slices)?;
             self.encoder = replacement;
             self.initialized = false;
         }
@@ -246,6 +255,9 @@ impl SoftwareEncoder {
             &mut self.packet,
             &mut self.initialized,
             &source,
+            self.fps,
+            self.encoding_budget,
+            &mut self.bounded_slices,
         )
     }
     /// Limited-range BT.709 NV12 from a mapped capture surface. The hardware
@@ -264,6 +276,9 @@ impl SoftwareEncoder {
             &mut self.packet,
             &mut self.initialized,
             &source,
+            self.fps,
+            self.encoding_budget,
+            &mut self.bounded_slices,
         )
     }
     fn encode_frame<'a>(
@@ -271,11 +286,43 @@ impl SoftwareEncoder {
         packet: &'a mut Vec<u8>,
         initialized: &mut bool,
         source: &YUVSlices<'_>,
+        fps: u16,
+        budget: u32,
+        bounded_slices: &mut bool,
     ) -> Result<&'a [u8], Error> {
+        if let Err(error) =
+            Self::encode_frame_once(encoder, packet, initialized, source, *bounded_slices)
+        {
+            // OpenH264 maps both allocation and bitstream-capacity errors to
+            // code 3, and uninitializes the failed native encoder. Retry this
+            // same owned frame once with bounded slices and a fresh codec.
+            // Never reuse that broken codec, drop a reference frame, or retry
+            // again if the bounded codec also fails (including real OOM).
+            if *bounded_slices
+                || !error.downcast_ref::<openh264::Error>().is_some_and(|error| {
+                    error.native_code() == i64::from(openh264_sys2::cmMallocMemeError)
+                })
+            {
+                return Err(error);
+            }
+            *encoder = Self::encoder(fps, budget, true)?;
+            *initialized = false;
+            *bounded_slices = true;
+            Self::encode_frame_once(encoder, packet, initialized, source, true)?;
+        }
+        Ok(packet)
+    }
+    fn encode_frame_once(
+        encoder: &mut Encoder,
+        packet: &mut Vec<u8>,
+        initialized: &mut bool,
+        source: &YUVSlices<'_>,
+        bounded_slices: bool,
+    ) -> Result<(), Error> {
         if !*initialized {
-            // The wrapper initializes dimensions lazily, and forces a single
-            // slice even with num_threads(4). Prime it privately, then enable
-            // independent slices; the first published frame must be a new IDR.
+            // The wrapper initializes dimensions lazily. Prime it privately
+            // before adjusting QP/slices; the first published frame must be a
+            // new IDR, including after a bounded-slice codec replacement.
             encoder.encode(source)?;
             {
                 use openh264_sys2::{
@@ -299,7 +346,7 @@ impl SoftwareEncoder {
                     let mut params = params.assume_init();
                     params.sSpatialLayers[0].iDLayerQp = i32::from(SOFTWARE_QP);
                     let (width, height) = source.dimensions();
-                    if width * height >= 65_536 {
+                    if !bounded_slices && width * height >= 65_536 {
                         params.iMultipleThreadIdc = 4;
                         params.sSpatialLayers[0].sSliceArgument.uiSliceMode = SM_FIXEDSLCNUM_SLICE;
                         params.sSpatialLayers[0].sSliceArgument.uiSliceNum = 4;
@@ -321,7 +368,7 @@ impl SoftwareEncoder {
         if packet.is_empty() || packet.len() > pab_protocol::DESKTOP_MAX_FRAME_BYTES {
             return Err("software encoder skipped a frame or exceeded the packet bound".into());
         }
-        Ok(packet)
+        Ok(())
     }
 }
 
@@ -394,6 +441,78 @@ impl SoftwareDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn high_entropy_frames_decode_across_budget_changes() {
+        for (width, height) in [(64, 48), (128, 72), (256, 144), (512, 288)] {
+            let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+            let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+            let mut state = 123456789u32;
+            let mut pixels = vec![0; width * height * 4];
+            for budget in [0, 150_000, 0] {
+                encoder.set_encoding_budget(budget).unwrap();
+                for frame in 0..4 {
+                    for pixel in pixels.chunks_exact_mut(4) {
+                        state ^= state << 13;
+                        state ^= state >> 17;
+                        state ^= state << 5;
+                        pixel.copy_from_slice(&[
+                            state as u8,
+                            (state >> 8) as u8,
+                            (state >> 16) as u8,
+                            255,
+                        ]);
+                    }
+                    let packet = encoder.encode_bgra(&pixels, width * 4).unwrap_or_else(|error| {
+                        panic!("{width}x{height}, budget {budget}, frame {frame}: {error:?}")
+                    });
+                    assert!(decoder.decode(packet).unwrap().is_some());
+                    if frame == 0 {
+                        assert!(
+                            SoftwareDecoder::new(width, height).unwrap().decode(packet).unwrap().is_some(),
+                            "first frame after budget change must initialize a fresh decoder"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn high_entropy_nv12_recovers_after_an_existing_frame_without_stale_output() {
+        let (width, height) = (256, 144);
+        let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+        let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+        let mut y = vec![128; width * height];
+        let mut uv = vec![128; width * height / 2];
+        let packet = encoder.encode_nv12(&y, width, &uv, width).unwrap();
+        let mut previous = decoder.decode(packet).unwrap().unwrap().to_vec();
+        let mut state = 123456789u32;
+        for (phase, budget) in [0, 150_000, 0].into_iter().enumerate() {
+            encoder.set_encoding_budget(budget).unwrap();
+            for frame in 0..4 {
+                for value in y.iter_mut().chain(uv.iter_mut()) {
+                    state ^= state << 13;
+                    state ^= state >> 17;
+                    state ^= state << 5;
+                    *value = 16 + (state % 220) as u8;
+                }
+                let was_bounded = encoder.bounded_slices;
+                let packet = encoder.encode_nv12(&y, width, &uv, width).unwrap().to_vec();
+                let output = decoder.decode(&packet).unwrap().expect("frame skipped");
+                assert_ne!(output, previous, "stale decoded frame at {phase}/{frame}");
+                previous.copy_from_slice(output);
+                if (!was_bounded && encoder.bounded_slices) || (phase > 0 && frame == 0) {
+                    assert!(
+                        SoftwareDecoder::new(width, height).unwrap().decode(&packet).unwrap().is_some(),
+                        "replacement encoder must start with an independent keyframe"
+                    );
+                }
+            }
+        }
+        assert!(
+            encoder.bounded_slices,
+            "regression did not exercise native buffer recovery"
+        );
+    }
     #[test]
     fn live_bitrate_budget_preserves_every_frame_and_restores_full_quality() {
         let (width, height) = (256, 144);
@@ -495,6 +614,7 @@ mod tests {
             );
             let packet = SoftwareEncoder::encode_frame(
                 &mut encoder.encoder, &mut encoder.packet, &mut encoder.initialized, &source,
+                encoder.fps, encoder.encoding_budget, &mut encoder.bounded_slices,
             ).unwrap();
             let encoded = Instant::now();
             let bytes = packet.len();
