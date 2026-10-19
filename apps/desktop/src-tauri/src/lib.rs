@@ -398,7 +398,7 @@ pub fn run() {
         let mut context = context;
         if let Some(arguments) = operator::desktop_terminal::acceptance_browser_arguments() {
             for window in &mut context.config_mut().app.windows {
-                window.additional_browser_args = Some(arguments.into());
+                window.additional_browser_args = Some(arguments.clone());
             }
         }
         context

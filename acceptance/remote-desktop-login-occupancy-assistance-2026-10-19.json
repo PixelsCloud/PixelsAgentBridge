@@ -1,0 +1,1815 @@
+{
+  "date": "2026-10-19",
+  "source_base_commit": "634cce4",
+  "source_change": "opt-in debug-only custom CDP port; no release behavior change",
+  "windows_desktop_sha256": "8628976f9738dac0373be90ccb30b689db117a9da48f53071d1601227e8bed22",
+  "mcp_sha256": "f2a76f70dbb5c1947c1e027db530141ee973be239ca43a5b09eef33096b2ce93",
+  "remote_artifacts": {
+    "pab-desktop": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+    "pab-executor": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+    "manager.py": "0c7130b57d48090f25a8bfcca2a896feae7844721306b92a4ceba0f91b965e1a",
+    "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
+  },
+  "login": {
+    "passed": true,
+    "scope": "existing Ubuntu GNOME Wayland session lock -> password -> desktop; not logout or boot login",
+    "password_submissions": 1,
+    "password_content_recorded": false,
+    "steps": [
+      {
+        "name": "open",
+        "time": 1792373738.0487537,
+        "result": {
+          "accepted": true
+        }
+      },
+      {
+        "name": "ordinary",
+        "time": 1792373740.1702359,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "d66dddd0-119b-4e2b-9d07-147922ce093f",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        },
+        "probe": {
+          "session": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "fixture": null,
+          "owned": [
+            {
+              "pid": 102146,
+              "uid": 0,
+              "args": [
+                "--config",
+                "/etc/pixels-agent-bridge/config.toml",
+                ""
+              ]
+            },
+            {
+              "pid": 102153,
+              "uid": 0,
+              "args": [
+                "--media-supervisor",
+                ""
+              ]
+            },
+            {
+              "pid": 102160,
+              "uid": 1000,
+              "args": [
+                "--media-helper",
+                ""
+              ]
+            },
+            {
+              "pid": 102256,
+              "uid": 1000,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1"
+              ]
+            }
+          ],
+          "restored": false,
+          "rollback_trigger": ""
+        },
+        "picture": ".build\\remote-desktop\\mixed-product-414bfc40c6b2\\owned-surface-1792373740110668700.png"
+      },
+      {
+        "name": "lock",
+        "time": 1792373741.4850736,
+        "submitted": "{\"lock_submitted_once\": true, \"session\": \"2\"}"
+      },
+      {
+        "name": "locked",
+        "time": 1792373744.689844,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "fd6c3d09-0b9f-4825-963f-afb6bb1470a0",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        },
+        "probe": {
+          "session": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=yes",
+          "fixture": null,
+          "owned": [
+            {
+              "pid": 102146,
+              "uid": 0,
+              "args": [
+                "--config",
+                "/etc/pixels-agent-bridge/config.toml",
+                ""
+              ]
+            },
+            {
+              "pid": 102153,
+              "uid": 0,
+              "args": [
+                "--media-supervisor",
+                ""
+              ]
+            },
+            {
+              "pid": 102160,
+              "uid": 1000,
+              "args": [
+                "--media-helper",
+                ""
+              ]
+            },
+            {
+              "pid": 102373,
+              "uid": 1000,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1"
+              ]
+            },
+            {
+              "pid": 102377,
+              "uid": 0,
+              "args": [
+                "--media-worker",
+                "export-session",
+                "1676"
+              ]
+            }
+          ],
+          "restored": false,
+          "rollback_trigger": ""
+        },
+        "picture": ".build\\remote-desktop\\mixed-product-414bfc40c6b2\\owned-surface-1792373744625670900.png"
+      },
+      {
+        "name": "enable_control",
+        "time": 1792373746.036154,
+        "submitted": "true"
+      },
+      {
+        "name": "prompt_enter",
+        "time": 1792373746.6702843,
+        "submitted": "Owned viewer Enter submitted"
+      },
+      {
+        "name": "prompt",
+        "time": 1792373748.8411076,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "fd6c3d09-0b9f-4825-963f-afb6bb1470a0",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": true,
+          "decoder": "d3d11_hardware"
+        },
+        "probe": {
+          "session": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=yes",
+          "fixture": null,
+          "owned": [
+            {
+              "pid": 102146,
+              "uid": 0,
+              "args": [
+                "--config",
+                "/etc/pixels-agent-bridge/config.toml",
+                ""
+              ]
+            },
+            {
+              "pid": 102153,
+              "uid": 0,
+              "args": [
+                "--media-supervisor",
+                ""
+              ]
+            },
+            {
+              "pid": 102160,
+              "uid": 1000,
+              "args": [
+                "--media-helper",
+                ""
+              ]
+            },
+            {
+              "pid": 102373,
+              "uid": 1000,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1"
+              ]
+            },
+            {
+              "pid": 102377,
+              "uid": 0,
+              "args": [
+                "--media-worker",
+                "export-session",
+                "1676"
+              ]
+            },
+            {
+              "pid": 102482,
+              "uid": 1000,
+              "args": [
+                "--media-worker",
+                "input",
+                "gnome:Virtual-1"
+              ]
+            },
+            {
+              "pid": 102485,
+              "uid": 0,
+              "args": [
+                "--media-worker",
+                "input-session",
+                "1676"
+              ]
+            }
+          ],
+          "restored": false,
+          "rollback_trigger": ""
+        },
+        "picture": ".build\\remote-desktop\\mixed-product-414bfc40c6b2\\owned-surface-1792373748775830000.png"
+      },
+      {
+        "name": "password_submit",
+        "time": 1792373763.944337,
+        "result": "Credential submitted once through owned native viewer"
+      },
+      {
+        "name": "observe",
+        "time": 1792373774.0287447,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "88977b79-4124-45e0-a743-cf85d5d2f77a",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        },
+        "probe": {
+          "session": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "fixture": null,
+          "owned": [
+            {
+              "pid": 102146,
+              "uid": 0,
+              "args": [
+                "--config",
+                "/etc/pixels-agent-bridge/config.toml",
+                ""
+              ]
+            },
+            {
+              "pid": 102153,
+              "uid": 0,
+              "args": [
+                "--media-supervisor",
+                ""
+              ]
+            },
+            {
+              "pid": 102160,
+              "uid": 1000,
+              "args": [
+                "--media-helper",
+                ""
+              ]
+            },
+            {
+              "pid": 102773,
+              "uid": 1000,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1"
+              ]
+            }
+          ],
+          "restored": false,
+          "rollback_trigger": ""
+        },
+        "picture": ".build\\remote-desktop\\mixed-product-414bfc40c6b2\\owned-surface-1792373773977227800.png"
+      },
+      {
+        "name": "close",
+        "time": 1792373780.979925,
+        "submitted": "Owned native window close submitted once"
+      }
+    ],
+    "initial_observe_during_surface_recreation": "Screenshot unavailable during the transition; observed again without repeating password"
+  },
+  "same_account_desktops_and_ai_assistance": {
+    "same_account": true,
+    "distinct_profiles": true,
+    "remote_input_sent": false,
+    "steps": [
+      {
+        "name": "first_open",
+        "time": 1792373781.7880685,
+        "result": {
+          "accepted": true
+        }
+      },
+      {
+        "name": "first_viewing",
+        "time": 1792373782.5042567,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "d22c46db-2eee-45f6-aa98-039d6420ddf8",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      },
+      {
+        "name": "second_connected",
+        "time": 1792373783.9037275,
+        "connected": true
+      },
+      {
+        "name": "second_main",
+        "time": 1792373787.875377,
+        "status": {
+          "label": "main",
+          "text": "Pixels Agent Bridge (V1.3.4)\nH\nhome\nView profile\nMy devices\nDevice list\nMCP connections\nActivity\nMe\nSettings\nLocal service status unknown\nServer status unknown\nThis device cannot receive connections yet. The device service may be missing, stopped, or inaccessible to this user. You can still connect to other devices.\nAdd device\nRemote device code\nRemote password\nAdd device\nAdded devices\n556 688 188\nRemote device\nUnknown\n472 668 356\nMINMIN\nUnknown\n947 158 375\nXRServer03\nUnknown\n428 358 431\n90\nUnknown\n559 038 160\nCompany\nUnknown\n419 438 177\nRemote device\nUnknown"
+        }
+      },
+      {
+        "name": "assistance_requested",
+        "time": 1792373788.0259387,
+        "snapshot": {
+          "assistance_id": "598116da-29bd-4b60-8378-c76ae2564727",
+          "created_at_unix_ms": 1792373788010,
+          "delivery": "pending",
+          "expires_at_unix_ms": 1792374088010,
+          "outcome": null,
+          "request": {
+            "device_code": "556688188",
+            "expected_action": "Verify view-only handoff after the other viewer closes, then complete",
+            "expires_in_seconds": 300,
+            "reason": "Acceptance: same-account Desktop occupancy and assistance",
+            "request_id": "cd38d3b9-a560-46ee-9bdc-22f53c88d0f1",
+            "screen_id": null
+          },
+          "revision": 1,
+          "status": "waiting",
+          "window_label": null
+        }
+      },
+      {
+        "name": "second_open",
+        "time": 1792373789.8881888,
+        "result": {
+          "action": "open",
+          "opened_from_prompt": true
+        }
+      },
+      {
+        "name": "second_busy",
+        "time": 1792373790.722019,
+        "status": {
+          "phase": "failed",
+          "error": "remote desktop Busy: remote desktop Busy: this device already has a desktop viewer",
+          "opened": null,
+          "input_ready": false,
+          "frame_ready": false,
+          "input_enabled": false,
+          "decoder": null
+        },
+        "ui": {
+          "label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c",
+          "text": "Remote desktop\nView only\nConnection failed\nDisplay\n15 FPS\n30 FPS\nEnable control\nCtrl+Alt+Delete\nFullscreen\nReconnect\n\nremote desktop Busy: remote desktop Busy: this device already has a desktop viewer"
+        }
+      },
+      {
+        "name": "assistance_waiting_while_busy",
+        "time": 1792373791.424063,
+        "snapshot": {
+          "assistance_id": "598116da-29bd-4b60-8378-c76ae2564727",
+          "created_at_unix_ms": 1792373788010,
+          "delivery": "displayed",
+          "expires_at_unix_ms": 1792374088010,
+          "outcome": null,
+          "request": {
+            "device_code": "556688188",
+            "expected_action": "Verify view-only handoff after the other viewer closes, then complete",
+            "expires_in_seconds": 300,
+            "reason": "Acceptance: same-account Desktop occupancy and assistance",
+            "request_id": "cd38d3b9-a560-46ee-9bdc-22f53c88d0f1",
+            "screen_id": null
+          },
+          "revision": 2,
+          "status": "waiting",
+          "window_label": null
+        },
+        "ui": {
+          "action": "busy",
+          "label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c",
+          "status": {
+            "phase": "failed",
+            "error": "remote desktop Busy: remote desktop Busy: this device already has a desktop viewer",
+            "opened": null,
+            "input_ready": false,
+            "frame_ready": false,
+            "input_enabled": false,
+            "decoder": null
+          }
+        }
+      },
+      {
+        "name": "first_uninterrupted",
+        "time": 1792373791.7647505,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "d22c46db-2eee-45f6-aa98-039d6420ddf8",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      },
+      {
+        "name": "first_closed",
+        "time": 1792373792.0036142
+      },
+      {
+        "name": "second_retry",
+        "time": 1792373792.0980186,
+        "result": null
+      },
+      {
+        "name": "second_acquired",
+        "time": 1792373793.0747375,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "b6a20304-9077-40ce-9f38-081011b8a1cd",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      },
+      {
+        "name": "assistance_active_ui",
+        "time": 1792373793.7144089,
+        "ui": {
+          "action": "ready",
+          "label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c",
+          "status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "b6a20304-9077-40ce-9f38-081011b8a1cd",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware"
+          },
+          "viewer_asset": {
+            "url": "http://tauri.localhost/assets/RemoteDesktopWindow-CdiOOGAK.js",
+            "sha256": "aac1bf479db887fca3d57173a9bd028be6cdd166339713d144a51b365096e0c1"
+          }
+        }
+      },
+      {
+        "name": "assistance_active_after_handoff",
+        "time": 1792373793.7301364,
+        "snapshot": {
+          "assistance_id": "598116da-29bd-4b60-8378-c76ae2564727",
+          "created_at_unix_ms": 1792373788010,
+          "delivery": "displayed",
+          "expires_at_unix_ms": 1792374088010,
+          "outcome": null,
+          "request": {
+            "device_code": "556688188",
+            "expected_action": "Verify view-only handoff after the other viewer closes, then complete",
+            "expires_in_seconds": 300,
+            "reason": "Acceptance: same-account Desktop occupancy and assistance",
+            "request_id": "cd38d3b9-a560-46ee-9bdc-22f53c88d0f1",
+            "screen_id": null
+          },
+          "revision": 3,
+          "status": "active",
+          "window_label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c"
+        }
+      },
+      {
+        "name": "second_actual_pixels",
+        "time": 1792373803.9090676,
+        "sample": {
+          "method": "desktop-visible pixels, 12-bit generated frame code with complement",
+          "capture_method": "desktop",
+          "started_unix_ms": 1792373793876,
+          "finished_unix_ms": 1792373803891,
+          "source_dimensions": [
+            1920,
+            1080
+          ],
+          "surface_dimensions": [
+            704,
+            489
+          ],
+          "surface_hwnd": 2232788,
+          "desktop_pid": 61132,
+          "surface_pid": 58264,
+          "parent_hwnd": 3743890,
+          "surface_screen_bounds": [
+            28,
+            143,
+            732,
+            632
+          ],
+          "sample_points": [
+            [
+              116,
+              263
+            ],
+            [
+              151,
+              263
+            ],
+            [
+              186,
+              263
+            ],
+            [
+              222,
+              263
+            ],
+            [
+              257,
+              263
+            ],
+            [
+              292,
+              263
+            ],
+            [
+              327,
+              263
+            ],
+            [
+              362,
+              263
+            ],
+            [
+              398,
+              263
+            ],
+            [
+              433,
+              263
+            ],
+            [
+              468,
+              263
+            ],
+            [
+              503,
+              263
+            ],
+            [
+              538,
+              263
+            ],
+            [
+              574,
+              263
+            ],
+            [
+              609,
+              263
+            ],
+            [
+              644,
+              263
+            ],
+            [
+              116,
+              298
+            ],
+            [
+              151,
+              298
+            ],
+            [
+              186,
+              298
+            ],
+            [
+              222,
+              298
+            ],
+            [
+              257,
+              298
+            ],
+            [
+              292,
+              298
+            ],
+            [
+              327,
+              298
+            ],
+            [
+              362,
+              298
+            ],
+            [
+              398,
+              298
+            ],
+            [
+              433,
+              298
+            ],
+            [
+              468,
+              298
+            ],
+            [
+              503,
+              298
+            ],
+            [
+              538,
+              298
+            ],
+            [
+              574,
+              298
+            ],
+            [
+              609,
+              298
+            ],
+            [
+              644,
+              298
+            ]
+          ],
+          "first_invalid_sample": null,
+          "first_nonmonotonic_sample": null,
+          "failure": null,
+          "seconds": 10.01430260000052,
+          "samples": 599,
+          "invalid_samples": 0,
+          "sample_hz": 59.81444978504733,
+          "threshold_failures": [],
+          "capture_timing": {
+            "calls": 599,
+            "total_seconds": 9.961173800053075,
+            "max_seconds": 0.03648609999800101,
+            "calls_above_60_hz_budget": 284,
+            "max_sample_gap_seconds": 0.036540999994031154
+          },
+          "repeated_samples": 452,
+          "unique_presentations": 147,
+          "warmup_seconds": 3,
+          "steady_fps": 14.541716520754672,
+          "longest_presentation_gap_seconds": 0.11670050000248011,
+          "events": [
+            [
+              0.018939000001410022,
+              2149
+            ],
+            [
+              0.04967439999745693,
+              2151
+            ],
+            [
+              0.13460679999843705,
+              2153
+            ],
+            [
+              0.20216159999836236,
+              2155
+            ],
+            [
+              0.26512430000002496,
+              2157
+            ],
+            [
+              0.3330537000001641,
+              2159
+            ],
+            [
+              0.3988979999994626,
+              2161
+            ],
+            [
+              0.4680429000000004,
+              2163
+            ],
+            [
+              0.5346471999946516,
+              2165
+            ],
+            [
+              0.6015564999979688,
+              2167
+            ],
+            [
+              0.6686429999972461,
+              2169
+            ],
+            [
+              0.735027299990179,
+              2171
+            ],
+            [
+              0.8159789999917848,
+              2173
+            ],
+            [
+              0.8676631999987876,
+              2175
+            ],
+            [
+              0.9489486999955261,
+              2177
+            ],
+            [
+              1.014717499987455,
+              2179
+            ],
+            [
+              1.0822231999918586,
+              2181
+            ],
+            [
+              1.1489073999982793,
+              2183
+            ],
+            [
+              1.198603999990155,
+              2185
+            ],
+            [
+              1.2822550999990199,
+              2187
+            ],
+            [
+              1.3494929000007687,
+              2189
+            ],
+            [
+              1.4151173999998719,
+              2191
+            ],
+            [
+              1.4821248999942327,
+              2193
+            ],
+            [
+              1.5489146999898367,
+              2195
+            ],
+            [
+              1.5983156000002054,
+              2198
+            ],
+            [
+              1.702260699996259,
+              2200
+            ],
+            [
+              1.7855475999967894,
+              2202
+            ],
+            [
+              1.852004799991846,
+              2204
+            ],
+            [
+              1.9181491999916034,
+              2206
+            ],
+            [
+              1.9851507999992464,
+              2208
+            ],
+            [
+              2.050293699998292,
+              2210
+            ],
+            [
+              2.1150391999981366,
+              2212
+            ],
+            [
+              2.182286399998702,
+              2214
+            ],
+            [
+              2.2670545000000857,
+              2216
+            ],
+            [
+              2.315467099993839,
+              2218
+            ],
+            [
+              2.381631899988861,
+              2220
+            ],
+            [
+              2.4684104999905685,
+              2222
+            ],
+            [
+              2.5146999999997206,
+              2224
+            ],
+            [
+              2.601095299993176,
+              2226
+            ],
+            [
+              2.6676099999895087,
+              2228
+            ],
+            [
+              2.7328361999971094,
+              2230
+            ],
+            [
+              2.799767599994084,
+              2232
+            ],
+            [
+              2.8675339999899734,
+              2234
+            ],
+            [
+              2.948707799994736,
+              2236
+            ],
+            [
+              2.99871699999494,
+              2238
+            ],
+            [
+              3.064847000001464,
+              2240
+            ],
+            [
+              3.149396299995715,
+              2242
+            ],
+            [
+              3.2170665000012377,
+              2244
+            ],
+            [
+              3.3156902999908198,
+              2246
+            ],
+            [
+              3.3678183999873,
+              2248
+            ],
+            [
+              3.414734399993904,
+              2250
+            ],
+            [
+              3.4818398999923375,
+              2252
+            ],
+            [
+              3.547912499998347,
+              2254
+            ],
+            [
+              3.631801399998949,
+              2256
+            ],
+            [
+              3.6989599999942584,
+              2258
+            ],
+            [
+              3.748066899992409,
+              2260
+            ],
+            [
+              3.8328230999904918,
+              2262
+            ],
+            [
+              3.9151712999882875,
+              2264
+            ],
+            [
+              3.964994599999045,
+              2266
+            ],
+            [
+              4.032654700000421,
+              2268
+            ],
+            [
+              4.1021921999927144,
+              2270
+            ],
+            [
+              4.165048099996056,
+              2272
+            ],
+            [
+              4.231681399993249,
+              2274
+            ],
+            [
+              4.298754499992356,
+              2276
+            ],
+            [
+              4.365249800001038,
+              2278
+            ],
+            [
+              4.4492874999996275,
+              2280
+            ],
+            [
+              4.49927949999983,
+              2282
+            ],
+            [
+              4.567643999995198,
+              2284
+            ],
+            [
+              4.648830099991756,
+              2286
+            ],
+            [
+              4.698208699992392,
+              2288
+            ],
+            [
+              4.78175859998737,
+              2290
+            ],
+            [
+              4.836365099996328,
+              2292
+            ],
+            [
+              4.91487349999079,
+              2294
+            ],
+            [
+              4.986960199996247,
+              2296
+            ],
+            [
+              5.049315399999614,
+              2298
+            ],
+            [
+              5.1152590999990935,
+              2300
+            ],
+            [
+              5.184720599994762,
+              2302
+            ],
+            [
+              5.251013499990222,
+              2304
+            ],
+            [
+              5.319003299999167,
+              2306
+            ],
+            [
+              5.385676999998395,
+              2308
+            ],
+            [
+              5.465134099998977,
+              2310
+            ],
+            [
+              5.536040899998625,
+              2312
+            ],
+            [
+              5.584054999999353,
+              2314
+            ],
+            [
+              5.668854899995495,
+              2316
+            ],
+            [
+              5.718450699991081,
+              2318
+            ],
+            [
+              5.801018099999055,
+              2320
+            ],
+            [
+              5.870389699994121,
+              2322
+            ],
+            [
+              5.951201199990464,
+              2324
+            ],
+            [
+              6.002981599987834,
+              2326
+            ],
+            [
+              6.081598799995845,
+              2328
+            ],
+            [
+              6.132863199993153,
+              2330
+            ],
+            [
+              6.216174000001047,
+              2332
+            ],
+            [
+              6.267155299996375,
+              2334
+            ],
+            [
+              6.331791999997222,
+              2336
+            ],
+            [
+              6.4170867999928305,
+              2338
+            ],
+            [
+              6.468835099993157,
+              2340
+            ],
+            [
+              6.55034169999999,
+              2342
+            ],
+            [
+              6.618937299994286,
+              2344
+            ],
+            [
+              6.681824200000847,
+              2346
+            ],
+            [
+              6.752221599992481,
+              2348
+            ],
+            [
+              6.815244699988398,
+              2350
+            ],
+            [
+              6.88162580000062,
+              2352
+            ],
+            [
+              6.968882599991048,
+              2354
+            ],
+            [
+              6.998626899992814,
+              2357
+            ],
+            [
+              7.115327399995294,
+              2359
+            ],
+            [
+              7.182261499998276,
+              2361
+            ],
+            [
+              7.249801799989655,
+              2363
+            ],
+            [
+              7.3173337999905925,
+              2365
+            ],
+            [
+              7.38287629999104,
+              2367
+            ],
+            [
+              7.469687099990551,
+              2369
+            ],
+            [
+              7.531947700001183,
+              2371
+            ],
+            [
+              7.581343699988793,
+              2373
+            ],
+            [
+              7.667178099989542,
+              2375
+            ],
+            [
+              7.7156685999943875,
+              2377
+            ],
+            [
+              7.798606399999699,
+              2379
+            ],
+            [
+              7.868753399990965,
+              2382
+            ],
+            [
+              7.94976369998767,
+              2384
+            ],
+            [
+              7.998502499991446,
+              2385
+            ],
+            [
+              8.066169799989439,
+              2387
+            ],
+            [
+              8.134694399996079,
+              2389
+            ],
+            [
+              8.217476099991472,
+              2391
+            ],
+            [
+              8.267822499998147,
+              2393
+            ],
+            [
+              8.332039399989299,
+              2395
+            ],
+            [
+              8.416387399993255,
+              2397
+            ],
+            [
+              8.467989299999317,
+              2399
+            ],
+            [
+              8.548589300000458,
+              2401
+            ],
+            [
+              8.615998900000704,
+              2403
+            ],
+            [
+              8.681700599991018,
+              2405
+            ],
+            [
+              8.748669699998572,
+              2407
+            ],
+            [
+              8.81585559999803,
+              2409
+            ],
+            [
+              8.898240099995746,
+              2411
+            ],
+            [
+              8.966253199992934,
+              2413
+            ],
+            [
+              9.01691700000083,
+              2415
+            ],
+            [
+              9.098424700001488,
+              2417
+            ],
+            [
+              9.16681460000109,
+              2419
+            ],
+            [
+              9.217160499989404,
+              2421
+            ],
+            [
+              9.299515499995323,
+              2423
+            ],
+            [
+              9.349020399997244,
+              2425
+            ],
+            [
+              9.431895999994595,
+              2427
+            ],
+            [
+              9.499040399998194,
+              2429
+            ],
+            [
+              9.56751149999036,
+              2431
+            ],
+            [
+              9.631961199993384,
+              2433
+            ],
+            [
+              9.699826099997154,
+              2435
+            ],
+            [
+              9.765651499998057,
+              2437
+            ],
+            [
+              9.831990099992254,
+              2439
+            ],
+            [
+              9.915171599990572,
+              2441
+            ],
+            [
+              9.96504609999829,
+              2443
+            ]
+          ],
+          "passed": true
+        }
+      },
+      {
+        "name": "user_completed",
+        "time": 1792373804.4275696,
+        "ui": {
+          "action": "complete",
+          "label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c",
+          "status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "b6a20304-9077-40ce-9f38-081011b8a1cd",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware"
+          }
+        }
+      },
+      {
+        "name": "ai_received_completion",
+        "time": 1792373804.4425266,
+        "result": {
+          "assistance": {
+            "assistance_id": "598116da-29bd-4b60-8378-c76ae2564727",
+            "created_at_unix_ms": 1792373788010,
+            "delivery": "displayed",
+            "expires_at_unix_ms": 1792374088010,
+            "outcome": "user_completed",
+            "request": {
+              "device_code": "556688188",
+              "expected_action": "Verify view-only handoff after the other viewer closes, then complete",
+              "expires_in_seconds": 300,
+              "reason": "Acceptance: same-account Desktop occupancy and assistance",
+              "request_id": "cd38d3b9-a560-46ee-9bdc-22f53c88d0f1",
+              "screen_id": null
+            },
+            "revision": 4,
+            "status": "completed",
+            "window_label": "desktop-viewer-0fcc19db-26de-4069-b27f-00b39da9297c"
+          },
+          "terminal": true,
+          "verify_result_before_resuming": true
+        }
+      },
+      {
+        "name": "viewer_preserved_after_completion",
+        "time": 1792373804.5376124,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "b6a20304-9077-40ce-9f38-081011b8a1cd",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      }
+    ],
+    "desktop_sha256": "8628976f9738dac0373be90ccb30b689db117a9da48f53071d1601227e8bed22",
+    "passed": true,
+    "own_viewers_closed": true,
+    "companion_stopped": true
+  },
+  "mixed_business": {
+    "passed": true,
+    "elapsed_seconds": 60.08728079999855,
+    "rounds": [
+      {
+        "index": 1,
+        "fps": 14.685028940899464,
+        "sample_hz": 59.91644053199574,
+        "command": "e86828b4-6832-4bbc-8698-6be5ab32a24c",
+        "upload": "8dd19872-683a-4db0-a352-ec757e8db5a6",
+        "download": "75453ec9-0b2d-4b8c-bfdb-713b0ee0b9e6",
+        "terminal_marker": "__PAB_MIXED_0001__"
+      },
+      {
+        "index": 2,
+        "fps": 14.849546889646795,
+        "sample_hz": 59.97852349012432,
+        "command": "2da8d178-d70b-4506-b3a4-da4ec589b448",
+        "upload": "59ee0add-cad4-4bf8-a28a-62efd6d9c2bd",
+        "download": "9f941521-4acf-4f3d-aeb8-9ab6c08a67cb",
+        "terminal_marker": "__PAB_MIXED_0002__"
+      }
+    ],
+    "after_video_close": {
+      "terminal_after_video_close": "__PAB_MIXED_9999__",
+      "command_after_video_close": "b37bb9d3-1025-4b63-91a8-88189b1385e3",
+      "upload_after_video_close": "a08cd3dd-21e2-4e7e-a017-3d894230c26c",
+      "download_after_video_close": "8c4ab830-9909-4b9c-b64a-7f14f8a49755",
+      "remove_test_payload": "9cd81fdc-e6dc-4105-9212-f2c99eeda3fd"
+    },
+    "raw_result_sha256": "494685dcde209de2fdc363f7114236e3e1d111f6b0c9ef6adb2212ca4c03d1a8"
+  },
+  "recovery": {
+    "original": {
+      "session": "2",
+      "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "properties": {
+        "MainPID": "101369",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 09:23:17 CST] ; stop_time=[n/a] ; pid=101369 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      },
+      "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+      "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+      "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+    },
+    "restored": {
+      "original_service_restored": true,
+      "properties": {
+        "MainPID": "103404",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 09:38:32 CST] ; stop_time=[n/a] ; pid=103404 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      }
+    },
+    "owned_processes": [],
+    "input_devices": [],
+    "session_restored": true,
+    "rollback_trigger": "",
+    "stage_removed": true,
+    "fixture_removed": true
+  },
+  "layout_restored": {
+    "before_mode": "1694x1102@59.997711181640625",
+    "test_mode": "1920x1080@60",
+    "persistent": false,
+    "dimensions": [
+      1920,
+      1080
+    ],
+    "temporary_idle_inhibitor": true,
+    "generated_ticks": 4999,
+    "restored": true
+  },
+  "local_driver_exited": true,
+  "local_installed_app_modified": false,
+  "long_tests": "2h and 8h deferred to evening by user; neither started"
+}

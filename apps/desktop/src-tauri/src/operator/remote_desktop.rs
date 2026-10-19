@@ -271,7 +271,7 @@ pub(crate) async fn open_window(
     // environment arguments, as the terminal and main window already do.
     #[cfg(all(windows, debug_assertions))]
     let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments() {
-        builder.additional_browser_args(arguments)
+        builder.additional_browser_args(&arguments)
     } else {
         builder
     };
