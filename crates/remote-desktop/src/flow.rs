@@ -22,6 +22,7 @@ pub(crate) struct VideoFlow {
     credit_wait_since: Option<Instant>,
     last_capture: Option<Instant>,
     last_adjustment: Option<Instant>,
+    quality: crate::quality::EncodingQuality,
 }
 
 impl VideoFlow {
@@ -36,6 +37,7 @@ impl VideoFlow {
             credit_wait_since: None,
             last_capture: None,
             last_adjustment: None,
+            quality: crate::quality::EncodingQuality::new(),
         }
     }
 
@@ -53,6 +55,7 @@ impl VideoFlow {
         if let Some(since) = self.credit_wait_since.take() {
             let waited = now.saturating_duration_since(since);
             if waited > self.period.max(Duration::from_millis(100)) {
+                self.quality.pressure(now);
                 // A cumulative ACK may return several credits together. Avoid
                 // attributing their whole wait to each individual next frame.
                 let returned = DESKTOP_MAX_IN_FLIGHT as u32 - self.flights.len() as u32;
@@ -113,6 +116,11 @@ impl VideoFlow {
         let under_pressure = self.credit_wait_since.is_some_and(|since| {
             now.saturating_duration_since(since) > self.period.max(Duration::from_millis(100))
         });
+        if under_pressure {
+            self.quality.pressure(now);
+        } else if !first_presentation {
+            self.quality.consumed(now);
+        }
         if !under_pressure
             && self.period > self.nominal_period
             && self
@@ -130,11 +138,25 @@ impl VideoFlow {
             .front()
             .map(|frame| frame.started + MAX_BACKLOG_AGE)
     }
+    pub(crate) fn encoding_budget(&self) -> u32 {
+        self.quality.budget()
+    }
+    pub(crate) fn capture_fps_milli(&self) -> u32 {
+        let nanos = self.period.as_nanos();
+        ((1_000_000_000_000u128 + nanos / 2) / nanos) as u32
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nominal_rate_rounding_never_reports_a_false_quality_reduction() {
+        for fps in 1..=60 {
+            assert_eq!(VideoFlow::new(fps).capture_fps_milli(), u32::from(fps) * 1000);
+        }
+    }
 
     #[test]
     fn credit_duplicate_ack_and_future_ack_do_not_corrupt_history() {

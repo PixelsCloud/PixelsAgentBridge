@@ -7,7 +7,7 @@ use pab_transport::*;
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU32, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -16,6 +16,7 @@ mod cursor_sessions;
 mod cursor_wire;
 mod flow_recovery;
 mod input_wire;
+mod quality_feedback;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
@@ -59,6 +60,7 @@ fn config() -> DesktopVideoConfig {
 }
 #[derive(Default)]
 struct Backend {
+    budget: Option<Arc<AtomicU32>>,
     active: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     maximum: Arc<AtomicUsize>,
@@ -100,6 +102,7 @@ impl DesktopInputSink for InputSink {
     }
 }
 struct Source {
+    budget: Option<Arc<AtomicU32>>,
     backend: Arc<AtomicUsize>,
     produced: Arc<AtomicUsize>,
     number: u64,
@@ -114,6 +117,15 @@ impl Drop for Source {
     }
 }
 impl DesktopSource for Source {
+    fn encoding_budget(&self) -> Option<u32> {
+        self.budget.as_ref().map(|budget| budget.load(Ordering::SeqCst))
+    }
+    fn set_encoding_budget(&mut self, value: u32) -> MediaFuture<'_, ()> {
+        Box::pin(async move {
+            self.budget.as_ref().ok_or(DesktopError::Closed)?.store(value, Ordering::SeqCst);
+            Ok(())
+        })
+    }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async move {
             tokio::task::yield_now().await;
@@ -161,6 +173,7 @@ impl DesktopBackend for Backend {
             let count = self.active.fetch_add(1, Ordering::SeqCst) + 1;
             self.maximum.fetch_max(count, Ordering::SeqCst);
             Ok(Box::new(Source {
+                budget: self.budget.clone(),
                 backend: self.active.clone(),
                 produced: self.produced.clone(),
                 number: 0,

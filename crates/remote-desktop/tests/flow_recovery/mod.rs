@@ -8,6 +8,10 @@ async fn delayed_consumption_paces_new_capture_instead_of_bursting_returned_cred
     let mut viewer = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
         .await
         .unwrap();
+    // Decoder startup is intentionally excluded from capacity adaptation. Warm
+    // that presentation first, then measure a steady-state saturated window.
+    let first = viewer.next_frame(WAIT).await.unwrap();
+    viewer.report_presented(&first.header).unwrap();
     let mut last = viewer.next_frame(WAIT).await.unwrap().header;
     let start = tokio::time::Instant::now();
     for _ in 1..DESKTOP_MAX_IN_FLIGHT {
@@ -22,7 +26,7 @@ async fn delayed_consumption_paces_new_capture_instead_of_bursting_returned_cred
         resumed.elapsed() >= Duration::from_millis(120),
         "returned credits burst at the old fixed cadence"
     );
-    assert_eq!((fifth.header.frame_id, sixth.header.frame_id), (5, 6));
+    assert_eq!((fifth.header.frame_id, sixth.header.frame_id), (6, 7));
     server.legacy().await;
     viewer.close().await.unwrap();
 }

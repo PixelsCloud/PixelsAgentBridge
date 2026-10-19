@@ -9,6 +9,30 @@ pub const DESKTOP_MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
 pub const DESKTOP_MAX_IN_FLIGHT: u64 = 4;
 pub const DESKTOP_CONTROL_BYTES: usize = 64 * 1024;
 pub const DESKTOP_MAX_SCREENS: usize = 32;
+pub const DESKTOP_QUALITY_SCHEMA_VERSION: u16 = 1;
+
+/// Optional diagnostics on a separate stream; existing v2 media stays unchanged.
+/// Cadence/budget are sender targets, never measured FPS or delivered bitrate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DesktopQualitySnapshot {
+    pub version: u16,
+    pub session_id: RequestId,
+    pub generation: u64,
+    pub capture_fps_milli: u32,
+    /// None means the source cannot change rate control; zero means full quality.
+    pub encoder_target_bps: Option<u32>,
+}
+impl DesktopQualitySnapshot {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.version != DESKTOP_QUALITY_SCHEMA_VERSION || self.session_id.as_uuid().is_nil()
+            || self.generation == 0 || !(1000..=60_000).contains(&self.capture_fps_milli)
+            || self.encoder_target_bps.is_some_and(|b| b != 0 && !(150_000..=16_000_000).contains(&b)) {
+            return Err("invalid desktop quality snapshot");
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -170,6 +194,11 @@ pub enum RemoteDesktopRequest {
         session_id: RequestId,
         generation: u64,
     },
+    Quality {
+        version: u16,
+        session_id: RequestId,
+        generation: u64,
+    },
     Close {
         session_id: RequestId,
     },
@@ -194,6 +223,9 @@ pub enum RemoteDesktopReply {
     Ready,
     CursorReady {
         version: u16,
+    },
+    Quality {
+        snapshot: DesktopQualitySnapshot,
     },
     Closed,
     Error {

@@ -1,0 +1,232 @@
+{
+  "base_commit": "80c9dba",
+  "complete_acceptance": false,
+  "encoding_dimensions_changed": false,
+  "reliable_transport_unchanged": true,
+  "existing_authentication_unchanged": true,
+  "tests": {
+    "desktop_media_pass": 30,
+    "desktop_media_existing_ignored": 1,
+    "remote_desktop_pass": 12,
+    "quic_sessions_pass": 36,
+    "typescript": true,
+    "vite_build": true,
+    "desktop_build": true,
+    "latest_desktop_cargo_check": true
+  },
+  "native_optimized": {
+    "passed": true,
+    "desktop_pixels_saved": false,
+    "remote_input_sent": false,
+    "runs": [
+      {
+        "codec": "auto",
+        "exit_code": 0,
+        "result": {
+          "budget_updates": [
+            1500000,
+            0
+          ],
+          "codec_selection": "auto",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "display": {
+            "decoder": "d3d11_hardware",
+            "displayed": 90,
+            "test_max_rgb_error": 3,
+            "test_pixel_checks": 360
+          },
+          "effective_display_fps": 14.604437069441724,
+          "passed": true,
+          "renderer": "production_stream_protocol_v2",
+          "source": "synthetic",
+          "submitted": 90,
+          "target_fps": 15,
+          "warmup": 15
+        }
+      },
+      {
+        "codec": "software-encode",
+        "exit_code": 0,
+        "result": {
+          "budget_updates": [
+            1500000,
+            0
+          ],
+          "codec_selection": "software-encode",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "display": {
+            "decoder": "d3d11_hardware",
+            "displayed": 90,
+            "test_max_rgb_error": 11,
+            "test_pixel_checks": 360
+          },
+          "effective_display_fps": 13.670284085089898,
+          "passed": true,
+          "renderer": "production_stream_protocol_v2",
+          "source": "synthetic",
+          "submitted": 90,
+          "target_fps": 15,
+          "warmup": 15
+        }
+      }
+    ],
+    "artifacts": {
+      "pab-media-worker.exe": "d3471991882373be6aba804acf086d91934511a0cfc1893fc89e0658f0327d38",
+      "native_stream_check.exe": "54ac7e4b6de16b9be0c160ceecc7a5895e6d450d896b8756497c6506e37d756b"
+    }
+  },
+  "native_unoptimized": {
+    "passed": false,
+    "desktop_pixels_saved": false,
+    "remote_input_sent": false,
+    "runs": [
+      {
+        "codec": "auto",
+        "exit_code": 0,
+        "result": {
+          "budget_updates": [
+            1500000,
+            0
+          ],
+          "codec_selection": "auto",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "display": {
+            "decoder": "d3d11_hardware",
+            "displayed": 90,
+            "test_max_rgb_error": 3,
+            "test_pixel_checks": 360
+          },
+          "effective_display_fps": 14.594171126969677,
+          "passed": true,
+          "renderer": "production_stream_protocol_v2",
+          "source": "synthetic",
+          "submitted": 90,
+          "target_fps": 15,
+          "warmup": 15
+        }
+      },
+      {
+        "codec": "software-encode",
+        "exit_code": 1,
+        "result": {
+          "budget_updates": [
+            1500000,
+            0
+          ],
+          "codec_selection": "software-encode",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "display": {
+            "decoder": "d3d11_hardware",
+            "displayed": 90,
+            "test_max_rgb_error": 11,
+            "test_pixel_checks": 360
+          },
+          "effective_display_fps": 7.76341668755112,
+          "passed": false,
+          "renderer": "production_stream_protocol_v2",
+          "source": "synthetic",
+          "submitted": 90,
+          "target_fps": 15,
+          "warmup": 15
+        },
+        "error_tail": "media encoder=openh264_software readback_per_frame=1\n[OpenH264] this = 0x000001306963BF70, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.\nsoftware capture frames=90 mean_readback_ms=0.94262 mean_conversion_encode_ms=103.876\nError: \"native stream acceptance failed\"\n"
+      }
+    ],
+    "artifacts": {
+      "pab-media-worker.exe": "474ab5fdc9320519926ad085faf2b188d2b5c532617bc134acb2f4c44be8c9b1",
+      "native_stream_check.exe": "8d269a50bf6f04d5ee188b8456223d07e867af2109143c8741c2e3dcbcd03815"
+    }
+  },
+  "initial_diagnostic_false_failure": {
+    "passed": false,
+    "desktop_pixels_saved": false,
+    "remote_input_sent": false,
+    "runs": [
+      {
+        "codec": "auto",
+        "exit_code": 1,
+        "result": {
+          "budget_updates": [
+            1500000,
+            0
+          ],
+          "codec_selection": "auto",
+          "dimensions": [
+            1920,
+            1080
+          ],
+          "display": {
+            "decoder": "d3d11_hardware",
+            "displayed": 90,
+            "test_max_rgb_error": 3,
+            "test_pixel_checks": 364
+          },
+          "effective_display_fps": 14.459340950179975,
+          "passed": false,
+          "renderer": "production_stream_protocol_v2",
+          "source": "synthetic",
+          "submitted": 90,
+          "target_fps": 15,
+          "warmup": 15
+        },
+        "error_tail": "media encoder=nvenc_gpu readback_per_frame=0\nError: \"native stream acceptance failed\"\n"
+      }
+    ],
+    "artifacts": {
+      "pab-media-worker.exe": "474ab5fdc9320519926ad085faf2b188d2b5c532617bc134acb2f4c44be8c9b1",
+      "native_stream_check.exe": "d83adfa4b7d14ad3f604960cf0df9aa1bb6b1d64246339af7dd732885ac5d8df"
+    }
+  },
+  "software_budget_bytes_last_30_frames": [
+    181626,
+    133104,
+    181626
+  ],
+  "software_budget_decoded_frames": 180,
+  "software_random_noise_first_frame_error": {
+    "native_code": 3,
+    "dimensions": [
+      256,
+      144
+    ],
+    "resolved": false
+  },
+  "macos_native_syntax": {
+    "passed": true,
+    "task_id": "0c9fbe63-5e4c-4677-8909-d68dbb926d98",
+    "root": "/private/var/tmp/pab-encoding-budget-11443a82e859/source-v2"
+  },
+  "linux_native_syntax": {
+    "passed": true,
+    "exit_code": 0,
+    "image": "pab-remote-desktop-x11-dev:20261018",
+    "cpus": 1,
+    "log": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\config-defaults-check\\linux-native-syntax.log"
+  },
+  "linux_vm_development_tools_available": false,
+  "real_weak_network_automatic_adaptation_verified": false,
+  "new_macos_linux_native_runtime_verified": false,
+  "final_installer_built": false,
+  "installed_application_updated": false,
+  "cos_published": false,
+  "native_processes_stopped": true,
+  "remote_source_check_directories_removed": false,
+  "website_documentation": {
+    "commit": "f0482972295e74c21c79d54a4a826c5f111b059c",
+    "sync_passed": true,
+    "check_passed": true,
+    "published": false
+  }
+}

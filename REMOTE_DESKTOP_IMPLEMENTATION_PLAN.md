@@ -17,7 +17,7 @@ Linux Wayland 注销及真实重启后，同一窗口自动恢复到登录画面
 
 最新补齐 Windows active 取消/请求方崩溃/Desktop 崩溃重启/过期，以及实际设置页切换服务后的旧身份/观看清理；90 的 100% 主屏/125% 虚拟屏切换与四次坐标通过。临时屏幕、缩放缓存、原服务和测试凭据已恢复/清理，见[最新验收](acceptance/remote-desktop-active-switch-mixed-dpi-2026-10-19.md)。普通窗口启动的首击/双击/拖拽通过，特殊不激活夹具仍保留，见[普通启动对照](acceptance/remote-desktop-windows-normal-show-2026-10-19.md)。用户已明确后续不再使用 XRServer。
 
-后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。客户端私有编译 TOML、公开空配置和 Windows 隔离启动已通过[本轮检查](acceptance/remote-desktop-client-defaults-2026-10-19.md)，正式三平台安装与新服务仍待验收。接着实现视频自适应，再补剩余跨平台输入、active 与通知和混合 DPI 更多条件，随后固定候选做安装和稳定性验收。2/8 小时按用户安排暂缓。本文件保留架构约束与历史进展。
+后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。客户端私有编译 TOML 与公开空配置已通过[隔离启动检查](acceptance/remote-desktop-client-defaults-2026-10-19.md)；编码码率反馈、稳定恢复和可见降档接口已实现，并完成[本机原生短测](acceptance/remote-desktop-adaptive-bitrate-2026-10-19.md)。接着补真实弱网/RTT、跨平台新代码运行、输入与 active/通知及混合 DPI 剩余条件，再固定候选做正式安装、自建服务和稳定性验收。2/8 小时按用户安排暂缓。本文件保留架构约束与历史进展。
 
 以 RustDesk 的采集、编解码、原生纹理显示、输入及桌面切换实现为参考，新增独立远程桌面能力。沿用 Pixels 的账号、设备密码、已认证连接、可靠传输和 Relay，不增加远控专用鉴权体系。
 

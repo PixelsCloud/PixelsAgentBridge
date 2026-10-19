@@ -26,6 +26,13 @@ unsafe extern "C" fn pab_soft_encoder_drop(value: *mut SoftwareEncoder) {
     }
 }
 #[unsafe(no_mangle)]
+unsafe extern "C" fn pab_soft_encoder_budget(value: *mut SoftwareEncoder, bits_per_second: u32) -> bool {
+    if value.is_null() { return false; }
+    // SAFETY: the native worker passes its uniquely owned live encoder handle.
+    catch_unwind(AssertUnwindSafe(|| unsafe { &mut *value }.set_encoding_budget(bits_per_second).is_ok()))
+        .unwrap_or(false)
+}
+#[unsafe(no_mangle)]
 unsafe extern "C" fn pab_soft_encode(
     value: *mut SoftwareEncoder,
     data: *const u8,

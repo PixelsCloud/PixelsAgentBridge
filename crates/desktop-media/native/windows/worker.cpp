@@ -191,6 +191,11 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         // Cursor recovery must also work while video has no consumption credit.
         const auto command = read_value<uint8_t>(nullptr, coordinate);
         if (command == 0) { if (mode != "desktop") encoder.report(); return; }
+        if (command == 2) {
+            const bool applied = encoder.budget(read_value<uint32_t>(nullptr, coordinate));
+            write_value(applied ? magic : magic + 1);
+            continue;
+        }
         if (command != 1) throw std::runtime_error("Invalid capture command");
         std::this_thread::sleep_until(next);
         std::vector<uint8_t> packet;

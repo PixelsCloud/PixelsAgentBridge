@@ -20,6 +20,7 @@ pub struct ViewerStatus {
     frame_ready: bool,
     input_enabled: bool,
     decoder: Option<&'static str>,
+    quality: Option<pab_protocol::DesktopQualitySnapshot>,
 }
 enum Command {
     Screen(String),
@@ -382,6 +383,7 @@ fn publish(
         frame_ready: false,
         input_enabled: false,
         decoder: None,
+        quality: None,
     };
     owner.status.send_replace(status.clone());
     let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
@@ -654,6 +656,34 @@ async fn stream(
         // and toolbar commands never cancel a partially-read compressed frame.
         let mut presentations = viewer.presentations();
         let acknowledgements = session.presentation_control();
+        let mut quality = session.quality_control();
+        let quality_work = async {
+            let mut timer = tokio::time::interval(Duration::from_secs(2));
+            loop {
+                timer.tick().await;
+                let snapshot = match quality.snapshot().await {
+                    Ok(snapshot) => snapshot,
+                    // Older peers may not provide this optional diagnostic.
+                    // Its failure must not affect capture, input or other streams.
+                    Err(error) => {
+                        tracing::debug!(%error, "remote desktop quality diagnostics unavailable");
+                        break;
+                    }
+                };
+                let mut changed = false;
+                owner.status.send_modify(|status| {
+                    if status.opened.as_ref().is_some_and(|opened|
+                        opened.config.session_id == snapshot.session_id
+                            && opened.config.generation == snapshot.generation)
+                        && status.quality.as_ref() != Some(&snapshot) {
+                        status.quality = Some(snapshot.clone());
+                        changed = true;
+                    }
+                });
+                if changed { let _ = window.emit_to(window.label(), "desktop-viewer-quality", snapshot); }
+            }
+            std::future::pending::<()>().await;
+        };
         let video = async {
             let submit = async {
                 loop {
@@ -745,6 +775,7 @@ async fn stream(
             result = video => result.map(|_| None),
             result = interaction => result,
             result = cursor_work => result.map(|_| None),
+            _ = quality_work => unreachable!("quality polling does not complete the viewer"),
         };
         drop(viewer);
         let command = match outcome {

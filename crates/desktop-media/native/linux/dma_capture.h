@@ -189,6 +189,11 @@ inline void capture(GDBusConnection* bus, const Display& display, unsigned fps, 
     for (;;) {
         const auto command = read_value<uint8_t>();
         if (!command) return;
+        if (command == 2) {
+            if (!pab_soft_encoder_budget(encoder.get(), read_value<uint32_t>()))
+                throw std::runtime_error("DMA encoder budget update failed");
+            write_value(magic); continue;
+        }
         if (command != 1) throw std::runtime_error("Invalid DMA capture command");
         while (Clock::now() < next) { parent_alive(); pump(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
         guard.check();auto frame=stream.video();

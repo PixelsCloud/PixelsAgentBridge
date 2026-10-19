@@ -21,15 +21,21 @@ async fn main() -> Result<(), Error> {
 
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if !(3..=5).contains(&args.len()) || !matches!(args[1].as_str(), "synthetic" | "animate") {
-        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software|encoder-failure] [--embedded]".into());
+    if !(3..=6).contains(&args.len()) || !matches!(args[1].as_str(), "synthetic" | "animate") {
+        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software|encoder-failure] [--embedded|--standalone] [--budget-cycle]".into());
     }
     let prefix = match args.get(4).map(String::as_str) {
         None => vec![],
         Some("--embedded") => vec!["--media-worker".to_string()],
+        Some("--standalone") => vec![],
         _ => return Err("unknown worker mode".into()),
     };
     let codecs = args.get(3).map(String::as_str).unwrap_or("auto");
+    let budget_cycle = match args.get(5).map(String::as_str) {
+        None => false,
+        Some("--budget-cycle") => true,
+        _ => return Err("unknown budget test mode".into()),
+    };
     if !matches!(
         codecs,
         "auto" | "software-encode" | "software-decode" | "software" | "encoder-failure"
@@ -107,7 +113,17 @@ async fn run() -> Result<(), Error> {
     };
     let submit = async {
         let mut start = Instant::now();
+        let mut budgets = Vec::new();
         for index in 0..total {
+            if budget_cycle && (index == warmup * 2 || index == warmup * 4) {
+                let budget = if index == warmup * 2 { 1_500_000 } else { 0 };
+                input.write_u8(2).await?;
+                input.write_u32_le(budget).await?;
+                if packets.read_u32_le().await? != 0x31424150 {
+                    return Err("encoder budget acknowledgment mismatch".into());
+                }
+                budgets.push(budget);
+            }
             input.write_u8(1).await?;
             let size = packets.read_u32_le().await?;
             if size == 0 || size as usize > DESKTOP_MAX_FRAME_BYTES {
@@ -145,9 +161,9 @@ async fn run() -> Result<(), Error> {
             }
         }
         let display = viewer.finish().await?;
-        Ok::<_, Error>((display, start.elapsed()))
+        Ok::<_, Error>((display, start.elapsed(), budgets))
     };
-    let ((display, elapsed), ()) = tokio::try_join!(submit, receive_output)?;
+    let ((display, elapsed, budgets), ()) = tokio::try_join!(submit, receive_output)?;
     input.write_u8(0).await?;
     if !source.wait().await?.success() {
         return Err("source failed on shutdown".into());
@@ -157,11 +173,14 @@ async fn run() -> Result<(), Error> {
         .ok_or("missing display count")?;
     let effective_fps = confirmed.saturating_sub(warmup) as f64 / elapsed.as_secs_f64();
     let passed = confirmed <= total
+        && (!budget_cycle || confirmed == total)
         && (!software_decode || display["decoder"] == "openh264_software")
         && effective_fps > 12.0
         && effective_fps >= f64::from(fps) * 0.9
         && (!verify
-            || (display["test_pixel_checks"] == total * 4
+            // Native resize/static repaints also verify pixels, but do not
+            // count as displayed video frames. Extra checks are legitimate.
+            || (display["test_pixel_checks"].as_u64().is_some_and(|n| n >= total * 4)
                 && display["test_max_rgb_error"]
                     .as_u64()
                     .is_some_and(|n| n <= 12)));
@@ -169,7 +188,7 @@ async fn run() -> Result<(), Error> {
         "{}",
         serde_json::json!({"passed":passed,"source":args[1],"target_fps":fps,"codec_selection":codecs,
         "dimensions":[config.screen.pixel_width,config.screen.pixel_height],"submitted":total,"warmup":warmup,"display":display,
-        "effective_display_fps":effective_fps,"renderer":"production_stream_protocol_v2"})
+        "effective_display_fps":effective_fps,"renderer":"production_stream_protocol_v2", "budget_updates":budgets})
     );
     if !passed {
         return Err("native stream acceptance failed".into());

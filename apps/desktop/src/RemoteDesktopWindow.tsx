@@ -7,7 +7,8 @@ import type { Assistance } from "./DesktopAssistanceNotice";
 import { initialLanguage } from "./i18n";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
-type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; decoder?: string | null; opened?: { config: { screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
+type Quality = { session_id: string; generation: number; capture_fps_milli: number; encoder_target_bps: number | null };
+type Status = { phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; decoder?: string | null; quality?: Quality | null; opened?: { config: { session_id: string; screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean } };
 const english = initialLanguage() === "en";
 const text = english
   ? { title: "Remote desktop", view: "View only", screen: "Display", retry: "Reconnect", full: "Fullscreen", ready: "Preparing", connecting: "Connecting", reconnecting: "Restoring desktop", switching: "Switching display", viewing: "Connected", failed: "Connection failed", ended: "Disconnected", waiting: "Waiting for remote desktop…" }
@@ -45,12 +46,28 @@ export default function RemoteDesktopWindow() {
     })().catch((cause) => { if (active) setError(String(cause)); });
     return () => { active = false; unlisten?.(); };
   }, []);
+  useEffect(() => {
+    let active = true;
+    const subscription = listen<Quality>("desktop-viewer-quality", ({ payload }) => {
+      if (active) setStatus(current => current.phase === "viewing"
+        && current.opened?.config.session_id === payload.session_id
+        && current.opened.config.generation === payload.generation
+        ? { ...current, quality: payload } : current);
+    });
+    return () => { active = false; void subscription.then(unlisten => unlisten()); };
+  }, []);
   async function control(arguments_: Record<string, unknown>) {
     setBusy(true); setError("");
     try { await invoke("desktop_viewer_control", arguments_); }
     catch (cause) { setError(String(cause)); setBusy(false); }
   }
   const opened = status.opened;
+  const quality = status.quality;
+  const degraded = quality && ((quality.encoder_target_bps || 0) > 0
+    || quality.capture_fps_milli < (opened?.config.fps || 15) * 1000);
+  const budget = quality?.encoder_target_bps
+    ? `${(quality.encoder_target_bps / 1_000_000).toFixed(2)} Mbps` : null;
+  const qualityText = degraded ? `${english ? "Reduced quality" : "已降档"} · ${budget || `${(quality.capture_fps_milli / 1000).toFixed(1)} FPS`}` : null;
   const phase = text[status.phase as keyof typeof text] || status.phase;
   const decoder = status.decoder === "openh264_software"
     ? (english ? "Software decoding" : "软件解码")
@@ -60,6 +77,9 @@ export default function RemoteDesktopWindow() {
     <header className="remote-desktop-toolbar">
       <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span>
         {status.phase === "viewing" && decoder && <span className="remote-desktop-decoder">{decoder}</span>}
+        {status.phase === "viewing" && qualityText && <span className="remote-desktop-quality"
+          title={english ? "Adaptive encoder target and capture limit, not measured bitrate or displayed FPS"
+            : "当前编码码率目标与采集上限，非实测码率或显示帧率"}>{qualityText}</span>}
         {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
           request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
           onComplete={(id) => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id))} />}

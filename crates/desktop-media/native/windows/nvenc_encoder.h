@@ -13,6 +13,8 @@ class Encoder {
     NV_ENC_INPUT_PTR mapped_ = nullptr;
     ComPtr<ID3D11Texture2D> retained_;
     UINT width_ = 0, height_ = 0;
+    NV_ENC_CONFIG configuration_{};
+    NV_ENC_INITIALIZE_PARAMS initialization_{};
 
     static void require(NVENCSTATUS status, const char* stage) {
         if (status != NV_ENC_SUCCESS)
@@ -117,10 +119,26 @@ public:
         init.enableEncodeAsync = 0;
         init.encodeConfig = &config;
         require(api_.nvEncInitializeEncoder(session_, &init), "InitializeEncoder");
+        configuration_ = config;
+        initialization_ = init;
+        initialization_.encodeConfig = &configuration_;
         NV_ENC_CREATE_BITSTREAM_BUFFER output{};
         output.version = NV_ENC_CREATE_BITSTREAM_BUFFER_VER;
         require(api_.nvEncCreateBitstreamBuffer(session_, &output), "CreateBitstreamBuffer");
         bitstream_ = output.bitstreamBuffer;
+    }
+    void budget(uint32_t bits_per_second) {
+        if (bits_per_second && (bits_per_second < 150000 || bits_per_second > 16000000))
+            throw std::runtime_error("Encoder budget outside bounds");
+        auto candidate = configuration_;
+        candidate.rcParams.averageBitRate = candidate.rcParams.maxBitRate = bits_per_second ? bits_per_second : 6000000;
+        NV_ENC_RECONFIGURE_PARAMS update{};
+        update.version = NV_ENC_RECONFIGURE_PARAMS_VER;
+        update.reInitEncodeParams = initialization_;
+        update.reInitEncodeParams.encodeConfig = &candidate;
+        update.forceIDR = 1;
+        require(api_.nvEncReconfigureEncoder(session_, &update), "Reconfigure encoder budget");
+        configuration_ = candidate;
     }
 
     uint64_t encode(ID3D11Texture2D* texture, uint64_t index, std::ofstream* output, std::vector<uint8_t>* packet = nullptr) {

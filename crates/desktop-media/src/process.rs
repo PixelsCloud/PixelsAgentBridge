@@ -156,6 +156,7 @@ impl NativeBackend {
 struct NativeSource {
     process: MediaChild,
     index: u64,
+    encoding_budget: Option<u32>,
     #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     capture: Arc<cursor::CaptureLease>,
 }
@@ -166,6 +167,25 @@ impl Drop for NativeSource {
     }
 }
 impl DesktopSource for NativeSource {
+    fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
+    fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
+        Box::pin(async move {
+            if bits_per_second != 0 && !(150_000..=16_000_000).contains(&bits_per_second) {
+                return Err(media_error("encoder budget outside bounds"));
+            }
+            {
+                let mut input = self.process.input.lock().await;
+                input.write_u8(2).await.map_err(media_error)?;
+                input.write_u32_le(bits_per_second).await.map_err(media_error)?;
+            }
+            self.encoding_budget = match self.process.output.as_mut().unwrap().read_u32_le().await.map_err(media_error)? {
+                MAGIC => Some(bits_per_second),
+                value if value == MAGIC + 1 => None,
+                _ => return Err(media_error("encoder budget acknowledgment mismatch")),
+            };
+            Ok(())
+        })
+    }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
             let operation = async {
@@ -363,6 +383,7 @@ impl DesktopBackend for NativeBackend {
             Ok(Box::new(NativeSource {
                 process,
                 index: 0,
+                encoding_budget: Some(0),
                 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
                 capture,
             }) as Box<dyn DesktopSource>)

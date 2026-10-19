@@ -1,5 +1,8 @@
 # Tool acceptance
 
+Encoder budgets, optional quality diagnostics and optimized Windows native
+short runs: [2026-10-19 adaptive bitrate report](remote-desktop-adaptive-bitrate-2026-10-19.md).
+
 Client build defaults, public unconfigured startup and customer TOML precedence:
 [2026-10-19 configuration report](remote-desktop-client-defaults-2026-10-19.md).
 

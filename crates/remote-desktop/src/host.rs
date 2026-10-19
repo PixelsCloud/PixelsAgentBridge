@@ -29,6 +29,13 @@ pub struct MediaFrame {
 /// dropped, including cancellation while next_frame is pending. No archives.
 pub trait DesktopSource: Send {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame>;
+    /// In-place budget changes must preserve reference frames and geometry.
+    /// None opts out; zero restores the original encoder quality.
+    fn encoding_budget(&self) -> Option<u32> { None }
+    fn set_encoding_budget(&mut self, _bits_per_second: u32) -> MediaFuture<'_, ()> {
+        Box::pin(async { Err(DesktopError::reject(DesktopErrorCode::Unsupported,
+            "encoder budget changes are unavailable")) })
+    }
 }
 /// Latest cursor snapshot, independent of video credit. Keep at most one image
 /// and position while blocked; drop must release all native cursor resources.
@@ -108,6 +115,7 @@ struct Generation {
     cursor_stopped: watch::Sender<bool>,
     frame_ready: AtomicBool,
     progress: Mutex<crate::flow::VideoFlow>,
+    encoding_budget: Mutex<Option<u32>>,
     credit: Notify,
     backlog_changed: Notify,
 }
@@ -137,6 +145,7 @@ impl Generation {
             cursor_stopped: signal(),
             frame_ready: AtomicBool::new(false),
             progress: Mutex::new(flow),
+            encoding_budget: Mutex::new(None),
             credit: Notify::new(),
             backlog_changed: Notify::new(),
         })
@@ -462,6 +471,24 @@ impl DesktopHost {
         timeout: Duration,
     ) -> Result<()> {
         match request {
+            RemoteDesktopRequest::Quality { version, session_id, generation } => {
+                let result = self.entry(owner, account, session_id, false)
+                    .and_then(|entry| entry.video(generation))
+                    .and_then(|video| {
+                        if version != DESKTOP_QUALITY_SCHEMA_VERSION {
+                            return Err(DesktopError::reject(DesktopErrorCode::Unsupported,
+                                "unsupported desktop quality diagnostics version"));
+                        }
+                        let capture_fps_milli = video.progress.lock().unwrap().capture_fps_milli();
+                        let encoder_target_bps = *video.encoding_budget.lock().unwrap();
+                        Ok(DesktopQualitySnapshot { version, session_id, generation,
+                            capture_fps_milli, encoder_target_bps })
+                    });
+                match result {
+                    Ok(snapshot) => reply(&mut stream, RemoteDesktopReply::Quality { snapshot }, timeout).await?,
+                    Err(error) => rejected(&mut stream, error, timeout).await?,
+                }
+            }
             RemoteDesktopRequest::Open {
                 version,
                 session_id,
@@ -754,6 +781,7 @@ impl DesktopHost {
                     .await;
                 }
             };
+        *video.encoding_budget.lock().unwrap() = source.encoding_budget();
         reply(&mut stream, RemoteDesktopReply::Ready, timeout).await?;
         let (writer, mut reverse) = stream.into_framed();
         let mut writer = DesktopVideoWriter::new(writer, video.config.clone())?;
@@ -764,6 +792,12 @@ impl DesktopHost {
         loop {
             let send = async {
                 video.wait_to_capture().await;
+                let budget = video.progress.lock().unwrap().encoding_budget();
+                if source.encoding_budget().is_some_and(|current| current != budget) {
+                    tokio::time::timeout(MEDIA_TIMEOUT, source.set_encoding_budget(budget))
+                        .await.map_err(|_| DesktopError::Timeout)??;
+                    *video.encoding_budget.lock().unwrap() = source.encoding_budget();
+                }
                 let media = source.next_frame().await?;
                 if media.bytes.is_empty() || media.bytes.len() > DESKTOP_MAX_FRAME_BYTES {
                     return Err(DesktopError::Protocol("media frame too large or empty"));

@@ -88,5 +88,14 @@
   },
   "cross_platform_native_run_verified": false,
   "formal_installation_verified": false,
-  "customer_new_server_verified": false
+  "customer_new_server_verified": false,
+  "website_documentation": {
+    "commit": "f0482972295e74c21c79d54a4a826c5f111b059c",
+    "branch": "docs/client-defaults-20261019-656ee7b7",
+    "sync_passed": true,
+    "check_passed": true,
+    "chapters": 15,
+    "preexisting_changes_committed": false,
+    "published": false
+  }
 }

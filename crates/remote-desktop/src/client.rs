@@ -14,6 +14,40 @@ struct Command {
     command: DesktopControlCommand,
     result: oneshot::Sender<Result<DesktopControlReply>>,
 }
+/// Optional quality polling never cancels a pending video read or owns occupancy.
+#[derive(Clone)]
+pub struct RemoteDesktopQualityControl {
+    connection: PabConnection,
+    config: DesktopVideoConfig,
+    ended: watch::Receiver<bool>,
+}
+impl RemoteDesktopQualityControl {
+    pub async fn snapshot(&mut self) -> Result<DesktopQualitySnapshot> {
+        if *self.ended.borrow() || self.ended.has_changed().is_err() { return Err(DesktopError::Closed); }
+        let timeout = Duration::from_secs(3);
+        let query = async {
+            let mut stream = stream(&self.connection, RemoteDesktopRequest::Quality {
+                version: DESKTOP_QUALITY_SCHEMA_VERSION,
+                session_id: self.config.session_id, generation: self.config.generation,
+            }, timeout).await?;
+            let snapshot = match response(&mut stream, timeout).await? {
+                RemoteDesktopReply::Quality { snapshot } => snapshot,
+                _ => return Err(DesktopError::Protocol("unexpected desktop quality reply")),
+            };
+            snapshot.validate().map_err(DesktopError::Protocol)?;
+            if snapshot.session_id != self.config.session_id || snapshot.generation != self.config.generation
+                || snapshot.capture_fps_milli > u32::from(self.config.fps) * 1000 {
+                return Err(DesktopError::Protocol("obsolete desktop quality reply"));
+            }
+            Ok(snapshot)
+        };
+        tokio::select! {
+            biased;
+            _ = self.ended.changed() => Err(DesktopError::Closed),
+            result = query => result,
+        }
+    }
+}
 /// One viewer bound to one already-authenticated connection. Dropping it ends
 /// its streams only. No reconnect, account changes or credential storage.
 pub struct RemoteDesktopSession {
@@ -229,6 +263,10 @@ impl Drop for OpenCleanup {
     }
 }
 impl RemoteDesktopSession {
+    pub fn quality_control(&self) -> RemoteDesktopQualityControl {
+        RemoteDesktopQualityControl { connection: self.connection.clone(), config: self.opened.config.clone(),
+            ended: self.generation_ended.subscribe() }
+    }
     /// Caller must perform capability negotiation and reuse an authenticated
     /// connection. Server validates every stream against that connection's owner.
     pub async fn open(

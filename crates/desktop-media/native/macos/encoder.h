@@ -7,6 +7,7 @@ struct EncodedFrame { std::vector<uint8_t> bytes; bool key = false; };
 class Encoder {
     OwnedCF<VTCompressionSessionRef> session_;
     unsigned fps_;
+    uint64_t original_budget_;
     struct Output {
         std::mutex mutex;
         bool completed = false;
@@ -73,7 +74,8 @@ class Encoder {
         check(VTSessionSetProperty(session_.get(), key, value), operation.c_str());
     }
 public:
-    Encoder(unsigned width, unsigned height, unsigned fps) : fps_(fps) {
+    Encoder(unsigned width, unsigned height, unsigned fps) : fps_(fps),
+        original_budget_(std::max(uint64_t(2000000), uint64_t(width)*height*fps/4)) {
         if (!width || !height || width > 8192 || height > 8192 || uint64_t(width)*height > 33554432 ||
             width % 2 || height % 2 || !fps || fps > 60) throw std::runtime_error("Encoder geometry outside bounds");
         NSDictionary* specification = @{
@@ -101,7 +103,7 @@ public:
         else throw std::runtime_error("This hardware media backend requires macOS 13 or later");
         property(kVTCompressionPropertyKey_ExpectedFrameRate, (__bridge CFNumberRef)@(fps));
         property(kVTCompressionPropertyKey_MaxKeyFrameInterval, (__bridge CFNumberRef)@(fps * 2));
-        property(kVTCompressionPropertyKey_AverageBitRate, (__bridge CFNumberRef)@(std::max(uint64_t(2000000), uint64_t(width)*height*fps/4)));
+        property(kVTCompressionPropertyKey_AverageBitRate, (__bridge CFNumberRef)@(original_budget_));
         property(kVTCompressionPropertyKey_ColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
         property(kVTCompressionPropertyKey_TransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
         property(kVTCompressionPropertyKey_YCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
@@ -122,6 +124,11 @@ public:
         // Stop callbacks while output_ still exists. CFRelease alone is not a
         // callback lifetime barrier, including constructor/encode failures.
         if (session_.get()) VTCompressionSessionInvalidate(session_.get());
+    }
+    void budget(uint32_t value) {
+        if (value && (value < 150000 || value > 16000000)) throw std::runtime_error("Encoder budget outside bounds");
+        const auto target = value ? std::min(uint64_t(value), original_budget_) : original_budget_;
+        property(kVTCompressionPropertyKey_AverageBitRate, (__bridge CFNumberRef)@(target));
     }
     EncodedFrame encode(CVPixelBufferRef image, uint64_t index) {
         {
@@ -151,10 +158,13 @@ class VideoEncoder {
     PabVideoGeometry geometry_;
     unsigned fps_;
     bool fail_encode_;
+    uint32_t budget_ = 0;
     void use_software() {
         hardware_.reset();
         software_ = pab_soft_encoder_new(geometry_.width, geometry_.height, static_cast<uint16_t>(fps_));
         if (!software_) throw std::runtime_error("Software encoder initialization failed");
+        if (budget_ && !pab_soft_encoder_budget(software_, budget_))
+            throw std::runtime_error("Software encoder budget initialization failed");
     }
 public:
     VideoEncoder(unsigned width, unsigned height, unsigned fps, bool software = false,
@@ -174,6 +184,19 @@ public:
     }
     ~VideoEncoder() { if (software_) pab_soft_encoder_drop(software_); }
     bool software() const { return software_ != nullptr; }
+    bool budget(uint32_t value) {
+        if (value && (value < 150000 || value > 16000000)) throw std::runtime_error("Encoder budget outside bounds");
+        if (hardware_) {
+            try { hardware_->budget(value); budget_ = value; return true; }
+            catch (const std::exception& error) {
+                fprintf(stderr, "media hardware budget update unsupported: %s; retaining direct IOSurface path\n", error.what());
+                return false;
+            }
+        }
+        if (!pab_soft_encoder_budget(software_, value)) throw std::runtime_error("Software encoder budget update failed");
+        budget_ = value;
+        return true;
+    }
     EncodedFrame encode(CVPixelBufferRef image, uint64_t index) {
         if (!image || CVPixelBufferGetWidth(image) != geometry_.width ||
             CVPixelBufferGetHeight(image) != geometry_.height || CVPixelBufferGetPlaneCount(image) != 2 ||

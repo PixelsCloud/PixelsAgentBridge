@@ -60,7 +60,7 @@ relay_urls = []
 
 修改安装配置后重启后台服务，并重新启动 Desktop/MCP。Desktop 设置页保存的服务器地址为用户数据目录下的 operator-server.toml，MCP 工具开关为 mcp-tools.toml。用户服务器设置覆盖安装默认值；显式 --config PATH 使用指定 TOML，并跳过用户服务器覆盖。安装参数只用于首次安装，已有配置请直接编辑 TOML。
 
-安装配置空值使用本地编译时 `.env/client-defaults.toml` 提供的默认服务，设置输入框不回显该默认值。开源构建没有私有文件时等待配置，客户可填写自己的完整地址对。详见[配置规则](CONFIGURATION.md)。
+安装配置空值使用发行包中编译的默认服务，设置输入框不回显该默认值。开源构建未提供默认服务时等待配置，客户可填写完整的控制服务和 Relay 地址覆盖默认值。本地打包的默认值从不上 Git 的 .env/client-defaults.toml 读取。
 
 旧 settings.json/settings.env 由安装器迁移；旧 operator-server.json 和 mcp-tools.json 在首次读取时迁移。已有 TOML 优先，格式错误会报错，不回退到旧配置。设备身份、登录凭据、数据库和发布清单属于运行数据，保留原格式。
 
@@ -412,6 +412,8 @@ curl --fail https://relay.example.com/healthz
 Control: wss://bridge.example.com/control
 Relay:   https://relay.example.com
 ```
+
+客户填写的地址优先于发行包的内置默认值。后台服务需在安装目录的 config.toml 中配置完整地址对并重启服务；公开构建没有内置地址时保持待配置。操作端的用户设置只覆盖 Desktop/MCP，不改变后台服务。
 
 ### 操作端 Desktop / MCP
 

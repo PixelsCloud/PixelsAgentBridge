@@ -4,7 +4,7 @@ use openh264::{
     OpenH264API,
     decoder::Decoder,
     encoder::{
-        Complexity, Encoder, EncoderConfig, FrameRate, Profile, QpRange, RateControlMode,
+        BitRate, Complexity, Encoder, EncoderConfig, FrameRate, Profile, QpRange, RateControlMode,
         UsageType, VuiConfig,
     },
     formats::{YUVSlices, YUVSource},
@@ -166,6 +166,8 @@ pub struct SoftwareEncoder {
     packet: Vec<u8>,
     initialized: bool,
     prepared_bgra: bool,
+    encoding_budget: u32,
+    fps: u16,
 }
 impl SoftwareEncoder {
     pub fn new(width: usize, height: usize, fps: u16) -> Result<Self, Error> {
@@ -173,8 +175,19 @@ impl SoftwareEncoder {
         if !(1..=60).contains(&fps) {
             return Err("invalid software encoder frame rate".into());
         }
-        // Fixed quality keeps every changed frame and avoids hidden rate-control
-        // drops. Transport credit provides backpressure; bitrate is measured.
+        Ok(Self {
+            encoder: Self::encoder(fps, 0)?,
+            planar,
+            packet: Vec::new(),
+            initialized: false,
+            prepared_bgra: false,
+            encoding_budget: 0,
+            fps,
+        })
+    }
+    fn encoder(fps: u16, budget: u32) -> Result<Encoder, Error> {
+        // Full quality preserves the established path. A requested budget
+        // switches rate control but never permits hidden frame skipping.
         let config = EncoderConfig::new()
             .num_threads(4)
             .skip_frames(false)
@@ -182,18 +195,28 @@ impl SoftwareEncoder {
             .usage_type(UsageType::ScreenContentRealTime)
             .complexity(Complexity::Low)
             .profile(Profile::Baseline)
-            .rate_control_mode(RateControlMode::Off)
-            .qp(QpRange::new(SOFTWARE_QP, SOFTWARE_QP))
+            .rate_control_mode(if budget == 0 { RateControlMode::Off } else { RateControlMode::Bitrate })
+            .qp(if budget == 0 { QpRange::new(SOFTWARE_QP, SOFTWARE_QP) } else { QpRange::new(SOFTWARE_QP, 48) })
             .adaptive_quantization(false)
             .background_detection(false)
             .vui(VuiConfig::bt709());
-        Ok(Self {
-            encoder: Encoder::with_api_config(OpenH264API::from_source(), config)?,
-            planar,
-            packet: Vec::new(),
-            initialized: false,
-            prepared_bgra: false,
-        })
+        let config = if budget == 0 { config } else { config.bitrate(BitRate::from_bps(budget)) };
+        Ok(Encoder::with_api_config(OpenH264API::from_source(), config)?)
+    }
+    pub fn set_encoding_budget(&mut self, bits_per_second: u32) -> Result<(), Error> {
+        if bits_per_second != 0 && !(150_000..=16_000_000).contains(&bits_per_second) {
+            return Err("software encoder budget outside bounds".into());
+        }
+        if self.encoding_budget != bits_per_second {
+            // OpenH264 can accept an RC-mode update without changing the
+            // running rate controller. Replace only the codec; retain owned
+            // conversion planes and publish SPS/PPS + IDR on the next frame.
+            let replacement = Self::encoder(self.fps, bits_per_second)?;
+            self.encoder = replacement;
+            self.initialized = false;
+        }
+        self.encoding_budget = bits_per_second;
+        Ok(())
     }
     /// The returned Annex-B access unit stays valid until the next encode.
     pub fn encode_bgra(&mut self, input: &[u8], stride: usize) -> Result<&[u8], Error> {
@@ -371,6 +394,46 @@ impl SoftwareDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn live_bitrate_budget_preserves_every_frame_and_restores_full_quality() {
+        let (width, height) = (256, 144);
+        let mut encoder = SoftwareEncoder::new(width, height, 15).unwrap();
+        let mut decoder = SoftwareDecoder::new(width, height).unwrap();
+        assert!(encoder.set_encoding_budget(1).is_err());
+        let mut totals = [0usize; 3];
+        for (phase, budget) in [0, 150_000, 0].into_iter().enumerate() {
+            encoder.set_encoding_budget(budget).unwrap();
+            let mut state = 123456789u32;
+            let mut bgra = vec![0; width * height * 4];
+            for frame in 0..60 {
+                for ty in 0..height / 8 {
+                    for tx in 0..width / 8 {
+                        state ^= state << 13; state ^= state >> 17; state ^= state << 5;
+                        for y in ty * 8..(ty + 1) * 8 {
+                            for x in tx * 8..(tx + 1) * 8 {
+                                let offset = (y * width + x) * 4;
+                                bgra[offset..offset + 4].copy_from_slice(&[state as u8, (state >> 8) as u8, (state >> 16) as u8, 255]);
+                            }
+                        }
+                    }
+                }
+                let packet = encoder.encode_bgra(&bgra, width * 4)
+                    .unwrap_or_else(|error| panic!("encode {phase}/{frame}: {error:?}"));
+                assert!(decoder.decode(packet).unwrap_or_else(|error| panic!("decode {phase}/{frame}: {error:?}")).is_some(),
+                    "missing output at {phase}/{frame}");
+                if frame == 0 {
+                    assert!(SoftwareDecoder::new(width, height).unwrap().decode(packet).unwrap().is_some(),
+                        "new budget did not initialize a fresh decoder");
+                }
+                if frame >= 30 { totals[phase] += packet.len(); }
+            }
+        }
+        // With frame skipping disabled, budgets are targets. Incompressible
+        // input may exceed them; dimensions/cadence handle further pressure.
+        assert!(totals[1] * 5 < totals[0] * 4, "budget failed to reduce bytes: {totals:?}");
+        assert!(totals[2].abs_diff(totals[0]) < totals[0] / 20, "full quality did not recover: {totals:?}");
+        eprintln!("budget_test_last_30_frames_bytes={totals:?}; all_180_frames_decoded=true");
+    }
     #[test]
     fn prepared_bgra_owns_converted_pixels_after_capture_buffer_is_reused() {
         let (width, height) = (63, 47);

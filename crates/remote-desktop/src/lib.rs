@@ -6,6 +6,7 @@ pub use wire::{DesktopVideoReader, DesktopVideoWriter, VideoFrame};
 mod cursor_wire;
 pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};
 mod flow;
+mod quality;
 mod host;
 pub use host::{
     DesktopBackend, DesktopConnectionGuard, DesktopCursorSource, DesktopHost, DesktopInputSink,
@@ -15,6 +16,7 @@ mod client;
 pub use client::{
     RemoteDesktopCursor, RemoteDesktopInputControl, RemoteDesktopPresentationControl,
     RemoteDesktopSession,
+    RemoteDesktopQualityControl,
 };
 
 use pab_protocol::DesktopErrorCode;

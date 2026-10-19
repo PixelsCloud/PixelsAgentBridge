@@ -64,6 +64,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
     for (;;) { @autoreleasepool {
         const auto command = read_value<uint8_t>();
         if (command == 0) return;
+        if (command == 2) { const bool applied=encoder.budget(read_value<uint32_t>()); write_value(applied ? magic : magic+1); continue; }
         if (command != 1) throw std::runtime_error("Invalid capture command");
         while (Clock::now() < next) { parent_alive(); pump(); }
         auto sampled = Clock::now();

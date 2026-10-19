@@ -17,6 +17,7 @@ class CaptureEncoder {
     bool fail_encoder_ = false;
     double readback_ms_ = 0, codec_ms_ = 0;
     uint64_t frames_ = 0;
+    uint32_t budget_ = 0;
     void initialize_software() {
         // Retire NVENC's retained surface/session before constructing fallback.
         hardware_.reset();
@@ -30,6 +31,8 @@ class CaptureEncoder {
         device_->GetImmediateContext(&context_);
         software_ = pab_soft_encoder_new(width_,height_,static_cast<uint16_t>(fps_));
         if (!software_) throw std::runtime_error("Software encoder initialization failed");
+        if (budget_ && !pab_soft_encoder_budget(software_, budget_))
+            throw std::runtime_error("Software encoder budget initialization failed");
     }
 public:
     CaptureEncoder(ID3D11Device* device, UINT width, UINT height, UINT fps, bool force_software, bool fail_encoder = false)
@@ -58,6 +61,21 @@ public:
     ~CaptureEncoder() { if (software_) pab_soft_encoder_drop(software_); }
     CaptureEncoder(const CaptureEncoder&) = delete;
     bool software() const { return software_ != nullptr; }
+    bool budget(uint32_t value) {
+        if (value && (value < 150000 || value > 16000000)) throw std::runtime_error("Encoder budget outside bounds");
+        if (hardware_) {
+            try { hardware_->budget(value); budget_ = value; return true; }
+            catch (const std::exception&) {
+                // Rate-control support alone must not introduce CPU readback
+                // on an otherwise healthy direct GPU capture/encode path.
+                std::cerr << "media encoder_budget=unsupported encoder=nvenc_hardware\n";
+                return false;
+            }
+        }
+        if (!pab_soft_encoder_budget(software_, value)) throw std::runtime_error("Software encoder budget update failed");
+        budget_ = value;
+        return true;
+    }
     void report() const {
         if (frames_) std::cerr << "software capture frames=" << frames_
             << " mean_readback_ms=" << readback_ms_/frames_

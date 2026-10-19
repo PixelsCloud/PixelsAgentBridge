@@ -25,6 +25,7 @@ struct PabCodecBytes { const uint8_t* data; size_t size; };
 extern "C" {
 void* pab_soft_encoder_new(uint32_t width, uint32_t height, uint16_t fps);
 void pab_soft_encoder_drop(void* encoder);
+bool pab_soft_encoder_budget(void* encoder, uint32_t bits_per_second);
 bool pab_soft_encode(void* encoder, const uint8_t* data, size_t size, size_t stride, PabCodecBytes* output);
 // The prepare call owns the converted planes; it retains no capture mapping.
 // Prepared data is consumed once. The same handle remains single-thread owned.

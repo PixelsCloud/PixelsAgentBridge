@@ -199,6 +199,11 @@ inline void capture(Connection& connection, const Output& output, unsigned fps, 
     for (;;) {
         const auto command = read_value<uint8_t>();
         if (!command) return;
+        if (command == 2) {
+            if (!pab_soft_encoder_budget(encoder.get(), read_value<uint32_t>()))
+                throw std::runtime_error("X11 encoder budget update failed");
+            write_value(magic); continue;
+        }
         if (command != 1) throw std::runtime_error("Invalid capture command");
         for (;;) {
             parent_alive();
