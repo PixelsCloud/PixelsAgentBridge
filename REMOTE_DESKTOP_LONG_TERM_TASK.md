@@ -98,6 +98,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 - 90 原策略为 `EnableLUA=1`、`ConsentPromptBehaviorAdmin=0`、`ConsentPromptBehaviorUser=3`、`PromptOnSecureDesktop=0`、`FilterAdministratorToken=0`。本轮在备份及独立恢复任务就绪后，仅临时把安全桌面提示设为 1，使用普通 StreamTest 触发真实 UAC，远程输入管理员凭据并提权成功；随后策略、任务和临时文件全部恢复。UAC 不再列为缺少测试环境的阻塞，实际证据见[本轮登录记录](acceptance/remote-desktop-windows-input-login-2026-10-19.md)。
 - 本轮可用机器的 Intel/AMD、混合 DPI 等实际硬件条件须先确认；没有对应实机时记录具体缺口，不能由 NVIDIA、Apple 或虚拟 GPU 结果外推。已有用户豁免仅为 Mac 单屏及 Mac→Mac、Linux→Linux 两方向。
+- 最新只读显示快照：XRServer 可连接，四块 1920×1080 横排、均 100%；90 为一块 1920×1080、100%。尚未验证不同缩放并存的布局，当前没有改动两台的显示设置；混合 DPI 仍是待办，不计为通过。
 - 2 小时/8 小时仍按用户要求暂缓到晚间；当前不启动、不自动预约。本次规划没有新增重启、安装、发布或系统策略变更。
 
 下面逐条保留原验收要求和编号，并给出当前状态及未覆盖条件；没有因整理文档增加勾选。

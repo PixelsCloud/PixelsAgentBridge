@@ -1416,6 +1416,65 @@
     "macos_uploaded_manager_deleted": true,
     "local_candidate_desktops_stopped": true
   },
+  "next_windows_readonly_monitor_preflight": [
+    {
+      "device_code": "947158375",
+      "sampled_at_unix_ms": 1792387453715,
+      "monitors": [
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 1920,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 0,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": true
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 3840,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 5760,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        }
+      ]
+    },
+    {
+      "device_code": "428358431",
+      "sampled_at_unix_ms": 1792387456151,
+      "monitors": [
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 0,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": true
+        }
+      ]
+    }
+  ],
   "build": {
     "windows_cargo_jobs": 6,
     "native_parallelism": 1,
