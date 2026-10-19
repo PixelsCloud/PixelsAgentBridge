@@ -1,6 +1,10 @@
 # 远程桌面与人工协助开发方案
 
-日期：2026-10-16。状态：正式 Windows helper 媒体接入、90 到本机的已认证直连/Relay 动态画面已通过；Windows 独立窗口已实现。完整多屏操作、登录桌面、跨平台和 AI 协助仍在开发，详见长期任务和 [产品接入验收](acceptance/remote-desktop-product-2026-10-16.md)。
+方案起草：2026-10-16；进度核对：2026-10-19，验收记录截至 `9960e7b`。
+三平台媒体、独立窗口、基本输入与 AI 协助已有实现及实机记录；Windows 负原点竖屏、
+Mac 锁屏/注销登录、Linux 新候选锁屏密码登录、同账号双 Desktop 接手和 AI 完成闭环
+已有通过证据。仍在完成剩余平台/输入/登录边界、性能稳定性及安装发布，尚未整体交付。
+完整关闭 12/53 条，数量不是代码完成率，逐项状态以长期任务为准。
 
 后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md)。本文件保留架构约束与历史进展。
 
@@ -46,7 +50,7 @@
 | 协议 | `crates/protocol/src/remote_desktop.rs` | 版本、能力、会话、视频帧、屏幕、输入和关闭消息 |
 | 目标端会话 | `crates/remote-desktop/src/host.rs`，由 Executor task service 接入 | 独占占用、流、心跳、清理和媒体后端接口 |
 | 操作端会话 | `crates/bridge/src/connection/remote_desktop.rs` | 使用已认证连接建立远控专用可靠流 |
-| 平台与媒体 | `crates/desktop-media`、`crates/executor/src/local_ipc_media.rs` | Windows 原生采集、编解码、纹理显示与独立 helper 媒体 IPC；输入待实现 |
+| 平台与媒体 | `crates/desktop-media`、`crates/executor/src/local_ipc_media.rs` | 三平台采集、编解码、原生显示、独立光标及 helper 媒体/输入路由；各平台验收范围见长期任务 |
 | 查看器 | `apps/desktop/src-tauri/src/operator/remote_desktop.rs`、`RemoteDesktopWindow.tsx` | 独立 Tauri 窗口、原生显示子窗口、屏幕和 FPS 工具栏 |
 | 人工协助 | 新增协议、MCP 工具、Desktop 通知适配 | 请求、领取、状态、完成和取消 |
 
