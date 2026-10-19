@@ -138,7 +138,14 @@ public:
                 SetWindowPos(window_, HWND_TOP, 0, top, (std::max)(1L, bounds.right), (std::max)(1L, bounds.bottom-top), SWP_NOACTIVATE);
         }
         RECT client{}; GetClientRect(window_, &client);
-        if (client.right <= 0 || client.bottom <= 0 || IsIconic(parent_ ? parent_ : window_)) { was_minimized_ = true; return; }
+        if (client.right <= 0 || client.bottom <= 0 || IsIconic(parent_ ? parent_ : window_)) {
+            // The native child belongs to this process, while its Tauri owner
+            // may belong to another. Minimizing the owner need not deliver
+            // WM_KILLFOCUS to the child before rendering is suspended.
+            if (!was_minimized_) input_.release(window_);
+            was_minimized_ = true;
+            return;
+        }
         bool repaint = was_minimized_;
         was_minimized_ = false;
         if (occluded_ && swapchain_->Present(0, DXGI_PRESENT_TEST) == S_OK) { occluded_ = false; repaint = true; }
