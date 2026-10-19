@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { Alert, App, Button, ConfigProvider, Select, Space, Tag, Typography, theme } from "antd";
+import { Alert, App, Button, ConfigProvider, Select, Space, Tag, theme } from "antd";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Copy, Clipboard, Eraser, RefreshCw, Square, Minus, Maximize2, X } from "lucide-react";
@@ -300,7 +300,6 @@ function TerminalContent() {
     {error && <Alert className="desktop-terminal-alert" type="error" showIcon title={text.error} description={error} closable onClose={() => setError("")} />}
     {reason && <Alert className="desktop-terminal-alert" type="info" title={`${text.endedReason}: ${reason}`} />}
     {opened?.os_family === "macos" && phase === "running" && !privacyHintDismissed && <Alert className="desktop-terminal-alert" type="info" showIcon title={text.macosFilesTitle} description={text.macosFilesBody} closable onClose={() => setPrivacyHintDismissed(true)} />}
-    <div className="desktop-terminal-screen" ref={host} />
-    <footer className="desktop-terminal-footer"><Typography.Text type="secondary">{text.privacy}</Typography.Text></footer>
+    <div className="desktop-terminal-screen"><div className="desktop-terminal-host" ref={host} /></div>
   </div>;
 }

@@ -13,7 +13,7 @@ const fixture = (window as any).fixture = {
   output(text: string) { const bytes = new TextEncoder().encode(text); const frame = new Uint8Array(bytes.length + 9); new DataView(frame.buffer).setBigUint64(1, BigInt(offset)); frame.set(bytes, 9); channel.onmessage(frame.buffer); offset += bytes.length; },
   end() { const data = new TextEncoder().encode(JSON.stringify({ exit_code: 7, reason: "Shell exited" })); const frame = new Uint8Array(data.length + 9); frame[0] = 1; new DataView(frame.buffer).setBigUint64(1, BigInt(offset)); frame.set(data, 9); channel.onmessage(frame.buffer); },
   closeWindow() { callbacks.get(listeners.get("tauri://close-requested")!)?.({ event: "tauri://close-requested", id: 1, payload: null }); },
-  paste(text: string) { const data = new DataTransfer(); data.setData("text/plain", text); document.querySelector(".desktop-terminal-screen")!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true })); },
+  paste(text: string) { const data = new DataTransfer(); data.setData("text/plain", text); document.querySelector(".desktop-terminal-host")!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true })); },
   raw(bytes: number[]) { channel.onmessage(new Uint8Array(bytes).buffer); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
