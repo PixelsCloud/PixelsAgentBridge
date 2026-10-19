@@ -1,0 +1,486 @@
+{
+  "date": "2026-10-19",
+  "source_baseline": "655773f",
+  "device": "90",
+  "candidate_hashes": {
+    "pab-executor.exe": "252223ac81648750057610a66d8df12dafc479f3bde1b02755bacbed44e9f009",
+    "pab-desktop.exe": "8628976f9738dac0373be90ccb30b689db117a9da48f53071d1601227e8bed22",
+    "pab-media-worker.exe": "467cb4d071552f6f80317bd1ef27df9538632aaa35169f255e2023d21b40fb82"
+  },
+  "probe_observations": [
+    {
+      "task": "ddcc2ddb-c470-4f5a-be75-ee77518e10f9",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": false,
+        "selection": [
+          3,
+          3
+        ],
+        "length": 5922,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "a4d73845-8411-45ff-b710-992e63ecd49a",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": false,
+        "selection": [
+          3,
+          3
+        ],
+        "length": 5922,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "b59543e6-f523-4ffc-95ef-bd4a134cc7d1",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": true,
+        "selection": [
+          0,
+          11
+        ],
+        "length": 5922,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "cab73184-7a48-49de-a30f-c191f16dc0fd",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": true,
+        "selection": [
+          0,
+          25
+        ],
+        "length": 5922,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "0ecd4b16-6f27-4aa6-ae78-dc1c11917412",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": true,
+        "selection": [
+          0,
+          25
+        ],
+        "length": 5922,
+        "first_visible": 9,
+        "held": []
+      }
+    },
+    {
+      "task": "8c494cef-27c4-4ac2-a1a6-371b0d54dc8a",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": true,
+        "selection": [
+          0,
+          5922
+        ],
+        "length": 5922,
+        "typed_marker": false,
+        "first_visible": 174,
+        "held": []
+      }
+    },
+    {
+      "task": "fcc6d0fd-e4d1-497e-b5f9-4307306a3f50",
+      "observation": {
+        "rect": {
+          "x": 325,
+          "y": 67,
+          "right": 1309,
+          "bottom": 636
+        },
+        "foreground": true,
+        "selection": [
+          18,
+          18
+        ],
+        "length": 18,
+        "typed_marker": true,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "ea6f46b9-f309-4b5d-9a65-c69094645581",
+      "observation": {
+        "session": 2,
+        "held": [],
+        "owned_editor_exists": false,
+        "owned_file_exists": false
+      }
+    },
+    {
+      "task": "6467d6f6-3f71-43e4-a312-f0dfee0154cc",
+      "observation": {
+        "session": 2,
+        "held": [
+          17
+        ],
+        "owned_editor_exists": false,
+        "owned_file_exists": false
+      }
+    },
+    {
+      "task": "16ece47d-b02a-41ad-8555-4f9a2b7b394f",
+      "observation": {
+        "session": 2,
+        "held": [],
+        "owned_editor_exists": false,
+        "owned_file_exists": false
+      }
+    },
+    {
+      "task": "12221020-569e-4f31-8390-d76901d362b7",
+      "observation": {
+        "session": 2,
+        "held": [
+          17
+        ],
+        "owned_editor_exists": false,
+        "owned_file_exists": false
+      }
+    },
+    {
+      "task": "c5e2c1cb-bbab-4635-9ab1-71850db6c912",
+      "observation": {
+        "session": 2,
+        "held": [],
+        "owned_editor_exists": false,
+        "owned_file_exists": false
+      }
+    }
+  ],
+  "scope": "Windows operator to Windows target, one 1920x1080 screen, 100% DPI",
+  "product_input_changed": false,
+  "boot_automatic_reconnect_before_fix": "failed: control NotFound device offline was treated as permanent; manual retry recovered login view",
+  "credentials": "No secrets included; private evidence and screenshots excluded",
+  "logoff": {
+    "task": "e02718c2-0648-4ef3-a504-483c4d4c339d",
+    "console_before": 2,
+    "console_after": 3,
+    "login_console_check_task": "97cbced8-eddc-4f4a-8885-c217953ed804",
+    "auto_view_recovery": true,
+    "input_after_recovery": false,
+    "password_submissions": 1,
+    "ime_note": "Username entered through active Chinese IME; committed Latin candidate, then moved focus to empty password field."
+  },
+  "boot": {
+    "request_task": "530e0136-3d1a-4eff-9e97-2898ba8f06ca",
+    "before_utc": "2026-10-15T15:55:05.5000000Z",
+    "after_utc": "2026-10-19T03:15:21.5000000Z",
+    "prelogin_check_task": "f7ac085f-54a0-404a-8868-fa63ba67620f",
+    "prelogin_console_user": null,
+    "supervisor_pid": 3056,
+    "winlogon_helper_pid": 6324,
+    "login_check_task": "72b89511-0e6d-48c4-92b6-fe5b63e13790",
+    "console_after": 1,
+    "password_submissions": 1,
+    "input_after_recovery": false,
+    "initial_login_ui": "StreamTest incorrect username/password message visible before any test password was sent; dismissed and selected authorized Administrator identity. Existing auto-login configuration was not changed."
+  },
+  "cleanup": {
+    "original_service_restored": true,
+    "temporary_tasks_removed": true,
+    "remote_stage_removed": true,
+    "owned_notepad_and_file_removed": true,
+    "input_release_journal_nonzero_bytes": 0,
+    "local_installed_application_changed": false
+  },
+  "fixed_candidate": {
+    "hashes": {
+      "pab-executor.exe": "252223ac81648750057610a66d8df12dafc479f3bde1b02755bacbed44e9f009",
+      "pab-desktop.exe": "4725a9effa7449310ab0b69cdbf06838d6e1246e28870140168e3b90cfea836d",
+      "pab-media-worker.exe": "467cb4d071552f6f80317bd1ef27df9538632aaa35169f255e2023d21b40fb82"
+    },
+    "build_jobs": 6,
+    "native_build_jobs": 1,
+    "tests": {
+      "bridge_server_rejection_policy": 1,
+      "desktop_recovery": 4
+    },
+    "embedded_frontend": true,
+    "initial_debug_candidate": "Missing custom-protocol feature; failed frontend readiness check; restored service and rebuilt before reboot retest."
+  },
+  "fixed_boot": {
+    "request_task": "e0afc356-154e-4cd5-bbd0-240097234692",
+    "before_utc": "2026-10-19T03:15:21.5000000Z",
+    "after_utc": "2026-10-19T03:35:22.5000000Z",
+    "observed_recovery_seconds": 67.67,
+    "observation_interval_seconds": 1,
+    "automatic": true,
+    "manual_retry_commands": 0,
+    "phase_after": "viewing",
+    "input_after": false,
+    "frame_ready": true,
+    "decoder": "d3d11_hardware",
+    "prelogin_check_task": "1856600b-3439-4ae7-842b-0d081f4f1151",
+    "login_check_task": "03ef262a-4d74-4ec6-9de2-311cdc10ec03",
+    "login_identity": "streamtest",
+    "password_submissions": 1
+  },
+  "followup_observations": [
+    {
+      "task": "f4ea4721-59b4-4506-9746-829cdb76111d",
+      "result": {
+        "account": {
+          "Name": "streamtest",
+          "Enabled": true,
+          "SID": {
+            "BinaryLength": 28,
+            "AccountDomainSid": {
+              "BinaryLength": 24,
+              "AccountDomainSid": {
+                "BinaryLength": 24,
+                "AccountDomainSid": "S-1-5-21-651462275-30253513-3142702281",
+                "Value": "S-1-5-21-651462275-30253513-3142702281"
+              },
+              "Value": "S-1-5-21-651462275-30253513-3142702281"
+            },
+            "Value": "S-1-5-21-651462275-30253513-3142702281-1101"
+          }
+        },
+        "is_local_administrator": false,
+        "uac": {
+          "EnableLUA": 1,
+          "ConsentPromptBehaviorAdmin": 0,
+          "ConsentPromptBehaviorUser": 3,
+          "PromptOnSecureDesktop": 0,
+          "FilterAdministratorToken": 0
+        }
+      }
+    },
+    {
+      "task": "004b3931-6cbf-4c4c-81cb-8c539791105a",
+      "result": {
+        "rect": {
+          "x": 248,
+          "y": 211,
+          "right": 1232,
+          "bottom": 780
+        },
+        "foreground": false,
+        "selection": [
+          0,
+          0
+        ],
+        "length": 5922,
+        "typed_marker": false,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "a4d683ff-fbe4-4127-b458-f7cbaaa68fa8",
+      "result": {
+        "rect": {
+          "x": 248,
+          "y": 211,
+          "right": 1232,
+          "bottom": 780
+        },
+        "foreground": true,
+        "selection": [
+          18,
+          18
+        ],
+        "length": 18,
+        "typed_marker": true,
+        "first_visible": 0,
+        "held": []
+      }
+    },
+    {
+      "task": "3c835b8b-8c1b-4cfc-ab8b-b1150bec45e9",
+      "result": {
+        "original": 0,
+        "current": 1,
+        "rollback_task": "PixelsRemoteDesktopUacRestore-cd8024b1",
+        "rollback_registered": true
+      }
+    },
+    {
+      "task": "61236abb-59f9-49ca-a5f4-b54ea1c832e6",
+      "result": {
+        "secure_desktop_setting": 1,
+        "consent_processes": [
+          {
+            "Id": 6024,
+            "SessionId": 1
+          }
+        ],
+        "result": {}
+      }
+    },
+    {
+      "task": "eb238698-8b75-4cd8-9680-4f5e40fc2a32",
+      "result": {
+        "secure_desktop_setting": 1,
+        "consent_processes": [],
+        "result": {
+          "account": "WIN-RASS8RC6V3H\\Administrator",
+          "administrator": true,
+          "session": 1
+        }
+      }
+    },
+    {
+      "task": "da7c0226-436f-4653-9c90-dfca183bf530",
+      "result": {
+        "uac_original_value": 0,
+        "uac_stage_removed": true,
+        "restore_task_removed": true
+      }
+    },
+    {
+      "task": "5b816386-082b-4eb4-a773-76cfe37fcafb",
+      "result": {
+        "owned_editors_remaining": 0,
+        "owned_files_remaining": 0
+      }
+    },
+    {
+      "task": "816c6dde-56ba-4fc1-844c-6efbdf667c1b",
+      "result": {
+        "service": {
+          "State": "Running",
+          "ProcessId": 20388,
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\""
+        },
+        "console_user": "WIN-RASS8RC6V3H\\Administrator",
+        "staged_processes": 0,
+        "staged_tasks": 0,
+        "staged_directory_exists": false,
+        "uac": {
+          "EnableLUA": 1,
+          "ConsentPromptBehaviorAdmin": 0,
+          "ConsentPromptBehaviorUser": 3,
+          "PromptOnSecureDesktop": 0,
+          "FilterAdministratorToken": 0
+        },
+        "uac_stage_exists": false,
+        "uac_task_exists": false,
+        "release_journals": [
+          {
+            "name": "session-1.releases",
+            "nonzero": 0
+          },
+          {
+            "name": "session-2.releases",
+            "nonzero": 0
+          },
+          {
+            "name": "session-3.releases",
+            "nonzero": 0
+          }
+        ]
+      }
+    },
+    {
+      "task": "3915f58d-deb1-40f9-b052-f99d17a71db8",
+      "result": {
+        "account": "WIN-RASS8RC6V3H\\Administrator",
+        "session": 2,
+        "held": []
+      }
+    }
+  ],
+  "ordinary_input": {
+    "account": "streamtest",
+    "local_administrator": false,
+    "probe_before": "004b3931-6cbf-4c4c-81cb-8c539791105a",
+    "probe_after": "a4d683ff-fbe4-4127-b458-f7cbaaa68fa8",
+    "actions": [
+      "mouse_click",
+      "ctrl_a",
+      "physical_key_marker",
+      "enter_commit_ime_latin_candidate"
+    ],
+    "typed_marker": true,
+    "held": [],
+    "first_attempt": "Only Ctrl+A and IME composition observed before fixture timeout; text commit not counted. Repeated with a fresh bounded fixture and confirmed application text."
+  },
+  "uac": {
+    "launch_task": "ce5bd570-568c-411c-aad3-c0206d1671c8",
+    "standard_user": "streamtest",
+    "consent_pid": 6024,
+    "session": 1,
+    "password_submissions": 1,
+    "elevation_confirmed": true,
+    "returned_to_readonly": true,
+    "changed_policy_only": "PromptOnSecureDesktop",
+    "policy_before": 0,
+    "policy_during": 1,
+    "policy_after": 0,
+    "reference": "https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/settings-and-configuration?tabs=reg"
+  },
+  "user_switch": {
+    "disconnect_task": "7036fc14-b1b8-4584-a935-40dc67703aa7",
+    "from": "streamtest session 1",
+    "to": "Administrator session 2",
+    "old_session_retained": true,
+    "prelogin_check_task": "85999fda-acc0-453c-93e5-5c26eda211a7",
+    "login_check_task": "16115dcb-1b81-42d5-8d3e-6d238f3a3d96",
+    "automatic_view_recovery": true,
+    "input_after_recovery": false,
+    "password_submissions": 1
+  },
+  "fixed_cleanup": {
+    "verification_task": "816c6dde-56ba-4fc1-844c-6efbdf667c1b",
+    "original_service_running_pid": 20388,
+    "staged_processes": 0,
+    "staged_tasks": 0,
+    "remote_stage_removed": true,
+    "uac_policy_restored": true,
+    "uac_stage_removed": true,
+    "uac_restore_task_removed": true,
+    "owned_editor_and_files_removed": true,
+    "release_journals_all_zero": true,
+    "console_user": "Administrator",
+    "physical_key_state_task": "3915f58d-deb1-40f9-b052-f99d17a71db8",
+    "held": [],
+    "isolated_local_desktop_stopped": true
+  }
+}

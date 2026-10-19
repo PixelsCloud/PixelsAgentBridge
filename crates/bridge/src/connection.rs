@@ -739,6 +739,21 @@ pub enum BridgeError {
 }
 
 impl BridgeError {
+    /// A control lookup did not find an online device. This can also mean an
+    /// unknown/deleted device, so it is not a generally retryable connection
+    /// error. An established viewer may use it for bounded reboot recovery.
+    pub const fn is_device_not_found(&self) -> bool {
+        matches!(
+            self,
+            Self::NetworkResolution(DeviceNetworkResolutionError::Control(
+                EndpointControlError::Server {
+                    code: pab_protocol::ControlErrorCode::NotFound,
+                    ..
+                }
+            ))
+        )
+    }
+
     pub const fn is_recoverable_connection(&self) -> bool {
         match self {
             Self::NetworkResolution(
@@ -781,6 +796,10 @@ mod recovery_tests {
                 },
             ));
             assert!(!error.is_recoverable_connection(), "{code:?}");
+            assert_eq!(
+                error.is_device_not_found(),
+                code == ControlErrorCode::NotFound
+            );
         }
         assert!(
             BridgeError::NetworkResolution(DeviceNetworkResolutionError::Timeout)

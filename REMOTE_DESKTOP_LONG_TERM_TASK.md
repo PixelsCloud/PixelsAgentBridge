@@ -1,8 +1,8 @@
 # 远程桌面与 AI 人工协助：长期开发任务
 
-核对日期：2026-10-19。开发分支：`feat/remote-desktop-v1`。代码与记录核对至 `211c44b`：
+核对日期：2026-10-19。开发分支：`feat/remote-desktop-v1`。代码与记录核对至 `655773f`，另补充本轮 Windows 实测：
 `8e41278` 修复 Mac 登录域识别并记录重启登录，`211c44b` 修复远程终端底部遮挡。
-各平台测试产物以各自验收记录的哈希为准。本次仅更新文档与后续安排，没有新增运行测试、安装或发布。
+各平台测试产物以各自验收记录的哈希为准。本轮修复 Windows 重启离线时自动重连提前结束，真实重启复测通过；新增普通用户输入、UAC 安全桌面和用户切换实测。未更新本机安装版或发布。
 
 ## 当前结论
 
@@ -18,6 +18,7 @@
 
 | 范围 | 已验证的结果 | 证据 |
 | --- | --- | --- |
+| Windows 普通输入与登录 | 记事本单击/双击/拖拽/滚轮、Ctrl+A、失焦与关闭释放通过；注销、修复后真实重启约 68 秒自动恢复、StreamTest 普通用户登录/输入、UAC 提权与切回管理员通过；均恢复只查看 | [输入与登录实测](acceptance/remote-desktop-windows-input-login-2026-10-19.md) |
 | Windows 多屏与故障恢复 | 90 负原点竖屏，两种窗口尺寸八次点击、光标像素、Ctrl 切屏释放、采集代理故障后恢复 | [统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md) |
 | Mac 被控端登录 | 锁屏、注销和真实重启后的密码登录通过；持久候选包重启后 helper 自动启动、桌面自动恢复，未再次提示权限；新会话硬解、只查看 | [Mac 锁屏](acceptance/remote-desktop-macos-lock-login-2026-10-19.md)、[重复注销与启动跟进](acceptance/remote-desktop-macos-login-startup-followup-2026-10-19.md) |
 | Linux 被控端登录 | 新候选 Wayland 锁屏密码解锁；较早候选的 GDM 注销登录自动恢复也有通过记录，两者分别记录 | [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[Linux 注销恢复](acceptance/remote-desktop-login-recovery-2026-10-17.md) |
@@ -55,7 +56,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 | 顺序 | 具体行动 | 完成条件 / 对应条目 |
 | --- | --- | --- |
-| 1. Windows 输入与登录 | 90 上复现首次激活输入，核对真实点击、双击、拖拽和修饰键释放；补注销、开机未登录、用户切换、普通非管理员及 UAC。混合 DPI 优先用 90，条件不足时使用已有授权的 XRServer 四屏 | 当前桌面收到正确且不重复的操作；切换后无卡键、旧输入或长期黑屏；每个实际场景独立记录。03.3～03.5、04.2～04.5、05.1/05.3/05.4 |
+| 1. Windows 输入与登录 | 已补普通应用输入、注销、开机未登录、普通非管理员、用户切换及 UAC；剩余未初始化活动窗口的首击消息边界、混合 DPI、反复切换与最终安装链路。混合 DPI 优先用 90，条件不足时使用已有授权的 XRServer 四屏 | 当前桌面收到正确且不重复的操作；切换后无卡键、旧输入或长期黑屏；每个实际场景独立记录。03.3～03.5、04.2～04.5、05.1/05.3/05.4 |
 | 2. Linux 剩余会话与跨平台输入 | 当前候选在虚拟机补 Wayland 注销/开机恢复、普通 Xorg 与 X11 操作端；Apple 补操作端键位、目标登录和窗口生命周期。沿用已通过的 Apple 被控端登录记录 | X11/Wayland 分列；七个必验方向的缺项逐项填入平台矩阵；真实屏幕、光标、键鼠和恢复均有证据。03.2～03.6、LT-04、07.1～07.6 |
 | 3. AI 协助与连接清理 | Mac/Linux 隐藏或最小化窗口的通知投递；active 时 Desktop/请求方退出、离线、删除设备、切换账号及控制服务 | 无假完成、旧请求误完成、遗留占用或输入；其他设备连接及现有工具仍可用。01.6、02.6、08.3～08.6 |
 | 4. 性能、弱网与配置收尾 | 完成必要降档及坐标配置更新；核对三平台实际显示 FPS、软硬后备、限速/RTT/路径变化、内存与队列；同步核对默认地址与 TOML 覆盖 | 约定动态基准实际显示 >12 FPS；带宽不足明确降档，恢复显示新画面且不干扰 PTY/命令/传输；客户配置优先、设置页不显示内置地址。06.1～06.6、09.4 |
@@ -68,12 +69,12 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 ### 下一次开始时的第一批动作
 
 1. 检查 worktree 和 90 当前会话/服务，确认测试产物哈希及回滚路径。保留 `experiments/remote-desktop/windows_control_fixture.cpp` 的既有未提交修改，不能将其当成本轮已完成修复。
-2. 先做 90 首次激活输入复现与可用的会话切换验证；UAC 的环境条件见下方。需要等待环境时直接推进 Linux 会话验收或 AI 清理，不反复跑已经通过的 Mac 登录。
+2. 已完成 90 普通应用输入、注销、修复后的重启自动恢复、普通用户、UAC 和用户切换。后续补 Linux 当前候选注销/启动、跨平台输入与 AI 异常清理；Windows 仍保留首次激活诊断边界及混合 DPI，不反复跑已经通过的 Mac 登录。
 3. Mac 最终包安装验收沿用持久包位置和固定签名，记录新安装与升级是否出现权限提示；不把测试包曾获授权扩展成所有安装场景无需授权。
 
 ### 当前环境条件与暂缓安排
 
-- 90 的只读预检显示 `EnableLUA=1`、`ConsentPromptBehaviorAdmin=0`、`PromptOnSecureDesktop=0`、`FilterAdministratorToken=0`（任务 `1ea2bfb7-97f5-4d1d-bd16-a0cb90f2b931`）。**当前环境没有产生管理员 UAC 安全桌面提示的条件**，不能把“未弹窗”算通过。下一次先选择可产生真实安全桌面提示的测试环境；若需临时改策略，备份原值、安排独立恢复并限定当前测试范围。此前只读检查没有改策略。
+- 90 原策略为 `EnableLUA=1`、`ConsentPromptBehaviorAdmin=0`、`ConsentPromptBehaviorUser=3`、`PromptOnSecureDesktop=0`、`FilterAdministratorToken=0`。本轮在备份及独立恢复任务就绪后，仅临时把安全桌面提示设为 1，使用普通 StreamTest 触发真实 UAC，远程输入管理员凭据并提权成功；随后策略、任务和临时文件全部恢复。UAC 不再列为缺少测试环境的阻塞，实际证据见[本轮登录记录](acceptance/remote-desktop-windows-input-login-2026-10-19.md)。
 - 本轮可用机器的 Intel/AMD、混合 DPI 等实际硬件条件须先确认；没有对应实机时记录具体缺口，不能由 NVIDIA、Apple 或虚拟 GPU 结果外推。已有用户豁免仅为 Mac 单屏及 Mac→Mac、Linux→Linux 两方向。
 - 2 小时/8 小时仍按用户要求暂缓到晚间；当前不启动、不自动预约。本次规划没有新增重启、安装、发布或系统策略变更。
 
@@ -180,7 +181,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **01.3** 在正确的交互桌面 helper 中创建媒体资源。普通服务进程不能把
   Session 0 的枚举结果当成用户桌面。资源跟随 helper/桌面上下文退出。
-  核对状态（2026-10-19）：**部分完成**。Windows 普通桌面用户采集/Winlogon 与 Mac Aqua/LoginWindow 已有实机结果；还需普通非管理员及剩余启动会话边界。见 [统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)、[Mac 注销登录](acceptance/remote-desktop-macos-logout-login-2026-10-19.md)。
+  核对状态（2026-10-19）：**部分完成**。Windows 普通桌面/Winlogon、普通非管理员及重启未登录采集，与 Mac Aqua/LoginWindow 已有实机结果；剩余平台及最终安装会话边界继续验证。见 [Windows 输入与登录](acceptance/remote-desktop-windows-input-login-2026-10-19.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)、[Mac 注销登录](acceptance/remote-desktop-macos-logout-login-2026-10-19.md)。
 
 - [x] **01.4** 用正式 backend 实现 `DesktopBackend` / `DesktopSource`，在
   `DeviceSessionAcceptor` 创建阶段注册；所有连接共享设备级查看占用。
@@ -270,7 +271,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **04.2** 实现鼠标移动、点击、双击、按下/释放、拖拽和滚轮；将窗口坐标去除
   留白及缩放后映射到所选屏幕，验证负原点、DPI、旋转和多显卡屏幕。
-  核对状态（2026-10-19）：**部分完成**。基本鼠标输入及竖屏两种窗口尺寸八次点击通过；混合 DPI、完整拖拽/双击及 Windows 首次激活重复消息边界仍未关闭。见 [统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
+  核对状态（2026-10-19）：**部分完成**。基本鼠标输入及竖屏两种窗口尺寸八次点击通过；本轮新增记事本单击、双击、拖拽和滚轮真实结果。混合 DPI、跨平台完整输入及 Windows 未初始化活动窗口的首次消息边界仍未关闭。见 [普通应用输入](acceptance/remote-desktop-windows-input-login-2026-10-19.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
 
 - [ ] **04.3** 实现键盘按下/释放、修饰键和常用组合键，明确实体键与文本输入行为；
   Windows/macOS/Linux 的键位、输入法和特殊键分别验证。
@@ -278,7 +279,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **04.4** 目标端维护按下状态。失焦、切屏、禁止操作、断线、helper 退出时释放；
   鼠标拖出窗口也能结束拖拽，避免按键或鼠标卡住。
-  核对状态（2026-10-19）：**部分完成**。切屏、关窗、渲染故障与断流时的 Ctrl/Shift 释放已有实测；拖出窗口、失焦及所有平台异常组合仍需补齐。见 [窗口与断流恢复](acceptance/remote-desktop-product-flow-recovery-2026-10-18.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
+  核对状态（2026-10-19）：**部分完成**。切屏、关窗、渲染故障与断流时的 Ctrl/Shift 释放已有实测；本轮新增 90 失焦和关闭的 Ctrl 实际释放。拖出窗口及跨平台异常组合仍需补齐。见 [本轮输入与释放](acceptance/remote-desktop-windows-input-login-2026-10-19.md)、[窗口与断流恢复](acceptance/remote-desktop-product-flow-recovery-2026-10-18.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
 
 - [ ] **04.5** 输入带递增序号，拒绝旧版本或重复事件；重连不重放点击、密码或按键。
   区分收到消息、已交给系统输入接口和应用实际完成，不把传输 ACK 当操作成功。
@@ -303,11 +304,11 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **05.3** 验证开机未登录、注销、用户切换、UAC 安全桌面及锁屏反复切换。
   输入始终路由到当前正确桌面，切换前清空按下状态。
-  核对状态（2026-10-19）：**待验证**。Windows 开机未登录、注销、用户切换、UAC 及反复切换尚未获得完整验收。90 当前策略自动提权且不使用 UAC 安全桌面，须先解决真实提示的测试条件，见上方执行计划。Mac/Linux 登录结果不能代替。
+  核对状态（2026-10-19）：**部分完成**。90 注销、修复后的真实重启自动恢复及普通用户密码登录、UAC 安全桌面提权、保留旧会话切换到管理员均通过，恢复后默认只查看。最终候选上的反复切换及正式安装链路仍需收尾，不用一次通过替代持续验证。旧候选重启失败保留，见 [本轮登录记录](acceptance/remote-desktop-windows-input-login-2026-10-19.md)。
 
 - [ ] **05.4** helper 崩溃/重新启动、用户桌面不存在、显示设备重新枚举时可恢复；
   后台服务自动启动与媒体就绪分开观察，主窗口退出不终止被控能力。
-  核对状态（2026-10-19）：**部分完成**。采集代理故障后的进程回收、画面恢复通过；普通非管理员、无用户桌面、启动及重新枚举完整边界待补。见 [统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
+  核对状态（2026-10-19）：**部分完成**。采集代理故障后的回收与恢复通过；本轮补普通非管理员、开机未登录 helper 自动启动和重启后屏幕 ID 变化的恢复。最终安装链路及完整故障边界仍待收尾。见 [本轮输入与登录](acceptance/remote-desktop-windows-input-login-2026-10-19.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)。
 
 
 完成标准：在指定可中断测试机上，从未登录/锁屏状态完成登录并继续操作。

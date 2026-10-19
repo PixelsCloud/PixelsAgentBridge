@@ -44,6 +44,7 @@ impl From<&DesktopOpened> for InputGeneration {
 struct StreamFailure {
     message: String,
     recoverable: bool,
+    device_not_found: bool,
     renderer: bool,
 }
 impl StreamFailure {
@@ -51,6 +52,7 @@ impl StreamFailure {
         Self {
             message: error.to_string(),
             recoverable: false,
+            device_not_found: false,
             renderer: true,
         }
     }
@@ -60,6 +62,7 @@ impl From<String> for StreamFailure {
         Self {
             message,
             recoverable: false,
+            device_not_found: false,
             renderer: false,
         }
     }
@@ -73,6 +76,7 @@ impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
     fn from(error: pab_bridge::RemoteDesktopError) -> Self {
         Self {
             recoverable: error.is_recoverable_media(),
+            device_not_found: false,
             message: error.to_string(),
             renderer: false,
         }
@@ -80,6 +84,10 @@ impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
 }
 impl From<pab_bridge::RuntimeError> for StreamFailure {
     fn from(error: pab_bridge::RuntimeError) -> Self {
+        let device_not_found = matches!(
+            &error,
+            pab_bridge::RuntimeError::Bridge(error) if error.is_device_not_found()
+        );
         let recoverable = match &error {
             pab_bridge::RuntimeError::Bridge(error) => {
                 error.is_recoverable_connection()
@@ -90,6 +98,7 @@ impl From<pab_bridge::RuntimeError> for StreamFailure {
         };
         Self {
             recoverable,
+            device_not_found,
             message: error.to_string(),
             renderer: false,
         }
@@ -410,6 +419,7 @@ async fn run(
         let mut failures = 0u32;
         let mut first_failure = None;
         let mut software_decoder = false;
+        let mut has_presented = false;
         loop {
             // Input and SAS belong to the previous generation. Never replay
             // queued actions into a newly opened login desktop.
@@ -443,16 +453,22 @@ async fn run(
                 software_decoder,
             )
             .await;
+            has_presented |= first_presented.is_some();
             match result {
                 Ok(true) => continue,
                 Ok(false) => break,
                 Err(error) => {
+                    let recoverable = recovery::can_retry(
+                        error.recoverable,
+                        error.device_not_found,
+                        has_presented,
+                    );
                     // Automatic recovery clears the UI error. Keep its cause
                     // in the existing diagnostic log before replacing status.
                     tracing::warn!(
                         window = window.label(),
                         renderer = error.renderer,
-                        recoverable = error.recoverable,
+                        recoverable,
                         error = %error.message,
                         "remote desktop stream failed"
                     );
@@ -473,7 +489,7 @@ async fn run(
                         failures = 0;
                         first_failure = None;
                     }
-                    if error.recoverable
+                    if recoverable
                         && let Some(delay) =
                             recovery::retry_delay(&mut first_failure, failures, Instant::now())
                     {

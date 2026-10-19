@@ -4,13 +4,13 @@
 Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必验与交付阻塞范围；
 其余七个方向继续按实际证据验收。Apple 按单屏处理，多屏不作为本轮阻塞。
 
-最新核对：2026-10-19，记录核对至 `211c44b`，包含 Apple 真实重启登录与自动恢复（`8e41278`）；原表基线为 `a4a58d8`。
+最新核对：2026-10-19，记录核对至 `655773f`，另补充本轮 Windows 输入与登录；包含 Apple 真实重启登录与自动恢复（`8e41278`）；原表基线为 `a4a58d8`。
 本轮没有关闭 LT-07.6。各记录的产物哈希分别
 有效，不能混成一份已经通过全部功能的发布包。被控端登录通过不能计为反向操作端通过。
 
 | 操作端 → 被控端 | 已有正式产品窗口证据 | 仍缺的主要证据 |
 | --- | --- | --- |
-| Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[锁屏密码登录](remote-desktop-lock-login-2026-10-17.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md) | 混合 DPI、普通非管理员、完整输入及首次激活重复消息边界；开机/UAC/用户切换、最终候选动态基准与长稳 |
+| Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[锁屏密码登录](remote-desktop-lock-login-2026-10-17.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md)；[普通应用输入、注销、修复后重启自动恢复、普通用户、UAC 提权与用户切换](remote-desktop-windows-input-login-2026-10-19.md) | 混合 DPI、跨平台完整输入及首次激活重复消息边界；最终候选反复切换、正式安装链路、动态基准与长稳 |
 | Windows → macOS | [Apple 单屏输入、独立光标、协助占用及恢复](remote-desktop-macos-activity-input-assistance-2026-10-18.md)；[锁屏密码登录](remote-desktop-macos-lock-login-2026-10-19.md)；[注销后 LoginWindow 密码登录和画面恢复](remote-desktop-macos-logout-login-2026-10-19.md)；[重复注销、真实重启密码登录及自动恢复，未再次授权](remote-desktop-macos-login-startup-followup-2026-10-19.md) | 最终候选动态有效 FPS、完整输入与长稳；正式安装 helper 链路。重启结果来自隔离候选包，不代替安装升级。单屏不宣称多屏通过 |
 | Windows → Linux | [原生窗口、输入及网络恢复](remote-desktop-product-flow-recovery-2026-10-18.md)；[Xorg GDM 密码登录](remote-desktop-linux-system-login-2026-10-17.md)；[既有 Wayland 注销登录自动恢复](remote-desktop-login-recovery-2026-10-17.md)；[新候选锁屏密码登录、双 Desktop 接手、AI 完成、60 秒混合及关闭后原业务](remote-desktop-login-occupancy-assistance-2026-10-19.md) | 新候选注销/开机与反复会话切换；普通 Xorg 完整产品、复杂多屏和输入法；30 分钟混合及长期资源验证 |
 | macOS → Windows | [Apple 正式窗口接收 90 光标、移动输入、只查看与故障隔离](remote-desktop-macos-cursor-product-2026-10-18.md) | 新候选完整键盘/鼠标、动态 FPS、多屏、Windows 系统登录与长期负载 |
@@ -24,7 +24,7 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 首帧截图、解码吞吐和实际动态呈现 FPS 分开计数。系统密码登录、管理员恢复解锁、
 登录后的普通桌面三类结果也分开记录；不能用恢复脚本替代产品登录。
 
-下一轮执行顺序与结束条件统一见[长期任务的后续安排](../REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。Windows UAC 先解决 90 当前未启用安全桌面提示的环境条件；Apple 已有开机登录证据直接保留，后续重点是操作端缺项、性能与最终安装链路。本次仅更新文档，未重新运行平台组合。
+下一轮执行顺序与结束条件统一见[长期任务的后续安排](../REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。Windows 离线自动重连已修复并通过真实重启，UAC 临时测试设置已恢复；接下来补 Linux 当前候选会话、跨平台输入和 AI 异常清理。Apple 已有开机登录证据直接保留，后续重点是操作端缺项、性能与最终安装链路。本轮新增 Windows→Windows 实测，其余组合未重新运行。
 
 较早 Windows → Linux 测试曾被窗口遮挡中断，记录保留在
 [当轮验收](remote-desktop-window-capture-2026-10-18.md)。最新 58 轮约 29 分钟
