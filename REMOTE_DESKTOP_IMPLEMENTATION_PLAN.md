@@ -1,10 +1,10 @@
 # 远程桌面与人工协助开发方案
 
-方案起草：2026-10-16；进度核对：2026-10-19，基线 `3d83e3f`，另补本轮普通首击、active 协助、实际服务切换和 90 混合 DPI 实测。
+方案起草：2026-10-16；进度核对：2026-10-19，源码核对至 `3d0b23d`；各平台实机结果分别绑定其验收记录中的产物，不能当成同一最终发布包。
 三平台媒体、独立窗口、基本输入与 AI 协助已有实现及实机记录；Windows 负原点竖屏、
 Mac 锁屏/注销/真实重启密码登录及自动恢复、Linux 锁屏/注销/真实重启密码登录、同账号双 Desktop 接手和 AI 完成闭环
 已有通过证据。仍在完成剩余平台/输入/登录边界、性能稳定性及安装发布，尚未整体交付。
-完整关闭 12/53 条，数量不是代码完成率，逐项状态以长期任务为准。另已修复远程终端末行遮挡并移除底部提示，尚未打包发布。
+进度复核后关闭 18/53 条，另有 32 条部分完成、3 条交付待验收/执行；六条功能要求依据既有证据关闭，最终包回归保留在 LT-09。数量不是代码完成率，见[复核依据](acceptance/remote-desktop-progress-reaudit-2026-10-19.md)及长期任务。另已修复远程终端末行遮挡并移除底部提示，尚未打包发布。
 
 本轮 Windows 普通应用输入、注销、修复后真实重启自动恢复、StreamTest 普通用户登录与输入、
 UAC 安全桌面提权及用户切换通过；原服务和临时策略已恢复，未更新本机安装版。
@@ -17,7 +17,7 @@ Linux Wayland 注销及真实重启后，同一窗口自动恢复到登录画面
 
 最新补齐 Windows active 取消/请求方崩溃/Desktop 崩溃重启/过期，以及实际设置页切换服务后的旧身份/观看清理；90 的 100% 主屏/125% 虚拟屏切换与四次坐标通过。临时屏幕、缩放缓存、原服务和测试凭据已恢复/清理，见[最新验收](acceptance/remote-desktop-active-switch-mixed-dpi-2026-10-19.md)。普通窗口启动的首击/双击/拖拽通过，特殊不激活夹具仍保留，见[普通启动对照](acceptance/remote-desktop-windows-normal-show-2026-10-19.md)。用户已明确后续不再使用 XRServer。
 
-后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。客户端私有编译 TOML 与公开空配置已通过[隔离启动检查](acceptance/remote-desktop-client-defaults-2026-10-19.md)；编码反馈已补通正式 helper，90 的[实际限速、切屏延续及并行命令/PTY](acceptance/remote-desktop-helper-budget-weak-network-2026-10-19.md)通过，Linux 新原生预算循环通过；此前[本机原生短测](acceptance/remote-desktop-adaptive-bitrate-2026-10-19.md)保留。接着补完整新 session 的低带宽首帧/预算延续、RTT/路径变化、Mac/Linux 新窗口，及输入、active/通知、混合 DPI 剩余条件，再固定候选做正式安装、自建服务和稳定性验收。2/8 小时按用户安排暂缓。本文件保留架构约束与历史进展。
+后续阶段、任务依赖、验收条件和执行清单统一维护在 [长期开发任务](REMOTE_DESKTOP_LONG_TERM_TASK.md#去重后的执行清单)。客户端私有编译 TOML 与公开空配置已通过[隔离启动检查](acceptance/remote-desktop-client-defaults-2026-10-19.md)；编码反馈已补通正式 helper，90 的[实际限速、切屏延续及并行命令/PTY](acceptance/remote-desktop-helper-budget-weak-network-2026-10-19.md)通过，Linux 新原生预算循环通过；此前[本机原生短测](acceptance/remote-desktop-adaptive-bitrate-2026-10-19.md)保留。复杂软件帧 error 3 已做[定向修复](acceptance/remote-desktop-software-capacity-recovery-2026-10-19.md)。接着补完整新 session 低带宽首帧与恢复、RTT/路径变化、Mac/Linux 新窗口，以及未覆盖输入、active/通知和混合 DPI 条件，再固定候选做正式安装、自建服务和稳定性。跨新 session 保留旧预算不单独新增为需求，以首帧实测决定必要修复。2/8 小时按用户安排暂缓。本文件保留架构约束与历史进展。
 
 以 RustDesk 的采集、编解码、原生纹理显示、输入及桌面切换实现为参考，新增独立远程桌面能力。沿用 Pixels 的账号、设备密码、已认证连接、可靠传输和 Relay，不增加远控专用鉴权体系。
 
