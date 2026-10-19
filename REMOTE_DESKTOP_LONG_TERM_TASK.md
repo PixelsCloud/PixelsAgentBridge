@@ -1,6 +1,6 @@
 # 远程桌面与 AI 人工协助：长期开发任务
 
-核对日期：2026-10-19。开发分支：`feat/remote-desktop-v1`。代码与记录核对至 `655773f`，另补充本轮 Windows 实测：
+核对日期：2026-10-19。开发分支：`feat/remote-desktop-v1`。代码与记录核对至 `a690c81`，另补充本轮 Linux 注销及重启实测：
 `8e41278` 修复 Mac 登录域识别并记录重启登录，`211c44b` 修复远程终端底部遮挡。
 各平台测试产物以各自验收记录的哈希为准。本轮修复 Windows 重启离线时自动重连提前结束，真实重启复测通过；新增普通用户输入、UAC 安全桌面和用户切换实测。未更新本机安装版或发布。
 
@@ -21,7 +21,7 @@
 | Windows 普通输入与登录 | 记事本单击/双击/拖拽/滚轮、Ctrl+A、失焦与关闭释放通过；注销、修复后真实重启约 68 秒自动恢复、StreamTest 普通用户登录/输入、UAC 提权与切回管理员通过；均恢复只查看 | [输入与登录实测](acceptance/remote-desktop-windows-input-login-2026-10-19.md) |
 | Windows 多屏与故障恢复 | 90 负原点竖屏，两种窗口尺寸八次点击、光标像素、Ctrl 切屏释放、采集代理故障后恢复 | [统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md) |
 | Mac 被控端登录 | 锁屏、注销和真实重启后的密码登录通过；持久候选包重启后 helper 自动启动、桌面自动恢复，未再次提示权限；新会话硬解、只查看 | [Mac 锁屏](acceptance/remote-desktop-macos-lock-login-2026-10-19.md)、[重复注销与启动跟进](acceptance/remote-desktop-macos-login-startup-followup-2026-10-19.md) |
-| Linux 被控端登录 | 新候选 Wayland 锁屏密码解锁；较早候选的 GDM 注销登录自动恢复也有通过记录，两者分别记录 | [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[Linux 注销恢复](acceptance/remote-desktop-login-recovery-2026-10-17.md) |
+| Linux 被控端登录 | Wayland 锁屏、注销和真实重启后的密码登录通过；本轮自动恢复到 GDM 及新用户桌面，无手动重试，默认只查看；原服务已恢复 | [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[注销与开机实测](acceptance/remote-desktop-linux-session-boot-2026-10-19.md) |
 | 占用与 AI 协助 | 同账号两个真实 Desktop：第二端 Busy，第一端关闭后接手；waiting→active→用户完成→MCP 收到完成 | [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md) |
 | 原有业务 | 视频并行及关闭后的原 PTY、命令、4 MiB 文件传输通过；60 秒实际显示约 14.69/14.85 FPS | [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md) |
 | 远程终端界面 | 移除底部提示，修正行数测量导致的末行截断；三种尺寸无截断，16 项现有 UI 测试和 TypeScript 检查通过；未更新安装版 | [终端底部修复](acceptance/desktop-terminal-bottom-layout-2026-10-19.md) |
@@ -57,7 +57,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 | 顺序 | 具体行动 | 完成条件 / 对应条目 |
 | --- | --- | --- |
 | 1. Windows 输入与登录 | 已补普通应用输入、注销、开机未登录、普通非管理员、用户切换及 UAC；剩余未初始化活动窗口的首击消息边界、混合 DPI、反复切换与最终安装链路。混合 DPI 优先用 90，条件不足时使用已有授权的 XRServer 四屏 | 当前桌面收到正确且不重复的操作；切换后无卡键、旧输入或长期黑屏；每个实际场景独立记录。03.3～03.5、04.2～04.5、05.1/05.3/05.4 |
-| 2. Linux 剩余会话与跨平台输入 | 当前候选在虚拟机补 Wayland 注销/开机恢复、普通 Xorg 与 X11 操作端；Apple 补操作端键位、目标登录和窗口生命周期。沿用已通过的 Apple 被控端登录记录 | X11/Wayland 分列；七个必验方向的缺项逐项填入平台矩阵；真实屏幕、光标、键鼠和恢复均有证据。03.2～03.6、LT-04、07.1～07.6 |
+| 2. Linux 剩余会话与跨平台输入 | Wayland 注销/开机恢复已补齐；接着验证普通 Xorg 与 X11 操作端、反复会话切换；Apple 补操作端键位、目标登录和窗口生命周期。沿用已通过的 Apple 被控端登录记录 | X11/Wayland 分列；七个必验方向的缺项逐项填入平台矩阵；真实屏幕、光标、键鼠和恢复均有证据。03.2～03.6、LT-04、07.1～07.6 |
 | 3. AI 协助与连接清理 | Mac/Linux 隐藏或最小化窗口的通知投递；active 时 Desktop/请求方退出、离线、删除设备、切换账号及控制服务 | 无假完成、旧请求误完成、遗留占用或输入；其他设备连接及现有工具仍可用。01.6、02.6、08.3～08.6 |
 | 4. 性能、弱网与配置收尾 | 完成必要降档及坐标配置更新；核对三平台实际显示 FPS、软硬后备、限速/RTT/路径变化、内存与队列；同步核对默认地址与 TOML 覆盖 | 约定动态基准实际显示 >12 FPS；带宽不足明确降档，恢复显示新画面且不干扰 PTY/命令/传输；客户配置优先、设置页不显示内置地址。06.1～06.6、09.4 |
 | 5. 集成并固定候选包 | 仅吸收主线已提交工作，保留其他会话未提交修改；按每机 ≤10 作业构建三平台，包含 `8e41278` 与 `211c44b`；核对 helper、后备依赖、签名和既有压缩方案 | 每个包有版本、Git 提交、平台/架构和 SHA-256；安装位置持久、权限正确；后续验收绑定明确候选。09.1/09.2 |
@@ -69,7 +69,7 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 ### 下一次开始时的第一批动作
 
 1. 检查 worktree 和 90 当前会话/服务，确认测试产物哈希及回滚路径。保留 `experiments/remote-desktop/windows_control_fixture.cpp` 的既有未提交修改，不能将其当成本轮已完成修复。
-2. 已完成 90 普通应用输入、注销、修复后的重启自动恢复、普通用户、UAC 和用户切换。后续补 Linux 当前候选注销/启动、跨平台输入与 AI 异常清理；Windows 仍保留首次激活诊断边界及混合 DPI，不反复跑已经通过的 Mac 登录。
+2. 已完成 90 普通应用输入、注销、修复后的重启自动恢复、普通用户、UAC 和用户切换，以及 Linux Wayland 注销/真实重启登录。后续补普通 Xorg、X11 操作端、跨平台输入与 AI 异常清理；Windows 仍保留首次激活诊断边界及混合 DPI，不反复跑已经通过的 Mac 登录。Linux 原服务已恢复，临时启动项及候选目录已清理，保持已登录 Wayland 桌面。
 3. Mac 最终包安装验收沿用持久包位置和固定签名，记录新安装与升级是否出现权限提示；不把测试包曾获授权扩展成所有安装场景无需授权。
 
 ### 当前环境条件与暂缓安排
@@ -368,7 +368,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 - [ ] **07.4 Linux Wayland**：普通用户桌面与 greeter/登录界面分别处理，评估现有
   PipeWire/portal 和固定 RustDesk DRM/KMS 路径；验证 uinput、设备权限、helper
   身份和会话切换。普通桌面分享成功不能计为登录界面可用。
-  核对状态（2026-10-19）：**部分完成**。Wayland 普通桌面、既有 GDM 注销登录自动恢复及新候选锁屏密码登录通过；新候选注销/开机与重复会话切换仍待验证。见 [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[Linux 注销恢复](acceptance/remote-desktop-login-recovery-2026-10-17.md)。
+  核对状态（2026-10-19）：**部分完成**。Wayland 普通桌面、锁屏密码登录、注销和真实重启后的 GDM 密码登录及自动恢复通过；本轮使用修复后的 Windows 操作端和已核对哈希的 Linux 媒体候选。反复会话切换与最终安装链路仍待验证。见 [登录、占用与原业务回归](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[Linux 注销与开机实测](acceptance/remote-desktop-linux-session-boot-2026-10-19.md)。
 
 - [ ] **07.5 Linux 操作端**：原生显示和输入映射；X11/Wayland 窗口系统分别测试。
   核对状态（2026-10-19）：**部分完成**。Linux Wayland 操作端已有 Windows/Mac 正式窗口、光标和部分输入结果；X11 操作端、完整输入及新候选性能仍待验证。GTK 已销毁按钮兼容修复有独立通过证据。

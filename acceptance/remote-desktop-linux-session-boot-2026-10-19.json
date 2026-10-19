@@ -1,0 +1,444 @@
+{
+  "date": "2026-10-19",
+  "source_baseline": "a690c81",
+  "scope": "Windows operator to Ubuntu 22.04 Wayland target; logout and boot login",
+  "artifacts": {
+    "windows_desktop_sha256": "4725a9effa7449310ab0b69cdbf06838d6e1246e28870140168e3b90cfea836d",
+    "linux_desktop_sha256": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+    "linux_executor_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+    "linux_target_reused_existing_artifacts": true,
+    "all_platforms_rebuilt_at_source_baseline": false
+  },
+  "recovery_measurement": "approximately 1-second observations, first reconnecting to new session frame_ready",
+  "recovery": {
+    "logout": {
+      "first_reconnecting_elapsed_seconds": 11.01,
+      "new_frame_ready_elapsed_seconds": 27.38,
+      "sampled_recovery_seconds": 16.37,
+      "manual_retry": false,
+      "final_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "92d49bee-8278-4c4d-a0b5-91d890dbf2f0",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1485,
+              "desktop_height": 868,
+              "pixel_width": 1485,
+              "pixel_height": 868,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1485,
+              "desktop_height": 868,
+              "pixel_width": 1485,
+              "pixel_height": 868,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    "logout-login": {
+      "first_reconnecting_elapsed_seconds": 13.19,
+      "new_frame_ready_elapsed_seconds": 20.83,
+      "sampled_recovery_seconds": 7.64,
+      "manual_retry": false,
+      "final_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "8ef700aa-8ed3-4c1a-a0ee-9470f38ee7ca",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1485,
+              "desktop_height": 868,
+              "pixel_width": 1485,
+              "pixel_height": 868,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1485,
+              "desktop_height": 868,
+              "pixel_width": 1485,
+              "pixel_height": 868,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    "reboot": {
+      "first_reconnecting_elapsed_seconds": 18.03,
+      "new_frame_ready_elapsed_seconds": 52.14,
+      "sampled_recovery_seconds": 34.11,
+      "manual_retry": false,
+      "final_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "3aeda4d5-6e8e-41aa-8ca0-61c8a0898713",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1280,
+              "desktop_height": 800,
+              "pixel_width": 1280,
+              "pixel_height": 800,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1280,
+              "desktop_height": 800,
+              "pixel_width": 1280,
+              "pixel_height": 800,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    "boot-login": {
+      "first_reconnecting_elapsed_seconds": 17.69,
+      "new_frame_ready_elapsed_seconds": 26.51,
+      "sampled_recovery_seconds": 8.82,
+      "manual_retry": false,
+      "final_status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "72663e9a-67ab-4341-8a29-69b911660da0",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1280,
+              "desktop_height": 800,
+              "pixel_width": 1280,
+              "pixel_height": 800,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1280,
+              "desktop_height": 800,
+              "pixel_width": 1280,
+              "pixel_height": 800,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    }
+  },
+  "system_probes": [
+    {
+      "session": "2",
+      "session_state": "User=1000\nName=hy\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "boot_id": "244a2e68-c110-43d9-86b1-27f496a7cd07",
+      "service": {
+        "MainPID": "109815",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor --config /etc/pixels-agent-bridge/config.toml ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109815 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": "/etc/systemd/system/pixels-agent-bridge-executor.service.d/90-pab-rd-acceptance.conf"
+      },
+      "executable": "/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor",
+      "media": {
+        "MainPID": "109823",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop --media-supervisor ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109823 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-media.service",
+        "DropInPaths": ""
+      },
+      "boot_guard": {
+        "MainPID": "0",
+        "ExecStart": "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /var/lib/pab-rd-acceptance-a37ad7134764/state/manage.py boot-watch ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-boot-restore.service",
+        "DropInPaths": ""
+      },
+      "restored": false
+    },
+    {
+      "session": "c2",
+      "session_state": "User=128\nName=gdm\nType=wayland\nClass=greeter\nActive=yes\nLockedHint=no",
+      "boot_id": "244a2e68-c110-43d9-86b1-27f496a7cd07",
+      "service": {
+        "MainPID": "109815",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor --config /etc/pixels-agent-bridge/config.toml ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109815 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": "/etc/systemd/system/pixels-agent-bridge-executor.service.d/90-pab-rd-acceptance.conf"
+      },
+      "executable": "/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor",
+      "media": {
+        "MainPID": "109823",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop --media-supervisor ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109823 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-media.service",
+        "DropInPaths": ""
+      },
+      "boot_guard": {
+        "MainPID": "0",
+        "ExecStart": "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /var/lib/pab-rd-acceptance-a37ad7134764/state/manage.py boot-watch ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-boot-restore.service",
+        "DropInPaths": ""
+      },
+      "restored": false
+    },
+    {
+      "session": "277",
+      "session_state": "User=1000\nName=hy\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "boot_id": "244a2e68-c110-43d9-86b1-27f496a7cd07",
+      "service": {
+        "MainPID": "109815",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor --config /etc/pixels-agent-bridge/config.toml ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109815 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": "/etc/systemd/system/pixels-agent-bridge-executor.service.d/90-pab-rd-acceptance.conf"
+      },
+      "executable": "/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor",
+      "media": {
+        "MainPID": "109823",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop --media-supervisor ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:54:42 CST] ; stop_time=[n/a] ; pid=109823 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-media.service",
+        "DropInPaths": ""
+      },
+      "boot_guard": {
+        "MainPID": "0",
+        "ExecStart": "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /var/lib/pab-rd-acceptance-a37ad7134764/state/manage.py boot-watch ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-boot-restore.service",
+        "DropInPaths": ""
+      },
+      "restored": false
+    },
+    {
+      "session": "c1",
+      "session_state": "User=128\nName=gdm\nType=wayland\nClass=greeter\nActive=yes\nLockedHint=no",
+      "boot_id": "8f016b38-eb74-4995-b3d1-45d95caf1dcc",
+      "service": {
+        "MainPID": "965",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor --config /etc/pixels-agent-bridge/config.toml ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:38 CST] ; stop_time=[n/a] ; pid=965 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": "/etc/systemd/system/pixels-agent-bridge-executor.service.d/90-pab-rd-acceptance.conf"
+      },
+      "executable": "/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor",
+      "media": {
+        "MainPID": "906",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop --media-supervisor ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:37 CST] ; stop_time=[n/a] ; pid=906 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-media.service",
+        "DropInPaths": ""
+      },
+      "boot_guard": {
+        "MainPID": "903",
+        "ExecStart": "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /var/lib/pab-rd-acceptance-a37ad7134764/state/manage.py boot-watch ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:37 CST] ; stop_time=[n/a] ; pid=903 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-boot-restore.service",
+        "DropInPaths": ""
+      },
+      "restored": false
+    },
+    {
+      "session": "6",
+      "session_state": "User=1000\nName=hy\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "boot_id": "8f016b38-eb74-4995-b3d1-45d95caf1dcc",
+      "service": {
+        "MainPID": "965",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor --config /etc/pixels-agent-bridge/config.toml ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:38 CST] ; stop_time=[n/a] ; pid=965 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": "/etc/systemd/system/pixels-agent-bridge-executor.service.d/90-pab-rd-acceptance.conf"
+      },
+      "executable": "/var/lib/pab-rd-acceptance-a37ad7134764/pab-executor",
+      "media": {
+        "MainPID": "906",
+        "ExecStart": "{ path=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop ; argv[]=/var/lib/pab-rd-acceptance-a37ad7134764/pab-desktop --media-supervisor ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:37 CST] ; stop_time=[n/a] ; pid=906 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-media.service",
+        "DropInPaths": ""
+      },
+      "boot_guard": {
+        "MainPID": "903",
+        "ExecStart": "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /var/lib/pab-rd-acceptance-a37ad7134764/state/manage.py boot-watch ; ignore_errors=no ; start_time=[Mon 2026-10-19 11:58:37 CST] ; stop_time=[n/a] ; pid=903 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/etc/systemd/system/pab-rd-session-a37ad7134764-boot-restore.service",
+        "DropInPaths": ""
+      },
+      "restored": false
+    }
+  ],
+  "password_submissions": {
+    "logout-login": 1,
+    "boot-login": 1
+  },
+  "cleanup": {
+    "original": {
+      "properties": {
+        "MainPID": "103404",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 09:38:32 CST] ; stop_time=[n/a] ; pid=103404 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      },
+      "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+      "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+      "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+      "boot_id": "244a2e68-c110-43d9-86b1-27f496a7cd07",
+      "gdm_sha256": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af"
+    },
+    "restored": {
+      "original_service_restored": true,
+      "properties": {
+        "MainPID": "2696",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 12:02:30 CST] ; stop_time=[n/a] ; pid=2696 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      }
+    },
+    "session": "6",
+    "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+    "owned_processes": [],
+    "input_devices": [],
+    "stage_removed": true,
+    "manager_cleanup": {
+      "temporary_service_state_removed": true,
+      "original_service_running": true
+    }
+  },
+  "local_owned_desktop_stopped": true,
+  "installed_local_app_updated": false,
+  "configured_fps": 15,
+  "dynamic_fps_remeasured": false,
+  "formal_installer_acceptance": false,
+  "long_tests_run": false,
+  "remaining": [
+    "normal Xorg product",
+    "X11 operator",
+    "complete keyboard and IME",
+    "repeated sessions",
+    "final installer",
+    "sustained runtime"
+  ]
+}
