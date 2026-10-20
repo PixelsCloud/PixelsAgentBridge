@@ -1,7 +1,8 @@
 //! One remote-view generation owns its input state. It never borrows the
 //! browser/legacy input engine. Native state and its destructor stay on AppKit.
-use super::{input::map_virtual_key, recovery::RecoveryInput};
+use super::recovery::RecoveryInput;
 use crate::macos_display::DisplayGeometry;
+use crate::macos_media_keycodes::native_key;
 use enigo::{Axis, Button, Coordinate, Direction};
 use pab_protocol::{DesktopMouseButton, DesktopRotation, DesktopScreen, RemoteDesktopInput};
 use std::{
@@ -170,10 +171,8 @@ impl MacMediaInput {
                         } else if !down {
                             return Ok(());
                         } else {
-                            let key = map_virtual_key(virtual_key)
-                                .ok_or("unsupported media virtual key")?;
                             let code =
-                                u16::try_from(key).map_err(|_| "unsupported media native key")?;
+                                native_key(virtual_key).ok_or("unsupported media virtual key")?;
                             state.keys.insert(virtual_key, code);
                             code
                         };

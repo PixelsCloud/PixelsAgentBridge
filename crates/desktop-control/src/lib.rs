@@ -5,6 +5,8 @@ pub mod apps;
 mod batch;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;
+#[cfg(any(target_os = "macos", test))]
+mod macos_media_keycodes;
 mod monitor_input;
 mod ui_controller;
 pub mod ui_engine;
