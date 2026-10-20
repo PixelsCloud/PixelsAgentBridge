@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
+#include <shellscalingapi.h>
 #include <wrl/client.h>
 #include <chrono>
 #include <cstdint>
@@ -48,7 +49,15 @@ struct Display {
     ComPtr<IDXGIOutput1> output;
     DXGI_ADAPTER_DESC1 gpu{};
     DXGI_OUTPUT_DESC screen{};
+    UINT dpi_x = 96, dpi_y = 96;
 };
+
+inline bool same_display_layout(const Display& selected, const Display& current) {
+    return EqualRect(&selected.screen.DesktopCoordinates, &current.screen.DesktopCoordinates) &&
+        selected.screen.Rotation == current.screen.Rotation &&
+        selected.screen.Monitor == current.screen.Monitor &&
+        selected.dpi_x == current.dpi_x && selected.dpi_y == current.dpi_y;
+}
 
 inline std::vector<Display> displays() {
     ComPtr<IDXGIFactory1> factory;
@@ -69,7 +78,10 @@ inline std::vector<Display> displays() {
             check(output.As(&d.output), "IDXGIOutput1");
             check(adapter->GetDesc1(&d.gpu), "Adapter.GetDesc1");
             check(output->GetDesc(&d.screen), "Output.GetDesc");
-            if (d.screen.AttachedToDesktop) found.push_back(std::move(d));
+            if (d.screen.AttachedToDesktop) {
+                check(GetDpiForMonitor(d.screen.Monitor, MDT_EFFECTIVE_DPI, &d.dpi_x, &d.dpi_y), "Monitor DPI");
+                found.push_back(std::move(d));
+            }
         }
     }
     return found;

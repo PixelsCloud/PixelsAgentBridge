@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
     unsigned duration = 0;
     const bool portrait = argc == 5 && std::string(argv[3]) == "--layout"
         && std::string(argv[4]) == "left-portrait";
-    if ((argc == 3 || portrait) && std::string(argv[1]) == "--lease-seconds") {
+    const char* stop_file = argc == 5 && std::string(argv[3]) == "--stop-file" ? argv[4] : nullptr;
+    if ((argc == 3 || portrait || stop_file) && std::string(argv[1]) == "--lease-seconds") {
         const std::string value(argv[2]);
         if (value.empty() || value.size() > 3 || value.find_first_not_of("0123456789") != std::string::npos) return 2;
         duration = std::stoul(value);
@@ -152,6 +153,7 @@ int main(int argc, char** argv) {
     const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(duration);
     auto next_snapshot = std::chrono::steady_clock::now();
     while (!result && std::chrono::steady_clock::now() < end) {
+        if (stop_file && GetFileAttributesA(stop_file) != INVALID_FILE_ATTRIBUTES) break;
         if (std::chrono::steady_clock::now() >= next_snapshot) {
             snapshot("leased");
             next_snapshot += std::chrono::seconds(2);

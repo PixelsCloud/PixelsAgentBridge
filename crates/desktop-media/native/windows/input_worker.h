@@ -208,8 +208,7 @@ static void input_worker(const Display& selected) {
             if (active != initial_desktop) throw std::runtime_error("Input desktop changed; renew capture generation");
             bool same = false;
             for (const auto& current : displays()) if (screen_id(current) == screen_id(selected)) {
-                const auto now = current.screen.DesktopCoordinates;
-                same = EqualRect(&rect, &now) && current.screen.Rotation == selected.screen.Rotation;
+                same = same_display_layout(selected, current);
             }
             if (!same) throw std::runtime_error("Input screen changed; renew capture generation");
             INPUT inputs[2]{}; unsigned count = 0;

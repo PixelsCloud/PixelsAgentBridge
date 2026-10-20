@@ -10,6 +10,7 @@
 53 条要求中 **20 条已关闭、30 条部分完成、3 条交付待验收/执行**。
 此前进度复核依既有证据关闭 01.3、03.3、05.1、05.3、07.1、07.4；该复核没有新增实测。
 随后补新 helper 实测并修复 Mac 在线显示器判断；本轮又完成窗口恢复/复用及 Mac/Linux 协助边界，关闭 03.1、03.6，见[最新验收](acceptance/remote-desktop-window-input-assistance-2026-10-20.md)。最新[本批输入、中文与释放验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)补 55 项主验收并修正 Mac 媒体实体键映射，不外推整个输入矩阵关闭。最终安装包仍未验收。
+本批又修复 [Linux X11 系统隐藏光标](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)和 [Windows 观看中 DPI 变化未退代](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)，补齐 90 动态分辨率、100%/125% 交接、按住 Ctrl 释放及缩窗光标像素检查。已通过条件退出当前待办；不因此将全平台条款或交付整组打勾。
 已有功能的验收与 09.x 的最终包回归分开，避免重复挂账。
 其余 33 条不是 33 个未开发功能，也不能据此计算代码完成率。
 逐项依据、真正的问题与剩余批次见[进度复核](acceptance/remote-desktop-progress-reaudit-2026-10-19.md)。
@@ -22,6 +23,7 @@
 
 | 范围 | 已验证的结果 | 证据 |
 | --- | --- | --- |
+| 动态 DPI、分辨率和系统隐藏光标 | Linux 单 X screen 系统 hide/show 与客户端退出恢复已修复；90 动态 DPI 漏检已修复，分辨率与缩放变化时暂停输入、释放 Ctrl、新 session 只查看；缩窗光标位移 94/预期 94.4 像素，无残影 | [Linux 隐藏修复](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)、[Windows 动态布局](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)；本批通过条件不再重测 |
 | 常用键、中文输入、异常释放和 Apple 首击 | 三种操作端→90 共 39 项常用键；90/Apple/Linux 中文组词及取消；停止操作和输入 helper 退出释放、新会话只查看；Apple 恢复首击落点 `(100,100)`。修正 Mac 媒体实体键映射，原失败保留 | [本批输入、中文与释放验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；已测条件直接复用，私有副本保留限制单列 |
 | 三平台窗口恢复与 Mac/Linux 协助 | 修复 Linux 菜单不能唤回最小化窗口、隐藏显示被误判解码超时；三平台菜单复用、全屏恢复和拖出释放有结果，Linux 最新包恢复后完整输入；Mac/Linux 隐藏/最小化通知、active 取消、请求方退出、Desktop 重启及过期通过 | [窗口、输入与协助](acceptance/remote-desktop-window-input-assistance-2026-10-20.md)；旧 Apple 首击观察仍保留为诊断，私有文件清理限制如实列明 |
 | Windows 普通输入与登录 | 记事本单击/双击/拖拽/滚轮、Ctrl+A、失焦与关闭释放通过；注销、修复后真实重启约 68 秒自动恢复、StreamTest 普通用户登录/输入、UAC 提权与切回管理员通过；均恢复只查看 | [输入与登录实测](acceptance/remote-desktop-windows-input-login-2026-10-19.md) |
@@ -102,12 +104,12 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 90、Apple、Linux 原服务与安装文件恢复/核对完成，自有 Desktop、MCP 和输入夹具已退出；Windows/Mac 临时凭据槽撤销，原账号未变，输入法选择恢复。部分私有副本继续保留，此前被拒绝或受权限限制的删除未重试；未更新本机安装版、push 或发布。
 
-**下一批先做动态布局和光标，再做 AI 产品联动：**
+**本批动态显示的指定缺口已处理，下一批先做 AI 产品联动：**
 
 | 顺序 | 只补的缺口 | 结束标准 |
 | --- | --- | --- |
-| 动态显示（03.4/03.5） | 90 布局、分辨率/缩放变化时的代次交接与光标位置/热点；Linux 单 X screen 的 XFixes 隐藏已修复并经实机 worker 验证，独立 X screen 归属/其他隐藏来源保留。既有负原点/竖屏及基本混合 DPI 不重复 | 新配置和首帧前暂停输入，旧代次不能落到新屏幕，布局稳定后定位与光标匹配；恢复原显示配置 |
 | AI 产品联动（08.3～08.6、02.6） | 离线/删除设备、实际另一账号、新服务成功连接后的观看/协助。使用自有隔离测试条目保留用户现有设备；启动后两项前先确认实际账号/服务环境 | 状态、通知、观看与旧绑定清理一致；另一账号/新服务成功使用独立留证，不以回环切换代替。环境缺失时记录条件并继续其他项 |
+| 动态显示剩余边界（03.4/03.5） | 仅保留尚无同类实机证据的 Mac/Linux 动态布局前后旧输入边界，以及 Linux 独立 X screen 隐藏归属/其他隐藏来源。Windows 本批 DPI/分辨率/缩窗光标、Linux 单 root HideCursor 和既有负原点/竖屏/基本混合 DPI 均不重开 | 不把 Windows 或单 root 结论外推为全平台通过；沿原条款补缺，不追加无界组合矩阵 |
 
 执行前先核对既有结果及源码；按用户最新更正，每台机器编译最多 10 核/10 个作业，同机其他会话与嵌套构建合计不得超过 10。不替换本机安装版，不读取无关编辑器正文；目标使用 90 的自有测试窗口，XRServer 不再使用。实际失败才修改相应代码，通过后停止重复同条件测试。以上仍归原第 1/3 组，其后继续：
 
@@ -305,10 +307,10 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **03.4** 屏幕切换、热插拔、分辨率或缩放改变时更新 generation；新配置和
   新首帧确认之前暂停输入，旧帧/旧输入不能落到新屏幕。
-  核对状态（2026-10-19）：**部分完成**。切屏代次、Ctrl 释放、90 双屏移除恢复已有证据；缩放/分辨率/热插拔全组合及旧输入边界仍需补齐。
+  核对状态（2026-10-20）：**部分完成**。既有切屏代次、Ctrl 释放、90 双屏移除恢复保留；[本批](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)修复 Windows DPI 漏检，补动态 100%/125%、1280×720/1920×1080 交接、新首帧前暂停输入、按住 Ctrl 释放、恢复只查看及实际点击。自动恢复使用新的 session/generation 二元标识；共享旧输入/旧帧隔离沿用既有协议结果。Mac/Linux 尚缺的同类动态布局实机边界保留，不重跑 Windows 本批及原有通过条件。
 
 - [ ] **03.5** 单独同步光标形状、热点、位置和可见性，明确采集是否包含光标。
-  核对状态（2026-10-20）：**部分完成**。三平台独立光标及多个正式窗口像素/恢复检查通过；本批修复普通单 X screen 的 XFixes 系统隐藏，实机 worker 验证启动前隐藏、嵌套/多客户端隐藏和退出恢复，形状不重传。独立 X screen 的隐藏归属、其他隐藏来源及剩余动态窗口边界未关闭。见 [本批隐藏修复](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)、[Mac 输入、光标与协助](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md)。
+  核对状态（2026-10-20）：**部分完成**。三平台独立光标及多个正式窗口像素/恢复检查通过；本批修复普通单 X screen 的 XFixes 系统隐藏，实机 worker 验证启动前隐藏、嵌套/多客户端隐藏和退出恢复，形状不重传；90 动态 125% 后缩窗像素检查新增位移 94/预期 94.4 像素、无残影。独立 X screen 的隐藏归属和其他隐藏来源等原边界未关闭，不重测本批已过条件。见 [本批隐藏修复](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)、[动态 DPI/光标](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)、[Mac 输入、光标与协助](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md)。
 
 - [x] **03.6** 最小化/恢复、静态桌面、窗口失焦、关闭和重新打开有确定行为。
   静态画面保留，停止产生新帧不能被当作网络掉线；最小化可停采但保持当前占用。

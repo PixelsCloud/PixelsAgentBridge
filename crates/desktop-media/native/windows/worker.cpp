@@ -69,8 +69,6 @@ static void inventory(const std::vector<Display>& found) {
         const char* rotation = d.screen.Rotation == DXGI_MODE_ROTATION_ROTATE90 ? "clockwise90" :
             d.screen.Rotation == DXGI_MODE_ROTATION_ROTATE180 ? "clockwise180" :
             d.screen.Rotation == DXGI_MODE_ROTATION_ROTATE270 ? "clockwise270" : "identity";
-        UINT dpi_x = 96, dpi_y = 96;
-        check(GetDpiForMonitor(d.screen.Monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y), "Monitor DPI");
         MONITORINFO monitor{}; monitor.cbSize = sizeof(monitor);
         if (!GetMonitorInfoW(d.screen.Monitor, &monitor)) throw std::runtime_error("Monitor info failed");
         std::cout << "{\"id\":" << quoted(wide.c_str()) << ",\"name\":" << quoted(d.screen.DeviceName)
@@ -78,7 +76,7 @@ static void inventory(const std::vector<Display>& found) {
             << ",\"desktop_width\":" << r.right-r.left << ",\"desktop_height\":" << r.bottom-r.top
             << ",\"pixel_width\":" << (rotated ? r.bottom-r.top : r.right-r.left)
             << ",\"pixel_height\":" << (rotated ? r.right-r.left : r.bottom-r.top)
-            << ",\"scale_milli\":" << dpi_x * 1000 / 96 << ",\"rotation\":\"" << rotation
+            << ",\"scale_milli\":" << d.dpi_x * 1000 / 96 << ",\"rotation\":\"" << rotation
             << "\",\"primary\":" << ((monitor.dwFlags & MONITORINFOF_PRIMARY) ? "true" : "false") << '}';
     }
     std::cout << "]\n";
@@ -97,6 +95,13 @@ static bool idr(const std::vector<uint8_t>& bytes) {
     }
     return false;
 }
+static void validate_display_layout(const Display& selected) {
+    for (const auto& current : displays()) if (screen_id(current) == screen_id(selected)) {
+        if (same_display_layout(selected, current)) return;
+        break;
+    }
+    throw std::runtime_error("Screen changed; refresh generation");
+}
 static void validate_wgc_desktop(const Display& selected) {
     // WGC is only a fallback on the same ordinary desktop. A lock, session
     // switch or monitor change must still go through generation recovery.
@@ -107,13 +112,7 @@ static void validate_wgc_desktop(const Display& selected) {
     CloseDesktop(desktop);
     if (active != L"Default" || desktop_name(GetThreadDesktop(GetCurrentThreadId())) != active)
         throw std::runtime_error("Capture desktop changed; renew generation");
-    for (const auto& current : displays()) if (screen_id(current) == screen_id(selected)) {
-        if (EqualRect(&selected.screen.DesktopCoordinates, &current.screen.DesktopCoordinates)
-            && current.screen.Rotation == selected.screen.Rotation
-            && current.screen.Monitor == selected.screen.Monitor) return;
-        break;
-    }
-    throw std::runtime_error("Screen changed; refresh generation");
+    validate_display_layout(selected);
 }
 static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder,
     const std::string& capture_token = {}) {
@@ -179,7 +178,16 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         }
         std::cerr << "media capture=wgc_gpu readback_per_frame=0\n";
     };
+    auto next_layout = Clock::now();
     const auto coordinate = [&] {
+        // DPI can change without invalidating a DXGI duplication. Check even
+        // on a static desktop or while waiting for video credit. This guard
+        // only checks layout; WGC's Default-desktop restriction must not be
+        // applied to DXGI capture of the secure login desktop.
+        if (!synthetic && Clock::now() >= next_layout) {
+            validate_display_layout(display);
+            next_layout = Clock::now() + std::chrono::milliseconds(100);
+        }
         if (coordination && coordination->requested()) switch_wgc();
     };
     std::cerr << "media encoder=" << (encoder.software() ? "openh264_software readback_per_frame=1" : "nvenc_gpu readback_per_frame=0") << '\n';
@@ -243,6 +251,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                 sampled = Clock::now();
             }
             encoder.encode(texture.Get(), index, packet);
+            // Keep backend switching outside the outstanding DXGI frame lease.
+            // Here only reject a layout transition before publishing the frame.
+            if (!synthetic) validate_display_layout(display);
         }
         if (!synthetic) texture.Reset();
         if (packet.empty() || packet.size() > max_packet) throw std::runtime_error("Encoded frame outside bounds");

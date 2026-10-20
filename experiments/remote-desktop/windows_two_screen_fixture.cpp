@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     if ((argc != 3 && !quadrants) || std::string(argv[1]) != "--two-screens") return 2;
     const std::string value(argv[2]);
     if (value.empty() || value.size()>3 || value.find_first_not_of("0123456789")!=std::string::npos) return 2;
-    const unsigned seconds=std::stoul(value); if (seconds<5 || seconds>180) return 2;
+    const unsigned seconds=std::stoul(value); if (seconds<5 || seconds>540) return 2;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     std::vector<Screen> screens;
     EnumDisplayMonitors(nullptr,nullptr,+[](HMONITOR monitor,HDC,LPRECT,LPARAM data)->BOOL {
