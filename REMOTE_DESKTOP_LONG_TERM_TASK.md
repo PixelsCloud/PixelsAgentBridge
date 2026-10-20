@@ -18,6 +18,7 @@
 随后[复核积压恢复](acceptance/remote-desktop-backlog-evidence-reaudit-2026-10-20.md)，确认真实窗口恢复和共享连接/新关键帧早已通过，四个关键源码哈希未变，复用结果关闭 06.2；150 ms 定向延迟整形也已有证据，不重复测试。
 最新完成 [本批路径迁移与同连接业务](acceptance/remote-desktop-path-migration-latency-2026-10-20.md)：Direct→Relay→Direct 自动迁移、实际点击反馈、同一 Desktop 的原 PTY/命令/4 MiB 双向传输通过，关闭 06.5。原失败和故障夹具清理修正保留。
 随后补 [Mac / Linux X11→90 锁屏登录](acceptance/remote-desktop-operator-windows-login-recovery-2026-10-20.md)，修复生命周期错误通过协议回复后误变为永久 InvalidRequest 的问题；两个正式窗口均完成密码解锁、原窗恢复只查看及重新启停操作。保留夹具失败、环境到时中断与计时测试隔离结果，不外推其他目标或 Wayland 操作端通过。
+本批再完成 [本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)：Mac→Linux 注销至 GDM 后单次密码登录、Linux 原生 Wayland→Mac 锁屏登录、Wayland→90 的 SAS/密码登录均通过；三个指定缺项退出待办。原 Mac/X11→90 及既有被控端登录证据复用，无新增产品修改。
 其余 25 条不是 25 个未开发功能，也不能据此计算代码完成率。
 逐项依据、真正的问题与剩余批次见[进度复核](acceptance/remote-desktop-progress-reaudit-2026-10-19.md)。
 
@@ -114,16 +115,19 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 90、Apple、Linux 原服务与安装文件恢复/核对完成，自有 Desktop、MCP 和输入夹具已退出；Windows/Mac 临时凭据槽撤销，原账号未变，输入法选择恢复。部分私有副本继续保留，此前被拒绝或受权限限制的删除未重试；未更新本机安装版、push 或发布。
 
-**AI 四项、03.4、06.1、06.2、06.5 已处理；本批路径、反馈与同连接业务退出待办，见[本批路径迁移与同连接业务](acceptance/remote-desktop-path-migration-latency-2026-10-20.md)。接着补操作端目标登录：**
+**AI 四项、03.4、06.1、06.2、06.5 以及本批指定的操作端登录组合已处理。登录结果见 [本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)；下面进入统一候选与交付核对：**
 
 | 顺序 | 只补的缺口 | 结束标准 |
 | --- | --- | --- |
-| 操作端目标登录（07.2/07.5/07.6） | Mac / Linux X11→90 本批已通过。接着只补 Mac→Linux、Linux→Mac 以及 Wayland 操作端→Windows 的登录缺项 | 登录后显示恢复、默认只查看；本批两个方向、Windows 操作端及三平台被控端已有登录不重做，不另加系统预启动解锁要求 |
+| 指定操作端登录组合（07.2/07.5/07.6） | 已完成：Mac/X11→90 复用；本批 Mac→Linux GDM、Wayland→Mac 锁屏、Wayland→90 SAS/密码登录通过 | 此项退出待办。退代后原窗口恢复只查看；Mac 锁屏本例未退代，明确停止操作。不新增逐方向注销/开机排列或系统预启动解锁要求 |
+| 统一候选核对（09.1/09.2/09.6） | 核对主线新增提交、冲突、版本、平台依赖、许可、签名/压缩和最终产物哈希；使用隔离目录 | 形成可复查的候选清单，不替换本机安装版；未改变的通过结果直接复用 |
 | 光标能力缺口（03.5） | 独立 X screen 隐藏归属和其他隐藏来源继续按已登记限制处理；原 XRes 全局计数不能归属独立 root 的诊断不再重复 | 不以旧诊断反复替代实现；单 root HideCursor 和已通过的三平台独立光标保持有效 |
+
+候选准备已做只读核对，见[本批预检](acceptance/remote-desktop-candidate-preflight-2026-10-20.json)：fetch 后确认本地 main 与 origin/main 的已提交修改均已包含；主目录另有进行中的未提交工作，其中 19 个已跟踪路径与本分支改动交叉。未拷贝这些工作区修改、未改主目录、未分配发布版本；最终候选应从已提交来源隔离构建，再按提交边界核对交叉改动，不从进行中的主工作区直接打包。
 
 执行前先核对既有结果及源码；按用户最新更正，每台机器编译最多 10 核/10 个作业，同机其他会话与嵌套构建合计不得超过 10。不替换本机安装版，不读取无关编辑器正文；目标使用 90 的自有测试窗口，XRServer 不再使用。实际失败才修改相应代码，通过后停止重复同条件测试。以上仍归原第 1 组；AI 产品联动四项已退出当前待办，其后继续：
 
-1. **操作端目标登录与余项核对（第 2/4 组）**：路径迁移、实际反馈及同连接业务已关闭 06.5；本批又通过 Mac / Linux X11→90 的锁屏密码解锁和原窗只查看恢复，修复错误编码导致的永久停止。接着只补 Mac→Linux、Linux→Mac 及 Wayland 操作端→Windows 的登录缺项；每项先核对既有证据，不重开已关闭的被控端接入、动态布局、Mac 预算或积压恢复。
+1. **统一候选准备（第 6 组）**：指定登录组合已通过，见 [本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)，不重复本批三个方向。核对主线新增修复与协议/IPC/安装入口，固定三平台版本、依赖、签名/压缩和哈希。其他已登记输入/光标边界按既有范围处理，不扩充无尽组合，不重开动态布局、Mac 预算、积压或网络验证。
 2. **固定候选与交付（第 5/6 组）**：上述必要修复收敛后统一三平台版本/哈希，完成正式安装升级、配置/身份保留及受影响旧业务，再做 30 分钟混合和 100 次开关，最后发布。2/8 小时仍保留暂缓，不因进入晚间自动启动。
 
 Windows 特殊不激活夹具的首次消息问题保留原诊断；普通窗口和记事本已通过，下一批不重复该夹具来代替推进其他缺口。
@@ -140,6 +144,8 @@ Windows 特殊不激活夹具的首次消息问题保留原诊断；普通窗口
 - 工作目录使用独立远程桌面 worktree。主目录有其他会话的未提交开发，当前 worktree 的 `experiments/remote-desktop/windows_control_fixture.cpp` 也有既有修改，均不纳入本轮文档/集成提交。
 - 当前没有最终安装包、COS 发布或在线升级通过结果。临时服务启动成功不能替代正式安装自启动；Mac 最终安装沿用持久路径和固定签名，记录实际权限提示情况。
 - 不新增独立鉴权、使用次数或设备数量限制；保持既有可靠传输及设备级单查看者。2/8 小时仍暂缓到晚间，当前未启动长测或发布。
+
+- 2026-10-20 操作端登录收尾：[本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)的三个指定组合已通过。90/Apple 原服务恢复；Linux 恢复已解锁 X11 会话 674 和原会话偏好，配置哈希一致；自有进程/虚拟输入/回滚任务退出，原账号槽保留，私有副本按限制保留。未修改产品代码、未更新本机安装版、未发布。
 
 ### 当前环境条件与暂缓安排
 
@@ -429,7 +435,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **07.2 macOS 操作端**：原生硬解及显示，窗口、缩放、光标、键盘映射；在 Apple
   实机完成普通桌面、锁屏、系统登录和会话切换。权限缺失时能说明并恢复。
-  核对状态（2026-10-20）：**部分完成**。Mac→Windows 与 Mac→Linux 正式窗口、原生显示和既有输入保留；本批 Mac→90 补 13 项常用键与远端中文。[操作端登录本批](acceptance/remote-desktop-operator-windows-login-recovery-2026-10-20.md)又补 Mac→90 锁屏、窗口内 SAS、实体键单次密码解锁、原窗硬解与只查看恢复、重新启停操作。Mac→Linux 目标登录仍缺，其他目标应用/系统键、动态 FPS 和未覆盖异常保留；Windows→Mac 登录不计为 Mac 操作端验证，见[本批输入](acceptance/remote-desktop-input-ime-release-2026-10-20.md)。
+  核对状态（2026-10-20）：**部分完成**。Mac→Windows 与 Mac→Linux 正式窗口、原生显示和既有输入保留；本批 Mac→90 补 13 项常用键与远端中文。[操作端登录本批](acceptance/remote-desktop-operator-windows-login-recovery-2026-10-20.md)又补 Mac→90 锁屏、窗口内 SAS、实体键单次密码解锁、原窗硬解与只查看恢复、重新启停操作。随后[本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)补 Mac→Linux 从 X11 注销至 Wayland GDM、单次密码进入 Wayland 用户桌面，原窗硬解及只查看恢复。指定登录缺项退出待办，其他既定输入/异常和最终候选性能保留；Windows→Mac 登录不计为 Mac 操作端验证，见[本批输入](acceptance/remote-desktop-input-ime-release-2026-10-20.md)。
 
 - [ ] **07.3 Linux X11**：采集、输入、多屏、旋转、用户会话与登录管理器链路；
   优先让软件编解码在虚拟机上完整工作，再对实体 GPU 增加硬编硬解验证。
@@ -441,7 +447,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
   核对状态（2026-10-19 复核）：**已关闭**。Wayland 普通桌面、锁屏、注销、真实重启后的 GDM 密码登录和自动恢复均已实测；用户/GDM helper UID 交接、旧输入进程退出和虚拟输入设备清理有系统侧观察，见[GDM 正式窗口](acceptance/remote-desktop-linux-gdm-product-2026-10-17.md)、[登录与占用](acceptance/remote-desktop-login-occupancy-assistance-2026-10-19.md)、[注销与开机](acceptance/remote-desktop-linux-session-boot-2026-10-19.md)。最新 helper 码率运行、性能和正式安装继续归 06.1/06.6/09.3，不作为缺少 Wayland 接入。
 
 - [ ] **07.5 Linux 操作端**：原生显示和输入映射；X11/Wayland 窗口系统分别测试。
-  核对状态（2026-10-20）：**部分完成**。Wayland/X11 → Windows/Mac 的既有正式窗口、基本输入、恢复及关闭释放直接复用；本批 Linux X11→90 补 13 项常用键和远端中文。[操作端登录本批](acceptance/remote-desktop-operator-windows-login-recovery-2026-10-20.md)补 X11→90 锁屏、窗口内 SAS、单次密码解锁与原窗只查看恢复，并修复 Closed/Timeout 通过协议回复误变 InvalidRequest。Linux→Mac 和 Wayland 操作端→Windows 登录仍缺，其他目标应用/系统键、未覆盖组合与候选性能保留，见[本批输入](acceptance/remote-desktop-input-ime-release-2026-10-20.md)、[此前恢复](acceptance/remote-desktop-window-input-assistance-2026-10-20.md)。
+  核对状态（2026-10-20）：**部分完成**。Wayland/X11 → Windows/Mac 的既有正式窗口、基本输入、恢复及关闭释放直接复用；本批 Linux X11→90 补 13 项常用键和远端中文。[操作端登录本批](acceptance/remote-desktop-operator-windows-login-recovery-2026-10-20.md)补 X11→90 锁屏、窗口内 SAS、单次密码解锁与原窗只查看恢复，并修复 Closed/Timeout 通过协议回复误变 InvalidRequest。随后[本批 Mac/Linux 登录验收](acceptance/remote-desktop-posix-operator-login-2026-10-20.md)补原生 Wayland→Mac 的窗口内锁屏/单次密码返回桌面和 Wayland→90 的 SAS/单次密码/原窗只查看恢复；未用 XTest。指定登录缺项退出待办，其他既定输入/窗口边界及候选性能保留，见[本批输入](acceptance/remote-desktop-input-ime-release-2026-10-20.md)、[此前恢复](acceptance/remote-desktop-window-input-assistance-2026-10-20.md)。
 
 - [ ] **07.6 平台矩阵**：Windows/macOS/Linux 操作端对三类被控端的七个必验方向，覆盖
   连接、画面、多屏、基本输入及平台登录场景，明确实际验证的 OS/桌面环境。
