@@ -50,6 +50,10 @@ pub fn query_guarded(
     let result = verify()
         .map_err(|e| AppActionError::new(false, e))
         .and_then(|()| match query {
+            AppQuery::Package { .. } => Err(AppActionError::new(
+                false,
+                "unsupported_platform: package changes currently require Android",
+            )),
             AppQuery::List { request } => list(request)
                 .map(|snapshot| AppSnapshot::List { snapshot })
                 .map_err(|e| AppActionError::new(false, e)),
@@ -270,6 +274,7 @@ mod tests {
         let mut snapshot = AppListSnapshot {
             apps: (0..200)
                 .map(|i| AppInfo {
+                    details: None,
                     name: format!("Application {i}"),
                     app_id: Some("\u{1}".repeat(4096)),
                     path: None,

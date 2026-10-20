@@ -84,10 +84,36 @@ fn require_capability(version: Option<u16>, query: &SystemQuery) -> Result<(), B
     Ok(())
 }
 fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
+    let notification_kind = matches!(
+        r.kind.as_str(),
+        "notification_status"
+            | "notification_list"
+            | "notification_wait"
+            | "notification_open"
+            | "notification_dismiss"
+    );
+    if notification_kind {
+        match &r.data {
+            Some(SystemQueryData::Notifications { snapshot }) if snapshot.validate().is_ok() => {}
+            None if r.state != "completed" => {}
+            _ => return false,
+        }
+    }
     let browser_kind = BrowserAction::ALL
         .iter()
         .any(|action| action.name() == r.kind);
-    if (["app_list", "app_launch", "app_open_file"].contains(&r.kind.as_str()) || browser_kind)
+    if ([
+        "app_list",
+        "app_launch",
+        "app_open_file",
+        "app_package_inspect",
+        "app_install",
+        "app_uninstall",
+        "app_change_status",
+        "app_change_resume",
+    ]
+    .contains(&r.kind.as_str())
+        || browser_kind)
         && !valid_application(r)
     {
         return false;
@@ -139,7 +165,8 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                 | "cancel_requested"
                 | "cancelled"
         )
-        && (browser_kind
+        && (notification_kind
+            || browser_kind
             || matches!(
                 r.kind.as_str(),
                 "containers"
@@ -177,6 +204,11 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
                     | "app_list"
                     | "app_launch"
                     | "app_open_file"
+                    | "app_package_inspect"
+                    | "app_install"
+                    | "app_uninstall"
+                    | "app_change_status"
+                    | "app_change_resume"
                     | "process_terminate"
                     | "services"
                     | "service"
@@ -189,6 +221,7 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
         && r.warnings.len() <= 8
         && serde_json::to_vec(r).is_ok_and(|b| b.len() <= MAX_SYSTEM_REPLY_BYTES)
         && (r.state != "completed"
+            || notification_kind
             || (browser_kind
                 && matches!(
                     r.data,
@@ -199,7 +232,14 @@ fn valid(r: &SystemQueryReply, id: RequestId) -> bool {
             || matches!(
                 (r.kind.as_str(), r.data.as_ref()),
                 (
-                    "app_list" | "app_launch" | "app_open_file",
+                    "app_list"
+                        | "app_launch"
+                        | "app_open_file"
+                        | "app_package_inspect"
+                        | "app_install"
+                        | "app_uninstall"
+                        | "app_change_status"
+                        | "app_change_resume",
                     Some(SystemQueryData::Applications { .. })
                 ) | (
                     "containers" | "container" | "container_logs" | "container_control",
@@ -263,6 +303,16 @@ fn valid_application(reply: &SystemQueryReply) -> bool {
         return reply.state != "completed";
     };
     let (identity, instances, count) = match (reply.kind.as_str(), data) {
+        (
+            "app_package_inspect"
+            | "app_install"
+            | "app_uninstall"
+            | "app_change_status"
+            | "app_change_resume",
+            SystemQueryData::Applications {
+                snapshot: AppSnapshot::Package { result },
+            },
+        ) if result.validate().is_ok() => (&result.execution_identity, Vec::new(), 1),
         (
             "app_list",
             SystemQueryData::Applications {
@@ -330,6 +380,54 @@ fn valid_application(reply: &SystemQueryReply) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn notification_replies_accept_all_five_kinds_and_require_matching_bounded_data() {
+        let mut reply = SystemQueryReply::pending(
+            RequestId::new(),
+            &SystemQuery::Notifications {
+                query: NotificationRequest::Status {},
+            },
+        );
+        for kind in [
+            "notification_status",
+            "notification_list",
+            "notification_wait",
+            "notification_open",
+            "notification_dismiss",
+        ] {
+            reply.kind = kind.into();
+            reply.state = "failed".into();
+            reply.error = Some("control_paused".into());
+            reply.data = None;
+            assert!(valid(&reply, reply.request_id));
+            reply.state = "completed".into();
+            assert!(!valid(&reply, reply.request_id));
+            reply.error = None;
+            reply.data = Some(SystemQueryData::Notifications {
+                snapshot: NotificationSnapshot {
+                    access_granted: true,
+                    listener_connected: true,
+                    revision: 1,
+                    entries: vec![],
+                    outcome: "sampled".into(),
+                    action_dispatched: false,
+                    truncated: false,
+                },
+            });
+            assert!(valid(&reply, reply.request_id));
+            assert!(!valid(&reply, RequestId::new()));
+            if let Some(SystemQueryData::Notifications { snapshot }) = &mut reply.data {
+                snapshot.outcome = "unknown".into();
+            }
+            assert!(!valid(&reply, reply.request_id));
+            reply.data = Some(SystemQueryData::Disks { entries: vec![] });
+            assert!(!valid(&reply, reply.request_id));
+        }
+        reply.kind = "notification_unknown".into();
+        reply.state = "failed".into();
+        reply.data = None;
+        assert!(!valid(&reply, reply.request_id));
+    }
     #[test]
     fn applications_require_v12_and_reply_identity_matches_persisted_context() {
         let query = SystemQuery::Applications {

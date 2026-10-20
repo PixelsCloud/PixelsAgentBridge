@@ -98,7 +98,8 @@ impl SystemCollector {
                 reply.error = Some("desktop query requires the interactive helper".into());
                 return reply;
             }
-            SystemQuery::Logs { .. }
+            SystemQuery::Notifications { .. }
+            | SystemQuery::Logs { .. }
             | SystemQuery::Container { .. }
             | SystemQuery::ExecutionContexts { .. }
             | SystemQuery::Git { .. }
@@ -118,6 +119,7 @@ impl SystemCollector {
                 let executor = self.process(executor, cpu, &identities);
                 Some(SystemQueryData::Info {
                     info: Box::new(SystemInfo {
+                        mobile: None,
                         host_name: System::host_name().map(|s| bounded(&s, 512)),
                         os_name: System::name(),
                         os_version: System::long_os_version().map(|s| bounded(&s, 512)),
@@ -267,8 +269,8 @@ impl SystemCollector {
                         mac: (mac != "00:00:00:00:00:00").then_some(mac),
                         mtu: (network.mtu() > 0).then_some(network.mtu()),
                         state: network.operational_state().to_string(),
-                        received_bytes: network.total_received(),
-                        transmitted_bytes: network.total_transmitted(),
+                        received_bytes: Some(network.total_received()),
+                        transmitted_bytes: Some(network.total_transmitted()),
                     };
                     if !push_bounded(&mut entries, item, &mut output_bytes, &mut reply) {
                         break;

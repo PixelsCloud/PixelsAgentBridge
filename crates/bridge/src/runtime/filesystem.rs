@@ -218,10 +218,26 @@ impl BridgeRuntime {
         };
         match connection.filesystem(request, payload).await {
             Ok(result) => {
-                self.inner
-                    .store
-                    .save_filesystem_reply(&result.reply)
-                    .await?;
+                if result
+                    .reply
+                    .error
+                    .as_ref()
+                    .is_some_and(|e| e.phase == "result")
+                {
+                    let fact = connection.get_filesystem(request.request_id).await?;
+                    if fact.path != request.path
+                        || fact.kind != request.operation.kind()
+                        || fact.destination.as_deref() != request.operation.destination()
+                    {
+                        return Err(RuntimeStoreError::SnapshotIdentityMismatch.into());
+                    }
+                    self.inner.store.save_filesystem_reply(&fact).await?;
+                } else {
+                    self.inner
+                        .store
+                        .save_filesystem_reply(&result.reply)
+                        .await?;
+                }
                 Ok(result)
             }
             Err(error) => {
@@ -236,7 +252,11 @@ impl BridgeRuntime {
                     }
                 );
                 reply.state = if (request.operation.mutates()
-                    || matches!(request.operation, pab_protocol::FileSystemAction::Hash))
+                    || matches!(
+                        request.operation,
+                        pab_protocol::FileSystemAction::Hash
+                            | pab_protocol::FileSystemAction::Read { .. }
+                    ))
                     && !matches!(error, crate::BridgeError::UnsupportedFileSystem)
                     && !rejected_context
                 {
@@ -271,6 +291,50 @@ impl BridgeRuntime {
         }
     }
 
+    pub async fn get_filesystem_result(
+        &self,
+        device: DeviceRef,
+        id: RequestId,
+    ) -> Result<FileSystemResult, RuntimeError> {
+        let (stored, cached) = self
+            .inner
+            .store
+            .filesystem_record(id, None, &self.inner.initiated_by, &self.inner.session_id)
+            .await?;
+        if stored != device {
+            return Err(RuntimeStoreError::NotFound.into());
+        }
+        let connection = self.inner.device(device).await.connection().await?;
+        let result = connection.get_filesystem_result(id).await?;
+        if result.reply.path != cached.path
+            || result.reply.kind != cached.kind
+            || result.reply.destination != cached.destination
+        {
+            return Err(RuntimeStoreError::SnapshotIdentityMismatch.into());
+        }
+        if result
+            .reply
+            .error
+            .as_ref()
+            .is_some_and(|e| e.phase == "result")
+        {
+            let fact = connection.get_filesystem(id).await?;
+            if fact.path != cached.path
+                || fact.kind != cached.kind
+                || fact.destination != cached.destination
+            {
+                return Err(RuntimeStoreError::SnapshotIdentityMismatch.into());
+            }
+            self.inner.store.save_filesystem_reply(&fact).await?;
+        } else {
+            self.inner
+                .store
+                .save_filesystem_reply(&result.reply)
+                .await?;
+        }
+        Ok(result)
+    }
+
     pub async fn cancel_filesystem(
         &self,
         device: DeviceRef,
@@ -282,7 +346,7 @@ impl BridgeRuntime {
             .filesystem_record(id, None, &self.inner.initiated_by, &self.inner.session_id)
             .await?;
         if stored != device
-            || !pab_protocol::cancellable_filesystem_kind(&cached.kind)
+            || !cached.supports_cancel()
             || !self
                 .inner
                 .store

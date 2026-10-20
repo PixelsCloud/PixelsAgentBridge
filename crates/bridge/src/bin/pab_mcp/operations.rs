@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use pab_agent_core::{DataPaths};
+use pab_agent_core::DataPaths;
 use pab_bridge::{
     BridgeConfig, BridgeIdentity, BridgeRuntime, QueuedTransfer, TransferControl, TransferQueue,
     TransferRequest,
@@ -368,12 +368,22 @@ impl OperationManager {
             destination: args.destination,
             overwrite: args.overwrite,
         };
-        spec.validate_paths(
-            device
-                .os_family
-                .ok_or("Connect to verify the device platform first")?,
-        )
-        .map_err(str::to_owned)?;
+        // A server catalog entry may omit the platform even after normal pairing.
+        // Resolve that missing hint from the authenticated device, never assume the
+        // operator's OS or reject a connection we have already verified.
+        let os = match device.os_family {
+            Some(os) => os,
+            None => {
+                self.runtime()
+                    .await?
+                    .current_environment(device.device_ref)
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .execution
+                    .os_family
+            }
+        };
+        spec.validate_paths(os).map_err(str::to_owned)?;
         let mut jobs = self.jobs.lock().await;
         if self.closed.load(Ordering::Acquire) {
             return Err("MCP is shutting down".to_owned());
@@ -541,7 +551,16 @@ impl OperationManager {
     ) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if self.documents.lock().await.get(&id).copied() == Some(code)
-            || args["kind"] == "document_open"
+            || args["kind"].as_str().is_some_and(|kind| {
+                matches!(
+                    kind,
+                    "document_open"
+                        | "document_read"
+                        | "document_search"
+                        | "document_render_page"
+                        | "document_close"
+                )
+            })
         {
             let device = self
                 .queue
@@ -577,10 +596,56 @@ impl OperationManager {
             );
         }
         if let Ok((device_ref, mut reply)) = self.queue.filesystem_record(id, code).await {
-            if matches!(
-                reply.state.as_str(),
-                "running" | "unconfirmed" | "cancel_requested"
-            ) {
+            let mut text = None;
+            let mut result_data_error = None;
+            if reply.kind == "file_read" || reply.kind == "file_search" {
+                let lookup = async {
+                    self.runtime()
+                        .await?
+                        .get_filesystem_result(device_ref, id)
+                        .await
+                        .map_err(|e| e.to_string())
+                };
+                match tokio::time::timeout(Duration::from_secs(5), lookup).await {
+                    Ok(Ok(result)) => {
+                        if result
+                            .reply
+                            .error
+                            .as_ref()
+                            .is_some_and(|e| e.phase == "result")
+                        {
+                            result_data_error = result.reply.error.clone().map(|e| json!(e));
+                            reply = self
+                                .queue
+                                .filesystem_record(id, code)
+                                .await
+                                .map_err(|e| e.to_string())?
+                                .1;
+                        } else {
+                            if result.reply.kind == "file_read"
+                                && result.reply.state == "completed"
+                                && result.reply.data_sha256.is_some()
+                            {
+                                text = Some(
+                                    String::from_utf8(result.data).map_err(|e| e.to_string())?,
+                                );
+                            }
+                            reply = result.reply;
+                        }
+                    }
+                    outcome => {
+                        result_data_error = Some(
+                            json!({"code":"result_unavailable","message":format!("Original content could not be retrieved; preserve operation ID ({})",if outcome.is_err() {"lookup deadline"} else {"device unavailable"})}),
+                        )
+                    }
+                }
+            }
+            if !matches!(reply.kind.as_str(), "file_read" | "file_search")
+                && matches!(
+                    reply.state.as_str(),
+                    "running" | "unconfirmed" | "cancel_requested"
+                )
+            {
                 let lookup = async {
                     self.runtime()
                         .await?
@@ -598,8 +663,16 @@ impl OperationManager {
                 .remembered_device(code)
                 .await
                 .map_err(|error| error.to_string())?;
+            if result_data_error.is_some()
+                && let Some(search) = reply.search.as_mut()
+            {
+                for item in &mut search.matches {
+                    item.preview = None;
+                    item.context.clear();
+                }
+            }
             return Ok(
-                json!({ "operation_ref": { "device_code": code, "operation_id": id, "kind": reply.kind }, "result": reply, "os_reminder": device.os_reminder }),
+                json!({ "operation_ref": { "device_code": code, "operation_id": id, "kind": reply.kind }, "result": reply, "text": text, "result_data_error": result_data_error, "os_reminder": device.os_reminder }),
             );
         }
         if let Ok(record) = self.queue.get(id, code).await {
@@ -711,7 +784,16 @@ impl OperationManager {
     async fn cancel(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
         let (id, code) = reference(args)?;
         if self.documents.lock().await.get(&id).copied() == Some(code)
-            || args["kind"] == "document_open"
+            || args["kind"].as_str().is_some_and(|kind| {
+                matches!(
+                    kind,
+                    "document_open"
+                        | "document_read"
+                        | "document_search"
+                        | "document_render_page"
+                        | "document_close"
+                )
+            })
         {
             let device = self
                 .queue
@@ -756,7 +838,7 @@ impl OperationManager {
             );
         }
         if let Ok((device, reply)) = self.queue.filesystem_record(id, code).await {
-            if !pab_protocol::cancellable_filesystem_kind(&reply.kind) {
+            if !reply.supports_cancel() {
                 return Err("this bounded filesystem operation does not support cancellation; query the original operation_ref".to_owned());
             }
             if !self
@@ -941,7 +1023,7 @@ impl OperationManager {
             let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
             for (id, code) in files {
                 if let Ok((device, reply)) = self.queue.filesystem_record(id, code).await
-                    && pab_protocol::cancellable_filesystem_kind(&reply.kind)
+                    && reply.supports_cancel()
                 {
                     let _ =
                         tokio::time::timeout_at(deadline, runtime.cancel_filesystem(device, id))

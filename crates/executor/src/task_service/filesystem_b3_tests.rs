@@ -522,6 +522,7 @@ async fn bulk_quic_accept_query_cancel_have_independent_streams() {
         (
             DeviceTaskRequest::GetFileSystem {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                include_data: false,
                 request_id: req.request_id,
             },
             "running",

@@ -6,6 +6,15 @@ Do not run concurrent compilation commands whose combined jobs exceed 10.
 Do not update the local installed Pixels application unless necessary: other
 sessions use it.
 
+# Android deployment
+
+The primary Android development device is the USB phone `e2b3b128`.
+After building a new APK, update the phone using `adb -s e2b3b128 install -r`.
+Always preserve the installed application's data and identity. Never uninstall,
+clear application data, or replace a signing key to resolve an update failure.
+Keep `.build/android/device.toml` configured with this serial so the Android
+build helper installs updated APKs automatically. Do not update unrelated apps.
+
 # Configuration format
 
 All application configuration formats owned by this project must use TOML on

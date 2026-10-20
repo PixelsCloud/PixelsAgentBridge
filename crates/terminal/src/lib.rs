@@ -71,6 +71,31 @@ pub struct TerminalSession {
 
 impl TerminalSession {
     pub fn start(shell: &str, args: &[&str], cols: u16, rows: u16) -> Result<Self, TerminalError> {
+        let mut command = CommandBuilder::new(shell);
+        command.args(args);
+        Self::start_builder(command, cols, rows)
+    }
+
+    /// Explicit clean environment and working directory, without changing desktop defaults.
+    pub fn start_in(
+        shell: &str,
+        args: &[&str],
+        cols: u16,
+        rows: u16,
+        cwd: &str,
+        env: &std::collections::BTreeMap<String, String>,
+    ) -> Result<Self, TerminalError> {
+        let mut command = CommandBuilder::new(shell);
+        command.args(args);
+        command.env_clear();
+        command.cwd(cwd);
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        Self::start_builder(command, cols, rows)
+    }
+
+    fn start_builder(command: CommandBuilder, cols: u16, rows: u16) -> Result<Self, TerminalError> {
         validate_size(cols, rows)?;
         let pair = NativePtySystem::default()
             .openpty(PtySize {
@@ -80,13 +105,28 @@ impl TerminalSession {
                 pixel_height: 0,
             })
             .map_err(|error| TerminalError::Pty(error.to_string()))?;
-        let mut command = CommandBuilder::new(shell);
-        command.args(args);
         let mut child = pair
             .slave
             .spawn_command(command)
             .map_err(|error| TerminalError::Pty(error.to_string()))?;
         drop(pair.slave);
+        #[cfg(target_os = "android")]
+        if let Some(fd) = pair.master.as_raw_fd() {
+            // PTY input must not block the Android connection owner if the shell
+            // stops reading. The reader below handles the same nonblocking fd.
+            let result = unsafe {
+                let flags = libc::fcntl(fd, libc::F_GETFL);
+                if flags < 0 {
+                    -1
+                } else {
+                    libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK)
+                }
+            };
+            if result < 0 {
+                let _ = child.kill();
+                return Err(TerminalError::Io(std::io::Error::last_os_error()));
+            }
+        }
         let mut reader = match pair.master.try_clone_reader() {
             Ok(reader) => reader,
             Err(error) => {
@@ -116,6 +156,11 @@ impl TerminalSession {
                 let mut startup = StartupCursor::default();
                 loop {
                     match reader.read(&mut buffer) {
+                        #[cfg(target_os = "android")]
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(10));
+                            continue;
+                        }
                         Ok(0) | Err(_) => break,
                         Ok(count) => {
                             #[cfg(windows)]
@@ -220,6 +265,16 @@ impl TerminalSession {
     }
 
     pub fn has_exited(&self) -> Result<bool, TerminalError> {
+        #[cfg(target_os = "android")]
+        {
+            let mut child = self.child.lock().unwrap();
+            // Keep the PTY session leader unreaped until session cleanup. This
+            // also reserves its session ID when background jobs outlive the shell.
+            return android_child_exit(child.as_mut())
+                .map(|value| value.unwrap_or(true))
+                .map_err(TerminalError::Io);
+        }
+        #[cfg(not(target_os = "android"))]
         self.child
             .lock()
             .unwrap()
@@ -230,16 +285,78 @@ impl TerminalSession {
 
     pub fn close(&self) -> Result<(), TerminalError> {
         let mut child = self.child.lock().unwrap();
+        #[cfg(not(target_os = "android"))]
         if child.try_wait().map_err(TerminalError::Io)?.is_some() {
             return Ok(());
         }
-        match child.kill() {
+        #[cfg(target_os = "android")]
+        {
+            if android_child_exit(child.as_mut())
+                .map_err(TerminalError::Io)?
+                .is_none()
+            {
+                return Ok(());
+            }
+            if let Some(pid) = child.process_id() {
+                // Job-control shells give background jobs separate groups. While
+                // the session leader is unreaped, its session ID cannot be reused.
+                // Only descendants still in this PTY's session are selected.
+                if let Ok(entries) = std::fs::read_dir("/proc") {
+                    for entry in entries.flatten() {
+                        let Some(candidate) = entry
+                            .file_name()
+                            .to_str()
+                            .and_then(|name| name.parse::<libc::pid_t>().ok())
+                        else {
+                            continue;
+                        };
+                        if candidate <= 0 || candidate == pid as libc::pid_t {
+                            continue;
+                        }
+                        unsafe {
+                            if libc::getsid(candidate) == pid as libc::pid_t {
+                                libc::kill(candidate, libc::SIGKILL);
+                            }
+                        }
+                    }
+                }
+            }
+            // Interactive jobs can own their own foreground process group.
+            // Signal that group and the shell's group while its PID is unreaped.
+            let group = self.master.lock().unwrap().process_group_leader();
+            if let Some(group) = group.filter(|group| *group > 0) {
+                unsafe {
+                    libc::kill(-group, libc::SIGKILL);
+                }
+            }
+            if let Some(pid) = child.process_id() {
+                unsafe {
+                    libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
+                }
+            }
+        }
+        #[cfg(target_os = "android")]
+        if child.try_wait().map_err(TerminalError::Io)?.is_some() {
+            return Ok(());
+        }
+        let result = match child.kill() {
             Ok(()) => Ok(()),
             // The child may exit between try_wait and kill. Recheck the actual
             // child instead of treating ESRCH as a failed terminal close.
             Err(_) if child.try_wait().ok().flatten().is_some() => Ok(()),
             Err(error) => Err(TerminalError::Io(error)),
+        };
+        #[cfg(target_os = "android")]
+        if result.is_ok() {
+            // Reap the owned shell promptly; SIGKILL has already been requested.
+            for _ in 0..20 {
+                if child.try_wait().map_err(TerminalError::Io)?.is_some() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
+        result
     }
 }
 
@@ -272,12 +389,45 @@ impl StartupCursor {
 
 impl Drop for TerminalSession {
     fn drop(&mut self) {
+        #[cfg(target_os = "android")]
+        {
+            let _ = self.close();
+        }
+        #[cfg(not(target_os = "android"))]
         if let Ok(child) = self.child.get_mut() {
             // portable-pty's Unix kill begins with a PID signal. Once try_wait
             // has reaped this shell, that PID may belong to another process.
             if matches!(child.try_wait(), Ok(None)) {
                 let _ = child.kill();
             }
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+fn android_child_exit(child: &mut dyn portable_pty::Child) -> std::io::Result<Option<bool>> {
+    let Some(pid) = child.process_id() else {
+        return Ok(None);
+    };
+    loop {
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        let result = unsafe {
+            libc::waitid(
+                libc::P_PID,
+                pid,
+                &mut info,
+                libc::WEXITED | libc::WNOWAIT | libc::WNOHANG,
+            )
+        };
+        if result == 0 {
+            return Ok(Some(unsafe { info.si_pid() } != 0));
+        }
+        let error = std::io::Error::last_os_error();
+        if error.raw_os_error() == Some(libc::ECHILD) {
+            return Ok(None);
+        }
+        if error.kind() != std::io::ErrorKind::Interrupted {
+            return Err(error);
         }
     }
 }

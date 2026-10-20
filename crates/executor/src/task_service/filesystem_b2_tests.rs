@@ -489,6 +489,7 @@ async fn quic_hash_acceptance_query_and_cancel_use_independent_streams() {
         (
             DeviceTaskRequest::GetFileSystem {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                include_data: false,
                 request_id: req.request_id,
             },
             "running",

@@ -134,9 +134,7 @@ impl AuthenticatedDeviceConnection {
             .await?;
         match response {
             DeviceTaskResponse::FileSystem { reply }
-                if valid_reply(&reply, id)
-                    && pab_protocol::cancellable_filesystem_kind(&reply.kind)
-                    && reply.data_size == 0 =>
+                if valid_reply(&reply, id) && reply.supports_cancel() && reply.data_size == 0 =>
             {
                 Ok(*reply)
             }
@@ -149,6 +147,7 @@ impl AuthenticatedDeviceConnection {
             .task_request(DeviceTaskRequest::GetFileSystem {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
                 request_id: id,
+                include_data: false,
             })
             .await?;
         match response {
@@ -159,6 +158,61 @@ impl AuthenticatedDeviceConnection {
             }
             response => Err(unexpected_task_response(response)),
         }
+    }
+
+    pub async fn get_filesystem_result(
+        &self,
+        id: RequestId,
+    ) -> Result<FileSystemResult, BridgeError> {
+        let timeout = self.operation_timeout();
+        let mut stream = self.connection.open_bi(timeout).await?;
+        stream
+            .send_frame_json(
+                &DeviceTaskRequest::GetFileSystem {
+                    schema_version: DEVICE_TASK_SCHEMA_VERSION,
+                    request_id: id,
+                    include_data: true,
+                },
+                timeout,
+            )
+            .await?;
+        stream.finish_send(timeout).await?;
+        let response: DeviceTaskResponse = stream.receive_json(timeout).await?;
+        let DeviceTaskResponse::FileSystem { reply } = response else {
+            return Err(unexpected_task_response(response));
+        };
+        if !valid_reply(&reply, id)
+            || (reply.data_size > 0 && (reply.kind != "file_read" || reply.state != "completed"))
+        {
+            return Err(BridgeError::UnexpectedTaskResponse(
+                "invalid original filesystem result".into(),
+            ));
+        }
+        let mut data = Vec::with_capacity(reply.data_size as usize);
+        while data.len() < reply.data_size as usize {
+            let chunk = stream.receive_binary_frame(timeout).await?;
+            if chunk.is_empty() || data.len() + chunk.len() > reply.data_size as usize {
+                return Err(BridgeError::UnexpectedTaskResponse(
+                    "invalid original result frame".into(),
+                ));
+            }
+            data.extend(chunk);
+        }
+        stream.expect_receive_end(timeout).await?;
+        if reply
+            .data_sha256
+            .as_ref()
+            .is_some_and(|hash| *hash != format!("{:x}", Sha256::digest(&data)))
+            || std::str::from_utf8(&data).is_err()
+        {
+            return Err(BridgeError::UnexpectedTaskResponse(
+                "original result integrity check failed".into(),
+            ));
+        }
+        Ok(FileSystemResult {
+            reply: *reply,
+            data,
+        })
     }
 }
 

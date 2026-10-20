@@ -36,7 +36,7 @@ fn accepted(os_family: OsFamily, path_style: PathStyle) -> AcceptedTask {
             interpreter: None,
             cwd: Some(match os_family {
                 OsFamily::Windows => r"C:\Work".to_owned(),
-                OsFamily::Linux | OsFamily::Macos => "/work".to_owned(),
+                OsFamily::Linux | OsFamily::Macos | OsFamily::Android => "/work".to_owned(),
             }),
             environment_revision: "env-7".to_owned(),
         },

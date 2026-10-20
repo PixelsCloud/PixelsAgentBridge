@@ -1,8 +1,10 @@
 //! Application discovery is a bounded snapshot, not a paginated process list.
+use crate::{AppPackageRequest, AppPackageResult};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AppQuery {
+    Package { request: AppPackageRequest },
     List { request: AppListRequest },
     Execute { request: AppActionRequest },
     Browser { request: crate::BrowserRequest },
@@ -10,6 +12,7 @@ pub enum AppQuery {
 impl AppQuery {
     pub fn validate(&self) -> Result<(), &'static str> {
         match self {
+            Self::Package { request } => request.validate(),
             Self::List { request } => request.validate(),
             Self::Execute { request } => request.validate(),
             Self::Browser { request } => request.validate(),
@@ -17,6 +20,7 @@ impl AppQuery {
     }
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Package { request } => request.kind(),
             Self::List { .. } => "app_list",
             Self::Execute {
                 request: AppActionRequest::Launch { .. },
@@ -27,12 +31,16 @@ impl AppQuery {
     }
     pub fn is_mutation(&self) -> bool {
         match self {
+            Self::Package { request } => request.is_mutation(),
             Self::Browser { request } => request.action.is_mutation(),
             Self::Execute { .. } => true,
             Self::List { .. } => false,
         }
     }
     pub fn required_helper_version(&self) -> u16 {
+        if matches!(self, Self::Package { .. }) {
+            return 4;
+        }
         if matches!(self, Self::Browser { .. }) {
             return 3;
         }
@@ -54,6 +62,7 @@ impl AppQuery {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppSnapshot {
+    Package { result: AppPackageResult },
     List { snapshot: AppListSnapshot },
     Action { result: AppActionResult },
     Browser { result: crate::BrowserResult },
@@ -208,12 +217,22 @@ pub struct AppInstance {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<AppDetails>,
     pub name: String,
     /// OS identifier: Shell parsing name on Windows, bundle ID on macOS.
     pub app_id: Option<String>,
     pub path: Option<String>,
     pub source: String,
     pub instance: Option<AppInstance>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppDetails {
+    pub version_name: Option<String>,
+    pub version_code: Option<u64>,
+    pub enabled: bool,
+    pub system: bool,
+    pub launchable: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppListSnapshot {
@@ -227,6 +246,13 @@ pub struct AppListSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn desktop_application_wire_shape_is_preserved_without_android_details() {
+        let value = serde_json::json!({"name":"App","app_id":"app.id","path":null,"source":"fixture","instance":null});
+        let parsed: AppInfo = serde_json::from_value(value.clone()).unwrap();
+        assert!(parsed.details.is_none());
+        assert_eq!(serde_json::to_value(parsed).unwrap(), value);
+    }
     #[test]
     fn application_query_requires_explicit_desktop_selection_and_version_12() {
         use crate::{ExecutionContextRef, ExecutionSelection, SystemQuery};

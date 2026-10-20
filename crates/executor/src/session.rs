@@ -1,64 +1,19 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    sync::{Arc, Mutex as StdMutex},
-    time::{Duration, Instant, SystemTime},
-};
+use std::{path::Path, time::Duration};
 
 use pab_agent_core::{DevicePeerAuthorizer, PeerAuthorizationError};
-use pab_protocol::{
-    DEVICE_SESSION_AUTH_SCHEMA_VERSION, DeviceRef, DeviceSessionAuthenticate,
-    DeviceSessionAuthenticationResult, EndpointKey, MAX_DEVICE_PASSWORD_BYTES,
-};
+use pab_device_session::{PasswordAttempts, SessionError};
+use pab_protocol::DeviceRef;
 use pab_transport::{PabConnection, PabConnectionError};
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
-use zeroize::Zeroizing;
 
 use crate::credential::{DeviceCredential, DeviceCredentialError};
 use crate::task_service::TaskService;
 
-const FAILED_PASSWORD_DELAY: Duration = Duration::from_millis(500);
-const PASSWORD_ATTEMPT_WINDOW: Duration = Duration::from_secs(600);
-const MAX_PASSWORD_FAILURES: usize = 5;
 const AUTHORIZATION_RECHECK_INTERVAL: Duration = Duration::from_secs(5);
-type FailedPasswords = Arc<Mutex<HashMap<EndpointKey, Vec<Instant>>>>;
+type FailedPasswords = PasswordAttempts;
 
-#[derive(Clone, Default)]
-pub(crate) struct ActiveSessions(Arc<StdMutex<HashMap<EndpointKey, u16>>>);
-
-impl ActiveSessions {
-    fn enter(&self, endpoint_key: EndpointKey) -> ActiveSessionLease {
-        let mut sessions = self.0.lock().unwrap();
-        *sessions.entry(endpoint_key).or_default() += 1;
-        ActiveSessionLease {
-            sessions: self.clone(),
-            endpoint_key,
-        }
-    }
-
-    pub(crate) fn operator_count(&self) -> u16 {
-        self.0.lock().unwrap().len() as u16
-    }
-}
-
-struct ActiveSessionLease {
-    sessions: ActiveSessions,
-    endpoint_key: EndpointKey,
-}
-
-impl Drop for ActiveSessionLease {
-    fn drop(&mut self) {
-        let mut sessions = self.sessions.0.lock().unwrap();
-        if let Some(count) = sessions.get_mut(&self.endpoint_key) {
-            *count -= 1;
-            if *count == 0 {
-                sessions.remove(&self.endpoint_key);
-            }
-        }
-    }
-}
+pub(crate) use pab_device_session::ActiveSessions;
 
 #[derive(Clone)]
 pub struct DeviceSessionAcceptor {
@@ -88,7 +43,7 @@ impl DeviceSessionAcceptor {
             device_ref,
             timeout,
             tasks: None,
-            failed_passwords: Arc::default(),
+            failed_passwords: PasswordAttempts::default(),
             active_sessions: ActiveSessions::default(),
         })
     }
@@ -105,7 +60,7 @@ impl DeviceSessionAcceptor {
             device_ref,
             timeout,
             tasks: None,
-            failed_passwords: Arc::default(),
+            failed_passwords: PasswordAttempts::default(),
             active_sessions: ActiveSessions::default(),
         }
     }
@@ -138,7 +93,7 @@ impl DeviceSessionAcceptor {
             self.device_ref,
             self.timeout,
             self.tasks.clone(),
-            Arc::clone(&self.failed_passwords),
+            self.failed_passwords.clone(),
             self.active_sessions.clone(),
         )
         .await
@@ -155,87 +110,19 @@ async fn authenticate(
     failed_passwords: FailedPasswords,
     active_sessions: ActiveSessions,
 ) -> Result<(), DeviceSessionError> {
-    let mut stream = connection.accept_bi(timeout).await?;
-    let request: DeviceSessionAuthenticate = stream.receive_sensitive_json(timeout).await?;
-    let password = Zeroizing::new(request.device_password);
-    if request.schema_version != DEVICE_SESSION_AUTH_SCHEMA_VERSION
-        || request.device_ref != device_ref
-        || password.is_empty()
-        || password.len() > MAX_DEVICE_PASSWORD_BYTES
-    {
-        reject(&mut stream, timeout).await?;
-        return Err(DeviceSessionError::Rejected);
-    }
-
-    let peer_endpoint_key = EndpointKey::new(connection.remote_endpoint_key());
-    let authorized = match authorizer.authorize(peer_endpoint_key).await {
-        Ok(authorized)
-            if authorized.device_ref == device_ref
-                && authorized.peer_endpoint_key == peer_endpoint_key
-                && authorized.operator.endpoint_key() == peer_endpoint_key =>
-        {
-            authorized
-        }
-        Ok(_) => {
-            reject(&mut stream, timeout).await?;
-            return Err(DeviceSessionError::IdentityMismatch);
-        }
-        Err(error) => {
-            reject(&mut stream, timeout).await?;
-            return Err(DeviceSessionError::PeerAuthorization(error));
-        }
-    };
-
-    let locked_out = {
-        let mut failures = failed_passwords.lock().await;
-        let now = Instant::now();
-        failures.retain(|_, attempts| {
-            attempts.retain(|at| now.duration_since(*at) < PASSWORD_ATTEMPT_WINDOW);
-            !attempts.is_empty()
-        });
-        failures
-            .get(&peer_endpoint_key)
-            .is_some_and(|attempts| attempts.len() >= MAX_PASSWORD_FAILURES)
-    };
-    if locked_out {
-        reject(&mut stream, timeout).await?;
-        return Err(DeviceSessionError::Rejected);
-    }
-
-    if !credential.verify(password).await? {
-        failed_passwords
-            .lock()
-            .await
-            .entry(peer_endpoint_key)
-            .or_default()
-            .push(Instant::now());
-        tokio::time::sleep(FAILED_PASSWORD_DELAY).await;
-        reject(&mut stream, timeout).await?;
-        return Err(DeviceSessionError::Rejected);
-    }
-    failed_passwords.lock().await.remove(&peer_endpoint_key);
-
+    let password = credential.shared().map_err(map_session_error)?;
+    let authorized = pab_device_session::authenticate(
+        &connection,
+        &authorizer,
+        &password,
+        device_ref,
+        timeout,
+        &failed_passwords,
+    )
+    .await
+    .map_err(map_session_error)?;
+    let peer_endpoint_key = authorized.peer_endpoint_key;
     let _session_lease = active_sessions.enter(peer_endpoint_key);
-
-    // The authenticated target reports success. Operator self-reports cannot add arbitrary devices.
-    // A temporary control outage must not undo an otherwise successful device authentication.
-    let reporter = authorizer.clone();
-    tokio::spawn(async move {
-        let _ = reporter.report_authenticated(peer_endpoint_key).await;
-    });
-
-    stream
-        .send_json(
-            &DeviceSessionAuthenticationResult::Accepted {
-                user_context: authorized.user_context.clone(),
-                device_ref,
-                operator: authorized.operator,
-                password_version: credential.password_version(),
-                authenticated_at_unix_ms: unix_millis(SystemTime::now())?,
-            },
-            timeout,
-        )
-        .await?;
     if let Some(tasks) = tasks {
         let tasks = tasks.for_ui_connection();
         let _terminals = tasks.terminal_connection_guard();
@@ -295,21 +182,16 @@ async fn authenticate(
     Ok(())
 }
 
-async fn reject(
-    stream: &mut pab_transport::PabBiStream,
-    timeout: Duration,
-) -> Result<(), PabConnectionError> {
-    stream
-        .send_json(&DeviceSessionAuthenticationResult::Rejected, timeout)
-        .await
-}
-
-fn unix_millis(now: SystemTime) -> Result<i64, DeviceSessionError> {
-    let value = now
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(|_| DeviceSessionError::InvalidSystemTime)?
-        .as_millis();
-    i64::try_from(value).map_err(|_| DeviceSessionError::InvalidSystemTime)
+fn map_session_error(error: SessionError) -> DeviceSessionError {
+    match error {
+        SessionError::Rejected => DeviceSessionError::Rejected,
+        SessionError::IdentityMismatch => DeviceSessionError::IdentityMismatch,
+        SessionError::InvalidTimeout => DeviceSessionError::InvalidTimeout,
+        SessionError::InvalidTime => DeviceSessionError::InvalidSystemTime,
+        SessionError::Authorization(error) => DeviceSessionError::PeerAuthorization(error),
+        SessionError::Connection(error) => DeviceSessionError::Connection(error),
+        error => DeviceSessionError::TaskService(error.to_string()),
+    }
 }
 
 #[derive(Debug, Error)]
@@ -337,6 +219,7 @@ pub enum DeviceSessionError {
 #[cfg(test)]
 mod presence_tests {
     use super::*;
+    use pab_protocol::EndpointKey;
 
     #[test]
     fn active_operator_count_tracks_distinct_endpoint_keys() {

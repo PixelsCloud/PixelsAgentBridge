@@ -28,6 +28,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const [password, setPassword] = useState("");
   const [devices, setDevices] = useState<ConnectedDevice[]>([]);
   const [devicesLoaded, setDevicesLoaded] = useState(false);
+  const [refreshingDevices, setRefreshingDevices] = useState(false);
   const [devicePresence, setDevicePresence] = useState<Record<string, { name: string; online: boolean | null }>>({});
   const [deleteTarget, setDeleteTarget] = useState<ConnectedDevice | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -71,6 +72,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const tasksRef = useRef(tasks);
   const savedConnectionAttemptRef = useRef(0);
   const connectionRevisionRef = useRef(0);
+  const deviceRefreshRef = useRef(false);
+  const presenceRequestRef = useRef(0);
   const historyRefreshRef = useRef<Promise<void> | null>(null);
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
@@ -83,6 +86,56 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     setDevices(update);
   }
 
+  async function refreshDevicePresence(isClosed = () => false) {
+    const request = ++presenceRequestRef.current;
+    try {
+      const statuses = await invoke<{ deviceCode: string; name: string; online: boolean | null }[]>(
+        "operator_saved_device_presence",
+      );
+      if (isClosed() || request !== presenceRequestRef.current) return;
+      setDevicePresence((current) => {
+        const next = { ...current };
+        for (const status of statuses) {
+          next[status.deviceCode] = { name: status.name || current[status.deviceCode]?.name || "", online: status.online };
+        }
+        return next;
+      });
+    } catch (cause) {
+      if (!isClosed() && request === presenceRequestRef.current) {
+        setDevicePresence((current) => Object.fromEntries(Object.entries(current).map(([code, value]) =>
+          [code, { ...value, online: null }])));
+      }
+      throw cause;
+    }
+  }
+
+  async function refreshDeviceList() {
+    if (deviceRefreshRef.current || !signedIn) return;
+    deviceRefreshRef.current = true;
+    setRefreshingDevices(true);
+    setError("");
+    const revision = connectionRevisionRef.current;
+    try {
+      const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
+      setDevices((current) => {
+        const known = new Map(current.map((device) => [device.deviceCode, device]));
+        const next = saved.devices.map((device) => {
+          const previous = known.get(device.deviceCode);
+          return previous ? { ...device, connected: previous.connected, connectionPath: previous.connectionPath } : device;
+        });
+        const savedCodes = new Set(next.map((device) => device.deviceCode));
+        return revision === connectionRevisionRef.current ? next : [...next, ...current.filter((device) => !savedCodes.has(device.deviceCode))];
+      });
+      setDevicesLoaded(true);
+      await refreshDevicePresence();
+    } catch {
+      setError(t.refreshDevicesFailed);
+    } finally {
+      deviceRefreshRef.current = false;
+      setRefreshingDevices(false);
+    }
+  }
+
   useEffect(() => {
     if (view !== "remote") return;
     if (devices.some((device) => device.deviceCode === selectedCode)) return;
@@ -93,36 +146,13 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     if (!signedIn || (view !== "home" && view !== "remote") || !savedCodes) return;
     let closed = false;
     let refreshing = false;
-    const codes = savedCodes.split(",");
     const refresh = async () => {
       if (refreshing) return;
       refreshing = true;
       try {
-        const statuses = await invoke<{ deviceCode: string; name: string; online: boolean | null }[]>(
-          "operator_saved_device_presence",
-        );
-        if (closed) return;
-        setDevicePresence((current) => {
-          const next = { ...current };
-          for (const status of statuses) {
-            next[status.deviceCode] = {
-              name: status.name || current[status.deviceCode]?.name || "",
-              online: status.online,
-            };
-          }
-          return next;
-        });
-      } catch {
-        if (!closed) {
-          setDevicePresence((current) => {
-            const next = { ...current };
-            for (const code of codes) {
-              next[code] = { name: current[code]?.name || "", online: null };
-            }
-            return next;
-          });
-        }
-      } finally {
+        await refreshDevicePresence(() => closed);
+      } catch { /* Availability becomes unknown until a later refresh succeeds. */ }
+      finally {
         refreshing = false;
       }
     };
@@ -899,6 +929,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
             language={language}
             error={error}
             devices={devices}
+            refreshing={refreshingDevices || !signedIn}
+            onRefresh={() => void refreshDeviceList()}
             devicePresence={devicePresence}
             selectedCode={selectedCode}
             onSelect={(device) => setSelectedCode(device.deviceCode)}

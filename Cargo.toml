@@ -1,5 +1,9 @@
 [workspace]
 members = [
+    "crates/android-agent",
+    "crates/command-runtime",
+    "crates/device-session",
+    "crates/file-codec",
     "crates/agent-core",
     "crates/bridge",
     "crates/executor",

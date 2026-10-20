@@ -1,5 +1,8 @@
 use pab_bridge::BridgeRuntime;
-use pab_protocol::{ConnectionFilter, DnsRecordType, RequestId, ServiceControlAction, SystemLogFilter, SystemLogMode, SystemLogQuery, SystemQuery};
+use pab_protocol::{
+    ConnectionFilter, DnsRecordType, RequestId, ServiceControlAction, SystemLogFilter,
+    SystemLogMode, SystemLogQuery, SystemQuery,
+};
 use serde_json::{Value, json};
 
 pub(super) fn tools() -> Vec<Value> {
@@ -29,11 +32,24 @@ pub(super) fn tools() -> Vec<Value> {
         let mutation=["pab_terminate_process","pab_service_control"].contains(&name);
         let logs=name.starts_with("pab_system_log_");
         let version=if logs {15}else if name=="pab_list_execution_contexts"{10}else if ["pab_terminate_process","pab_list_services","pab_get_service","pab_service_control"].contains(&name){3}else if ["pab_list_network_connections","pab_resolve_dns","pab_list_sessions"].contains(&name){2}else{1};
+        let android_note = match name {
+            "pab_system_info" => "Android includes mobile battery/network status; global CPU/GPU telemetry is unavailable.",
+            "pab_list_disks" => "Android reports workspace filesystem capacity, not all physical disks or SAF provider capacity.",
+            "pab_list_processes" | "pab_get_process" => "Android reports only Pixels' current process; foreign PIDs and termination are unavailable.",
+            "pab_list_network_interfaces" => "Android reports ConnectivityManager-visible networks; inaccessible counters are null.",
+            "pab_resolve_dns" => "Android supports A/AAAA via its native resolver, with null TTL; other record types are explicitly unavailable.",
+            "pab_list_execution_contexts" => "Android desktop_user selects the current app UID's unlocked activity session; it is not another UID or a desktop login.",
+            _ if logs => "Android uses bounded current-PID snapshots with partial integrity, range mode only, and transient cursors/events for 10 minutes; no durable history or follow.",
+            _ => "Android reports unsupported management actions explicitly; no ADB/root fallback.",
+        };
         let behavior=if logs {"Read-only; request_id is generated automatically. If the operation itself is running, query pab_get_operation with its operation_id. Scan cursors are separate opaque strings and can be reused after reconnect by the same caller until expiry. Native retention/permission limits are reported, not silently ignored."} else if mutation {"Asynchronous lifecycle control: returns running after about 250 ms if still active. Keep request_id and poll pab_get_operation for the original operation; disconnect/caller cancellation does not cancel an accepted action. Same request ID is never replayed, even after restart; a different request ID is a new action. Cannot cancel/undo lifecycle actions."} else {"Read-only query. Keep request_id to retrieve the SAME sampled result using pab_get_operation; omit it for a new sample. Queries cannot be cancelled. OS/driver calls may delay completion; no hard interruption of blocking native calls. CPU basis points: 10000 = 100%, per-process CPU may exceed 10000."};
-        json!({"name":name,"description":format!("{description} Requires system-query capability v{version}. Bounded 32 KiB result with timestamps and explicit truncation; unavailable fields are null. {behavior}"),"inputSchema":{"type":"object","properties":properties,"required":required,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":name=="pab_resolve_dns"}})
+        json!({"name":name,"description":format!("{description} Requires system-query capability v{version}. {android_note} Bounded 32 KiB result with timestamps and explicit truncation; unavailable fields are null. {behavior}"),"inputSchema":{"type":"object","properties":properties,"required":required,"additionalProperties":false},"annotations":{"readOnlyHint":!mutation,"destructiveHint":mutation,"idempotentHint":!mutation,"openWorldHint":name=="pab_resolve_dns"}})
     }).collect()
 }
 pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery), String> {
+    if super::mcp_notifications::handles(name) {
+        return super::mcp_notifications::parse(name, args);
+    }
     if super::mcp_applications::handles(name) {
         return super::mcp_applications::parse(name, args);
     }
@@ -89,34 +105,81 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
         .map_err(|_| "invalid timeout_ms".into())
     };
     let q = match name {
-        "pab_system_log_sources" => SystemQuery::Logs { query: SystemLogQuery::Sources {
-            scan_cursor: filter("scan_cursor"), after: filter("after"), limit: if args.get("limit").is_some() { limit } else { 32 },
-        } },
+        "pab_system_log_sources" => SystemQuery::Logs {
+            query: SystemLogQuery::Sources {
+                scan_cursor: filter("scan_cursor"),
+                after: filter("after"),
+                limit: if args.get("limit").is_some() {
+                    limit
+                } else {
+                    32
+                },
+            },
+        },
         "pab_system_log_read" => {
-            let sources = args.get("sources").map(|value| serde_json::from_value::<Vec<String>>(value.clone())
-                .map_err(|_| "invalid log sources".to_owned())).transpose()?;
+            let sources = args
+                .get("sources")
+                .map(|value| {
+                    serde_json::from_value::<Vec<String>>(value.clone())
+                        .map_err(|_| "invalid log sources".to_owned())
+                })
+                .transpose()?;
             let integer = |key: &str| -> Result<Option<i64>, String> {
-                args.get(key).map(|v| v.as_i64().ok_or_else(|| format!("invalid {key}"))).transpose()
+                args.get(key)
+                    .map(|v| v.as_i64().ok_or_else(|| format!("invalid {key}")))
+                    .transpose()
             };
-            let mode = args.get("mode").map(|value| serde_json::from_value::<SystemLogMode>(value.clone())
-                .map_err(|_| "invalid log mode".to_owned())).transpose()?.unwrap_or_default();
+            let mode = args
+                .get("mode")
+                .map(|value| {
+                    serde_json::from_value::<SystemLogMode>(value.clone())
+                        .map_err(|_| "invalid log mode".to_owned())
+                })
+                .transpose()?
+                .unwrap_or_default();
             let message_contains = filter("message_contains");
             let native_level = filter("native_level");
             let filter = if message_contains.is_some() || native_level.is_some() {
-                Some(SystemLogFilter { message_contains, native_level })
-            } else { None };
-            SystemQuery::Logs { query: SystemLogQuery::Read {
-                cursor: filter_string(args, "cursor")?, sources,
-                start_unix_ms: integer("start_unix_ms")?, end_unix_ms: integer("end_unix_ms")?,
-                mode, filter, limit: if args.get("limit").is_some() { limit } else { 32 },
-            } }
+                Some(SystemLogFilter {
+                    message_contains,
+                    native_level,
+                })
+            } else {
+                None
+            };
+            SystemQuery::Logs {
+                query: SystemLogQuery::Read {
+                    cursor: filter_string(args, "cursor")?,
+                    sources,
+                    start_unix_ms: integer("start_unix_ms")?,
+                    end_unix_ms: integer("end_unix_ms")?,
+                    mode,
+                    filter,
+                    limit: if args.get("limit").is_some() {
+                        limit
+                    } else {
+                        32
+                    },
+                },
+            }
         }
-        "pab_system_log_event_read" => SystemQuery::Logs { query: SystemLogQuery::EventRead {
-            event_ref: filter_string(args, "event_ref")?.ok_or("event_ref required")?,
-            offset: args.get("offset").map(|v| v.as_u64().ok_or("invalid offset")).transpose()?.unwrap_or(0),
-            max_bytes: u32::try_from(args.get("max_bytes").map(|v| v.as_u64().ok_or("invalid max_bytes")).transpose()?.unwrap_or(8192))
+        "pab_system_log_event_read" => SystemQuery::Logs {
+            query: SystemLogQuery::EventRead {
+                event_ref: filter_string(args, "event_ref")?.ok_or("event_ref required")?,
+                offset: args
+                    .get("offset")
+                    .map(|v| v.as_u64().ok_or("invalid offset"))
+                    .transpose()?
+                    .unwrap_or(0),
+                max_bytes: u32::try_from(
+                    args.get("max_bytes")
+                        .map(|v| v.as_u64().ok_or("invalid max_bytes"))
+                        .transpose()?
+                        .unwrap_or(8192),
+                )
                 .map_err(|_| "invalid max_bytes")?,
-        } },
+            },
+        },
         "pab_terminate_process" => SystemQuery::TerminateProcess {
             pid: pid.ok_or("pid required")?,
             identity: filter("identity").ok_or("identity required")?,
@@ -229,7 +292,14 @@ pub(super) fn parse(name: &str, args: &Value) -> Result<(RequestId, SystemQuery)
 }
 
 fn filter_string(args: &Value, key: &str) -> Result<Option<String>, String> {
-    args.get(key).map(|value| value.as_str().map(str::to_owned).ok_or_else(|| format!("invalid {key}"))).transpose()
+    args.get(key)
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("invalid {key}"))
+        })
+        .transpose()
 }
 pub(super) async fn call(
     runtime: &BridgeRuntime,
@@ -256,17 +326,64 @@ mod tests {
     use super::*;
     #[test]
     fn log_tools_generate_request_ids_and_keep_cursor_separate() {
-        for name in ["pab_system_log_sources", "pab_system_log_read", "pab_system_log_event_read"] {
-            let tool = tools().into_iter().find(|tool| tool["name"] == name).unwrap();
-            assert_eq!(tool["inputSchema"]["properties"]["request_id"]["format"], "uuid");
-            assert!(!tool["inputSchema"]["required"].as_array().unwrap().iter().any(|value| value == "request_id"));
-            assert!(tool["description"].as_str().unwrap().contains("capability v15"));
+        for name in [
+            "pab_system_log_sources",
+            "pab_system_log_read",
+            "pab_system_log_event_read",
+        ] {
+            let tool = tools()
+                .into_iter()
+                .find(|tool| tool["name"] == name)
+                .unwrap();
+            assert_eq!(
+                tool["inputSchema"]["properties"]["request_id"]["format"],
+                "uuid"
+            );
+            assert!(
+                !tool["inputSchema"]["required"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value == "request_id")
+            );
+            assert!(
+                tool["description"]
+                    .as_str()
+                    .unwrap()
+                    .contains("capability v15")
+            );
         }
-        let (id, query) = parse("pab_system_log_read", &json!({"device_code":"123456789","sources":["eventlog:Application"],"limit":2})).unwrap();
+        let (id, query) = parse(
+            "pab_system_log_read",
+            &json!({"device_code":"123456789","sources":["eventlog:Application"],"limit":2}),
+        )
+        .unwrap();
         assert_ne!(id.to_string(), "");
-        assert!(matches!(query, SystemQuery::Logs { query: SystemLogQuery::Read { cursor: None, sources: Some(_), limit: 2, .. } }));
-        assert!(parse("pab_system_log_read", &json!({"cursor":"opaque","sources":["eventlog:System"]})).is_err());
-        assert!(parse("pab_system_log_event_read", &json!({"event_ref":"event","max_bytes":8193})).is_err());
+        assert!(matches!(
+            query,
+            SystemQuery::Logs {
+                query: SystemLogQuery::Read {
+                    cursor: None,
+                    sources: Some(_),
+                    limit: 2,
+                    ..
+                }
+            }
+        ));
+        assert!(
+            parse(
+                "pab_system_log_read",
+                &json!({"cursor":"opaque","sources":["eventlog:System"]})
+            )
+            .is_err()
+        );
+        assert!(
+            parse(
+                "pab_system_log_event_read",
+                &json!({"event_ref":"event","max_bytes":8193})
+            )
+            .is_err()
+        );
     }
     #[test]
     fn execution_context_discovery_is_strict_versioned_and_read_only() {

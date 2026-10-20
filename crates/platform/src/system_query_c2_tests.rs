@@ -202,7 +202,11 @@ async fn local_dns_types_ttl_and_ptr_source_are_preserved() {
         assert!(!result.hosts_file_consulted);
         assert_eq!(result.record_type, kind);
         assert!(!result.records[0].value.is_empty());
-        assert!(result.records[0].ttl_seconds > 0 && result.records[0].ttl_seconds <= 42);
+        assert!(
+            result.records[0]
+                .ttl_seconds
+                .is_some_and(|ttl| ttl > 0 && ttl <= 42)
+        );
         if kind == DnsRecordType::Ptr {
             assert_eq!(result.query_name, "1.2.0.192.in-addr.arpa.");
         }

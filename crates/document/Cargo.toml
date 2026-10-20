@@ -4,7 +4,13 @@ version = "1.2.48"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["native-runtime"]
+native-runtime = ["dep:xberg-tesseract", "dep:pdfium-render"]
+
 [dependencies]
+pab-protocol = { path = "../protocol" }
+regex = "1"
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
@@ -17,9 +23,9 @@ lopdf = "=0.42.0"
 thiserror.workspace = true
 anydoc = "=0.2.4"
 pdf-inspector = "=1.14.2"
-xberg-tesseract = { version = "=1.3.8", default-features = false, features = ["static-linking"] }
+xberg-tesseract = { version = "=1.3.8", optional = true, default-features = false, features = ["static-linking"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-pdfium-render = { version = "=0.8.37", default-features = false, features = ["pdfium_latest", "thread_safe", "image_025"] }
+pdfium-render = { version = "=0.8.37", optional = true, default-features = false, features = ["pdfium_latest", "thread_safe", "image_025"] }
 tokio = { workspace = true, features = ["rt", "macros"] }
 
 [dev-dependencies]

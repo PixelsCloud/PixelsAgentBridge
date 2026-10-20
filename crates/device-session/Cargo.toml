@@ -1,0 +1,14 @@
+[package]
+name = "pab-device-session"
+version = "1.2.48"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+argon2 = "0.5"
+pab-agent-core = { path = "../agent-core" }
+pab-protocol = { path = "../protocol" }
+pab-transport = { path = "../transport" }
+tokio.workspace = true
+thiserror.workspace = true
+zeroize = "1"

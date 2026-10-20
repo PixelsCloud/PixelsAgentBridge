@@ -2,11 +2,14 @@ use crate::RequestId;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_SYSTEM_REPLY_BYTES: usize = 32 * 1024;
-pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 15;
+pub const SYSTEM_QUERY_SCHEMA_VERSION: u16 = 17;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SystemQuery {
+    Notifications {
+        query: crate::NotificationRequest,
+    },
     Logs {
         query: crate::SystemLogQuery,
     },
@@ -88,6 +91,7 @@ pub enum SystemQuery {
 impl SystemQuery {
     pub fn kind(&self) -> &'static str {
         match self {
+            Self::Notifications { query } => query.kind(),
             Self::Logs { query } => query.kind(),
             Self::Applications { query, .. } => query.kind(),
             Self::ExecutionContexts { .. } => "execution_contexts",
@@ -109,10 +113,16 @@ impl SystemQuery {
         }
     }
     pub fn required_version(&self) -> u16 {
+        if matches!(self, Self::Notifications { .. }) {
+            return 17;
+        }
         if matches!(self, Self::Logs { .. }) {
             return 15;
         }
         if let Self::Applications { query, .. } = self {
+            if matches!(query, crate::AppQuery::Package { .. }) {
+                return 16;
+            }
             return if query.required_helper_version() >= 3 {
                 14
             } else if query.required_helper_version() >= 2 {
@@ -179,6 +189,9 @@ impl SystemQuery {
         }
     }
     pub fn is_mutation(&self) -> bool {
+        if let Self::Notifications { query } = self {
+            return query.is_mutation();
+        }
         if let Self::Applications { query, .. } = self {
             return query.is_mutation();
         }
@@ -200,7 +213,11 @@ impl SystemQuery {
     pub fn persistence_form(&self) -> Self {
         let mut value = self.clone();
         if let Self::Logs {
-            query: crate::SystemLogQuery::Read { filter: Some(filter), .. },
+            query:
+                crate::SystemLogQuery::Read {
+                    filter: Some(filter),
+                    ..
+                },
         } = &mut value
         {
             if let Some(needle) = &mut filter.message_contains {
@@ -252,6 +269,9 @@ impl SystemQuery {
         value
     }
     pub fn validate(&self) -> Result<(), &'static str> {
+        if let Self::Notifications { query } = self {
+            return query.validate();
+        }
         if let Self::Logs { query } = self {
             return query.validate();
         }
@@ -404,6 +424,9 @@ impl SystemQueryReply {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SystemQueryData {
+    Notifications {
+        snapshot: crate::NotificationSnapshot,
+    },
     Logs {
         snapshot: Box<crate::SystemLogData>,
     },
@@ -465,6 +488,9 @@ pub enum SystemQueryData {
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SystemInfo {
+    /// Android public API observations. Absent on desktop executors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mobile: Option<MobileSystemInfo>,
     pub host_name: Option<String>,
     pub os_name: Option<String>,
     pub os_version: Option<String>,
@@ -486,6 +512,17 @@ pub struct SystemInfo {
     pub swap_used_bytes: u64,
     pub executor: ProcessInfo,
     pub gpu: GpuQuery,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MobileSystemInfo {
+    pub manufacturer: String,
+    pub model: String,
+    pub sdk: u32,
+    pub battery_percent: Option<u32>,
+    pub charging: Option<bool>,
+    pub active_transport: Option<String>,
+    pub internet_validated: Option<bool>,
+    pub dns_servers: Vec<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessInfo {
@@ -521,8 +558,9 @@ pub struct NetworkInfo {
     pub mac: Option<String>,
     pub mtu: Option<u64>,
     pub state: String,
-    pub received_bytes: u64,
-    pub transmitted_bytes: u64,
+    /// None when the OS does not expose counters for this interface.
+    pub received_bytes: Option<u64>,
+    pub transmitted_bytes: Option<u64>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GpuQuery {
@@ -688,7 +726,8 @@ pub enum DnsRecordType {
 pub struct DnsRecord {
     pub name: String,
     pub record_type: String,
-    pub ttl_seconds: u32,
+    /// Native address resolution may not expose the DNS TTL.
+    pub ttl_seconds: Option<u32>,
     pub value: String,
     pub value_truncated: bool,
 }
@@ -720,6 +759,28 @@ pub struct OsSessionInfo {
 #[cfg(test)]
 mod c2_tests {
     use super::*;
+    #[test]
+    fn desktop_counter_and_dns_wire_values_roundtrip_while_android_can_report_unavailable() {
+        let network = serde_json::json!({"name":"eth0","addresses":[],"mac":null,"mtu":1500,"state":"up","received_bytes":123,"transmitted_bytes":456});
+        let parsed: NetworkInfo = serde_json::from_value(network.clone()).unwrap();
+        assert_eq!(parsed.received_bytes, Some(123));
+        assert_eq!(serde_json::to_value(parsed).unwrap(), network);
+        let mut unavailable = network;
+        unavailable["received_bytes"] = serde_json::Value::Null;
+        unavailable["transmitted_bytes"] = serde_json::Value::Null;
+        assert_eq!(
+            serde_json::from_value::<NetworkInfo>(unavailable)
+                .unwrap()
+                .received_bytes,
+            None
+        );
+        let record = serde_json::json!({"name":"example.com","record_type":"A","ttl_seconds":42,"value":"192.0.2.1","value_truncated":false});
+        assert_eq!(
+            serde_json::to_value(serde_json::from_value::<DnsRecord>(record.clone()).unwrap())
+                .unwrap(),
+            record
+        );
+    }
     #[test]
     fn dns_validation_and_c2_capability_do_not_reject_c1_peers() {
         assert_eq!(SystemQuery::Disks { limit: 100 }.required_version(), 1);

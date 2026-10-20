@@ -1,5 +1,5 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
-use pab_agent_core::{DataPaths};
+use pab_agent_core::DataPaths;
 use pab_bridge::output_text::{OutputEncoding, decode_output};
 use pab_bridge::{BridgeLocalStore, BridgeRuntime};
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
@@ -10,6 +10,9 @@ pub(super) async fn call_tool(
     name: &str,
     arguments: &Value,
 ) -> Result<Value, String> {
+    if super::mcp_notifications::handles(name) {
+        return super::mcp_system_query::call(runtime, name, arguments).await;
+    }
     if super::mcp_browser::handles(name) {
         return super::mcp_browser::call(runtime, name, arguments).await;
     }
@@ -42,6 +45,11 @@ pub(super) async fn call_tool(
         | "pab_list_apps"
         | "pab_launch_app"
         | "pab_open_file"
+        | "pab_inspect_app_package"
+        | "pab_install_app"
+        | "pab_uninstall_app"
+        | "pab_get_app_change"
+        | "pab_resume_app_change"
         | "pab_terminate_process"
         | "pab_list_services"
         | "pab_get_service"

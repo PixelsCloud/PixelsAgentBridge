@@ -1,5 +1,33 @@
 import { test, expect } from '@playwright/test';
 
+test('manual refresh reloads saved devices and presence without resetting a live connection', async ({page}) => {
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=offline&connected');
+  await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+  await page.evaluate(() => {
+    const fixture = (window as any).fixture;
+    fixture.presence = true;
+    const original = (window as any).__TAURI_INTERNALS__.invoke;
+    (window as any).__TAURI_INTERNALS__.invoke = async (command:string, args:any) => {
+      if (command === 'operator_bootstrap') {
+        await new Promise(resolve => { fixture.finishRefresh = resolve; });
+        const saved = await original(command, args);
+        return {...saved, devices: [...saved.devices, {...saved.devices[0], deviceId:'new-device', deviceCode:'987654321', alias:'New device', connected:false}]};
+      }
+      return original(command, args);
+    };
+  });
+  const refresh = page.getByRole('button',{name:'Refresh device list',exact:true});
+  await refresh.click();
+  await expect(refresh).toBeDisabled();
+  await page.evaluate(() => (window as any).fixture.finishRefresh());
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator('.device-list .home-recent-device')).toHaveCount(2);
+  await expect(page.locator('.count-badge')).toHaveText('2');
+  await expect(page.locator('.home-recent-device').filter({hasText:'123 456 789'}).locator('.home-recent-connection')).toContainText('Connected');
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((call:any)=>call.command==='operator_saved_device_presence').length)).toBeGreaterThan(1);
+  await expect(page.getByText('New device',{exact:true})).toBeVisible();
+});
+
 for (const view of ['home', 'remote']) {
   for (const [presence, label] of [['online', 'Online'], ['offline', 'Offline'], ['unknown', 'Unknown'], ['error', 'Unknown']]) {
     test(`${view} card shows ${label} without requiring an authenticated device connection (${presence})`, async ({page}) => {

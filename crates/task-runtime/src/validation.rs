@@ -8,7 +8,7 @@ pub fn validate_execution_context(value: &ExecutionContext) -> Result<(), TaskRu
     validate_text("environment_revision", &value.environment_revision, 128)?;
     let expected_path_style = match value.os_family {
         OsFamily::Windows => PathStyle::Windows,
-        OsFamily::Linux | OsFamily::Macos => PathStyle::Posix,
+        OsFamily::Linux | OsFamily::Macos | OsFamily::Android => PathStyle::Posix,
     };
     if value.path_style != expected_path_style {
         return Err(TaskRuntimeError::PathStyleMismatch);

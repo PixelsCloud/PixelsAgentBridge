@@ -172,7 +172,7 @@ pub(crate) async fn native_import(
         .any(|s| s.chars().count() > 128 || s.chars().any(char::is_control))
         || !matches!(
             input.system.as_deref(),
-            None | Some("windows" | "macos" | "linux")
+            None | Some("windows" | "macos" | "linux" | "android")
         )
     {
         return Err(WebError::invalid());

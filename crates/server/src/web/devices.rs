@@ -34,7 +34,7 @@ impl DeviceQuery {
             || !matches!(self.status.as_deref(), None | Some("online" | "offline"))
             || !matches!(
                 self.system.as_deref(),
-                None | Some("windows" | "linux" | "macos")
+                None | Some("windows" | "linux" | "macos" | "android")
             )
             || !matches!(self.scope.as_deref(), None | Some("mine" | "all"))
         {

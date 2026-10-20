@@ -172,6 +172,11 @@ pub struct TransferSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskRequest {
+    Mobile {
+        schema_version: u16,
+        mobile_schema_version: u16,
+        request: crate::MobileRequest,
+    },
     DesktopTerminal {
         schema_version: u16,
         request: crate::DesktopTerminalRequest,
@@ -219,6 +224,8 @@ pub enum DeviceTaskRequest {
     GetFileSystem {
         schema_version: u16,
         request_id: RequestId,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        include_data: bool,
     },
     GetEnvironment {
         schema_version: u16,
@@ -357,6 +364,10 @@ impl DeviceTaskRequest {
             | Self::UploadFile { request_id, .. }
             | Self::DownloadFile { request_id, .. } => Some(*request_id),
             Self::TransferFile { request, .. } => Some(request.request_id),
+            Self::Mobile {
+                request: crate::MobileRequest::Execute { request_id, .. },
+                ..
+            } => Some(*request_id),
             Self::FileSystem { request, .. } => Some(request.request_id),
             Self::Document { request, .. } => Some(request.request_id),
             _ => None,
@@ -366,6 +377,7 @@ impl DeviceTaskRequest {
         match self {
             Self::GetUserContext { schema_version } => *schema_version,
             Self::TransferFile { schema_version, .. }
+            | Self::Mobile { schema_version, .. }
             | Self::DesktopTerminal { schema_version, .. }
             | Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
@@ -430,6 +442,9 @@ pub enum PortForwardErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DeviceTaskResponse {
+    Mobile {
+        reply: Box<crate::MobileReply>,
+    },
     DesktopTerminal {
         reply: crate::DesktopTerminalReply,
     },
@@ -468,6 +483,8 @@ pub enum DeviceTaskResponse {
         document_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         port_forward_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mobile_schema_version: Option<u16>,
     },
     PortForwardConnected,
     PortForwardRejected {
@@ -664,6 +681,30 @@ mod tests {
         let decoded: DeviceTaskRequest = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(decoded, request);
         assert_eq!(decoded.schema_version(), DEVICE_TASK_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn filesystem_result_body_is_an_optional_backward_compatible_request() {
+        // Derive the wire tag rather than coupling this check to Rust spelling.
+        let request = DeviceTaskRequest::GetFileSystem {
+            schema_version: DEVICE_TASK_SCHEMA_VERSION,
+            request_id: RequestId::from_u128(7),
+            include_data: false,
+        };
+        let mut legacy = serde_json::to_value(&request).unwrap();
+        assert!(legacy.get("include_data").is_none());
+        assert_eq!(
+            serde_json::from_value::<DeviceTaskRequest>(legacy.clone()).unwrap(),
+            request
+        );
+        legacy["include_data"] = serde_json::json!(true);
+        assert!(matches!(
+            serde_json::from_value::<DeviceTaskRequest>(legacy).unwrap(),
+            DeviceTaskRequest::GetFileSystem {
+                include_data: true,
+                ..
+            }
+        ));
     }
 
     #[test]

@@ -5,6 +5,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub const DEFAULT_CONTROL_URL: &str = "wss://pab.rgaa.vip/control";
+pub const DEFAULT_RELAY_URL: &str = "https://pab-relay.rgaa.vip";
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClientConfig {
@@ -195,9 +198,9 @@ pub fn configure(args: &[String]) -> Result<(), String> {
         }
     }
     let config = ClientConfig {
-        control_url: control.unwrap_or("wss://pab.rgaa.vip/control").into(),
+        control_url: control.unwrap_or(DEFAULT_CONTROL_URL).into(),
         relay_urls: relay
-            .unwrap_or("https://pab-relay.rgaa.vip")
+            .unwrap_or(DEFAULT_RELAY_URL)
             .split(',')
             .map(|s| s.trim().into())
             .collect(),

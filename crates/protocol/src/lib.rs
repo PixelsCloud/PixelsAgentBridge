@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 mod app_management;
 pub use app_management::*;
+mod app_package;
+pub use app_package::*;
 mod browser;
 pub use browser::*;
 mod container;
@@ -15,8 +17,12 @@ mod monitor_input;
 pub use monitor_input::*;
 mod ui_automation;
 pub use ui_automation::*;
+mod notification;
+pub use notification::*;
 
 mod control;
+mod mobile;
+pub use mobile::*;
 mod device;
 mod device_code;
 mod device_network;

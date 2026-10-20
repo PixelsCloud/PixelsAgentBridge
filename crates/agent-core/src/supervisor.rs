@@ -30,6 +30,7 @@ pub struct EndpointControlSupervisor {
     connector: Connector,
     policy: ReconnectPolicy,
     device_hello: Option<DeviceHello>,
+    optional_device_hello: bool,
     device_network: Option<watch::Receiver<DeviceNetworkUpdate>>,
     relay_directory_enabled: bool,
     relay_cache: Option<crate::relay_cache::RelayCache>,
@@ -49,6 +50,7 @@ impl EndpointControlSupervisor {
             connector,
             policy: policy.validate()?,
             device_hello: None,
+            optional_device_hello: false,
             device_network: None,
             relay_directory_enabled: false,
             relay_cache: None,
@@ -88,6 +90,15 @@ impl EndpointControlSupervisor {
         }
         self.device_hello = Some(hello);
         Ok(self)
+    }
+
+    /// Older control servers cannot decode new platform metadata. Opt-in endpoints
+    /// may reconnect without that optional announcement after a mismatched response.
+    /// Authentication, signed identity and network publication remain mandatory.
+    /// Existing callers keep the strict behavior unless they explicitly opt in.
+    pub fn with_optional_device_hello(mut self) -> Self {
+        self.optional_device_hello = true;
+        self
     }
 
     pub fn with_relay_directory(mut self) -> Self {
@@ -190,6 +201,14 @@ impl EndpointControlSupervisor {
                             .map(|_| ()),
                         None => Ok(()),
                     };
+                    if self.optional_device_hello
+                        && matches!(&hello_result, Err(EndpointControlError::MismatchedResponse))
+                    {
+                        // Use a fresh authenticated connection. Never reuse a stream
+                        // whose reply could not be bound to the metadata request.
+                        self.device_hello = None;
+                        self.optional_device_hello = false;
+                    }
                     let network_result = match (hello_result, self.device_network.as_mut()) {
                         (Ok(()), Some(updates)) => {
                             let update = updates.borrow_and_update().clone();

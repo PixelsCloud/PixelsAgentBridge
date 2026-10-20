@@ -30,6 +30,12 @@ pub async fn call(
             .and_then(Value::as_bool)
             .unwrap_or(true),
     );
+    if target.execution.os_family == pab_protocol::OsFamily::Android {
+        if metadata["preview_to_desktop"].is_object() {
+            metadata["preview_to_desktop"]["coordinate_space"] = json!("android_screen_pixels");
+        }
+        metadata["source_frame_format"] = json!("jpeg");
+    }
     metadata["destination"] = json!(
         destination
             .map(str::to_owned)

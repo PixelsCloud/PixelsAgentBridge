@@ -1,8 +1,7 @@
 use std::path::Path;
 
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::PasswordHash;
 use thiserror::Error;
-use zeroize::Zeroizing;
 
 #[derive(Clone)]
 pub(crate) struct DeviceCredential {
@@ -11,6 +10,20 @@ pub(crate) struct DeviceCredential {
 }
 
 impl DeviceCredential {
+    pub async fn verify(
+        &self,
+        password: zeroize::Zeroizing<String>,
+    ) -> Result<bool, DeviceCredentialError> {
+        Ok(self.shared()?.verify(password).await?)
+    }
+    pub(crate) fn shared(
+        &self,
+    ) -> Result<pab_device_session::DevicePassword, pab_device_session::SessionError> {
+        pab_device_session::DevicePassword::from_phc(
+            self.password_version,
+            self.password_hash.clone(),
+        )
+    }
     pub async fn read(path: &Path) -> Result<Self, DeviceCredentialError> {
         let stored = crate::device_access::load(path).await?;
         if stored.password_version == 0 {
@@ -26,27 +39,12 @@ impl DeviceCredential {
             password_hash: stored.password_hash,
         })
     }
-
-    pub const fn password_version(&self) -> u64 {
-        self.password_version
-    }
-
-    pub async fn verify(&self, password: Zeroizing<String>) -> Result<bool, DeviceCredentialError> {
-        let password_hash = self.password_hash.clone();
-        tokio::task::spawn_blocking(move || {
-            let parsed = PasswordHash::new(&password_hash)
-                .map_err(|_| DeviceCredentialError::InvalidPasswordHash)?;
-            Ok(Argon2::default()
-                .verify_password(password.as_bytes(), &parsed)
-                .is_ok())
-        })
-        .await
-        .map_err(DeviceCredentialError::Worker)?
-    }
 }
 
 #[derive(Debug, Error)]
 pub enum DeviceCredentialError {
+    #[error(transparent)]
+    Shared(#[from] pab_device_session::SessionError),
     #[error(transparent)]
     Store(#[from] crate::device_access::DeviceAccessError),
     #[error("device password version must be greater than zero")]
@@ -61,7 +59,8 @@ pub enum DeviceCredentialError {
 
 #[cfg(test)]
 mod tests {
-    use argon2::{PasswordHasher, password_hash::SaltString};
+    use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
+    use zeroize::Zeroizing;
 
     use super::*;
 
@@ -89,15 +88,19 @@ mod tests {
         .unwrap();
 
         let credential = DeviceCredential::read(&path).await.unwrap();
-        assert_eq!(credential.password_version(), 7);
+        assert_eq!(credential.shared().unwrap().version(), 7);
         assert!(
             credential
+                .shared()
+                .unwrap()
                 .verify(Zeroizing::new("correct device password".to_owned()))
                 .await
                 .unwrap()
         );
         assert!(
             !credential
+                .shared()
+                .unwrap()
                 .verify(Zeroizing::new("wrong device password".to_owned()))
                 .await
                 .unwrap()

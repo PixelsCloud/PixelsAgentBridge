@@ -1,15 +1,15 @@
 use std::{sync::atomic::AtomicU64, time::Duration};
 
+use pab_device_session::port_forward::IDLE_TIMEOUT;
+
 use pab_protocol::{
     DeviceTaskResponse, PORT_FORWARD_SCHEMA_VERSION, PortForwardErrorCode, valid_port_forward_host,
 };
 use pab_transport::PabBiStream;
-use tokio::{net::TcpStream, time::Instant};
+#[cfg(test)]
+use tokio::net::TcpStream;
 
 use super::{TaskService, TaskServiceError};
-
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-const IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 impl TaskService {
     pub(super) async fn port_forward_stream(
@@ -56,72 +56,9 @@ impl TaskService {
             )
             .await;
         };
-        let deadline = Instant::now() + CONNECT_TIMEOUT;
-        let addresses =
-            match tokio::time::timeout_at(deadline, tokio::net::lookup_host((host, port))).await {
-                Ok(Ok(addresses)) => addresses.collect::<Vec<_>>(),
-                Ok(Err(error)) => {
-                    return reject(
-                        &mut stream,
-                        timeout,
-                        PortForwardErrorCode::DnsFailed,
-                        &format!("target DNS lookup failed: {error}"),
-                    )
-                    .await;
-                }
-                Err(_) => {
-                    return reject(
-                        &mut stream,
-                        timeout,
-                        PortForwardErrorCode::ConnectTimeout,
-                        "target DNS lookup timed out",
-                    )
-                    .await;
-                }
-            };
-        if addresses.is_empty() {
-            return reject(
-                &mut stream,
-                timeout,
-                PortForwardErrorCode::DnsFailed,
-                "target DNS returned no addresses",
-            )
-            .await;
-        }
-        let mut last_error = None;
-        let mut tcp = None;
-        for address in addresses {
-            match tokio::time::timeout_at(deadline, TcpStream::connect(address)).await {
-                Ok(Ok(connection)) => {
-                    tcp = Some(connection);
-                    break;
-                }
-                Ok(Err(error)) => last_error = Some(error),
-                Err(_) => {
-                    return reject(
-                        &mut stream,
-                        timeout,
-                        PortForwardErrorCode::ConnectTimeout,
-                        "target TCP connect timed out",
-                    )
-                    .await;
-                }
-            }
-        }
-        let Some(tcp) = tcp else {
-            let error = last_error.expect("nonempty address list");
-            let code = if error.kind() == std::io::ErrorKind::ConnectionRefused {
-                PortForwardErrorCode::ConnectionRefused
-            } else {
-                PortForwardErrorCode::ConnectFailed
-            };
-            return reject(
-                &mut stream,
-                timeout,
-                code,
-                &format!("target TCP connect failed: {error}"),
-            )
-            .await;
+        let tcp = match pab_device_session::port_forward::connect_target(host, port).await {
+            Ok(tcp) => tcp,
+            Err(error) => return reject(&mut stream, timeout, error.code, &error.message).await,
         };
         stream
             .send_frame_json(&DeviceTaskResponse::PortForwardConnected, timeout)

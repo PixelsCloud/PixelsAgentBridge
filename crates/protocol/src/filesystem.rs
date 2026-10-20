@@ -439,6 +439,8 @@ pub struct FileSystemError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSystemReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cancellable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<crate::DirectoryPage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_context: Option<crate::ExecutionContext>,
@@ -468,8 +470,13 @@ pub struct FileSystemReply {
 }
 
 impl FileSystemReply {
+    pub fn supports_cancel(&self) -> bool {
+        self.cancellable
+            .unwrap_or_else(|| cancellable_filesystem_kind(&self.kind))
+    }
     pub fn pending(request: &FileSystemRequest) -> Self {
         Self {
+            cancellable: None,
             directory: None,
             execution_context: None,
             log: None,

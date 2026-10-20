@@ -155,7 +155,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_open_terminal",
-            "Open an interactive shell. Returns actual shell and startup arguments/mode when reported by the peer (Windows no-profile, macOS login-interactive, Linux interactive). Default execution is service; user requires a context_ref discovered on this connection. Identity is fixed for this session and never falls back. Subsequent calls use session_id. Disconnect closes the session; no automatic reopen or replay of input.",
+            "Open an interactive shell. Returns actual shell and startup arguments/mode when reported by the peer (Windows no-profile, macOS login-interactive, Linux/Android interactive). Default execution is service; user requires a context_ref discovered on this connection. Android uses /system/bin/sh -i under the application UID, starts in its workspace, permits two PTYs and expires idle sessions after 15 minutes; this is not adb/root or a filesystem sandbox. Identity is fixed for this session and never falls back. Subsequent calls use session_id. Disconnect closes the session; no automatic reopen or replay of input.",
             json!({
                 "type": "object",
                 "properties": {
@@ -216,7 +216,7 @@ pub(super) fn tools() -> Vec<Value> {
         ),
         tool(
             "pab_get_operation",
-            "Read operation status by original request ID and device code. For document_open, also pass kind=document_open from its operation_ref so a restarted MCP can ask the device directly. Document caches expire after one hour.",
+            "Read operation status by original request ID and device code. Android completed file reads also return text through the original result channel, without reading the file again; read/search content expires after 15 minutes or bounded-cache eviction and requires current control/mount authorization. result_data_error reports unavailable/expired/denied content separately from the original result.state; text=null is not an empty file. Metadata-only older peers may not return text. For document operations, pass kind from operation_ref so a restarted MCP can ask the device directly. Document caches expire after one hour on desktop or 15 minutes on Android.",
             operation_schema(),
         ),
         tool(
@@ -252,9 +252,11 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_container::tools());
     tools.extend(super::mcp_desktop::tools());
     tools.extend(super::mcp_ui::tools());
+    tools.extend(super::mcp_notifications::tools());
     tools.extend(super::mcp_applications::tools());
     tools.extend(super::mcp_browser::tools());
     tools.extend(super::mcp_port_forward::tools());
+    tools.extend(super::mcp_mobile::tools());
     super::mcp_desktop::enhance_input_tool(
         tools
             .iter_mut()
@@ -263,6 +265,28 @@ pub(super) fn tools() -> Vec<Value> {
     );
     for entry in &mut tools {
         let name = entry["name"].as_str().unwrap().to_owned();
+        let android = match name.as_str() {
+            "pab_list_windows" | "pab_list_monitors" => Some(
+                "Android supports only its current unlocked accessibility window and active display (ID 0), not a global desktop inventory. Returned opaque window refs bind to caller, connection, native window and geometry.",
+            ),
+            "pab_focus_window" => Some(
+                "Android verifies this is still the current accessibility window; it cannot focus an arbitrary background window. Use pab_launch_app to switch apps.",
+            ),
+            "pab_type_text" => Some(
+                "Android supports insertion at the current focused non-password editable control's selection, preserving other text. Use pab_ui_action set_value for replacement. No clipboard access or shell fallback.",
+            ),
+            "pab_ui_query" | "pab_ui_get" | "pab_ui_action" | "pab_ui_wait" => Some(
+                "Android adapts this same schema through its existing accessibility backend. Only advertised native node actions are available; stale/cross-connection refs fail. Query traversal is capped at 128 returned nodes and 2000 visits; truncation cannot prove absence. Password values are never exposed or writable. Native dispatch is not a business postcondition.",
+            ),
+            "pab_capture_screenshot" => Some(
+                "Android supports consented JPEG capture of its active display with optional caller-bound window_ref and bounded crop. Coordinates are android_screen_pixels. Protected/locked windows are rejected.",
+            ),
+            _ => None,
+        };
+        if let Some(note) = android {
+            let description = entry["description"].as_str().unwrap().to_owned();
+            entry["description"] = json!(format!("{description} {note}"));
+        }
         let properties = entry["inputSchema"]["properties"].as_object_mut().unwrap();
         if matches!(
             name.as_str(),
@@ -341,7 +365,7 @@ pub(super) fn tools() -> Vec<Value> {
                 " Defaults to service. User execution requires filesystem v6 and a current connection context_ref from pab_list_execution_contexts. Use the same selection for subsequent name-cursor pages. No service fallback; pages report actual execution identity. Directory contents may change between pages."
             }
             "pab_run_command" => {
-                " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. encoding only decodes the returned output preview (UTF-8 default), never changes the program or stored bytes. include_base64 returns unfiltered bytes for [offset,next_offset). Use pab_read_output to re-decode the original task without rerunning."
+                " Execution defaults to the service account. User execution requires command v3 and a user context_ref returned by pab_list_execution_contexts on this connection; unavailable contexts never fall back to service. Reuse request_id to observe the original task; changing execution conflicts. env/stdin_text/timeout_ms require command v2. stdin is UTF-8, maximum 16 KiB. wait_ms waits after remote acceptance; it does not stop the command. timeout_ms stops the direct child; descendants may remain. Android supports service execution as the application UID, four commands at once, a default 5-minute deadline and 1 MiB retained per output stream in transient memory for up to 32 tasks. Reconnect never reruns accepted work; app restart preserves task facts but expires output. cwd is /workspace or its existing subdirectories; use relative command arguments there and file tools for SAF mounts. Shells have the app UID's filesystem access, not a workspace sandbox or adb/root privileges. Android cleanup stops the owned process group; independent sessions can escape that boundary. Android 10+ cannot exec downloaded binaries in writable app home; use system programs or shell scripts via /system/bin/sh. encoding only decodes the returned output preview (UTF-8 default), never changes the program or stored bytes. include_base64 returns unfiltered bytes for [offset,next_offset). Use pab_read_output to re-decode the original task without rerunning."
             }
             "pab_get_task" | "pab_get_operation" => {
                 " wait_ms optionally waits up to 30s for change or completion. Reuse after_revision to avoid missing updates. Expiry returns observed facts, not a task failure."
@@ -403,7 +427,7 @@ fn operation_schema() -> Value {
     json!({ "type": "object", "properties": {
         "device_code": { "type": "string", "pattern": "^[0-9]{9}$" },
         "operation_id": { "type": "string", "format": "uuid" },
-        "kind": { "type": "string", "enum": ["document_open"] }
+        "kind": { "type": "string", "enum": ["document_open", "document_read", "document_search", "document_render_page", "document_close"] }
     }, "required": ["device_code", "operation_id"], "additionalProperties": false })
 }
 
@@ -413,11 +437,17 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
         .find(|tool| tool["name"] == name)
         .ok_or_else(|| format!("unknown tool: {name}"))?;
     validate_value(args, &definition["inputSchema"], "arguments")?;
+    if name == "pab_mobile_control" {
+        super::mcp_mobile::parse(args)?;
+    }
     if super::mcp_applications::handles(name) {
         super::mcp_applications::parse(name, args)?;
     }
     if super::mcp_ui::handles(name) {
         super::mcp_ui::parse(name, args)?;
+    }
+    if super::mcp_notifications::handles(name) {
+        super::mcp_notifications::parse(name, args)?;
     }
     if super::mcp_browser::handles(name) {
         super::mcp_browser::parse(name, args)?;
@@ -650,8 +680,8 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 110);
-        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 110);
+        assert_eq!(all.len(), 121);
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 121);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
                 version: 3,

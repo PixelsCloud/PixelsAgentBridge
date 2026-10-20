@@ -4764,6 +4764,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-android-agent"
+version = "1.2.48"
+dependencies = [
+ "argon2",
+ "axum",
+ "axum-server",
+ "blake3",
+ "futures-util",
+ "globset",
+ "iroh-base",
+ "iroh-relay",
+ "jni 0.21.1",
+ "jni 0.22.4",
+ "libc",
+ "ndk-context",
+ "pab-agent-core",
+ "pab-command-runtime",
+ "pab-device-session",
+ "pab-document",
+ "pab-file-codec",
+ "pab-protocol",
+ "pab-screenshot",
+ "pab-service-config",
+ "pab-task-runtime",
+ "pab-terminal",
+ "pab-transport",
+ "rand_core 0.6.4",
+ "rcgen",
+ "rustls",
+ "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "tokio-tungstenite",
+ "toml",
+ "url",
+ "uuid",
+ "zeroize",
+ "zip 8.6.0",
+]
+
+[[package]]
 name = "pab-bridge"
 version = "1.2.48"
 dependencies = [
@@ -4791,6 +4837,15 @@ dependencies = [
  "tracing",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "pab-command-runtime"
+version = "1.2.48"
+dependencies = [
+ "libc",
+ "pab-protocol",
+ "tokio",
 ]
 
 [[package]]
@@ -4822,6 +4877,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pab-device-session"
+version = "1.2.48"
+dependencies = [
+ "argon2",
+ "pab-agent-core",
+ "pab-protocol",
+ "pab-transport",
+ "thiserror 2.0.21",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "pab-document"
 version = "1.2.48"
 dependencies = [
@@ -4832,9 +4900,11 @@ dependencies = [
  "image",
  "libc",
  "lopdf",
+ "pab-protocol",
  "pdf-inspector",
  "pdfium-render",
  "quick-xml 0.41.0",
+ "regex",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4861,7 +4931,10 @@ dependencies = [
  "hmac",
  "iroh-base",
  "pab-agent-core",
+ "pab-command-runtime",
+ "pab-device-session",
  "pab-document",
+ "pab-file-codec",
  "pab-interactive-terminal",
  "pab-logging",
  "pab-os-control",
@@ -4891,6 +4964,19 @@ dependencies = [
  "windows-service",
  "zeroize",
  "zip 8.6.0",
+]
+
+[[package]]
+name = "pab-file-codec"
+version = "1.2.48"
+dependencies = [
+ "globset",
+ "pab-protocol",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
 ]
 
 [[package]]
@@ -5130,6 +5216,7 @@ dependencies = [
 name = "pab-terminal"
 version = "1.2.48"
 dependencies = [
+ "libc",
  "portable-pty",
  "thiserror 2.0.21",
 ]

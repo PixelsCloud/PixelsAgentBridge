@@ -16,7 +16,7 @@ pub fn detect_native_execution_context() -> Result<ExecutionContext, PlatformDet
     let cwd = path_to_string(&cwd)?;
     let path_style = match os_family {
         OsFamily::Windows => PathStyle::Windows,
-        OsFamily::Linux | OsFamily::Macos => PathStyle::Posix,
+        OsFamily::Linux | OsFamily::Macos | OsFamily::Android => PathStyle::Posix,
     };
     // Identity lookup failure must not stop the device's service/connection. An
     // unobserved account is explicit and cannot be used as a run-as context.

@@ -13,6 +13,7 @@ mod presence;
 mod reconciliation;
 mod remembered;
 mod screenshot;
+mod mobile;
 mod session;
 mod store;
 #[cfg(test)]

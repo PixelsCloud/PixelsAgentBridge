@@ -272,7 +272,7 @@ async fn dns_with_builder(
         let item = DnsRecord {
             name: bounded(&record.name.to_string(), 512),
             record_type: record.record_type().to_string(),
-            ttl_seconds: record.ttl,
+            ttl_seconds: Some(record.ttl),
             value: bounded(&value, 4096),
             value_truncated,
         };

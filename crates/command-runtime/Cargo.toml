@@ -1,0 +1,12 @@
+[package]
+name = "pab-command-runtime"
+version = "1.2.48"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pab-protocol = { path = "../protocol" }
+tokio.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+libc = "0.2"

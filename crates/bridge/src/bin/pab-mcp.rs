@@ -19,6 +19,8 @@ mod mcp_browser;
 mod mcp_catalog;
 #[path = "pab_mcp/desktop.rs"]
 mod mcp_desktop;
+#[path = "pab_mcp/device.rs"]
+mod mcp_device;
 #[path = "pab_mcp/document.rs"]
 mod mcp_document;
 #[path = "pab_mcp/endpoint.rs"]
@@ -27,6 +29,10 @@ mod mcp_endpoint;
 mod mcp_filesystem;
 #[path = "pab_mcp/filesystem_bulk.rs"]
 mod mcp_filesystem_bulk;
+#[path = "pab_mcp/mobile.rs"]
+mod mcp_mobile;
+#[path = "pab_mcp/notifications.rs"]
+mod mcp_notifications;
 #[path = "pab_mcp/operations.rs"]
 mod mcp_operations;
 #[path = "pab_mcp/port_forward.rs"]
@@ -61,7 +67,7 @@ use rmcp::{
 use serde_json::{Value, json};
 
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. Upload/download return an operation_ref immediately; file_hash and bulk file/ZIP operations return after remote acceptance and execute in the background. Cancellation does not roll back completed filesystem effects. Use the dedicated file tools before shell fallback, and preserve expected_hash when editing or continuing reads; query pab_get_operation with its device_code and operation_id. Reuse request_id for deduplication. An unconfirmed result is not failure: query the original request, never replay it with a new ID. cancel_requested is intent; only a terminal cancelled result confirms it stopped. pab_disconnect affects only this MCP session. The device password stays in the local Bridge database; never pass it as a tool argument.";
+const INSTRUCTIONS: &str = "Select a device by its 9-digit code. Call pab_connect before commands and preserve its verified OS/shell context across context compaction. Windows, Linux and macOS have different commands. Use pab_run_command for native OS fallback. Android supports pab_mobile_control for observe, input, navigation, gestures and consented screenshots, plus advertised app-UID commands/PTY, workspace or SAF file tools, unified window/UI/type-text/screenshot tools and explicit-app notification management (system v17). Notification-listener access is a separate local system permission. Android desktop window management and raw desktop input remain unsupported. SAF mounts are not POSIX command working directories. Follow the connected device's capability versions and permission boundaries. Upload/download return an operation_ref immediately; file_hash and bulk file/ZIP operations return after remote acceptance and execute in the background. Cancellation does not roll back completed filesystem effects. Use the dedicated file tools before shell fallback, and preserve expected_hash when editing or continuing reads; query pab_get_operation with its device_code and operation_id. Reuse request_id for deduplication. An unconfirmed result is not failure: query the original request, never replay it with a new ID. cancel_requested is intent; only a terminal cancelled result confirms it stopped. pab_disconnect affects only this MCP session. The device password stays in the local Bridge database; never pass it as a tool argument.";
 
 fn main() {
     let args = match mcp_settings::apply_at_start() {
@@ -101,8 +107,14 @@ async fn run(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     if args.first().is_some_and(|arg| arg == "account") {
         return mcp_account::run(&args[1..]).await;
     }
+    if args.first().is_some_and(|arg| arg == "device") {
+        return mcp_device::run(&args[1..]).await;
+    }
     if !args.is_empty() {
-        return Err("usage: pab-mcp [--config PATH] [account ...]".into());
+        return Err(
+            "usage: pab-mcp [--config PATH] [account ... | device connect <code> --password-stdin]"
+                .into(),
+        );
     }
     let tool_settings = pab_bridge::mcp_tool_settings::McpToolSettings::load(
         &pab_bridge::mcp_tool_settings::McpToolSettings::path()?,
@@ -244,6 +256,13 @@ impl ServerHandler for McpServer {
                                     metadata
                                 },
                             )
+                        } else if request.name == "pab_mobile_control" {
+                            mcp_mobile::call(&runtime, &arguments)
+                                .await
+                                .map(|(metadata, image)| {
+                                    image_content = image;
+                                    metadata
+                                })
                         } else if request.name == "pab_document_render_page" {
                             mcp_document::render(&runtime, &arguments).await.map(
                                 |(metadata, image)| {
@@ -284,12 +303,23 @@ impl ServerHandler for McpServer {
             call.observe_result(value);
         }
         let tool_failed = result.as_ref().is_ok_and(|value| {
+            if request.name == "pab_mobile_control" {
+                return matches!(
+                    value.pointer("/operation/state").and_then(Value::as_str),
+                    Some("failed" | "unconfirmed")
+                );
+            }
             if request.name == "pab_run_command" {
                 return value.pointer("/task/state").and_then(Value::as_str) == Some("failed");
             }
             matches!(
                 request.name.as_ref(),
                 "pab_list_monitors"
+                    | "pab_notification_status"
+                    | "pab_list_notifications"
+                    | "pab_wait_notification"
+                    | "pab_open_notification"
+                    | "pab_dismiss_notification"
                     | "pab_list_windows"
                     | "pab_focus_window"
                     | "pab_window_control"
@@ -416,22 +446,7 @@ async fn ensure_runtime(
     session_id: &str,
 ) -> Result<Arc<BridgeRuntime>, String> {
     if runtime.is_none() {
-        let config = if env::var("PAB_MCP_GUEST").as_deref() != Ok("0") {
-            tokio::time::timeout(
-                Duration::from_secs(12),
-                BridgeConfig::register_guest_with_secret(mcp_endpoint::guest_secret_path()?),
-            )
-            .await
-            .map_err(|_| {
-                "The control server is unavailable; retry the tool call when it is online"
-                    .to_owned()
-            })?
-            .map_err(|error| error.to_string())?
-        } else {
-            let config = BridgeConfig::from_env().map_err(|error| error.to_string())?;
-            mcp_endpoint::reserve_account_secret(&config.endpoint_secret_file)?;
-            config
-        };
+        let config = endpoint_config().await?;
         let paths = DataPaths::for_operator().map_err(|error| error.to_string())?;
         let database_path = env::var_os("PAB_BRIDGE_DATABASE")
             .map(PathBuf::from)
@@ -454,6 +469,24 @@ async fn ensure_runtime(
         .clone())
 }
 
+async fn endpoint_config() -> Result<BridgeConfig, String> {
+    if env::var("PAB_MCP_GUEST").as_deref() != Ok("0") {
+        tokio::time::timeout(
+            Duration::from_secs(12),
+            BridgeConfig::register_guest_with_secret(mcp_endpoint::guest_secret_path()?),
+        )
+        .await
+        .map_err(|_| {
+            "The control server is unavailable; retry the tool call when it is online".to_owned()
+        })?
+        .map_err(|error| error.to_string())
+    } else {
+        let config = BridgeConfig::from_env().map_err(|error| error.to_string())?;
+        mcp_endpoint::reserve_account_secret(&config.endpoint_secret_file)?;
+        Ok(config)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,7 +503,7 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 110);
+        assert_eq!(catalog.tools.len(), 116);
         let names = catalog
             .tools
             .iter()

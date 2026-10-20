@@ -538,6 +538,7 @@ impl TaskService {
         request: DeviceTaskRequest,
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
+            DeviceTaskRequest::Mobile { .. } => Err(TaskServiceError::InvalidRequest("Mobile control requires an Android device")),
             DeviceTaskRequest::DesktopTerminal { .. } => Err(TaskServiceError::InvalidRequest(
                 "Desktop terminal requires its streaming handler",
             )),
@@ -595,6 +596,7 @@ impl TaskService {
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 document_schema_version: Some(pab_protocol::DOCUMENT_SCHEMA_VERSION),
                 port_forward_schema_version: Some(PORT_FORWARD_SCHEMA_VERSION),
+                mobile_schema_version: None,
                 context: Box::new(TargetContext {
                     device_ref: self.device_ref,
                     execution: self.execution_context.clone(),

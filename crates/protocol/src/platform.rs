@@ -16,6 +16,7 @@ pub enum OsFamily {
     Windows,
     Linux,
     Macos,
+    Android,
 }
 
 impl fmt::Display for OsFamily {
@@ -24,6 +25,7 @@ impl fmt::Display for OsFamily {
             Self::Windows => "Windows",
             Self::Linux => "Linux",
             Self::Macos => "macOS",
+            Self::Android => "Android",
         })
     }
 }

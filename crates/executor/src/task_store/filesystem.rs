@@ -121,6 +121,7 @@ impl TaskStore {
             serde_json::from_str::<FileSystemReply>(&json)?
         } else {
             FileSystemReply {
+                cancellable: None,
                 directory: None,
                 execution_context: None,
                 log: None,

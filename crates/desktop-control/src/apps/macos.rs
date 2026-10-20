@@ -104,6 +104,7 @@ fn bundle(path: &Path) -> Result<AppInfo, String> {
         .ok_or("invalid application path")?
         .to_owned();
     Ok(AppInfo {
+        details: None,
         name: text("CFBundleDisplayName")
             .or_else(|| text("CFBundleName"))
             .unwrap_or_else(|| {
@@ -157,6 +158,7 @@ fn running(identity: &UserIdentity, snapshot: &mut AppListSnapshot) -> Result<()
             continue;
         }
         let entry = AppInfo {
+            details: None,
             name: app
                 .localizedName()
                 .map(|v| v.to_string())

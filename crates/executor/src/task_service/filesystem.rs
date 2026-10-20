@@ -6,25 +6,14 @@ use super::{
     filesystem_text as text,
 };
 use pab_protocol::{
-    DeviceTaskResponse, FileSystemAction, FileSystemError, FileSystemReply, FileSystemRequest,
-    OperatorRef, RequestId, TextEdit,
+    DeviceTaskResponse, FileSystemAction, FileSystemReply, FileSystemRequest, OperatorRef,
+    RequestId, TextEdit,
 };
 use pab_transport::PabBiStream;
 use std::{path::Path, time::Duration};
 use tokio::fs;
 
-#[derive(Debug)]
-pub(crate) struct FileError(pub FileSystemError);
-
-impl FileError {
-    pub(super) fn new(code: &str, phase: &str, message: impl Into<String>) -> Self {
-        Self(FileSystemError {
-            code: code.to_owned(),
-            phase: phase.to_owned(),
-            message: message.into().chars().take(2048).collect(),
-        })
-    }
-}
+pub(crate) use pab_file_codec::FileError;
 
 impl TaskService {
     pub(super) async fn filesystem_stream(
@@ -471,25 +460,17 @@ impl super::filesystem_engine::FileEngine {
                     })?;
                 let (original, _) = load(path).await?;
                 check_hash(&original, Some(expected_hash))?;
-                let doc = text::decode(&original, *encoding)?;
-                let updated = text::patch(&doc.text, &edits)?;
-                let bytes = text::encode(&updated, doc.encoding, doc.bom > 0)?;
+                let plan = pab_file_codec::plan_patch(&original, *encoding, &edits)?;
                 if *dry_run {
-                    reply.patch_preview = Some(pab_protocol::PatchPreview {
-                        original_sha256: digest(&original),
-                        result_sha256: digest(&bytes),
-                        result_size: bytes.len() as u64,
-                        changed: original != bytes,
-                        matched_edits: edits.iter().map(|e| e.expected_matches).collect(),
-                    });
+                    reply.patch_preview = Some(plan.preview);
                     return Ok(Vec::new());
                 }
                 self.publish_locked(
                     request,
-                    &bytes,
+                    &plan.bytes,
                     true,
                     Some(expected_hash),
-                    Some((doc.encoding, text::newline(&updated))),
+                    Some((plan.encoding, plan.newline)),
                     reply,
                 )
                 .await?;

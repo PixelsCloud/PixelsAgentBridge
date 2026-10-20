@@ -32,6 +32,7 @@ mod document;
 mod file_transfer;
 mod filesystem;
 mod screenshot;
+mod mobile;
 mod system_query;
 mod terminal;
 mod transfer_control;

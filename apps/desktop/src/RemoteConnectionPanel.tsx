@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { OsLogo } from "./OsLogo";
 import { messages, type Language } from "./i18n";
 import type { ConnectedDevice } from "./operatorTypes";
@@ -11,6 +11,8 @@ type Props = {
   language: Language;
   error: string;
   devices: ConnectedDevice[];
+  refreshing: boolean;
+  onRefresh: () => void;
   devicePresence: Record<string, { name: string; online: boolean | null }>;
   selectedCode: string;
   onSelect: (device: ConnectedDevice) => void;
@@ -19,7 +21,7 @@ type Props = {
 };
 
 export function RemoteConnectionPanel({
-  language, error, devices, devicePresence, selectedCode, onSelect, onConnect, onDeviceMenu,
+  language, error, devices, refreshing, onRefresh, devicePresence, selectedCode, onSelect, onConnect, onDeviceMenu,
 }: Props) {
   const t = messages[language];
   const [search, setSearch] = useState("");
@@ -34,7 +36,16 @@ export function RemoteConnectionPanel({
 
   return (
     <section className="surface remote-list">
-      <div className="list-heading"><h2>{t.connectedDevices}</h2><span>{devices.length}</span></div>
+      <div className="list-heading device-list-heading">
+        <h2>{t.connectedDevices}</h2>
+        <div className="device-list-heading-actions">
+          <span className="count-badge">{devices.length}</span>
+          <button type="button" className="credential-icon-button device-list-refresh" aria-label={t.refreshDevices}
+            title={t.refreshDevices} aria-busy={refreshing} disabled={refreshing} onClick={onRefresh}>
+            <RefreshCw size={16} className={refreshing ? "password-refreshing" : undefined} />
+          </button>
+        </div>
+      </div>
       <Input className="device-search" aria-label={t.searchDevices} placeholder={t.searchDevices}
         prefix={<Search size={15} />} allowClear value={search} onChange={(event) => setSearch(event.target.value)} />
       {error && <div className="inline-error" role="alert">{error}</div>}

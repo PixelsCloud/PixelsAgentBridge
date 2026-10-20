@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, Metadata, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 pub(super) struct Entry {
@@ -667,58 +667,4 @@ fn remove_entries(work: &mut Work, entries: &[Entry], count_bytes: bool) -> Resu
     Ok(())
 }
 
-pub(super) fn portable_relative(name: &str, max_depth: u32) -> Result<PathBuf, FileError> {
-    let name = name.strip_suffix('/').unwrap_or(name);
-    if name.is_empty()
-        || name.len() > 4096
-        || name.starts_with('/')
-        || name.contains(['\\', ':', '\0'])
-    {
-        return Err(FileError::new(
-            "unsafe_archive_path",
-            "validate_archive",
-            "archive path is empty, absolute, ambiguous or contains a device/drive path",
-        ));
-    }
-    let parts = name.split('/').collect::<Vec<_>>();
-    if parts.len() > max_depth as usize {
-        return Err(FileError::new(
-            "depth_limit",
-            "validate_archive",
-            "archive path exceeds max_depth",
-        ));
-    }
-    for part in parts {
-        let stem = part.split('.').next().unwrap_or("").to_ascii_uppercase();
-        if part.is_empty()
-            || part
-                .chars()
-                .any(|c| c.is_control() || matches!(c, '<' | '>' | '"' | '|' | '?' | '*'))
-            || part == "."
-            || part == ".."
-            || part.ends_with([' ', '.'])
-            || matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-            || (stem.len() == 4
-                && (stem.starts_with("COM") || stem.starts_with("LPT"))
-                && stem.as_bytes()[3].is_ascii_digit())
-        {
-            return Err(FileError::new(
-                "unsafe_archive_path",
-                "validate_archive",
-                "archive contains traversal or reserved/ambiguous names",
-            ));
-        }
-    }
-    let path = PathBuf::from(name);
-    if path
-        .components()
-        .any(|c| !matches!(c, Component::Normal(_)))
-    {
-        return Err(FileError::new(
-            "unsafe_archive_path",
-            "validate_archive",
-            "archive contains an invalid path component",
-        ));
-    }
-    Ok(path)
-}
+pub(super) use pab_file_codec::archive::portable_relative;

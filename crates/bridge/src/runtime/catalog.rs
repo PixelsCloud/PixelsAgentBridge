@@ -114,6 +114,7 @@ fn remembered(item: SavedDevice) -> Result<RememberedDevice, RuntimeStoreError> 
             Some("windows") => Some(OsFamily::Windows),
             Some("macos") => Some(OsFamily::Macos),
             Some("linux") => Some(OsFamily::Linux),
+            Some("android") => Some(OsFamily::Android),
             _ => None,
         },
         os_reminder: item.system.unwrap_or_default(),
@@ -185,6 +186,7 @@ impl RuntimeStore {
                         OsFamily::Windows => "windows",
                         OsFamily::Macos => "macos",
                         OsFamily::Linux => "linux",
+                        OsFamily::Android => "android",
                     }
                     .into()
                 }),
@@ -296,6 +298,7 @@ impl RuntimeStore {
                         OsFamily::Windows => "windows",
                         OsFamily::Macos => "macos",
                         OsFamily::Linux => "linux",
+                        OsFamily::Android => "android",
                     }
                     .into(),
                 );
@@ -322,6 +325,7 @@ impl RuntimeStore {
                     OsFamily::Windows => "windows",
                     OsFamily::Macos => "macos",
                     OsFamily::Linux => "linux",
+                    OsFamily::Android => "android",
                 }
                 .into()
             }),

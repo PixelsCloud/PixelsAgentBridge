@@ -72,6 +72,7 @@ pub(super) fn list(
             name(&item, SIGDN_DESKTOPABSOLUTEPARSING),
         ) {
             (Ok(name), Ok(id)) => snapshot.apps.push(AppInfo {
+                details: None,
                 name,
                 app_id: Some(id),
                 path: name_path(&item),
@@ -183,6 +184,7 @@ fn running(identity: &UserIdentity, snapshot: &mut AppListSnapshot) -> Result<()
             .to_string_lossy()
             .into_owned();
         snapshot.apps.push(AppInfo {
+            details: None,
             name,
             app_id: None,
             path: Some(path),
