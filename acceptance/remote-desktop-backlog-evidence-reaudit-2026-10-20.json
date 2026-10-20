@@ -1,0 +1,129 @@
+{
+  "date": "2026-10-20",
+  "kind": "existing evidence reconciliation, no new test or machine mutation",
+  "at_commit": "1599537",
+  "current_sources_match_passed_evidence": {
+    "crates/remote-desktop/src/flow.rs": "53552e8f5b4ab509b2e07f66bfcc6ca4be64734d2e85cfa05b1c54bf817fd055",
+    "crates/remote-desktop/src/host.rs": "250482f8495abdfaf8a163c4612f1af6b783ae01f556da81de851320d782b20e",
+    "crates/remote-desktop/tests/flow_recovery/mod.rs": "cc8f7bf6786a16a9b3631764c74acb7a6b684ae503b43722bb789c3cbe561633",
+    "apps/desktop/src-tauri/src/operator/remote_desktop/recovery.rs": "6cac42f480d720cc32d463e2c061d0758d58b94b5c3909aaacb60b303d0d37e0"
+  },
+  "latest_reliable_suite": {
+    "evidence": "remote-desktop-helper-budget-weak-network-2026-10-19.json",
+    "passed": 36,
+    "log_sha256": "7a5f4375c269e6d7e2534d04040b7bca95c995a11faacce0f3250a6642f984af"
+  },
+  "native_product_recovery": {
+    "evidence": "remote-desktop-product-flow-recovery-2026-10-18.json",
+    "long_pause": {
+      "elapsed": 6.246168100042269,
+      "old_pid": 13860,
+      "old_command": [
+        "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\assistance-product-10fecf5e5cb8\\pab-desktop.exe",
+        "--media-worker",
+        "render",
+        "1314",
+        "704",
+        "15",
+        "stream-interactive",
+        "59121970",
+        "0"
+      ],
+      "new_pid": 78348,
+      "new_command": [
+        "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\assistance-product-10fecf5e5cb8\\pab-desktop.exe",
+        "--media-worker",
+        "render",
+        "1314",
+        "704",
+        "15",
+        "stream-interactive-software",
+        "59121970",
+        "0"
+      ],
+      "after": {
+        "ticks": 1179,
+        "draws": 1177,
+        "elapsed": 20.051431655003398,
+        "width": 1314,
+        "height": 704,
+        "focused": true,
+        "clicks": 0,
+        "releases": 0,
+        "left_held": false,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false
+      },
+      "recovered": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false
+      },
+      "same_window": true,
+      "dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266097424433000.png",
+          "sha256": "51a523a54ccda4ebbaedb38b584d0ae10af4b2bbdb986aace5ee64128b2bb61a"
+        },
+        "second": {
+          "name": "linux-cursor-1792266098111808300.png",
+          "sha256": "28f2a4482d91ba8af1ad07187ef18925bde7b93fdf2987e15a549bc249025536"
+        },
+        "changed_pixels": 233639
+      }
+    }
+  },
+  "later_visibility_recovery": {
+    "evidence": "remote-desktop-window-input-assistance-2026-10-20.json",
+    "checks": {
+      "passed": 7,
+      "failed": 0,
+      "new_tests": 3
+    }
+  },
+  "scope_limit": "Native renderer stall proves product restoration, not sole server-backlog causality. Exact server backlog, retained control connection/occupancy and new IDR are isolated in real QUIC tests. Neither is rewritten as the other.",
+  "prior_netem": "remote-desktop-decoder-status-2026-10-18.md: 150 ms one-way / 128 kbit, 20.094 s, 381 matched packets already passed. Not a measured RTT number."
+}
