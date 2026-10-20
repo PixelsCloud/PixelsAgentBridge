@@ -235,8 +235,7 @@ pub(crate) async fn open_window(
                         .try_send(Command::Screen(screen))
                         .map_err(|_| "viewer is busy; retry opening assistance")?;
                 }
-                let _ = window.unminimize();
-                window.set_focus().map_err(|e| e.to_string())?;
+                crate::tray::restore_window(&window).map_err(|e| e.to_string())?;
                 return Ok(label.clone());
             }
         }
@@ -395,6 +394,9 @@ fn publish_input(window: &WebviewWindow, owner: &Owner, ready: bool, enabled: bo
     owner.status.send_replace(status.clone());
     let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
 }
+fn viewer_visible(window: &WebviewWindow) -> bool {
+    window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(true)
+}
 async fn run(
     window: WebviewWindow,
     owner: Arc<Owner>,
@@ -423,6 +425,16 @@ async fn run(
         let mut software_decoder = false;
         let mut has_presented = false;
         loop {
+            // Native presenters intentionally stop acknowledging presentation
+            // while minimized. Do not create replacement sessions in that
+            // state or spend the network recovery deadline waiting for a user.
+            let hidden_at = Instant::now();
+            while !viewer_visible(&window) {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            if let Some(started) = first_failure.as_mut() {
+                *started += hidden_at.elapsed();
+            }
             // Input and SAS belong to the previous generation. Never replay
             // queued actions into a newly opened login desktop.
             while let Ok(command) = commands.try_recv() {
@@ -672,15 +684,18 @@ async fn stream(
                 };
                 let mut changed = false;
                 owner.status.send_modify(|status| {
-                    if status.opened.as_ref().is_some_and(|opened|
+                    if status.opened.as_ref().is_some_and(|opened| {
                         opened.config.session_id == snapshot.session_id
-                            && opened.config.generation == snapshot.generation)
-                        && status.quality.as_ref() != Some(&snapshot) {
+                            && opened.config.generation == snapshot.generation
+                    }) && status.quality.as_ref() != Some(&snapshot)
+                    {
                         status.quality = Some(snapshot.clone());
                         changed = true;
                     }
                 });
-                if changed { let _ = window.emit_to(window.label(), "desktop-viewer-quality", snapshot); }
+                if changed {
+                    let _ = window.emit_to(window.label(), "desktop-viewer-quality", snapshot);
+                }
             }
             std::future::pending::<()>().await;
         };
@@ -691,12 +706,14 @@ async fn stream(
                         .next_frame_when_changed()
                         .await
                         .map_err(StreamFailure::from)?;
-                    tokio::time::timeout(Duration::from_secs(5), viewer.submit(&frame))
-                        .await
-                        .map_err(|_| {
-                            StreamFailure::renderer("native decoder submission timed out")
-                        })?
-                        .map_err(StreamFailure::renderer)?;
+                    recovery::submit_with_visible_budget(
+                        viewer.submit(&frame),
+                        || viewer_visible(window),
+                        Duration::from_secs(5),
+                    )
+                    .await
+                    .ok_or_else(|| StreamFailure::renderer("native decoder submission timed out"))?
+                    .map_err(StreamFailure::renderer)?;
                 }
                 #[allow(unreachable_code)]
                 Ok::<(), StreamFailure>(())

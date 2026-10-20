@@ -11,15 +11,17 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 
 追加核对（2026-10-20）：[最新采集与恢复](remote-desktop-display-wake-recovery-2026-10-20.md) 补 Windows→Mac 新包持续锁屏/登录、1080p 实际 14.687 FPS，以及 Windows→Linux 新 helper 非零预算和解除限速实际恢复 14.533 FPS；其余方向不因此记为通过。
 
+本轮追加：[窗口、输入与协助](remote-desktop-window-input-assistance-2026-10-20.md) 补三平台操作端菜单复用/全屏恢复/拖出释放，Linux 最新包 →90 最小化恢复后完整输入、Apple 最新包 →90 长最小化恢复输入，以及 Mac/Linux 隐藏/最小化通知和 active 生命周期。不同目标方向、构建和既有复用证据分别记录，不外推七方向完整通过。
+
 | 操作端 → 被控端 | 已有正式产品窗口证据 | 仍缺的主要证据 |
 | --- | --- | --- |
-| Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md)；[普通应用输入、注销、重启恢复、普通用户、UAC 与会话切换](remote-desktop-windows-input-login-2026-10-19.md)；[100%/125% 双屏四次点击与 active 清理](remote-desktop-active-switch-mixed-dpi-2026-10-19.md)；[普通启动首次点击](remote-desktop-windows-normal-show-2026-10-19.md) | 混合 DPI 的更多尺寸/光标组合、完整输入及特殊不激活夹具首次消息边界；最终候选反复切换、安装链路、动态基准与长稳 |
-| Windows → macOS | [Apple 单屏输入、独立光标、协助占用及恢复](remote-desktop-macos-activity-input-assistance-2026-10-18.md)；[锁屏密码登录](remote-desktop-macos-lock-login-2026-10-19.md)；[注销后 LoginWindow 密码登录和画面恢复](remote-desktop-macos-logout-login-2026-10-19.md)；[重复注销、真实重启密码登录及自动恢复，未再次授权](remote-desktop-macos-login-startup-followup-2026-10-19.md) | 最终候选动态有效 FPS、完整输入与长稳；正式安装 helper 链路。重启结果来自隔离候选包，不代替安装升级。单屏不宣称多屏通过 |
+| Windows → Windows | [90 双屏切换、点击与热拔恢复](remote-desktop-windows-dual-viewer-2026-10-18.md)；[统一产物负原点竖屏、缩放点击、WGC 光标和采集代理恢复](remote-desktop-windows-portrait-matched-2026-10-19.md)；[普通应用输入、注销、重启恢复、普通用户、UAC 与会话切换](remote-desktop-windows-input-login-2026-10-19.md)；[100%/125% 双屏四次点击与 active 清理](remote-desktop-active-switch-mixed-dpi-2026-10-19.md)；[普通启动首次点击](remote-desktop-windows-normal-show-2026-10-19.md)；[同窗恢复首击、全屏/退出定位及重开只查看](remote-desktop-window-input-assistance-2026-10-20.md) | 混合 DPI 的更多尺寸/光标组合、完整输入及特殊不激活夹具首次消息边界；最终候选反复切换、安装链路、动态基准与长稳 |
+| Windows → macOS | [Apple 单屏输入、独立光标、协助占用及恢复](remote-desktop-macos-activity-input-assistance-2026-10-18.md)；[锁屏密码登录](remote-desktop-macos-lock-login-2026-10-19.md)；[注销后 LoginWindow 密码登录和画面恢复](remote-desktop-macos-logout-login-2026-10-19.md)；[重复注销、真实重启密码登录及自动恢复，未再次授权](remote-desktop-macos-login-startup-followup-2026-10-19.md)；[全屏恢复、Shift 最小化释放和拖出释放](remote-desktop-window-input-assistance-2026-10-20.md) | 最终候选动态有效 FPS、完整输入与长稳；旧恢复首击坐标观察保留为不完整诊断，不能用 Windows→90 原子首击通过替代。正式安装 helper 链路仍缺，单屏不宣称多屏通过 |
 | Windows → Linux | [原生窗口、输入及网络恢复](remote-desktop-product-flow-recovery-2026-10-18.md)；[普通 Xorg 桌面鼠标/文本、缩放及 Windows 最小化释放修复](remote-desktop-xorg-x11-minimize-2026-10-19.md)；[Xorg GDM 密码登录](remote-desktop-linux-system-login-2026-10-17.md)；[Wayland 注销、真实重启、密码登录及自动恢复](remote-desktop-linux-session-boot-2026-10-19.md)；[锁屏、占用、AI 完成及原业务](remote-desktop-login-occupancy-assistance-2026-10-19.md) | 反复会话切换、复杂多屏和完整输入法；30 分钟混合及长期资源验证；最终安装启动路径 |
-| macOS → Windows | [Apple 正式窗口接收 90 光标、移动输入、只查看与故障隔离](remote-desktop-macos-cursor-product-2026-10-18.md) | 新候选完整键盘/鼠标、动态 FPS、多屏、Windows 系统登录与长期负载 |
+| macOS → Windows | [Apple 正式窗口接收 90 光标、移动输入、只查看与故障隔离](remote-desktop-macos-cursor-product-2026-10-18.md)；[设备菜单复用、长最小化后恢复、完整标记输入及拖出释放](remote-desktop-window-input-assistance-2026-10-20.md) | 新候选完整键盘/鼠标、动态 FPS、多屏、Windows 系统登录与长期负载 |
 | macOS → macOS | 未验证；用户于 2026-10-19 确认本轮跳过 | 不作为本轮交付阻塞项，不记为通过 |
 | macOS → Linux | [正式窗口首帧、实际点击/Ctrl、关闭释放及协助闭环](remote-desktop-macos-to-linux-2026-10-17.md) | 当前候选动态 FPS、独立光标、系统登录、完整输入、异常恢复与长稳 |
-| Linux → Windows | [Wayland 正式窗口、90 光标、移动与故障隔离](remote-desktop-linux-cursor-product-2026-10-18.md)；[X11 正式窗口、记事本鼠标/标记输入、最小化及关闭释放、重开](remote-desktop-xorg-x11-minimize-2026-10-19.md) | 完整键位/输入法、动态 FPS、多屏与 Windows 登录；X11 最小化恢复仍待补 |
+| Linux → Windows | [Wayland 正式窗口、90 光标、移动与故障隔离](remote-desktop-linux-cursor-product-2026-10-18.md)；[X11 正式窗口、记事本鼠标/标记输入、最小化及关闭释放、重开](remote-desktop-xorg-x11-minimize-2026-10-19.md)；[X11 最新构建菜单恢复同窗、聚焦并完整输入，中间构建全屏与拖出释放](remote-desktop-window-input-assistance-2026-10-20.md) | 完整键位/输入法、动态 FPS、多屏与 Windows 登录；未覆盖的异常组合 |
 | Linux → macOS | [Wayland 正式窗口首帧、单击/A/Shift、关闭释放及协助闭环](remote-desktop-linux-to-macos-2026-10-17.md)；[X11 正式窗口、坐标/A/Shift+A/滚轮及关闭释放](remote-desktop-xorg-x11-minimize-2026-10-19.md) | 独立光标边界、动态 FPS、Mac 登录、完整输入与长稳；X11 窗口恢复 |
 | Linux → Linux | 未验证；用户于 2026-10-19 确认本轮跳过 | 不作为本轮交付阻塞项，不记为通过 |
 
@@ -29,7 +31,7 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 
 下一轮执行顺序与结束条件统一见[长期任务的后续安排](../REMOTE_DESKTOP_LONG_TERM_TASK.md#接下来必做的工作)。Windows 离线自动重连及最小化释放已有修复，Linux Wayland 登录和普通 Xorg/X11 基本输入已有证据。Apple 已有被控端开机登录证据直接保留，后续重点是操作端缺项、性能与最终安装链路。各方向测试产物分别记录，不合并为同一最终发布包。
 
-本轮已补普通 Xorg/X11 输入、Windows 最小化释放、active/服务切换及 90 混合 DPI；[私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md) 和[正式 helper 转发及 90 限速恢复](remote-desktop-helper-budget-weak-network-2026-10-19.md) 有记录。[新窗口](remote-desktop-helper-window-first-frame-2026-10-19.md) 补 Linux 1306×768 实际 14.696 FPS、受限新 session 首帧；[最新验收](remote-desktop-display-wake-recovery-2026-10-20.md) 又补 Linux 同 session 非零预算/恢复 14.533 FPS及 Mac 新包持续锁屏、登录、1080p 实际 14.687 FPS。仍缺 Mac 实际非零预算、RTT/路径、积压退代恢复及其他方向的原输入/窗口/资源缺项。原服务、限速及专属运行目录已恢复清理。Apple 操作端、X11 恢复和 Mac/Linux active/通知按原清单补缺；既有未受影响的证据复用，同平台双端豁免保持。
+此前 Xorg/X11 基本输入、Windows 最小化释放、active/服务切换及 90 混合 DPI 保留；[私有编译 TOML 与公开空配置](remote-desktop-client-defaults-2026-10-19.md)、[正式 helper 及 90 限速恢复](remote-desktop-helper-budget-weak-network-2026-10-19.md)、[新窗口首帧](remote-desktop-helper-window-first-frame-2026-10-19.md)、[最新采集与恢复](remote-desktop-display-wake-recovery-2026-10-20.md) 不重复挂账。本轮再补窗口恢复和 Mac/Linux active/通知，关闭 03.1/03.6；仍缺完整输入、动态布局/光标、操作端目标登录，以及 Mac 非零预算、RTT/路径、积压退代和资源性能。原服务和测试进程已恢复；本轮私有文件删除受限情况见最新验收，不沿用较早记录的全部清理结论。同平台双端豁免保持。
 
 较早 Windows → Linux 测试曾被窗口遮挡中断，记录保留在
 [当轮验收](remote-desktop-window-capture-2026-10-18.md)。最新 58 轮约 29 分钟
@@ -42,4 +44,4 @@ Mac→Mac、Linux→Linux。两项保留“未验证”事实，移出本轮必�
 发布前仍须按最终候选重新核对平台能力、安装依赖、TOML/身份保留、服务与桌面
 自启动、覆盖升级和 COS 下载校验。阶段性测试安装目录和系统服务恢复记录不能
 替代正式安装包的升级验收。本次重新核对既有证据后，长期清单为
-**18/53 已关闭、32 部分完成、3 交付待验收/执行**，见[进度复核](remote-desktop-progress-reaudit-2026-10-19.md)。逐项状态见[长期任务](../REMOTE_DESKTOP_LONG_TERM_TASK.md)。
+**20/53 已关闭、30 部分完成、3 交付待验收/执行**，见[进度复核](remote-desktop-progress-reaudit-2026-10-19.md)。逐项状态见[长期任务](../REMOTE_DESKTOP_LONG_TERM_TASK.md)。
