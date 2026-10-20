@@ -1,9 +1,9 @@
 # Build concurrency
 
-The user requires compilation to use at most 1 core per machine. On each
-machine, use no more than 1 concurrent build job across all sessions, including
-direct Cargo commands and nested builds. Set Cargo, CMake and other nested
-build concurrency to 1; do not overlap compilation commands on the same machine.
+The user requires compilation to use at most 10 cores per machine. On each
+machine, use no more than 10 concurrent build jobs across all sessions, including
+direct Cargo commands and nested builds. Account for nested build concurrency
+and other compilations so their combined jobs on one machine never exceed 10.
 Do not update the local installed Pixels application unless necessary: other
 sessions use it.
 

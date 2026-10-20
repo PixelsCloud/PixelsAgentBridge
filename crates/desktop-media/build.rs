@@ -87,6 +87,7 @@ fn main() {
             "xext",
             "xrandr",
             "xfixes",
+            "xres",
             "xdamage",
             "xtst",
         ] {

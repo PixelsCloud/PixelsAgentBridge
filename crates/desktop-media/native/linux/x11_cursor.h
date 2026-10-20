@@ -1,5 +1,6 @@
 #pragma once
 #include "x11_capture.h"
+#include "x11_cursor_visibility.h"
 
 namespace pab_linux::x11 {
 // XFixes pixels are native unsigned longs containing premultiplied ARGB32,
@@ -29,12 +30,13 @@ inline std::shared_ptr<const CursorImage> cursor_image(const XFixesCursorImage& 
 class CursorSource {
     Connection& connection_;
     Output output_;
+    CursorVisibility visibility_;
     int event_ = 0;
     bool refresh_ = true, opaque_ = false;
     Clock::time_point next_layout_{};
 public:
     CursorState state;
-    CursorSource(Connection& connection, Output output):connection_(connection),output_(std::move(output)) {
+    CursorSource(Connection& connection, Output output):connection_(connection),output_(std::move(output)),visibility_(connection) {
         int error;
         if (!XFixesQueryExtension(connection_.get(), &event_, &error))
             throw std::runtime_error("X11 XFixes is required for cursor capture");
@@ -70,10 +72,8 @@ public:
         const bool inside = rx >= display.x && ry >= display.y &&
             int64_t(rx) < int64_t(display.x) + display.size.width &&
             int64_t(ry) < int64_t(display.y) + display.size.height;
-        // A transparent cursor is hidden. XFixesHideCursor does NOT change
-        // GetCursorImage or send a shape notification; it requires a separate
-        // authoritative visibility source (see the X11 acceptance record).
-        state.update(inside && opaque_, rx, ry, std::move(image));
+        const bool system_hidden = visibility_.hidden();
+        state.update(inside && opaque_ && !system_hidden, rx, ry, std::move(image));
     }
 };
 

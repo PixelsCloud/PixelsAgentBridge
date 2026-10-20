@@ -44,10 +44,12 @@ public:
     ~Connection() { XCloseDisplay(display_); XSetErrorHandler(previous_); }
     Connection(const Connection&) = delete;
     ::Display* get() const { return display_; }
-    void check() {
+    int check(int allowed_error = 0) {
         XSync(display_, False);
         const int error = std::exchange(error_, 0);
-        if (error) throw std::runtime_error("X11 operation failed: " + std::to_string(error));
+        if (error && error != allowed_error)
+            throw std::runtime_error("X11 operation failed: " + std::to_string(error));
+        return error;
     }
 };
 struct Output { pab_linux::Display display; int screen; Window root; };
