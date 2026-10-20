@@ -2,6 +2,56 @@
 //! Counts refer to the test input sink, not OS injection or application actions.
 use super::*;
 
+#[tokio::test]
+async fn helper_retirement_keeps_wire_errors_recoverable_and_reopens_readonly() {
+    for (failure, expected) in [
+        (1, DesktopErrorCode::StaleGeneration),
+        (2, DesktopErrorCode::MediaUnavailable),
+    ] {
+        let backend = Arc::new(Backend {
+            fail_input: Some(Arc::new(AtomicUsize::new(failure))),
+            ..Backend::default()
+        });
+        let global = DesktopHost::new(Some(backend.clone()));
+        let server = Harness::new(&global).await;
+        let mut session = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+            .await
+            .unwrap();
+        session.next_frame(WAIT).await.unwrap();
+        let old_id = session.opened().config.session_id;
+        let error = session.input_control().set_enabled(true).await.unwrap_err();
+        assert!(matches!(&error, DesktopError::Rejected { code, .. } if *code == expected));
+        assert!(error.is_recoverable_media());
+        assert_eq!(backend.input_active.load(Ordering::SeqCst), 0);
+        assert_eq!(backend.input_applied.load(Ordering::SeqCst), 0);
+        session.close().await.unwrap();
+        eventually(|| backend.active.load(Ordering::SeqCst) == 0).await;
+        server.legacy().await;
+
+        let mut replacement = RemoteDesktopSession::open(server.client.clone(), None, 15, WAIT)
+            .await
+            .unwrap();
+        assert_ne!(replacement.opened().config.session_id, old_id);
+        replacement.next_frame(WAIT).await.unwrap();
+        let input = replacement.input_control();
+        assert!(
+            input
+                .send(RemoteDesktopInput::Key {
+                    virtual_key: 0x41,
+                    down: true,
+                })
+                .await
+                .is_err()
+        );
+        assert_eq!(backend.input_applied.load(Ordering::SeqCst), 0);
+        input.set_enabled(true).await.unwrap();
+        assert_eq!(backend.input_held.load(Ordering::SeqCst), 0);
+        replacement.close().await.unwrap();
+        eventually(|| backend.input_active.load(Ordering::SeqCst) == 0).await;
+        server.legacy().await;
+    }
+}
+
 async fn attach(server: &Harness, request: RemoteDesktopRequest) -> PabBiStream {
     let mut stream = server.client.open_bi(WAIT).await.unwrap();
     stream

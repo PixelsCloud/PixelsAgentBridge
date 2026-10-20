@@ -68,6 +68,7 @@ struct Backend {
     input_active: Arc<AtomicUsize>,
     input_held: Arc<AtomicUsize>,
     input_applied: Arc<AtomicUsize>,
+    fail_input: Option<Arc<AtomicUsize>>,
     wake: Option<Arc<tokio::sync::Notify>>,
     fail_after: Option<u64>,
     encode_delay: Option<Duration>,
@@ -158,6 +159,11 @@ impl DesktopBackend for Backend {
     }
     fn input(&self, _: DesktopVideoConfig) -> MediaFuture<'_, Box<dyn DesktopInputSink>> {
         Box::pin(async move {
+            match self.fail_input.as_ref().map(|fail| fail.swap(0, Ordering::SeqCst)) {
+                Some(1) => return Err(DesktopError::Closed),
+                Some(2) => return Err(DesktopError::Timeout),
+                _ => {}
+            }
             self.input_active.fetch_add(1, Ordering::SeqCst);
             Ok(Box::new(InputSink {
                 active: self.input_active.clone(),

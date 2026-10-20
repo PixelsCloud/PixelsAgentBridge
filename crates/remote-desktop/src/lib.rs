@@ -63,6 +63,11 @@ impl DesktopError {
     pub(crate) fn code(&self) -> DesktopErrorCode {
         match self {
             Self::Rejected { code, .. } => *code,
+            // Native helper/session retirement can race a control request.
+            // Preserve its lifecycle classification across the wire so the
+            // viewer may reopen a generation within its existing retry budget.
+            Self::Closed => DesktopErrorCode::StaleGeneration,
+            Self::Timeout => DesktopErrorCode::MediaUnavailable,
             _ => DesktopErrorCode::InvalidRequest,
         }
     }
@@ -71,6 +76,28 @@ impl DesktopError {
 #[cfg(test)]
 mod recovery_tests {
     use super::*;
+
+    #[test]
+    fn lifecycle_errors_remain_recoverable_after_a_wire_reply() {
+        for error in [DesktopError::Closed, DesktopError::Timeout] {
+            let reply = pab_protocol::RemoteDesktopReply::Error {
+                code: error.code(),
+                message: error.to_string(),
+            };
+            let encoded = serde_json::to_vec(&reply).unwrap();
+            let decoded: pab_protocol::RemoteDesktopReply =
+                serde_json::from_slice(&encoded).unwrap();
+            let pab_protocol::RemoteDesktopReply::Error { code, message } = decoded else {
+                panic!("expected a media failure reply");
+            };
+            assert_ne!(code, DesktopErrorCode::InvalidRequest);
+            assert!(DesktopError::reject(code, message).is_recoverable_media());
+        }
+        assert_eq!(
+            DesktopError::Protocol("invalid frame").code(),
+            DesktopErrorCode::InvalidRequest
+        );
+    }
 
     #[test]
     fn recovery_never_bypasses_ownership_or_protocol_rejections() {
