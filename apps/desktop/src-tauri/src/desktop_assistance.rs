@@ -1,4 +1,5 @@
 use pab_bridge::desktop_assistance::{Snapshot, Status, Store};
+use pab_protocol::DeviceCode;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -29,6 +30,21 @@ impl Default for AssistanceState {
     }
 }
 impl AssistanceState {
+    pub(crate) async fn device_removed(&self, code: DeviceCode) -> Result<(), String> {
+        if pab_agent_core::account::AccountStore::from_env()
+            .and_then(|store| store.read())
+            .map_err(|e| e.to_string())?
+            .user
+            .is_none()
+        {
+            return Ok(());
+        }
+        self.store()
+            .await?
+            .device_removed(self.0.instance, code)
+            .await
+            .map_err(|e| e.to_string())
+    }
     async fn store(&self) -> Result<Store, String> {
         let mut slot = self.0.store.lock().await;
         if slot.as_ref().is_some_and(|s| !s.is_current_account()) {
@@ -166,6 +182,8 @@ pub(crate) async fn desktop_assistance_open(
     if window.label() != "main" {
         return Err("only main may open assistance".into());
     }
+    let operator = app.state::<crate::operator::OperatorState>();
+    let _guard = operator.account_changes.lock().await;
     let (store, pending) = state.pending().await?;
     let request = pending
         .into_iter()
@@ -173,7 +191,7 @@ pub(crate) async fn desktop_assistance_open(
         .ok_or("assistance request has ended")?;
     let label = crate::operator::remote_desktop::open_window(
         app.clone(),
-        &app.state::<crate::operator::OperatorState>(),
+        &operator,
         &app.state::<crate::operator::remote_desktop::RemoteDesktopState>(),
         request.request.device_code.to_string(),
         request.request.screen_id,

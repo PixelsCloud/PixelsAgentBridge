@@ -486,6 +486,30 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+    /// Forgetting a saved device ends its outstanding assistance requests.
+    /// A transient disconnection instead keeps the request waiting for recovery.
+    pub async fn device_removed(&self, desktop: Uuid, code: DeviceCode) -> Result<(), Error> {
+        let mut tx = self.begin().await?;
+        self.live(&mut tx, "desktop", desktop).await?;
+        let rows: Vec<String> = sqlx::query_scalar(
+            "SELECT payload FROM assistance_requests WHERE scope=? AND terminal=0",
+        )
+        .bind(&self.scope)
+        .fetch_all(&mut *tx)
+        .await?;
+        for data in rows {
+            let mut entry: Entry = serde_json::from_str(&data)?;
+            if entry.snapshot.request.device_code == code {
+                entry.snapshot.status = Status::Cancelled;
+                entry.snapshot.outcome = Some("device_removed".into());
+                entry.snapshot.window_label = None;
+                entry.snapshot.revision += 1;
+                self.save(&mut tx, &entry).await?;
+            }
+        }
+        tx.commit().await?;
+        Ok(())
+    }
     pub async fn stop_requester(&self, owner: Uuid) -> Result<(), Error> {
         self.stop("requester", owner).await
     }

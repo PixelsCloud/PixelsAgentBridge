@@ -8,6 +8,50 @@ struct Fixture {
     owner: Uuid,
     desktop: Uuid,
 }
+
+#[tokio::test]
+async fn removing_device_cancels_all_its_pending_requests_without_reviving_or_crossing_scopes() {
+    let f = Fixture::new().await;
+    f.store.heartbeat_desktop(f.desktop).await.unwrap();
+    let request = f.request();
+    let waiting = f.store.request(f.owner, request.clone()).await.unwrap();
+    let other_owner = Uuid::new_v4();
+    f.store.heartbeat_requester(other_owner).await.unwrap();
+    let active = f.store.request(other_owner, f.request()).await.unwrap();
+    f.store.activate(f.desktop, active.assistance_id, "desktop-viewer-removed").await.unwrap();
+    let completed = f.create().await;
+    f.store.activate(f.desktop, completed.assistance_id, "desktop-viewer-completed").await.unwrap();
+    f.store.complete(f.desktop, completed.assistance_id).await.unwrap();
+    let other_device = f.store.request(f.owner, Request {
+        device_code: "987654321".parse().unwrap(),
+        ..f.request()
+    }).await.unwrap();
+    let mut other_scope = Store::open(&f._dir.path().join("assistance.db"), "other-account:1".into()).await.unwrap();
+    other_scope.clock = f.store.clock.clone();
+    other_scope.heartbeat_requester(other_owner).await.unwrap();
+    let private = other_scope.request(other_owner, f.request()).await.unwrap();
+
+    f.store.device_removed(f.desktop, request.device_code).await.unwrap();
+    for (owner, id) in [(f.owner, waiting.assistance_id), (other_owner, active.assistance_id)] {
+        let ended = f.store.status(owner, id).await.unwrap();
+        assert_eq!(ended.status, Status::Cancelled);
+        assert_eq!(ended.outcome.as_deref(), Some("device_removed"));
+        assert!(ended.window_label.is_none());
+        // A stale lifecycle observer and replay of the original request must
+        // never revive an explicitly removed device's request.
+        let stale = f.store.activate(f.desktop, id, "desktop-viewer-stale").await.unwrap();
+        assert_eq!(stale.status, Status::Cancelled);
+        assert_eq!(stale.revision, ended.revision);
+        assert!(stale.window_label.is_none());
+        f.store.device_removed(f.desktop, request.device_code).await.unwrap();
+        assert_eq!(f.store.status(owner, id).await.unwrap().revision, ended.revision);
+    }
+    assert_eq!(f.store.replay(f.owner, &request).await.unwrap().unwrap().status, Status::Cancelled);
+    assert_eq!(f.store.status(f.owner, completed.assistance_id).await.unwrap().status, Status::Completed);
+    assert_eq!(f.store.status(f.owner, other_device.assistance_id).await.unwrap().status, Status::Waiting);
+    assert_eq!(other_scope.status(other_owner, private.assistance_id).await.unwrap().status, Status::Waiting);
+    assert_eq!(f.store.pending(f.desktop).await.unwrap().len(), 1);
+}
 impl Fixture {
     async fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();

@@ -130,6 +130,27 @@ fn account() -> Result<String, String> {
         .ok_or_else(|| "login required to view a remote computer".into())
 }
 impl RemoteDesktopState {
+    pub(crate) async fn device_removed(&self, app: &tauri::AppHandle, code: DeviceCode) {
+        let labels = {
+            let owners = self.windows.lock().await;
+            owners
+                .iter()
+                .filter(|(_, owner)| owner.code == code)
+                .map(|(label, owner)| {
+                    owner.stop.send_replace(true);
+                    label.clone()
+                })
+                .collect::<Vec<_>>()
+        };
+        for label in labels {
+            self.close(&label).await;
+            if let Some(window) = app.get_webview_window(&label) {
+                if let Err(error) = window.close() {
+                    tracing::warn!(%error, window = label, "could not close removed device viewer");
+                }
+            }
+        }
+    }
     pub(crate) async fn assistance_viewing(&self, label: &str, code: DeviceCode) -> bool {
         let owners = self.windows.lock().await;
         owners.get(label).is_some_and(|owner| {
@@ -181,6 +202,7 @@ pub async fn desktop_viewer_window(
     if window.label() != "main" {
         return Err("only the main window can open a remote desktop".into());
     }
+    let _guard = state.account_changes.lock().await;
     open_window(app, &state, &viewers, code, None, false)
         .await
         .map(|_| ())
