@@ -3,11 +3,12 @@
 #include "../software_codec_ffi.h"
 
 namespace pab_mac {
-struct EncodedFrame { std::vector<uint8_t> bytes; bool key = false; };
+struct EncodedFrame { std::vector<uint8_t> bytes; bool key = false, dropped = false; };
 class Encoder {
     OwnedCF<VTCompressionSessionRef> session_;
     unsigned fps_;
     uint64_t original_budget_;
+    uint64_t submitted_ = 0;
     struct Output {
         std::mutex mutex;
         bool completed = false;
@@ -63,8 +64,10 @@ class Encoder {
         try {
             check(status, "Hardware encode");
             if (output.completed) throw std::runtime_error("Unexpected duplicate encoder output");
-            if (flags & kVTEncodeInfo_FrameDropped) throw std::runtime_error("Encoder dropped a requested frame");
-            output.frame = annex_b(sample);
+            // A successful rate-control drop has no compressed reference frame.
+            // It is not a hardware failure and must not select CPU fallback.
+            if (flags & kVTEncodeInfo_FrameDropped) output.frame.dropped = true;
+            else output.frame = annex_b(sample);
         } catch (const std::exception& error) { output.error = error.what(); }
         catch (...) { output.error = "Unknown encoder failure"; }
         output.completed = true;
@@ -137,14 +140,23 @@ public:
         }
         NSDictionary* options = index == 0 ? @{(__bridge NSString*)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES} : nil;
         VTEncodeInfoFlags flags{};
-        check(VTCompressionSessionEncodeFrame(session_.get(), image, CMTimeMake(index, fps_), CMTimeMake(1, fps_),
+        // Drops consume a submission timestamp, but not a wire frame number.
+        // VideoToolbox requires strictly increasing PTS, including retries.
+        const auto timestamp = CMTimeMake(submitted_++, fps_);
+        check(VTCompressionSessionEncodeFrame(session_.get(), image, timestamp, CMTimeMake(1, fps_),
             (__bridge CFDictionaryRef)options, nullptr, &flags), "Encode frame submit");
         // One requested frame in flight: no hidden encoder backlog is allowed
         // to accumulate behind the reliable transport's existing credit window.
-        check(VTCompressionSessionCompleteFrames(session_.get(), CMTimeMake(index, fps_)), "Encode frame complete");
+        check(VTCompressionSessionCompleteFrames(session_.get(), timestamp), "Encode frame complete");
         std::lock_guard<std::mutex> lock(output_.mutex);
+        // A synchronous drop can be reported without an output callback.
+        if (!output_.completed && (flags & kVTEncodeInfo_FrameDropped)) {
+            output_.frame.dropped = true;
+            output_.completed = true;
+        }
         if (!output_.error.empty()) throw std::runtime_error(output_.error);
-        if (!output_.completed || output_.frame.bytes.empty() || (index == 0 && !output_.frame.key))
+        if (!output_.completed || (!output_.frame.dropped &&
+            (output_.frame.bytes.empty() || (index == 0 && !output_.frame.key))))
             throw std::runtime_error("Encoder did not produce the requested frame");
         return std::move(output_.frame);
     }

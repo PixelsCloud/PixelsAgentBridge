@@ -60,7 +60,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         encoder.software() ? "openh264_software" : "videotoolbox_hardware",
         mode.c_str(), (desktop ? 0u : 1u) + (encoder.software() ? 1u : 0u));
     write_value(magic); write_value(display.width); write_value(display.height);
-    uint64_t index = 0;
+    uint64_t index = 0, dropped = 0;
     auto inspected = Clock::now() - std::chrono::milliseconds(100);
     const auto check_layout = [&] {
         if (desktop && Clock::now() - inspected >= std::chrono::milliseconds(100)) {
@@ -75,19 +75,29 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         if (command == 0) return;
         if (command == 2) { const bool applied=encoder.budget(read_value<uint32_t>()); write_value(applied ? magic : magic+1); continue; }
         if (command != 1) throw std::runtime_error("Invalid capture command");
-        while (Clock::now() < next) { parent_alive(); pump(); }
         auto sampled = Clock::now();
-        OwnedCF<CVPixelBufferRef> image;
-        if (source) image = source(sampled);
-        else image = synthetic(display.width, display.height, index);
-        const auto packet = encoder.encode(image.get(), index);
-        if (desktop && !display_current(display))
-            throw std::runtime_error("Screen changed during encoding; refresh generation");
+        const auto deadline = sampled + std::chrono::seconds(5);
+        EncodedFrame packet;
+        do { @autoreleasepool {
+            while (Clock::now() < next) { parent_alive(); check_layout(); pump(); }
+            OwnedCF<CVPixelBufferRef> image;
+            if (source) image = source(sampled);
+            else { sampled = Clock::now(); image = synthetic(display.width, display.height, index); }
+            packet = encoder.encode(image.get(), index);
+            if (desktop && !display_current(display))
+                throw std::runtime_error("Screen changed during encoding; refresh generation");
+            next = std::max(next + std::chrono::microseconds(1000000/fps), Clock::now());
+            if (packet.dropped) {
+                if (!dropped++) fprintf(stderr, "media hardware rate control skipped an unencoded frame; retaining direct IOSurface path\n");
+                // Keep this one credit, sample fresh pixels, and never invent
+                // a packet or discard an already encoded H.264 reference.
+                if (Clock::now() >= deadline) throw std::runtime_error("Hardware rate control produced no frame within five seconds");
+            }
+        } } while (packet.dropped);
         write_value(static_cast<uint32_t>(packet.bytes.size())); write_value(index);
         write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(sampled-start).count()));
         write_value(static_cast<uint32_t>(packet.key)); write_bytes(packet.bytes.data(), packet.bytes.size());
         ++index;
-        next = std::max(next + std::chrono::microseconds(1000000/fps), Clock::now());
     } }
 }
 static void render(unsigned width, unsigned height, unsigned fps, unsigned rotation, bool verify, bool software, bool fail_decoder, bool lifecycle) {
