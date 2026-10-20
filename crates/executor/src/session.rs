@@ -1,4 +1,4 @@
-use std::{path::Path, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use pab_agent_core::{DevicePeerAuthorizer, PeerAuthorizationError};
 use pab_device_session::{PasswordAttempts, SessionError};
