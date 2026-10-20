@@ -1,0 +1,836 @@
+{
+  "status": "accepted_pending_publication",
+  "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+  "published_baseline_source_archive_sha256": "f9c037dfa72610bcfeb303ef775d90cf107857255912655cbf74870f70f9e210",
+  "immutable_source_files": 1126,
+  "integration": {
+    "published_macos_baseline_preserved": true,
+    "mobile_and_desktop_assistance_tools_preserved": true,
+    "current_uncommitted_main_changes_copied": false,
+    "fix": "Restore Arc import required by the merged POSIX session implementation"
+  },
+  "reserved_versions": {
+    "windows": "1.3.10",
+    "macos": "1.2.75",
+    "linux": "1.0.5",
+    "linux-desktop": "1.0.4"
+  },
+  "windows_checks": {
+    "protocol-config-checks-result.json": {
+      "exit_code": 0,
+      "source_commit": "2139b36f00bb1f25678ff1a61f217790f917bf85"
+    },
+    "mcp-catalog-checks-v3-result.json": {
+      "exit_code": 0,
+      "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0"
+    },
+    "executor-integration-check-result.json": {
+      "exit_code": 0,
+      "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0"
+    }
+  },
+  "macos_package": {
+    "version": "1.2.75",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "package_verified": true,
+    "pinned_certificate": "BD9EAA0BA8136249F6FA2D8AB7154512E73AB275",
+    "signatures_verified": true,
+    "mcp_protocols": [
+      {
+        "protocol": "2025-11-25",
+        "tools": 122,
+        "assistance_tools": [
+          "pab_desktop_input",
+          "pab_desktop_assistance"
+        ],
+        "passed": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tools": 122,
+        "assistance_tools": [
+          "pab_desktop_input",
+          "pab_desktop_assistance"
+        ],
+        "passed": true
+      }
+    ],
+    "source_files_checked": 1126,
+    "generated_changes_reviewed": [
+      "Cargo.lock package ordering and LF normalization",
+      "Cargo.toml LF normalization"
+    ],
+    "runtime_source_and_dependency_graph_unchanged": true,
+    "public_installer_defaults_empty": true,
+    "package_bytes": 90136365,
+    "package_sha256": "716b4373dcaceee03c848ef9381611a432f97ddd3914bbcc4f960b9153117f67",
+    "receipt_files_checked": 7,
+    "installed_application_unchanged_during_packaging": true
+  },
+  "macos_upgrade": {
+    "version": "1.2.75",
+    "package_sha256": "716b4373dcaceee03c848ef9381611a432f97ddd3914bbcc4f960b9153117f67",
+    "installation_exit_code": 0,
+    "checks": {
+      "installed_matches_verified_package": true,
+      "device_and_operator_identities_preserved": true,
+      "legacy_service_configuration_migrated_without_changing_server": true,
+      "desktop_window_and_session_helper_started_by_installer": true,
+      "autostart_registered": true,
+      "saved_devices_credentials_and_accounts_preserved": true
+    },
+    "launchd": {
+      "executor": {
+        "registered": true,
+        "launch_succeeded": true,
+        "detail": "path = /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist\nprogram = /Library/Application Support/PixelsAgentBridge/run-executor.sh\npid = 99369\nlast exit code = (never exited)"
+      },
+      "desktop": {
+        "registered": true,
+        "launch_succeeded": true,
+        "detail": "path = /Library/LaunchAgents/com.pixelsagentbridge.desktop.plist\nprogram = /usr/bin/open\nlast exit code = 0",
+        "application_pid": 99394
+      },
+      "session-helper": {
+        "registered": true,
+        "launch_succeeded": true,
+        "detail": "path = /Library/LaunchAgents/com.pixelsagentbridge.session-helper.plist\nprogram = /Applications/Pixels Agent Bridge.app/Contents/MacOS/pab-desktop\npid = 99373\nlast exit code = (never exited)"
+      }
+    },
+    "verified_at": 1792496708.3199291,
+    "installer_job_removed": true,
+    "long_duration_tests_started": false
+  },
+  "macos_affected_business": {
+    "version": "1.2.75",
+    "bytes": 1048576,
+    "sha256": "04eba9f93cf48350ecbed323d5c5bdaf37aa4a25fc3e6af3661edf785dafabff",
+    "checks": {
+      "interactive_terminal_write_read_resize": true,
+      "remote_command_and_uploaded_file_hash": true,
+      "bidirectional_file_transfer": true,
+      "terminal_closed": true
+    },
+    "terminal_session_id": "722c24a1-8381-43a8-820a-7d897cf237c2",
+    "upload_operation_id": "dedf2212-d9e4-4d1b-9306-1654319de5e5",
+    "download_operation_id": "648d4bf6-03ea-4c9d-83cc-bfc63e03b358"
+  },
+  "macos_native_window": {
+    "visible": true,
+    "width": 1000,
+    "height": 640
+  },
+  "macos_screenshot": {
+    "passed": true,
+    "width": 1920,
+    "height": 1080
+  },
+  "pending": [
+    "Commit and push final source/evidence, then publish and verify four packages"
+  ],
+  "deferred": [
+    "2-hour run",
+    "8-hour run"
+  ],
+  "local_installed_windows_application_updated": false,
+  "published": false,
+  "macos_boot": {
+    "before_login": {
+      "before_boot": "{ sec = 1792377864, usec = 394714 } Mon Oct 19 10:44:24 2026",
+      "current_boot": "{ sec = 1792497862, usec = 880218 } Tue Oct 20 20:04:22 2026",
+      "boot_changed": true,
+      "console_user": "root",
+      "jobs": {
+        "executor": {
+          "loaded": true,
+          "running": true,
+          "detail": "path = /Library/LaunchDaemons/com.pixelsagentbridge.executor.plist\npid = 311\nlast exit code = (never exited)"
+        },
+        "login-helper": {
+          "loaded": true,
+          "running": true,
+          "detail": "path = /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist\npid = 298\nlast exit code = (never exited)"
+        },
+        "session-helper": {
+          "loaded": false,
+          "running": false,
+          "detail": ""
+        },
+        "desktop": {
+          "loaded": false,
+          "running": false,
+          "detail": ""
+        }
+      },
+      "observed": 1792497908.552363
+    },
+    "after_login": {
+      "version": "1.2.75",
+      "boot_changed": true,
+      "before_boot": "{ sec = 1792377864, usec = 394714 } Mon Oct 19 10:44:24 2026",
+      "current_boot": "{ sec = 1792497862, usec = 880218 } Tue Oct 20 20:04:22 2026",
+      "service_started_before_login": true,
+      "loginwindow_helper_started_before_login": true,
+      "console_user": "huayang",
+      "single_password_submission": true,
+      "desktop_application_pid": 549,
+      "desktop_launchagent_success": true,
+      "session_helper_started_at_login": true,
+      "installed_hashes_unchanged": true,
+      "jobs": {
+        "executor": {
+          "loaded": true,
+          "running": true,
+          "launch_exit_code": null,
+          "pid": 311
+        },
+        "session-helper": {
+          "loaded": true,
+          "running": true,
+          "launch_exit_code": null,
+          "pid": 1323
+        },
+        "desktop": {
+          "loaded": true,
+          "running": false,
+          "launch_exit_code": 0,
+          "pid": null
+        }
+      },
+      "verified_at": 1792498037.597434
+    }
+  },
+  "windows_package": {
+    "version": "1.3.10",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "package_sha256": "19c28e188c4781addd0f92c9ce3d84caee6636e8dfff64da92f816472980d478",
+    "package_bytes": 55093808,
+    "real_installer_extraction_verified": true,
+    "x64_payloads_match_build_receipt": true,
+    "stored_inner_runtime_zips_verified": true,
+    "solid_lzma_verified": true,
+    "license_notice_verified": true,
+    "public_configuration_empty": true,
+    "mcp_protocols": [
+      {
+        "protocol": "2025-11-25",
+        "tools": 122,
+        "passed": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tools": 122,
+        "passed": true
+      }
+    ],
+    "installed_application_updated": false,
+    "payload": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\candidate-20261020\\windows-installer-extracted\\$PLUGINSDIR\\payload"
+  },
+  "windows_upgrade": {
+    "version": "1.3.10",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "package_sha256": "19c28e188c4781addd0f92c9ce3d84caee6636e8dfff64da92f816472980d478",
+    "installation_exit_code": 0,
+    "installed_binary_hashes_match": true,
+    "customer_toml_unchanged": true,
+    "identity_keys_unchanged": true,
+    "service_running": true,
+    "service_auto_start": true,
+    "session_supervisor_running": true,
+    "startup_shortcuts": [
+      "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\Pixels Agent Bridge.lnk"
+    ],
+    "desktop_processes": [
+      {
+        "ProcessId": 26632,
+        "SessionId": 0,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --session-supervisor"
+      },
+      {
+        "ProcessId": 26416,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --application-helper --desktop=Default"
+      },
+      {
+        "ProcessId": 23504,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --session-helper --desktop=Default"
+      },
+      {
+        "ProcessId": 26516,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --session-helper --desktop=Winlogon"
+      },
+      {
+        "ProcessId": 26720,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --media-helper --desktop=Default"
+      },
+      {
+        "ProcessId": 20840,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\" --media-helper --desktop=Winlogon"
+      },
+      {
+        "ProcessId": 27616,
+        "SessionId": 2,
+        "CommandLine": "\"C:\\Program Files\\PixelsAgentBridge\\pab-desktop.exe\""
+      }
+    ],
+    "desktop_main_process_count": 1,
+    "reboot_verified": true,
+    "boot_evidence": "windows_boot"
+  },
+  "windows_boot": {
+    "version": "1.3.10",
+    "before_boot": "2026-10-19T03:35:22.5000000Z",
+    "service_started_before_login": true,
+    "desktop_pid": 20492,
+    "boot_changed": true,
+    "explorer_running": true,
+    "service_pid": 5976,
+    "session_supervisor_started_before_login": true,
+    "logon_ui_ended": true,
+    "binary_hashes_unchanged": true,
+    "session_id": 1,
+    "current_boot": "2026-10-20T13:10:54.5000000Z",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "desktop_started_after_login": true
+  },
+  "linux_package": {
+    "version": "1.0.4",
+    "backend_version": "1.0.5",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "package_sha256": "c94d2fb4afc572fdc0691cf2d51f6c8e3c8359b3f59a91efb429f2558f5b99e4",
+    "package_bytes": 67683500,
+    "payload_binaries_verified": {
+      "opt/pixels-agent-bridge/pab-desktop": "214aad016f0a118f3dee21023ad9e3df03d1a01ad5ddd46fc9a667cc9241eafb",
+      "opt/pixels-agent-bridge/pab-document-worker": "07103283ff1790fb943b923740f67f81ad0168bdabaaf3562f980808ead20928",
+      "opt/pixels-agent-bridge/pab-executor": "9405215e564ef492d6ed4f44f16bdfe89a87e1eb467a062f64dbabcc9334a02c",
+      "opt/pixels-agent-bridge/pab-mcp": "e5989c49a9a85a287223a71d08f7b559457631f428dbe7e7312a36006d4198a0"
+    },
+    "x86_64_verified": true,
+    "paired_backend_hash_verified": true,
+    "startup_and_media_units_present": true,
+    "customer_configuration_not_packaged_overwrite": true,
+    "shell_launch_files_lf": true,
+    "published": false
+  },
+  "linux_upgrade": {
+    "version": "1.0.4",
+    "backend_version": "1.0.5",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "package_sha256": "c94d2fb4afc572fdc0691cf2d51f6c8e3c8359b3f59a91efb429f2558f5b99e4",
+    "installation_exit_code": 0,
+    "binary_hashes_match": true,
+    "customer_config_unchanged": true,
+    "device_and_operator_identities_preserved": true,
+    "saved_credentials_and_catalog_keys_preserved": true,
+    "units": {
+      "pixels-agent-bridge-executor.service": {
+        "active": true,
+        "enabled": true
+      },
+      "pixels-agent-bridge-media.service": {
+        "active": true,
+        "enabled": true
+      }
+    },
+    "desktop_autostart_entry_present": true,
+    "reboot_verified": true,
+    "verified_at": 1792501341.0149894,
+    "boot_evidence": "linux_boot"
+  },
+  "linux_boot": {
+    "version": "1.0.4",
+    "backend_version": "1.0.5",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "boot_changed": true,
+    "before_boot": "2cc6d116-b8b5-4c56-aa15-902bfc30fad9",
+    "current_boot": "8c50ec01-64b4-4e91-853d-17923202cb43",
+    "service_started_before_login": true,
+    "media_started_before_login": true,
+    "desktop_started_after_login": true,
+    "desktop_pid": 2282,
+    "graphical_session": "wayland",
+    "units": {
+      "pixels-agent-bridge-executor.service": "active",
+      "pixels-agent-bridge-media.service": "active"
+    },
+    "verified_at": 1792505416.0722568
+  },
+  "windows_macos_candidate_viewer": {
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "operator_version": "1.3.10",
+    "target_version": "1.2.75",
+    "formal_release_binaries": true,
+    "phase": "viewing",
+    "frame_ready": true,
+    "input_ready": true,
+    "input_enabled": false,
+    "decoder": "d3d11_hardware",
+    "screen": {
+      "id": "3",
+      "name": "29C1",
+      "x": 0,
+      "y": 0,
+      "desktop_width": 1920,
+      "desktop_height": 1080,
+      "pixel_width": 1920,
+      "pixel_height": 1080,
+      "scale_milli": 1000,
+      "rotation": "identity",
+      "primary": true
+    },
+    "session_id": "4fcef656-615f-4a1e-bd6f-67456c8c2ea1",
+    "actual_fps_measured": false,
+    "observed_at": 1792501541.4754086,
+    "trace": {
+      "current": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "4fcef656-615f-4a1e-bd6f-67456c8c2ea1",
+            "generation": 1,
+            "screen": {
+              "id": "3",
+              "name": "29C1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "3",
+              "name": "29C1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware",
+        "quality": {
+          "version": 1,
+          "session_id": "4fcef656-615f-4a1e-bd6f-67456c8c2ea1",
+          "generation": 1,
+          "capture_fps_milli": 15000,
+          "encoder_target_bps": 0
+        }
+      },
+      "events": [
+        {
+          "at_unix_ms": 1792501340970,
+          "source": "snapshot",
+          "status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "4fcef656-615f-4a1e-bd6f-67456c8c2ea1",
+                "generation": 1,
+                "screen": {
+                  "id": "3",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "3",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware",
+            "quality": {
+              "version": 1,
+              "session_id": "4fcef656-615f-4a1e-bd6f-67456c8c2ea1",
+              "generation": 1,
+              "capture_fps_milli": 15000,
+              "encoder_target_bps": 0
+            }
+          }
+        }
+      ],
+      "dropped": 0
+    }
+  },
+  "packages": {
+    "windows": {
+      "version": "1.3.10",
+      "architecture": "x86_64",
+      "filename": "pixels-agent-bridge-windows-x86_64-release-1.3.10-setup.exe",
+      "bytes": 55093808,
+      "sha256": "19c28e188c4781addd0f92c9ce3d84caee6636e8dfff64da92f816472980d478"
+    },
+    "macos": {
+      "version": "1.2.75",
+      "architecture": "aarch64",
+      "filename": "pixels-agent-bridge-macos-aarch64-release-1.2.75-setup.pkg",
+      "bytes": 90136365,
+      "sha256": "716b4373dcaceee03c848ef9381611a432f97ddd3914bbcc4f960b9153117f67"
+    },
+    "linux": {
+      "version": "1.0.5",
+      "architecture": "x86_64",
+      "filename": "pixels-agent-bridge-linux-x86_64-release-1.0.5.tar.gz",
+      "bytes": 48674422,
+      "sha256": "5954e6d9c27432570b75b57e695b96c37853bef8fce0d2e664d97e6e76517884"
+    },
+    "linux-desktop": {
+      "version": "1.0.4",
+      "architecture": "x86_64",
+      "filename": "pixels-agent-bridge-desktop-linux-x86_64-1.0.4.deb",
+      "bytes": 67683500,
+      "sha256": "c94d2fb4afc572fdc0691cf2d51f6c8e3c8359b3f59a91efb429f2558f5b99e4"
+    }
+  },
+  "short_candidate_regression": {
+    "passed": true,
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "mixed_seconds": 1800.0428254000144,
+    "mixed_rounds": 60,
+    "actual_fps": {
+      "min": 12.120697045583057,
+      "median": 14.565884484997177,
+      "max": 14.712173676672734
+    },
+    "reopen_count": 100,
+    "unique_sessions": 100,
+    "windows_sas_visible_recovery_passed": true,
+    "fixture_display_restored": true,
+    "private_test_slots_revoked": true,
+    "local_installed_windows_application_updated": false,
+    "deferred": [
+      "2-hour stability",
+      "8-hour stability"
+    ],
+    "verified_at": 1792507838.307254
+  },
+  "windows_login_observation": {
+    "initial_fixture_attempts_invalid": true,
+    "chinese_ime_composition_observed": true,
+    "english_mode_confirmed_before_password": true,
+    "password_field_selected_explicitly": true,
+    "subsequent_login_and_autostart_verified": true,
+    "intermediate_sas_input_unavailable_observation_preserved": true,
+    "additional_visibility_diagnosis_pending": false,
+    "original_visibility_cause_not_recorded": true,
+    "targeted_visible_and_minimized_recovery_passed": true
+  },
+  "windows_sas_visibility": {
+    "reason": "Diagnose the preserved intermediate SAS observation with actual window visibility",
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "product_binaries_changed": false,
+    "previous_failed_observation_preserved": true,
+    "cycles": [
+      {
+        "mode": "visible",
+        "before": {
+          "visible": true,
+          "minimized": false
+        },
+        "previous_session": "aa86d0a2-4ec3-4f0f-a200-c21283104893",
+        "after": {
+          "visible": true,
+          "minimized": false
+        },
+        "new_session": "3e8fbb71-c7c2-4eb8-9a0b-c1d6569610d2",
+        "readonly": true,
+        "decoder": "d3d11_hardware",
+        "input_ready": true
+      },
+      {
+        "mode": "visible-repeat",
+        "before": {
+          "visible": true,
+          "minimized": false
+        },
+        "previous_session": "3e8fbb71-c7c2-4eb8-9a0b-c1d6569610d2",
+        "after": {
+          "visible": true,
+          "minimized": false
+        },
+        "new_session": "d7f13213-1272-4f3d-84c5-e6102e93d2d2",
+        "readonly": true,
+        "decoder": "d3d11_hardware",
+        "input_ready": true
+      },
+      {
+        "mode": "minimized-then-restored",
+        "before": {
+          "visible": true,
+          "minimized": false
+        },
+        "previous_session": "d7f13213-1272-4f3d-84c5-e6102e93d2d2",
+        "while_minimized": {
+          "visibility": {
+            "visible": true,
+            "minimized": true
+          },
+          "status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "d7f13213-1272-4f3d-84c5-e6102e93d2d2",
+                "generation": 1,
+                "screen": {
+                  "id": "0:81952:\\\\.\\DISPLAY1",
+                  "name": "\\\\.\\DISPLAY1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "0:81952:\\\\.\\DISPLAY1",
+                  "name": "\\\\.\\DISPLAY1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": false,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware",
+            "quality": {
+              "version": 1,
+              "session_id": "d7f13213-1272-4f3d-84c5-e6102e93d2d2",
+              "generation": 1,
+              "capture_fps_milli": 15000,
+              "encoder_target_bps": 0
+            }
+          }
+        },
+        "after": {
+          "visible": true,
+          "minimized": false
+        },
+        "new_session": "e4932bf6-57a3-433f-9658-c5cccb4b68f7",
+        "readonly": true,
+        "decoder": "d3d11_hardware",
+        "input_ready": true
+      }
+    ],
+    "preparation_failure_preserved": "windows90-sas-visibility-preparation-failure.json",
+    "lock_preparation": "Existing authenticated user-context system command",
+    "lock_status": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "aa86d0a2-4ec3-4f0f-a200-c21283104893",
+          "generation": 1,
+          "screen": {
+            "id": "0:81952:\\\\.\\DISPLAY1",
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "0:81952:\\\\.\\DISPLAY1",
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "aa86d0a2-4ec3-4f0f-a200-c21283104893",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "visible_and_minimized_recovery_passed": true,
+    "login_recovered": true,
+    "readonly_after_login": true,
+    "os_login": {
+      "desktop_pid": 20492,
+      "interactive_login_recovered": true,
+      "logon_ui_ended": true
+    },
+    "after_login_status": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "b9b80b36-50a5-4106-b213-487c15ca68a1",
+          "generation": 1,
+          "screen": {
+            "id": "0:81952:\\\\.\\DISPLAY1",
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "0:81952:\\\\.\\DISPLAY1",
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "b9b80b36-50a5-4106-b213-487c15ca68a1",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "passed": true
+  },
+  "fixture_cleanup": {
+    "display_restored": true,
+    "fixture_exited": true,
+    "result": {
+      "before_mode": "1280x800@60",
+      "test_mode": "1920x1080@60",
+      "persistent": false,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "temporary_idle_inhibitor": true,
+      "generated_ticks": 61498,
+      "restored": true
+    }
+  },
+  "private_profile_cleanup": {
+    "owned_desktop_stopped": true,
+    "fresh_slots_revoked": true,
+    "original_vault_entries_unchanged": true
+  },
+  "upstream_main_audit": {
+    "upstream_main": "de243e2cd8314db209e702bd930bbad683c7f2fd",
+    "included_in_candidate_history": true,
+    "source_commit": "e03da9f874d87fecc5274f9abc8c935e8a4a6fc0",
+    "new_remote_commits_requiring_integration": 0
+  }
+}
