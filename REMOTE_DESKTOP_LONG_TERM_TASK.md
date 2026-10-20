@@ -1,6 +1,6 @@
 # 远程桌面与 AI 人工协助：长期开发任务
 
-核对日期：2026-10-20。开发分支：`feat/remote-desktop-v1`。最新一批已完成 AI 离线/删除/真实账号/新服务，见[本批四项](acceptance/remote-desktop-assistance-device-service-2026-10-20.md)。本轮新增 Mac 媒体实体键映射修正及常用键/中文/释放/首击验收，见[本批输入、中文与释放验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；原检查点 `e0c0c5a` 的窗口恢复、隐藏显示等待及 Mac/Linux 协助证据直接复用。此前记录包括 `3d0b23d` 软件容量、`592b13a` Mac 在线显示器修复，以及 `bcadf50` 采集期间显示器唤醒和实际恢复记录：
+核对日期：2026-10-20。开发分支：`feat/remote-desktop-v1`。最新一批修复 Mac 同逻辑尺寸密度漏检及无额度等待时布局检查，完成 Mac 产品窗口和 Linux X11 原生旧输入边界，见[动态布局本批记录](acceptance/remote-desktop-macos-linux-layout-boundary-2026-10-20.md)。此前 AI 离线/删除/真实账号/新服务见[四项记录](acceptance/remote-desktop-assistance-device-service-2026-10-20.md)。Mac 媒体实体键映射及常用键/中文/释放/首击见[输入验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；原检查点 `e0c0c5a` 的窗口恢复、隐藏显示等待及 Mac/Linux 协助证据直接复用。此前记录包括 `3d0b23d` 软件容量、`592b13a` Mac 在线显示器修复，以及 `bcadf50` 采集期间显示器唤醒和实际恢复记录：
 `8e41278` 修复 Mac 登录域识别并记录重启登录，`211c44b` 修复远程终端底部遮挡。
 各平台测试产物以各自验收记录的哈希为准。Windows 已修复重启离线重连提前结束和最小化未释放输入；Linux Wayland 登录与普通 Xorg/X11 基本输入均有实测。未更新本机安装版或发布。
 
@@ -24,6 +24,7 @@
 
 | 范围 | 已验证的结果 | 证据 |
 | --- | --- | --- |
+| Mac/X11 动态布局旧输入 | Mac 同 bounds 密度漏检修复，原生负向/修复后回归通过；正式窗口两次分辨率交接、Ctrl 释放、首帧前暂停输入与只查看恢复、点击误差 ≤1 像素；X11 真实变更后 Ctrl+左键释放、旧包/旧几何拒绝、新坐标与 IDR 通过 | [本批动态布局](acceptance/remote-desktop-macos-linux-layout-boundary-2026-10-20.md)；X11 原生测试不冒充完整窗口/Wayland 测试，03.4 只保留 Wayland 动态缺项 |
 | AI 离线、删除与实际新服务 | 离线回 waiting、恢复只查看；删除确认后窗口/媒体退出、MCP cancelled/device_removed；重新添加可用；真实 A→B 及独立控制服务/PostgreSQL/Relay 的注册、观看和显式完成通过 | [本批四项缺口与修复](acceptance/remote-desktop-assistance-device-service-2026-10-20.md)，共享状态 9 项测试及 Windows 构建通过；未重跑已通过的三平台通知/退出组合 |
 | 动态 DPI、分辨率和系统隐藏光标 | Linux 单 X screen 系统 hide/show 与客户端退出恢复已修复；90 动态 DPI 漏检已修复，分辨率与缩放变化时暂停输入、释放 Ctrl、新 session 只查看；缩窗光标位移 94/预期 94.4 像素，无残影 | [Linux 隐藏修复](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)、[Windows 动态布局](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)；本批通过条件不再重测 |
 | 常用键、中文输入、异常释放和 Apple 首击 | 三种操作端→90 共 39 项常用键；90/Apple/Linux 中文组词及取消；停止操作和输入 helper 退出释放、新会话只查看；Apple 恢复首击落点 `(100,100)`。修正 Mac 媒体实体键映射，原失败保留 | [本批输入、中文与释放验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；已测条件直接复用，私有副本保留限制单列 |
@@ -106,11 +107,12 @@ Mac 注销后的 LoginWindow 新系统确认由用户明确批准后才点击；
 
 90、Apple、Linux 原服务与安装文件恢复/核对完成，自有 Desktop、MCP 和输入夹具已退出；Windows/Mac 临时凭据槽撤销，原账号未变，输入法选择恢复。部分私有副本继续保留，此前被拒绝或受权限限制的删除未重试；未更新本机安装版、push 或发布。
 
-**本批 AI 产品联动的四个指定缺口已处理，下一批继续动态显示剩余边界：**
+**AI 四项及本批 Mac/X11 动态边界已处理，下一批只补 Wayland 动态显示：**
 
 | 顺序 | 只补的缺口 | 结束标准 |
 | --- | --- | --- |
-| 动态显示剩余边界（03.4/03.5） | 仅保留尚无同类实机证据的 Mac/Linux 动态布局前后旧输入边界，以及 Linux 独立 X screen 隐藏归属/其他隐藏来源。Windows 本批 DPI/分辨率/缩窗光标、Linux 单 root HideCursor 和既有负原点/竖屏/基本混合 DPI 均不重开 | 不把 Windows 或单 root 结论外推为全平台通过；沿原条款补缺，不追加无界组合矩阵 |
+| Wayland 动态布局（03.4） | 普通 Wayland 桌面真实布局变化后的旧输入释放/旧画面拒绝及新几何恢复；Mac 产品分辨率、同 bounds 密度原生回归和 X11 生产 worker 动态几何已通过，不再重测 | 只补该后端缺口，复用共享 session/generation 和首帧门控证据 |
+| 光标能力缺口（03.5） | 独立 X screen 隐藏归属和其他隐藏来源继续按已登记限制处理；原 XRes 全局计数不能归属独立 root 的诊断不再重复 | 不以旧诊断反复替代实现；单 root HideCursor 和已通过的三平台独立光标保持有效 |
 
 执行前先核对既有结果及源码；按用户最新更正，每台机器编译最多 10 核/10 个作业，同机其他会话与嵌套构建合计不得超过 10。不替换本机安装版，不读取无关编辑器正文；目标使用 90 的自有测试窗口，XRServer 不再使用。实际失败才修改相应代码，通过后停止重复同条件测试。以上仍归原第 1 组；AI 产品联动四项已退出当前待办，其后继续：
 
@@ -121,6 +123,7 @@ Windows 特殊不激活夹具的首次消息问题保留原诊断；普通窗口
 
 ### 当前检查点与后续验收边界
 
+- 2026-10-20 动态布局检查点：Mac 修复后签名 `d382b0e5…`，同一已授权路径和签名身份；原生六项及 release 构建、产品窗口两次分辨率变化通过。Linux X11 使用已核对 worker，真实模式变化释放/拒绝边界通过，无 Linux 新修改。服务、显示模式与自有进程已恢复，详见[本批记录](acceptance/remote-desktop-macos-linux-layout-boundary-2026-10-20.md)；Wayland 动态布局未因此通过。
 - 2026-10-20 AI 检查点：Windows 修复后产物 `e61ab5dd…` 通过删除确认、重新添加、真实 A→B、新控制服务/Relay 的观看及完成；9 项共享协助测试通过。四个指定缺口退出待办，见[本批记录](acceptance/remote-desktop-assistance-device-service-2026-10-20.md)。原服务未改，自有进程和服务已停止，私有文件保留，未 push 或发布。
 - 2026-10-20 最新：本批 Mac 修正后签名包 `2592b820…` 及常用键/中文/释放/首击见[本批输入、中文与释放验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；Windows `f53f5803…`、Mac 原 `b5240fad…`、Linux `3abb4459…` 的窗口恢复/协助证据继续有效，见[本轮记录](acceptance/remote-desktop-window-input-assistance-2026-10-20.md)。服务与进程已恢复；私有副本的删除受限情况单列，不沿用较早轮次“全部清理”的结论。
 - `a690c81`：Windows 离线自动重连修复；`27d23cd`：Linux 注销/重启验收和环境恢复记录。Linux 本轮被控端沿用已核对哈希的媒体产物，不能称为三平台同提交发布包。
@@ -309,7 +312,7 @@ Windows 内部预览在 LT-02 开始；Windows 功能验收须包含 LT-05，三
 
 - [ ] **03.4** 屏幕切换、热插拔、分辨率或缩放改变时更新 generation；新配置和
   新首帧确认之前暂停输入，旧帧/旧输入不能落到新屏幕。
-  核对状态（2026-10-20）：**部分完成**。既有切屏代次、Ctrl 释放、90 双屏移除恢复保留；[本批](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)修复 Windows DPI 漏检，补动态 100%/125%、1280×720/1920×1080 交接、新首帧前暂停输入、按住 Ctrl 释放、恢复只查看及实际点击。自动恢复使用新的 session/generation 二元标识；共享旧输入/旧帧隔离沿用既有协议结果。Mac/Linux 尚缺的同类动态布局实机边界保留，不重跑 Windows 本批及原有通过条件。
+  核对状态（2026-10-20）：**部分完成**。既有切屏代次、Ctrl 释放、90 双屏移除恢复保留；[Windows 动态布局](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)修复 DPI 漏检，补动态 100%/125%、分辨率交接、首帧前暂停输入、Ctrl 释放、只查看及点击。[Mac/X11 本批](acceptance/remote-desktop-macos-linux-layout-boundary-2026-10-20.md)修复 Mac 同 bounds 密度漏检和无额度布局检查，Mac 产品窗口两次真实变更通过；X11 生产 worker 实测 Ctrl+左键释放、旧几何/旧包拒绝及新布局输入/首帧。自动恢复使用新的 session/generation 二元标识，共享隔离证据复用。只保留 Wayland 动态布局缺项，不能以 X11 结果替代；不重跑本批通过条件。
 
 - [ ] **03.5** 单独同步光标形状、热点、位置和可见性，明确采集是否包含光标。
   核对状态（2026-10-20）：**部分完成**。三平台独立光标及多个正式窗口像素/恢复检查通过；本批修复普通单 X screen 的 XFixes 系统隐藏，实机 worker 验证启动前隐藏、嵌套/多客户端隐藏和退出恢复，形状不重传；90 动态 125% 后缩窗像素检查新增位移 94/预期 94.4 像素、无残影。独立 X screen 的隐藏归属和其他隐藏来源等原边界未关闭，不重测本批已过条件。见 [本批隐藏修复](acceptance/remote-desktop-x11-system-cursor-hide-2026-10-20.md)、[动态 DPI/光标](acceptance/remote-desktop-dynamic-dpi-layout-2026-10-20.md)、[统一产物竖屏验收](acceptance/remote-desktop-windows-portrait-matched-2026-10-19.md)、[Mac 输入、光标与协助](acceptance/remote-desktop-macos-activity-input-assistance-2026-10-18.md)。

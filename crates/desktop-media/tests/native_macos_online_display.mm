@@ -5,6 +5,8 @@
 
 static CGDirectDisplayID physical_display;
 static bool connected = true, moved = false;
+static bool mode_available = true;
+static unsigned density = 1;
 static unsigned active_queries = 0;
 static CGError online_displays(uint32_t capacity, CGDirectDisplayID* ids, uint32_t* count) {
     assert(capacity >= 2);
@@ -21,7 +23,10 @@ static CGRect test_display_bounds(CGDirectDisplayID id) {
     return id == 24 ? CGRectMake(0, 0, 1920, 1080) :
         CGRectMake(moved ? -1200 : -1280, 0, 1280, 720);
 }
-static CGDisplayModeRef test_display_mode(CGDirectDisplayID) { return CGDisplayCopyDisplayMode(physical_display); }
+static CGDisplayModeRef test_display_mode(CGDirectDisplayID) {
+    return mode_available ? CGDisplayCopyDisplayMode(physical_display) : nullptr;
+}
+static size_t pixel_width(CGDisplayModeRef mode) { return CGDisplayModeGetWidth(mode) * density; }
 
 #define CGGetOnlineDisplayList online_displays
 #define CGGetActiveDisplayList active_displays
@@ -30,6 +35,7 @@ static CGDisplayModeRef test_display_mode(CGDirectDisplayID) { return CGDisplayC
 #define CGDisplayIsMain is_main
 #define CGDisplayBounds test_display_bounds
 #define CGDisplayCopyDisplayMode test_display_mode
+#define CGDisplayModeGetPixelWidth pixel_width
 #include "../native/macos/common.h"
 
 int main() {
@@ -47,6 +53,19 @@ int main() {
         assert(!pab_mac::display_current(found[0]));
         moved = false;
         assert(pab_mac::display_current(found[0]));
-        puts("{\"inactive_online_inventory\":true,\"primary_by_id\":true,\"unplug_rejected\":true,\"geometry_change_rejected\":true}");
+        density = 2;
+        if (pab_mac::display_current(found[0])) {
+            fputs("Same-bounds density change was accepted as the old layout\n", stderr);
+            return 2;
+        }
+        const auto retina = pab_mac::displays();
+        assert(retina[0].scale_milli == 2000 && retina[0].width == found[0].width * 2);
+        assert(pab_mac::display_current(retina[0]));
+        density = 1;
+        assert(!pab_mac::display_current(retina[0]));
+        assert(pab_mac::display_current(found[0]));
+        mode_available = false;
+        assert(!pab_mac::display_current(found[0]));
+        puts("{\"inactive_online_inventory\":true,\"primary_by_id\":true,\"unplug_rejected\":true,\"geometry_change_rejected\":true,\"same_bounds_density_change_rejected\":true,\"missing_mode_rejected\":true}");
     }
 }

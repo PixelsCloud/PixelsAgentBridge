@@ -102,8 +102,18 @@ struct Display {
 inline bool display_current(const Display& display) {
     // A locked or sleeping Aqua session can report an online display as
     // inactive. Only disconnection or changed geometry retires this layout.
-    return CGDisplayIsOnline(display.id) &&
-        CGRectEqualToRect(CGDisplayBounds(display.id), display.bounds);
+    if (!CGDisplayIsOnline(display.id) ||
+        !CGRectEqualToRect(CGDisplayBounds(display.id), display.bounds)) return false;
+    OwnedCF<CGDisplayModeRef> mode(CGDisplayCopyDisplayMode(display.id));
+    if (!mode.get() || !CGDisplayModeGetWidth(mode.get())) return false;
+    const double scale = double(CGDisplayModeGetPixelWidth(mode.get())) / CGDisplayModeGetWidth(mode.get());
+    if (!std::isfinite(scale) || scale < 0.1 || scale > 8) return false;
+    // ScreenCaptureKit keeps its configured output size when the backing
+    // density changes. Bounds and delivered texture dimensions alone cannot
+    // establish that an old capture still describes the current display.
+    return std::lround(scale * 1000) == display.scale_milli &&
+        std::round(display.bounds.size.width * scale) == display.width &&
+        std::round(display.bounds.size.height * scale) == display.height;
 }
 inline std::vector<Display> displays() {
     CGDirectDisplayID ids[33]; uint32_t count = 0;
