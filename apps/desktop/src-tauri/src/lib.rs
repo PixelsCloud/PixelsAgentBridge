@@ -8,6 +8,8 @@ mod agent_integrations;
 mod desktop_input;
 #[cfg(target_os = "linux")]
 mod linux_launch;
+#[cfg(target_os = "linux")]
+mod linux_media_supervisor;
 #[cfg(target_os = "macos")]
 mod macos_launch;
 mod macos_permissions;
@@ -23,6 +25,7 @@ pub fn macos_diagnostics() -> serde_json::Value {
 }
 mod browser_helper;
 mod browser_setup;
+mod desktop_assistance;
 mod device_account;
 mod github_login;
 mod mcp_reporting;
@@ -320,6 +323,15 @@ pub fn run_session_supervisor() -> Result<(), String> {
     windows_session_supervisor::run()
 }
 
+#[cfg(windows)]
+pub fn run_media_supervisor() -> Result<(), String> {
+    windows_session_supervisor::run_media_only()
+}
+#[cfg(target_os = "linux")]
+pub fn run_media_supervisor() -> Result<(), String> {
+    linux_media_supervisor::run()
+}
+
 pub fn run_session_helper() -> Result<(), String> {
     session_helper::run()
 }
@@ -365,6 +377,13 @@ pub fn run() {
             return;
         }
     };
+    #[cfg(target_os = "linux")]
+    {
+        // The GUI entry point runs on the main thread, before Tauri creates
+        // any GTK windows. Media/session helper entry points do not use this.
+        let installed = unsafe { pab_desktop_media::initialize_linux_accessibility() };
+        tracing::debug!(installed, "checked GTK button accessibility compatibility");
+    }
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     let context = {
@@ -379,7 +398,7 @@ pub fn run() {
         let mut context = context;
         if let Some(arguments) = operator::desktop_terminal::acceptance_browser_arguments() {
             for window in &mut context.config_mut().app.windows {
-                window.additional_browser_args = Some(arguments.into());
+                window.additional_browser_args = Some(arguments.clone());
             }
         }
         context
@@ -387,8 +406,10 @@ pub fn run() {
     tauri::Builder::default()
         .manage(LocalStatus::default())
         .manage(mcp_reporting::McpReportingState::default())
+        .manage(desktop_assistance::AssistanceState::default())
         .manage(operator::OperatorState::new())
         .manage(operator::desktop_terminal::DesktopTerminalState::default())
+        .manage(operator::remote_desktop::RemoteDesktopState::default())
         .manage(github_login::GithubLoginState::default())
         .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
@@ -402,6 +423,10 @@ pub fn run() {
             {
                 gui_instance.listen(app.handle().clone())?;
                 app.manage(gui_instance);
+                match session_helper::linux_media::start() {
+                    Ok(media) => { app.manage(media); }
+                    Err(error) => tracing::warn!(%error, "Linux media helper is unavailable"),
+                }
             }
             tauri::async_runtime::spawn(show_pending_browser_handoff(app.handle().clone()));
             let update_state = app.state::<update::UpdateState>().inner().clone();
@@ -421,12 +446,23 @@ pub fn run() {
                 .inner()
                 .clone();
             tauri::async_runtime::block_on(mcp_reporting::start(app.handle().clone(), reporting));
+            desktop_assistance::start(
+                app.handle().clone(),
+                app.state::<desktop_assistance::AssistanceState>()
+                    .inner()
+                    .clone(),
+            );
             let handle = app.handle().clone();
             let status = app.state::<LocalStatus>().inner().clone();
             tauri::async_runtime::spawn(watch_local_service(handle, status));
             Ok(())
         })
         .invoke_handler(|invoke| {
+            if invoke.message.webview().label().starts_with("desktop-viewer-")
+                && !invoke.message.command().starts_with("desktop_viewer_") {
+                invoke.resolver.reject("command is unavailable in a remote desktop window");
+                return true;
+            }
             // A terminal WebView cannot call stable operator/account/task APIs.
             // Every allowed terminal command additionally checks its native label.
             if invoke
@@ -442,6 +478,15 @@ pub fn run() {
                 return true;
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                operator::remote_desktop::desktop_viewer_window,
+                operator::remote_desktop::desktop_viewer_start,
+                operator::remote_desktop::desktop_viewer_control,
+                desktop_assistance::desktop_assistance_pending,
+                desktop_assistance::desktop_assistance_displayed,
+                desktop_assistance::desktop_assistance_open,
+                desktop_assistance::desktop_assistance_cancel,
+                desktop_assistance::desktop_viewer_assistance,
+                desktop_assistance::desktop_viewer_assistance_complete,
                 operator::desktop_terminal::desktop_terminal_window,
                 operator::desktop_terminal::desktop_terminal_info,
                 operator::desktop_terminal::desktop_terminal_accounts,
@@ -541,7 +586,10 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen { .. } => tray::show_window(handle),
-            tauri::RunEvent::Exit => handle.state::<mcp_reporting::McpReportingState>().stop(),
+            tauri::RunEvent::Exit => {
+                handle.state::<mcp_reporting::McpReportingState>().stop();
+                handle.state::<desktop_assistance::AssistanceState>().stop();
+            }
             _ => {}
         });
 }

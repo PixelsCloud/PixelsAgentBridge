@@ -1,0 +1,120 @@
+{
+  "recorded_at": "2026-10-18",
+  "source_commit": "b2a7f0c",
+  "scope": "Mac operator to Windows 90 independent cursor",
+  "host_task": "feaee517-d2d0-4c6d-ae9c-0b50748d6abe",
+  "host_variants": 4,
+  "host_exit_code": 0,
+  "source_binary_sha256": "ef0119267c6bf709f279d0d868eaec7d6894225cbbaaa7186d2799fed3f73170",
+  "signed_binary_sha256": "797f3e7160189bda4f37ad053276e8339fa44ddcd5b76a624b95e0a1591dfee9",
+  "measurement": {
+    "format": "JPEG quality 95; descriptive measurements, not exact pixel equality",
+    "images": {
+      "zone0.jpg": {
+        "region": [
+          260,
+          425,
+          295,
+          470
+        ],
+        "pixels_difference_gt_32": 49,
+        "bounding_box": [
+          270,
+          438,
+          277,
+          450
+        ]
+      },
+      "zone1.jpg": {
+        "region": [
+          445,
+          425,
+          485,
+          470
+        ],
+        "pixels_difference_gt_32": 81,
+        "bounding_box": [
+          461,
+          441,
+          470,
+          450
+        ]
+      },
+      "zone2.jpg": {
+        "region": [
+          630,
+          425,
+          670,
+          470
+        ],
+        "pixels_difference_gt_32": 171,
+        "bounding_box": [
+          638,
+          433,
+          657,
+          442
+        ]
+      }
+    },
+    "fault_clear": {
+      "before_patch_channel_range": [
+        45,
+        176,
+        157
+      ],
+      "after_patch_channel_range": [
+        0,
+        0,
+        0
+      ],
+      "after_background_max_difference": 0,
+      "changing_stripe_max_difference": 153
+    },
+    "sha256": {
+      "cursor-failure-fresh.jpg": "64cb66baca0d49a0d636e982e3a61c195e9f6490036a45fd93ac2ed74ec95dfe",
+      "cursor-failure.jpg": "c061ee5a8e99530454fa4ad4970ff4c4f35a6741bd045f30c9547f0f8f514368",
+      "reopen-color.jpg": "4cfc318e5eaf7152d9ff9a4e26ee269d6cdd8d570e5e04c3736f490e67091bd5",
+      "zone0.jpg": "5764be888a1f4687f207852d39e82621f70b9b31fa583a062a9639a6a513e3b0",
+      "zone1.jpg": "0cbfb39d74ecdbcc3690acc29130cded66ff6802e48ffa4611b99bf1d91b039c",
+      "zone2.jpg": "af6561aba52fa02deefc56ee3fc6d8a128dc0d5e8c703c31b03c7f90437b415e",
+      "zone3.jpg": "21df001ebd211395e3bab916ece6bf6e5adab6042a565e28a55d8c2767e3e019"
+    }
+  },
+  "discarded_evidence": {
+    "cursor-failure.jpg": "fixture had expired; not used as clear evidence"
+  },
+  "local_system_cursor": {
+    "view_only_visible_pixels": 21297,
+    "control_inside_image_visible_pixels": 0,
+    "control_inside_image_dimensions": [
+      1,
+      1
+    ],
+    "stop_control_visible_pixels": 21297,
+    "cursor_source_failure_visible_pixels": 21297
+  },
+  "fault": {
+    "killed_component": "staged cursor worker only",
+    "fixture_alive": true,
+    "same_window_active": true,
+    "input_after_failure": [
+      1449,
+      550
+    ],
+    "video_stripe_continued": true
+  },
+  "cleanup": {
+    "mac_candidate_processes": 0,
+    "assistance_cancelled": true,
+    "observer_binary_removed": true,
+    "windows_original_service_restored": true,
+    "windows_service": "Running",
+    "windows_owned_processes": 0,
+    "windows_held_release_flags": 0,
+    "windows_staged_tasks_and_root_removed": true
+  },
+  "installed_apps_modified": false,
+  "tcc_modified": false,
+  "mac_locked_by_test": false,
+  "full_goal_complete": false
+}

@@ -1,5 +1,15 @@
 # Tool acceptance
 
+Encoder budgets, optional quality diagnostics and optimized Windows native
+short runs: [2026-10-19 adaptive bitrate report](remote-desktop-adaptive-bitrate-2026-10-19.md).
+
+Client build defaults, public unconfigured startup and customer TOML precedence:
+[2026-10-19 configuration report](remote-desktop-client-defaults-2026-10-19.md).
+
+Linux DMA video/cursor multiplexing, production worker checks and the remaining
+rapid-lock wake failure are recorded in
+[the 2026-10-18 cursor stream report](remote-desktop-linux-dma-cursor-stream-2026-10-18.md).
+
 `python scripts/acceptance.py run isolated` runs protocol/desktop, real stdio MCP,
 and Executor regressions. Every run has a fresh UUID and isolated fixtures;
 reports and raw test logs remain in `.build/acceptance/<run-id>/` locally.

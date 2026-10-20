@@ -1,0 +1,820 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-20",
+  "scope": "three requested window/input/assistance batches; no release acceptance",
+  "base_commit": "0953dbf6d37b73d86fee93be4ff9fb67768b9590",
+  "source_sha256": {
+    "apps/desktop/src-tauri/src/operator/remote_desktop.rs": "cec33bae4f71a179b8f9a81101d726a75562ebff3055fad9ac4f6c463eb84af0",
+    "apps/desktop/src-tauri/src/operator/remote_desktop/recovery.rs": "6cac42f480d720cc32d463e2c061d0758d58b94b5c3909aaacb60b303d0d37e0",
+    "apps/desktop/src-tauri/src/tray.rs": "ac8cd2c7ca3cad5394e60db4fcb21655b045ea98cb2f70685936e6e519188197"
+  },
+  "source_note": "Artifacts were built and tested before final rustfmt-only formatting. No functional changes followed the real-machine acceptance.",
+  "artifacts": {
+    "windows_desktop": {
+      "sha256": "f53f5803e45b844bef2963a79b0d02b1137d08e3c1b12571f0ce6840cd5619ab",
+      "profile": "debug"
+    },
+    "linux_desktop": {
+      "sha256": "3abb44595c25bbbd1cc13662d83485c748ca07ae9cdaf2b3e7a210b4046baebe",
+      "bytes": 47561288
+    },
+    "linux_gtk_fix_intermediate": {
+      "sha256": "d3ff46082e077d459bea901d100438cf89a7a8b981497a3bce13f4b34814d9b9",
+      "bytes": 47534280
+    },
+    "mac_desktop_signed": {
+      "sha256": "b5240fad63f3d3c7febc3aba833d3e020c717e5503c28f398751572195bee0ba"
+    },
+    "mac_desktop_unsigned": {
+      "sha256": "c1ac0809e62ad53cb97ce32fd9b215c3707c04e6e0749463183cd02c57d69643"
+    },
+    "windows_target": {
+      "pab-executor.exe": "b92967b2398d9ef6570eee64aca6db09c36034c2af86322ec984fca536f9eb6b",
+      "pab-desktop.exe": "6607a2f5b696af446274e1341a5e8a072ac95ccf512c05068b71693c3e262760",
+      "pab-media-worker.exe": "d3471991882373be6aba804acf086d91934511a0cfc1893fc89e0658f0327d38"
+    }
+  },
+  "checks": {
+    "recovery_tests": {
+      "passed": 7,
+      "failed": 0,
+      "new_tests": 3
+    },
+    "desktop_builds": [
+      "Windows debug",
+      "macOS aarch64 release",
+      "Linux x86_64 release"
+    ],
+    "cargo_jobs_per_machine": 4,
+    "nested_native_jobs": 1,
+    "installed_local_app_updated": false,
+    "push_or_cos_release": false
+  },
+  "window_acceptance": {
+    "linux_x11": {
+      "same_native_window_after_menu_restore": "0x6002b7",
+      "ctrl_observed_before_minimize": [
+        17
+      ],
+      "ctrl_after_minimize": [],
+      "native_surface_focus_after_restore": true,
+      "marker_matches": true,
+      "marker_length": 18,
+      "restored_click_expected": [
+        400,
+        300
+      ],
+      "restored_click_observed": [
+        399,
+        298
+      ],
+      "held_after_marker": [],
+      "intermediate_package_fullscreen_and_drag_out_passed": true
+    },
+    "windows": {
+      "same_native_window_after_menu_restore": 386407968,
+      "same_video_session_before_after_restore": true,
+      "atomic_source_cursor_requested": [
+        428,
+        507
+      ],
+      "atomic_source_cursor_observed": [
+        428,
+        507
+      ],
+      "remote_restored_click_expected": [
+        400,
+        300
+      ],
+      "remote_restored_click_observed": [
+        399,
+        300
+      ],
+      "fullscreen_rect": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "restored_rect": [
+        190,
+        190,
+        1122,
+        816
+      ],
+      "reopen_readonly": true,
+      "prior_apple_target_shift_release_and_drag_out_passed": true
+    },
+    "mac": {
+      "same_native_window_after_long_minimize": 587,
+      "marker_matches": true,
+      "marker_length": 18,
+      "held_after_marker": [],
+      "drag_downs_before_release": 3,
+      "drag_ups_before_release": 2,
+      "drag_ups_after_release": 3,
+      "held_after_drag_out": [],
+      "fullscreen_rect": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "restored_rect": [
+        410,
+        80,
+        1100,
+        760
+      ],
+      "fullscreen_result_reused_from_earlier_package": true
+    }
+  },
+  "assistance": [
+    {
+      "platform": "linux",
+      "scenario": "hidden",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429154092336000.json",
+        "linux-1792429155215976000.json",
+        "linux-1792429169172232900.json",
+        "linux-1792429193340421600.json",
+        "linux-1792429194726933400.json",
+        "linux-assistance-hidden-cancel-1792429194764708800.json",
+        "linux-assistance-hidden-request-1792429154124288700.json",
+        "linux-assistance-hidden-status-1792429155246398700.json",
+        "linux-assistance-hidden-status-1792429169204424900.json",
+        "linux-assistance-hidden-status-1792429193370589100.json"
+      ]
+    },
+    {
+      "platform": "linux",
+      "scenario": "minimized",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 3,
+          "viewer_bound": false
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429201928944600.json",
+        "linux-1792429204496688000.json",
+        "linux-1792429227208340800.json",
+        "linux-assistance-minimized-cancel-1792429227255701700.json",
+        "linux-assistance-minimized-request-1792429201958804700.json",
+        "linux-assistance-minimized-status-1792429204535374300.json"
+      ]
+    },
+    {
+      "platform": "linux",
+      "scenario": "active_cancel",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429319687614300.json",
+        "linux-1792429330000742400.json",
+        "linux-1792429346243408400.json",
+        "linux-assistance-cancel-active-cancel-1792429346281077800.json",
+        "linux-assistance-cancel-active-request-1792429319725675200.json",
+        "linux-assistance-cancel-active-status-1792429330029420500.json"
+      ]
+    },
+    {
+      "platform": "linux",
+      "scenario": "requester_exit",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_unavailable",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429349911000100.json",
+        "linux-1792429369156612900.json",
+        "linux-1792429406088683500.json",
+        "linux-assistance-requester-exit-request-1792429349947367100.json",
+        "linux-assistance-requester-exit-status-1792429369188753600.json"
+      ]
+    },
+    {
+      "platform": "linux",
+      "scenario": "desktop_restart",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 6,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 7,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 8,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429425609287500.json",
+        "linux-1792429442286149900.json",
+        "linux-1792429524057152300.json",
+        "linux-1792429559214708500.json",
+        "linux-1792429575417903500.json",
+        "linux-assistance-desktop-restart-cancel-1792429575451286600.json",
+        "linux-assistance-desktop-restart-request-1792429425638715400.json",
+        "linux-assistance-desktop-restart-status-1792429442318784600.json",
+        "linux-assistance-desktop-restart-status-1792429524087589100.json",
+        "linux-assistance-desktop-restart-status-1792429559239748900.json"
+      ]
+    },
+    {
+      "platform": "linux",
+      "scenario": "expiry",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "expired",
+          "delivery": "displayed",
+          "outcome": "expired",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "linux-1792429578770045200.json",
+        "linux-1792429590074548500.json",
+        "linux-1792429602978727200.json",
+        "linux-assistance-expiry-request-1792429578796734400.json",
+        "linux-assistance-expiry-status-1792429590103948400.json",
+        "linux-assistance-expiry-status-1792429603008039200.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "hidden",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "51d157de-cef8-4eb6-b500-4057233f1339.json",
+        "54bab4ae-58ba-46c6-8b9f-2f1caabfa516.json",
+        "5ad12c54-976d-404d-9db1-cd59bab77e8c.json",
+        "698479ba-29db-4203-9b5c-a55c9a5bcffb.json",
+        "b714bd1f-2f8d-4cbc-8c6c-4d1e5a638c69.json",
+        "mac-assistance-hidden-native-cancel-1792430586722533200.json",
+        "mac-assistance-hidden-native-request-1792430478886701200.json",
+        "mac-assistance-hidden-native-status-1792430498855279500.json",
+        "mac-assistance-hidden-native-status-1792430531422534800.json",
+        "mac-assistance-hidden-native-status-1792430551744628900.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "minimized",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_unavailable",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "0d13bc49-a714-462a-9292-93a5de98b149.json",
+        "2c062ac0-8ca1-42f0-8fae-b79c489f2d6c.json",
+        "3429a9f5-8c1e-4c53-a6d2-fee9c6b03a32.json",
+        "9d928ffc-1932-471f-bdcd-badbde1e1f80.json",
+        "mac-assistance-minimized-native-request-1792430597934639900.json",
+        "mac-assistance-minimized-native-status-1792430624343972600.json",
+        "mac-assistance-minimized-native-status-1792430628909104800.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "active_cancel",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "51d157de-cef8-4eb6-b500-4057233f1339.json",
+        "54bab4ae-58ba-46c6-8b9f-2f1caabfa516.json",
+        "5ad12c54-976d-404d-9db1-cd59bab77e8c.json",
+        "698479ba-29db-4203-9b5c-a55c9a5bcffb.json",
+        "b714bd1f-2f8d-4cbc-8c6c-4d1e5a638c69.json",
+        "mac-assistance-hidden-native-cancel-1792430586722533200.json",
+        "mac-assistance-hidden-native-request-1792430478886701200.json",
+        "mac-assistance-hidden-native-status-1792430498855279500.json",
+        "mac-assistance-hidden-native-status-1792430531422534800.json",
+        "mac-assistance-hidden-native-status-1792430551744628900.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "requester_exit",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 2,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_unavailable",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "0d13bc49-a714-462a-9292-93a5de98b149.json",
+        "2c062ac0-8ca1-42f0-8fae-b79c489f2d6c.json",
+        "3429a9f5-8c1e-4c53-a6d2-fee9c6b03a32.json",
+        "9d928ffc-1932-471f-bdcd-badbde1e1f80.json",
+        "mac-assistance-minimized-native-request-1792430597934639900.json",
+        "mac-assistance-minimized-native-status-1792430624343972600.json",
+        "mac-assistance-minimized-native-status-1792430628909104800.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "desktop_restart",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "waiting",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 6,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 7,
+          "viewer_bound": true
+        },
+        {
+          "status": "cancelled",
+          "delivery": "displayed",
+          "outcome": "requester_cancelled",
+          "revision": 8,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "0b2aeda2-684b-4f65-92ed-e7312aebad8b.json",
+        "1c33dfc9-ebb7-445f-9f3e-ec86cad748a3.json",
+        "353777ee-d93f-433a-a965-b995a78a1776.json",
+        "be602f68-8dff-4135-8272-633e9872fbcc.json",
+        "eb81f8cc-3b05-47f2-acae-3b6ad2c6def1.json",
+        "mac-assistance-restart-final-cancel-1792432636505586600.json",
+        "mac-assistance-restart-final-request-1792432447833331000.json",
+        "mac-assistance-restart-final-status-1792432452611546100.json",
+        "mac-assistance-restart-final-status-1792432555777056600.json",
+        "mac-assistance-restart-final-status-1792432579116984300.json"
+      ]
+    },
+    {
+      "platform": "mac",
+      "scenario": "expiry",
+      "observations": [
+        {
+          "status": "waiting",
+          "delivery": "pending",
+          "outcome": null,
+          "revision": 1,
+          "viewer_bound": false
+        },
+        {
+          "status": "active",
+          "delivery": "displayed",
+          "outcome": null,
+          "revision": 3,
+          "viewer_bound": true
+        },
+        {
+          "status": "expired",
+          "delivery": "displayed",
+          "outcome": "expired",
+          "revision": 4,
+          "viewer_bound": true
+        }
+      ],
+      "private_evidence_files": [
+        "64768d4c-4281-4af7-b2d0-59a52e32d61d.json",
+        "b67346d0-79a4-41f2-acae-c94c6f95d592.json",
+        "d85f16da-9c14-4fdf-90e5-159f16be6313.json",
+        "mac-assistance-expiry-final-request-1792432640300418900.json",
+        "mac-assistance-expiry-final-status-1792432644773432900.json",
+        "mac-assistance-expiry-final-status-1792432747193169500.json"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "case": "old Linux device-menu restore",
+      "classification": "confirmed product defect",
+      "observation": "Existing viewer stayed Iconic; GTK UI-thread show/deiconify/present fixed and verified."
+    },
+    {
+      "case": "old Mac long minimize",
+      "classification": "confirmed product defect",
+      "observation": "Intentional hidden-surface backpressure hit a five-second decoder submission timeout and exhausted software fallback. Visible-time-only submission budget fixed and verified."
+    },
+    {
+      "case": "earlier Windows-to-Apple first click after restore",
+      "classification": "inconclusive; not marked fixed",
+      "expected": [
+        100,
+        100
+      ],
+      "observed": [
+        97,
+        172
+      ],
+      "note": "Earlier source click lacked atomic input and cursor-at-click recording. The pre-pause follow-up aborted before clicking. Fresh Windows-to-90 atomic restore check passed; this does not turn the older Apple observation into a pass."
+    },
+    {
+      "case": "resumed Linux input setup",
+      "classification": "test environment",
+      "observation": "Original target service lacked the candidate media backend; later target was still locked. Prepared the isolated backend and observed Default desktop before recording successful input."
+    }
+  ],
+  "cleanup": {
+    "windows_original_service_restored": true,
+    "windows_staged_processes_absent": true,
+    "windows_staged_tasks_removed": true,
+    "linux_original_service_not_replaced": true,
+    "isolated_desktops_stopped": true,
+    "original_windows_credential_slots_unchanged": true,
+    "windows_cloned_slots_absent": true,
+    "mac_original_service_and_files_restored": true,
+    "mac_cloned_keychain_slots_absent": true,
+    "mac_copied_runtime_data_removed": true,
+    "credential_file_cleanup_complete": false,
+    "remaining_private_copies": "Some local private SQLite copies remain because automatic approval rejected file deletion with blocked by policy; Linux partial cleanup encountered root-owned files. No cleanup bypass attempted.",
+    "evidence_private": true
+  },
+  "checklist": {
+    "newly_closed": [
+      "03.1",
+      "03.6"
+    ],
+    "closed": 20,
+    "partial": 30,
+    "delivery_pending": 3,
+    "total": 53
+  },
+  "not_covered": [
+    "Full keyboard/layout/IME matrix",
+    "Remaining dynamic display/cursor combinations",
+    "The older Apple restored-click diagnostic under fully recorded conditions",
+    "AI offline/deleted-device and actual different-account/new-server cases",
+    "Final installers, production upgrades and final build performance",
+    "Deferred two-hour and eight-hour runs"
+  ],
+  "private_evidence_sha256": {
+    "0b2aeda2-684b-4f65-92ed-e7312aebad8b.json": "c28229f615fbd1de1ec445374f2578a3fa6811135a94c4b0f20fa3fa05807d4c",
+    "0d13bc49-a714-462a-9292-93a5de98b149.json": "41ce1a1aa8a456ffe24391ff80cfd0ee96aed188da5b4f20d8bd67e800fe65fb",
+    "1c33dfc9-ebb7-445f-9f3e-ec86cad748a3.json": "3a746ee85c12839326ee1d022204d3b74f98fac844b166e9665fb545f8eeaf28",
+    "2c062ac0-8ca1-42f0-8fae-b79c489f2d6c.json": "a54d319e919cfcbb2133ddb91f8344010734ecff2a7adacbdb01a0b5c263d0cd",
+    "3429a9f5-8c1e-4c53-a6d2-fee9c6b03a32.json": "b35ac67f1f3b812a7560244a1bc7e146a55e1ef4508d7800cc60ae0501b90ece",
+    "353777ee-d93f-433a-a965-b995a78a1776.json": "4bcf2042fc1117e54217e5ad59424d8e1181201ed488815257c07f5b45a75630",
+    "51d157de-cef8-4eb6-b500-4057233f1339.json": "02a5efcd425e4aa861fa3cecf0a2072ca6927cc7623a64a2c9c336af61a67a14",
+    "54bab4ae-58ba-46c6-8b9f-2f1caabfa516.json": "cd44b1eff2094147b1ad616085392b800ff1f760570c2aa44d8b9ea87eea65a8",
+    "5ad12c54-976d-404d-9db1-cd59bab77e8c.json": "59124d9e605707bb8354c4597e5ec5b355bab55da3d79431b8ad5efd50712f59",
+    "64768d4c-4281-4af7-b2d0-59a52e32d61d.json": "1ef93fe23949356c51826770db4d343c2984c37a72efb3e80b8020bf3b039ece",
+    "698479ba-29db-4203-9b5c-a55c9a5bcffb.json": "3a38856bfb1c8b7d7290ae2f46731138c76725125f55d43ce608ddef1198c756",
+    "9d928ffc-1932-471f-bdcd-badbde1e1f80.json": "53e939b84c5777735644a0a456808807971f30eea085d846329559d2b5c5393d",
+    "b67346d0-79a4-41f2-acae-c94c6f95d592.json": "e3fe26bf0301ace4726b3543d7e10787ce7302cc82b543c1bc4a9ecf89c759bb",
+    "b714bd1f-2f8d-4cbc-8c6c-4d1e5a638c69.json": "c425ccb42e2ef90b5954e50b11c0e6a756ee1f1e22b51bef26d123908e1f083f",
+    "be602f68-8dff-4135-8272-633e9872fbcc.json": "4ae51e327c3797978c27d7940522ee6e4791cf273d40d60d63115a8a043dff29",
+    "d85f16da-9c14-4fdf-90e5-159f16be6313.json": "858d87488a6c4a1bec4f10d609a33742dc2d068c78da65a140c42aece29df45e",
+    "eb81f8cc-3b05-47f2-acae-3b6ad2c6def1.json": "15bb4d4a39463bc49b26a0fcb9717ba0311fc1cebe651b2df6396b1a2c8eab3f",
+    "linux-1792429154092336000.json": "197f1a704e2b4d3f6474a3d8211b19b2337b9db405ad7f77ce20f07e8c5e8d20",
+    "linux-1792429155215976000.json": "197f1a704e2b4d3f6474a3d8211b19b2337b9db405ad7f77ce20f07e8c5e8d20",
+    "linux-1792429169172232900.json": "48b365eb56fb4b778c8cf0b106dc404979fcdc0c661c657c8b92a4e1bfb93e05",
+    "linux-1792429193340421600.json": "48b365eb56fb4b778c8cf0b106dc404979fcdc0c661c657c8b92a4e1bfb93e05",
+    "linux-1792429194726933400.json": "9bb5ded1c6c42a09e3936e8a4f7ceeb2d51777902be478eb9b9e9ae42ce905a2",
+    "linux-1792429201928944600.json": "904f660bdcb24c3903c85a945e468f1f7a5d6f700870f0b86e5b5ebd4383135b",
+    "linux-1792429204496688000.json": "0eeae9601569ff9c02f8efe86fcbc89f932be50566958dcc4088a634d4022643",
+    "linux-1792429227208340800.json": "56f2ac218efbfe14cf3a3e00bffaa176635a1792333ca6e8a5090453c4f4740e",
+    "linux-1792429319687614300.json": "2d34459828b74f03b506f177c626038868bd8a94a0c306ff97262ef1646e7ef6",
+    "linux-1792429330000742400.json": "8ef62989edff9bd94119d2dadfcaaa19421bbd7d290dfd9e87378060420328fc",
+    "linux-1792429346243408400.json": "6418a4323269fb6127402ced2fdc3713d50332007fed79610254aaa8e099fbe2",
+    "linux-1792429349911000100.json": "b09875952beed3fa90de0676605bea0c06b6461498716d36ca13b420c7072f76",
+    "linux-1792429369156612900.json": "8716f0a80d0ffbbb25565922e078200f18f5de58e23a88eb82dff093cbd08163",
+    "linux-1792429406088683500.json": "a2391f699deb5e7f7bd0f8e1186736ef6707d351172210990cc07df244f017f1",
+    "linux-1792429425609287500.json": "862b05be93bfc8a660a0e23c9225537d97b026e6b7ee872c82256330fdf777ea",
+    "linux-1792429442286149900.json": "15cd42f92d9d176a45a15f8bd6e9b04bbdd6aa6908392fc4fe5ad46d1127295f",
+    "linux-1792429524057152300.json": "830b057e4ca21abb7d7c9a0a98e2d0f7706bb2293fc798416c6b27745ffc8887",
+    "linux-1792429559214708500.json": "5cb5d6d15c197026d076cc5e735e92e7af8f5bcde04e669bdaf31928c47e61ab",
+    "linux-1792429575417903500.json": "e302a7d9d24fd8acdcdc90e6c84f2c1f83225ee5f3e04cdccf1606674af47218",
+    "linux-1792429578770045200.json": "b81690569290c4522930acf00ac1205c3e3bdc675be99a0a61b14949249d7df9",
+    "linux-1792429590074548500.json": "e7d98d5f6188b2ac07d7b9a5dc1c71936cd7b29d64cefd3dcce1bbd770742bbe",
+    "linux-1792429602978727200.json": "16b34c626cf51121d45565eb240b5569250b8e9801def3a2cf9f4174f5e9e23a",
+    "linux-1792455904391877900.json": "11daa0ac527e889da868cce59e2c01a78a68339222116562748b0b12e0fa961a",
+    "linux-1792455905635465500.json": "1f9d56e7355c1c3ff92142131c9fb3d7cbb5cd38f3da725503a9f7805845bfc8",
+    "linux-1792455912709543600.json": "1bd10afc7d96f00d4e4d3fdd4f53ba046870a86fa251a9d280af7935c6a059c5",
+    "linux-1792455920043440400.json": "c73a92506ff2b28659e2febbb1aa66c305b9eb392db9b8eb44d781bb2fb991ed",
+    "linux-1792455935336205900.json": "16469e76fcc27f894fd728125a2edaae1d8b1bef7f4f59d095bebe7077c2e1e8",
+    "linux-1792455943732457700.json": "479b8a9ee67a014d70911ebfe6479b458c5cdec1d92470ad9113412f653d691c",
+    "linux-1792456023397091400.json": "1f9d56e7355c1c3ff92142131c9fb3d7cbb5cd38f3da725503a9f7805845bfc8",
+    "linux-1792456026533714500.json": "1bd10afc7d96f00d4e4d3fdd4f53ba046870a86fa251a9d280af7935c6a059c5",
+    "linux-1792456036600634400.json": "65d654fd4d54e90ea69bba37684645e2c35c87a8816ad96602e17b1e6d58ebcd",
+    "linux-1792456037599839000.json": "1b4fed482823dc50dac83b909c866fa6f621bb43ca5623df9258f56467f78669",
+    "linux-1792456051077875000.json": "c80a4d8ad508f5160c5141bac0d63d17ffd07965e5eeef18c4093201b062a750",
+    "linux-1792456052324846100.json": "c312bff10e3e7c39f5f37a2c7edffc54389fb5bb6e13511f5f2ebaea3559f8b5",
+    "linux-1792456053347235000.json": "9a4a15b0aa2c415be4ed2b7567be21ec0a139470b4b0f8918d14866625c129a4",
+    "linux-1792456055929592500.json": "14fe356975ee7a4c70b81299565cb8afdc1263142382c3f7db6cff205c1279e8",
+    "linux-1792456067072639700.json": "1f7478d8391aa487c1c5ee20ce10121281d77e8f2ad1efc1899bfae061fc0c89",
+    "linux-1792456072099053200.json": "72ec09de2c7a08bcec6db694547208841f7665d0ba720734a48194ef5d9d7022",
+    "linux-1792456082571192800.json": "3d6efc52778a23c5e9401aa21124d245cd876048f402ed0c8d2d875979ecc45f",
+    "linux-1792456083754148700.json": "1f9d56e7355c1c3ff92142131c9fb3d7cbb5cd38f3da725503a9f7805845bfc8",
+    "linux-1792456084955522200.json": "1bd10afc7d96f00d4e4d3fdd4f53ba046870a86fa251a9d280af7935c6a059c5",
+    "linux-1792456086062581800.json": "f97125a31eefeca070a55b102d2082504320fbf2051b311deb08c4b98860faea",
+    "linux-1792456096953140700.json": "c312bff10e3e7c39f5f37a2c7edffc54389fb5bb6e13511f5f2ebaea3559f8b5",
+    "linux-1792456102838670600.json": "9a4a15b0aa2c415be4ed2b7567be21ec0a139470b4b0f8918d14866625c129a4",
+    "linux-1792456117563185200.json": "1f7478d8391aa487c1c5ee20ce10121281d77e8f2ad1efc1899bfae061fc0c89",
+    "linux-1792456118489815900.json": "4214b167f0160d1e2d6ae2cbeac5af160c3f150b20264b78d468da0ce0d1a821",
+    "linux-1792456146809367600.json": "270c7770ef063c92b9a917a062863ce54d6f080b4d35a8c7d85e5d892f2f91f0",
+    "linux-1792456162235200100.json": "39d1745ad7bf9ff62077d362026252b823f17daf7ab631697c8260ddf5b0be09",
+    "linux-1792456208608891900.json": "479b8a9ee67a014d70911ebfe6479b458c5cdec1d92470ad9113412f653d691c",
+    "linux-1792456287508842000.json": "1f9d56e7355c1c3ff92142131c9fb3d7cbb5cd38f3da725503a9f7805845bfc8",
+    "linux-1792456288723587100.json": "1bd10afc7d96f00d4e4d3fdd4f53ba046870a86fa251a9d280af7935c6a059c5",
+    "linux-1792456308289296100.json": "c80a4d8ad508f5160c5141bac0d63d17ffd07965e5eeef18c4093201b062a750",
+    "linux-1792456309602084400.json": "c312bff10e3e7c39f5f37a2c7edffc54389fb5bb6e13511f5f2ebaea3559f8b5",
+    "linux-1792456321590982900.json": "9a4a15b0aa2c415be4ed2b7567be21ec0a139470b4b0f8918d14866625c129a4",
+    "linux-1792456324240385600.json": "14fe356975ee7a4c70b81299565cb8afdc1263142382c3f7db6cff205c1279e8",
+    "linux-1792456327008986200.json": "1f7478d8391aa487c1c5ee20ce10121281d77e8f2ad1efc1899bfae061fc0c89",
+    "linux-1792456327935283700.json": "4a3e3d3d2d6edaf32128f1c2b740c194277e8584f8562ac633fdd7f444df3a5b",
+    "linux-1792456344534592000.json": "1f9d56e7355c1c3ff92142131c9fb3d7cbb5cd38f3da725503a9f7805845bfc8",
+    "linux-1792456355694346100.json": "1bd10afc7d96f00d4e4d3fdd4f53ba046870a86fa251a9d280af7935c6a059c5",
+    "linux-1792456356971887600.json": "338565008f97dd0f4bcce53ffcdd775e22321b0758f5d88471559d099cde0ecd",
+    "linux-1792456358593775800.json": "20025ec72b19f8f3301b7efce893f3a6d70512f318cf0b1e853f64d8345a0c9a",
+    "linux-1792456363234984100.json": "b43dab111fd67f3fb844f3d67451d135340cca2ff3033271ad870ea1822df2d4",
+    "linux-1792456370264517600.json": "0ea1c40a3200d490b233f2b825804a335772926f7eea6f5bfe39a77648ebf722",
+    "linux-1792456397849665900.json": "479b8a9ee67a014d70911ebfe6479b458c5cdec1d92470ad9113412f653d691c",
+    "linux-assistance-cancel-active-cancel-1792429346281077800.json": "6418a4323269fb6127402ced2fdc3713d50332007fed79610254aaa8e099fbe2",
+    "linux-assistance-cancel-active-request-1792429319725675200.json": "2d34459828b74f03b506f177c626038868bd8a94a0c306ff97262ef1646e7ef6",
+    "linux-assistance-cancel-active-status-1792429330029420500.json": "8ef62989edff9bd94119d2dadfcaaa19421bbd7d290dfd9e87378060420328fc",
+    "linux-assistance-desktop-restart-cancel-1792429575451286600.json": "e302a7d9d24fd8acdcdc90e6c84f2c1f83225ee5f3e04cdccf1606674af47218",
+    "linux-assistance-desktop-restart-request-1792429425638715400.json": "862b05be93bfc8a660a0e23c9225537d97b026e6b7ee872c82256330fdf777ea",
+    "linux-assistance-desktop-restart-status-1792429442318784600.json": "15cd42f92d9d176a45a15f8bd6e9b04bbdd6aa6908392fc4fe5ad46d1127295f",
+    "linux-assistance-desktop-restart-status-1792429524087589100.json": "830b057e4ca21abb7d7c9a0a98e2d0f7706bb2293fc798416c6b27745ffc8887",
+    "linux-assistance-desktop-restart-status-1792429559239748900.json": "5cb5d6d15c197026d076cc5e735e92e7af8f5bcde04e669bdaf31928c47e61ab",
+    "linux-assistance-expiry-request-1792429578796734400.json": "b81690569290c4522930acf00ac1205c3e3bdc675be99a0a61b14949249d7df9",
+    "linux-assistance-expiry-status-1792429590103948400.json": "e7d98d5f6188b2ac07d7b9a5dc1c71936cd7b29d64cefd3dcce1bbd770742bbe",
+    "linux-assistance-expiry-status-1792429603008039200.json": "16b34c626cf51121d45565eb240b5569250b8e9801def3a2cf9f4174f5e9e23a",
+    "linux-assistance-hidden-cancel-1792429194764708800.json": "9bb5ded1c6c42a09e3936e8a4f7ceeb2d51777902be478eb9b9e9ae42ce905a2",
+    "linux-assistance-hidden-request-1792429154124288700.json": "197f1a704e2b4d3f6474a3d8211b19b2337b9db405ad7f77ce20f07e8c5e8d20",
+    "linux-assistance-hidden-status-1792429155246398700.json": "197f1a704e2b4d3f6474a3d8211b19b2337b9db405ad7f77ce20f07e8c5e8d20",
+    "linux-assistance-hidden-status-1792429169204424900.json": "48b365eb56fb4b778c8cf0b106dc404979fcdc0c661c657c8b92a4e1bfb93e05",
+    "linux-assistance-hidden-status-1792429193370589100.json": "48b365eb56fb4b778c8cf0b106dc404979fcdc0c661c657c8b92a4e1bfb93e05",
+    "linux-assistance-minimized-cancel-1792429227255701700.json": "56f2ac218efbfe14cf3a3e00bffaa176635a1792333ca6e8a5090453c4f4740e",
+    "linux-assistance-minimized-request-1792429201958804700.json": "904f660bdcb24c3903c85a945e468f1f7a5d6f700870f0b86e5b5ebd4383135b",
+    "linux-assistance-minimized-status-1792429204535374300.json": "0eeae9601569ff9c02f8efe86fcbc89f932be50566958dcc4088a634d4022643",
+    "linux-assistance-requester-exit-request-1792429349947367100.json": "b09875952beed3fa90de0676605bea0c06b6461498716d36ca13b420c7072f76",
+    "linux-assistance-requester-exit-status-1792429369188753600.json": "8716f0a80d0ffbbb25565922e078200f18f5de58e23a88eb82dff093cbd08163",
+    "linux-build-result.json": "632ddd061f93d213be24c7c5818301921d61f3ce372b425dd7627f3dad57a97c",
+    "linux-visible-build-result.json": "296faa53d05dd8d98d45159dccfa27fcaaa8cf43362806893578b4fabe58654c",
+    "linux-visible-build.log": "b52a8c0166b9511fe2fa18bc2ab1ecffd64043a02a01bcf54f5e41f80a25e61c",
+    "mac-assistance-expiry-final-request-1792432640300418900.json": "00993f3d036ab11d049622bffd65742cb1d56b2a40d8aa149fa18de04c00ba1c",
+    "mac-assistance-expiry-final-status-1792432644773432900.json": "704c75d15b5019fa66e3383cf3ce26ad8dd4bc5be245aac8094826e04feb76d4",
+    "mac-assistance-expiry-final-status-1792432747193169500.json": "2481c3a7edb774c4079b981272cff801ca494e70953aed00e82249a096cb4d58",
+    "mac-assistance-hidden-native-cancel-1792430586722533200.json": "580b3f464a4f92ba89af4678350bada29372ecbffdf0eb09a724049ea9cd4ea6",
+    "mac-assistance-hidden-native-request-1792430478886701200.json": "aa28f7b0337e111adca872bc976f07ec40823eea2d8bdc75faf6cd18e202011b",
+    "mac-assistance-hidden-native-status-1792430498855279500.json": "a93e0b23444ec1360f3b4900a17d85de1016b211c840f8164614a74e3e3a2956",
+    "mac-assistance-hidden-native-status-1792430531422534800.json": "a93e0b23444ec1360f3b4900a17d85de1016b211c840f8164614a74e3e3a2956",
+    "mac-assistance-hidden-native-status-1792430551744628900.json": "1337a69e8ec44c1872c2b960f9cef85494835f6b7ca4eed1afc3a848781fa73b",
+    "mac-assistance-minimized-native-request-1792430597934639900.json": "cdb55c20cc39a0ce6bab7a05937a551f55520d083d79c217bd35254f4e1999a8",
+    "mac-assistance-minimized-native-status-1792430624343972600.json": "5646534ecfccbb762e090515f07dd65e2a257d082d56c7f555ead2b0948921b6",
+    "mac-assistance-minimized-native-status-1792430628909104800.json": "e2f4787526bebeee1965cb95d33cfac39de1a2de34bce5174b01bb8d15661f34",
+    "mac-assistance-restart-final-cancel-1792432636505586600.json": "f8623637a3344a2aa426e8f8767e0bbf985303c3e41c06546223a692bca55948",
+    "mac-assistance-restart-final-request-1792432447833331000.json": "115926482989f5408a46ae5021267bd15c8d035e7984ca84eef6247909f0d6a7",
+    "mac-assistance-restart-final-status-1792432452611546100.json": "88ccabec82ee666393091cac4408042f2e65e9a4bae17299d32ac2c4dd559dfa",
+    "mac-assistance-restart-final-status-1792432555777056600.json": "b2908b7229dddc75f8230af9030d30c7e7bf763a045dbfea227d637a973bbb16",
+    "mac-assistance-restart-final-status-1792432579116984300.json": "d1e1505e96e79577a6b3f4929cff386f0f752e0699aa93dcbd97d79cb28ea9c3",
+    "mac-fixture-1792433100009332900.json": "4de9440015eec3d910dbb436ceed93ee08a72f765b6f10c826876f07cea821d9",
+    "visible-windows-build.log": "99415a2931b9ff5c111b6005310033cba881572b4ebdac0bb10f79764e00c697",
+    "visible-windows-tests.log": "24345798098e4287f82d6c59bec9fa3ab466af16a78b3c70bccae2e19df1d58c"
+  }
+}

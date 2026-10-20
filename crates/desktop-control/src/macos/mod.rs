@@ -12,6 +12,8 @@ use std::{
     time::{Duration, Instant},
 };
 mod input;
+mod media_input;
+pub use media_input::MacMediaInput;
 pub(crate) mod recovery;
 pub use input::{apply_input, release_idle_input, release_input};
 pub const BACKEND: &str = "xcap/macos_accessibility/enigo";

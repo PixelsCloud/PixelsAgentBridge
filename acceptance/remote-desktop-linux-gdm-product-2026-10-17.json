@@ -1,0 +1,1138 @@
+{
+  "date": "2026-10-17",
+  "baseline": "d2db8836a5bda07bbadffad2e12edc4cc0202a39",
+  "scope": "Windows formal independent viewer -> Ubuntu GNOME Wayland GDM password authentication -> existing user session 23",
+  "build": {
+    "cargo_jobs": 8,
+    "nested_jobs": 1,
+    "concurrent_build_commands": false,
+    "full_linux_desktop_and_executor": true
+  },
+  "runs": [
+    {
+      "id": "4c2f80215369",
+      "artifacts": {
+        "pab-desktop": "b02624116b4c3648192b1d19d0fd8aabd876221e2ed97c6d8cf98976f686306c",
+        "pab-executor": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+        "manager.py": "e9d1334d42a08d867c5d01e8d67c157408dea34730cd0e99c017eb073f8e5bbf",
+        "fixture.py": "d37727d2005fb68337eb5af397bdf46ddd1407cb31d3df54d819a36aa39d0eb8"
+      },
+      "login_before_recovery": [
+        {
+          "session": "23",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "rollback_trigger": "",
+          "restore_performed": false,
+          "media_unit": "active"
+        }
+      ],
+      "submission": {
+        "single_submission_marker": true,
+        "console_prompt_reviewed": true,
+        "windows_presentation_verified": false,
+        "scripts": {
+          "linux_console_reviewed_password.py": "a48dde207241a1ee50e732c8974280a041b799d2c14b2e8ca31ffcd7db7de76f",
+          "linux_login_viewer_input.py": "0b015a512607a659875a548e05be55ba936451762c6a44f66ee6410c49d7a03b"
+        },
+        "windows_artifacts": {
+          "pab-desktop.exe": "bdacbfad5580c64ca93a9fe68daa7ae08199706b12e0223f5d859c131f68e4e6",
+          "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+        }
+      },
+      "comparison": {
+        "passed": false,
+        "reason": "Windows presentation observation unavailable; independently reviewed VMware console instead"
+      },
+      "recovery": {
+        "original": {
+          "session": "23",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "properties": {
+            "MainPID": "24984",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 17:34:45 CST] ; stop_time=[n/a] ; pid=24984 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          },
+          "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+          "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "staged_sha256": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+          "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+        },
+        "restored": {
+          "original_service_restored": true,
+          "properties": {
+            "MainPID": "30042",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 18:08:04 CST] ; stop_time=[n/a] ; pid=30042 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          }
+        },
+        "console": {
+          "samples": [
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23"
+          ],
+          "retired_test_greeters": [],
+          "original_session_restored": true,
+          "gdm_config_preserved": true
+        },
+        "greeter": {
+          "created": "(objectpath '/org/gnome/DisplayManager/Displays/123809747199648',)",
+          "session": "c12",
+          "greeter": {
+            "User": "128",
+            "Type": "wayland",
+            "Class": "greeter",
+            "Active": "yes",
+            "LockedHint": "no"
+          },
+          "helper_pid": 28790,
+          "original": {
+            "User": "1000",
+            "Type": "wayland",
+            "Class": "user",
+            "Active": "no",
+            "LockedHint": "yes"
+          },
+          "ready": true
+        },
+        "owned_processes": [],
+        "input_devices": [],
+        "fixture": {
+          "clicks": 0,
+          "releases": 0,
+          "ctrl_down": 0,
+          "ctrl_up": 0,
+          "ctrl_held": false,
+          "left_held": false,
+          "last_x": null,
+          "last_y": null,
+          "updated": 1792231683.9224331,
+          "width": 1280,
+          "height": 800,
+          "focused": true
+        },
+        "runtime_removed": true,
+        "session_state_restored": true,
+        "rollback_trigger": ""
+      },
+      "remote_cleanup": {
+        "stage_removed": true,
+        "fixture_removed": true
+      },
+      "local_cleanup": {
+        "owned_processes": 0,
+        "profile_removed": true
+      },
+      "images_sha256": {
+        "console-prompt.png": "728a796b76edca9f56e58c4de8e633db67a4adce03d173e2e0c5b315b69aa055",
+        "console-returned.png": "5149c46241c5e5fa69ca88e6870907c32e46ca7e6da829a01275e05ac71f0b4a"
+      },
+      "evidence_sha256": {
+        "arm-1792231470200286200.json": "de0fc8d5472bb8ba9c24f910826afaaba82db3653f0a861c45cc9fec373074d2",
+        "comparison.json": "5b3f6515f4d620c4faedfab4500a1a76de404e1d2813a7d342447c768d855b90",
+        "frames.json": "e27c39237c4bb27b51146315992ddcfc9f72ceafa09283470ba2180d7606771c",
+        "greeter-1792231513330090500.json": "7ee966913748caab2bbaeda56779b02cbd8e19063f567c125e0bec96786ecc52",
+        "inspect-1792231561199287400.json": "134423d68129b8238b21289fa33c5f2687da26140f46d475c52871befc49dd3a",
+        "inspect-1792231664804865200.json": "5c85b3567bf485ca14ec1a712d01908ad5630ddd304e8c3aed9ec2c084ceb3ca",
+        "invalid-viewer-captures.json": "efbb743d52e6235c6478792d32361edea03cfbb4732932d27827cf33038df498",
+        "local-cleanup.json": "b319db0f065021b211bccc16a332cec0035cf4aeec37df2afb15d60739d629ce",
+        "observe-1792231627599209300.json": "5857cdd56303470a5ff2759e896c0ba4e9e082ed859027caf67bc9a0aeb73195",
+        "observe-1792231649928304400.json": "ba6ac9275a8debdc695443069bdd87939b713366f31b4d782856520f7ad0b004",
+        "operation.json": "8a81ef9fec03a93c60d6122eee70a593ec06adb2d6c0a3edf648c8abcb85a3b0",
+        "prepared.json": "39ad830f54c94a63ed9a337287f89008b6a5c25e93a1d721ce0e54130787cef5",
+        "recovery.json": "aa3931508a4ac5389abbca93bc8622e1cd4a86da55b723ee0c834fd0e25cb5b0",
+        "remote-cleanup.json": "41e49d69f16ec648fa4035fbcce3806736487c5005643d39fc6750b9be97dd74",
+        "restore-1792231682634710200.json": "88d684e13dbc8a51aefa6c53b8c2e1821f350d3ff037abdb62c24f7a0b196af1",
+        "returned-viewer.json": "622055d3aa0a654478143f3d95fa3ba9d47e0567dbb8c33ee895e5548d60fbfb",
+        "submission.json": "763b408b29f1b1802fdeee8b9d31dda5a4584601a7b497b6f588aec9eff511e7"
+      }
+    },
+    {
+      "id": "3cdace8fe6df",
+      "artifacts": {
+        "pab-desktop": "b02624116b4c3648192b1d19d0fd8aabd876221e2ed97c6d8cf98976f686306c",
+        "pab-executor": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+        "manager.py": "982f0b49b548aceb38f4ff12298236eb9a056005ed30a39e4ce573a57c5a8316",
+        "fixture.py": "d37727d2005fb68337eb5af397bdf46ddd1407cb31d3df54d819a36aa39d0eb8"
+      },
+      "login_before_recovery": [
+        {
+          "session": "23",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "rollback_trigger": "",
+          "restore_performed": false,
+          "media_unit": "active"
+        }
+      ],
+      "submission": {
+        "single_submission_marker": true,
+        "prompt_reviewed": true,
+        "input_script_sha256": "0b015a512607a659875a548e05be55ba936451762c6a44f66ee6410c49d7a03b",
+        "windows_artifacts": {
+          "pab-desktop.exe": "bdacbfad5580c64ca93a9fe68daa7ae08199706b12e0223f5d859c131f68e4e6",
+          "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+        }
+      },
+      "comparison": {
+        "region": [
+          15,
+          160,
+          1657,
+          1176
+        ],
+        "mean_rgb_absolute_error": [
+          0.0017934725272617416,
+          0.001719144120383247,
+          0.0017245389241082988
+        ],
+        "passed": true
+      },
+      "recovery": {
+        "original": {
+          "session": "23",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "properties": {
+            "MainPID": "30042",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 18:08:04 CST] ; stop_time=[n/a] ; pid=30042 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          },
+          "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+          "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "staged_sha256": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+          "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+        },
+        "restored": {
+          "original_service_restored": true,
+          "properties": {
+            "MainPID": "32474",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 18:17:36 CST] ; stop_time=[n/a] ; pid=32474 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          }
+        },
+        "console": {
+          "samples": [
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23",
+            "23"
+          ],
+          "retired_test_greeters": [],
+          "original_session_restored": true,
+          "gdm_config_preserved": true
+        },
+        "greeter": {
+          "created": "(objectpath '/org/gnome/DisplayManager/Displays/123809747199136',)",
+          "session": "c13",
+          "greeter": {
+            "User": "128",
+            "Type": "wayland",
+            "Class": "greeter",
+            "Active": "yes",
+            "LockedHint": "no"
+          },
+          "helper_pid": 30751,
+          "original": {
+            "User": "1000",
+            "Type": "wayland",
+            "Class": "user",
+            "Active": "no",
+            "LockedHint": "yes"
+          },
+          "ready": true
+        },
+        "owned_processes": [],
+        "input_devices": [],
+        "fixture": {
+          "clicks": 1,
+          "releases": 1,
+          "ctrl_down": 0,
+          "ctrl_up": 0,
+          "ctrl_held": false,
+          "left_held": false,
+          "last_x": 639.87890625,
+          "last_y": 400.2734375,
+          "updated": 1792232256.1275148,
+          "width": 1280,
+          "height": 800,
+          "focused": true
+        },
+        "runtime_removed": true,
+        "session_state_restored": true,
+        "rollback_trigger": ""
+      },
+      "remote_cleanup": {
+        "stage_removed": true,
+        "fixture_removed": true
+      },
+      "local_cleanup": {
+        "profile_removed": true,
+        "owned_processes": 0
+      },
+      "images_sha256": {
+        "before.png": "c2e7fa6354be84001a3d6513af286d8eea372ab4bae37d4a249420d8ac250bb4",
+        "locked.png": "573387417d47ae60b21ddb09ea72c539771f12ac8b1a63580a05a538a2356b5c",
+        "prompt.png": "ef88833ab83d6c201a4f5abc65aa09cbf542267cff30cb31eb28b8462de99a66",
+        "returned.png": "25dec0881028a5d63e36984c81c18c95e5c604e0dd970db7f7bf58cbc315e8aa"
+      },
+      "evidence_sha256": {
+        "arm-1792231828731447100.json": "de0fc8d5472bb8ba9c24f910826afaaba82db3653f0a861c45cc9fec373074d2",
+        "comparison.json": "edfddc966d57854e75cc3e0c444a9ceaf608dcd4515c8b697a117ad457aa11cd",
+        "frames.json": "3cabdcfacb2276c059ab5aab8f1e3ab19193e32605602c0ae603b0cac729e532",
+        "greeter-1792231876339798200.json": "b33ce00c27cedbcd3287ccd1f11b3754749389146ab9376d0faff2ac221866bd",
+        "idle-monitor.json": "95537bf6500a13d34415c1bad476449ce4c2d4254ccb03d438d7652f8db8a888",
+        "idle-result.json": "a4980b0e6e234bf4d4733c988d4730b687ca0a7d7b0aa98b04954371f32da6f4",
+        "inspect-1792231872255975000.json": "0952f6d27d9311625a947da9546f1cd73e5686c36a7cdd3bc20da497ccdace5a",
+        "inspect-1792231900800051200.json": "a8a456e3e2353b581cfb3387a012f145a9676075947aaf34b646e50fa41703c1",
+        "inspect-1792232230742520500.json": "86b9f453102ff864cea1dfadb4f5d14d804da51e6ddd04c9c8a30a9739aba46b",
+        "local-cleanup.json": "88555fb3d8f9b23d9fba5ad651497b742db1267e44dd1afa64eb66e597a7f21f",
+        "observe-1792232221007961700.json": "ba6ac9275a8debdc695443069bdd87939b713366f31b4d782856520f7ad0b004",
+        "operation.json": "582f662c8f792004dc3b5e0c61cc2bfa8a39f1f1cffd343d1af8df670ee07869",
+        "prepared.json": "c08bdd2a74ce8cba4b14a3557b923ca96f098728579a8a4eb00f9b2c33d8bac9",
+        "recovery.json": "163c9a8d503325bdc572a95f8c085638e33fd6a39fa7481e156f1f76f1f64d83",
+        "remote-cleanup.json": "41e49d69f16ec648fa4035fbcce3806736487c5005643d39fc6750b9be97dd74",
+        "restore-1792232254151172600.json": "ac2cd3594983d9854ca2ec119e8be1971048048b03b678fe1d7188961b2eac2d",
+        "returned-viewer.json": "4d0a4f55cc7c814ae200375a53cdbfe2770bb30187148984de4f7d1e808d3ab0",
+        "status-1792232200216752500.json": "ecbfbcdd3a69c405a19b9fac9eb71c749774d32a8d46c2c38a82e81a482ff984",
+        "status-1792232278028853500.json": "5d5c4b81c61e4db67067c14db1cd55ad6feaf23668da44543850c3733b51a7b8",
+        "submission.json": "5f9ad939ebae38af0bd2bd0041c5e84dc5c8cc3cdb4c4a9c3db41aab3ca88506"
+      },
+      "idle_summary": {
+        "passed": true,
+        "seconds": 37.65,
+        "samples": 8,
+        "same_session_and_worker": true,
+        "input_remained_enabled": true
+      },
+      "idle_samples": [
+        {
+          "seconds": 0.476,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 5.79,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 11.138,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 16.431,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 21.747,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 27.047,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 32.347,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        },
+        {
+          "seconds": 37.65,
+          "viewer": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "21c8ad2a-2cbb-496a-ad66-c5c87038795b",
+                "generation": 1,
+                "screen": {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": true
+          },
+          "remote": {
+            "power": 0,
+            "pixels_inhibitors": 1,
+            "session": "c13",
+            "uid": 128,
+            "capture_pids": [
+              30983
+            ]
+          }
+        }
+      ],
+      "returned_viewer_status_note": "CDP command used an invalid target and returned main-page text; not accepted as viewer status. Actual returned native-window image shows view-only and restored fixture; post-login helper inspection confirms UID 1000.",
+      "inspections": [
+        {
+          "processes": [
+            {
+              "pid": 30416,
+              "uid": 0,
+              "group": 30416,
+              "args": [
+                "--media-supervisor"
+              ]
+            },
+            {
+              "pid": 30423,
+              "uid": 1000,
+              "group": 30423,
+              "args": [
+                "--media-helper"
+              ]
+            },
+            {
+              "pid": 30480,
+              "uid": 1000,
+              "group": 30423,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1",
+                "15",
+                "desktop"
+              ]
+            },
+            {
+              "pid": 30552,
+              "uid": 1000,
+              "group": 30423,
+              "args": [
+                "--media-worker",
+                "input",
+                "gnome:Virtual-1"
+              ]
+            }
+          ],
+          "fixture": {
+            "clicks": 1,
+            "releases": 1,
+            "ctrl_down": 0,
+            "ctrl_up": 0,
+            "ctrl_held": false,
+            "left_held": false,
+            "last_x": 639.87890625,
+            "last_y": 400.2734375,
+            "updated": 1792231890.0674899,
+            "width": 1280,
+            "height": 800,
+            "focused": true
+          }
+        },
+        {
+          "processes": [
+            {
+              "pid": 30416,
+              "uid": 0,
+              "group": 30416,
+              "args": [
+                "--media-supervisor"
+              ]
+            },
+            {
+              "pid": 30751,
+              "uid": 128,
+              "group": 30751,
+              "args": [
+                "--media-helper"
+              ]
+            },
+            {
+              "pid": 30983,
+              "uid": 128,
+              "group": 30751,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1",
+                "15",
+                "desktop"
+              ]
+            },
+            {
+              "pid": 31013,
+              "uid": 0,
+              "group": 31013,
+              "args": [
+                "--media-worker",
+                "export-session",
+                "30729",
+                "64",
+                "65"
+              ]
+            },
+            {
+              "pid": 31065,
+              "uid": 128,
+              "group": 30751,
+              "args": [
+                "--media-worker",
+                "input",
+                "gnome:Virtual-1"
+              ]
+            },
+            {
+              "pid": 31070,
+              "uid": 0,
+              "group": 31070,
+              "args": [
+                "--media-worker",
+                "input-session",
+                "30729",
+                "64",
+                "65"
+              ]
+            }
+          ],
+          "fixture": {
+            "clicks": 1,
+            "releases": 1,
+            "ctrl_down": 0,
+            "ctrl_up": 0,
+            "ctrl_held": false,
+            "left_held": false,
+            "last_x": 639.87890625,
+            "last_y": 400.2734375,
+            "updated": 1792231918.6533802,
+            "width": 1280,
+            "height": 800,
+            "focused": false
+          }
+        },
+        {
+          "processes": [
+            {
+              "pid": 30416,
+              "uid": 0,
+              "group": 30416,
+              "args": [
+                "--media-supervisor"
+              ]
+            },
+            {
+              "pid": 32228,
+              "uid": 1000,
+              "group": 32228,
+              "args": [
+                "--media-helper"
+              ]
+            },
+            {
+              "pid": 32255,
+              "uid": 1000,
+              "group": 32228,
+              "args": [
+                "--media-worker",
+                "capture",
+                "gnome:Virtual-1",
+                "15",
+                "desktop"
+              ]
+            }
+          ],
+          "fixture": {
+            "clicks": 1,
+            "releases": 1,
+            "ctrl_down": 0,
+            "ctrl_up": 0,
+            "ctrl_held": false,
+            "left_held": false,
+            "last_x": 639.87890625,
+            "last_y": 400.2734375,
+            "updated": 1792232248.546949,
+            "width": 1280,
+            "height": 800,
+            "focused": true
+          }
+        }
+      ]
+    }
+  ],
+  "capture_diagnosis": {
+    "expected": [
+      29,
+      181,
+      93
+    ],
+    "samples": [
+      {
+        "index": 0,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 1,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 2,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 3,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 4,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 5,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 6,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 7,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 8,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 9,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 10,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      },
+      {
+        "index": 11,
+        "rgb": [
+          29,
+          181,
+          93
+        ],
+        "matches": true
+      }
+    ],
+    "display_idle_reset_result": 2147483648
+  },
+  "capture_method": "Temporarily topmost only the owned viewer while sampling its rectangle, then restore prior topmost state. Before/greeter/prompt/returned reviewed by agent.",
+  "private_tools_sha256": {
+    "formal_gdm_manager.py": "5cee2e6039c8a71f401dd9c7e26b197d2821e917eb098c57ac005107917c39d9",
+    "prepare_formal_gdm.py": "f1045f79f248dd3f69a400b9cfbe76d16f9fd71be7654ef5950aace2ee8bae52",
+    "capture_visible_owned_viewer.py": "2a228d364f67dd7dd6976c6bbe5372fa801115561aa026b2a589f43fc768aa2c",
+    "formal_gdm_idle.py": "364f5690e389278df652a81464730b829feba564415fdab1952f63c9ef0003fd",
+    "finish_formal_gdm.py": "e5ce3596c430376fcf94dee54c6c98367030d4fe8828f83b1402615602a5529a",
+    "linux_login_viewer_input.py": "0b015a512607a659875a548e05be55ba936451762c6a44f66ee6410c49d7a03b"
+  },
+  "unverified": [
+    "logout and new user session",
+    "cold-boot login",
+    "multi-monitor",
+    "dynamic FPS in GDM",
+    "long duration stability",
+    "installation/upgrade"
+  ],
+  "production_changes_this_run": false
+}

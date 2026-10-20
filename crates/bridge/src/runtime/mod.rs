@@ -2,6 +2,7 @@ mod account;
 mod catalog;
 mod credential;
 mod desktop_terminal;
+mod remote_desktop;
 mod device;
 mod directory;
 mod document;
@@ -18,6 +19,8 @@ mod session;
 mod store;
 #[cfg(test)]
 mod store_tests;
+#[cfg(test)]
+mod test_support;
 mod system_query;
 mod terminal;
 mod terminal_store;

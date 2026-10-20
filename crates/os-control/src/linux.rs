@@ -78,6 +78,56 @@ fn leased_fd(pid: u32, expected: &str) -> Result<OwnedFd, String> {
         )?;
     rustix::io::dup(&lease.fd).map_err(|e| e.to_string())
 }
+#[cfg(test)]
+mod media_process_watch_tests {
+    use super::*;
+    use crate::execution::LinuxProcessWatch;
+
+    struct Child(std::process::Child);
+    impl Child {
+        fn start() -> Self {
+            Self(std::process::Command::new("/bin/sleep").arg("60").spawn().unwrap())
+        }
+    }
+    impl Drop for Child {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    #[test]
+    fn operation_lease_expiry_does_not_retire_live_media_process() {
+        let child = Child::start();
+        let pid = child.0.id();
+        let watch = LinuxProcessWatch::observe(pid).unwrap();
+        let native = watch.user_identity().unwrap();
+        let token = identity(pid).unwrap();
+        // Deterministically cross the ten-minute operation-token boundary.
+        LEASES.lock().unwrap().get_mut(&pid).unwrap().expires = Instant::now();
+        assert!(leased_fd(pid, &token).is_err(), "old operation tokens must still expire");
+        assert_ne!(identity(pid).unwrap(), token);
+        assert!(watch.current());
+        assert_eq!(watch.user_identity().unwrap(), native);
+        assert_eq!(LinuxProcessWatch::observe(pid).unwrap(), watch);
+        assert!(watch.duplicate_fd().is_ok());
+    }
+    #[test]
+    fn media_watch_rejects_exited_and_different_processes() {
+        let mut child = Child::start();
+        let pid = child.0.id();
+        let watch = LinuxProcessWatch::observe(pid).unwrap();
+        let other = Child::start();
+        assert_ne!(watch, LinuxProcessWatch::observe(other.0.id()).unwrap());
+        let descriptor = watch.duplicate_fd().unwrap();
+        child.0.kill().unwrap();
+        child.0.wait().unwrap();
+        assert!(!watch.current());
+        assert!(watch.user_identity().is_err());
+        assert!(watch.duplicate_fd().is_err());
+        assert!(LinuxProcessWatch::observe(pid).is_err());
+        assert!(exited(&descriptor).unwrap());
+    }
+}
 fn wait(fd: &OwnedFd, deadline: Instant) -> Result<bool, String> {
     loop {
         if exited(fd)? {

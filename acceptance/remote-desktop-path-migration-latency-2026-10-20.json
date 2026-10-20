@@ -1,0 +1,1124 @@
+{
+  "date": "2026-10-20",
+  "at_commit": "652de0d34fc9d92ba31cbf12b1f3f86afa57008b",
+  "kind": "actual Windows native viewer to Linux X11: existing artifacts, no new compilation or product modification",
+  "requirements_closed": [
+    "06.5"
+  ],
+  "artifacts": {
+    "pab-desktop": "3abb44595c25bbbd1cc13662d83485c748ca07ae9cdaf2b3e7a210b4046baebe",
+    "pab-executor": "fead2d822d6b1becd53f686067b72a768da8931c03bba67fc15c86f387d23c65",
+    "pab-desktop.exe": "e61ab5ddd3411923d904c6c82c77381ba87f86e7aaf64709140c4fb1e3cba6f1",
+    "pab-mcp.exe": "ee83616b7ed75a691518a0ede40bd25104bedb1adc30561b3836986f59d9c3fb"
+  },
+  "corrected_fixture_sha256": "d8c07533802ec1961f00e3fff36b249754c98eaf3ff1cab5aa59e659d141a71e",
+  "target": {
+    "platform": "Linux X11",
+    "resolution": [
+      1306,
+      768
+    ],
+    "source_input": "Windows physical SendInput to own native viewer"
+  },
+  "path_changes": [
+    {
+      "elapsed_ms": 808.4080999833532,
+      "path": "p2p",
+      "phase": "viewing",
+      "input_enabled": false,
+      "input_ready": true,
+      "frame_ready": true,
+      "error": null,
+      "session_id": "405d1b8e-02cb-45c4-b3ff-b9dc089b181e"
+    },
+    {
+      "elapsed_ms": 36105.352099984884,
+      "path": "p2p",
+      "phase": "reconnecting",
+      "input_enabled": false,
+      "input_ready": false,
+      "frame_ready": false,
+      "error": null,
+      "session_id": null
+    },
+    {
+      "elapsed_ms": 37010.3858000075,
+      "path": "relay",
+      "phase": "reconnecting",
+      "input_enabled": false,
+      "input_ready": false,
+      "frame_ready": false,
+      "error": null,
+      "session_id": null
+    },
+    {
+      "elapsed_ms": 37945.60629999614,
+      "path": "relay",
+      "phase": "viewing",
+      "input_enabled": false,
+      "input_ready": true,
+      "frame_ready": true,
+      "error": null,
+      "session_id": "48391b8b-83df-4ef7-a4a0-5e4aa54bdf31"
+    },
+    {
+      "elapsed_ms": 54792.39970000344,
+      "path": "relay",
+      "phase": "viewing",
+      "input_enabled": true,
+      "input_ready": true,
+      "frame_ready": true,
+      "error": null,
+      "session_id": "48391b8b-83df-4ef7-a4a0-5e4aa54bdf31"
+    },
+    {
+      "elapsed_ms": 60621.09319999581,
+      "path": "relay",
+      "phase": "viewing",
+      "input_enabled": false,
+      "input_ready": true,
+      "frame_ready": true,
+      "error": null,
+      "session_id": "48391b8b-83df-4ef7-a4a0-5e4aa54bdf31"
+    },
+    {
+      "elapsed_ms": 80517.95350000612,
+      "path": "relay",
+      "phase": "reconnecting",
+      "input_enabled": false,
+      "input_ready": false,
+      "frame_ready": false,
+      "error": null,
+      "session_id": null
+    },
+    {
+      "elapsed_ms": 81450.77039999887,
+      "path": "relay",
+      "phase": "viewing",
+      "input_enabled": false,
+      "input_ready": true,
+      "frame_ready": true,
+      "error": null,
+      "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619"
+    }
+  ],
+  "returned_p2p_observation": {
+    "samples": [
+      {
+        "elapsed_seconds": 0,
+        "paths": [
+          {
+            "deviceCode": "556688188",
+            "path": "p2p"
+          }
+        ]
+      }
+    ],
+    "status": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+          "generation": 1,
+          "screen": {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "target": {
+      "fixture": {
+        "pid": 85029,
+        "frame": 12346,
+        "clicks": 15,
+        "releases": 15,
+        "left_held": false,
+        "focused": true,
+        "width": 1306,
+        "height": 768,
+        "updated": 1792486619.8057303
+      },
+      "service_pid": 83817
+    }
+  },
+  "migration_assessment": {
+    "direct_to_relay_observed": true,
+    "relay_to_direct_observed": true,
+    "manual_viewer_reopen_or_retry": false,
+    "same_operator_runtime": true,
+    "media_session_replaced_during_recovery": true,
+    "recovery_readonly_observed": true,
+    "final_capture_reported_fps_milli": 15000,
+    "held_key_at_fault": false,
+    "held_key_release_reuses": "remote-desktop-backlog-evidence-reaudit-2026-10-20.json",
+    "note": "Timeline uses only operator monotonic clock. No remote clock subtraction or exact drop-to-migration timing claim."
+  },
+  "latency": {
+    "baseline-v2": {
+      "passed": true,
+      "source": "atomic physical source click to visibly decoded target counter, one operator monotonic clock",
+      "samples": [
+        {
+          "visible_counter": 1,
+          "latency_ms": 243.63830001675524,
+          "polls": 7,
+          "invalid_samples": 0,
+          "max_capture_ms": 33.0307999975048
+        },
+        {
+          "visible_counter": 2,
+          "latency_ms": 221.81129999808036,
+          "polls": 9,
+          "invalid_samples": 0,
+          "max_capture_ms": 27.62149999034591
+        },
+        {
+          "visible_counter": 3,
+          "latency_ms": 268.5285999905318,
+          "polls": 8,
+          "invalid_samples": 0,
+          "max_capture_ms": 31.751700007589534
+        },
+        {
+          "visible_counter": 4,
+          "latency_ms": 189.75180000416003,
+          "polls": 5,
+          "invalid_samples": 0,
+          "max_capture_ms": 34.476000000722706
+        },
+        {
+          "visible_counter": 5,
+          "latency_ms": 178.98440000135452,
+          "polls": 7,
+          "invalid_samples": 0,
+          "max_capture_ms": 28.86150000267662
+        }
+      ],
+      "median_ms": 221.81129999808036,
+      "min_ms": 178.98440000135452,
+      "max_ms": 268.5285999905318
+    },
+    "relay": {
+      "passed": true,
+      "source": "atomic physical source click to visibly decoded target counter, one operator monotonic clock",
+      "samples": [
+        {
+          "visible_counter": 6,
+          "latency_ms": 1014.2565999994986,
+          "polls": 51,
+          "invalid_samples": 0,
+          "max_capture_ms": 32.321900012902915
+        },
+        {
+          "visible_counter": 7,
+          "latency_ms": 868.0226000142284,
+          "polls": 42,
+          "invalid_samples": 0,
+          "max_capture_ms": 40.749500010861084
+        },
+        {
+          "visible_counter": 8,
+          "latency_ms": 962.5901999825146,
+          "polls": 52,
+          "invalid_samples": 0,
+          "max_capture_ms": 38.38000001269393
+        },
+        {
+          "visible_counter": 9,
+          "latency_ms": 211.38540000538342,
+          "polls": 12,
+          "invalid_samples": 0,
+          "max_capture_ms": 16.82810002239421
+        },
+        {
+          "visible_counter": 10,
+          "latency_ms": 639.4695000199135,
+          "polls": 35,
+          "invalid_samples": 0,
+          "max_capture_ms": 29.998999991221353
+        }
+      ],
+      "median_ms": 868.0226000142284,
+      "min_ms": 211.38540000538342,
+      "max_ms": 1014.2565999994986
+    },
+    "recovered": {
+      "passed": true,
+      "source": "atomic physical source click to visibly decoded target counter, one operator monotonic clock",
+      "samples": [
+        {
+          "visible_counter": 11,
+          "latency_ms": 242.54070001188666,
+          "polls": 14,
+          "invalid_samples": 0,
+          "max_capture_ms": 19.612299976870418
+        },
+        {
+          "visible_counter": 12,
+          "latency_ms": 231.58910000347532,
+          "polls": 13,
+          "invalid_samples": 0,
+          "max_capture_ms": 18.752100004348904
+        },
+        {
+          "visible_counter": 13,
+          "latency_ms": 210.46649999334477,
+          "polls": 11,
+          "invalid_samples": 0,
+          "max_capture_ms": 27.56690001115203
+        },
+        {
+          "visible_counter": 14,
+          "latency_ms": 210.4201999900397,
+          "polls": 12,
+          "invalid_samples": 0,
+          "max_capture_ms": 25.381100014783442
+        },
+        {
+          "visible_counter": 15,
+          "latency_ms": 232.9248999885749,
+          "polls": 12,
+          "invalid_samples": 0,
+          "max_capture_ms": 22.876900009578094
+        }
+      ],
+      "median_ms": 231.58910000347532,
+      "min_ms": 210.4201999900397,
+      "max_ms": 242.54070001188666
+    },
+    "p2p-return": {
+      "passed": true,
+      "source": "atomic physical source click to visibly decoded target counter, one operator monotonic clock",
+      "samples": [
+        {
+          "visible_counter": 16,
+          "latency_ms": 178.3737000077963,
+          "polls": 8,
+          "invalid_samples": 0,
+          "max_capture_ms": 24.300099990796298
+        },
+        {
+          "visible_counter": 17,
+          "latency_ms": 122.84359999466687,
+          "polls": 6,
+          "invalid_samples": 0,
+          "max_capture_ms": 17.498100001830608
+        },
+        {
+          "visible_counter": 18,
+          "latency_ms": 101.45960000227205,
+          "polls": 3,
+          "invalid_samples": 0,
+          "max_capture_ms": 29.12960000685416
+        },
+        {
+          "visible_counter": 19,
+          "latency_ms": 181.2942000105977,
+          "polls": 8,
+          "invalid_samples": 0,
+          "max_capture_ms": 31.022200011648238
+        },
+        {
+          "visible_counter": 20,
+          "latency_ms": 160.62059998512268,
+          "polls": 6,
+          "invalid_samples": 0,
+          "max_capture_ms": 31.40089998487383
+        }
+      ],
+      "median_ms": 160.62059998512268,
+      "min_ms": 101.45960000227205,
+      "max_ms": 181.2942000105977
+    }
+  },
+  "latency_scope": "Five samples each; click to decoded visible counter includes OS, rendering and PrintWindow sampling; not pure network RTT or an SLA. Relay phase overlaps 4 MiB file traffic.",
+  "business": {
+    "baseline": {
+      "raw_passed": true,
+      "operations": {
+        "terminal": {
+          "session_id": "478e4e66-cd7b-4cf4-b71d-3e10ed3bafcc",
+          "marker_observed": true,
+          "elapsed_ms": 894.0695999772288
+        },
+        "accepted_task_id": "2e170185-def9-486d-a9d4-b57f79e6a1a1",
+        "command": {
+          "task_id": "2e170185-def9-486d-a9d4-b57f79e6a1a1",
+          "state": "Succeeded",
+          "marker_observed": true,
+          "elapsed_ms": 1285.5627000099048,
+          "identity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        }
+      },
+      "paths_before": [
+        {
+          "deviceCode": "556688188",
+          "path": "p2p"
+        }
+      ],
+      "status_after": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "405d1b8e-02cb-45c4-b3ff-b9dc089b181e",
+            "generation": 1,
+            "screen": {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware",
+        "quality": {
+          "version": 1,
+          "session_id": "405d1b8e-02cb-45c4-b3ff-b9dc089b181e",
+          "generation": 1,
+          "capture_fps_milli": 15000,
+          "encoder_target_bps": 0
+        }
+      }
+    },
+    "relay": {
+      "raw_passed": false,
+      "operations": {
+        "accepted_task_id": "0306514e-ef03-4d1a-bbf1-06e0c5ac1c73",
+        "terminal": {
+          "session_id": "478e4e66-cd7b-4cf4-b71d-3e10ed3bafcc",
+          "marker_observed": true,
+          "elapsed_ms": 469.33290001470596
+        },
+        "command": {
+          "task_id": "0306514e-ef03-4d1a-bbf1-06e0c5ac1c73",
+          "state": "Succeeded",
+          "marker_observed": true,
+          "elapsed_ms": 516.1519999965094,
+          "identity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        },
+        "upload_request_id": "c33d0447-5cf6-44a0-995e-46a5e1761d78",
+        "upload": {
+          "request_id": "c33d0447-5cf6-44a0-995e-46a5e1761d78",
+          "elapsed_ms": 15536.548000003677,
+          "id": "c33d0447-5cf6-44a0-995e-46a5e1761d78",
+          "deviceCode": "556688188",
+          "state": "completed",
+          "offset": 4194304,
+          "size": 4194304,
+          "message": null,
+          "executionIdentity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        },
+        "download_request_id": "f4bd5ff9-05b2-4e18-895a-c81c33eba52b",
+        "download": {
+          "request_id": "f4bd5ff9-05b2-4e18-895a-c81c33eba52b",
+          "elapsed_ms": 11194.028199999593,
+          "id": "f4bd5ff9-05b2-4e18-895a-c81c33eba52b",
+          "deviceCode": "556688188",
+          "state": "completed",
+          "offset": 4194304,
+          "size": 4194304,
+          "message": null,
+          "executionIdentity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        }
+      },
+      "paths_before": [
+        {
+          "deviceCode": "556688188",
+          "path": "relay"
+        }
+      ],
+      "status_after": {
+        "phase": "reconnecting",
+        "error": null,
+        "opened": null,
+        "input_ready": false,
+        "frame_ready": false,
+        "input_enabled": false,
+        "decoder": null,
+        "quality": null
+      }
+    },
+    "recovered": {
+      "raw_passed": true,
+      "operations": {
+        "accepted_task_id": "3010dab9-111d-4502-ac76-eb3b38ff34a6",
+        "terminal": {
+          "session_id": "478e4e66-cd7b-4cf4-b71d-3e10ed3bafcc",
+          "marker_observed": true,
+          "elapsed_ms": 428.9472999807913
+        },
+        "command": {
+          "task_id": "3010dab9-111d-4502-ac76-eb3b38ff34a6",
+          "state": "Succeeded",
+          "marker_observed": true,
+          "elapsed_ms": 470.2434000209905,
+          "identity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        }
+      },
+      "paths_before": [
+        {
+          "deviceCode": "556688188",
+          "path": "relay"
+        }
+      ],
+      "status_after": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+            "generation": 1,
+            "screen": {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware",
+        "quality": {
+          "version": 1,
+          "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+          "generation": 1,
+          "capture_fps_milli": 15000,
+          "encoder_target_bps": 0
+        }
+      }
+    },
+    "p2p-return": {
+      "raw_passed": true,
+      "operations": {
+        "accepted_task_id": "9639a1b0-d4eb-4311-b6a5-13e716ffd000",
+        "terminal": {
+          "session_id": "478e4e66-cd7b-4cf4-b71d-3e10ed3bafcc",
+          "marker_observed": true,
+          "elapsed_ms": 362.7785999851767
+        },
+        "command": {
+          "task_id": "9639a1b0-d4eb-4311-b6a5-13e716ffd000",
+          "state": "Succeeded",
+          "marker_observed": true,
+          "elapsed_ms": 362.14129999279976,
+          "identity": {
+            "mode": "service",
+            "account_id": "uid:0",
+            "account_name": "root",
+            "home": "/root",
+            "primary_group": 0,
+            "session_id": null,
+            "logon_id": null,
+            "environment_source": "service_process"
+          }
+        }
+      },
+      "paths_before": [
+        {
+          "deviceCode": "556688188",
+          "path": "p2p"
+        }
+      ],
+      "status_after": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+            "generation": 1,
+            "screen": {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "x11:0:Virtual1",
+              "name": "Virtual1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1306,
+              "desktop_height": 768,
+              "pixel_width": 1306,
+              "pixel_height": 768,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware",
+        "quality": {
+          "version": 1,
+          "session_id": "1bc98acc-7927-475a-9c65-4dd6d9094619",
+          "generation": 1,
+          "capture_fps_milli": 15000,
+          "encoder_target_bps": 0
+        }
+      }
+    }
+  },
+  "business_assessment": {
+    "same_terminal_session_id": "478e4e66-cd7b-4cf4-b71d-3e10ed3bafcc",
+    "terminal_reopened": false,
+    "both_transfer_sha256": "d8355986551be103c9e77437cb0c32cd210fe52f2c14ebbac970d8d9cdc2a2c6",
+    "transfer_bytes_each": 4194304,
+    "relay_raw_failure_preserved": true,
+    "relay_raw_failure_cause": "Immediate frame_ready assertion ran during transient video reconnect after completed download; business operations succeeded. Independent timeline observed recovery without retry; recovered and p2p-return phases confirmed fresh visible counters and original PTY."
+  },
+  "fault": {
+    "target_pid": 83817,
+    "target_executable": "/tmp/pab-linux-media-b6470d3c9f21/pab-executor",
+    "ports": [
+      39017,
+      56619
+    ],
+    "dev": "ens33",
+    "duration_limit_seconds": 90,
+    "qdiscs_before": [
+      {
+        "kind": "fq_codel",
+        "handle": "0:",
+        "root": true,
+        "refcnt": 2,
+        "options": {
+          "limit": 10240,
+          "flows": 1024,
+          "quantum": 1514,
+          "target": 4999,
+          "interval": 99999,
+          "memory_limit": 33554432,
+          "ecn": true,
+          "drop_batch": 64
+        }
+      }
+    ],
+    "restored": true,
+    "rules": [
+      [
+        "ip",
+        49160
+      ],
+      [
+        "ipv6",
+        49161
+      ],
+      [
+        "ip",
+        49162
+      ],
+      [
+        "ipv6",
+        49163
+      ]
+    ],
+    "active_unix_ms": 1792486299443,
+    "elapsed_seconds": 60.15106212600949,
+    "filters": [
+      {
+        "protocol": "ip",
+        "pref": 49160,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 49160,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv4",
+            "ip_proto": "udp",
+            "src_port": 39017
+          },
+          "skip_hw": true,
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "gact",
+              "control_action": {
+                "type": "drop"
+              },
+              "prob": {
+                "random_type": "none",
+                "control_action": {
+                  "type": "pass"
+                },
+                "val": 0
+              },
+              "index": 1,
+              "ref": 1,
+              "bind": 1,
+              "installed": 60,
+              "last_used": 60,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49161,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49161,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv6",
+            "ip_proto": "udp",
+            "src_port": 39017
+          },
+          "skip_hw": true,
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "gact",
+              "control_action": {
+                "type": "drop"
+              },
+              "prob": {
+                "random_type": "none",
+                "control_action": {
+                  "type": "pass"
+                },
+                "val": 0
+              },
+              "index": 2,
+              "ref": 1,
+              "bind": 1,
+              "installed": 60,
+              "last_used": 60,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 49162,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 49162,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv4",
+            "ip_proto": "udp",
+            "src_port": 56619
+          },
+          "skip_hw": true,
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "gact",
+              "control_action": {
+                "type": "drop"
+              },
+              "prob": {
+                "random_type": "none",
+                "control_action": {
+                  "type": "pass"
+                },
+                "val": 0
+              },
+              "index": 3,
+              "ref": 1,
+              "bind": 1,
+              "installed": 60,
+              "last_used": 8,
+              "first_used": 60,
+              "stats": {
+                "bytes": 136642,
+                "packets": 282,
+                "drops": 203,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49163,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49163,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv6",
+            "ip_proto": "udp",
+            "src_port": 56619
+          },
+          "skip_hw": true,
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "gact",
+              "control_action": {
+                "type": "drop"
+              },
+              "prob": {
+                "random_type": "none",
+                "control_action": {
+                  "type": "pass"
+                },
+                "val": 0
+              },
+              "index": 4,
+              "ref": 1,
+              "bind": 1,
+              "installed": 60,
+              "last_used": 60,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "qdiscs_after": [
+      {
+        "kind": "fq_codel",
+        "handle": "0:",
+        "root": true,
+        "refcnt": 2,
+        "options": {
+          "limit": 10240,
+          "flows": 1024,
+          "quantum": 1514,
+          "target": 4999,
+          "interval": 99999,
+          "memory_limit": 33554432,
+          "ecn": true,
+          "drop_batch": 64
+        }
+      }
+    ],
+    "restore_method": "verified_global_listing_exact_owned_pref_delete",
+    "active_marker": true,
+    "done_marker": true
+  },
+  "fault_cleanup_correction": "tc pref-filtered JSON did not satisfy helper assertion. Both helper and timer failed restoration. Follow-up globally listed rules, validated exact protocol/pref/UDP source-port/drop action, deleted only the four owned preferences, and verified original root qdisc equality. Final stop of already-expired timer returned unit-not-loaded after restoration; postflight independently confirms inactive timer and zero owned filters.",
+  "preparatory_failures": [
+    {
+      "file": "latency-baseline.json",
+      "passed": false,
+      "cause": "Operation enable watch had not yet settled; target did not receive clicks. Added explicit readiness wait."
+    },
+    {
+      "file": "latency-baseline-ready.json",
+      "passed": false,
+      "cause": "GTK synthetic double-press notification incremented click counter. Own fixture now counts only BUTTON_PRESS; no product input change."
+    }
+  ],
+  "final_fixture": {
+    "pid": 85029,
+    "frame": 13008,
+    "clicks": 20,
+    "releases": 20,
+    "left_held": false,
+    "focused": true,
+    "width": 1306,
+    "height": 768,
+    "updated": 1792486642.529939
+  },
+  "cleanup": {
+    "linux": {
+      "service_active": true,
+      "service_pid": 87213,
+      "service_executable": "/opt/pixels-agent-bridge/pab-executor",
+      "binary_unchanged": true,
+      "config_unchanged": true,
+      "unit_unchanged": true,
+      "dropins_unchanged": true,
+      "media_runtime_absent": true,
+      "qdisc_restored": true,
+      "own_filter_prefs_absent": true,
+      "units": {
+        "pab-rd-linux-b6470d3c9f21-watch.service": "inactive",
+        "pab-rd-linux-b6470d3c9f21-media.service": "inactive",
+        "pab-rd-linux-b6470d3c9f21-fixture.service": "inactive",
+        "pab-rd-linux-b6470d3c9f21-rollback.timer": "inactive",
+        "pab-net-path-b6470d3c9f21.service": "failed",
+        "pab-net-path-b6470d3c9f21-rollback.service": "failed",
+        "pab-net-path-b6470d3c9f21-rollback.timer": "inactive"
+      },
+      "session": "User=1000\nType=x11\nActive=yes\nLockedHint=no",
+      "retained_private_state_mode": "0o700",
+      "retained_media": "/tmp/pab-linux-media-b6470d3c9f21",
+      "remaining_owned_processes": [],
+      "fixture_stopped": true,
+      "checks_passed": true
+    },
+    "windows": {
+      "original_slots_unchanged": true,
+      "own_slots_absent": true,
+      "desktop_stopped": true
+    },
+    "retained": "ACL-restricted Windows profile, root-700 Linux manager state, owned media/fixture artifacts and test file retained; no claim of deleting all private copies."
+  },
+  "reused_evidence": [
+    "remote-desktop-decoder-status-2026-10-18.json",
+    "remote-desktop-helper-budget-weak-network-2026-10-19.json",
+    "remote-desktop-display-wake-recovery-2026-10-20.json",
+    "remote-desktop-backlog-evidence-reaudit-2026-10-20.json"
+  ],
+  "not_claimed": [
+    "full seven-direction final performance matrix",
+    "1080p Linux baseline",
+    "pure network RTT",
+    "held-key-at-migration new test",
+    "30 minute/100 open-close/2 hour/8 hour soak",
+    "final installation or publication"
+  ],
+  "raw_root": ".build/remote-desktop/network-path-20261020",
+  "raw_sha256": {
+    "linux-manifest.json": "77534279d372df78bd58678722f52ab1addb0412ab89a7dc23b75c78b2cfc775",
+    "viewer/profile.json": "be336ee56b519c68274088cfc00d5bbf5cd51c3b9a9f7a369d46b07faabc9d4e",
+    "viewer/process.json": "b9476b84508bd27b8959ff9f1cf16b2f0ccf8ab2340fd327bc510170dfc3eda3",
+    "viewer/stopped.json": "c3380c30bd291aa5d91cf4bc19dcc7600b45c8f2556ebc43de57b9e462cbec7b",
+    "path-timeline.json": "9601afeb93cd50707265b56da7b5b9db8c27a30827643ab549679a5db526bb6a",
+    "after-restoration.json": "013076a3bf0424457df515deb2983477116816024809ee6951b606231931382b",
+    "fault-inspect.json": "badf57500e0bb7d5b2b751ce1add63be31876190f658f39ed3d1b4961146b1f3",
+    "fault-status-latest.json": "7378ae8abb327cf1d139a6f07c5c7e0cd70f0bd609fd5efc55e9ea6b2e8a5a63",
+    "postflight.json": "1229b7cd5e6f9d4628969c7e8996831ad40c160226ab9b83459c8edece8f267e",
+    "pre-cleanup.json": "77c91afee602c0c9c3345a05f79d28fa67cc4679659f8ad08b7fff98b2a1538b",
+    "linux-restore-latest.json": "125cdfaa2a320b27d695c14c4ed2f3538f3bf284dff9c209085b768d9aef7ec7",
+    "linux-cleanup-latest.json": "0c410702ba1eb6132f8dbd0d72b3b37e332acb5c28d39ec104eb532a5ba041e8",
+    "latency-baseline.json": "0b1c8e5d70d36974600b97ea6eecb7a1dd9f337e81b928949f09b97542fbea1c",
+    "latency-baseline-ready.json": "51a1f50b25cc641b0ec72b5c206c0812e0b94d2a290605dce51a021700388371",
+    "business.py": "2034e66d862e719e68e16fda7305c3b6e97f7df217c744ae7e4486c5253f9b99",
+    "sample.py": "8fd708326e704c9d8e1a32918551e04fe68cf482aef95006fb3bb176566470f2",
+    "udp-path.py": "6a1a7f9b1868cd5971340413b33ff2e9a06a823c4d642f69798ca134fd885d48",
+    "restore_owned_fault.py": "8387ce8037240ce1d0b39697a79d8f8051744a458d8006e3be62215b5690235a",
+    "fixture.py": "d8c07533802ec1961f00e3fff36b249754c98eaf3ff1cab5aa59e659d141a71e",
+    "common.py": "7aaa1229ca41e9908260bcd3226e593796012ce96c35972f3d318983a5b22197",
+    "rpc.mjs": "15db6c89c36b545a04a097775edd5dca95df89e0d6d9d01c127902df282040e1",
+    "watch.py": "f273df6d2096093c6af1da037a19a0a4342bfcbfd83173822a0aa2bf6a29bbc4",
+    "business-baseline.json": "eb62a21a7d3b0ecc45ab6eeecfbfa93ee8c7a87e31956a80701f73eae157a865",
+    "business-relay.json": "d124fb39cb79f96837aded73bb76d0f2ffa3f5bf89b13acbda9e80d08c939300",
+    "business-recovered.json": "0853134efd022f73edac40a178613692fcb5210cf309b0d342dc86203425c94c",
+    "business-p2p-return.json": "65a684602b5c9a85c7635bd2c8be06bb73d52a42877acdeef7d4b3d816ed8dcd",
+    "latency-baseline-v2.json": "feecccce3bbe81769042413382043df13fbbe4a807e0097f582e7d7b95acd5b0",
+    "latency-relay.json": "e1dd5ad29ed1896d97947b41c0a02c2e7179c011dac55e3eae0d0a1568d2114e",
+    "latency-recovered.json": "e7fffbe8d870243c58ff55c552c63d945804126a0b6cb1658f6f27bbadeaeedb",
+    "latency-p2p-return.json": "a0d0a2ca03769aab0231dcf3206784aa1b77e9ff8e4e1e8b21fd1255be1eef31"
+  }
+}

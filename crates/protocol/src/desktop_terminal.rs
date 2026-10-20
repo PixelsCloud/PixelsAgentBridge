@@ -184,6 +184,8 @@ mod tests {
             response,
             crate::DeviceTaskResponse::Environment {
                 desktop_terminal_schema_version: None,
+                remote_desktop_schema_version: None,
+                remote_desktop_cursor_schema_version: None,
                 ..
             }
         ));

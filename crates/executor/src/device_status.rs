@@ -45,6 +45,9 @@ pub(crate) async fn read_device_status(root: &Path) -> Result<DeviceStatus, Devi
 pub(crate) async fn read_device_status_from_service(
     root: &Path,
 ) -> Result<DeviceStatus, DeviceStatusError> {
+    if pab_service_config::client::is_unconfigured() {
+        return Ok(unconfigured_status());
+    }
     read_device_status_with_service(root, true).await
 }
 
@@ -80,6 +83,17 @@ async fn read_device_status_with_service(
         executor_running: service_alive || heartbeat_running || service_running(),
         control_phase,
     })
+}
+
+fn unconfigured_status() -> DeviceStatus {
+    DeviceStatus {
+        device_code: String::new(),
+        device_id: String::new(),
+        temporary_password: String::new(),
+        password_version: 0,
+        executor_running: true,
+        control_phase: "Unconfigured".into(),
+    }
 }
 
 #[cfg(windows)]
@@ -181,10 +195,18 @@ mod tests {
         .await
         .unwrap();
 
-        let status = read_device_status_from_service(root.path()).await.unwrap();
+        let status = read_device_status_with_service(root.path(), true).await.unwrap();
         assert_eq!(status.device_code, "123456789");
         assert_eq!(status.temporary_password, "ABCDEFGH");
         assert_eq!(status.control_phase, "Unknown");
         assert!(status.executor_running);
+    }
+
+    #[test]
+    fn unconfigured_service_never_exposes_cached_device_credentials() {
+        let status = unconfigured_status();
+        assert!(status.executor_running);
+        assert_eq!(status.control_phase, "Unconfigured");
+        assert!(status.device_code.is_empty() && status.device_id.is_empty() && status.temporary_password.is_empty());
     }
 }

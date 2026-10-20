@@ -252,6 +252,8 @@ impl DeviceSession {
             .as_ref()
             .is_some_and(|current| Arc::ptr_eq(current, failed))
         {
+            tracing::warn!(device_id = %self.device_ref.device_id, %error,
+                "replacing failed device connection; connection-bound sessions will end");
             connection.take();
             failed.as_ref().clone().close();
         }

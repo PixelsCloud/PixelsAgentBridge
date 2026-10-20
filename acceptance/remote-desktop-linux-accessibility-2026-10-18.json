@@ -1,0 +1,430 @@
+{
+  "date": "2026-10-18",
+  "product_base_commit": "e5b9a2b",
+  "product_desktop_sha256": "6294fb4bfd985a16248eb5ed2da28b1d6d4d2c93a065ca7c9072feb95164754d",
+  "packages": {
+    "gtk": "3.24.33-1ubuntu2.2",
+    "atk": "2.36.0-3build1",
+    "atk_bridge": "2.38.0-3",
+    "webkit": "2.50.4-0ubuntu0.22.04.1"
+  },
+  "records": [
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-cd860fb5.json",
+      "sha256": "57d011fe97e0892169fd41fd65b3852297c9ca97cee287f3a6ec40966bddd491",
+      "binary_sha256": "24d36ef04f26a15c27bb7ab277889e856c4424de1067fb42613edbb9819737a8",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "baseline",
+          "backend": "wayland",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "host",
+          "backend": "wayland",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": true,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "baseline",
+          "backend": "x11",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "host",
+          "backend": "x11",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": true,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-8f70d1d2.json",
+      "sha256": "514e2bb520a7d4a9b4b82485755cc5579bc36f5b5d8f8d446640c976d068b65f",
+      "binary_sha256": "24d36ef04f26a15c27bb7ab277889e856c4424de1067fb42613edbb9819737a8",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "baseline",
+          "backend": "wayland",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "host",
+          "backend": "wayland",
+          "query_count": 3,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": true,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-1e976613.json",
+      "sha256": "22e7d81488821db46475648120b8ad03a6d0469985b0c46d335a81200a339fb8",
+      "binary_sha256": "053e82dc48dee691d302dcf82215f79882ca408e054fe1ef328f69aaa70f7e4f",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "cycle",
+          "backend": "wayland",
+          "query_count": 12,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 8,
+          "driver_svga_diagnostic": true,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-fe8deb58.json",
+      "sha256": "398bf457e67b9be79cb70c658867f748f25ecaf05192797c7c3690b54e19c639",
+      "binary_sha256": "da167bc4821f701669979ef532dcd3814af7013f594a52629e4653765fed24ab",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "retired-button",
+          "backend": "wayland",
+          "query_count": 12,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": true,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-1ad5ddc5.json",
+      "sha256": "42661f6c3dceac29f8bef8ac358215052540bcb1615e0e3f6ead71f57b101629",
+      "binary_sha256": "da167bc4821f701669979ef532dcd3814af7013f594a52629e4653765fed24ab",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "retired-button",
+          "backend": "wayland",
+          "query_count": 4,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": null,
+          "retired_button_null_state": true,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": "(probe:98471): Atk-CRITICAL **: 04:47:59.762: atk_state_set_contains_state: assertion 'ATK_IS_STATE_SET (set)' failed\nThread 1 \"probe\" received signal SIGTRAP, Trace/breakpoint trap.\n#0  0x00007ffff1d23497 in g_logv () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#1  0x00007ffff1d23753 in g_log () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#2  0x00007ffff7e610fa in atk_state_set_contains_state () from /lib/x86_64-linux-gnu/libatk-1.0.so.0\n#3  0x00007fffede9ae8d in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#4  0x00007ffff1cfe768 in g_hash_table_foreach () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#5  0x00007fffedea0425 in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#6  0x00007fffedea3eab in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#7  0x00007fffebb0d869 in dbus_connection_dispatch () from /lib/x86_64-linux-gnu/libdbus-1.so.3\n#8  0x00007fffebacee29 in ?? () from /lib/x86_64-linux-gnu/libatspi.so.0\n#9  0x00007ffff1d1ad8b in g_main_context_dispatch () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#10 0x00007ffff1d705f8 in ?? () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#11 0x00007ffff1d18433 in g_main_context_iteration () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#12 0x000055555555b93e in pab_linux::pump () at /source/experiments/remote-desktop/../../crates/desktop-media/native/linux/common.h:49\n#13 main (argc=<optimized out>, argv=0x7fffffffec38) at /source/experiments/remote-desktop/linux_accessibility_probe.cpp:54"
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-product-54c37267.json",
+      "sha256": "ac5d16ca1cffa835b1711a6a3920b32adb9a4f67805ae5ca1efb594d7d07cf30",
+      "binary_sha256": "6294fb4bfd985a16248eb5ed2da28b1d6d4d2c93a065ca7c9072feb95164754d",
+      "stage_removed": true,
+      "remaining": [],
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "product",
+          "backend": "wayland",
+          "query_count": 47,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": false,
+          "forced_timeout": true,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-viewer-pab-linux-viewer-ec1p_78g.json",
+      "sha256": "df8866841939d41ae76c6017f5ae6209207946906195af89b2c7ca5302862b06",
+      "binary_sha256": null,
+      "stage_removed": null,
+      "remaining": [],
+      "same_session": null,
+      "assistance_cancelled": true,
+      "assistance_status": "waiting",
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "product",
+          "backend": "wayland",
+          "query_count": 5,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": false,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-viewer-pab-linux-viewer-upb00p3_.json",
+      "sha256": "fc9d72dc5483c8e4bdba239e3a0b525cbf56e622c1470e4b2ef84eddfb8a67bb",
+      "binary_sha256": null,
+      "stage_removed": null,
+      "remaining": [],
+      "same_session": null,
+      "assistance_cancelled": true,
+      "assistance_status": "waiting",
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "product",
+          "backend": "wayland",
+          "query_count": 5,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": false,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-viewer-pab-linux-viewer-2ds59z3f.json",
+      "sha256": "64358356cf988d63be2d84359ba8d965ec3cfed48457aa1cb7c79ca7711be2fe",
+      "binary_sha256": null,
+      "stage_removed": null,
+      "remaining": [],
+      "same_session": null,
+      "assistance_cancelled": true,
+      "assistance_status": "waiting",
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "product",
+          "backend": "wayland",
+          "query_count": 5,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": false,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": true,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-viewer-pab-linux-viewer-q9vbo00o.json",
+      "sha256": "027187780d5e4a34e27f5f88ea3a77f7b16e1cb2297ab01e176db200cec0a1a9",
+      "binary_sha256": null,
+      "stage_removed": null,
+      "remaining": [],
+      "same_session": null,
+      "assistance_cancelled": true,
+      "assistance_status": "waiting",
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "product",
+          "backend": "wayland",
+          "query_count": 4,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": false,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": true,
+          "widget_null_confirmed": true,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": "(pab-desktop:98288): Atk-CRITICAL **: 04:46:52.476: atk_state_set_contains_state: assertion 'ATK_IS_STATE_SET (set)' failed\nThread 1 \"pab-desktop\" received signal SIGTRAP, Trace/breakpoint trap.\n#0  0x00007ffff7aea497 in g_logv () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#1  0x00007ffff7aea753 in g_log () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#2  0x00007fffeeb4e0fa in atk_state_set_contains_state () from /lib/x86_64-linux-gnu/libatk-1.0.so.0\n#3  0x00007fffedb1be8d in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#4  0x00007ffff7ac5768 in g_hash_table_foreach () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#5  0x00007fffedb21425 in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#6  0x00007fffedb24eab in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n#7  0x00007ffff7a54869 in dbus_connection_dispatch () from /lib/x86_64-linux-gnu/libdbus-1.so.3\n#8  0x00007fffeb9c6e29 in ?? () from /lib/x86_64-linux-gnu/libatspi.so.0\n#9  0x00007ffff7ae1d8b in g_main_context_dispatch () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#10 0x00007ffff7b375f8 in ?? () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#11 0x00007ffff7adf433 in g_main_context_iteration () from /lib/x86_64-linux-gnu/libglib-2.0.so.0\n#12 0x00007ffff1c48e15 in gtk_main_iteration_do () from /lib/x86_64-linux-gnu/libgtk-3.so.0\n#13 0x0000555556dda8c7 in ?? ()\n#14 0x000055555654a2bd in ?? ()\n#15 0x0000555556560e57 in ?? ()\n#16 0x0000555555fb62a1 in ?? ()\n#17 0x0000555555fad430 in ?? ()\n#3  0x00007fffedb1be8d in ?? () from /lib/x86_64-linux-gnu/libatk-bridge-2.0.so.0\n$1 = 0x7ffff1e073e9 \"GtkButtonAccessible\"\n$2 = 42\n$3 = (void *) 0x0"
+        }
+      ]
+    },
+    {
+      "path": ".build/remote-desktop/linux-native/accessibility-vix-pab-linux-atk-bd7d7f0e860e.json",
+      "sha256": "11ac6b5c1282a99879e784f166d93c5e4a1678ca357290d0d2c7db068e30e681",
+      "binary_sha256": "5a6f486794fc242f8b27ffdfb6700b11a4371f1400b88e8c6f8ade6da872f22e",
+      "stage_removed": true,
+      "remaining": null,
+      "same_session": true,
+      "assistance_cancelled": null,
+      "assistance_status": null,
+      "window_label": null,
+      "cases": [
+        {
+          "mode": "baseline",
+          "backend": "wayland",
+          "query_count": 12,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "host",
+          "backend": "wayland",
+          "query_count": 12,
+          "query_timeouts": 0,
+          "critical": false,
+          "inferior_normal_exit": true,
+          "forced_timeout": null,
+          "retired_button_null_state": false,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": true,
+          "stack_excerpt": null
+        },
+        {
+          "mode": "retired-button",
+          "backend": "wayland",
+          "query_count": 4,
+          "query_timeouts": 0,
+          "critical": true,
+          "inferior_normal_exit": false,
+          "forced_timeout": null,
+          "retired_button_null_state": true,
+          "accessible_type_confirmed": false,
+          "widget_null_confirmed": false,
+          "renderer_cycles": 0,
+          "driver_svga_diagnostic": false,
+          "stack_excerpt": null
+        }
+      ]
+    }
+  ],
+  "diagnostic_built_source_sha256": "07d91dca6ed08c2aad17f6d4f35e5fd8fd45ffb8912f168db214a66e857101f3",
+  "current_source_sha256": {
+    "experiments/remote-desktop/linux_accessibility_probe.cpp": "ee5cf85b8408975c0490cf646da742b40b485e97d0bd65bdcdb9a036419f2e84",
+    "experiments/remote-desktop/linux_accessibility_walk.py": "19da99082bf0b0adc886a85fd45dc5c54cfece2aec530cc5564a2e8dfdf27490"
+  },
+  "limits": {
+    "native_compile_jobs": 1,
+    "container_cpus": 2,
+    "concurrent_compilation": false
+  },
+  "conclusion": "Confirmed null state set from a retired GtkButtonAccessible in AT-SPI cache traversal. Same failure reproduced in native GTK fixture without constructing the presenter. Product mitigation not implemented; entry remains open.",
+  "followup_build": {
+    "attempted": true,
+    "completed": true,
+    "reason": "Docker engine unavailable; subsequent SSH connection timed out before staging. Earlier binary results do not validate the added diagnostic error exit guard.",
+    "initial_attempt_completed": false,
+    "recovered_with": "Docker Desktop started hidden; native diagnostic rebuilt serially, then Guest Tools ran baseline/host/retired-button on the existing VM. Baseline and host each completed 12 tree queries; retired-button reproduced ATK critical; all staged files removed and session unchanged.",
+    "binary_sha256": "5a6f486794fc242f8b27ffdfb6700b11a4371f1400b88e8c6f8ade6da872f22e"
+  }
+}

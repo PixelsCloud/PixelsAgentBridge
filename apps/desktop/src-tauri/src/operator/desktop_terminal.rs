@@ -37,8 +37,19 @@ pub struct DesktopTerminalState {
 /// Opt-in instrumentation for isolated native acceptance. This function and
 /// its callers are absent from every release build; defaults remain unchanged.
 #[cfg(all(windows, debug_assertions))]
-pub(crate) fn acceptance_browser_arguments() -> Option<&'static str> {
-    (std::env::var("PAB_DESKTOP_TERMINAL_ACCEPTANCE").as_deref() == Ok("1")).then_some("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=39100 --remote-debugging-address=127.0.0.1")
+pub(crate) fn acceptance_browser_arguments() -> Option<String> {
+    if std::env::var("PAB_DESKTOP_TERMINAL_ACCEPTANCE").as_deref() != Ok("1") {
+        return None;
+    }
+    // Separate isolated Desktop processes need separate loopback listeners.
+    // This invocation option is only available in opt-in debug builds.
+    let port = match std::env::args()
+        .find_map(|arg| arg.strip_prefix("--acceptance-cdp-port=").map(str::to_owned))
+    {
+        Some(value) => value.parse::<u16>().ok().filter(|port| *port >= 1024)?,
+        None => 39100,
+    };
+    Some(format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port} --remote-debugging-address=127.0.0.1"))
 }
 struct WindowOwner {
     code: DeviceCode,
@@ -162,7 +173,7 @@ pub async fn desktop_terminal_window(
     .decorations(false);
     #[cfg(all(windows, debug_assertions))]
     let builder = if let Some(arguments) = acceptance_browser_arguments() {
-        builder.additional_browser_args(arguments).initialization_script("window.__PIXELS_TERMINAL_ACCEPTANCE__ = {onFrame: null, paused: false, pending: [], pendingBytes: 0, maxPendingBytes: 0};")
+        builder.additional_browser_args(&arguments).initialization_script("window.__PIXELS_TERMINAL_ACCEPTANCE__ = {onFrame: null, paused: false, pending: [], pendingBytes: 0, maxPendingBytes: 0};")
     } else {
         builder
     };

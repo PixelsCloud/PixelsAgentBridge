@@ -43,6 +43,8 @@ mod filesystem_user;
 mod filesystem_user_tests;
 pub(crate) mod git;
 mod port_forward;
+#[cfg(test)]
+mod remote_desktop_tests;
 mod subscription;
 mod system_log;
 mod system_query;
@@ -80,11 +82,14 @@ pub(crate) struct TaskService {
     active: Arc<Mutex<HashMap<TaskId, watch::Sender<Option<String>>>>>,
     terminals: Arc<Mutex<HashMap<pab_protocol::RequestId, Arc<terminal::ActiveTerminal>>>>,
     desktop_terminals: desktop_terminal::DesktopTerminals,
+    remote_desktop: pab_remote_desktop::DesktopHost,
     upload_locks: upload_lock::UploadPathLocks,
     filesystem_slots: Arc<tokio::sync::Semaphore>,
     documents: document::DocumentCache,
     #[cfg(test)]
     hash_test_gate: Arc<Mutex<Option<Arc<filesystem_hash::HashTestGate>>>>,
+    #[cfg(test)]
+    subscription_test_gate: Arc<Mutex<Option<Arc<subscription::CatchUpTestGate>>>>,
     #[cfg(test)]
     bulk_test_gate: Arc<Mutex<Option<Arc<filesystem_bulk::BulkTestGate>>>>,
     bulk_slots: Arc<tokio::sync::Semaphore>,
@@ -133,6 +138,19 @@ impl Drop for UiConnection {
 }
 
 impl TaskService {
+    pub(crate) fn with_remote_desktop_backend(
+        mut self,
+        backend: Arc<dyn pab_remote_desktop::DesktopBackend>,
+    ) -> Self {
+        self.remote_desktop = pab_remote_desktop::DesktopHost::new(Some(backend));
+        self
+    }
+    pub(crate) fn remote_desktop_connection_guard(&self) -> pab_remote_desktop::DesktopConnectionGuard {
+        self.remote_desktop.connection_guard()
+    }
+    pub(crate) fn recheck_remote_desktop_account(&self, account: Option<pab_protocol::UserId>) {
+        self.remote_desktop.recheck_account(account);
+    }
     pub(crate) fn with_user_context(mut self, context: pab_protocol::EndpointUserContext) -> Self {
         self.store = self.store.with_initiating_user(context.user.clone());
         self.user_context = context;
@@ -143,6 +161,7 @@ impl TaskService {
         let mut service = self.clone();
         service.ui_connection = Arc::new(UiConnection::new());
         service.desktop_terminals = self.desktop_terminals.for_connection();
+        service.remote_desktop = self.remote_desktop.for_connection();
         service.port_forward_session_slots = Arc::new(tokio::sync::Semaphore::new(64));
         service
     }
@@ -208,11 +227,15 @@ impl TaskService {
             active: Arc::new(Mutex::new(HashMap::new())),
             terminals: Arc::new(Mutex::new(HashMap::new())),
             desktop_terminals: desktop_terminal::DesktopTerminals::default(),
+            // Capability stays absent until a native backend is registered.
+            remote_desktop: pab_remote_desktop::DesktopHost::default(),
             upload_locks: upload_lock::UploadPathLocks::default(),
             filesystem_slots: Arc::new(tokio::sync::Semaphore::new(8)),
             documents: document::DocumentCache::default(),
             #[cfg(test)]
             hash_test_gate: Arc::new(Mutex::new(None)),
+            #[cfg(test)]
+            subscription_test_gate: Arc::new(Mutex::new(None)),
             #[cfg(test)]
             bulk_test_gate: Arc::new(Mutex::new(None)),
             bulk_slots: Arc::new(tokio::sync::Semaphore::new(4)),
@@ -269,6 +292,19 @@ impl TaskService {
             return self
                 .desktop_terminal_stream(initiated_by, request, stream, timeout)
                 .await;
+        }
+        if let DeviceTaskRequest::RemoteDesktop { request, .. } = request {
+            return self
+                .remote_desktop
+                .serve(
+                    initiated_by,
+                    self.user_context.user.as_ref().map(|u| u.user_id),
+                    request,
+                    stream,
+                    timeout,
+                )
+                .await
+                .map_err(TaskServiceError::RemoteDesktop);
         }
         if let Some(request_id) = request.initiating_request_id() {
             self.store
@@ -539,6 +575,9 @@ impl TaskService {
     ) -> Result<DeviceTaskResponse, TaskServiceError> {
         match request {
             DeviceTaskRequest::Mobile { .. } => Err(TaskServiceError::InvalidRequest("Mobile control requires an Android device")),
+            DeviceTaskRequest::RemoteDesktop { .. } => Err(TaskServiceError::InvalidRequest(
+                "remote desktop requires its streaming handler",
+            )),
             DeviceTaskRequest::DesktopTerminal { .. } => Err(TaskServiceError::InvalidRequest(
                 "Desktop terminal requires its streaming handler",
             )),
@@ -585,6 +624,8 @@ impl TaskService {
                 "filesystem requests require their binary stream handler",
             )),
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
+                remote_desktop_schema_version: self.remote_desktop.supported_version(),
+                remote_desktop_cursor_schema_version: self.remote_desktop.supported_cursor_version(),
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
                 desktop_terminal_schema_version: Some(
@@ -1110,6 +1151,8 @@ fn unix_millis() -> Result<i64, TaskServiceError> {
 
 #[derive(Debug, Error)]
 pub(crate) enum TaskServiceError {
+    #[error(transparent)]
+    RemoteDesktop(#[from] pab_remote_desktop::DesktopError),
     #[error("{0}")]
     ExecutionContext(String),
     #[error("invalid task request: {0}")]
@@ -1148,7 +1191,14 @@ pub(crate) enum TaskServiceError {
 
 impl TaskServiceError {
     pub(crate) const fn is_connection_end(&self) -> bool {
-        matches!(self, Self::Connection(_))
+        matches!(
+            self,
+            Self::Connection(_)
+                | Self::RemoteDesktop(
+                    pab_remote_desktop::DesktopError::Closed
+                        | pab_remote_desktop::DesktopError::Transport(_)
+                )
+        )
     }
 }
 

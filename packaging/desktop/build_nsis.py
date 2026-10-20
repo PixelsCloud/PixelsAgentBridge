@@ -37,13 +37,19 @@ CONTENTS = set(BINARIES) | {
     "installer-logging.ps1",
     "installer-recovery.ps1",
     "INSTALL-WINDOWS.txt",
+    "THIRD-PARTY-NOTICES.txt",
 }
 
 
 def parse_url(value: str, scheme: str) -> str:
+    if not value:
+        return ""
     parsed = urlsplit(value)
-    if parsed.scheme != scheme or not parsed.hostname or any(char in value for char in '"$\r\n'):
+    if (parsed.scheme != scheme or not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.fragment
+            or any(char in value for char in '"$') or any(char.isspace() for char in value)):
         raise ValueError(f"expected a safe {scheme} URL")
+    _ = parsed.port
     return value
 
 
@@ -69,10 +75,13 @@ def write_stored_runtime(content: bytes, destination: Path) -> None:
 
 def main() -> None:
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("--control-url", default="wss://pab.rgaa.vip/control")
-    parser.add_argument("--relay-url", default="https://pab-relay.rgaa.vip")
+    parser.add_argument("--control-url", default="")
+    parser.add_argument("--relay-url", default="")
     parser.add_argument("--profile", choices=("debug", "release"), default="debug")
     args = parser.parse_args()
+
+    if bool(args.control_url) != bool(args.relay_url):
+        parser.error("supply both server URLs, or leave both empty")
 
     control_url = parse_url(args.control_url, "wss")
     relay_url = parse_url(args.relay_url, "https")

@@ -1,0 +1,21 @@
+[package]
+name = "pab-remote-desktop"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pab-protocol = { path = "../protocol" }
+pab-transport = { path = "../transport" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+iroh-base = { version = "=1.2.0", features = ["key"] }
+tokio = { workspace = true, features = ["test-util"] }
+
+[[example]]
+name = "reliable-media"
+path = "../../experiments/remote-desktop/reliable_media.rs"

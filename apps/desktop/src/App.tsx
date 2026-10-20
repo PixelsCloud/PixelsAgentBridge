@@ -12,6 +12,7 @@ import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
 import { UpdateNotice } from "./UpdateNotice";
 import { BrowserHandoffNotice } from "./BrowserHandoffNotice";
+import { DesktopAssistanceNotice } from "./DesktopAssistanceNotice";
 import { McpConnectionsPanel } from "./McpConnectionsPanel";
 import { AccountConnectionPanel, AccountLoginDialog } from "./AccountConnectionPanel";
 import type { ScopeStatus } from "./operatorTypes";
@@ -164,6 +165,7 @@ function App() {
     if (!device) return t.serverUnknown;
     if (!device.executor_running) return t.serverDisconnected;
     switch (device?.control_phase?.toLowerCase()) {
+      case "unconfigured": return t.serverUnconfigured;
       case "authenticated": return t.serverConnected;
       case "connecting":
       case "reconnecting": return t.serverConnecting;
@@ -276,7 +278,9 @@ function App() {
           <div className={`page-content page-${view}`}>
             {view === "home" && (
               <section className="surface home-device">
-                {device ? (
+                {device?.control_phase.toLowerCase() === "unconfigured" ? (
+                  <div className="empty-device">{t.deviceServerUnconfigured}</div>
+                ) : device ? (
                   <div className="home-credentials">
                     <div className="home-credential">
                       <span className="code-label">{t.deviceCode}</span>
@@ -306,6 +310,7 @@ function App() {
         setLoginOpen(false);
         setView("me");
       }} />
+      <DesktopAssistanceNotice language={language} />
     </div>
     </AntdApp>
     </ConfigProvider>

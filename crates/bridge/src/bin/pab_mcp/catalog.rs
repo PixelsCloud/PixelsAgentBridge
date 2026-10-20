@@ -257,6 +257,7 @@ pub(super) fn tools() -> Vec<Value> {
     tools.extend(super::mcp_browser::tools());
     tools.extend(super::mcp_port_forward::tools());
     tools.extend(super::mcp_mobile::tools());
+    tools.push(super::mcp_assistance::definition());
     super::mcp_desktop::enhance_input_tool(
         tools
             .iter_mut()
@@ -440,6 +441,7 @@ pub(super) fn validate_arguments(name: &str, args: &Value) -> Result<(), String>
     if name == "pab_mobile_control" {
         super::mcp_mobile::parse(args)?;
     }
+    if name == "pab_desktop_assistance" { super::mcp_assistance::parse(args)?; }
     if super::mcp_applications::handles(name) {
         super::mcp_applications::parse(name, args)?;
     }
@@ -680,8 +682,8 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 121);
-        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 121);
+        assert_eq!(all.len(), 122);
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 122);
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
                 version: 3,

@@ -1,0 +1,598 @@
+{
+  "baseline_commit": "4df7f93",
+  "scope": "Windows operator to Ubuntu GNOME Wayland, 1297x752, one logout/login cycle",
+  "build_jobs": 8,
+  "unit_tests": {
+    "passed": 3,
+    "failed": 0
+  },
+  "before": {
+    "run": "formal-linux-login-7e509e7eddaa",
+    "reports": {
+      "regression-status.json": {
+        "passed": false,
+        "password_submissions": 1,
+        "manual_viewer_retries": 2,
+        "new_session": "281",
+        "reason": "Bounded six-attempt automatic media recovery exhausted during greeter/new-user initialization; manual retries recovered both transitions. Original logout command was not replayed. Readiness observer initially timed out, then same greeter was observed ready."
+      },
+      "comparison.json": {
+        "passed": false,
+        "measured": false,
+        "threshold": 2,
+        "reason": "Baseline screenshot was partially occluded by an unrelated local window; no valid full-image comparison is claimed."
+      },
+      "recovery.json": {
+        "original": {
+          "session": "191",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "properties": {
+            "MainPID": "44895",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 20:10:32 CST] ; stop_time=[n/a] ; pid=44895 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          },
+          "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+          "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "staged_sha256": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+          "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+        },
+        "restored": {
+          "original_service_restored": true,
+          "properties": {
+            "MainPID": "48872",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 20:26:54 CST] ; stop_time=[n/a] ; pid=48872 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          }
+        },
+        "console": {
+          "samples": [
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "281",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            }
+          ],
+          "new_user_session": true,
+          "user_active_unlocked": true,
+          "gdm_config_preserved": true,
+          "recovery_input_sent": false
+        },
+        "greeter": {
+          "session": "c15",
+          "greeter": {
+            "User": "128",
+            "Type": "wayland",
+            "Class": "greeter",
+            "Active": "yes",
+            "LockedHint": "no"
+          },
+          "helper_pid": 45842,
+          "ready": true,
+          "seconds": 0.07435474299927591,
+          "error": "",
+          "reobservation_after_initial_timeout": true
+        },
+        "current_session": "281",
+        "owned_processes": [],
+        "input_devices": [],
+        "fixture": {
+          "clicks": 1,
+          "releases": 1,
+          "ctrl_down": 1,
+          "ctrl_up": 1,
+          "ctrl_held": false,
+          "left_held": false,
+          "last_x": 648.38671875,
+          "last_y": 375.8828125,
+          "updated": 1792240012.7748785,
+          "width": 1297,
+          "height": 752,
+          "focused": true
+        },
+        "runtime_removed": true,
+        "new_user_session_preserved": true,
+        "rollback_trigger": ""
+      },
+      "submission.json": {
+        "single_submission_marker": true,
+        "prompt_reviewed": true,
+        "input_script_sha256": "0b015a512607a659875a548e05be55ba936451762c6a44f66ee6410c49d7a03b",
+        "windows_artifacts": {
+          "pab-desktop.exe": "69536ab268af831d6d72ca226fc8e84587a948b5333c2b12a95db306f6db7d70",
+          "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+        }
+      },
+      "remote-cleanup.json": {
+        "stage_removed": true,
+        "fixture_removed": true
+      },
+      "local-cleanup.json": {
+        "owned_processes": 0,
+        "profile_removed": true
+      }
+    },
+    "private_evidence_sha256": {
+      "regression-status.json": "af6e0811fc818213898da6c5f111cc44128fe6e1737fab1b3fdc5dbdcd3a2cd8",
+      "comparison.json": "e4bbfee6d085152fb92ba8ddf2e5c9f472120e0584ed7af7bdfb21ff9d685c53",
+      "recovery.json": "b31ddd1fcd9394f4cf8d387b3b4c3e71d532f1f5358426a886aabb73f2049732",
+      "submission.json": "8b95bd0df8c21f76fcf1716f11702473c8a26d27b3bc90b2e65b4bc810125440",
+      "remote-cleanup.json": "41e49d69f16ec648fa4035fbcce3806736487c5005643d39fc6750b9be97dd74",
+      "local-cleanup.json": "cdad056bb1936ee4ee39dde7af388a1f6686e76d1ec0f3c9836ac1f6e83184b2"
+    }
+  },
+  "after": {
+    "run": "formal-linux-login-8d653224f4b0",
+    "reports": {
+      "regression-status.json": {
+        "passed": true,
+        "password_submissions": 1,
+        "manual_viewer_retries": 0,
+        "new_session": "299",
+        "status_samples": 111,
+        "first_sample_of_each_viewing_session_is_view_only": true,
+        "transitions": [
+          {
+            "elapsed_seconds": 0.0,
+            "phase": "viewing",
+            "media_session": "5332dcb6-18e2-44dd-81fd-6a1a3136bd3c",
+            "input_enabled": false
+          },
+          {
+            "elapsed_seconds": 18.618,
+            "phase": "reconnecting",
+            "media_session": null,
+            "input_enabled": false
+          },
+          {
+            "elapsed_seconds": 27.397,
+            "phase": "viewing",
+            "media_session": "85e58183-8dd5-4139-99fc-cb199f018899",
+            "input_enabled": false
+          },
+          {
+            "elapsed_seconds": 41.654,
+            "phase": "viewing",
+            "media_session": "85e58183-8dd5-4139-99fc-cb199f018899",
+            "input_enabled": true
+          },
+          {
+            "elapsed_seconds": 62.515,
+            "phase": "reconnecting",
+            "media_session": null,
+            "input_enabled": false
+          },
+          {
+            "elapsed_seconds": 68.019,
+            "phase": "viewing",
+            "media_session": "ccb4b752-48d4-41ad-91ea-9e767d919434",
+            "input_enabled": false
+          },
+          {
+            "elapsed_seconds": 89.945,
+            "phase": "viewing",
+            "media_session": "ccb4b752-48d4-41ad-91ea-9e767d919434",
+            "input_enabled": true
+          }
+        ]
+      },
+      "comparison.json": {
+        "region": [
+          15,
+          160,
+          1235,
+          880
+        ],
+        "image_size": [
+          1250,
+          900
+        ],
+        "mean_rgb_absolute_error": [
+          0.0479735883424408,
+          0.03397427140255009,
+          0.03873406193078324
+        ],
+        "threshold": 2,
+        "passed": true
+      },
+      "recovery.json": {
+        "original": {
+          "session": "281",
+          "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+          "properties": {
+            "MainPID": "48872",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 20:26:54 CST] ; stop_time=[n/a] ; pid=48872 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          },
+          "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+          "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "staged_sha256": "78195000984144b70ff40735b3355914cdbfde129eb528a2c5ade410c87d4a2c",
+          "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+        },
+        "restored": {
+          "original_service_restored": true,
+          "properties": {
+            "MainPID": "52119",
+            "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sat 2026-10-17 20:40:23 CST] ; stop_time=[n/a] ; pid=52119 ; code=(null) ; status=0/0 }",
+            "ActiveState": "active",
+            "SubState": "running",
+            "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+            "DropInPaths": ""
+          }
+        },
+        "console": {
+          "samples": [
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            },
+            {
+              "session": "299",
+              "state": {
+                "User": "1000",
+                "Type": "wayland",
+                "Class": "user",
+                "Active": "yes",
+                "LockedHint": "no"
+              }
+            }
+          ],
+          "new_user_session": true,
+          "user_active_unlocked": true,
+          "gdm_config_preserved": true,
+          "recovery_input_sent": false
+        },
+        "greeter": {
+          "created": "GDM after authorized logout",
+          "session": "c16",
+          "greeter": {
+            "User": "128",
+            "Type": "wayland",
+            "Class": "greeter",
+            "Active": "yes",
+            "LockedHint": "no"
+          },
+          "helper_pid": 50298,
+          "original_session": "281",
+          "original_absent": true,
+          "ready": true
+        },
+        "current_session": "299",
+        "owned_processes": [],
+        "input_devices": [],
+        "fixture": {
+          "clicks": 1,
+          "releases": 1,
+          "ctrl_down": 1,
+          "ctrl_up": 1,
+          "ctrl_held": false,
+          "left_held": false,
+          "last_x": 648.5234375,
+          "last_y": 376.546875,
+          "updated": 1792240822.6545062,
+          "width": 1297,
+          "height": 752,
+          "focused": true
+        },
+        "runtime_removed": true,
+        "new_user_session_preserved": true,
+        "rollback_trigger": ""
+      },
+      "submission.json": {
+        "single_submission_marker": true,
+        "prompt_reviewed": true,
+        "input_script_sha256": "0b015a512607a659875a548e05be55ba936451762c6a44f66ee6410c49d7a03b",
+        "windows_artifacts": {
+          "pab-desktop.exe": "47eb26bbda181385dec00a9f2655f8360491651fe823fa68bc565b61c836dd9d",
+          "pab-mcp.exe": "34394af88b3e3440139f0d50a26a7a92e5f2d1ce9a2a4eb1fef24d2e2b37ad97"
+        }
+      },
+      "remote-cleanup.json": {
+        "stage_removed": true,
+        "fixture_removed": true
+      },
+      "local-cleanup.json": {
+        "owned_processes": 0,
+        "profile_removed": true
+      }
+    },
+    "private_evidence_sha256": {
+      "regression-status.json": "2de55c7bc303ffbdc6c2cbfe86a42ff3833ac9c4beb8fe61fe9ef7d338c81b88",
+      "comparison.json": "05c51495330ebc0f9e17be0a4a7a88e13268d3db0c9e0fc61155893e9d39eaf0",
+      "recovery.json": "31f1ded43b57a50be6b7f6a03df0d2cfb41dcaec25502b0be36d585b7d32b5fe",
+      "submission.json": "14246175c7df8f712a385e3d6417b66d6ab1cb777a3a3aa7e646535b3fa74fc5",
+      "remote-cleanup.json": "41e49d69f16ec648fa4035fbcce3806736487c5005643d39fc6750b9be97dd74",
+      "local-cleanup.json": "b319db0f065021b211bccc16a332cec0035cf4aeec37df2afb15d60739d629ce",
+      "viewer-timeline.jsonl": "e26f5a8e80f4a87dabc911efd4b56f3f7be0c45a80afcfb6fb21c7f3a871d9c3"
+    }
+  }
+}

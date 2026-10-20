@@ -4,14 +4,17 @@ set -euo pipefail
 install_dir=/opt/pixels-agent-bridge
 install -d -m 755 /etc/pixels-agent-bridge
 "$install_dir/pab-executor" configure --config /etc/pixels-agent-bridge/config.toml \
-    --previous "$install_dir" --control-url wss://pab.rgaa.vip/control --relay-url https://pab-relay.rgaa.vip
+    --previous "$install_dir"
 chmod 644 /etc/pixels-agent-bridge/config.toml
 install -d -m 700 /var/lib/pixels-agent-bridge
 if [[ -d /run/systemd/system ]]; then
     systemctl daemon-reload
     systemctl enable pixels-agent-bridge-executor.service
+    systemctl enable pixels-agent-bridge-media.service
     systemctl restart pixels-agent-bridge-executor.service
+    systemctl restart pixels-agent-bridge-media.service
     systemctl is-active --quiet pixels-agent-bridge-executor.service
+    systemctl is-active --quiet pixels-agent-bridge-media.service
 fi
 declare -A users=()
 if [[ -n ${SUDO_USER:-} && ${SUDO_USER} != root ]]; then users["$SUDO_USER"]=1; fi

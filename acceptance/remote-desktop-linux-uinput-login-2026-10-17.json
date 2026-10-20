@@ -1,0 +1,777 @@
+{
+  "date": "2026-10-17",
+  "baseline": "eb742d4350a5ef9ae420affbab70591a9dcf6790",
+  "scope": "production broker/user launcher/native input and capture components; one real GNOME Wayland lock/password unlock; not a full remote-window login gate",
+  "full_product_login_gate_passed": false,
+  "build": {
+    "exit_code": 0,
+    "sha256": "8a864bfd02ea9e39679c7a079f7ecd3925a4eca15bf1e9ca77aea20a041834b8",
+    "bytes": 45970008,
+    "cargo_jobs": 8,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "compiled_source_sha256": {
+    "crates/os-control/src/execution/linux_media_dma.rs": "61a18cc144b3263c4570b729600140e4ad4defac51701ca961f57b9c69ab8048",
+    "crates/os-control/src/execution/linux_media_environment.rs": "0aa1fec7bbf88b77596dd0ce1fd9406e79cc0ff1a4e69e818badd5c5ca7cd8ac",
+    "crates/os-control/examples/linux_dma_broker_check.rs": "50980f4b31f2cd7c6e079f6767ee9995347d2f01adb7e35d4e30443ec3a7d9c9",
+    "apps/desktop/src-tauri/src/linux_media_supervisor.rs": "373633e7180c8fb733ad1d0e8d901c0f5154401bcce24fa46213d52f6cde429b",
+    "crates/desktop-media/tests/native_linux_uinput.cpp": "4598cb3fea1fe692c6bd16ef08bcc092589c354e5bbe869e86284d1f8075bcd7",
+    "crates/desktop-media/native/linux/capture.h": "ee6f7cd7b6c88745b6cfd9aafcb63f4389f939b5341a95952c0bfe7bd05ef70c",
+    "crates/desktop-media/native/linux/common.h": "749be2bbc0490a8b41005c3e383bef372f0e165fa458e690fe84d64bf23e61f7",
+    "crates/desktop-media/native/linux/dma_broker.h": "c5a8be066bae8e3546a18ae1e163a1d535b8786ab6a75e914a74a7b84533e095",
+    "crates/desktop-media/native/linux/dma_capture.h": "5cce7a69925585c402235316fab7fb07b2e105fe4140efc705dd4676be5c2b0b",
+    "crates/desktop-media/native/linux/dma_frame.h": "bfbaefb1079222cce709d23ef509d3e51094e6a5035b81567e7df416446f2f19",
+    "crates/desktop-media/native/linux/dma_image.h": "29b8e279e2259383a8034ad8e525db3e8dbf26c1042e5be7c89e4731180adfb5",
+    "crates/desktop-media/native/linux/drm_export.h": "628dcd3a671f7f4434fa9eb385b2ff9484281e59c2d44575b8faf23620fabe0c",
+    "crates/desktop-media/native/linux/geometry.h": "b8634f55431cbf8920c32898c773d0ff47de61c704a9648910981c0c67abc95b",
+    "crates/desktop-media/native/linux/gnome.h": "bc48602c8b53466573ae28425c102d5273987dbdb1d3cecf69c446ee12d90e66",
+    "crates/desktop-media/native/linux/host.h": "3a27d99c4ae6d526ad5f39c390c2a60a2313037477a39fbbcc25ec44419ef65f",
+    "crates/desktop-media/native/linux/input.h": "d568503d884ce7029b5addf26303975afb3ad87f4431788ac0bfa309a2892127",
+    "crates/desktop-media/native/linux/keycodes.h": "0389bcc13f745558a3f136309f0c47c9fc93227b01de591ed02083bd22bbe433",
+    "crates/desktop-media/native/linux/presenter.h": "03394667227c509a2e35348ad165766fb9e0e327153f02fc9945232528ad61e6",
+    "crates/desktop-media/native/linux/render.h": "d0a9edddfe3b9b92fd168d841faf7abe98677a99032cfa1de5f23f86f4606a0b",
+    "crates/desktop-media/native/linux/uinput.h": "51128a3425e147aaec726efcc0af24d794047820e19d55884d5643a9be4bad9b",
+    "crates/desktop-media/native/linux/uinput_client.h": "2f5f63a688355a279544b63e3f3cf95b041a5502e060aac823d6735cb6ba0e2f",
+    "crates/desktop-media/native/linux/viewer_input.h": "e18ef7bcc607302c7296168e86a3bc1fab297cd34418678b19713c392116da5b",
+    "crates/desktop-media/native/linux/worker.cpp": "ce6af04b624d19125090ecf691635460db5c0bb45a2e6f98a10b72f9d69f6c9b",
+    "crates/desktop-media/native/linux/x11_capture.h": "28729328d361e1f67d5b8fba6c829b86618a68785dcf8d7e9cbf22075eb25e55",
+    "crates/desktop-media/native/linux/x11_input.h": "e06645973b3a8b73abeca0955f2cff5ef97498d16d1d43964f52353aa7df1642"
+  },
+  "test_source_sha256": {
+    "experiments/remote-desktop/verify_linux_input.py": "6e4b5d5aa68692f13164728c793a0cb23335718d0f350da99c28aac1bda140a4",
+    "experiments/remote-desktop/verify_linux_lock.py": "07b9e743b5daa353259118bc3e32af4af5f78b78379f6d36edac023f3929dad6"
+  },
+  "build_log_sha256": "f78eba028a8e5fe27cfcd047359780d254c3f3af508df23250cd75faee28baba",
+  "geometry_sanitizer_output": "uinput geometry: negative origins, multi-screen extents and invalid bounds passed\n",
+  "runs": [
+    {
+      "id": "uinput-84a45d7590fb",
+      "report": {
+        "exit_code": 1,
+        "stdout": "{\"broker_errors\":[],\"helper_exit\":\"Some(1)\",\"runs\":[{\"exit\":1,\"kind\":\"input\",\"stderr\":\"Traceback (most recent call last):\\n  File \\\"/tmp/pab-uinput-84a45d7590fb/input.py\\\", line 192, in <module>\\n    main()\\n  File \\\"/tmp/pab-uinput-84a45d7590fb/input.py\\\", line 106, in main\\n    assert area.get_allocated_width() == screen['desktop_width'] and area.get_allocated_height() == screen['desktop_height']\\nAssertionError\\n\",\"stdout\":\"\"}],\"session_unchanged\":true,\"socket_removed\":true}\n",
+        "stderr": "Error: \"supervised DMA check failed\"\n",
+        "ipc_exit": 0,
+        "ipc_stdout": "\nrunning 1 test\ntest local_ipc::media::tests::supervised_media_wins_over_later_gui_and_falls_back_after_retirement ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 204 filtered out; finished in 0.11s\n\n",
+        "ipc_stderr": "",
+        "hashes": {
+          "desktop": "b54b6dd77cd8f8bb9c588571386fe927769f577347b1920f416a5b9b5f7d6d65",
+          "check": "b66196c974a8964aa369ffcef9099a4560b5252e87fd88923b8bf6d11c34be29",
+          "ipc-tests": "a273a88f46afc8a5eba506d8569a1605793ff7e36b901b48c7e3435934151a80",
+          "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+          "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+          "input.py": "31741bc88cbc9f7f319ffff66422637df6c81f15a9c4622e4b453bbb841a12ee"
+        },
+        "before": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "after": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "installed": {
+          "/opt/pixels-agent-bridge/pab-executor": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+          "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "/lib/systemd/system/pixels-agent-bridge-executor.service": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+        },
+        "unit": "pab-uinput-check-84a45d7590fb"
+      },
+      "parsed": {
+        "broker_errors": [],
+        "helper_exit": "Some(1)",
+        "runs": [
+          {
+            "exit": 1,
+            "kind": "input",
+            "stderr": "Traceback (most recent call last):\n  File \"/tmp/pab-uinput-84a45d7590fb/input.py\", line 192, in <module>\n    main()\n  File \"/tmp/pab-uinput-84a45d7590fb/input.py\", line 106, in main\n    assert area.get_allocated_width() == screen['desktop_width'] and area.get_allocated_height() == screen['desktop_height']\nAssertionError\n",
+            "stdout": ""
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true,
+        "parsed_runs": [
+          {
+            "exit": 1,
+            "kind": "input",
+            "stderr": "Traceback (most recent call last):\n  File \"/tmp/pab-uinput-84a45d7590fb/input.py\", line 192, in <module>\n    main()\n  File \"/tmp/pab-uinput-84a45d7590fb/input.py\", line 106, in main\n    assert area.get_allocated_width() == screen['desktop_width'] and area.get_allocated_height() == screen['desktop_height']\nAssertionError\n",
+            "stdout": "",
+            "parsed": null
+          }
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "owned_workers": [],
+        "runtime_profiles": [],
+        "service": "active"
+      },
+      "report_sha256": "65ec724e296fa7f77b0e680bf148deb36640839385b616def04a60aee9e6801e"
+    },
+    {
+      "id": "uinput-21a1f5c35c5b",
+      "report": {
+        "exit_code": 0,
+        "stdout": "{\"broker_errors\":[],\"helper_exit\":\"Some(0)\",\"runs\":[{\"exit\":0,\"kind\":\"input\",\"stderr\":\"\",\"stdout\":\"{\\\"passed\\\": true, \\\"checks\\\": [\\\"selected_screen_absolute_click\\\", \\\"text_shift_and_control_chord\\\", \\\"drag_with_button_held\\\", \\\"wheel_both_directions\\\", \\\"explicit_release_all\\\", \\\"partial_packet_eof_releases_state\\\", \\\"worker_death_releases_state\\\", \\\"root_worker_sigkill_releases_state\\\", \\\"malformed_packet_releases_state\\\", \\\"stale_geometry_rejected\\\", \\\"idle_layout_change_releases_state_and_reopens\\\"], \\\"worker_processes_reaped\\\": 8, \\\"screen\\\": \\\"gnome:Virtual-1\\\", \\\"dimensions\\\": [1280, 800], \\\"layout_restored\\\": true, \\\"input_backend\\\": \\\"supervised_uinput\\\", \\\"input_contents_saved\\\": false, \\\"installed_application_modified\\\": false}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 14.89321966435507, \\\"changed_fps_after_warmup\\\": 14.89321966435507, \\\"encoded_bytes\\\": 351436, \\\"fixture_ticks\\\": 216, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 14.994268996886632, \\\"changed_fps_after_warmup\\\": 14.994268996886632, \\\"encoded_bytes\\\": 345289, \\\"fixture_ticks\\\": 180, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":false,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 13.623027988152094, \\\"changed_fps_after_warmup\\\": 13.623027988152094, \\\"encoded_bytes\\\": 363588, \\\"fixture_ticks\\\": 201, \\\"stderr\\\": \\\"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"pipewire\\\"}\\n\"}],\"session_unchanged\":true,\"socket_removed\":true}\n",
+        "stderr": "media: Invalid native input operation\n",
+        "ipc_exit": 0,
+        "ipc_stdout": "\nrunning 1 test\ntest local_ipc::media::tests::supervised_media_wins_over_later_gui_and_falls_back_after_retirement ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 204 filtered out; finished in 0.10s\n\n",
+        "ipc_stderr": "",
+        "hashes": {
+          "desktop": "b54b6dd77cd8f8bb9c588571386fe927769f577347b1920f416a5b9b5f7d6d65",
+          "check": "b66196c974a8964aa369ffcef9099a4560b5252e87fd88923b8bf6d11c34be29",
+          "ipc-tests": "a273a88f46afc8a5eba506d8569a1605793ff7e36b901b48c7e3435934151a80",
+          "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+          "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+          "input.py": "6e4b5d5aa68692f13164728c793a0cb23335718d0f350da99c28aac1bda140a4"
+        },
+        "before": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "after": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "installed": {
+          "/opt/pixels-agent-bridge/pab-executor": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+          "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "/lib/systemd/system/pixels-agent-bridge-executor.service": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+        },
+        "unit": "pab-uinput-check-21a1f5c35c5b"
+      },
+      "parsed": {
+        "broker_errors": [],
+        "helper_exit": "Some(0)",
+        "runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"checks\": [\"selected_screen_absolute_click\", \"text_shift_and_control_chord\", \"drag_with_button_held\", \"wheel_both_directions\", \"explicit_release_all\", \"partial_packet_eof_releases_state\", \"worker_death_releases_state\", \"root_worker_sigkill_releases_state\", \"malformed_packet_releases_state\", \"stale_geometry_rejected\", \"idle_layout_change_releases_state_and_reopens\"], \"worker_processes_reaped\": 8, \"screen\": \"gnome:Virtual-1\", \"dimensions\": [1280, 800], \"layout_restored\": true, \"input_backend\": \"supervised_uinput\", \"input_contents_saved\": false, \"installed_application_modified\": false}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.89321966435507, \"changed_fps_after_warmup\": 14.89321966435507, \"encoded_bytes\": 351436, \"fixture_ticks\": 216, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.994268996886632, \"changed_fps_after_warmup\": 14.994268996886632, \"encoded_bytes\": 345289, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.623027988152094, \"changed_fps_after_warmup\": 13.623027988152094, \"encoded_bytes\": 363588, \"fixture_ticks\": 201, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n"
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true,
+        "parsed_runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"checks\": [\"selected_screen_absolute_click\", \"text_shift_and_control_chord\", \"drag_with_button_held\", \"wheel_both_directions\", \"explicit_release_all\", \"partial_packet_eof_releases_state\", \"worker_death_releases_state\", \"root_worker_sigkill_releases_state\", \"malformed_packet_releases_state\", \"stale_geometry_rejected\", \"idle_layout_change_releases_state_and_reopens\"], \"worker_processes_reaped\": 8, \"screen\": \"gnome:Virtual-1\", \"dimensions\": [1280, 800], \"layout_restored\": true, \"input_backend\": \"supervised_uinput\", \"input_contents_saved\": false, \"installed_application_modified\": false}\n",
+            "parsed": {
+              "passed": true,
+              "checks": [
+                "selected_screen_absolute_click",
+                "text_shift_and_control_chord",
+                "drag_with_button_held",
+                "wheel_both_directions",
+                "explicit_release_all",
+                "partial_packet_eof_releases_state",
+                "worker_death_releases_state",
+                "root_worker_sigkill_releases_state",
+                "malformed_packet_releases_state",
+                "stale_geometry_rejected",
+                "idle_layout_change_releases_state_and_reopens"
+              ],
+              "worker_processes_reaped": 8,
+              "screen": "gnome:Virtual-1",
+              "dimensions": [
+                1280,
+                800
+              ],
+              "layout_restored": true,
+              "input_backend": "supervised_uinput",
+              "input_contents_saved": false,
+              "installed_application_modified": false
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.89321966435507, \"changed_fps_after_warmup\": 14.89321966435507, \"encoded_bytes\": 351436, \"fixture_ticks\": 216, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 14.89321966435507,
+              "changed_fps_after_warmup": 14.89321966435507,
+              "encoded_bytes": 351436,
+              "fixture_ticks": 216,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.994268996886632, \"changed_fps_after_warmup\": 14.994268996886632, \"encoded_bytes\": 345289, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 14.994268996886632,
+              "changed_fps_after_warmup": 14.994268996886632,
+              "encoded_bytes": 345289,
+              "fixture_ticks": 180,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.623027988152094, \"changed_fps_after_warmup\": 13.623027988152094, \"encoded_bytes\": 363588, \"fixture_ticks\": 201, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 13.623027988152094,
+              "changed_fps_after_warmup": 13.623027988152094,
+              "encoded_bytes": 363588,
+              "fixture_ticks": 201,
+              "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "pipewire"
+            }
+          }
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "owned_workers": [],
+        "runtime_profiles": [],
+        "service": "active"
+      },
+      "report_sha256": "bb05126c12f7809f76121a49610842d6bad323fe44c333d29f2013f8850dc315"
+    },
+    {
+      "id": "lock-uinput-fc2597ebd801",
+      "report": {
+        "before": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "hashes": {
+          "desktop": "8a864bfd02ea9e39679c7a079f7ecd3925a4eca15bf1e9ca77aea20a041834b8",
+          "check": "90058b3def05fa0109ba689b3605dd9c56306e82d3e3e622e0cbc2774f0eeb1f",
+          "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+          "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+          "input.py": "07b9e743b5daa353259118bc3e32af4af5f78b78379f6d36edac023f3929dad6"
+        },
+        "installed": {
+          "/opt/pixels-agent-bridge/pab-executor": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+          "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "/lib/systemd/system/pixels-agent-bridge-executor.service": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+        },
+        "unit": "pab-lock-uinput-fc2597ebd801",
+        "recovery_unit": "pab-lock-uinput-fc2597ebd801-recover",
+        "exit_code": 0,
+        "stdout": "{\"broker_errors\":[],\"helper_exit\":\"Some(0)\",\"runs\":[{\"exit\":0,\"kind\":\"input\",\"stderr\":\"\",\"stdout\":\"{\\\"passed\\\": true, \\\"normal_entry_points\\\": true, \\\"login_submissions\\\": 1, \\\"locked_power\\\": 3, \\\"automatic_wake\\\": true, \\\"password_login_unlocked\\\": true, \\\"locked_capture_source\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\nmedia: Lock state changed; restart capture generation\\\\n\\\", \\\"old_generation_retired\\\": true, \\\"unlocked_capture_source\\\": \\\"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\\\n\\\", \\\"final_locked\\\": false, \\\"input_contents_saved\\\": false}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 14.926479003383646, \\\"changed_fps_after_warmup\\\": 14.926479003383646, \\\"encoded_bytes\\\": 350384, \\\"fixture_ticks\\\": 180, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 88, \\\"decoded_fps_after_warmup\\\": 14.826427225841364, \\\"changed_fps_after_warmup\\\": 14.826427225841364, \\\"encoded_bytes\\\": 349446, \\\"fixture_ticks\\\": 181, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":false,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 13.664145937951588, \\\"changed_fps_after_warmup\\\": 13.664145937951588, \\\"encoded_bytes\\\": 365515, \\\"fixture_ticks\\\": 194, \\\"stderr\\\": \\\"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"pipewire\\\"}\\n\"}],\"session_unchanged\":true,\"socket_removed\":true}\n",
+        "stderr": "",
+        "before_recovery": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "timer_triggered": false,
+        "recovery_unlock_needed": false,
+        "after": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ]
+      },
+      "parsed": {
+        "broker_errors": [],
+        "helper_exit": "Some(0)",
+        "runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"normal_entry_points\": true, \"login_submissions\": 1, \"locked_power\": 3, \"automatic_wake\": true, \"password_login_unlocked\": true, \"locked_capture_source\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\nmedia: Lock state changed; restart capture generation\\n\", \"old_generation_retired\": true, \"unlocked_capture_source\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"final_locked\": false, \"input_contents_saved\": false}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.926479003383646, \"changed_fps_after_warmup\": 14.926479003383646, \"encoded_bytes\": 350384, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 88, \"decoded_fps_after_warmup\": 14.826427225841364, \"changed_fps_after_warmup\": 14.826427225841364, \"encoded_bytes\": 349446, \"fixture_ticks\": 181, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.664145937951588, \"changed_fps_after_warmup\": 13.664145937951588, \"encoded_bytes\": 365515, \"fixture_ticks\": 194, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n"
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true,
+        "parsed_runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"normal_entry_points\": true, \"login_submissions\": 1, \"locked_power\": 3, \"automatic_wake\": true, \"password_login_unlocked\": true, \"locked_capture_source\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\nmedia: Lock state changed; restart capture generation\\n\", \"old_generation_retired\": true, \"unlocked_capture_source\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"final_locked\": false, \"input_contents_saved\": false}\n",
+            "parsed": {
+              "passed": true,
+              "normal_entry_points": true,
+              "login_submissions": 1,
+              "locked_power": 3,
+              "automatic_wake": true,
+              "password_login_unlocked": true,
+              "locked_capture_source": "media source=drm_dma encoder=openh264_software direct_bgra=true\nmedia: Lock state changed; restart capture generation\n",
+              "old_generation_retired": true,
+              "unlocked_capture_source": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+              "final_locked": false,
+              "input_contents_saved": false
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.926479003383646, \"changed_fps_after_warmup\": 14.926479003383646, \"encoded_bytes\": 350384, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 14.926479003383646,
+              "changed_fps_after_warmup": 14.926479003383646,
+              "encoded_bytes": 350384,
+              "fixture_ticks": 180,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 88, \"decoded_fps_after_warmup\": 14.826427225841364, \"changed_fps_after_warmup\": 14.826427225841364, \"encoded_bytes\": 349446, \"fixture_ticks\": 181, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 88,
+              "decoded_fps_after_warmup": 14.826427225841364,
+              "changed_fps_after_warmup": 14.826427225841364,
+              "encoded_bytes": 349446,
+              "fixture_ticks": 181,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.664145937951588, \"changed_fps_after_warmup\": 13.664145937951588, \"encoded_bytes\": 365515, \"fixture_ticks\": 194, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 13.664145937951588,
+              "changed_fps_after_warmup": 13.664145937951588,
+              "encoded_bytes": 365515,
+              "fixture_ticks": 194,
+              "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "pipewire"
+            }
+          }
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "owned_workers": [],
+        "input_devices": [],
+        "runtime_profiles": [],
+        "service": "active"
+      },
+      "report_sha256": "92f42462c84b725666aae252a5f42bd0ec353c59c71640064a43bbf0d756d277",
+      "console_comparison": [
+        {
+          "phase": "lock",
+          "mean_luminance_error": 4.6954033203125,
+          "fraction_over_30": 9.765625e-07,
+          "passed": true
+        },
+        {
+          "phase": "prompt",
+          "mean_luminance_error": 4.6972109375,
+          "fraction_over_30": 9.765625e-07,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "id": "uinput-be7f40732459",
+      "report": {
+        "exit_code": 0,
+        "stdout": "{\"broker_errors\":[],\"helper_exit\":\"Some(0)\",\"runs\":[{\"exit\":0,\"kind\":\"input\",\"stderr\":\"\",\"stdout\":\"{\\\"passed\\\": true, \\\"checks\\\": [\\\"selected_screen_absolute_click\\\", \\\"text_shift_and_control_chord\\\", \\\"drag_with_button_held\\\", \\\"wheel_both_directions\\\", \\\"explicit_release_all\\\", \\\"partial_packet_eof_releases_state\\\", \\\"worker_death_releases_state\\\", \\\"root_worker_sigkill_releases_state\\\", \\\"malformed_packet_releases_state\\\", \\\"stale_geometry_rejected\\\", \\\"idle_layout_change_releases_state_and_reopens\\\"], \\\"worker_processes_reaped\\\": 8, \\\"screen\\\": \\\"gnome:Virtual-1\\\", \\\"dimensions\\\": [1280, 800], \\\"layout_restored\\\": true, \\\"input_backend\\\": \\\"supervised_uinput\\\", \\\"input_contents_saved\\\": false, \\\"installed_application_modified\\\": false}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 14.172802579971096, \\\"changed_fps_after_warmup\\\": 14.172802579971096, \\\"encoded_bytes\\\": 350561, \\\"fixture_ticks\\\": 181, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":true,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 15.00644016081824, \\\"changed_fps_after_warmup\\\": 15.00644016081824, \\\"encoded_bytes\\\": 345277, \\\"fixture_ticks\\\": 180, \\\"stderr\\\": \\\"media source=drm_dma encoder=openh264_software direct_bgra=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"dma\\\"}\\n\"},{\"dma\":false,\"exit\":0,\"stderr\":\"\",\"stdout\":\"{\\\"dimensions\\\": [1280, 800], \\\"inventory\\\": [{\\\"id\\\": \\\"gnome:Virtual-1\\\", \\\"name\\\": \\\"Unknown Display\\\", \\\"x\\\": 0, \\\"y\\\": 0, \\\"desktop_width\\\": 1280, \\\"desktop_height\\\": 800, \\\"pixel_width\\\": 1280, \\\"pixel_height\\\": 800, \\\"scale_milli\\\": 1000, \\\"rotation\\\": \\\"identity\\\", \\\"primary\\\": true}], \\\"frames\\\": 90, \\\"changed_samples\\\": 89, \\\"decoded_fps_after_warmup\\\": 13.574143832437583, \\\"changed_fps_after_warmup\\\": 13.574143832437583, \\\"encoded_bytes\\\": 362358, \\\"fixture_ticks\\\": 197, \\\"stderr\\\": \\\"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\\\n\\\", \\\"pixel_bytes_saved\\\": 0, \\\"worker_exit\\\": 0, \\\"consumer_uid\\\": 1000, \\\"source\\\": \\\"pipewire\\\"}\\n\"}],\"session_unchanged\":true,\"socket_removed\":true}\n",
+        "stderr": "media: Invalid native input operation\n",
+        "ipc_exit": 0,
+        "ipc_stdout": "\nrunning 1 test\ntest local_ipc::media::tests::supervised_media_wins_over_later_gui_and_falls_back_after_retirement ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 204 filtered out; finished in 0.10s\n\n",
+        "ipc_stderr": "",
+        "hashes": {
+          "desktop": "8a864bfd02ea9e39679c7a079f7ecd3925a4eca15bf1e9ca77aea20a041834b8",
+          "check": "90058b3def05fa0109ba689b3605dd9c56306e82d3e3e622e0cbc2774f0eeb1f",
+          "ipc-tests": "ad443d5c46d06f2ea658511c6e44dfd37974a3154bebf0fe73b9c7bf870d92c7",
+          "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+          "verify.py": "1d47f7eec393ecb3439df578b6d89736b0966b701de34c095ceba3308b6bc324",
+          "input.py": "6e4b5d5aa68692f13164728c793a0cb23335718d0f350da99c28aac1bda140a4"
+        },
+        "before": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "after": [
+          "23",
+          "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no"
+        ],
+        "installed": {
+          "/opt/pixels-agent-bridge/pab-executor": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+          "/etc/pixels-agent-bridge/config.toml": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+          "/lib/systemd/system/pixels-agent-bridge-executor.service": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+        },
+        "unit": "pab-uinput-check-be7f40732459"
+      },
+      "parsed": {
+        "broker_errors": [],
+        "helper_exit": "Some(0)",
+        "runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"checks\": [\"selected_screen_absolute_click\", \"text_shift_and_control_chord\", \"drag_with_button_held\", \"wheel_both_directions\", \"explicit_release_all\", \"partial_packet_eof_releases_state\", \"worker_death_releases_state\", \"root_worker_sigkill_releases_state\", \"malformed_packet_releases_state\", \"stale_geometry_rejected\", \"idle_layout_change_releases_state_and_reopens\"], \"worker_processes_reaped\": 8, \"screen\": \"gnome:Virtual-1\", \"dimensions\": [1280, 800], \"layout_restored\": true, \"input_backend\": \"supervised_uinput\", \"input_contents_saved\": false, \"installed_application_modified\": false}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.172802579971096, \"changed_fps_after_warmup\": 14.172802579971096, \"encoded_bytes\": 350561, \"fixture_ticks\": 181, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 15.00644016081824, \"changed_fps_after_warmup\": 15.00644016081824, \"encoded_bytes\": 345277, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n"
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.574143832437583, \"changed_fps_after_warmup\": 13.574143832437583, \"encoded_bytes\": 362358, \"fixture_ticks\": 197, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n"
+          }
+        ],
+        "session_unchanged": true,
+        "socket_removed": true,
+        "parsed_runs": [
+          {
+            "exit": 0,
+            "kind": "input",
+            "stderr": "",
+            "stdout": "{\"passed\": true, \"checks\": [\"selected_screen_absolute_click\", \"text_shift_and_control_chord\", \"drag_with_button_held\", \"wheel_both_directions\", \"explicit_release_all\", \"partial_packet_eof_releases_state\", \"worker_death_releases_state\", \"root_worker_sigkill_releases_state\", \"malformed_packet_releases_state\", \"stale_geometry_rejected\", \"idle_layout_change_releases_state_and_reopens\"], \"worker_processes_reaped\": 8, \"screen\": \"gnome:Virtual-1\", \"dimensions\": [1280, 800], \"layout_restored\": true, \"input_backend\": \"supervised_uinput\", \"input_contents_saved\": false, \"installed_application_modified\": false}\n",
+            "parsed": {
+              "passed": true,
+              "checks": [
+                "selected_screen_absolute_click",
+                "text_shift_and_control_chord",
+                "drag_with_button_held",
+                "wheel_both_directions",
+                "explicit_release_all",
+                "partial_packet_eof_releases_state",
+                "worker_death_releases_state",
+                "root_worker_sigkill_releases_state",
+                "malformed_packet_releases_state",
+                "stale_geometry_rejected",
+                "idle_layout_change_releases_state_and_reopens"
+              ],
+              "worker_processes_reaped": 8,
+              "screen": "gnome:Virtual-1",
+              "dimensions": [
+                1280,
+                800
+              ],
+              "layout_restored": true,
+              "input_backend": "supervised_uinput",
+              "input_contents_saved": false,
+              "installed_application_modified": false
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 14.172802579971096, \"changed_fps_after_warmup\": 14.172802579971096, \"encoded_bytes\": 350561, \"fixture_ticks\": 181, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 14.172802579971096,
+              "changed_fps_after_warmup": 14.172802579971096,
+              "encoded_bytes": 350561,
+              "fixture_ticks": 181,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": true,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 15.00644016081824, \"changed_fps_after_warmup\": 15.00644016081824, \"encoded_bytes\": 345277, \"fixture_ticks\": 180, \"stderr\": \"media source=drm_dma encoder=openh264_software direct_bgra=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"dma\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 15.00644016081824,
+              "changed_fps_after_warmup": 15.00644016081824,
+              "encoded_bytes": 345277,
+              "fixture_ticks": 180,
+              "stderr": "media source=drm_dma encoder=openh264_software direct_bgra=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "dma"
+            }
+          },
+          {
+            "dma": false,
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"dimensions\": [1280, 800], \"inventory\": [{\"id\": \"gnome:Virtual-1\", \"name\": \"Unknown Display\", \"x\": 0, \"y\": 0, \"desktop_width\": 1280, \"desktop_height\": 800, \"pixel_width\": 1280, \"pixel_height\": 800, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}], \"frames\": 90, \"changed_samples\": 89, \"decoded_fps_after_warmup\": 13.574143832437583, \"changed_fps_after_warmup\": 13.574143832437583, \"encoded_bytes\": 362358, \"fixture_ticks\": 197, \"stderr\": \"media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\\n\", \"pixel_bytes_saved\": 0, \"worker_exit\": 0, \"consumer_uid\": 1000, \"source\": \"pipewire\"}\n",
+            "parsed": {
+              "dimensions": [
+                1280,
+                800
+              ],
+              "inventory": [
+                {
+                  "id": "gnome:Virtual-1",
+                  "name": "Unknown Display",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 800,
+                  "pixel_width": 1280,
+                  "pixel_height": 800,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "frames": 90,
+              "changed_samples": 89,
+              "decoded_fps_after_warmup": 13.574143832437583,
+              "changed_fps_after_warmup": 13.574143832437583,
+              "encoded_bytes": 362358,
+              "fixture_ticks": 197,
+              "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+              "pixel_bytes_saved": 0,
+              "worker_exit": 0,
+              "consumer_uid": 1000,
+              "source": "pipewire"
+            }
+          }
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "owned_workers": [],
+        "runtime_profiles": [],
+        "service": "active"
+      },
+      "report_sha256": "bc85b45d1e11d018829dbbd08bacfff4e173a80c16e0fe8d290bceebf704d393"
+    }
+  ]
+}

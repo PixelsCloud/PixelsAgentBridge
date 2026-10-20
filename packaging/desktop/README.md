@@ -39,9 +39,13 @@ python3.13 packaging/desktop/build_macos_pkg.py --arch aarch64
 python3.13 packaging/desktop/build_macos_pkg.py --arch x86_64
 ```
 
-The default control/relay addresses match `build_nsis.py`:
-`wss://pab.rgaa.vip/control` and `https://pab-relay.rgaa.vip`. Override them with
-`--control-url` and `--relay-url` for another server. No UUID is embedded or requested.
+Installer configuration defaults are empty on every platform. Put local build
+defaults in the ignored `.env/client-defaults.toml` before compiling all client
+binaries, or set `PAB_CLIENT_DEFAULTS_FILE`. Missing defaults produce an unconfigured
+public build. Customer TOML/settings take priority; installed files and settings
+inputs do not reveal the compiled defaults. See [configuration](../../docs/CONFIGURATION.md).
+`--control-url` and `--relay-url` explicitly set a new installation's customer
+configuration; they never replace an existing TOML. No UUID is requested.
 
 Each `*-setup.pkg` embeds all binaries and installation scripts, requires admin
 authorization, checks the native CPU architecture, installs only on the running
@@ -102,9 +106,10 @@ steps. To make a single EXE installer for another Windows computer, copy NSIS
 `python packaging/desktop/build_nsis.py`
 after building the complete Windows Debug ZIP. The NSIS builder checks the ZIP
 checksum and every Debug binary before embedding them. The resulting
-`.build/packages/pixels-agent-bridge-windows-x86_64-debug-<version>-setup.exe` has the CN
-WSS control and HTTPS Relay URLs by default; use `--control-url` and
-`--relay-url` to target another deployment. It uses the same `install.ps1` and
+`.build/packages/pixels-agent-bridge-windows-x86_64-debug-<version>-setup.exe` writes
+empty server defaults and uses the values compiled into its client binaries, if any.
+Use paired `--control-url`/`--relay-url` to configure a new customer installation.
+It uses the same `install.ps1` and
 `uninstall.ps1` as the ZIP, creates an all-users Start menu entry, and appears
 in Windows Installed Apps. It automatically enables service-generated
 Ctrl+Alt+Delete when the machine policy does not already allow it; inability to

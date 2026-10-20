@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-viewer",
+  "description": "Independent remote desktop windows",
+  "windows": ["desktop-viewer-*"],
+  "permissions": ["core:default", "core:window:allow-set-fullscreen"]
+}

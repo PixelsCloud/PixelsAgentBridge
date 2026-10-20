@@ -1,0 +1,349 @@
+{
+  "date": "2026-10-17",
+  "baseline": "3be229f",
+  "direction": "macOS operator to Linux GNOME Wayland target",
+  "operator": {
+    "os": "macOS 27.0.1 arm64",
+    "desktop_sha256": "34ed9891d8320930dea616951826f53f066d4cb4935b6fdb45f75820066b1073",
+    "mcp_sha256": "80cb5da63276a016cf9421d8814a0a1f5bb1540572b985b6e620a666365171a9",
+    "viewer_task": "e81251f3-c54b-47cb-9b1d-97eb559f0f0a",
+    "viewer_task_state": "succeeded",
+    "window": {
+      "x": 410,
+      "y": 80,
+      "width": 1100,
+      "height": 760
+    }
+  },
+  "target": {
+    "os": "Ubuntu 22.04.5 x86_64, GNOME Wayland",
+    "session": "23",
+    "resolution": [
+      1280,
+      800
+    ],
+    "executor_sha256": "802ab09cfa6c938fe5b2a09abe4f1294431c02edf5234b971e222551e150ca64",
+    "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+    "fixture_sha256": "f8689758db098344f8501910c80dc2a91179464e7d02d27cd0d9cd2d344ceced"
+  },
+  "baseline_probe": {
+    "task_id": "80605133-2bdf-4126-a834-690a7b23ae5e",
+    "clicks": 0,
+    "releases": 0,
+    "ctrl_down": 0,
+    "ctrl_up": 0,
+    "ctrl_held": false,
+    "left_held": false,
+    "width": 1280,
+    "height": 800,
+    "focused": true
+  },
+  "snapshots": [
+    {
+      "phase": "crossLinuxAfterInput",
+      "task_id": "7c4d27fe-f0d6-4867-87f9-867f96807c85",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792219850742,
+      "observed": {
+        "clicks": 1,
+        "releases": 1,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": 640.11328125,
+        "last_y": 400.1171875,
+        "updated": 1792219850.679459,
+        "width": 1280,
+        "height": 800,
+        "focused": true
+      }
+    },
+    {
+      "phase": "crossLinuxReadonly",
+      "task_id": "5e7b6820-faa8-49a5-a47f-55c10cae4dd3",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792219886919,
+      "observed": {
+        "clicks": 1,
+        "releases": 1,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": 640.11328125,
+        "last_y": 400.1171875,
+        "updated": 1792219886.8758626,
+        "width": 1280,
+        "height": 800,
+        "focused": true
+      }
+    },
+    {
+      "phase": "crossLinuxAIRecheck",
+      "task_id": "4a53db48-a01a-4ec8-8117-870a79a0108c",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792219907238,
+      "observed": {
+        "clicks": 1,
+        "releases": 1,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": 640.11328125,
+        "last_y": 400.1171875,
+        "updated": 1792219907.1985455,
+        "width": 1280,
+        "height": 800,
+        "focused": true
+      }
+    },
+    {
+      "phase": "crossLinuxHeld",
+      "task_id": "020c193a-8f6a-4a04-b72e-0ca9ba8b666a",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220028983,
+      "observed": {
+        "clicks": 2,
+        "releases": 2,
+        "ctrl_down": 2,
+        "ctrl_up": 1,
+        "ctrl_held": true,
+        "left_held": false,
+        "last_x": 640.11328125,
+        "last_y": 400.1171875,
+        "updated": 1792220028.9614623,
+        "width": 1280,
+        "height": 800,
+        "focused": true
+      }
+    },
+    {
+      "phase": "crossLinuxReleased",
+      "task_id": "d74eb147-273d-4bf3-8054-ec76e0d38fc2",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220060358,
+      "observed": {
+        "clicks": 2,
+        "releases": 2,
+        "ctrl_down": 2,
+        "ctrl_up": 2,
+        "ctrl_held": false,
+        "left_held": false,
+        "last_x": 640.11328125,
+        "last_y": 400.1171875,
+        "updated": 1792220060.319248,
+        "width": 1280,
+        "height": 800,
+        "focused": true
+      }
+    }
+  ],
+  "captures": [
+    {
+      "name": "crossMacMain",
+      "sha256": "f7d89ae724c4355925fc0cc38f2ce10300199ce2749b98870000b17494465d35",
+      "capture": {
+        "captured_at_unix_ms": 1792219794531,
+        "desktop_rect": {
+          "height": 640,
+          "width": 1000,
+          "x": 460,
+          "y": 110
+        },
+        "format": "jpeg",
+        "height": 640,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 460,
+        "origin_y": 110,
+        "quality": 85,
+        "resized": false,
+        "source_height": 640,
+        "source_width": 1000,
+        "width": 1000,
+        "window_ref": "337903f1-2aa0-4824-8a4b-de0225290344"
+      }
+    },
+    {
+      "name": "crossMacFirst",
+      "sha256": "28e4a1c603bf318d323169973133f38bdf1c38cbd4ca97d4736b4532e46a13f7",
+      "capture": {
+        "captured_at_unix_ms": 1792219817992,
+        "desktop_rect": {
+          "height": 760,
+          "width": 1100,
+          "x": 410,
+          "y": 80
+        },
+        "format": "jpeg",
+        "height": 760,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 410,
+        "origin_y": 80,
+        "quality": 85,
+        "resized": false,
+        "source_height": 760,
+        "source_width": 1100,
+        "width": 1100,
+        "window_ref": "8ad1edb6-4dc1-4648-a47a-a53224d952d3"
+      }
+    },
+    {
+      "name": "crossMacEnabled2",
+      "sha256": "1be5452597a80ade98d288f2772fedb8557a895b239994f6da933b90c75eea79",
+      "capture": {
+        "captured_at_unix_ms": 1792219837160,
+        "desktop_rect": {
+          "height": 760,
+          "width": 1100,
+          "x": 410,
+          "y": 80
+        },
+        "format": "jpeg",
+        "height": 760,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 410,
+        "origin_y": 80,
+        "quality": 85,
+        "resized": false,
+        "source_height": 760,
+        "source_width": 1100,
+        "width": 1100,
+        "window_ref": "8ad1edb6-4dc1-4648-a47a-a53224d952d3"
+      }
+    },
+    {
+      "name": "crossMacReadonly",
+      "sha256": "635dd195d6e2c0f3cfcd657dadc1ec54169c0f43c4644dda719d71c130fe13e0",
+      "capture": {
+        "captured_at_unix_ms": 1792219867210,
+        "desktop_rect": {
+          "height": 760,
+          "width": 1100,
+          "x": 410,
+          "y": 80
+        },
+        "format": "jpeg",
+        "height": 760,
+        "mode": "jpeg",
+        "monitor_id": 1,
+        "origin_x": 410,
+        "origin_y": 80,
+        "quality": 85,
+        "resized": false,
+        "source_height": 760,
+        "source_width": 1100,
+        "width": 1100,
+        "window_ref": "8ad1edb6-4dc1-4648-a47a-a53224d952d3"
+      }
+    }
+  ],
+  "mac_cleanup": {
+    "task_id": "d2b8d4a0-ac70-4130-8287-6cf888ea8c63",
+    "processes": [],
+    "stopped": {
+      "candidate_processes": 0,
+      "mcp_request_cancelled": true
+    },
+    "history": [
+      {
+        "assistance_id": "bfb5e6ee-c9a7-445f-83f7-5efe01be2825",
+        "created_at_unix_ms": 1792219772804,
+        "delivery": "pending",
+        "expires_at_unix_ms": 1792220372804,
+        "outcome": null,
+        "request": {
+          "device_code": "556688188",
+          "expected_action": "Open the independent viewer, then operate only the owned Linux test fixture",
+          "expires_in_seconds": 600,
+          "reason": "Acceptance: Mac operator to Linux VM",
+          "request_id": "ff066687-161c-4796-8939-4f460a937104",
+          "screen_id": null
+        },
+        "revision": 2,
+        "status": "waiting",
+        "window_label": null
+      },
+      {
+        "assistance_id": "bfb5e6ee-c9a7-445f-83f7-5efe01be2825",
+        "created_at_unix_ms": 1792219772804,
+        "delivery": "displayed",
+        "expires_at_unix_ms": 1792220372804,
+        "outcome": null,
+        "request": {
+          "device_code": "556688188",
+          "expected_action": "Open the independent viewer, then operate only the owned Linux test fixture",
+          "expires_in_seconds": 600,
+          "reason": "Acceptance: Mac operator to Linux VM",
+          "request_id": "ff066687-161c-4796-8939-4f460a937104",
+          "screen_id": null
+        },
+        "revision": 3,
+        "status": "waiting",
+        "window_label": null
+      },
+      {
+        "assistance_id": "bfb5e6ee-c9a7-445f-83f7-5efe01be2825",
+        "created_at_unix_ms": 1792219772804,
+        "delivery": "displayed",
+        "expires_at_unix_ms": 1792220372804,
+        "outcome": null,
+        "request": {
+          "device_code": "556688188",
+          "expected_action": "Open the independent viewer, then operate only the owned Linux test fixture",
+          "expires_in_seconds": 600,
+          "reason": "Acceptance: Mac operator to Linux VM",
+          "request_id": "ff066687-161c-4796-8939-4f460a937104",
+          "screen_id": null
+        },
+        "revision": 4,
+        "status": "active",
+        "window_label": "desktop-viewer-de4c39e4-01cb-47fd-b4ac-ebed240b81ad"
+      },
+      {
+        "assistance_id": "bfb5e6ee-c9a7-445f-83f7-5efe01be2825",
+        "created_at_unix_ms": 1792219772804,
+        "delivery": "displayed",
+        "expires_at_unix_ms": 1792220372804,
+        "outcome": "user_completed",
+        "request": {
+          "device_code": "556688188",
+          "expected_action": "Open the independent viewer, then operate only the owned Linux test fixture",
+          "expires_in_seconds": 600,
+          "reason": "Acceptance: Mac operator to Linux VM",
+          "request_id": "ff066687-161c-4796-8939-4f460a937104",
+          "screen_id": null
+        },
+        "revision": 5,
+        "status": "completed",
+        "window_label": "desktop-viewer-de4c39e4-01cb-47fd-b4ac-ebed240b81ad"
+      }
+    ],
+    "temporary_linux_credential_removed": 1
+  },
+  "linux_cleanup": {
+    "original_service_running": true,
+    "original_service_config_unit_hashes_unchanged": true,
+    "owned_processes": [],
+    "temporary_profiles_removed": true,
+    "media_runtime_removed": true,
+    "installed_binary_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+    "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+    "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857"
+  },
+  "limitations": [
+    "ordinary single-screen desktop only",
+    "15 FPS is configuration, not a measured rate in this run",
+    "no Mac/Linux system-login acceptance in this run",
+    "no long-duration, weak-network, full keyboard-layout or multiscreen result",
+    "no new build, installed-app replacement or publication"
+  ],
+  "center_error_pixels": [
+    0.61328125,
+    0.6171875
+  ]
+}

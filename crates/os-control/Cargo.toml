@@ -15,6 +15,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_
 
 [target.'cfg(target_os = "linux")'.dependencies]
 futures-util = "0.3"
+libloading = "0.8"
 rustix = { version = "=1.1.4", features = ["process", "event"] }
 zbus_systemd = { version = "=0.26100.0", default-features = false, features = ["systemd1", "zbus-async-tokio"] }
 

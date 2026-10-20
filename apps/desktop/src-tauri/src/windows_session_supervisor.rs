@@ -86,16 +86,39 @@ impl Drop for Worker {
 }
 
 pub fn run() -> Result<(), String> {
+    run_mode(false)
+}
+
+/// Isolated acceptance can attach media to Default/Winlogon without registering
+/// another application, screenshot or legacy input provider.
+pub fn run_media_only() -> Result<(), String> {
+    run_mode(true)
+}
+
+fn run_mode(media_only: bool) -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::Machine).map_err(|error| error.to_string())?;
-    pab_logging::init("session-supervisor", paths.root()).map_err(|error| error.to_string())?;
+    pab_logging::init(
+        if media_only {
+            "media-supervisor"
+        } else {
+            "session-supervisor"
+        },
+        paths.root(),
+    )
+    .map_err(|error| error.to_string())?;
 
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let mut workers = Vec::<Worker>::new();
+    let mut media_workers = Vec::<Worker>::new();
     let mut application_workers = Vec::<Worker>::new();
     loop {
         // Application sessions are independent of the single desktop selected
         // for legacy window/input control. Never redirect an explicit user.
-        match application_targets() {
+        match if media_only {
+            Ok(Vec::new())
+        } else {
+            application_targets()
+        } {
             Ok(targets) => {
                 application_workers
                     .retain(|worker| targets.contains(&worker.target) && worker.is_running());
@@ -106,7 +129,7 @@ pub fn run() -> Result<(), String> {
                     {
                         continue;
                     }
-                    match launch_helper(&executable, target) {
+                    match launch_helper(&executable, target, false) {
                         Ok(worker) => application_workers.push(worker),
                         Err(error) => {
                             tracing::warn!(session_id = target.session_id, %error, "could not launch application helper")
@@ -128,39 +151,50 @@ pub fn run() -> Result<(), String> {
                 } else {
                     &[DesktopKind::Winlogon]
                 };
-                workers.retain(|worker| {
+                let keep = |worker: &Worker| {
                     worker.target.session_id == target.session_id
                         && worker.target.winlogon_pid == target.winlogon_pid
                         && worker.target.user_logon_id == target.user_logon_id
                         && desktops.contains(&worker.target.desktop)
                         && worker.is_running()
-                });
-                for &desktop in desktops {
-                    let next_target = Target { desktop, ..target };
-                    if workers.iter().any(|worker| worker.target == next_target) {
+                };
+                workers.retain(keep);
+                media_workers.retain(keep);
+                for (group, is_media) in [(&mut workers, false), (&mut media_workers, true)] {
+                    if media_only && !is_media {
                         continue;
                     }
-                    match launch_helper(&executable, next_target) {
-                        Ok(next) => {
-                            tracing::info!(
-                                session_id = target.session_id,
-                                desktop = desktop.name(),
-                                "session helper launched"
-                            );
-                            workers.push(next);
+                    for &desktop in desktops {
+                        let next_target = Target { desktop, ..target };
+                        if group.iter().any(|worker| worker.target == next_target) {
+                            continue;
                         }
-                        Err(error) => {
-                            tracing::warn!(
-                                session_id = target.session_id,
-                                desktop = desktop.name(),
-                                %error,
-                                "could not launch session helper"
-                            );
+                        match launch_helper(&executable, next_target, is_media) {
+                            Ok(next) => {
+                                tracing::info!(
+                                    session_id = target.session_id,
+                                    desktop = desktop.name(),
+                                    media = is_media,
+                                    "session helper launched"
+                                );
+                                group.push(next);
+                            }
+                            Err(error) => {
+                                tracing::warn!(
+                                    session_id = target.session_id,
+                                    desktop = desktop.name(),
+                                    %error,
+                                    "could not launch session helper"
+                                );
+                            }
                         }
                     }
                 }
             }
-            Ok(None) => workers.clear(),
+            Ok(None) => {
+                workers.clear();
+                media_workers.clear();
+            }
             Err(error) => tracing::warn!(%error, "could not inspect active Windows session"),
         }
         thread::sleep(Duration::from_secs(3));
@@ -521,15 +555,19 @@ fn environment_value(entry: &[u16], name: &str) -> Option<OsString> {
         .then(|| OsString::from_wide(&entry[separator + 1..]))
 }
 
-fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
-    // Window properties on a user's desktop must be accessed in that user's
-    // logon context. Keep SYSTEM confined to the Winlogon helper.
-    let primary = match target.desktop {
-        DesktopKind::Default => interactive_token(target)?,
-        DesktopKind::Winlogon => winlogon_token(target)?,
-        DesktopKind::Applications => application_token(target)?,
+fn launch_helper(executable: &Path, target: Target, media_only: bool) -> io::Result<Worker> {
+    // Media needs continuity across secure-desktop transitions. It registers
+    // only capture/input IPC; window/application helpers retain their user token.
+    let primary = if media_only {
+        winlogon_token(target)?
+    } else {
+        match target.desktop {
+            DesktopKind::Default => interactive_token(target)?,
+            DesktopKind::Winlogon => winlogon_token(target)?,
+            DesktopKind::Applications => application_token(target)?,
+        }
     };
-    let environment = if target.desktop != DesktopKind::Winlogon {
+    let environment = if !media_only && target.desktop != DesktopKind::Winlogon {
         let environment = UserEnvironment::new(&primary)?;
         pab_executor::local_ipc::issue_local_access(
             &environment.local_data()?.join("local-access.key"),
@@ -546,6 +584,8 @@ fn launch_helper(executable: &Path, target: Target) -> io::Result<Worker> {
         executable.display(),
         if target.desktop == DesktopKind::Applications {
             "--application-helper"
+        } else if media_only {
+            "--media-helper"
         } else {
             "--session-helper"
         },

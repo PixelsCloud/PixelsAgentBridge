@@ -1,0 +1,17 @@
+html:has(.remote-desktop), body:has(.remote-desktop), #root:has(.remote-desktop) { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+.remote-desktop { height: 100vh; background: #101820; color: #183144; font: 13px "Segoe UI", system-ui, sans-serif; }
+.remote-desktop-toolbar { box-sizing: border-box; height: 72px; padding: 8px 14px; display: flex; flex-direction: column; justify-content: space-between; background: #f7faf9; border-bottom: 1px solid #dbe8e4; }
+.remote-desktop-status, .remote-desktop-controls { display: flex; align-items: center; gap: 10px; }
+.remote-desktop-status { font-size: 12px; color: #617681; }
+.remote-desktop-status strong { color: #183144; }
+.remote-desktop-status [role=alert] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a63636; }
+.remote-desktop-view-only { color: #157c6b; }
+.remote-desktop-decoder { white-space: nowrap; }
+.remote-desktop-quality { white-space: nowrap; color: #9b670b; }
+.remote-desktop-assistance { margin-left: auto; min-width: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #cfddd9; border-radius: 5px; background: white; color: #157c6b; cursor: pointer; font: inherit; }
+.remote-desktop-controls select, .remote-desktop-controls button { height: 26px; box-sizing: border-box; border: 1px solid #cfddd9; border-radius: 5px; background: white; color: #183144; font: inherit; }
+.remote-desktop-controls select:first-child { min-width: 160px; max-width: 50vw; }
+.remote-desktop-controls button { cursor: pointer; padding: 0 10px; }
+.remote-desktop-controls :disabled { opacity: .55; cursor: default; }
+.remote-desktop-placeholder { height: calc(100% - 72px); display: grid; place-items: center; color: #c0d0d9; padding: 0 24px; }
+.remote-desktop-placeholder [role=alert] { color: #ffb8b8; white-space: pre-wrap; max-width: 700px; overflow-wrap: anywhere; }

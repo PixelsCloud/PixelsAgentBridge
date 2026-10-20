@@ -39,7 +39,10 @@ def unpack_backend(archive, expected_sha256, destination):
         raise ValueError('Backend archive checksum does not match')
     with tarfile.open(archive, 'r:gz') as tar:
         members = tar.getmembers()
-        if len(members) != len(ALLOWED) or {m.name for m in members} != ALLOWED:
+        # Accept verified older headless archives too; this Desktop build adds
+        # its own current notice below, independent of the backend version.
+        names = {m.name for m in members}
+        if len(members) != len(names) or names not in (ALLOWED, ALLOWED | {'THIRD-PARTY-NOTICES.txt'}):
             raise ValueError('Unexpected backend package entries')
         if any(not m.isfile() or not 0 <= m.size <= 500_000_000 for m in members):
             raise ValueError('Unsafe backend archive entry')
@@ -91,6 +94,7 @@ def main():
     install.mkdir(parents=True)
     backend = unpack_backend(args.headless_package, args.headless_sha256, install)
     shutil.copy2(args.desktop, install / 'pab-desktop')
+    shutil.copy2(ROOT / 'packaging/desktop/windows/THIRD-PARTY-NOTICES.txt', install / 'THIRD-PARTY-NOTICES.txt')
     for name in ['run-desktop.sh','grant-desktop-user.sh']: shutil.copy2(SCRIPTS / name, install / name)
     (install / 'desktop-release.toml').write_text(
         f'version = "{args.version}"\nbackend_version = "{backend["version"]}"\n'
@@ -99,6 +103,7 @@ def main():
         'usr/share/applications/pixels-agent-bridge.desktop': SCRIPTS / 'pixels-agent-bridge.desktop',
         'etc/xdg/autostart/pixels-agent-bridge.desktop': SCRIPTS / 'pixels-agent-bridge-autostart.desktop',
         'lib/systemd/system/pixels-agent-bridge-executor.service': SCRIPTS / 'pixels-agent-bridge-executor.service',
+        'lib/systemd/system/pixels-agent-bridge-media.service': SCRIPTS / 'pixels-agent-bridge-media.service',
         'usr/share/icons/hicolor/128x128/apps/pixels-agent-bridge.png': ROOT / 'apps/desktop/src-tauri/icons/128x128.png',
     }
     for name, source in entries.items():
@@ -112,8 +117,9 @@ def main():
         f'Package: pixels-agent-bridge\nVersion: {args.version}\nArchitecture: amd64\n'
         'Maintainer: Pixels <support@rgaa.vip>\nSection: net\nPriority: optional\n'
         'Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libgtk-3-0, libwebkit2gtk-4.1-0, '
-        'libayatana-appindicator3-1, libxdo3, libpipewire-0.3-0, libgbm1, libegl1, '
-        'libwayland-client0, libwayland-server0, libxcb1, systemd, util-linux, bash\n'
+        'libayatana-appindicator3-1, libxdo3, libpipewire-0.3-0, libepoxy0, libgbm1, libdrm2, libegl1, libgles2, '
+        'libwayland-client0, libwayland-server0, libxcb1, libx11-6, libxext6, '
+        'libxrandr2, libxfixes3, libxres1, libxdamage1, libxtst6, systemd, util-linux, bash\n'
         'Description: Pixels Agent Bridge desktop and device service\n'
         ' Native graphical client, remote terminal, MCP and offline document tools.\n', encoding='utf-8')
     for name in ['postinst','prerm','postrm']: shutil.copy2(SCRIPTS / name, control / name)

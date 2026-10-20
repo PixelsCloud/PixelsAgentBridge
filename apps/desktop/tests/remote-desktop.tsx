@@ -1,0 +1,58 @@
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+localStorage.setItem("pab.language", "en");
+const callbacks = new Map<number, (value: unknown) => void>();
+const listeners = new Map<string, number>();
+let next = 1;
+const screens = [
+  { id: "adapter:primary", name: "Main", desktop_width: 1920, desktop_height: 1080, primary: true },
+  { id: "adapter:left", name: "Portrait", desktop_width: 1080, desktop_height: 1920, primary: false },
+];
+let opened = { config: { screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
+let phase = "viewing";
+let inputReady = true, inputEnabled = false;
+let decoder: string | null = null;
+const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, decoder });
+const fixture = (window as any).fixture = {
+  calls: [] as any[], reject: false,
+  assistance: [] as any[],
+  holdCompletion: [] as string[],
+  deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
+  decoder(value: string | null) { decoder = value; fixture.emit(status()); },
+  emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
+  fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
+  recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; decoder = null; fixture.emit(status()); },
+  ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; fixture.emit(status()); },
+};
+(window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
+(window as any).__TAURI_INTERNALS__ = {
+  metadata: { currentWindow: { label: "desktop-viewer-fixture" }, currentWebview: { label: "desktop-viewer-fixture" } },
+  transformCallback(callback: (value: unknown) => void) { const id = next++; callbacks.set(id, callback); return id; },
+  unregisterCallback(id: number) { callbacks.delete(id); },
+  invoke: async (command: string, args: any) => {
+    fixture.calls.push({ command, args });
+    if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
+    if (command.startsWith("plugin:")) return null;
+    if (command === "desktop_viewer_start") return status();
+    if (command === "desktop_viewer_assistance") return fixture.assistance;
+    if (command === "desktop_viewer_assistance_complete") {
+      if (fixture.holdCompletion.includes(args.id)) {
+        await new Promise<void>((resolve, reject) => { fixture.deferredCompletion[args.id] = { resolve, reject }; });
+      }
+      fixture.assistance = fixture.assistance.filter((row: any) => row.assistance_id !== args.id);
+      return null;
+    }
+    if (command === "desktop_viewer_control") {
+      if (fixture.reject) throw "Renderer is busy; retry shortly";
+      fixture.emit({ phase: "switching", opened });
+      inputEnabled = typeof args.inputEnabled === "boolean" ? args.inputEnabled : false;
+      if (args.screen) opened = { ...opened, config: { ...opened.config, screen: screens.find((s) => s.id === args.screen)!, generation: opened.config.generation + 1 } };
+      if (args.fps) opened = { ...opened, config: { ...opened.config, fps: args.fps } };
+      setTimeout(() => { phase = "viewing"; fixture.emit(status()); }, 40);
+      return null;
+    }
+    throw new Error(`Unexpected viewer call: ${command}`);
+  },
+};
+const { default: RemoteDesktopWindow } = await import("../src/RemoteDesktopWindow");
+createRoot(document.getElementById("root")!).render(<StrictMode><RemoteDesktopWindow /></StrictMode>);

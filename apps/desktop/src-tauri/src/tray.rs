@@ -17,13 +17,36 @@ struct TrayState {
 
 pub fn show_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
-        let result = window
-            .show()
-            .and_then(|_| window.unminimize())
-            .and_then(|_| window.set_focus());
-        if let Err(error) = result {
+        if let Err(error) = restore_window(&window) {
             tracing::warn!(%error, "could not restore desktop window from tray");
         }
+    }
+}
+
+pub(crate) fn restore_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        // Tao queues deiconification, but its focus request checks the old
+        // minimized state before that queue is drained. Present the GTK window
+        // on the UI thread so restoring and raising it happen together.
+        let owned = window.clone();
+        window.run_on_main_thread(move || {
+            use gtk::prelude::*;
+            match owned.gtk_window() {
+                Ok(native) => {
+                    native.show();
+                    native.deiconify();
+                    native.present();
+                }
+                Err(error) => tracing::warn!(%error, "could not restore GTK desktop window"),
+            }
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()
     }
 }
 

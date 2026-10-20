@@ -1,0 +1,1084 @@
+{
+  "date": "2026-10-18",
+  "baseline": "974a8a4",
+  "scope": "Formal Windows operator to Linux GNOME Wayland single screen; short diagnostic, not full matrix or performance acceptance",
+  "source_sha256": {
+    "experiments/remote-desktop/linux_flow_fixture.py": "af796925ac1f1d3bd10b6a2c73f39bbc827840886f94dee9451065b6ca28f322",
+    "experiments/remote-desktop/linux_owned_udp_fault.py": "9d57a2ba93de162e951b53cc9f2ad68892f9e5573e291b4440e0261598a7977c",
+    "crates/remote-desktop/src/flow.rs": "58afbc35adfed2d129acac12800ef7c98487c370fabcc77fb2ad998d91012245",
+    "crates/remote-desktop/src/host.rs": "84528a1aaf1477ad098bce84b80bd0f0e1c86d16b9425d33738a3b9cb802d57a",
+    "apps/desktop/src-tauri/src/operator/remote_desktop.rs": "87faa008174eba932f323b122c20010ec2253ccb25cc8bacfff5e8941c56b4b1"
+  },
+  "windows_artifacts": {
+    "pab-mcp.exe": "ed7b37bb02d4890a4c36b9525a186c20957d9ff9b02da71ed7279f5a62b57f3e",
+    "pab-desktop.exe": "35237c633488175fa55f18e094b9230725378de5d6428f37bce38e1817dc5b21"
+  },
+  "linux_artifacts": {
+    "pab-desktop": "6fe68abc63db46c69180c9eab20917172f286743dbff886d1e667f5869dcda7a",
+    "pab-executor": "3be28536c340748ec0f125d2f743da895e2e31efa2edfc221bf87635ffb1ec5c",
+    "manager.py": "3b387e6f789e8ba79102b4a9cf470eab1cce267547e33fa7678c782fbf5c08f5",
+    "fixture.py": "7e5130e9d3ee39d525b46a357866535d026e891b328c4527c698ecb9599bab2c"
+  },
+  "renderer_product": {
+    "short_pause": {
+      "elapsed": 1.3950581999961287,
+      "same_session": true,
+      "dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266087213558000.png",
+          "sha256": "103b4db9af02b86b88649497c65adb433924d4fe70d4a815d62911c2b2095b9e"
+        },
+        "second": {
+          "name": "linux-cursor-1792266087914389600.png",
+          "sha256": "d337292677fe3c4c4672ffdee22a07b534cf910326c288c3720309e78b4d7d8a"
+        },
+        "changed_pixels": 233639
+      }
+    },
+    "long_pause": {
+      "elapsed": 6.246168100042269,
+      "old_pid": 13860,
+      "old_command": [
+        "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\assistance-product-10fecf5e5cb8\\pab-desktop.exe",
+        "--media-worker",
+        "render",
+        "1314",
+        "704",
+        "15",
+        "stream-interactive",
+        "59121970",
+        "0"
+      ],
+      "new_pid": 78348,
+      "new_command": [
+        "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\assistance-product-10fecf5e5cb8\\pab-desktop.exe",
+        "--media-worker",
+        "render",
+        "1314",
+        "704",
+        "15",
+        "stream-interactive-software",
+        "59121970",
+        "0"
+      ],
+      "after": {
+        "ticks": 1179,
+        "draws": 1177,
+        "elapsed": 20.051431655003398,
+        "width": 1314,
+        "height": 704,
+        "focused": true,
+        "clicks": 0,
+        "releases": 0,
+        "left_held": false,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false
+      },
+      "recovered": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false
+      },
+      "same_window": true,
+      "dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266097424433000.png",
+          "sha256": "51a523a54ccda4ebbaedb38b584d0ae10af4b2bbdb986aace5ee64128b2bb61a"
+        },
+        "second": {
+          "name": "linux-cursor-1792266098111808300.png",
+          "sha256": "28f2a4482d91ba8af1ad07187ef18925bde7b93fdf2987e15a549bc249025536"
+        },
+        "changed_pixels": 233639
+      }
+    },
+    "input_after_recovery": {
+      "pressed": {
+        "ticks": 1327,
+        "draws": 1326,
+        "elapsed": 22.576562198002648,
+        "width": 1314,
+        "height": 704,
+        "focused": true,
+        "clicks": 0,
+        "releases": 0,
+        "left_held": false,
+        "ctrl_down": 2,
+        "ctrl_up": 1,
+        "ctrl_held": true
+      },
+      "released": {
+        "ticks": 1393,
+        "draws": 1392,
+        "elapsed": 23.68896793699969,
+        "width": 1314,
+        "height": 704,
+        "focused": true,
+        "clicks": 0,
+        "releases": 0,
+        "left_held": false,
+        "ctrl_down": 2,
+        "ctrl_up": 2,
+        "ctrl_held": false
+      },
+      "returned_to_view_only": true
+    },
+    "static": {
+      "seconds": 9.079643700039014,
+      "same_session": true,
+      "ticks_before": 1430,
+      "ticks_after": 1430,
+      "images": [
+        {
+          "name": "linux-cursor-1792266102730149100.png",
+          "sha256": "1c1cef96d36d6d4301daed3f66c2802f29bf02738421057522f731a608396216"
+        },
+        {
+          "name": "linux-cursor-1792266111161163200.png",
+          "sha256": "1c1cef96d36d6d4301daed3f66c2802f29bf02738421057522f731a608396216"
+        }
+      ]
+    },
+    "minimized": {
+      "seconds": 8,
+      "same_session": true,
+      "restored_dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266121735815200.png",
+          "sha256": "d5e59d0ce2ecf74701e7a7dac3a00ae63f039c26ebcb38799a4c6f4b0b52edf2"
+        },
+        "second": {
+          "name": "linux-cursor-1792266122427358000.png",
+          "sha256": "9064e20d9f3815946e4abc6d198e779b091848569b967ac872034d0af0060040"
+        },
+        "changed_pixels": 233639
+      }
+    },
+    "normal_close": {
+      "owned_media_processes": 0,
+      "existing_mcp_connection_available": true
+    },
+    "reopened": {
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "59dde7a3-0eb6-4e78-a6f7-9397343d65c0",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false
+      },
+      "dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266124201516000.png",
+          "sha256": "da2c0a2c1cd5de9b008d8181982483f733d7d54e94fc8ac4c0e84579406a5e1e"
+        },
+        "second": {
+          "name": "linux-cursor-1792266124904977800.png",
+          "sha256": "3c028e70b089c917e29541c1fd62a61551cc4bc32b34407f0bf2818df4cc71d4"
+        },
+        "changed_pixels": 233639
+      }
+    }
+  },
+  "renderer_driver_exit": 1,
+  "renderer_cleanup_after_driver_exit": {
+    "private_files_removed": [
+      "data\\operators\\0bca575025bf645dd1007d30b183b705763919188420b2beabc227fea10e6557\\bridge.sqlite3",
+      "data\\operators\\0bca575025bf645dd1007d30b183b705763919188420b2beabc227fea10e6557\\bridge.sqlite3-shm",
+      "data\\operators\\0bca575025bf645dd1007d30b183b705763919188420b2beabc227fea10e6557\\bridge.sqlite3-wal",
+      "data\\operators\\0bca575025bf645dd1007d30b183b705763919188420b2beabc227fea10e6557\\guest-endpoint.key",
+      "data\\operators\\0bca575025bf645dd1007d30b183b705763919188420b2beabc227fea10e6557\\mcp-endpoints\\guest-0.key"
+    ],
+    "remaining_owned_processes": 0,
+    "driver_exit_code": 1,
+    "reason": "All product assertions passed; final cleanup was blocked by the driver sqlite3 setup handles until it exited"
+  },
+  "network_product": {
+    "fault_target": {
+      "peer": "192.168.159.1",
+      "ports": [
+        63259
+      ],
+      "owned_pid": 77928
+    },
+    "fault": {
+      "peer": "192.168.159.1",
+      "ports": [
+        63259
+      ],
+      "dev": "ens33",
+      "preferences": [
+        49152
+      ],
+      "qdiscs_before": [
+        {
+          "kind": "fq_codel",
+          "handle": "0:",
+          "root": true,
+          "refcnt": 2,
+          "options": {
+            "limit": 10240,
+            "flows": 1024,
+            "quantum": 1514,
+            "target": 4999,
+            "interval": 99999,
+            "memory_limit": 33554432,
+            "ecn": true,
+            "drop_batch": 64
+          }
+        }
+      ],
+      "restored": true,
+      "duration_seconds": 7,
+      "observed_seconds": 7.004246338001394,
+      "filter_statistics": [
+        {
+          "protocol": "ip",
+          "pref": 49152,
+          "kind": "flower",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 49152,
+          "kind": "flower",
+          "chain": 0,
+          "options": {
+            "handle": 1,
+            "keys": {
+              "eth_type": "ipv4",
+              "ip_proto": "udp",
+              "dst_ip": "192.168.159.1",
+              "dst_port": 63259
+            },
+            "skip_hw": true,
+            "not_in_hw": true,
+            "actions": [
+              {
+                "order": 1,
+                "kind": "gact",
+                "control_action": {
+                  "type": "drop"
+                },
+                "prob": {
+                  "random_type": "none",
+                  "control_action": {
+                    "type": "pass"
+                  },
+                  "val": 0
+                },
+                "index": 1,
+                "ref": 1,
+                "bind": 1,
+                "installed": 7,
+                "last_used": 0,
+                "first_used": 7,
+                "stats": {
+                  "bytes": 26489,
+                  "packets": 44,
+                  "drops": 31,
+                  "overlimits": 0,
+                  "requeues": 0,
+                  "backlog": 0,
+                  "qlen": 0
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "qdiscs_after": [
+        {
+          "kind": "fq_codel",
+          "handle": "0:",
+          "root": true,
+          "refcnt": 2,
+          "options": {
+            "limit": 10240,
+            "flows": 1024,
+            "quantum": 1514,
+            "target": 4999,
+            "interval": 99999,
+            "memory_limit": 33554432,
+            "ecn": true,
+            "drop_batch": 64
+          }
+        }
+      ]
+    },
+    "matched_packets": 44,
+    "reported_drops": 31,
+    "counter_label_correction": "The initial driver called action packet matches dropped_packets; preserve raw tc statistics and report packets and drops separately.",
+    "during_fault": {
+      "ticks": 1021,
+      "draws": 1019,
+      "elapsed": 17.45379572299862,
+      "width": 1314,
+      "height": 704,
+      "focused": true,
+      "clicks": 0,
+      "releases": 0,
+      "left_held": false,
+      "ctrl_down": 1,
+      "ctrl_up": 1,
+      "ctrl_held": false
+    },
+    "parallel_other_endpoint_task": {
+      "changed": false,
+      "complete": true,
+      "last_event_seq": 3,
+      "revision": "71cdfbbe7a58bf07616e03b598f94c0a711665e3e67ec589abfe623e6c4c8964",
+      "snapshot": {
+        "capability": {
+          "name": "process.exec",
+          "version": 2
+        },
+        "completion": {
+          "exit_code": 0,
+          "summary": "process exited successfully"
+        },
+        "created_at_unix_ms": 1792266371514,
+        "display_summary": "/usr/bin/true",
+        "error": null,
+        "execution_context": {
+          "architecture": "x86_64",
+          "cwd": null,
+          "environment_revision": "native-v2:c266a8a93fa344cb32b5329d0b90d3028590b7bce356ad1814cde7086e2f4dc9",
+          "execution_scope": "native",
+          "identity": {
+            "account_id": "uid:0",
+            "account_name": "root",
+            "environment_source": "service_process",
+            "home": "/root",
+            "logon_id": null,
+            "mode": "service",
+            "primary_group": 0,
+            "session_id": null
+          },
+          "interpreter": null,
+          "os_family": "linux",
+          "os_name": "Ubuntu",
+          "os_version": "22.4.0",
+          "path_style": "posix"
+        },
+        "finished_at_unix_ms": 1792266371536,
+        "initiated_by": {
+          "guest_endpoint_key": [
+            212,
+            115,
+            202,
+            109,
+            60,
+            246,
+            180,
+            251,
+            130,
+            165,
+            37,
+            68,
+            20,
+            222,
+            174,
+            112,
+            173,
+            221,
+            172,
+            123,
+            37,
+            230,
+            45,
+            56,
+            230,
+            202,
+            130,
+            233,
+            77,
+            25,
+            7,
+            107
+          ]
+        },
+        "initiating_user": {
+          "user_id": "78e7862f-93c8-4757-8d62-20b8acb78102",
+          "username": "home"
+        },
+        "latest_event_seq": 3,
+        "output": {
+          "stderr": {
+            "available_to": 0,
+            "complete": true,
+            "retained_from": 0
+          },
+          "stdout": {
+            "available_to": 0,
+            "complete": true,
+            "retained_from": 0
+          }
+        },
+        "progress": null,
+        "request_id": "961ca58e-3eb7-4995-bb7c-14b8b31ef32d",
+        "schema_version": 1,
+        "stage": null,
+        "started_at_unix_ms": 1792266371519,
+        "state": "succeeded",
+        "task_ref": {
+          "device_ref": {
+            "device_id": "716d5898-363c-45d8-9247-1fdf43688f04",
+            "tenant_id": "8f03cad1-4c3c-48ff-b81b-79667bb3b4a5"
+          },
+          "task_id": "6c1cdf33-daa8-484b-8fdc-e887cbe26d21"
+        }
+      },
+      "stderr": {
+        "available_to": 0,
+        "complete": true,
+        "retained_from": 0
+      },
+      "stdout": {
+        "available_to": 0,
+        "complete": true,
+        "retained_from": 0
+      },
+      "task_ref": {
+        "device_ref": {
+          "device_id": "716d5898-363c-45d8-9247-1fdf43688f04",
+          "tenant_id": "8f03cad1-4c3c-48ff-b81b-79667bb3b4a5"
+        },
+        "task_id": "6c1cdf33-daa8-484b-8fdc-e887cbe26d21"
+      },
+      "wait_expired": false
+    },
+    "network_recovery": {
+      "elapsed": 10.990060200216249,
+      "status": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "7dfe8d75-aa9c-4810-a09e-ef7eb4aed8e6",
+            "generation": 1,
+            "screen": {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "gnome:Virtual-1",
+              "name": "Unknown Display",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1314,
+              "desktop_height": 704,
+              "pixel_width": 1314,
+              "pixel_height": 704,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false
+      },
+      "same_window": true,
+      "renderer_command": [
+        "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\assistance-product-bb967d555bc4\\pab-desktop.exe",
+        "--media-worker",
+        "render",
+        "1314",
+        "704",
+        "15",
+        "stream-interactive",
+        "138875772",
+        "0"
+      ],
+      "dynamic": {
+        "first": {
+          "name": "linux-cursor-1792266357521513500.png",
+          "sha256": "4d649f3976cf45225bbdb5fc233c9ffefc90803b7287a14d6937fd5919d58c45"
+        },
+        "second": {
+          "name": "linux-cursor-1792266358223699600.png",
+          "sha256": "67370cb195043a4de9d5080a6c830df87c0cd1f559bdc03e9f235e328a2802b3"
+        },
+        "changed_pixels": 233639
+      },
+      "after": {
+        "ticks": 1260,
+        "draws": 1257,
+        "elapsed": 21.49285941600101,
+        "width": 1314,
+        "height": 704,
+        "focused": true,
+        "clicks": 0,
+        "releases": 0,
+        "left_held": false,
+        "ctrl_down": 1,
+        "ctrl_up": 1,
+        "ctrl_held": false
+      }
+    }
+  },
+  "network_driver_exit": 0,
+  "network_observations": [
+    {
+      "elapsed": 0.0,
+      "phase": "ready",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.2977750999853015,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.5937719000503421,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.8891435000114143,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 1.188608800061047,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 2.7271265001036227,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 12.26236919988878,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 12.554142999928445,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 12.846560999983922,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 13.136427100049332,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 13.428389699896798,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "2de7e188-1e3d-4ec5-bf3c-e1dfc03a0572"
+    },
+    {
+      "elapsed": 13.722873100079596,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 14.016633100109175,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 14.316475699888542,
+      "phase": "viewing",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": "7dfe8d75-aa9c-4810-a09e-ef7eb4aed8e6"
+    },
+    {
+      "elapsed": 14.621175799984485,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "7dfe8d75-aa9c-4810-a09e-ef7eb4aed8e6"
+    }
+  ],
+  "renderer_observations": [
+    {
+      "elapsed": 0.0,
+      "phase": "ready",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.29124989989213645,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.5883347999770194,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 0.880242699990049,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 1.1793032998684794,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 1.4724624999798834,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 4.183600599877536,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 6.139815799891949,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 7.3577636000700295,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 7.6548734998796135,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 7.9472632999531925,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 8.240400800015777,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 8.533075300045311,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 8.824929099995643,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 9.116169000044465,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 9.406242799945176,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 9.696309899911284,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 9.987804899923503,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 10.282533899880946,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 10.577069699997082,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 10.872035299893469,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 11.161800199886784,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 11.45450900006108,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 11.744781000074,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 12.037516599986702,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "44989524-ffcc-4eda-8938-e337b3a46a90"
+    },
+    {
+      "elapsed": 12.331081700045615,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 12.624325399985537,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 12.918184400070459,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 13.214612900046632,
+      "phase": "reconnecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 13.509461199864745,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b"
+    },
+    {
+      "elapsed": 15.672436699969694,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": true,
+      "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b"
+    },
+    {
+      "elapsed": 17.998575799865648,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b"
+    },
+    {
+      "elapsed": 28.134904299862683,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b"
+    },
+    {
+      "elapsed": 38.67564580007456,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "061f4ffe-4dc6-4a8e-85d3-bd3ced3cb48b"
+    },
+    {
+      "elapsed": 40.26972520002164,
+      "phase": "ready",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 40.56839539995417,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 40.87104110000655,
+      "phase": "connecting",
+      "frame_ready": false,
+      "input_enabled": false,
+      "session_id": null
+    },
+    {
+      "elapsed": 41.16654790006578,
+      "phase": "viewing",
+      "frame_ready": true,
+      "input_enabled": false,
+      "session_id": "59dde7a3-0eb6-4e78-a6f7-9397343d65c0"
+    }
+  ],
+  "restoration": {
+    "original": {
+      "session": "299",
+      "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "properties": {
+        "MainPID": "78026",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 03:42:34 CST] ; stop_time=[n/a] ; pid=78026 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      },
+      "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+      "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "staged_sha256": "3be28536c340748ec0f125d2f743da895e2e31efa2edfc221bf87635ffb1ec5c",
+      "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+    },
+    "restored": {
+      "original_service_restored": true,
+      "properties": {
+        "MainPID": "79055",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 03:46:18 CST] ; stop_time=[n/a] ; pid=79055 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      }
+    },
+    "owned_processes": [],
+    "input_devices": [],
+    "session_restored": true,
+    "rollback_trigger": "",
+    "stage_removed": true,
+    "fixture_removed": true
+  },
+  "local_private_files_removed": 7,
+  "owned_desktop_exited": true,
+  "local_records": [
+    ".build/remote-desktop/formal-linux-login-ee489f56e764",
+    ".build/remote-desktop/formal-linux-login-be119e679b87",
+    ".build/remote-desktop/formal-linux-login-2d02ec9604db",
+    ".build/remote-desktop/formal-linux-login-b0b02807837c"
+  ],
+  "network_postflight": [
+    {
+      "command": [
+        "tc",
+        "-j",
+        "qdisc",
+        "show",
+        "dev",
+        "ens33"
+      ],
+      "result": "[{\"kind\":\"fq_codel\",\"handle\":\"0:\",\"root\":true,\"refcnt\":2,\"options\":{\"limit\":10240,\"flows\":1024,\"quantum\":1514,\"target\":4999,\"interval\":99999,\"memory_limit\":33554432,\"ecn\":true,\"drop_batch\":64}}]\n"
+    },
+    {
+      "command": [
+        "tc",
+        "-j",
+        "filter",
+        "show",
+        "dev",
+        "ens33",
+        "egress"
+      ],
+      "result": "[]\n"
+    },
+    {
+      "command": [
+        "systemctl",
+        "show",
+        "pixels-agent-bridge-executor.service",
+        "-p",
+        "ActiveState",
+        "-p",
+        "DropInPaths"
+      ],
+      "result": "ActiveState=active\nDropInPaths=\n"
+    }
+  ],
+  "decoder_evidence_limit": "stream-interactive records hardware-preferred policy only; native initialization can fall back. Actual decoder kind was not read in this product check.",
+  "apple_read_only_preflight": {
+    "local_record": ".build/remote-desktop/apple-worker-a5edf16be3dc/b35aec84-78a0-4f94-9a19-02fe5ba5c480.json",
+    "console_uid": 501,
+    "locked": true,
+    "gui_tests_run": false
+  }
+}

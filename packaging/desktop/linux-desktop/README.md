@@ -49,6 +49,17 @@ for the GUI, showing its main window after sign-in. Closing the main window keep
 launching the application again restores the existing window. The tray's Exit
 action exits the GUI while keeping the system Executor running.
 
+The desktop package also enables `pixels-agent-bridge-media.service`. Its root
+supervisor observes the active local console session and starts a separate media
+helper as that user or login-screen account. It supplies a private temporary local
+access file and the verified graphical environment, then reaps the old helper on
+session changes. Closing the GUI does not stop this service. This lifecycle support
+does not by itself mean that every compositor permits lock-screen capture; actual
+X11/Wayland login support is tracked in the remote-desktop acceptance records.
+
+The service preserves the existing command/terminal account selection. It does
+not enable automatic login or change the display manager's configuration.
+
 Installation grants local service access to the installing/active desktop user.
 To enable another local account:
 

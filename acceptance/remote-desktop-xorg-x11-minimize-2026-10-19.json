@@ -1,0 +1,1508 @@
+{
+  "date": "2026-10-19",
+  "source_baseline": "7efc841 plus Windows minimization patch",
+  "directions": [
+    "Windows to Linux Xorg",
+    "Linux X11 to Windows",
+    "Linux X11 to macOS"
+  ],
+  "artifacts": {
+    "windows_operator_before_sha256": "4725a9effa7449310ab0b69cdbf06838d6e1246e28870140168e3b90cfea836d",
+    "windows_operator_after_sha256": "8be996596a4bb22954554b80be373d088f4c21c44098c8fb93f60a9448a68efc",
+    "windows_target": {
+      "pab-executor.exe": "252223ac81648750057610a66d8df12dafc479f3bde1b02755bacbed44e9f009",
+      "pab-desktop.exe": "4725a9effa7449310ab0b69cdbf06838d6e1246e28870140168e3b90cfea836d",
+      "pab-media-worker.exe": "467cb4d071552f6f80317bd1ef27df9538632aaa35169f255e2023d21b40fb82"
+    },
+    "linux": {
+      "pab-desktop": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+      "pab-mcp": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d"
+    },
+    "linux_executor_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+    "macos_desktop_sha256": "d4b10da0bb6465f365f9b34dbe27c4b521b015ba5375bb3129b1dbda7fa40f8f",
+    "macos_executor_sha256": "3cd290acf946e7cdc1e4bac4f4c32e37fe73faa34deecc8c0e43a6a71885fc45",
+    "same_source_release_candidate": false
+  },
+  "windows_minimization": {
+    "negative_sample": [
+      {
+        "elapsed": 0.147,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 0.401,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 0.654,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 0.907,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 1.162,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 1.417,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 1.67,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 1.923,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 2.176,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 2.428,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 2.681,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 2.934,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 3.186,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 3.439,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 3.692,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      },
+      {
+        "elapsed": 3.945,
+        "ctrl_held": true,
+        "ctrl_down": 5,
+        "ctrl_up": 4
+      }
+    ],
+    "fixed_ctrl_sample": [
+      {
+        "elapsed": 0.284,
+        "ctrl_held": false,
+        "ctrl_down": 1,
+        "ctrl_up": 1
+      }
+    ],
+    "fixed_ctrl_and_left_sample": [
+      {
+        "elapsed": 0.198,
+        "ctrl_held": false,
+        "ctrl_down": 2,
+        "ctrl_up": 2,
+        "left_held": false,
+        "press": 3,
+        "release": 3
+      }
+    ],
+    "new_session_default_readonly": true,
+    "installed_app_updated": false
+  },
+  "linux_xorg_observations": [
+    {
+      "press": 0,
+      "release": 0,
+      "double": 0,
+      "drag_motion": 0,
+      "wheel": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": null,
+      "updated": 1792385592.9752688,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 1,
+      "release": 1,
+      "double": 0,
+      "drag_motion": 1,
+      "wheel": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        300,
+        100
+      ],
+      "updated": 1792385601.3687046,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 3,
+      "release": 3,
+      "double": 1,
+      "drag_motion": 3,
+      "wheel": 0,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        600,
+        100
+      ],
+      "updated": 1792385602.583023,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        801,
+        181
+      ],
+      "updated": 1792385604.6035886,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 0,
+      "ctrl_up": 0,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        371,
+        8
+      ],
+      "updated": 1792385614.9054127,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 208.6443284117773
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 1,
+      "ctrl_up": 1,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        371,
+        8
+      ],
+      "updated": 1792385616.424166,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 7599,
+      "scroll": 208.6443284117773
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 1,
+      "ctrl_up": 1,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        371,
+        8
+      ],
+      "updated": 1792385619.5542233,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 2,
+      "ctrl_up": 1,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        371,
+        8
+      ],
+      "updated": 1792385620.565022,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 4,
+      "release": 4,
+      "double": 1,
+      "drag_motion": 14,
+      "wheel": 3,
+      "ctrl_down": 2,
+      "ctrl_up": 2,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        371,
+        8
+      ],
+      "updated": 1792385621.4732955,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 5,
+      "release": 5,
+      "double": 1,
+      "drag_motion": 15,
+      "wheel": 3,
+      "ctrl_down": 2,
+      "ctrl_up": 2,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        901,
+        100
+      ],
+      "updated": 1792385646.8272438,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 2,
+      "ctrl_up": 2,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385648.0400875,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 3,
+      "ctrl_up": 2,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385649.1500733,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 3,
+      "ctrl_up": 3,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385665.1063585,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 4,
+      "ctrl_up": 3,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385678.0413957,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 4,
+      "ctrl_up": 3,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385679.0537274,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 4,
+      "ctrl_up": 4,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385691.5865524,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 5,
+      "ctrl_up": 4,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385713.5139408,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 6,
+      "ctrl_up": 5,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385746.7589023,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 6,
+      "release": 6,
+      "double": 1,
+      "drag_motion": 16,
+      "wheel": 3,
+      "ctrl_down": 6,
+      "ctrl_up": 6,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        400,
+        120
+      ],
+      "updated": 1792385747.6693857,
+      "pid": 6828,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 1,
+      "release": 1,
+      "double": 0,
+      "drag_motion": 1,
+      "wheel": 0,
+      "ctrl_down": 1,
+      "ctrl_up": 0,
+      "ctrl_held": true,
+      "left_held": false,
+      "last_point": [
+        300,
+        100
+      ],
+      "updated": 1792386245.8128452,
+      "pid": 10694,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 3,
+      "release": 2,
+      "double": 0,
+      "drag_motion": 2,
+      "wheel": 0,
+      "ctrl_down": 2,
+      "ctrl_up": 1,
+      "ctrl_held": true,
+      "left_held": true,
+      "last_point": [
+        500,
+        100
+      ],
+      "updated": 1792386269.5384786,
+      "pid": 10694,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": false,
+      "text_length": 7599,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 3,
+      "release": 3,
+      "double": 0,
+      "drag_motion": 2,
+      "wheel": 0,
+      "ctrl_down": 3,
+      "ctrl_up": 3,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        500,
+        100
+      ],
+      "updated": 1792386288.0198638,
+      "pid": 10694,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    },
+    {
+      "press": 3,
+      "release": 3,
+      "double": 0,
+      "drag_motion": 2,
+      "wheel": 0,
+      "ctrl_down": 4,
+      "ctrl_up": 4,
+      "ctrl_held": false,
+      "left_held": false,
+      "last_point": [
+        500,
+        100
+      ],
+      "updated": 1792386289.1379042,
+      "pid": 10694,
+      "session_type": "x11",
+      "area_rect": [
+        0,
+        0,
+        1280,
+        220
+      ],
+      "text_rect": [
+        0,
+        220,
+        1280,
+        580
+      ],
+      "active": true,
+      "marker_exact": true,
+      "text_length": 18,
+      "selection_length": 0,
+      "scroll": 0.0
+    }
+  ],
+  "x11_to_windows_observations": [
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        0,
+        11
+      ],
+      "length": 5922,
+      "typed_marker": false,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        0,
+        25
+      ],
+      "length": 5922,
+      "typed_marker": false,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        0,
+        25
+      ],
+      "length": 5922,
+      "typed_marker": false,
+      "first_visible": 9,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        0,
+        5922
+      ],
+      "length": 5922,
+      "typed_marker": false,
+      "first_visible": 174,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        0,
+        5922
+      ],
+      "length": 5922,
+      "typed_marker": false,
+      "first_visible": 174,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        18,
+        18
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        18,
+        18
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": [
+        17
+      ]
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        18,
+        18
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        18,
+        18
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        18,
+        18
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        7,
+        7
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        7,
+        7
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": [
+        17
+      ]
+    },
+    {
+      "rect": {
+        "x": 248,
+        "y": 211,
+        "right": 1232,
+        "bottom": 780
+      },
+      "foreground": true,
+      "selection": [
+        7,
+        7
+      ],
+      "length": 18,
+      "typed_marker": true,
+      "first_visible": 0,
+      "held": []
+    }
+  ],
+  "x11_to_macos_observations": [
+    {
+      "downs": 0,
+      "keys_up": 0,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": false,
+      "timestamp": 1792386824.614698,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 0,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 0,
+      "click_y": 0,
+      "pid": 4712,
+      "ups": 0
+    },
+    {
+      "downs": 0,
+      "keys_up": 0,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": false,
+      "timestamp": 1792386828.2061791,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 0,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 0,
+      "click_y": 0,
+      "pid": 4712,
+      "ups": 0
+    },
+    {
+      "downs": 1,
+      "keys_up": 0,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": true,
+      "timestamp": 1792386910.412679,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 0,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 119,
+      "click_y": 100,
+      "pid": 4712,
+      "ups": 1
+    },
+    {
+      "downs": 2,
+      "keys_up": 0,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": true,
+      "timestamp": 1792386912.713015,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 0,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 4712,
+      "ups": 2
+    },
+    {
+      "downs": 1,
+      "keys_up": 0,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": true,
+      "timestamp": 1792387029.95793,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 0,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 5384,
+      "ups": 1
+    },
+    {
+      "downs": 1,
+      "keys_up": 1,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": true,
+      "timestamp": 1792387032.269343,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 1,
+      "wheels": 0,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 5384,
+      "ups": 1
+    },
+    {
+      "downs": 1,
+      "keys_up": 1,
+      "last_key": 0,
+      "shift_down": 0,
+      "focused": true,
+      "timestamp": 1792387034.96823,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 1,
+      "wheels": 3,
+      "shift_up": 0,
+      "shifted": false,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 5384,
+      "ups": 1
+    },
+    {
+      "downs": 1,
+      "keys_up": 2,
+      "last_key": 0,
+      "shift_down": 1,
+      "focused": true,
+      "timestamp": 1792387038.269367,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 2,
+      "wheels": 3,
+      "shift_up": 0,
+      "shifted": true,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 5384,
+      "ups": 1
+    },
+    {
+      "downs": 1,
+      "keys_up": 2,
+      "last_key": 0,
+      "shift_down": 1,
+      "focused": true,
+      "timestamp": 1792387040.352983,
+      "x": 8879,
+      "screen_id": "2",
+      "y": 41301,
+      "keys_down": 2,
+      "wheels": 3,
+      "shift_up": 1,
+      "shifted": false,
+      "click_x": 100,
+      "click_y": 100,
+      "pid": 5384,
+      "ups": 1
+    }
+  ],
+  "x11_to_macos_final_fixture_pid": 5384,
+  "cleanup": {
+    "linux": {
+      "original": {
+        "properties": {
+          "MainPID": "2696",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        },
+        "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+        "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+        "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+        "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d",
+        "gdm_sha256": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+        "preferences": {
+          "Session": "(<''>,)",
+          "SessionType": "(<''>,)",
+          "XSession": "(<''>,)"
+        },
+        "preference_values": {
+          "Session": "",
+          "SessionType": "",
+          "XSession": ""
+        }
+      },
+      "restored": {
+        "original_service_restored": true,
+        "properties": {
+          "MainPID": "18129",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 13:17:40 CST] ; stop_time=[n/a] ; pid=18129 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        }
+      },
+      "operator_stopped": {
+        "desktop_exit": -15,
+        "requests_cancelled": 2
+      },
+      "preferences_restored": true,
+      "session": "22",
+      "session_state": "User=1000\nType=x11\nClass=user\nActive=yes\nLockedHint=no",
+      "owned_processes": [],
+      "virtual_input_devices": [],
+      "runtime_directory_absent": true,
+      "manager_cleanup": {
+        "temporary_service_state_removed": true,
+        "original_service_running": true
+      },
+      "stage_directories_removed": true
+    },
+    "macos": {
+      "private_stage_removed": true,
+      "restored": {
+        "original_running": true,
+        "pid": 5554,
+        "installed_files_unchanged": true
+      }
+    },
+    "windows_stage_cleaned": true,
+    "linux_generated_modifiers_held": [],
+    "macos_uploaded_manager_deleted": true,
+    "local_candidate_desktops_stopped": true
+  },
+  "next_windows_readonly_monitor_preflight": [
+    {
+      "device_code": "947158375",
+      "sampled_at_unix_ms": 1792387453715,
+      "monitors": [
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 1920,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 0,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": true
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 3840,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 5760,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": false
+        }
+      ]
+    },
+    {
+      "device_code": "428358431",
+      "sampled_at_unix_ms": 1792387456151,
+      "monitors": [
+        {
+          "width": 1920,
+          "height": 1080,
+          "x": 0,
+          "y": 0,
+          "scale_percent": 100,
+          "rotation_degrees": 0,
+          "primary": true
+        }
+      ]
+    }
+  ],
+  "build": {
+    "windows_cargo_jobs": 6,
+    "native_parallelism": 1,
+    "custom_protocol": true,
+    "success": true,
+    "macos_fixture_jobs": 1,
+    "macos_fixture_builds": 2,
+    "initial_windows_build_failed_for_missing_nasm_on_path": true,
+    "waited_for_other_10_job_build": true
+  },
+  "excluded_attempts": [
+    "GTK TextView geometry probe corrected before counting",
+    "X11 credential import corrected from SHA256 directory to existing BLAKE3 service scope",
+    "X11 AT-SPI pressed state corrected before input",
+    "Notepad observer BOM and stalled continuous observer excluded",
+    "X11 restore did not confirm native focus and refused held key",
+    "first AppKit fixture expired after 120 seconds; keyboard and wheel probes rejected"
+  ],
+  "limits": {
+    "configured_fps": 15,
+    "dynamic_fps_remeasured": false,
+    "full_keyboard_ime_acceptance": false,
+    "formal_installer_acceptance": false,
+    "mixed_dpi": false,
+    "two_hour_test": false,
+    "eight_hour_test": false,
+    "published": false,
+    "checklist_closed": 12,
+    "checklist_total": 53
+  }
+}

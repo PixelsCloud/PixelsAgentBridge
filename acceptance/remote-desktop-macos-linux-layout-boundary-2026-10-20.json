@@ -1,0 +1,944 @@
+{
+  "date": "2026-10-20",
+  "source_base": "5f65459",
+  "source_archive": {
+    "source_base": "5f65459 + macOS layout fix",
+    "archive_sha256": "9a62d25fb1a9f23637f71d2f48870927876bdf941b4b27164c8f430530d8cb3e",
+    "file_count": 868,
+    "changed": {
+      "crates/desktop-media/native/macos/common.h": "a37df151f281141bca5258f81f483c9da7bcfcb6099eae687c01030161f4b37c",
+      "crates/desktop-media/native/macos/worker.mm": "b55b8c4ac8fa823e241e57943c1aed410522f8a23c0cb374c83b46e8fd28e22b",
+      "crates/desktop-media/tests/native_macos_online_display.mm": "f432afe857d5fcd91ee589eef6b38825cade4365f9535339cf0532687a5851a3"
+    }
+  },
+  "scope": "Mac product resolution and native density validation; Linux production X11 native worker layout/input boundary",
+  "mac": {
+    "native-before.json": {
+      "exit_code": 2,
+      "stdout": "",
+      "stderr": "Same-bounds density change was accepted as the old layout\n",
+      "production_header_sha256": "329799c0d5026ac65ac025135740d0d9578aa43fd3aca1d5f09bd99ccec8f280"
+    },
+    "native-fixed.json": {
+      "exit_code": 0,
+      "stdout": "{\"inactive_online_inventory\":true,\"primary_by_id\":true,\"unplug_rejected\":true,\"geometry_change_rejected\":true,\"same_bounds_density_change_rejected\":true,\"missing_mode_rejected\":true}\n",
+      "stderr": ""
+    },
+    "build-result.json": {
+      "exit_code": 0,
+      "jobs": 4,
+      "nested_jobs": 1,
+      "native_geometry_test": true,
+      "unsigned_sha256": "433c319487eaee6e308acac7a6b3383075715af61a59f6105036c627c36386ac"
+    },
+    "signed-result.json": {
+      "exit_code": 0,
+      "same_signing_identity": true,
+      "sha256": "d382b0e5d357bdb33f07e66ccae78bc861279b59337f0d9e7cdfc56c79dd20d6",
+      "app_path_unchanged": true
+    },
+    "fixture-cleanup.json": {
+      "fixture_stopped": true,
+      "display_restored": {
+        "exit_code": 0,
+        "current": {
+          "width": 1920,
+          "height": 1080,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "id": 34
+        },
+        "exact_original_mode": true
+      },
+      "ctrl_released": true
+    },
+    "native-idle-result.json": {
+      "launcher_exit_code": 0,
+      "worker_ended": true,
+      "worker_exit_code_observable": false,
+      "error": "media encoder=videotoolbox_hardware source=desktop-separate-cursor cpu_pixel_mappings_per_frame=0\nmedia: Screen changed; refresh generation\n",
+      "unexpected_stdout_bytes": 0,
+      "retirement_after_mode_ms": 664.3947499999996
+    },
+    "display-restored.json": {
+      "exit_code": 0,
+      "current": {
+        "width": 1920,
+        "height": 1080,
+        "pixel_width": 1920,
+        "pixel_height": 1080,
+        "id": 34
+      },
+      "exact_original_mode": true
+    },
+    "restored.json": {
+      "original_running": true,
+      "pid": 72027,
+      "installed_files_unchanged": true
+    },
+    "disarmed.json": {
+      "restored": true
+    }
+  },
+  "mac_product": {
+    "steps": [
+      {
+        "name": "original_mode_click",
+        "value": {
+          "before": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 0,
+            "click_y": 0,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 0,
+            "ctrl_down": 0,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482627.372735,
+            "y": 41301,
+            "ctrl_up": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 0,
+            "last_key": 0
+          },
+          "after": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 1,
+            "ctrl_down": 0,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482629.102751,
+            "y": 41301,
+            "ctrl_up": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 1,
+            "last_key": 0
+          },
+          "source": "{\"atomic_source_click\": [183, 585], \"actual_source_cursor_after\": [183, 585]}\n{\"action\": \"fixture-click\", \"before\": {\"parent\": 165617490, \"surface\": 12922310, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": false}, \"after\": {\"parent\": 165617490, \"surface\": 12922310, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": true}}\n"
+        }
+      },
+      {
+        "name": "old_ctrl_held",
+        "value": {
+          "fixture.json": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 1,
+            "ctrl_down": 1,
+            "shift_up": 0,
+            "ctrl_held": true,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482630.652915,
+            "y": 41301,
+            "ctrl_up": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 1,
+            "last_key": 0
+          },
+          "display-original.json": {
+            "display_id": 2,
+            "mode": {
+              "width": 1920,
+              "height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "id": 34
+            },
+            "pid": 70948
+          },
+          "ctrl_key_state": {
+            "combined": true,
+            "hid": true
+          }
+        }
+      },
+      {
+        "name": "old_ctrl_held",
+        "value": {
+          "fixture.json": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 1,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": true,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482830.95784,
+            "y": 41301,
+            "ctrl_up": 1,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 1,
+            "last_key": 0
+          },
+          "display-original.json": {
+            "display_id": 2,
+            "mode": {
+              "width": 1920,
+              "height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "id": 34
+            },
+            "pid": 71500
+          },
+          "ctrl_key_state": {
+            "combined": true,
+            "hid": true
+          }
+        }
+      },
+      {
+        "name": "native_capture_credit_withheld",
+        "value": {
+          "capture_pid": 71586,
+          "initial_frame": [
+            126882,
+            0,
+            210822,
+            1
+          ],
+          "credit_withheld": true
+        }
+      },
+      {
+        "name": "old_generation_release_and_idle_capture_retired",
+        "value": {
+          "fixture.json": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 1,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 13322,
+            "keys_down": 0,
+            "timestamp": 1792482846.298832,
+            "y": 56511,
+            "ctrl_up": 2,
+            "desktop_width": 1280,
+            "desktop_height": 720,
+            "pid": 70946,
+            "focused": true,
+            "ups": 1,
+            "last_key": 0
+          },
+          "native-idle-result.json": {
+            "launcher_exit_code": 0,
+            "worker_ended": true,
+            "worker_exit_code_observable": false,
+            "error": "media encoder=videotoolbox_hardware source=desktop-separate-cursor cpu_pixel_mappings_per_frame=0\nmedia: Screen changed; refresh generation\n",
+            "unexpected_stdout_bytes": 0,
+            "retirement_after_mode_ms": 664.3947499999996
+          },
+          "display-original.json": {
+            "display_id": 2,
+            "mode": {
+              "width": 1920,
+              "height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "id": 34
+            },
+            "pid": 71500
+          },
+          "ctrl_key_state": {
+            "combined": false,
+            "hid": false
+          }
+        }
+      },
+      {
+        "name": "mode_small",
+        "value": {
+          "change": {
+            "changed": true,
+            "mode": {
+              "width": 1280,
+              "height": 720,
+              "pixel_width": 1280,
+              "pixel_height": 720,
+              "id": 14
+            },
+            "action": "small"
+          },
+          "old_config": {
+            "session_id": "f2bf1585-d564-4cf7-b19f-65522d062a55",
+            "generation": 1,
+            "screen": {
+              "id": "2",
+              "name": "29C1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "new_status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 720,
+                  "pixel_width": 1280,
+                  "pixel_height": 720,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 720,
+                  "pixel_width": 1280,
+                  "pixel_height": 720,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware",
+            "quality": {
+              "version": 1,
+              "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+              "generation": 1,
+              "capture_fps_milli": 15000,
+              "encoder_target_bps": 0
+            }
+          },
+          "timeline": [
+            {
+              "at": 1792482832869,
+              "phase": "viewing",
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": true,
+              "error": null,
+              "config": {
+                "session_id": "f2bf1585-d564-4cf7-b19f-65522d062a55",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            },
+            {
+              "at": 1792482834560,
+              "phase": "reconnecting",
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "error": null
+            },
+            {
+              "at": 1792482835634,
+              "phase": "viewing",
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "error": null,
+              "config": {
+                "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 720,
+                  "pixel_width": 1280,
+                  "pixel_height": 720,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            },
+            {
+              "at": 1792482835684,
+              "phase": "viewing",
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": false,
+              "error": null,
+              "config": {
+                "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 720,
+                  "pixel_width": 1280,
+                  "pixel_height": 720,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "new_mode_small_click",
+        "value": {
+          "before": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 1,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 13322,
+            "keys_down": 0,
+            "timestamp": 1792482847.643807,
+            "y": 56511,
+            "ctrl_up": 2,
+            "desktop_width": 1280,
+            "desktop_height": 720,
+            "pid": 70946,
+            "focused": true,
+            "ups": 1,
+            "last_key": 0
+          },
+          "after": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 99,
+            "click_y": 101,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 2,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 13322,
+            "keys_down": 0,
+            "timestamp": 1792482849.480389,
+            "y": 56511,
+            "ctrl_up": 2,
+            "desktop_width": 1280,
+            "desktop_height": 720,
+            "pid": 70946,
+            "focused": true,
+            "ups": 2,
+            "last_key": 0
+          },
+          "source": "{\"atomic_source_click\": [257, 728], \"actual_source_cursor_after\": [257, 728]}\n{\"action\": \"fixture-click\", \"before\": {\"parent\": 165617490, \"surface\": 13512134, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": false}, \"after\": {\"parent\": 165617490, \"surface\": 13512134, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": true}}\n"
+        }
+      },
+      {
+        "name": "mode_restore",
+        "value": {
+          "change": {
+            "changed": true,
+            "mode": {
+              "width": 1920,
+              "height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "id": 34
+            },
+            "action": "restore"
+          },
+          "old_config": {
+            "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+            "generation": 1,
+            "screen": {
+              "id": "2",
+              "name": "29C1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1280,
+              "desktop_height": 720,
+              "pixel_width": 1280,
+              "pixel_height": 720,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "new_status": {
+            "phase": "viewing",
+            "error": null,
+            "opened": {
+              "config": {
+                "session_id": "5a02ad1d-0061-46e2-bd90-298de5e4046d",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              },
+              "screens": [
+                {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                }
+              ],
+              "heartbeat_ms": 5000,
+              "lease_ms": 15000,
+              "input_supported": true
+            },
+            "input_ready": true,
+            "frame_ready": true,
+            "input_enabled": false,
+            "decoder": "d3d11_hardware",
+            "quality": {
+              "version": 1,
+              "session_id": "5a02ad1d-0061-46e2-bd90-298de5e4046d",
+              "generation": 1,
+              "capture_fps_milli": 15000,
+              "encoder_target_bps": 0
+            }
+          },
+          "timeline": [
+            {
+              "at": 1792482849575,
+              "phase": "viewing",
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": true,
+              "error": null,
+              "config": {
+                "session_id": "92c8a88c-af17-424e-88a2-4ecd1d48b20a",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1280,
+                  "desktop_height": 720,
+                  "pixel_width": 1280,
+                  "pixel_height": 720,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            },
+            {
+              "at": 1792482851302,
+              "phase": "reconnecting",
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "error": null
+            },
+            {
+              "at": 1792482852307,
+              "phase": "viewing",
+              "input_ready": false,
+              "frame_ready": false,
+              "input_enabled": false,
+              "error": null,
+              "config": {
+                "session_id": "5a02ad1d-0061-46e2-bd90-298de5e4046d",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            },
+            {
+              "at": 1792482852397,
+              "phase": "viewing",
+              "input_ready": true,
+              "frame_ready": true,
+              "input_enabled": false,
+              "error": null,
+              "config": {
+                "session_id": "5a02ad1d-0061-46e2-bd90-298de5e4046d",
+                "generation": 1,
+                "screen": {
+                  "id": "2",
+                  "name": "29C1",
+                  "x": 0,
+                  "y": 0,
+                  "desktop_width": 1920,
+                  "desktop_height": 1080,
+                  "pixel_width": 1920,
+                  "pixel_height": 1080,
+                  "scale_milli": 1000,
+                  "rotation": "identity",
+                  "primary": true
+                },
+                "codec": "h264_annex_b",
+                "color": "bt709_limited",
+                "fps": 15
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "new_mode_restore_click",
+        "value": {
+          "before": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 99,
+            "click_y": 101,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 2,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482863.183774,
+            "y": 41301,
+            "ctrl_up": 2,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 2,
+            "last_key": 0
+          },
+          "after": {
+            "shifted": false,
+            "wheels": 0,
+            "click_x": 100,
+            "click_y": 100,
+            "keys_up": 0,
+            "shift_down": 0,
+            "downs": 3,
+            "ctrl_down": 2,
+            "shift_up": 0,
+            "ctrl_held": false,
+            "screen_id": "2",
+            "x": 8879,
+            "keys_down": 0,
+            "timestamp": 1792482865.0264559,
+            "y": 41301,
+            "ctrl_up": 2,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pid": 70946,
+            "focused": true,
+            "ups": 3,
+            "last_key": 0
+          },
+          "source": "{\"atomic_source_click\": [183, 585], \"actual_source_cursor_after\": [183, 585]}\n{\"action\": \"fixture-click\", \"before\": {\"parent\": 165617490, \"surface\": 13708742, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": false}, \"after\": {\"parent\": 165617490, \"surface\": 13708742, \"rect\": [26, 58, 1116, 799], \"surface_rect\": [34, 161, 1100, 688], \"minimized\": false, \"visible\": true, \"foreground\": true}}\n"
+        }
+      }
+    ],
+    "passed": true
+  },
+  "linux": {
+    "result.json": {
+      "original_mode": "1306x768",
+      "target_mode": "1280x720",
+      "steps": [
+        {
+          "name": "initial_capture",
+          "header": [
+            68501,
+            0,
+            5543,
+            1
+          ]
+        },
+        {
+          "name": "old_input_held",
+          "state": {
+            "ctrl": true,
+            "left": true
+          },
+          "events": [
+            {
+              "type": 2,
+              "detail": 37,
+              "x": 1305,
+              "y": 238
+            },
+            {
+              "type": 4,
+              "detail": 1,
+              "x": 170,
+              "y": 144
+            }
+          ]
+        },
+        {
+          "name": "old_input_retired",
+          "elapsed_ms": 255.60202299675439,
+          "code": 1,
+          "error": "media: X11 layout changed; refresh capture generation\n",
+          "state": {
+            "ctrl": false,
+            "left": false
+          },
+          "events": [
+            {
+              "type": 5,
+              "detail": 1,
+              "x": 170,
+              "y": 144
+            },
+            {
+              "type": 3,
+              "detail": 37,
+              "x": 170,
+              "y": 144
+            }
+          ]
+        },
+        {
+          "name": "capture_without_credit_after_layout",
+          "still_running": true
+        },
+        {
+          "name": "old_capture_retired",
+          "code": 1,
+          "error": "media source=x11_shm encoder=openh264_software pixel_format=bgrx cpu_conversion=true\nmedia: X11 layout changed; refresh capture generation\n",
+          "no_stale_packet": true
+        },
+        {
+          "name": "old_geometry_start_rejected",
+          "error": "media: Selected X11 input geometry changed\n"
+        },
+        {
+          "name": "new_geometry_click",
+          "expected": [
+            170,
+            144
+          ],
+          "events": [
+            {
+              "type": 4,
+              "detail": 1,
+              "x": 170,
+              "y": 144
+            },
+            {
+              "type": 5,
+              "detail": 1,
+              "x": 170,
+              "y": 144
+            }
+          ],
+          "layout": {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1280,
+            "desktop_height": 720,
+            "pixel_width": 1280,
+            "pixel_height": 720,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        },
+        {
+          "name": "new_capture_first_frame",
+          "header": [
+            64855,
+            0,
+            20601,
+            1
+          ]
+        }
+      ],
+      "passed": true,
+      "cleanup": {
+        "mode": "1306x768",
+        "original_restored": true,
+        "held": {
+          "ctrl": false,
+          "left": false
+        },
+        "own_workers_gone": true
+      }
+    },
+    "lease-result.json": {
+      "restored": true,
+      "error": ""
+    },
+    "installed_service_active": true
+  },
+  "linux_artifacts": {
+    "pab-media-worker": "d6f0117ef0b769fd6673425afe6d70213ef90b8b74facaeb14cdbf3d4ff20108",
+    "run.py": "e5de2c1ac52bce31f6424c055e5e5bfe2af616f0250fa7f92a4a3d6dc6ffc2b8",
+    "verify_linux_x11_input.py": "8b68f669c2da25bca1e3a2f8330366a3dca0844885b562fedd4c654324f43d10"
+  },
+  "windows_viewer_sha256": "e61ab5ddd3411923d904c6c82c77381ba87f86e7aaf64709140c4fb1e3cba6f1",
+  "windows_cleanup": {
+    "original_slots_unchanged": true,
+    "own_slots_absent": true,
+    "desktop_stopped": true
+  },
+  "reused": [
+    "Windows dynamic DPI/resolution and independent cursor acceptance, 2026-10-20",
+    "Shared old session/generation input and frame isolation protocol tests",
+    "Existing single-root X11 cursor hide/show acceptance"
+  ],
+  "not_run": [
+    "Wayland dynamic display layout",
+    "Physical Mac 2x density switch or multiple displays",
+    "Independent X screen cursor hiding attribution",
+    "30 minute / 100 open final candidate tests",
+    "2 hour / 8 hour tests",
+    "Final installer / release / COS"
+  ],
+  "diagnostics": [
+    "Native pre-fix density regression intentionally exits 2; fixed regression exits 0.",
+    "Mac automatically locked during setup. No clicks sent before own fixture focus assertion; one password submission through own product window restored the test environment. Not a new lock/login acceptance.",
+    "Direct native capture launched under Python lacked Screen Recording responsibility. Same previously approved app launched through LaunchServices succeeded; no new permission requested or granted.",
+    "LaunchServices open -W exit code is launcher status only. Worker termination is observed, actual worker exit code is not available.",
+    "Linux X11 capture remains alive without frame credit, rejects the next pull without emitting a stale packet; input independently retires and releases held keys.",
+    "Private profiles, encoded first frame and diagnostic artifacts retained with restricted access. No claim of full private file deletion."
+  ],
+  "release": {
+    "local_installed_app_updated": false,
+    "pushed": false,
+    "published": false
+  }
+}

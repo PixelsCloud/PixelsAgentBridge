@@ -7,6 +7,12 @@ use crate::{desktop_input, screenshot_session, window_session};
 
 #[path = "application_deadline.rs"]
 mod application_deadline;
+#[cfg(target_os = "macos")]
+#[path = "session_helper_macos_media.rs"]
+mod macos_media;
+#[cfg(target_os = "linux")]
+#[path = "session_helper_linux_media.rs"]
+pub(crate) mod linux_media;
 
 pub fn run() -> Result<(), String> {
     let paths = DataPaths::for_scope(DataScope::User).map_err(|error| error.to_string())?;
@@ -14,10 +20,21 @@ pub fn run() -> Result<(), String> {
         .nth(2)
         .and_then(|argument| argument.strip_prefix("--desktop=").map(str::to_owned));
     let applications_only = std::env::args().nth(1).as_deref() == Some("--application-helper");
+    let media_only = std::env::args().nth(1).as_deref() == Some("--media-helper");
+    if media_only {
+        let supported = (cfg!(windows)
+            && matches!(expected_desktop.as_deref(), Some("Default" | "Winlogon")))
+            || (cfg!(target_os = "linux") && expected_desktop.is_none());
+        if !supported {
+            return Err("media helper requires a supported interactive session".into());
+        }
+    }
     if applications_only && (!cfg!(windows) || expected_desktop.as_deref() != Some("Default")) {
         return Err("application helper requires the Windows Default desktop".into());
     }
-    let log_role = if applications_only {
+    let log_role = if media_only {
+        "media-helper"
+    } else if applications_only {
         "application-helper"
     } else {
         match expected_desktop.as_deref() {
@@ -28,6 +45,14 @@ pub fn run() -> Result<(), String> {
         }
     };
     pab_logging::init(log_role, paths.root()).map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    if media_only {
+        return tauri::async_runtime::block_on(async {
+            let _worker = start_media_helper(expected_desktop)?;
+            std::future::pending::<()>().await;
+            Ok(())
+        });
+    }
     #[cfg(target_os = "macos")]
     {
         use objc2::MainThreadMarker;
@@ -36,7 +61,11 @@ pub fn run() -> Result<(), String> {
         let app = NSApplication::sharedApplication(main);
         // A helper must service AppKit/AX and the main dispatch queue without
         // becoming the foreground app and taking focus away from its target.
-        if !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited) {
+        // An unbundled helper can already be Prohibited. AppKit may return
+        // false for that no-op, so do not mistake it for a startup failure.
+        if app.activationPolicy() != NSApplicationActivationPolicy::Prohibited
+            && !app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited)
+        {
             return Err("unable to configure background session helper".into());
         }
         // Finder can send the shared bundle's open event to this helper. Keep
@@ -47,6 +76,12 @@ pub fn run() -> Result<(), String> {
             app.setDelegate(Some(objc2::runtime::ProtocolObject::from_ref(&**delegate)));
         }
         let task = tauri::async_runtime::spawn(async move {
+            // A separate helper socket carries media/input; existing application
+            // requests and their user identity keep their original route.
+            let Ok(mut media) = macos_media::start(expected_desktop.clone()) else {
+                tracing::error!("unable to start Mac media helper");
+                std::process::exit(1);
+            };
             use tokio::signal::unix::{SignalKind, signal};
             let Ok(mut termination) = signal(SignalKind::terminate()) else {
                 tracing::error!("unable to install helper termination handler");
@@ -60,6 +95,7 @@ pub fn run() -> Result<(), String> {
             }
             // The request loop has been dropped. Release on the still-running
             // AppKit thread before launchd starts the replacement helper.
+            media.shutdown().await;
             pab_desktop_control::release_input();
             std::process::exit(0);
         });
@@ -69,7 +105,22 @@ pub fn run() -> Result<(), String> {
         task.abort();
         return Ok(());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    return tauri::async_runtime::block_on(async {
+        let mut media = if media_only { linux_media::start_media_only()? } else { linux_media::start()? };
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut termination = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
+        let result = tokio::select! {
+            result = async {
+                if media_only { std::future::pending::<Result<(), String>>().await }
+                else { run_forever(expected_desktop, applications_only).await }
+            } => result,
+            _ = termination.recv() => Ok(()),
+        };
+        media.shutdown().await;
+        result
+    });
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     tauri::async_runtime::block_on(run_forever(expected_desktop, applications_only))
 }
 
@@ -126,6 +177,52 @@ async fn run_forever(
         }
         tokio::time::sleep(Duration::from_secs(3)).await;
     }
+}
+
+#[cfg(windows)]
+struct MediaHelperTask(tauri::async_runtime::JoinHandle<()>);
+#[cfg(windows)]
+impl Drop for MediaHelperTask {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+#[cfg(windows)]
+fn start_media_helper(desktop: Option<String>) -> Result<MediaHelperTask, String> {
+    let backend = pab_desktop_media::NativeBackend::new(
+        std::env::current_exe().map_err(|e| e.to_string())?,
+        vec!["--media-worker".into()],
+    )
+    .with_input();
+    Ok(MediaHelperTask(tauri::async_runtime::spawn(async move {
+        loop {
+            if desktop_is_active(desktop.as_deref()) {
+                if let Err(error) = backend.recover_input().await {
+                    tracing::debug!(%error, "waiting for previous input owner to release");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+                let stopped = async {
+                    loop {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        if !desktop_is_active(desktop.as_deref()) {
+                            break;
+                        }
+                    }
+                };
+                tokio::select! {
+                    result = local_ipc::media::serve_helper(&backend) => {
+                        if let Err(error) = result { tracing::debug!(%error, "media helper disconnected"); }
+                    }
+                    _ = stopped => {}
+                }
+                // Do not re-register until the previous worker has really
+                // exited; this gate also covers interrupted native startup.
+                backend.idle().await;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })))
 }
 
 async fn serve_application_requests(socket: &mut LocalSocket) -> Result<(), String> {

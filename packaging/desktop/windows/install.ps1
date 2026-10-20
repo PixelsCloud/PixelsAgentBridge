@@ -1,9 +1,9 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$ControlUrl,
+    [AllowEmptyString()]
+    [string]$ControlUrl = '',
 
-    [Parameter(Mandatory = $true)]
-    [string]$RelayUrl,
+    [AllowEmptyString()]
+    [string]$RelayUrl = '',
 
     [string]$InstallRoot,
     [string]$InstallerLogPath
@@ -180,10 +180,11 @@ function Stop-PabRuntimeProcesses {
 }
 
 Set-PabInstallerStage 'validate_inputs'
-if (-not $ControlUrl.StartsWith('wss://')) {
+if ([bool]$ControlUrl -ne [bool]$RelayUrl) { throw 'Fill in both server URLs, or leave both empty' }
+if ($ControlUrl -and -not $ControlUrl.StartsWith('wss://')) {
     throw 'ControlUrl must use wss://'
 }
-if (-not $RelayUrl.StartsWith('https://')) {
+if ($RelayUrl -and -not $RelayUrl.StartsWith('https://')) {
     throw 'RelayUrl must use https://'
 }
 Set-PabInstallerStage 'check_administrator'
@@ -202,7 +203,8 @@ Set-PabInstallerStage 'validate_package'
 $requiredFiles = @(
     'pab-mcp.exe', 'pab-executor.exe', 'pab-desktop.exe', 'pab-document-worker.exe',
     'browser-runtime.zip', 'document-runtime.zip',
-    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'installer-logging.ps1'
+    'run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1',
+    'installer-logging.ps1', 'THIRD-PARTY-NOTICES.txt'
 )
 foreach ($name in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $name) -PathType Leaf)) {
@@ -352,7 +354,7 @@ foreach ($obsolete in @('run-ui.ps1', 'run-device-ui.ps1', 'run-executor.ps1', '
         Remove-Item -LiteralPath $path -Force
     }
 }
-foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'installer-logging.ps1')) {
+foreach ($name in @('run-app.ps1', 'launch-app.ps1', 'run-session-supervisor.ps1', 'uninstall.ps1', 'installer-logging.ps1', 'THIRD-PARTY-NOTICES.txt')) {
     Copy-Item -LiteralPath (Join-Path $source $name) -Destination $InstallRoot -Force
 }
 

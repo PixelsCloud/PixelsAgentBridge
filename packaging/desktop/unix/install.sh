@@ -8,10 +8,12 @@ if [[ ${1:-} == --no-service ]]; then mode=manual; shift; fi
 [[ $(uname -s) == Linux ]] || { echo 'This package requires Linux' >&2; exit 2; }
 install_dir=/opt/pixels-agent-bridge
 config_file=/etc/pixels-agent-bridge/config.toml
-control_url=${1:-wss://pab.rgaa.vip/control}
-relay_url=${2:-https://pab-relay.rgaa.vip}
-[[ $control_url == wss://?* ]] || { echo 'Control URL must use wss://' >&2; exit 2; }
-[[ $relay_url == https://?* ]] || { echo 'Relay URL must use https://' >&2; exit 2; }
+control_url=${1:-}
+relay_url=${2:-}
+if [[ -n $control_url || -n $relay_url ]]; then
+    [[ $control_url == wss://?* ]] || { echo 'Control URL must use wss://' >&2; exit 2; }
+    [[ $relay_url == https://?* ]] || { echo 'Relay URL must use https://' >&2; exit 2; }
+fi
 source_dir=$(cd "$(dirname "$0")" && pwd)
 unit=pixels-agent-bridge-executor.service
 for name in pab-mcp pab-executor pab-document-worker document-runtime-linux.tar.gz run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh INSTALL-LINUX.txt; do
@@ -27,6 +29,10 @@ tar -tzf "$source_dir/document-runtime-linux.tar.gz" | grep -Fx 'document-runtim
 install -d -m 755 /etc/pixels-agent-bridge
 "$source_dir/pab-executor" configure --config "$config_file" --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
 chmod 644 "$config_file"
+if has_systemd && systemctl cat pixels-agent-bridge-media.service >/dev/null 2>&1; then
+    # This archive removes the graphical binary; retire its companion first.
+    systemctl disable --now pixels-agent-bridge-media.service
+fi
 if has_systemd && systemctl cat "$unit" >/dev/null 2>&1; then
     systemctl stop "$unit"
     if [[ $mode == manual ]]; then systemctl disable "$unit"; fi
@@ -39,6 +45,7 @@ for name in pab-mcp pab-executor pab-document-worker run-mcp.sh run-executor.sh 
     install -m 755 "$source_dir/$name" "$install_dir/$name"
 done
 install -m 644 "$source_dir/INSTALL-LINUX.txt" "$install_dir/INSTALL-LINUX.txt"
+if [[ -f $source_dir/THIRD-PARTY-NOTICES.txt ]]; then install -m 644 "$source_dir/THIRD-PARTY-NOTICES.txt" "$install_dir/THIRD-PARTY-NOTICES.txt"; fi
 if [[ -f $source_dir/release.json ]]; then install -m 644 "$source_dir/release.json" "$install_dir/release.json"; fi
 if [[ -f $install_dir/settings.env ]]; then mv -n -- "$install_dir/settings.env" "$install_dir/settings.env.migrated"; fi
 # Remove only obsolete product entry points. Persistent device/user data is retained.

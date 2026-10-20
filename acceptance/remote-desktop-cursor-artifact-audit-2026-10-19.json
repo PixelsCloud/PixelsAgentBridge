@@ -1,0 +1,375 @@
+{
+  "date_local": "2026-10-19",
+  "base": "5f4e3f3 plus cursor error logging",
+  "local_desktop_sha256": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+  "remote_desktop_sha256": "6f07fed21ad2bc7d706c6d21985759e162dd6f4537d36ccc529c3154c54537f9",
+  "old_executor": {
+    "sha256": "f788fe26e6cfcccc0b34e55527934d1283a8abf65773c031243cf79df279d8c1",
+    "contains_cursor_schema_field": false,
+    "contains_cursor_helper_registration": false
+  },
+  "diagnostic": [
+    {
+      "name": "initial",
+      "value": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "8c151133-08dc-412d-967c-adc8a951aa83",
+            "generation": 1,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "portrait",
+      "value": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "8c151133-08dc-412d-967c-adc8a951aa83",
+            "generation": 2,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": false,
+        "decoder": "d3d11_hardware"
+      }
+    },
+    {
+      "name": "remote_cursor",
+      "value": {
+        "ctrl_held": false,
+        "left_held": false,
+        "cursor_known": true,
+        "cursor_flags": 1,
+        "cursor_shape": true,
+        "cursor_x": -756,
+        "cursor_y": 575,
+        "screens": [
+          {
+            "index": 0,
+            "visible": true,
+            "x": -1080,
+            "y": 0,
+            "width": 1080,
+            "height": 1920,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          },
+          {
+            "index": 1,
+            "visible": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "clicks": 0,
+            "ups": 0,
+            "last_x": -1,
+            "last_y": -1,
+            "ctrl_down": 0,
+            "ctrl_up": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "picture",
+      "value": {
+        "path": "D:\\GoCloud\\PixelsAgentBridge-remote-desktop\\.build\\remote-desktop\\dual-screen-product-9a9527a937c6\\portrait-window-1792339991090469300.png",
+        "colors": [
+          {
+            "x": 680,
+            "y": 258,
+            "rgb": [
+              179,
+              40,
+              40
+            ]
+          },
+          {
+            "x": 969,
+            "y": 258,
+            "rgb": [
+              39,
+              180,
+              40
+            ]
+          },
+          {
+            "x": 680,
+            "y": 773,
+            "rgb": [
+              39,
+              40,
+              179
+            ]
+          },
+          {
+            "x": 969,
+            "y": 773,
+            "rgb": [
+              181,
+              180,
+              41
+            ]
+          }
+        ],
+        "client_width": 1650,
+        "client_height": 1032,
+        "capture_method": "owned-window"
+      }
+    },
+    {
+      "name": "status",
+      "value": {
+        "phase": "viewing",
+        "error": null,
+        "opened": {
+          "config": {
+            "session_id": "8c151133-08dc-412d-967c-adc8a951aa83",
+            "generation": 2,
+            "screen": {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            },
+            "codec": "h264_annex_b",
+            "color": "bt709_limited",
+            "fps": 15
+          },
+          "screens": [
+            {
+              "id": "0:81493:\\\\.\\DISPLAY1",
+              "name": "\\\\.\\DISPLAY1",
+              "x": 0,
+              "y": 0,
+              "desktop_width": 1920,
+              "desktop_height": 1080,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "identity",
+              "primary": true
+            },
+            {
+              "id": "0:81493:\\\\.\\DISPLAY47",
+              "name": "\\\\.\\DISPLAY47",
+              "x": -1080,
+              "y": 0,
+              "desktop_width": 1080,
+              "desktop_height": 1920,
+              "pixel_width": 1920,
+              "pixel_height": 1080,
+              "scale_milli": 1000,
+              "rotation": "clockwise90",
+              "primary": false
+            }
+          ],
+          "heartbeat_ms": 5000,
+          "lease_ms": 15000,
+          "input_supported": true
+        },
+        "input_ready": true,
+        "frame_ready": true,
+        "input_enabled": true,
+        "decoder": "d3d11_hardware"
+      }
+    }
+  ],
+  "capture_proxy_crash": {
+    "old_processes": [
+      {
+        "ProcessId": 14084,
+        "ParentProcessId": 28200,
+        "SessionId": 2,
+        "CreationDate": "/Date(1792340007730)/"
+      },
+      {
+        "ProcessId": 28684,
+        "ParentProcessId": 14084,
+        "SessionId": 2,
+        "CreationDate": "/Date(1792340007748)/"
+      }
+    ],
+    "old_processes_reaped": true,
+    "terminated_only_proxy": true
+  },
+  "after_crash_observation": {
+    "session_id": "ce53f005-fe7c-40e2-bfba-946ee3ee37ac",
+    "generation": 1,
+    "phase": "viewing",
+    "frame_ready": true,
+    "input_ready": true,
+    "input_enabled": false,
+    "screen_x": -1080,
+    "decoder": "d3d11_hardware"
+  },
+  "restored": {
+    "service": "Running",
+    "restored": true,
+    "held_release_flags": 0,
+    "owned": [],
+    "tasks": [
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-fixture",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-foreman",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-helper",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-lease2",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-pattern",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-restore",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-95e475aa31b9-twoscreen2",
+        "State": 3
+      }
+    ],
+    "errors": {}
+  },
+  "cleaned": true,
+  "local_driver_exit": 0,
+  "hashes": {
+    "lease2.stdout": "1f80cb99f130b6b4e695bb253720fd332599449bfa1e143723bb82724baf1f71",
+    "lease2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "twoscreen2.stdout": "be2c8b156c6db61d74aeffe09193c818691af1b6dfa5c06606fd27cc9bf41487",
+    "twoscreen2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "diagnostic_build": {
+    "desktop": "passed",
+    "first_test_filter": "matched zero; not counted",
+    "corrected_test_filter": "local_ipc::media::tests::cursor_tests",
+    "tests_passed": 5
+  },
+  "conclusion": "The staged Executor predates independent cursor support. Its binary has neither cursor capability nor helper registration marker. The staged Desktop also remained the previous user-capture build while the local viewer had new diagnostics. No native source error was recorded; matched-artifact retest required.",
+  "action": "Staging now selects desktop-check/debug for all three executables, rejects an Executor missing cursor markers, requires equal local/remote Desktop SHA256, and records an artifact manifest. Building current Executor before another round."
+}

@@ -147,6 +147,31 @@ impl PreparedUser {
         args: &[OsString],
         cwd: &Path,
     ) -> io::Result<UserProcess> {
+        self.spawn_configured(executable, args, cwd, |_| Ok(()))
+    }
+    #[cfg(target_os = "linux")]
+    pub fn spawn_linux_media(&self, executable: &Path, args: &[OsString],
+                            target: &super::LinuxMediaEnvironment, data: &Path, port: u16) -> io::Result<UserProcess> {
+        // Captured before fork. Set parent-death handling AFTER setuid because
+        // changing credentials clears PR_SET_PDEATHSIG on Linux.
+        let parent = unsafe { libc::getpid() };
+        self.spawn_configured(executable, args, &self.account.identity.home, |command| {
+            command.envs(target.values()).env("PATH", "/usr/local/bin:/usr/bin:/bin")
+                .env("PAB_DATA_DIR", data).env("PAB_LOCAL_IPC_PORT", port.to_string());
+            unsafe {
+                command.pre_exec(move || {
+                    if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                    if libc::getppid() != parent { return Err(io::Error::from_raw_os_error(libc::ESRCH)); }
+                    Ok(())
+                });
+            }
+            Ok(())
+        })
+    }
+    fn spawn_configured(&self, executable: &Path, args: &[OsString], cwd: &Path,
+                        configure: impl FnOnce(&mut Command) -> io::Result<()>) -> io::Result<UserProcess> {
         if lookup(self.account.uid)? != self.account || groups(&self.account)? != self.groups {
             return Err(io::Error::other(
                 "execution account changed; resolve a fresh context",
@@ -230,6 +255,7 @@ impl PreparedUser {
         }
         // chdir happens in the hook AFTER dropping privileges. A root-only cwd
         // must fail, even if the service itself can traverse that directory.
+        configure(&mut command)?;
         command.spawn().map(|child| UserProcess {
             child,
             exited: false,
@@ -253,13 +279,80 @@ pub(super) fn process_user_identity(pid: u32) -> io::Result<UserIdentity> {
         identity.session_id = Some(token[6]);
         Ok(identity)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        use std::io::Read;
+        let mut status = String::new();
+        std::fs::File::open(format!("/proc/{pid}/status"))?
+            .take(65537)
+            .read_to_string(&mut status)?;
+        if status.len() > 65536 {
+            return Err(io::Error::other("process status exceeds limit"));
+        }
+        let (uid, gid) = linux_effective_credentials(&status)?;
+        let mut identity = lookup(uid)?.identity;
+        identity.primary_group = Some(gid);
+        // A POSIX process session is not a logind graphical session. The media
+        // route observes logind separately; never invent a numeric desktop ID.
+        Ok(identity)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         let _ = pid;
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "desktop helper observation is unavailable on the headless product",
         ))
+    }
+}
+#[cfg(target_os = "linux")]
+fn linux_effective_credentials(status: &str) -> io::Result<(u32, u32)> {
+    fn field(status: &str, name: &str) -> io::Result<u32> {
+        let mut found = status.lines().filter_map(|line| line.strip_prefix(name));
+        let line = found
+            .next()
+            .ok_or_else(|| io::Error::other("missing process credentials"))?;
+        if found.next().is_some() {
+            return Err(io::Error::other("duplicate process credentials"));
+        }
+        let fields = line
+            .split_whitespace()
+            .map(str::parse::<u32>)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| io::Error::other("invalid process credentials"))?;
+        if fields.len() != 4 {
+            return Err(io::Error::other("invalid process credentials"));
+        }
+        Ok(fields[1])
+    }
+    Ok((field(status, "Uid:")?, field(status, "Gid:")?))
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod linux_identity_tests {
+    use super::*;
+    #[test]
+    fn effective_credentials_are_kernel_fields_not_real_or_saved_ids() {
+        assert_eq!(
+            linux_effective_credentials("Name:\tworker\nUid:\t1 1000 2 3\nGid:\t4 1001 5 6\n")
+                .unwrap(),
+            (1000, 1001)
+        );
+        for bad in [
+            "Uid: 1 2 3\nGid: 1 2 3 4",
+            "Uid: 1 2 3 4\nUid: 1 2 3 4\nGid: 1 2 3 4",
+            "Uid: 1 nope 3 4\nGid: 1 2 3 4",
+            "Uid: 1 2 3 4\n",
+        ] {
+            assert!(linux_effective_credentials(bad).is_err());
+        }
+    }
+    #[test]
+    fn live_process_identity_matches_effective_account_without_faking_session() {
+        let observed = super::super::process_user_identity(std::process::id()).unwrap();
+        assert_eq!(observed, current_identity().unwrap());
+        assert!(observed.session_id.is_none());
+        assert!(super::super::process_user_identity(u32::MAX).is_err());
     }
 }
 pub(super) struct UserProcess {

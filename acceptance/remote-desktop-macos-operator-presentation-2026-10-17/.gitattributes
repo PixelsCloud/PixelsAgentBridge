@@ -1,0 +1,2 @@
+# Preserve downloaded report bytes for the recorded SHA-256 values.
+*.json -text

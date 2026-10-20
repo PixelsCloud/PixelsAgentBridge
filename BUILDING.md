@@ -2,6 +2,12 @@
 
 需要 Python 3.11+、项目固定版本的 Rust，以及对应目标所需的 Node/npm、NSIS 或 Docker。先在需要构建的 `apps/desktop`、`apps/web` 目录执行 `npm ci`。
 
+远程桌面内置的软件 H.264 编解码由源码编译。Windows x86/x64、macOS Intel
+及 Linux x86/x64 构建还需要 NASM；启动 Cargo 前确认 `nasm -v` 可用。
+Linux 构建镜像已经包含它，macOS 仅构建 ARM 不需要 NASM。曾经在缺少 NASM
+的环境中编译过 `openh264-sys2` 时，应在自己的构建缓存中重新编译该依赖，
+避免复用禁用了 SIMD 的旧产物。NASM 和编译器不随安装包交付，客户无需安装。
+
 macOS PKG 打包需要 Python 3.12+。Mac 的便捷入口会选取可用的 Python 3.12+ 并补齐 Homebrew 工具路径，避免使用系统 Python 3.9。
 
 ## 版本规则

@@ -10,7 +10,9 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 import build_macos_pkg as pkg
@@ -61,17 +63,23 @@ class Installer(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 pkg.checked_url(value, "wss")
 
-    @unittest.skipUnless(Path("/bin/bash").is_file(), "POSIX shell validation runs on macOS/Linux")
-    def test_generated_configuration_is_shell_quoted(self):
+    def test_generated_configuration_is_toml_data_not_shell(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)
             value = "wss://example.test/control?a='x'&b=$(false)"
-            pkg.prepare_scripts(path, "arm64", value, pkg.RELAY_URL)
+            with patch.object(pkg.subprocess, 'run'):
+                pkg.prepare_scripts(path, "arm64", value, "https://relay.test")
             for name in ("preinstall", "postinstall"):
                 self.assertNotIn(b"\r\n", (path / name).read_bytes())
-            self.assertNotIn("DEPLOYMENT", (path / "package.env").read_text())
-            result = subprocess.check_output(["/bin/bash", "-c", 'source "$1"; printf "%s" "$PAB_CONTROL_URL"', "test", str(path / "package.env")], text=True)
-            self.assertEqual(result, value)
+            self.assertFalse((path / 'package.env').exists())
+            config = tomllib.loads((path / 'package.toml').read_text())
+            self.assertEqual(config, {'control_url': value, 'relay_urls': ['https://relay.test']})
+            self.assertNotIn('source "$package_dir/package', (path / 'postinstall').read_text(encoding='utf-8'))
+            with patch.object(pkg.subprocess, 'run'):
+                pkg.prepare_scripts(path, 'arm64', '', '')
+            self.assertEqual(tomllib.loads((path / 'package.toml').read_text()), {'control_url':'', 'relay_urls':[]})
+            with self.assertRaises(ValueError):
+                pkg.prepare_scripts(path, 'arm64', value, '')
 
     def test_unsafe_incomplete_and_tampered_archives_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -99,7 +107,7 @@ class Installer(unittest.TestCase):
             (root / 'payload').mkdir()
             shutil.copyfile(pkg.SCRIPTS / 'pkg/postinstall', root / 'postinstall')
             (root / 'preinstall').write_text('#!/bin/bash\nexit 0\n')
-            (root / 'package.env').write_text('PAB_CONTROL_URL=wss://example.test\nPAB_RELAY_URL=https://example.test\n')
+            (root / 'package.toml').write_text('control_url="wss://example.test"\nrelay_urls=["https://example.test"]\n')
             # Capture the GUI boundary instead of opening a real alert in a test.
             (root / 'failure-dialog.sh').write_text('pab_report_failure() { printf "%s" "$1" > "$package_dir/displayed-message"; }\n')
             (root / 'payload/install.sh').write_text('#!/bin/bash\necho "Could not replace test application: permission denied" >&2\nexit 23\n')
@@ -137,7 +145,7 @@ class Installer(unittest.TestCase):
             distribution = ET.parse(expanded / "Distribution").getroot()
             self.assertEqual(distribution.find("domains").attrib["enable_anywhere"], "false")
             self.assertEqual(distribution.find("options").attrib["require-scripts"], "true")
-            configs = list(expanded.rglob("package.env"))
+            configs = list(expanded.rglob("package.toml"))
             self.assertEqual(len(configs), 1)
             self.assertNotIn("DEPLOYMENT", configs[0].read_text())
             self.assertTrue((configs[0].parent / 'failure-dialog.applescript').is_file())
@@ -145,7 +153,7 @@ class Installer(unittest.TestCase):
             welcome = next(expanded.rglob('Welcome.html')).read_text()
             self.assertIn('自动关闭旧版', welcome)
             self.assertNotIn('Quit Desktop and MCP clients first', welcome)
-            self.assertIn(pkg.CONTROL_URL, configs[0].read_text())
+            self.assertEqual(tomllib.loads(configs[0].read_text())['control_url'],pkg.CONTROL_URL)
             self.assertTrue((configs[0].parent / "payload" / pkg.APP / "Contents/MacOS/pab-desktop").is_file())
             pkg.verify_binaries(configs[0].parent / "payload", "arm64" if arch == "aarch64" else "x86_64")
             app_payload = configs[0].parent / "payload" / pkg.APP

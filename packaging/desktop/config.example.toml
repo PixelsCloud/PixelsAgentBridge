@@ -1,7 +1,9 @@
 # Installed application configuration (Windows, macOS and Linux).
 # Relative paths below are resolved from this file's directory.
-control_url = "wss://pab.rgaa.vip/control"
-relay_urls = ["https://pab-relay.rgaa.vip"]
+# An empty pair uses the private compiled defaults, if provided at build time.
+# Customer URLs here take priority. Restart the service and Desktop/MCP after edits.
+control_url = ""
+relay_urls = []
 # control_ca_cert = "certificates/control-ca.pem"
 # relay_ca_cert = "certificates/relay-ca.pem"
 

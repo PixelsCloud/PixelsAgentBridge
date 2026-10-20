@@ -23,6 +23,8 @@ class LinuxPackage(TestCase):
             package = root / 'packaging/desktop'
             shutil.copytree(ROOT / 'packaging/desktop/unix', package / 'unix')
             shutil.copy2(ROOT / 'packaging/desktop/build.py', package)
+            (package / 'windows').mkdir()
+            shutil.copy2(ROOT / 'packaging/desktop/windows/THIRD-PARTY-NOTICES.txt', package / 'windows')
             binaries = root / '.build/guest-desktop-linux-debug'
             binaries.mkdir(parents=True)
             files = {}
@@ -45,6 +47,7 @@ class LinuxPackage(TestCase):
                     'pab-mcp', 'pab-executor', 'pab-document-worker',
                     'document-runtime-linux.tar.gz', 'install.sh', 'uninstall.sh',
                     'lifecycle.sh', 'run-mcp.sh', 'run-executor.sh', 'INSTALL-LINUX.txt', 'release.json',
+                    'THIRD-PARTY-NOTICES.txt',
                 })
                 for info in tar:
                     self.assertEqual(info.mode, 0o644 if info.name.endswith(('.txt', '.json')) else 0o755)

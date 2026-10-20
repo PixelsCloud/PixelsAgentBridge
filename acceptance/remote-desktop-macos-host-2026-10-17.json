@@ -1,0 +1,224 @@
+{
+  "date": "2026-10-17",
+  "platform": "macOS 27.0.1 arm64 / Apple M4",
+  "product_acceptance_complete": false,
+  "desktop_release": {
+    "exit_code": 0,
+    "jobs": 2,
+    "bytes": 23427792,
+    "sha256": "9545920c09d4a1444c4335ded413ff64d0db0abab116a6f7524a9789d2795e0a"
+  },
+  "media_release_tests": {
+    "windows_passed": 11,
+    "macos_passed": 11
+  },
+  "local_view_input": {
+    "checks": 36,
+    "system_input_posted": false,
+    "source_sha256": "3ea8c8cd655e1c72cfb8688d4736ace1721e94572421922da4dbc8d86020e402"
+  },
+  "lifecycle_recheck": [
+    {
+      "source": "synthetic-15",
+      "rotation": 0,
+      "verify": true,
+      "decoder": "hardware",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=43.482 render_ms=3.925 drawable_ms=9.206 gpu_wait_ms=16.054 draws=10 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 0,
+      "verify": true,
+      "decoder": "software",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=5.773 render_ms=4.636 drawable_ms=10.664 gpu_wait_ms=17.263 draws=10 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 90,
+      "verify": true,
+      "decoder": "hardware",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=40.779 render_ms=3.648 drawable_ms=10.932 gpu_wait_ms=14.431 draws=9 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 90,
+      "verify": true,
+      "decoder": "software",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=4.806 render_ms=4.012 drawable_ms=9.624 gpu_wait_ms=19.644 draws=10 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 180,
+      "verify": true,
+      "decoder": "hardware",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=41.017 render_ms=3.761 drawable_ms=10.025 gpu_wait_ms=17.871 draws=10 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 180,
+      "verify": true,
+      "decoder": "software",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=4.691 render_ms=3.880 drawable_ms=11.053 gpu_wait_ms=16.811 draws=10 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 270,
+      "verify": true,
+      "decoder": "hardware",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=41.634 render_ms=3.751 drawable_ms=10.901 gpu_wait_ms=14.970 draws=9 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    },
+    {
+      "source": "synthetic-15",
+      "rotation": 270,
+      "verify": true,
+      "decoder": "software",
+      "lifecycle": true,
+      "size": [
+        1920,
+        1080
+      ],
+      "target_fps": 15,
+      "passed": true,
+      "fixture_sha256": "c55dfe3af0117dd2969325396d3c8588fb33bd494417a1e76bcabcdbb4e0a2ed",
+      "display_fps": null,
+      "summary": {
+        "displayed": 1,
+        "checks": 16,
+        "max_rgb_error": 1
+      },
+      "stderr": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1\nmedia lifecycle=resize_minimize_restore_close_passed static_display_count=1\nmedia decode_ms=5.083 render_ms=4.197 drawable_ms=11.268 gpu_wait_ms=18.153 draws=9 frames=1\n",
+      "worker_sha256": "6defa4fc148a986a283792fc27a11e66ce8bd7d107e481bbe22a4ddaf42acfac"
+    }
+  ],
+  "first_lifecycle_attempt": {
+    "passed": false,
+    "reason": "Active display count was zero during display sleep; old worker also failed. Passed after bounded display wake in foreground GUI bootstrap."
+  },
+  "gui_startup": {
+    "isolated_toml_and_profile": true,
+    "visible_product_windows": 1,
+    "remote_media_not_tested": true,
+    "owned_process_retired": true
+  },
+  "limits": [
+    "Real network product viewer and input pending",
+    "IME/Retina/mixed DPI pending",
+    "Capture permissions and macOS login pending",
+    "Native decode runs in-process; a hung driver cannot be forcibly retired"
+  ],
+  "final_artifact_checks": {
+    "sck_framework_weak": true,
+    "owned_native_processes": []
+  },
+  "windows_desktop_check": {
+    "exit_code": 0,
+    "jobs": 2,
+    "profile": "dev",
+    "locked": true
+  }
+}

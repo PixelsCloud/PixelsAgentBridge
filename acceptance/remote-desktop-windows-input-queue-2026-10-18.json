@@ -1,0 +1,2027 @@
+{
+  "date": "2026-10-18",
+  "product_baseline": "ab879d1",
+  "device": "90",
+  "session_id": "2",
+  "product_changed": false,
+  "product_issue_resolved": false,
+  "build": {
+    "jobs": 1,
+    "affinity_cores": 1,
+    "builds_sequential": true,
+    "build_count": 3,
+    "shared_source_from_git_head": true,
+    "final_sources": {
+      "windows_control_fixture.cpp": "fe51d01b621308d950b0582c8cd560658202e3aa08be41be89342a2f6ecf2b9d",
+      "windows_input_trace.cpp": "42829826b2ed360564f9f6b5bdb70259801ca4f8c74541712c379989fc276dc9"
+    },
+    "binary_sha256": "ba069d512d8648573cd278313c543f5ad69610fd130c4e5722041ec92aab9329"
+  },
+  "findings": [
+    "Extra first DOWN/DBLCLK already appears in separate PeekMessage PM_REMOVE results; callbacks each match a separate dispatched message.",
+    "Independent sender processes reproduce the initial single/double/drag failure, excluding self-process injection as a necessary trigger.",
+    "Initializing only the owned target thread active window with SetActiveWindow (no warmup click and unchanged foreground) restores single/double/drag sequences, including external sender processes.",
+    "SetActiveWindow(nullptr) attempt did not clear GetActiveWindow in the active-reset case; that case cannot prove behavior after clearing thread active state."
+  ],
+  "rounds": [
+    {
+      "private_report": "control-90-ff9131e26e5a/report.json",
+      "report_sha256": "b1f6794ee6a828229ba906b6fe5aa139c3fe2cadcbd6db689b8cf110500d3020",
+      "binary_sha256": "f03e961844abf930c769dce0eaf77e3071f12a43243651249aa2d278456b3bf4",
+      "trace_source_sha256": "6dbf5850cbe3b5ac06bf1ea6d9011e8f362a624fbfb602704fc99b6d959e140f",
+      "cases": [
+        {
+          "mode": "button-self",
+          "task_id": "1b98263d-87bd-4bfa-93f6-dfd8e8b59f44",
+          "state": "failed",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220601125,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220601125,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220601187,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220601125,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220601125,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220601187,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 29342
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 31374
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 33794
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 52735
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "doubleclick-self",
+          "task_id": "d830f517-12dc-46e8-b424-cea8c01e0433",
+          "state": "failed",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 2,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 3,
+            "drag_ends": 2,
+            "held_moves": 1,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220606343,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220606343,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220606406,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 7,
+              "message": 513,
+              "time": 220606468,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 9,
+              "message": 514,
+              "time": 220606515,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220606343,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220606343,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220606406,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 8,
+              "message": 513,
+              "time": 220606468,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 10,
+              "message": 514,
+              "time": 220606515,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 29342
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 31374
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 33794
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 52735
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "noactivate-button-self",
+          "task_id": "8696d98a-a205-4e83-bf9b-8318e698b7a6",
+          "state": "succeeded",
+          "result": {
+            "mode": "noactivate-button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220611531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220611578,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220611531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220611578,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 29342
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 31374
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 33794
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 52735
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        }
+      ],
+      "cleanup": {
+        "temporary_executable_removed": true,
+        "service_unchanged": true,
+        "service_before": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        },
+        "service_after": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        }
+      }
+    },
+    {
+      "private_report": "control-90-54ecd92ec4f2/report.json",
+      "report_sha256": "5ec4b6552b93fa4e0fc3fa83926ed28fc667c18a400b828d8283b8f86bbe2542",
+      "binary_sha256": "bb5d69a99d308dd34f950008068d12f9e5eba563fb5816e862b9765cb60f4d03",
+      "trace_source_sha256": "dea63d0f9ca3c40722619943c51ed64e0f44a3c510ea7dc917cdbb7652d920dd",
+      "cases": [
+        {
+          "mode": "external-button-self",
+          "task_id": "f892bb59-1e64-4b8d-8c67-de42852f6be3",
+          "state": "failed",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220676312,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220676312,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220676390,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220676312,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220676312,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220676390,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36158
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41694
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32354
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 43990
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 61679
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "external-doubleclick-self",
+          "task_id": "e6c9893d-40b8-41b7-8e4b-5769e7a960d0",
+          "state": "failed",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 2,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 3,
+            "drag_ends": 2,
+            "held_moves": 1,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220681531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220681531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220681609,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 7,
+              "message": 513,
+              "time": 220681687,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 9,
+              "message": 514,
+              "time": 220681750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220681531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220681531,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220681609,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 8,
+              "message": 513,
+              "time": 220681687,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 10,
+              "message": 514,
+              "time": 220681750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36158
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41694
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32354
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 43990
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 61679
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "external-drag-self",
+          "task_id": "bedb4d52-47b8-4713-b26c-62351452fb29",
+          "state": "failed",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 1,
+            "held_moves": 6,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220686750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220686750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220687062,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220686750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220686750,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220687062,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36158
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41694
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32354
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 43990
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 61679
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        }
+      ],
+      "cleanup": {
+        "temporary_executable_removed": true,
+        "service_unchanged": true,
+        "service_before": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        },
+        "service_after": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        }
+      }
+    },
+    {
+      "private_report": "control-90-b16ae20b8739/report.json",
+      "report_sha256": "5c64327259d53d60deaf255d175c5215fe8208b0228cfc990e96af8a99d75c88",
+      "binary_sha256": "ba069d512d8648573cd278313c543f5ad69610fd130c4e5722041ec92aab9329",
+      "trace_source_sha256": "42829826b2ed360564f9f6b5bdb70259801ca4f8c74541712c379989fc276dc9",
+      "cases": [
+        {
+          "mode": "active-only-button-self",
+          "task_id": "855bacec-ae1a-4123-a8cc-1f14db1997ee",
+          "state": "succeeded",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [
+            {
+              "active_setup": true,
+              "reset": false,
+              "thread_active_own": true,
+              "foreground_unchanged": true,
+              "foreground_own": false
+            }
+          ],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220766359,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220766421,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220766359,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220766421,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "active-reset-button-self",
+          "task_id": "f78cffc6-b549-4654-95fe-48c5672455ae",
+          "state": "succeeded",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [
+            {
+              "active_setup": true,
+              "reset": true,
+              "thread_active_own": true,
+              "foreground_unchanged": true,
+              "foreground_own": false
+            }
+          ],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220771593,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220771656,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220771593,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220771656,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "external-active-only-button-self",
+          "task_id": "2ab2d87e-bc1c-45c2-abb5-879026fa0fc0",
+          "state": "succeeded",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [
+            {
+              "active_setup": true,
+              "reset": false,
+              "thread_active_own": true,
+              "foreground_unchanged": true,
+              "foreground_own": false
+            }
+          ],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220776843,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220776921,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220776843,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220776921,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        }
+      ],
+      "cleanup": {
+        "temporary_executable_removed": true,
+        "service_unchanged": true,
+        "service_before": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        },
+        "service_after": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        }
+      }
+    },
+    {
+      "private_report": "control-90-ee2a2ef052b0/report.json",
+      "report_sha256": "5ea75971c5d73fc0d2823e9cfd57429eec29abfec0f3f595073abc6f2e2235a1",
+      "binary_sha256": "ba069d512d8648573cd278313c543f5ad69610fd130c4e5722041ec92aab9329",
+      "trace_source_sha256": "42829826b2ed360564f9f6b5bdb70259801ca4f8c74541712c379989fc276dc9",
+      "cases": [
+        {
+          "mode": "external-doubleclick-self",
+          "task_id": "0f84537c-ba15-42f4-bb3d-d5aa77409499",
+          "state": "failed",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 2,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 3,
+            "drag_ends": 2,
+            "held_moves": 1,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "setup": [],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220820734,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 515,
+              "time": 220820734,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 514,
+              "time": 220820796,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 7,
+              "message": 513,
+              "time": 220820875,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 9,
+              "message": 514,
+              "time": 220820953,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220820734,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 515,
+              "time": 220820734,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 514,
+              "time": 220820796,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 8,
+              "message": 513,
+              "time": 220820875,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 10,
+              "message": 514,
+              "time": 220820953,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "external-active-only-doubleclick-self",
+          "task_id": "7a2f088b-f585-4b07-b0a9-95c52ec1e6e2",
+          "state": "succeeded",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 2,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [
+            {
+              "active_setup": true,
+              "reset": false,
+              "thread_active_own": true,
+              "foreground_unchanged": true,
+              "foreground_own": false
+            }
+          ],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220825953,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220826015,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 5,
+              "message": 515,
+              "time": 220826093,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 7,
+              "message": 514,
+              "time": 220826171,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220825953,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220826015,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 6,
+              "message": 515,
+              "time": 220826093,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 515,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 8,
+              "message": 514,
+              "time": 220826171,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        },
+        {
+          "mode": "external-active-only-drag-self",
+          "task_id": "1c72526a-e73e-4d58-b5ab-4d5b10c0d1cb",
+          "state": "succeeded",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 1,
+            "drag_ends": 1,
+            "held_moves": 5,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "setup": [
+            {
+              "active_setup": true,
+              "reset": false,
+              "thread_active_own": true,
+              "foreground_unchanged": true,
+              "foreground_own": false
+            }
+          ],
+          "removed_messages": [
+            {
+              "trace": "removed",
+              "sequence": 1,
+              "message": 513,
+              "time": 220831140,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "removed",
+              "sequence": 3,
+              "message": 514,
+              "time": 220831468,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 0,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "callbacks": [
+            {
+              "trace": "callback",
+              "sequence": 2,
+              "message": 513,
+              "time": 220831140,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 513,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            },
+            {
+              "trace": "callback",
+              "sequence": 4,
+              "message": 514,
+              "time": 220831468,
+              "extra": 1346454083,
+              "retrieving": false,
+              "dispatching": 514,
+              "sent_flags": 0,
+              "source_ok": true,
+              "device_type": 2,
+              "origin": 2
+            }
+          ],
+          "unique_callback_stacks": [
+            [
+              {
+                "module": "owned-fixture.exe",
+                "offset": 36462
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 41998
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 65673
+              },
+              {
+                "module": "USER32.dll",
+                "offset": 64002
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 32642
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 44730
+              },
+              {
+                "module": "owned-fixture.exe",
+                "offset": 62415
+              },
+              {
+                "module": "KERNEL32.DLL",
+                "offset": 85168
+              },
+              {
+                "module": "ntdll.dll",
+                "offset": 519627
+              }
+            ]
+          ]
+        }
+      ],
+      "cleanup": {
+        "temporary_executable_removed": true,
+        "service_unchanged": true,
+        "service_before": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        },
+        "service_after": {
+          "State": "Running",
+          "PathName": "\"C:\\Program Files\\PixelsAgentBridge\\pab-executor.exe\" --service --config \"C:\\Program Files\\PixelsAgentBridge\\config.toml\"",
+          "ProcessId": 18796
+        }
+      }
+    }
+  ],
+  "limits": [
+    "A queued duplicate is observed, but root cause in OS/drivers/input routing is not established. Callback stacks do not rule out hooks elsewhere.",
+    "The target remains an owned diagnostic window, not an arbitrary external application or a formal network viewer acceptance.",
+    "No change to product input behavior, no forced foreground activation, click filtering, global hook or AttachThreadInput workaround.",
+    "Fresh SW_SHOWNOACTIVATE window with no prior thread active state remains a valid failing boundary, not removed from the acceptance requirements.",
+    "All 12 diagnostics ended without held left button or observed external input; installed services unchanged and four temporary uploads removed."
+  ]
+}

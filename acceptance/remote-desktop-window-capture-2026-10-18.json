@@ -1,0 +1,1886 @@
+{
+  "date": "2026-10-18",
+  "baseline": "a4a58d8",
+  "artifacts": {
+    "pab-desktop.exe": "b12711e819dc0be91e35040c8335c011f63beb68d0a0b3deb982b2e52b28a8a8",
+    "pab-mcp.exe": "f2a76f70dbb5c1947c1e027db530141ee973be239ca43a5b09eef33096b2ce93"
+  },
+  "remote_artifacts": {
+    "pab-desktop": "1432cceda8fd48bcf07c276c3b793903c68703e9e271e446d1d5133d6d9990c4",
+    "pab-executor": "2a3148d65ec71229db6f26736c9305b5cf0ffccbedb8c619a01cf3f9eec9d51c",
+    "manager.py": "7dcfcd589be105c8b70665816a9bee35aaf5a2f6701c65bb49766ce371ba83dc",
+    "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
+  },
+  "interrupted_mixed": {
+    "profile": "mixed-product-55e1ba1c96b1",
+    "sha256": "ac72850299d786286be01fec3cd7bb058420bcdaf6bee55d40bf5684c7f10b9b",
+    "requested_seconds": 1800,
+    "passed": false,
+    "completed_rounds": 16,
+    "fps_min": 14.426633313430827,
+    "fps_max": 14.71322762301808,
+    "fps_mean": 14.587598245174405,
+    "rounds": [
+      {
+        "index": 1,
+        "passed": true,
+        "elapsed": 4.699999408330768e-06,
+        "steady_fps": 14.427381993979484,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 25.562372188139058,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 378404864,
+          "local_handles": 4520,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "elapsed": 30.107165900000837,
+        "steady_fps": 14.713125689417653,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 18.487985685110385,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 379322368,
+          "local_handles": 4598,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 3,
+        "passed": true,
+        "elapsed": 60.19770419999986,
+        "steady_fps": 14.426633313430827,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 22.026544155181217,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 380551168,
+          "local_handles": 4598,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 4,
+        "passed": true,
+        "elapsed": 90.2689586000015,
+        "steady_fps": 14.550521758166992,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 16.87571995392295,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 381308928,
+          "local_handles": 4570,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 5,
+        "passed": true,
+        "elapsed": 120.31330850000086,
+        "steady_fps": 14.56945669953213,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 16.836244960645036,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 385118208,
+          "local_handles": 4571,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 6,
+        "passed": true,
+        "elapsed": 150.4747599000002,
+        "steady_fps": 14.541804215615995,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 16.449386503067483,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 383864832,
+          "local_handles": 4559,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 7,
+        "passed": true,
+        "elapsed": 180.51735960000224,
+        "steady_fps": 14.569316228706661,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 22.54224270348534,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 384864256,
+          "local_handles": 4557,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 8,
+        "passed": true,
+        "elapsed": 210.55627590000222,
+        "steady_fps": 14.56747433457372,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 21.825396825401484,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 386793472,
+          "local_handles": 4552,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 9,
+        "passed": true,
+        "elapsed": 240.61975430000166,
+        "steady_fps": 14.682757429258372,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 25.19941292833897,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 389824512,
+          "local_handles": 4547,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 10,
+        "passed": true,
+        "elapsed": 270.6879205000041,
+        "steady_fps": 14.5695411914355,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 21.544871794871796,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 390930432,
+          "local_handles": 4551,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 11,
+        "passed": true,
+        "elapsed": 300.728814099999,
+        "steady_fps": 14.71322762301808,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 21.121351766513058,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 393199616,
+          "local_handles": 4553,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 12,
+        "passed": true,
+        "elapsed": 330.76328999999896,
+        "steady_fps": 14.54466928887369,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 16.89068100358423,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 394944512,
+          "local_handles": 4570,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 13,
+        "passed": true,
+        "elapsed": 360.8122029999977,
+        "steady_fps": 14.695067295337413,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 15.649001536145997,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 394162176,
+          "local_handles": 4566,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 14,
+        "passed": true,
+        "elapsed": 390.8517660000034,
+        "steady_fps": 14.564047720093404,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 19.169226830517154,
+          "compiler_processes_before": [
+            {
+              "pid": 39420,
+              "name": "cmake.exe"
+            },
+            {
+              "pid": 53916,
+              "name": "cl.exe"
+            },
+            {
+              "pid": 56024,
+              "name": "ninja.exe"
+            }
+          ],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 395821056,
+          "local_handles": 4564,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 15,
+        "passed": true,
+        "elapsed": 420.8712484000025,
+        "steady_fps": 14.709652173857153,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 20.654396727968745,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 397721600,
+          "local_handles": 4542,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 16,
+        "passed": true,
+        "elapsed": 451.0085805000017,
+        "steady_fps": 14.556894967493406,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 22.242787847842738,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 397369344,
+          "local_handles": 4538,
+          "remote_fds": 101
+        }
+      },
+      {
+        "index": 17,
+        "passed": false,
+        "elapsed": 481.09373470000355,
+        "steady_fps": 2.138975848950044,
+        "operations_completed": true,
+        "resources": {
+          "host_busy_percent": 28.13613231552163,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 395460608,
+          "local_handles": 4540,
+          "remote_fds": 101
+        }
+      }
+    ],
+    "failed_sample": {
+      "method": "actual composed native surface, 12-bit generated frame code with complement",
+      "started_unix_ms": 1792323541653,
+      "finished_unix_ms": 1792323551665,
+      "source_dimensions": [
+        1920,
+        1080
+      ],
+      "surface_dimensions": [
+        698,
+        436
+      ],
+      "surface_hwnd": 65738414,
+      "desktop_pid": 39072,
+      "surface_screen_bounds": [
+        31,
+        193,
+        729,
+        629
+      ],
+      "first_invalid_sample": {
+        "elapsed": 4.114839000001666,
+        "bits": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "bgr": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "window_hits": [
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          },
+          {
+            "hwnd": 121570876,
+            "pid": 17988,
+            "class": "Qt6112QWindowOwnDCIcon"
+          }
+        ]
+      },
+      "first_nonmonotonic_sample": null,
+      "failure": null,
+      "seconds": 10.012701900006505,
+      "samples": 591,
+      "invalid_samples": 345,
+      "repeated_samples": 186,
+      "unique_presentations": 60,
+      "warmup_seconds": 3,
+      "steady_fps": 2.138975848950044,
+      "longest_presentation_gap_seconds": 5.934868900003494,
+      "passed": false
+    },
+    "interpretation": "First invalid sample is black and all 32 WindowFromPoint hits belong to a different Qt window; the low reported rate is not a valid unobscured presentation FPS measurement."
+  },
+  "occlusion_controls": [
+    {
+      "sha256": "1145b0c38d73542de811b4656f86a71091c3f2af23ba7df31ac7a2a3fbdb1bec",
+      "case": "window-occlusion-diagnostic.json",
+      "passed": true,
+      "owned_occluder_pid": 5728,
+      "owned_occluder_hwnd": 85071986,
+      "desktop": {
+        "method": "desktop-visible pixels, 12-bit generated frame code with complement",
+        "capture_method": "desktop",
+        "started_unix_ms": 1792323804513,
+        "finished_unix_ms": 1792323814526,
+        "source_dimensions": [
+          1920,
+          1080
+        ],
+        "surface_dimensions": [
+          698,
+          436
+        ],
+        "surface_hwnd": 123344676,
+        "desktop_pid": 39072,
+        "surface_screen_bounds": [
+          31,
+          193,
+          729,
+          629
+        ],
+        "first_invalid_sample": {
+          "elapsed": 0.01359289999527391,
+          "bits": [
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1
+          ],
+          "bgr": [
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ]
+          ],
+          "window_hits": [
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            },
+            {
+              "hwnd": 85071986,
+              "pid": 5728,
+              "class": "Static"
+            }
+          ]
+        },
+        "first_nonmonotonic_sample": null,
+        "failure": null,
+        "seconds": 10.012498099997174,
+        "samples": 301,
+        "invalid_samples": 301,
+        "repeated_samples": 0,
+        "unique_presentations": 0,
+        "warmup_seconds": 3,
+        "steady_fps": 0.0,
+        "longest_presentation_gap_seconds": 7.012498099997174,
+        "passed": false
+      },
+      "window": {
+        "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+        "capture_method": "window",
+        "started_unix_ms": 1792323804516,
+        "finished_unix_ms": 1792323814543,
+        "source_dimensions": [
+          1920,
+          1080
+        ],
+        "surface_dimensions": [
+          698,
+          436
+        ],
+        "surface_hwnd": 123344676,
+        "desktop_pid": 39072,
+        "surface_screen_bounds": [
+          31,
+          193,
+          729,
+          629
+        ],
+        "first_invalid_sample": null,
+        "first_nonmonotonic_sample": null,
+        "failure": null,
+        "seconds": 10.026545900000201,
+        "samples": 301,
+        "invalid_samples": 0,
+        "repeated_samples": 155,
+        "unique_presentations": 146,
+        "warmup_seconds": 3,
+        "steady_fps": 14.516378523905619,
+        "longest_presentation_gap_seconds": 0.13811189999978524,
+        "passed": true
+      }
+    },
+    {
+      "sha256": "6a727f18585c22f730e02e5b739ed148ca894882f176f331cd834635254737ce",
+      "case": "window-occlusion-guard-diagnostic.json",
+      "passed": true,
+      "owned_occluder_pid": 46896,
+      "owned_occluder_hwnd": 17635344,
+      "desktop": {
+        "method": "desktop-visible pixels, 12-bit generated frame code with complement",
+        "capture_method": "desktop",
+        "started_unix_ms": 1792323897749,
+        "finished_unix_ms": 1792323907760,
+        "source_dimensions": [
+          1920,
+          1080
+        ],
+        "surface_dimensions": [
+          698,
+          436
+        ],
+        "surface_hwnd": 62330754,
+        "desktop_pid": 39072,
+        "surface_pid": 53032,
+        "parent_hwnd": 212995756,
+        "surface_screen_bounds": [
+          31,
+          193,
+          729,
+          629
+        ],
+        "first_invalid_sample": {
+          "elapsed": 0.012160400001448579,
+          "bits": [
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1,
+            -1
+          ],
+          "bgr": [
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ],
+            [
+              105,
+              105,
+              105
+            ]
+          ],
+          "window_hits": [
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            },
+            {
+              "hwnd": 17635344,
+              "pid": 46896,
+              "class": "Static"
+            }
+          ]
+        },
+        "first_nonmonotonic_sample": null,
+        "failure": null,
+        "seconds": 10.011431900005846,
+        "samples": 301,
+        "invalid_samples": 301,
+        "repeated_samples": 0,
+        "unique_presentations": 0,
+        "warmup_seconds": 3,
+        "steady_fps": 0.0,
+        "longest_presentation_gap_seconds": 7.011431900005846,
+        "passed": false
+      },
+      "window": {
+        "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+        "capture_method": "window",
+        "started_unix_ms": 1792323897755,
+        "finished_unix_ms": 1792323907777,
+        "source_dimensions": [
+          1920,
+          1080
+        ],
+        "surface_dimensions": [
+          698,
+          436
+        ],
+        "surface_hwnd": 62330754,
+        "desktop_pid": 39072,
+        "surface_pid": 53032,
+        "parent_hwnd": 212995756,
+        "surface_screen_bounds": [
+          31,
+          193,
+          729,
+          629
+        ],
+        "first_invalid_sample": null,
+        "first_nonmonotonic_sample": null,
+        "failure": null,
+        "seconds": 10.022567100000742,
+        "samples": 301,
+        "invalid_samples": 0,
+        "repeated_samples": 153,
+        "unique_presentations": 148,
+        "warmup_seconds": 3,
+        "steady_fps": 14.667001188210664,
+        "longest_presentation_gap_seconds": 0.10127990000182763,
+        "passed": true
+      }
+    }
+  ],
+  "mixed_window_capture_short": {
+    "profile": "mixed-product-338cadfce6ed",
+    "sha256": "9f1faacedca87932ae62b81fb0f17e7e290397efcb3dd596d1412363478922aa",
+    "requested_seconds": 60,
+    "elapsed_seconds": 60.11374909999722,
+    "passed": true,
+    "rounds": [
+      {
+        "index": 1,
+        "passed": true,
+        "sample": {
+          "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+          "capture_method": "window",
+          "started_unix_ms": 1792323968661,
+          "finished_unix_ms": 1792323978663,
+          "source_dimensions": [
+            1920,
+            1080
+          ],
+          "surface_dimensions": [
+            698,
+            436
+          ],
+          "surface_hwnd": 155326162,
+          "desktop_pid": 48688,
+          "surface_pid": 44516,
+          "parent_hwnd": 184489692,
+          "surface_screen_bounds": [
+            31,
+            193,
+            729,
+            629
+          ],
+          "first_invalid_sample": null,
+          "first_nonmonotonic_sample": null,
+          "failure": null,
+          "seconds": 10.002207999998063,
+          "samples": 579,
+          "invalid_samples": 0,
+          "repeated_samples": 433,
+          "unique_presentations": 146,
+          "warmup_seconds": 3,
+          "steady_fps": 14.566833775864444,
+          "longest_presentation_gap_seconds": 0.11747299999842653,
+          "passed": true
+        },
+        "resources": {
+          "host_busy_percent": 18.97833611075503,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 382885888,
+          "local_handles": 4587,
+          "remote_fds": 102
+        }
+      },
+      {
+        "index": 2,
+        "passed": true,
+        "sample": {
+          "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+          "capture_method": "window",
+          "started_unix_ms": 1792323998830,
+          "finished_unix_ms": 1792324008839,
+          "source_dimensions": [
+            1920,
+            1080
+          ],
+          "surface_dimensions": [
+            698,
+            436
+          ],
+          "surface_hwnd": 155326162,
+          "desktop_pid": 48688,
+          "surface_pid": 44516,
+          "parent_hwnd": 184489692,
+          "surface_screen_bounds": [
+            31,
+            193,
+            729,
+            629
+          ],
+          "first_invalid_sample": null,
+          "first_nonmonotonic_sample": null,
+          "failure": null,
+          "seconds": 10.008949800001574,
+          "samples": 600,
+          "invalid_samples": 0,
+          "repeated_samples": 456,
+          "unique_presentations": 144,
+          "warmup_seconds": 3,
+          "steady_fps": 14.26747271038773,
+          "longest_presentation_gap_seconds": 0.15041439999913564,
+          "passed": true
+        },
+        "resources": {
+          "host_busy_percent": 22.269014803475777,
+          "compiler_processes_before": [],
+          "compiler_processes_after": [],
+          "local_process_count": 9,
+          "local_private_bytes": 386129920,
+          "local_handles": 4631,
+          "remote_fds": 102
+        }
+      }
+    ],
+    "same_terminal_after_video_close": true,
+    "command_upload_download_after_video_close": true,
+    "payload_removed_by_driver": true
+  },
+  "lifecycle": {
+    "started_remote": 1792323044.118804,
+    "finished_remote": 1792324093.2342296,
+    "stage_present": true,
+    "observed_files": [
+      "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+      "/var/lib/pixels-agent-bridge/logs/executor.log",
+      "/var/lib/pixels-agent-bridge/logs/media-supervisor.log"
+    ],
+    "records": [
+      {
+        "observed_remote_unix_ms": 1792323044119,
+        "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+        "line": "2026-10-18T11:30:34.961634Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper started session=\"2\" uid=1000 pid=58061"
+      },
+      {
+        "observed_remote_unix_ms": 1792323572772,
+        "path": "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+        "line": "2026-10-18T11:39:32.501643Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=local WebSocket closed"
+      },
+      {
+        "observed_remote_unix_ms": 1792323572773,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:39:32.441710Z  INFO pab_executor::session: authenticated device connection ended error=PAB stream failed: closed by peer: 0"
+      },
+      {
+        "observed_remote_unix_ms": 1792323718819,
+        "path": "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+        "line": "2026-10-18T11:41:58.373950Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=local WebSocket closed"
+      },
+      {
+        "observed_remote_unix_ms": 1792323835255,
+        "path": "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+        "line": "2026-10-18T11:43:54.958098Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=local WebSocket closed"
+      },
+      {
+        "observed_remote_unix_ms": 1792323928601,
+        "path": "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+        "line": "2026-10-18T11:45:28.195612Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=WebSocket protocol error: Connection reset without closing handshake"
+      },
+      {
+        "observed_remote_unix_ms": 1792323948675,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:45:48.227734Z  INFO pab_executor::session: authenticated device connection ended error=PAB stream failed: closed by peer: 0"
+      },
+      {
+        "observed_remote_unix_ms": 1792323949687,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:45:49.572765Z  WARN pab_executor::runtime: device session failed error=device peer authorization expired or could not be refreshed"
+      },
+      {
+        "observed_remote_unix_ms": 1792323960725,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:46:00.239067Z  INFO pab_executor::session: authenticated device connection ended error=PAB stream failed: closed by peer: 0"
+      },
+      {
+        "observed_remote_unix_ms": 1792324049065,
+        "path": "/run/pixels-agent-bridge-media/helper-Sc8EFq/data/logs/media-helper.log",
+        "line": "2026-10-18T11:47:28.645626Z  WARN pab_desktop_lib::session_helper::linux_media: Linux media helper disconnected error=local WebSocket closed"
+      },
+      {
+        "observed_remote_unix_ms": 1792324050571,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:47:30.204703Z  INFO pab_executor::session: authenticated device connection ended error=PAB stream failed: closed by peer: 0"
+      },
+      {
+        "observed_remote_unix_ms": 1792324091221,
+        "path": "/var/lib/pixels-agent-bridge/logs/executor.log",
+        "line": "2026-10-18T11:48:10.900587Z  INFO pab_executor::session: authenticated device connection ended error=PAB stream failed: closed by peer: 0"
+      },
+      {
+        "observed_remote_unix_ms": 1792324092733,
+        "path": "/var/lib/pixels-agent-bridge/logs/media-supervisor.log",
+        "line": "2026-10-18T11:48:12.253039Z  INFO pab_desktop_lib::linux_media_supervisor: Linux media helper reaped session=\"2\""
+      }
+    ],
+    "local_started": 1792323023.4165628,
+    "local_finished": 1792324072.9757366
+  },
+  "clock_offset_start": [
+    {
+      "local_before": 1792323045.7693405,
+      "local_after": 1792323045.9705486,
+      "remote": 1792323066.1886854,
+      "offset_lower_seconds": 20.21813678741455,
+      "offset_upper_seconds": 20.419344902038574
+    },
+    {
+      "local_before": 1792323045.9705527,
+      "local_after": 1792323046.0783632,
+      "remote": 1792323066.2939937,
+      "offset_lower_seconds": 20.215630531311035,
+      "offset_upper_seconds": 20.32344102859497
+    },
+    {
+      "local_before": 1792323046.0783668,
+      "local_after": 1792323046.186958,
+      "remote": 1792323066.4045072,
+      "offset_lower_seconds": 20.217549085617065,
+      "offset_upper_seconds": 20.32614040374756
+    }
+  ],
+  "clock_offset_end": [
+    {
+      "local_before": 1792324008.3367186,
+      "local_after": 1792324008.6738207,
+      "remote": 1792324028.9313724,
+      "offset_lower_seconds": 20.257551670074463,
+      "offset_upper_seconds": 20.594653844833374
+    },
+    {
+      "local_before": 1792324008.673825,
+      "local_after": 1792324008.8639205,
+      "remote": 1792324029.1198795,
+      "offset_lower_seconds": 20.255959033966064,
+      "offset_upper_seconds": 20.446054458618164
+    },
+    {
+      "local_before": 1792324008.863925,
+      "local_after": 1792324009.024731,
+      "remote": 1792324029.2811382,
+      "offset_lower_seconds": 20.256407260894775,
+      "offset_upper_seconds": 20.417213201522827
+    }
+  ],
+  "cleanup": [
+    {
+      "original": {
+        "session": "2",
+        "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+        "properties": {
+          "MainPID": "56999",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 19:14:21 CST] ; stop_time=[n/a] ; pid=56999 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        },
+        "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+        "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+        "staged_sha256": "2a3148d65ec71229db6f26736c9305b5cf0ffccbedb8c619a01cf3f9eec9d51c",
+        "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+      },
+      "restored": {
+        "original_service_restored": true,
+        "properties": {
+          "MainPID": "61552",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 19:48:12 CST] ; stop_time=[n/a] ; pid=61552 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        }
+      },
+      "owned_processes": [],
+      "input_devices": [],
+      "session_restored": true,
+      "rollback_trigger": "",
+      "stage_removed": true,
+      "fixture_removed": true
+    }
+  ],
+  "layout": {
+    "layout": {
+      "before_mode": "1694x1102@59.997711181640625",
+      "test_mode": "1920x1080@60",
+      "persistent": false,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "temporary_idle_inhibitor": true,
+      "generated_ticks": 31025,
+      "restored": true
+    },
+    "payload_removed": true
+  },
+  "collected_exits": {
+    "old_mixed": 1,
+    "old_desktop": 0,
+    "gpu_observer": 0,
+    "remote_observer": 0,
+    "short_mixed": 0,
+    "short_desktop": 0
+  },
+  "sources_sha256": {
+    "experiments\\remote-desktop\\windows_sample_presentation.py": "d9506548be7c16c39366e084701b0ee566e5426d9eb567b31f76af55aa18e22a",
+    "experiments\\remote-desktop\\verify_windows_linux_mixed.py": "bfe6a79543795c816ebd7b57c93d70d09faf2b109b331cb931a11d90edd8e7f3"
+  },
+  "limitations": [
+    "Window content capture measures composed HWND pixels, not physical desktop visibility while occluded",
+    "30min/2h/8h not accepted",
+    "Earlier invalid/no-order and performance failures retain their own unproven causes",
+    "No production application changes or builds in this turn"
+  ]
+}

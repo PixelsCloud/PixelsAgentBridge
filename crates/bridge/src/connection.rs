@@ -24,10 +24,12 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::{BridgeConfig, BridgeConfigError};
 
 mod desktop_terminal;
+mod remote_desktop;
 #[cfg(test)]
 mod desktop_terminal_tests;
 mod directory;
 pub use desktop_terminal::DesktopTerminalSession;
+pub use pab_remote_desktop::RemoteDesktopSession;
 mod document;
 mod file_transfer;
 mod filesystem;
@@ -671,6 +673,8 @@ fn read_file(path: &std::path::Path, kind: &'static str) -> Result<Vec<u8>, Brid
 
 #[derive(Debug, Error)]
 pub enum BridgeError {
+    #[error(transparent)]
+    RemoteDesktop(#[from] pab_remote_desktop::DesktopError),
     #[error(
         "target Executor does not support the requested command options; env/stdin/timeout require v2 and user execution requires v3; upgrade the target"
     )]
@@ -736,6 +740,21 @@ pub enum BridgeError {
 }
 
 impl BridgeError {
+    /// A control lookup did not find an online device. This can also mean an
+    /// unknown/deleted device, so it is not a generally retryable connection
+    /// error. An established viewer may use it for bounded reboot recovery.
+    pub const fn is_device_not_found(&self) -> bool {
+        matches!(
+            self,
+            Self::NetworkResolution(DeviceNetworkResolutionError::Control(
+                EndpointControlError::Server {
+                    code: pab_protocol::ControlErrorCode::NotFound,
+                    ..
+                }
+            ))
+        )
+    }
+
     pub const fn is_recoverable_connection(&self) -> bool {
         match self {
             Self::NetworkResolution(
@@ -778,6 +797,10 @@ mod recovery_tests {
                 },
             ));
             assert!(!error.is_recoverable_connection(), "{code:?}");
+            assert_eq!(
+                error.is_device_not_found(),
+                code == ControlErrorCode::NotFound
+            );
         }
         assert!(
             BridgeError::NetworkResolution(DeviceNetworkResolutionError::Timeout)

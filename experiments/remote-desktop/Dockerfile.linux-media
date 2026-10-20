@@ -1,0 +1,7 @@
+# Extends the repository's Ubuntu 22.04 Desktop dependency image. Build the
+# base from packaging/desktop/Dockerfile.linux-desktop when it is unavailable.
+FROM pab-linux-desktop-build-deps:jammy
+ENV DEBIAN_FRONTEND=noninteractive CARGO_BUILD_JOBS=8 CMAKE_BUILD_PARALLEL_LEVEL=1
+RUN apt-get -o Acquire::Retries=3 update \
+    && apt-get install -y --no-install-recommends nasm libdrm-dev libegl1-mesa-dev libxres-dev \
+    && rm -rf /var/lib/apt/lists/*

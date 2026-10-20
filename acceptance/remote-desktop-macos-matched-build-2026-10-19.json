@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-19",
+  "source_commit": "90adfbc",
+  "source_archive_sha256": "faa053a54fb56cd5d812ecc01b27eacd8aecf50df80a356bfd33667f629630e4",
+  "target": "Apple arm64",
+  "os_version": "27.0.1",
+  "task_id": "189a551b-69fb-4f72-9b32-c5887c03a34a",
+  "state": "succeeded",
+  "started_at_unix_ms": 1792341278212,
+  "finished_at_unix_ms": 1792341737862,
+  "jobs": 2,
+  "native_jobs": 1,
+  "media_tests": {
+    "passed": 30,
+    "failed": 0,
+    "ignored": 1
+  },
+  "results": [
+    {
+      "step": 0,
+      "exit_code": 0,
+      "jobs": 2
+    },
+    {
+      "step": 1,
+      "exit_code": 0,
+      "jobs": 2
+    },
+    {
+      "step": 2,
+      "exit_code": 0,
+      "jobs": 2
+    },
+    {
+      "artifact": "pab-desktop",
+      "sha256": "7956bbdf49e70a7fe7929e0b5bfaa43201595214c75b5de35d56749ded860385",
+      "bytes": 25156672
+    },
+    {
+      "artifact": "pab-executor",
+      "sha256": "3cd290acf946e7cdc1e4bac4f4c32e37fe73faa34deecc8c0e43a6a71885fc45",
+      "bytes": 31239904
+    }
+  ],
+  "raw_record_sha256": "9db680d6f8a99c5ecae145aba286cf2c35d8659f0a8eccef1b4036e67825b248",
+  "installed_app_modified": false,
+  "authorized_test_bundle_modified": false,
+  "tcc_requested": false,
+  "runtime_acceptance": false
+}

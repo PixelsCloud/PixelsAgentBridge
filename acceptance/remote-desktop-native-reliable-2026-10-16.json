@@ -1,0 +1,755 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "scope": "Native Windows media over local real QUIC on each machine; not cross-machine acceptance",
+  "local_windows_rtx3060": {
+    "created_at": "2026-10-16T10:52:12.847677+00:00",
+    "passed": true,
+    "cases": [
+      {
+        "source": "synthetic",
+        "verify_pixels": true,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 3,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 14.999525415015867,
+              "encoded_bytes": 686978,
+              "frames": 75,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.5932,
+              "receive_to_display_p95_ms": 13.290099999999999,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0001582,
+              "warmup_frames": 15
+            },
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 3,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 15.001282609663125,
+              "encoded_bytes": 686978,
+              "frames": 75,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.3381999999999998,
+              "receive_to_display_p95_ms": 15.4511,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9995725,
+              "warmup_frames": 15
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 15
+        }
+      },
+      {
+        "source": "synthetic",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 30.006425575972838,
+              "encoded_bytes": 1413386,
+              "frames": 150,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.0725,
+              "receive_to_display_p95_ms": 15.2213,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9989293,
+              "warmup_frames": 30
+            },
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.992961851571913,
+              "encoded_bytes": 1413386,
+              "frames": 150,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.1200999999999999,
+              "receive_to_display_p95_ms": 14.916,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0011733,
+              "warmup_frames": 30
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 30
+        }
+      },
+      {
+        "source": "animate",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 15.052762038331036,
+              "encoded_bytes": 2936921,
+              "frames": 75,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.2305000000000001,
+              "receive_to_display_p95_ms": 25.6803,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9824743,
+              "warmup_frames": 15
+            },
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 15.001683788988476,
+              "encoded_bytes": 3032480,
+              "frames": 75,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.3383,
+              "receive_to_display_p95_ms": 25.9009,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9994388,
+              "warmup_frames": 15
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 15
+        }
+      },
+      {
+        "source": "animate",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.504734703457157,
+              "encoded_bytes": 3004154,
+              "frames": 150,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.7618,
+              "receive_to_display_p95_ms": 16.530199999999997,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0839298,
+              "warmup_frames": 30
+            },
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.994168533753665,
+              "encoded_bytes": 2924575,
+              "frames": 150,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.5372999999999999,
+              "receive_to_display_p95_ms": 13.4957,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0009721,
+              "warmup_frames": 30
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 30
+        }
+      }
+    ]
+  },
+  "windows_90_rtx4090": {
+    "passed": true,
+    "cross_machine_video_passed": false,
+    "cross_machine_error": "Independent endpoint connection timed out; server offer contained only its private LAN address. Production Relay requires an admitted identity.",
+    "cases": [
+      {
+        "source": "synthetic",
+        "verify_pixels": true,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 2,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 15.00237877717891,
+              "encoded_bytes": 183501,
+              "frames": 75,
+              "generation": 1,
+              "parallel_legacy_max_ms": 0.7997,
+              "receive_to_display_p95_ms": 9.2878,
+              "screen": {
+                "desktop_height": 1080,
+                "desktop_width": 1920,
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 1080,
+                "pixel_width": 1920,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1000,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9992072,
+              "warmup_frames": 15
+            },
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 2,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 14.997295387749773,
+              "encoded_bytes": 183501,
+              "frames": 75,
+              "generation": 2,
+              "parallel_legacy_max_ms": 0.7029,
+              "receive_to_display_p95_ms": 19.3125,
+              "screen": {
+                "desktop_height": 1080,
+                "desktop_width": 1920,
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 1080,
+                "pixel_width": 1920,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1000,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0009017,
+              "warmup_frames": 15
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 15
+        }
+      },
+      {
+        "source": "animate",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.99710527934054,
+              "encoded_bytes": 1543570,
+              "frames": 150,
+              "generation": 1,
+              "parallel_legacy_max_ms": 0.5384,
+              "receive_to_display_p95_ms": 9.7326,
+              "screen": {
+                "desktop_height": 1080,
+                "desktop_width": 1920,
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 1080,
+                "pixel_width": 1920,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1000,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0004825,
+              "warmup_frames": 30
+            },
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.99929861639835,
+              "encoded_bytes": 1584015,
+              "frames": 150,
+              "generation": 2,
+              "parallel_legacy_max_ms": 0.6814,
+              "receive_to_display_p95_ms": 7.996100000000001,
+              "screen": {
+                "desktop_height": 1080,
+                "desktop_width": 1920,
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 1080,
+                "pixel_width": 1920,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1000,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0001169,
+              "warmup_frames": 30
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 30
+        }
+      }
+    ],
+    "cleanup_passed": true
+  },
+  "owned_window_close": {
+    "passed": true,
+    "observed_child_processes": 3,
+    "capture_and_viewer_exited": true
+  },
+  "cross_machine_video_passed": false,
+  "installed_application_modified": false,
+  "input_tested": false,
+  "lock_screen_tested": false,
+  "physical_multi_monitor_switch_tested": false,
+  "final_local_regression": {
+    "created_at": "2026-10-16T11:03:12.700410+00:00",
+    "passed": true,
+    "cases": [
+      {
+        "source": "synthetic",
+        "verify_pixels": true,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 3,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 14.998692114047657,
+              "encoded_bytes": 686978,
+              "frames": 75,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.2677,
+              "receive_to_display_p95_ms": 16.1492,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.000436,
+              "warmup_frames": 15
+            },
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 3,
+                "test_pixel_checks": 360
+              },
+              "effective_display_fps": 14.99740454916872,
+              "encoded_bytes": 686978,
+              "frames": 75,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.1235,
+              "receive_to_display_p95_ms": 16.2543,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0008653,
+              "warmup_frames": 15
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 15
+        }
+      },
+      {
+        "source": "synthetic",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.99403478636169,
+              "encoded_bytes": 1413386,
+              "frames": 150,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.0804,
+              "receive_to_display_p95_ms": 15.4246,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0009944,
+              "warmup_frames": 30
+            },
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 30.000814822130568,
+              "encoded_bytes": 1413386,
+              "frames": 150,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.1917,
+              "receive_to_display_p95_ms": 16.4898,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9998642,
+              "warmup_frames": 30
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 30
+        }
+      },
+      {
+        "source": "animate",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 14.999453119939249,
+              "encoded_bytes": 2862604,
+              "frames": 75,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.1891,
+              "receive_to_display_p95_ms": 19.8012,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0001823,
+              "warmup_frames": 15
+            },
+            {
+              "display": {
+                "displayed": 90,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 14.996238643423457,
+              "encoded_bytes": 2876489,
+              "frames": 75,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.1921,
+              "receive_to_display_p95_ms": 25.473300000000002,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0012541,
+              "warmup_frames": 15
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 15
+        }
+      },
+      {
+        "source": "animate",
+        "verify_pixels": false,
+        "metrics": {
+          "cases": [
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 29.999571606117463,
+              "encoded_bytes": 2890294,
+              "frames": 150,
+              "generation": 1,
+              "parallel_legacy_max_ms": 1.3044,
+              "receive_to_display_p95_ms": 14.2905,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 5.0000714,
+              "warmup_frames": 30
+            },
+            {
+              "display": {
+                "displayed": 180,
+                "test_max_rgb_error": 0,
+                "test_pixel_checks": 0
+              },
+              "effective_display_fps": 30.004613509373204,
+              "encoded_bytes": 2887288,
+              "frames": 150,
+              "generation": 2,
+              "parallel_legacy_max_ms": 1.191,
+              "receive_to_display_p95_ms": 13.5657,
+              "screen": {
+                "desktop_height": 2160,
+                "desktop_width": 3840,
+                "id": "0:96340:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "pixel_height": 2160,
+                "pixel_width": 3840,
+                "primary": true,
+                "rotation": "identity",
+                "scale_milli": 1500,
+                "x": 0,
+                "y": 0
+              },
+              "seconds": 4.9992312,
+              "warmup_frames": 30
+            }
+          ],
+          "display_confirmation": "dxgi_frame_statistics_each_present_id",
+          "installed_application_modified": false,
+          "media_gpu_texture_copies": 0,
+          "media_pixel_cpu_readbacks": 0,
+          "path": "Some(Direct)",
+          "stage": "reliable_native_media",
+          "target_fps": 30
+        }
+      }
+    ]
+  },
+  "unexpected_parent_loss": {
+    "passed": true,
+    "observed_child_processes": 3,
+    "capture_and_viewer_exited": true
+  },
+  "session_regression": {
+    "passed": 9,
+    "failed": 0,
+    "command": "cargo test -p pab-remote-desktop -j 4"
+  }
+}

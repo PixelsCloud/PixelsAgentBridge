@@ -13,12 +13,11 @@ html:has(.desktop-terminal), body:has(.desktop-terminal), #root:has(.desktop-ter
 @media (max-width: 850px) { .desktop-terminal-action-label { display: none; } .desktop-terminal-actions .ant-btn { width: 28px; padding-inline: 0; } }
 @media (max-width: 700px) { .desktop-terminal-title { gap: 6px; padding-left: 10px; } .desktop-terminal-header { gap: 6px; } .desktop-terminal-header .window-controls button { width: 36px; } }
 .desktop-terminal-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; }
-.desktop-terminal-screen { flex: 1; min-height: 0; overflow: hidden; padding: 10px 12px 0; background: #142334; }
+.desktop-terminal-screen { flex: 1; display: flex; min-height: 0; overflow: hidden; padding: 10px 12px 8px; background: #142334; }
+/* FitAddon measures its direct parent; keep padding outside that element. */
+.desktop-terminal-host { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .desktop-terminal-screen .xterm { height: 100%; }
 .desktop-terminal-screen .xterm-viewport { background-color: transparent !important; }
 .desktop-terminal-alert { margin: 8px 16px; }
-.desktop-terminal-footer { flex-shrink: 0; border-top: 1px solid #e6eeed; padding: 7px 16px; font-size: 11px; }
-.desktop-terminal-footer .ant-typography { font-size: 11px; }
 .desktop-terminal-dark { color: #e8eef1; background: #202329; }
-.desktop-terminal-dark .desktop-terminal-footer { border-color: #434b55; color: #afb9c2; }
 .desktop-terminal-dark .desktop-terminal-title > span { color: #afb9c2; }

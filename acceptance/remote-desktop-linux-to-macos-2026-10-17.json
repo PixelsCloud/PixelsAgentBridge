@@ -1,0 +1,238 @@
+{
+  "date": "2026-10-17",
+  "baseline": "8e76f10",
+  "direction": "Linux GNOME Wayland operator to macOS target",
+  "operator": {
+    "os": "Ubuntu 22.04.5 x86_64",
+    "session": "23",
+    "display": [
+      1280,
+      800
+    ],
+    "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+    "mcp_sha256": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d",
+    "desktop_task": "6df0e408-4589-4f15-8b44-7249563e5994",
+    "assistance_task": "d0805494-0afd-4c82-a052-b5f04f6d098a",
+    "actual_viewport": {
+      "x": 70,
+      "y": 146,
+      "width": 1210,
+      "height": 654
+    },
+    "local_click": {
+      "x": 251,
+      "y": 558
+    }
+  },
+  "target": {
+    "os": "macOS 27.0.1 arm64",
+    "display": [
+      1920,
+      1080
+    ],
+    "executor_sha256": "4d0ee1d6a8c280ae56fabb8d8b372ec83facc82db9499458466ecbaccfdc4637",
+    "desktop_signed_sha256": "34ed9891d8320930dea616951826f53f066d4cb4935b6fdb45f75820066b1073",
+    "fixture_source": "experiments/remote-desktop/macos_input_fixture.m",
+    "fixture_pid": 73740,
+    "fixture_seconds": 120
+  },
+  "native_user_probe": {
+    "execution_mode": "user",
+    "expected_uid": 501,
+    "program": "/usr/bin/id",
+    "args": [
+      "-u"
+    ],
+    "exit_code": 0,
+    "stdout": "501\n",
+    "scope": "Native user process creation under staged executable; not full command/file-access coverage"
+  },
+  "snapshots": [
+    {
+      "phase": "linuxMacAfterInput",
+      "task_id": "48fd1441-956e-41ac-91f4-d66ca7402361",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220552470,
+      "observed": {
+        "downs": 1,
+        "keys_up": 1,
+        "last_key": 0,
+        "shift_down": 0,
+        "focused": true,
+        "timestamp": 1792220552.462472,
+        "x": 8879,
+        "screen_id": "1",
+        "y": 41301,
+        "keys_down": 1,
+        "wheels": 0,
+        "shift_up": 0,
+        "shifted": false,
+        "click_x": 100,
+        "click_y": 100,
+        "pid": 73740,
+        "ups": 1
+      }
+    },
+    {
+      "phase": "linuxMacReadonly",
+      "task_id": "5fb9762a-1a98-4fc6-ac4e-ad70e0bb0d17",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220568549,
+      "observed": {
+        "downs": 1,
+        "keys_up": 1,
+        "last_key": 0,
+        "shift_down": 0,
+        "focused": true,
+        "timestamp": 1792220568.540302,
+        "x": 8879,
+        "screen_id": "1",
+        "y": 41301,
+        "keys_down": 1,
+        "wheels": 0,
+        "shift_up": 0,
+        "shifted": false,
+        "click_x": 100,
+        "click_y": 100,
+        "pid": 73740,
+        "ups": 1
+      }
+    },
+    {
+      "phase": "linuxMacAIRecheck",
+      "task_id": "8deb8330-c0b6-48cb-b095-bce25f62e6bc",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220585839,
+      "observed": {
+        "downs": 1,
+        "keys_up": 1,
+        "last_key": 0,
+        "shift_down": 0,
+        "focused": true,
+        "timestamp": 1792220585.8293738,
+        "x": 8879,
+        "screen_id": "1",
+        "y": 41301,
+        "keys_down": 1,
+        "wheels": 0,
+        "shift_up": 0,
+        "shifted": false,
+        "click_x": 100,
+        "click_y": 100,
+        "pid": 73740,
+        "ups": 1
+      }
+    },
+    {
+      "phase": "linuxMacHeld",
+      "task_id": "75bce3ed-6bbf-4171-8106-68c42a76af07",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220608716,
+      "observed": {
+        "downs": 2,
+        "keys_up": 1,
+        "last_key": 0,
+        "shift_down": 1,
+        "focused": true,
+        "timestamp": 1792220608.713217,
+        "x": 8879,
+        "screen_id": "1",
+        "y": 41301,
+        "keys_down": 1,
+        "wheels": 0,
+        "shift_up": 0,
+        "shifted": true,
+        "click_x": 100,
+        "click_y": 100,
+        "pid": 73740,
+        "ups": 2
+      }
+    },
+    {
+      "phase": "linuxMacReleased",
+      "task_id": "4de54320-1684-4eb5-9dd4-dd8fcda427cf",
+      "state": "succeeded",
+      "finished_at_unix_ms": 1792220610564,
+      "observed": {
+        "downs": 2,
+        "keys_up": 1,
+        "last_key": 0,
+        "shift_down": 1,
+        "focused": true,
+        "timestamp": 1792220610.558271,
+        "x": 8879,
+        "screen_id": "1",
+        "y": 41301,
+        "keys_down": 1,
+        "wheels": 0,
+        "shift_up": 1,
+        "shifted": false,
+        "click_x": 100,
+        "click_y": 100,
+        "pid": 73740,
+        "ups": 2
+      }
+    }
+  ],
+  "assistance": {
+    "task_id": "e9c46f15-3d76-4582-b20e-a3080d815630",
+    "state": "succeeded",
+    "result": {
+      "assistance": {
+        "assistance_id": "38542e36-ad1f-4c1e-beaa-7813b4871071",
+        "created_at_unix_ms": 1792220436867,
+        "delivery": "displayed",
+        "expires_at_unix_ms": 1792220736867,
+        "outcome": "user_completed",
+        "request": {
+          "device_code": "419438177",
+          "expected_action": "Click once in the focused isolated test window, then complete assistance",
+          "expires_in_seconds": 300,
+          "reason": "Acceptance: Linux native viewer",
+          "request_id": "296c11c7-32af-453b-89ff-6ae7cc4caf17",
+          "screen_id": null
+        },
+        "revision": 4,
+        "status": "completed",
+        "window_label": "desktop-viewer-5a7c314c-e044-49de-a448-c17b88a5fffd"
+      },
+      "terminal": true,
+      "verify_result_before_resuming": true
+    }
+  },
+  "mac_cleanup": {
+    "task_id": "94e57025-f729-48ee-b1ca-8c1b9dbdbde6",
+    "state": "succeeded",
+    "result": {
+      "original_pid": 74172,
+      "installed_hashes_unchanged": true,
+      "device_authentication_unchanged": true,
+      "candidate_processes": [],
+      "temporary_jobs_removed": 3,
+      "temporary_service_directory_removed": true,
+      "fixture_directory_removed": true
+    }
+  },
+  "linux_cleanup": {
+    "task_id": "30c550dd-9fce-457c-807c-ba95bcfcfb9e",
+    "state": "succeeded",
+    "result": {
+      "owned_processes": [],
+      "private_profile_removed": true,
+      "original_service": "active",
+      "artifacts": {
+        "pab-desktop": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+        "pab-mcp": "9d06a0f83ce494087f51b128f507f1bff877d38cc6effe637cec78b3a583555d",
+        "pab-linux-media-worker-cargo": "5835dcc244f28315b1780c236c1215ef0a6d8dd1b600370bb9cd3d8beffbe31b"
+      },
+      "active_session": "23"
+    }
+  },
+  "limits": [
+    "ordinary single-screen desktop",
+    "15 FPS is configuration, no dynamic presentation measurement in this run",
+    "no screen-recording authorization request observed; a local-network prompt was observed, without interaction or process attribution",
+    "no lock/login, multiscreen, text/IME, weak-network or long-duration claim",
+    "no product compilation, installed binary replacement or COS publication"
+  ]
+}

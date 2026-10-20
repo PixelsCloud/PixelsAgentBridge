@@ -177,6 +177,10 @@ pub enum DeviceTaskRequest {
         mobile_schema_version: u16,
         request: crate::MobileRequest,
     },
+    RemoteDesktop {
+        schema_version: u16,
+        request: crate::RemoteDesktopRequest,
+    },
     DesktopTerminal {
         schema_version: u16,
         request: crate::DesktopTerminalRequest,
@@ -379,6 +383,7 @@ impl DeviceTaskRequest {
             Self::TransferFile { schema_version, .. }
             | Self::Mobile { schema_version, .. }
             | Self::DesktopTerminal { schema_version, .. }
+            | Self::RemoteDesktop { schema_version, .. }
             | Self::SystemQuery { schema_version, .. }
             | Self::GetSystemQuery { schema_version, .. }
             | Self::CancelSystemQuery { schema_version, .. }
@@ -445,6 +450,9 @@ pub enum DeviceTaskResponse {
     Mobile {
         reply: Box<crate::MobileReply>,
     },
+    RemoteDesktop {
+        reply: crate::RemoteDesktopReply,
+    },
     DesktopTerminal {
         reply: crate::DesktopTerminalReply,
     },
@@ -471,6 +479,10 @@ pub enum DeviceTaskResponse {
         terminal_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         desktop_terminal_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        remote_desktop_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        remote_desktop_cursor_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

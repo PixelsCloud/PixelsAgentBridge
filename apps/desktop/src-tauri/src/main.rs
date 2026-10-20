@@ -32,6 +32,9 @@ fn main() {
         }
     }
     match std::env::args().nth(1).as_deref() {
+        Some("--media-worker") => {
+            std::process::exit(pab_desktop_media::worker_main(std::env::args().skip(2)));
+        }
         #[cfg(target_os = "linux")]
         Some("--local-data-path") => {
             match pab_desktop_lib::linux_user_data_path() {
@@ -52,9 +55,16 @@ fn main() {
         Some("--macos-check") => {
             println!("{}", pab_desktop_lib::macos_diagnostics());
         }
-        Some("--session-helper" | "--application-helper") => {
+        Some("--session-helper" | "--application-helper" | "--media-helper") => {
             if let Err(error) = pab_desktop_lib::run_session_helper() {
                 eprintln!("pab-session-helper: {error}");
+                std::process::exit(1);
+            }
+        }
+        #[cfg(any(windows, target_os = "linux"))]
+        Some("--media-supervisor") => {
+            if let Err(error) = pab_desktop_lib::run_media_supervisor() {
+                eprintln!("pab-media-supervisor: {error}");
                 std::process::exit(1);
             }
         }

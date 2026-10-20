@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "sampled_at": "2026-10-16T23:53:42.368619+00:00",
+  "base_commit": "01a234056f417de8ebbfc5ad9650f94e0525186f",
+  "scope": "Private GTK host and serial Rust decode/paint bridge; not enabled in formal Tauri viewer yet",
+  "machine": {
+    "device_code": "556688188",
+    "os": "Ubuntu 22.04.5",
+    "session": "GNOME Wayland",
+    "cpu_count": 2
+  },
+  "native_wayland_webkit_host": {
+    "task_id": "f859e0c3-3581-4b62-bb53-b37383f3701f",
+    "result": {
+      "passed": true,
+      "checks": 270,
+      "cycles": 20,
+      "retired_areas": 20,
+      "webkit_state_preserved": true,
+      "hidden_frame_ack_withheld": true
+    },
+    "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy"
+  },
+  "native_host_sanitizers": {
+    "address": true,
+    "undefined": true,
+    "fatal_glib_warnings": true,
+    "leak_detector": false,
+    "reason": "GTK/WebKit process-global allocations; per-view retirement checked with weak refs"
+  },
+  "rust_wayland": {
+    "task_id": "fac26e5a-adcc-4421-9593-1074270007a5",
+    "result": "running 1 test\ntest gtk_host_decode_present_cancel_and_restore ... Rust GTK host: 8 generated frames, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s",
+    "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy"
+  },
+  "rust_xwayland": {
+    "task_id": "635ffd40-d30a-45d5-bf0b-0afae64ce8be",
+    "result": "running 1 test\ntest gtk_host_decode_present_cancel_and_restore ... Rust GTK host: 8 generated frames, stale generation rejected, hidden ACK withheld, restore, queued cancellation, decoder failure, original child restored, host close with pending frame, runtime stopped\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s",
+    "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy"
+  },
+  "gtk_driver_baseline": {
+    "task_id": "3c0778aa-1509-48ae-91c1-e5069e08bf98",
+    "result": {
+      "gtk_baseline": true,
+      "cycles": 3
+    },
+    "stderr": "context mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy\ncontext mismatch in svga_surface_destroy"
+  },
+  "unit_tests": {
+    "linux": 12,
+    "windows": 11,
+    "passed": true
+  },
+  "native_boundaries": {
+    "checks": 76,
+    "passed": true
+  },
+  "cleanup": {
+    "task_id": "d03045aa-3ccc-4f51-be5c-a8a55ab24cc4",
+    "result": {
+      "owned_native_processes": []
+    },
+    "stderr": ""
+  },
+  "desktop_build": {
+    "exit_code": 0,
+    "sha256": "f71e862005860aafcab806b23f3bb6175637cf9a9f9d3c74ea29e46dc8b168ee",
+    "bytes": 44947784,
+    "cargo_jobs": 8,
+    "nested_jobs": 1
+  },
+  "limits": {
+    "cargo_jobs": 8,
+    "cmake_jobs": 1,
+    "msvc_parallel": "/MP1",
+    "native_build_jobs": 1,
+    "concurrent_builds": false
+  },
+  "artifacts": {
+    "pab-linux-host-test": {
+      "sha256": "cacfdf294efa54774af4433a8bdfe9b1b74be2d289b0dd81d7a051e1df8477af",
+      "bytes": 2141376
+    },
+    "pab-linux-rust-host-test": {
+      "sha256": "aca0d9c134d42996742f9b6728ff109af280b58673fd846de3345c24032ddeb8",
+      "bytes": 2736368
+    },
+    "pab-linux-media-worker-cargo": {
+      "sha256": "7e442827a884fe674567469de581f18a50de2215d37791cbb30bdf6a34be0669",
+      "bytes": 2369400
+    }
+  },
+  "source_sha256": {
+    "crates/desktop-media/native/linux/host.h": "54f2c913765f3caec1241be7599b0cd4c4e8f7915eb27b6db800884164386b8e",
+    "crates/desktop-media/native/linux/presenter.h": "baefbba1e4d7b6d465ee03678028e8ea02ad8d458768bca48b20445f55122378",
+    "crates/desktop-media/native/linux/worker.cpp": "5e511d638a52b61ef852bec545a318d8b0f10cf85e54187c368b6129b7d5f7fa",
+    "crates/desktop-media/src/lib.rs": "7203810fbe045b0d7d9b20bde39d23b0120d15054b7f728b6faea5ed7ca90e65",
+    "crates/desktop-media/src/linux_view.rs": "fd64ace270e728fad97b3656a4008d86f013f53884afc6e3fec475d5497843d4",
+    "crates/desktop-media/src/software.rs": "581d2f721f55286c0bc7dc3114a8c2cd7ecb28532d94570977b0964bbc3e8812",
+    "crates/desktop-media/tests/linux_host.rs": "e77021542b0ad3aaac565d09dbd038be32dc297aff33c737b68e94889b0fc292",
+    "crates/desktop-media/tests/native_linux_host.cpp": "0665b4e16d08afe81e47f243cd53ca57e41b667b30d1f89eded19f38fc61aba9"
+  },
+  "pending": [
+    "Tauri viewer command/window wiring and native viewer input",
+    "Full remote session/network/multi-display path",
+    "Hardware decoding and Linux login",
+    "Actual formal-viewer benchmark and long-running resource measurements",
+    "SVGA driver context mismatch also reproduced without presenter; no claim of GPU-resource leak absence",
+    "No installation, service replacement, push or COS release"
+  ]
+}

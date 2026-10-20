@@ -14,7 +14,7 @@ CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve
 TAURI_TARGET = CARGO_TARGET if 'CARGO_TARGET_DIR' in os.environ else ROOT / 'apps/desktop/src-tauri/target'
 CARGO_JOBS = max(1, min(10, int(os.environ.get('CARGO_BUILD_JOBS', '10'))))
 os.environ['CARGO_BUILD_JOBS'] = str(CARGO_JOBS)
-os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = str(CARGO_JOBS)
+os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = '1'
 
 
 def run(command, cwd=ROOT):
@@ -107,6 +107,8 @@ def main():
     required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
     if 'macos' in targets:
         required += ['node', 'rustup'] + (['/usr/bin/pkgbuild', '/usr/bin/productbuild'] if args.package else [])
+    if 'desktop' in targets or ('macos' in targets and 'x86_64' in architectures):
+        required.append('nasm')  # Bundled software H.264 needs its x86 SIMD build.
     for tool in required:
         if not shutil.which(tool):
             parser.error(f'{tool} is not installed')

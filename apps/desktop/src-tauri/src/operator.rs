@@ -14,6 +14,7 @@ use tokio::sync::{Mutex, OnceCell};
 use zeroize::Zeroizing;
 
 pub(crate) mod desktop_terminal;
+pub(crate) mod remote_desktop;
 pub(crate) mod directory;
 pub(crate) mod execution;
 pub(crate) mod history;
@@ -431,9 +432,15 @@ pub async fn operator_connect_saved(
 
 #[tauri::command]
 pub async fn operator_forget_device(
+    app: tauri::AppHandle,
     state: tauri::State<'_, OperatorState>,
+    viewers: tauri::State<'_, remote_desktop::RemoteDesktopState>,
+    assistance: tauri::State<'_, crate::desktop_assistance::AssistanceState>,
     code: String,
 ) -> Result<(), String> {
+    // Opening viewers/assistance and changing accounts use the same gate, so
+    // no stale open can outlive a successful removal from this account.
+    let _guard = state.account_changes.lock().await;
     let code = parse_code(&code)?;
     let local = state.local_store().await?;
     let remembered = local
@@ -458,10 +465,14 @@ pub async fn operator_forget_device(
         .forget_device(code)
         .await
         .map_err(|error| error.to_string())?;
-    state
+    let password_result = state
         .passwords
         .forget_password(device_id)
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string());
+    let assistance_result = assistance.device_removed(code).await;
+    viewers.device_removed(&app, code).await;
+    password_result?;
+    assistance_result?;
     Ok(())
 }
 

@@ -1,0 +1,906 @@
+{
+  "date": "2026-10-18",
+  "base_commit": "e3f70eb",
+  "scope": "Linux production embedded worker and private broker/cursor channels; not remote viewer acceptance",
+  "native_tests": {
+    "existing_video_boundaries": 39,
+    "cursor_stream": 38,
+    "sanitizers": [
+      "ASan",
+      "UBSan"
+    ]
+  },
+  "linux_media_tests": 24,
+  "desktop_build": {
+    "exit_code": 0,
+    "sha256": "1c61581d5eed32b82cc70bcfb7c0a9b3f86049ad37816f7ed67e8ba8d18e107b",
+    "bytes": 46069704,
+    "cargo_jobs": 4,
+    "nested_jobs": 1,
+    "fresh_media": false
+  },
+  "source_sha256": {
+    "crates/desktop-media/native/linux/cursor_metadata.h": "ae7bddecab68215d64dddd0f2646032de6d7c745a3a6329a9827a3a53579a955",
+    "crates/desktop-media/native/linux/dma_capture.h": "ed00fdd839f33eb931583c98dfef531c5f965a9e056470f1f2b172dc2886364c",
+    "crates/desktop-media/native/linux/dma_frame.h": "412aa6ce1a27bd2a81ede123db784397164ea83edbebcab268ea0cab894e31ac",
+    "crates/desktop-media/native/linux/drm_export.h": "ec167ba96408f402bac7f035678c5eaeabe6a7421624dc4edc939bc75975b95d",
+    "crates/desktop-media/native/linux/worker.cpp": "15c8454a242677f202a41ac09a7df2209c909d2a9c6046e7da5d1062b0b6db34",
+    "crates/desktop-media/native/linux/dma_cursor_frame.h": "e10128d9769206dd599db24ce33457fc72f670a07d772e2b3170d890167d9c05",
+    "crates/desktop-media/native/linux/dma_stream.h": "56a716d44a7979ac69644fc070eab54774430067263ce43954b45770dc87b738",
+    "crates/desktop-media/tests/native_linux_dma.cpp": "a5522dc33569fb39b65542e53ef5309520e3a6458478c5048b6ff17984e7b3bb",
+    "crates/desktop-media/tests/native_linux_dma_cursor.cpp": "b5ae7dbbb432f17ab39da2a5fdb53d655062ce1ea6dcd0cb390a0ad122ea0ced",
+    "experiments/remote-desktop/verify_linux_dma_cursor.py": "91527a6627a5df2f35c6de887c44a05b86b5ada1eea8fd28a05bbbf6a7d4082d"
+  },
+  "runs": [
+    {
+      "results": [
+        {
+          "phase": "ordinary",
+          "returncode": 1,
+          "stderr": "Error: \"supervised DMA check failed\"\n",
+          "state": [
+            "299",
+            {
+              "User": "1000",
+              "Type": "wayland",
+              "Class": "user",
+              "Active": "yes",
+              "LockedHint": "no"
+            }
+          ],
+          "broker": {
+            "broker_errors": [],
+            "helper_exit": "Some(1)",
+            "runs": [
+              {
+                "dma": true,
+                "exit": 1,
+                "stderr": "Traceback (most recent call last):\n  File \"/tmp/pab-dma-cursor-stream-bc53735bfc/verify.py\", line 151, in <module>\n    main()\n  File \"/tmp/pab-dma-cursor-stream-bc53735bfc/verify.py\", line 106, in main\n    video()\n  File \"/tmp/pab-dma-cursor-stream-bc53735bfc/verify.py\", line 97, in video\n    size, sequence, _, key = struct.unpack(\"<IQQI\", read(source.stdout, 24))\n  File \"/tmp/pab-dma-cursor-stream-bc53735bfc/verify.py\", line 50, in read\n    assert time.monotonic() < deadline, \"capture/cursor response timed out\"\nAssertionError: capture/cursor response timed out\n",
+                "stdout": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n\n"
+              }
+            ],
+            "session_unchanged": true,
+            "socket_removed": true
+          }
+        }
+      ],
+      "hashes": {
+        "desktop": "1c61581d5eed32b82cc70bcfb7c0a9b3f86049ad37816f7ed67e8ba8d18e107b",
+        "check": "7c72aeb50396791fe9e1124d6a412c3478ee9a73d845b7aa37f048bf271baa37",
+        "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+        "verify.py": "a6952c01a4add92a21b664ab49902bfd3e96263f5430903e4171b5cca9ec6a4d"
+      },
+      "before": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "after": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "installed_unchanged": true,
+      "owned_workers": [],
+      "stage_removed": true,
+      "service": "active",
+      "local_record": ".build\\remote-desktop\\dma-cursor-stream-bc53735bfc\\report.json",
+      "lock_settle_seconds": 0
+    },
+    {
+      "results": [
+        {
+          "phase": "ordinary",
+          "returncode": 0,
+          "stderr": "",
+          "state": [
+            "299",
+            {
+              "User": "1000",
+              "Type": "wayland",
+              "Class": "user",
+              "Active": "yes",
+              "LockedHint": "no"
+            }
+          ],
+          "broker": {
+            "broker_errors": [],
+            "helper_exit": "Some(0)",
+            "runs": [
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.033770930000173394,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.0341661069978727,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": false,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.03411236599640688,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              }
+            ],
+            "session_unchanged": true,
+            "socket_removed": true
+          }
+        },
+        {
+          "phase": "locked",
+          "returncode": 1,
+          "stderr": "Error: \"supervised DMA check failed\"\n",
+          "state": [
+            "299",
+            {
+              "User": "1000",
+              "Type": "wayland",
+              "Class": "user",
+              "Active": "yes",
+              "LockedHint": "yes"
+            }
+          ],
+          "broker": {
+            "broker_errors": [],
+            "helper_exit": "Some(1)",
+            "runs": [
+              {
+                "dma": true,
+                "exit": 1,
+                "stderr": "Traceback (most recent call last):\n  File \"/tmp/pab-dma-cursor-stream-221fefeea7/verify.py\", line 184, in <module>\n    main()\n  File \"/tmp/pab-dma-cursor-stream-221fefeea7/verify.py\", line 94, in main\n    assert struct.unpack(\"<III\", read(source.stdout, 12)) == (0x31424150, width, height)\n  File \"/tmp/pab-dma-cursor-stream-221fefeea7/verify.py\", line 83, in read\n    assert part, \"capture/cursor closed before response\"\nAssertionError: capture/cursor closed before response\n",
+                "stdout": "media: Display did not wake\n\n"
+              }
+            ],
+            "session_unchanged": true,
+            "socket_removed": true
+          }
+        }
+      ],
+      "hashes": {
+        "desktop": "1c61581d5eed32b82cc70bcfb7c0a9b3f86049ad37816f7ed67e8ba8d18e107b",
+        "check": "7c72aeb50396791fe9e1124d6a412c3478ee9a73d845b7aa37f048bf271baa37",
+        "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+        "verify.py": "91527a6627a5df2f35c6de887c44a05b86b5ada1eea8fd28a05bbbf6a7d4082d"
+      },
+      "before": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "after": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "installed_unchanged": true,
+      "owned_workers": [],
+      "stage_removed": true,
+      "service": "active",
+      "local_record": ".build\\remote-desktop\\dma-cursor-stream-221fefeea7\\report.json",
+      "lock_settle_seconds": 0
+    },
+    {
+      "results": [
+        {
+          "phase": "ordinary",
+          "returncode": 0,
+          "stderr": "",
+          "state": [
+            "299",
+            {
+              "User": "1000",
+              "Type": "wayland",
+              "Class": "user",
+              "Active": "yes",
+              "LockedHint": "no"
+            }
+          ],
+          "broker": {
+            "broker_errors": [],
+            "helper_exit": "Some(0)",
+            "runs": [
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.017906998997204937,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.0171021260030102,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": false,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      777,
+                      430
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      24,
+                      24,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 33,
+                  "fd_after": 33,
+                  "stop_seconds": 0.032391311004175805,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media source=gnome_pipewire encoder=openh264_software pixel_format=bgrx cpu_conversion=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              }
+            ],
+            "session_unchanged": true,
+            "socket_removed": true
+          }
+        },
+        {
+          "phase": "locked",
+          "returncode": 0,
+          "stderr": "",
+          "state": [
+            "299",
+            {
+              "User": "1000",
+              "Type": "wayland",
+              "Class": "user",
+              "Active": "yes",
+              "LockedHint": "yes"
+            }
+          ],
+          "broker": {
+            "broker_errors": [],
+            "helper_exit": "Some(0)",
+            "runs": [
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 15,
+                  "fd_after": 15,
+                  "stop_seconds": 0.0342175789992325,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": true,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 15,
+                  "fd_after": 15,
+                  "stop_seconds": 0.03479848300048616,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              },
+              {
+                "dma": false,
+                "exit": 0,
+                "stderr": "",
+                "result": {
+                  "screen": {
+                    "id": "gnome:Virtual-1",
+                    "name": "Unknown Display",
+                    "x": 0,
+                    "y": 0,
+                    "desktop_width": 1314,
+                    "desktop_height": 704,
+                    "pixel_width": 1314,
+                    "pixel_height": 704,
+                    "scale_milli": 1000,
+                    "rotation": "identity",
+                    "primary": true
+                  },
+                  "initial_before_video": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "recovered": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "latest": {
+                    "visible": true,
+                    "position": [
+                      776,
+                      429
+                    ],
+                    "image_id": 1,
+                    "shape": [
+                      64,
+                      64,
+                      4,
+                      4
+                    ]
+                  },
+                  "decoded_frames": 5,
+                  "fd_before": 15,
+                  "fd_after": 15,
+                  "stop_seconds": 0.03426612200564705,
+                  "cursor_socket_removed": true,
+                  "worker_exit": 0,
+                  "stderr": "media: locked-screen idle inhibition acquired\nmedia source=drm_dma encoder=openh264_software direct_bgra=true\n",
+                  "pixel_bytes_saved": 0
+                }
+              }
+            ],
+            "session_unchanged": true,
+            "socket_removed": true
+          }
+        }
+      ],
+      "hashes": {
+        "desktop": "1c61581d5eed32b82cc70bcfb7c0a9b3f86049ad37816f7ed67e8ba8d18e107b",
+        "check": "7c72aeb50396791fe9e1124d6a412c3478ee9a73d845b7aa37f048bf271baa37",
+        "codec.so": "725cce9c95f91f8c5353d25585422d5ed5abe348eacf9d3d2e62adb65822805c",
+        "verify.py": "91527a6627a5df2f35c6de887c44a05b86b5ada1eea8fd28a05bbbf6a7d4082d"
+      },
+      "before": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "after": [
+        "299",
+        {
+          "User": "1000",
+          "Type": "wayland",
+          "Class": "user",
+          "Active": "yes",
+          "LockedHint": "no"
+        }
+      ],
+      "installed_unchanged": true,
+      "owned_workers": [],
+      "stage_removed": true,
+      "service": "active",
+      "local_record": ".build\\remote-desktop\\dma-cursor-stream-d3477d037d\\report.json",
+      "lock_settle_seconds": 2
+    }
+  ],
+  "remaining": [
+    "Rapid lock transition may fail to wake before capture; waiting two seconds in fixture is not a product fix",
+    "Formal remote viewer, cursor movement/hide/shape, system login transition and real multiple displays",
+    "D-Bus failure cancellation latency and prolonged resource/performance checks"
+  ]
+}

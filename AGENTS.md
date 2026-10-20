@@ -1,8 +1,9 @@
 # Build concurrency
 
-The user requires all compilation to use at most 10 cores. Use no more than
-10 concurrent build jobs, including direct Cargo commands and nested builds.
-Do not run concurrent compilation commands whose combined jobs exceed 10.
+The user requires compilation to use at most 10 cores per machine. On each
+machine, use no more than 10 concurrent build jobs across all sessions, including
+direct Cargo commands and nested builds. Account for nested build concurrency
+and other compilations so their combined jobs on one machine never exceed 10.
 Do not update the local installed Pixels application unless necessary: other
 sessions use it.
 

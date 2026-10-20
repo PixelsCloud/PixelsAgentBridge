@@ -1,71 +1,8 @@
 use super::*;
-use crate::runtime::{BridgeAvailability, MemoryDevicePasswordProvider, RuntimeInner};
+use crate::runtime::test_support::runtime;
 use pab_protocol::{DeviceTaskRequest, DeviceTaskResponse};
-use std::{collections::HashMap, sync::atomic::AtomicU64, time::Duration};
-use tokio::sync::{Notify, broadcast, oneshot, watch};
-
-async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
-    let store = RuntimeStore::open(&path.join("runtime.sqlite3"))
-        .await
-        .unwrap();
-    store.start_session("fixture").await.unwrap();
-    let (shutdown, receiver) = watch::channel(false);
-    let account_store = pab_agent_core::account::AccountStore::new(
-        path,
-        &format!("https://{}.invalid", RequestId::new()),
-    )
-    .unwrap();
-    let user = pab_agent_core::account::AccountUser {
-        id: pab_protocol::UserId::new(),
-        username: "fixture".into(),
-        server_admin: false,
-    };
-    let account = account_store
-        .login(pab_agent_core::account::AccountSession {
-            user: user.clone(),
-            access_token: "fixture-token".into(),
-        })
-        .unwrap();
-    Arc::new(BridgeRuntime {
-        account_task: tokio::spawn(async {}),
-        inner: Arc::new(RuntimeInner {
-            account_store,
-            presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {
-                account: Some(crate::desktop_presence::AccountSyncReport {
-                    local_revision: account.revision,
-                    server_revision: Some(account.revision),
-                    user: Some(pab_protocol::UserAttribution {
-                        user_id: user.id,
-                        username: user.username,
-                    }),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            store,
-            screenshot_dir: path.join("screenshots"),
-            terminal_dir: path.to_owned(),
-            session_id: "fixture".into(),
-            passwords: Arc::new(MemoryDevicePasswordProvider::default()),
-            retry_interval: Duration::from_secs(1),
-            events: broadcast::channel(10).0,
-            event_sequence: AtomicU64::new(0),
-            availability: watch::channel(BridgeAvailability::Connecting).1,
-            shutdown: receiver,
-            devices: Mutex::new(HashMap::new()),
-            device_codes: Mutex::new(HashMap::new()),
-            initiated_by: "fixture".into(),
-            operations: Mutex::new(HashMap::new()),
-            terminals: Mutex::new(HashMap::new()),
-            port_forwards: Arc::new(crate::runtime::port_forward::PortForwardManager::default()),
-            reconciliation_notify: Notify::new(),
-        }),
-        shutdown,
-        bridge_task: tokio::spawn(async {}),
-        heartbeat_task: tokio::spawn(async {}),
-        reconciliation_task: tokio::spawn(async {}),
-    })
-}
+use std::time::Duration;
+use tokio::sync::oneshot;
 
 #[tokio::test]
 async fn close_archives_large_tail_serializes_polling_and_records_missing_output() {

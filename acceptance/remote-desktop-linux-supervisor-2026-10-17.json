@@ -1,0 +1,334 @@
+{
+  "date": "2026-10-17",
+  "baseline": "71761c9",
+  "scope": "Linux console media supervision; isolated production IPC, not installed-service/password-login acceptance",
+  "build": {
+    "exit_code": 0,
+    "sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+    "bytes": 45860040,
+    "cargo_jobs": 4,
+    "nested_jobs": 1
+  },
+  "os_tests": {
+    "passed": 16,
+    "failed": 0,
+    "log_sha256": "473516659f05b2ab33280bf69a0c2511436ef7c558b6afdbd7584947cb8509a7"
+  },
+  "executor_test_build": {
+    "cargo_jobs": 2,
+    "nested_jobs": 1,
+    "sha256": "bad04fd7aa89283498cfaa4b9d713ff7f1db2faf9ae9106e24f7f33cbc162092"
+  },
+  "authenticated_ipc": {
+    "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+    "executor_tests_sha256": "bad04fd7aa89283498cfaa4b9d713ff7f1db2faf9ae9106e24f7f33cbc162092",
+    "installed_service_replaced": false,
+    "isolated_ipc_port": 60341,
+    "recovery_unit": "pab-rd-ipc-restore-b428006958e8",
+    "before": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "user_media_ready": true,
+    "greeter_session_manager_running": true,
+    "greeter_media_ready": true,
+    "os_shift_held_verified": true,
+    "os_shift_released_on_switch": true,
+    "authenticated_media_three_phases_passed": true,
+    "restore_active_seat_samples": [
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13"
+    ],
+    "restored": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "configuration_restored": true,
+    "test_stdout": "\nrunning 1 test\nsupervised authenticated phase 0: uid=1000, 1314x742, decoded, native input acknowledged\nsupervised authenticated phase 1: uid=128, 1314x742, decoded, native input acknowledged\nsupervised authenticated phase 2: uid=1000, 1314x742, decoded, native input acknowledged\ntest local_ipc::media::tests::linux_supervisor_authenticated_media_retires_across_console_switch ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 203 filtered out; finished in 8.52s\n\n",
+    "test_stderr": "",
+    "temporary_data_removed": true
+  },
+  "supervisor_lifecycle": {
+    "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+    "installed_service_replaced": false,
+    "ipc_port": 9,
+    "original_session": "13",
+    "before": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "recovery_unit": "pab-rd-supervisor-restore-7650ce85e6cc",
+    "first": {
+      "pid": 185187,
+      "uid": 1000,
+      "data": "/run/pixels-agent-bridge-media/helper-4R8yDx/data",
+      "session": "13",
+      "type": "wayland",
+      "private_bus": false,
+      "process_group": 185187
+    },
+    "singleton_and_root_entry_verified": true,
+    "greeter": {
+      "pid": 185264,
+      "uid": 128,
+      "data": "/run/pixels-agent-bridge-media/helper-ohZ8GP/data",
+      "session": "c16",
+      "type": "x11",
+      "private_bus": true,
+      "process_group": 185264
+    },
+    "previous_user_reaped_and_data_removed": true,
+    "greeter_session_manager_running": true,
+    "returned_user": {
+      "pid": 185522,
+      "uid": 1000,
+      "data": "/run/pixels-agent-bridge-media/helper-3IQQd3/data",
+      "session": "13",
+      "type": "wayland",
+      "private_bus": false,
+      "process_group": 185522
+    },
+    "greeter_reaped_and_data_removed": true,
+    "parent_death_reaped_helper": true,
+    "restart": {
+      "pid": 185539,
+      "uid": 1000,
+      "data": "/run/pixels-agent-bridge-media/helper-I3DokI/data",
+      "session": "13",
+      "type": "wayland",
+      "private_bus": false,
+      "process_group": 185539
+    },
+    "restart_removed_stale_profile": true,
+    "graceful_shutdown_reaped_helper": true,
+    "remaining_profiles": 0,
+    "maximum_simultaneous_helpers": 1,
+    "restore_active_seat_samples": [
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13",
+      "13"
+    ],
+    "restored": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "configuration_restored": true,
+    "temporary_data_removed": true
+  },
+  "earlier_failures": [
+    {
+      "desktop_sha256": "e3d866f235ae4c9796ef674ae0c2705efe224b501608c7b00724296c3c02cb41",
+      "executor_tests_sha256": "8d7a0e10f217af471dd4623d6f140c07b3c30963964a91d679d5906f9cd2c562",
+      "installed_service_replaced": false,
+      "isolated_ipc_port": 56425,
+      "recovery_unit": "pab-rd-ipc-restore-5badb758793f",
+      "before": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "user_media_ready": true,
+      "greeter_media_ready": true,
+      "greeter_session_manager_running": true,
+      "os_shift_held_verified": true,
+      "failure": "Traceback (most recent call last):\n  File \"<string>\", line 11, in <module>\nAssertionError\n",
+      "restore_active_seat_samples": [
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13"
+      ],
+      "restored": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "configuration_restored": true,
+      "test_stdout": "\nrunning 1 test\nsupervised authenticated phase 0: uid=1000, 1314x742, decoded, native input acknowledged\nsupervised authenticated phase 1: uid=128, 1314x742, decoded, native input acknowledged\nsupervised authenticated phase 2: uid=1000, 1314x742, decoded, native input acknowledged\ntest local_ipc::media::tests::linux_supervisor_authenticated_media_retires_across_console_switch ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 203 filtered out; finished in 9.03s\n\n",
+      "test_stderr": "",
+      "diagnostic_directory": "/run/pab-rd-supervisor-ipc-sc1iy3v3"
+    },
+    {
+      "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+      "executor_tests_sha256": "8d7a0e10f217af471dd4623d6f140c07b3c30963964a91d679d5906f9cd2c562",
+      "installed_service_replaced": false,
+      "isolated_ipc_port": 52351,
+      "recovery_unit": "pab-rd-ipc-restore-f8f34601497d",
+      "before": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "user_media_ready": true,
+      "failure": "Rust test stopped before greeter-ready",
+      "restore_active_seat_samples": [
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "c12",
+        "13",
+        "13",
+        "13",
+        "13"
+      ],
+      "restored": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "configuration_restored": true,
+      "test_stdout": "\nrunning 1 test\nsupervised authenticated phase 0: uid=1000, 1314x742, decoded, native input acknowledged\ntest local_ipc::media::tests::linux_supervisor_authenticated_media_retires_across_console_switch ... FAILED\n\nfailures:\n\nfailures:\n    local_ipc::media::tests::linux_supervisor_authenticated_media_retires_across_console_switch\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 3.74s\n\n",
+      "test_stderr": "\nthread 'local_ipc::media::tests::linux_supervisor_authenticated_media_retires_across_console_switch' (183542) panicked at crates/executor/src/local_ipc_media.rs:740:69:\ncalled `Result::unwrap()` on an `Err` value: Rejected { code: MediaUnavailable, message: \"local WebSocket closed\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "diagnostic_directory": "/run/pab-rd-supervisor-ipc-xog35r6w"
+    },
+    {
+      "desktop_sha256": "30dea5f6eb771b92c7f9c8ed8db4c2b2e935efb0dc76f27fc0e9365015c4a51c",
+      "installed_service_replaced": false,
+      "ipc_port": 9,
+      "original_session": "13",
+      "before": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "recovery_unit": "pab-rd-supervisor-restore-50506da47114",
+      "first": {
+        "pid": 184112,
+        "uid": 1000,
+        "data": "/run/pixels-agent-bridge-media/helper-LhrUfY/data",
+        "session": "13",
+        "type": "wayland",
+        "private_bus": false,
+        "process_group": 184112
+      },
+      "singleton_and_root_entry_verified": true,
+      "greeter": {
+        "pid": 184167,
+        "uid": 128,
+        "data": "/run/pixels-agent-bridge-media/helper-0UzPoR/data",
+        "session": "c14",
+        "type": "wayland",
+        "private_bus": true,
+        "process_group": 184167
+      },
+      "failure": "",
+      "restore_active_seat_samples": [
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13",
+        "13"
+      ],
+      "restored": {
+        "User": "1000",
+        "Type": "wayland",
+        "Class": "user",
+        "Active": "yes",
+        "LockedHint": "no"
+      },
+      "configuration_restored": true,
+      "diagnostic_directory": "/run/pab-rd-supervisor-4fh7zan6"
+    }
+  ],
+  "cleanup": {
+    "owned_native_processes": [],
+    "temporary_recovery_and_smoke_directories": [],
+    "gdm_runtime_override_absent": true,
+    "original_session": {
+      "User": "1000",
+      "Type": "wayland",
+      "Class": "user",
+      "Active": "yes",
+      "LockedHint": "no"
+    },
+    "installed_executor_active": true
+  },
+  "packaging": {
+    "bash_syntax_scripts_passed": 4,
+    "python_syntax_passed": true,
+    "systemd_verify_exit_code": 0,
+    "systemd_unrelated_warning": "Existing snapd.service has unsupported RestartMode on the VM"
+  },
+  "not_verified": [
+    "Installed service/upgrade lifecycle",
+    "Password-based system login in formal viewer",
+    "Wayland locked/login-screen media",
+    "Nine-platform-direction and sustained acceptance",
+    "COS publication"
+  ]
+}

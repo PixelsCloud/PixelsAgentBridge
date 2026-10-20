@@ -1,0 +1,184 @@
+{
+  "gui_retired": true,
+  "owned_media_processes": [],
+  "raw_desktop_files_removed": 7,
+  "tcc_modified": false,
+  "installed_application_modified": false,
+  "capture_and_render": {
+    "bundle_sha256": "252568145762bd183074ae28ab80107191d42df45265fde9bd901373780c2177",
+    "launch": "LaunchServices",
+    "source": "actual_desktop",
+    "screens": [
+      {
+        "x": 0,
+        "desktop_width": 1920,
+        "pixel_width": 1920,
+        "id": "1",
+        "y": 0,
+        "desktop_height": 1080,
+        "pixel_height": 1080,
+        "scale_milli": 1000,
+        "rotation": "identity",
+        "primary": true,
+        "name": "29C1"
+      }
+    ],
+    "capture": [
+      {
+        "target_fps": 15,
+        "frames": 60,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "sample_span_us": 4029839,
+        "process_elapsed_seconds": 4.376852833,
+        "compressed_bytes": 340081,
+        "keyframes": [
+          0,
+          30
+        ],
+        "hardware_encoder": true,
+        "cpu_pixel_mappings_per_frame": 0,
+        "dynamic_fps_acceptance": false
+      },
+      {
+        "target_fps": 30,
+        "frames": 90,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "sample_span_us": 3295103,
+        "process_elapsed_seconds": 3.658528125,
+        "compressed_bytes": 329384,
+        "keyframes": [
+          0,
+          60
+        ],
+        "hardware_encoder": true,
+        "cpu_pixel_mappings_per_frame": 0,
+        "dynamic_fps_acceptance": false
+      }
+    ],
+    "stage": "/private/tmp/pab-mac-media-99f879354739/real-capture-391e0428151a",
+    "product_network_acceptance": false,
+    "actual_desktop_native_render": [
+      {
+        "source_target_fps": 15,
+        "software_decoder": false,
+        "accepted": 60,
+        "presented": 60,
+        "summary": {
+          "displayed": 60,
+          "checks": 0,
+          "max_color_error": 0
+        },
+        "diagnostic": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0",
+        "dynamic_performance_acceptance": false
+      },
+      {
+        "source_target_fps": 15,
+        "software_decoder": true,
+        "accepted": 60,
+        "presented": 60,
+        "summary": {
+          "displayed": 60,
+          "checks": 0,
+          "max_color_error": 0
+        },
+        "diagnostic": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1",
+        "dynamic_performance_acceptance": false
+      },
+      {
+        "source_target_fps": 30,
+        "software_decoder": false,
+        "accepted": 90,
+        "presented": 90,
+        "summary": {
+          "displayed": 90,
+          "checks": 0,
+          "max_color_error": 0
+        },
+        "diagnostic": "media decoder=videotoolbox_hardware cpu_pixel_mappings_per_frame=0",
+        "dynamic_performance_acceptance": false
+      },
+      {
+        "source_target_fps": 30,
+        "software_decoder": true,
+        "accepted": 90,
+        "presented": 90,
+        "summary": {
+          "displayed": 90,
+          "checks": 0,
+          "max_color_error": 0
+        },
+        "diagnostic": "media decoder=openh264_software cpu_pixel_mappings_per_frame=1",
+        "dynamic_performance_acceptance": false
+      }
+    ]
+  },
+  "build": [
+    {
+      "stage": 0,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "stage": 1,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "stage": 2,
+      "exit_code": 0,
+      "jobs": 4
+    },
+    {
+      "artifact": "pab-desktop",
+      "sha256": "8ba4c060344d0b9c3f30056f7129efc0af463db768482498c4afb31fd17cc4ed",
+      "bytes": 23907264
+    },
+    {
+      "artifact": "examples/macos_host_check",
+      "sha256": "e04ba2a5529b86733dc92b8445790dac6170195c60d5fbea4211624a6924b5d7",
+      "bytes": 1580864
+    }
+  ],
+  "bundle": {
+    "bundle": "/private/tmp/pab-mac-media-99f879354739/Pixels Presentation Test.app",
+    "source_sha256": "8ba4c060344d0b9c3f30056f7129efc0af463db768482498c4afb31fd17cc4ed",
+    "signed_sha256": "fd5038c46087174da1c223241ddae1f0ff2430b173811225c942e35862392da6",
+    "installed_app_modified": false
+  },
+  "date": "2026-10-17",
+  "baseline": "b01cf79",
+  "finalization_task_id": "ab353cf1-8f84-4fe4-a16e-a2a0dbe50422",
+  "old_renderer_failure": {
+    "accepted": 60,
+    "presentation_events": 60,
+    "metal_displayed": 58
+  },
+  "rust_host_check": {
+    "default_decoder": {
+      "generated_frames": 8,
+      "hidden_ack_withheld": true,
+      "static_restore": true,
+      "pending_frame_cancel": true
+    },
+    "software_decoder": {
+      "generated_frames": 8,
+      "hidden_ack_withheld": true,
+      "static_restore": true,
+      "pending_frame_cancel": true
+    },
+    "runtime_terminated": true
+  },
+  "unit_tests_passed": 11,
+  "source_sha256": {
+    "crates/desktop-media/native/macos/host.h": "75835657e40412789eedab879a612208c23eeee5683c5a5fb376636ecdd470a5",
+    "crates/desktop-media/native/macos/worker.mm": "c93a8c3388ad2a41c1fb4fbd3958ee767ff0098e568f36e0fdd595af92e87859",
+    "crates/desktop-media/src/macos_view.rs": "0e6e7d96b2eae791c222e8a06e8ebad96ebd4080efeeec5be581cf965a6bb762",
+    "crates/desktop-media/examples/macos_host_check.rs": "38b365183425e136f6173adb3d4df748ae416809da54ca559aea1529c96147ba"
+  }
+}

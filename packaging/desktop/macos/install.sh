@@ -1,13 +1,20 @@
 #!/bin/bash
 set -euo pipefail
-[[ $(uname -s) == Darwin && $EUID -eq 0 && $# -eq 2 ]] || {
-    echo 'usage (macOS): sudo bash install.sh WSS_CONTROL_URL HTTPS_RELAY_URL' >&2; exit 2;
+[[ $(uname -s) == Darwin && $EUID -eq 0 && ( $# -eq 0 || $# -eq 2 ) ]] || {
+    echo 'usage (macOS): sudo bash install.sh [WSS_CONTROL_URL HTTPS_RELAY_URL | --defaults PATH.toml]' >&2; exit 2;
 }
-control_url=$1
-relay_url=$2
-[[ $control_url == wss://?* && $relay_url == https://?* && $control_url != *[$'\r\n\t ']* && $relay_url != *[$'\r\n\t ']* ]] || {
-    echo 'Use wss:// control and https:// relay URLs without whitespace' >&2; exit 2;
-}
+server_args=()
+if [[ ${1:-} == --defaults ]]; then
+    [[ -f $2 ]] || { echo 'Missing installer defaults TOML' >&2; exit 2; }
+    server_args=(--defaults "$2")
+elif [[ $# -eq 2 ]]; then
+    control_url=$1
+    relay_url=$2
+    [[ $control_url == wss://?* && $relay_url == https://?* && $control_url != *[$'\r\n\t ']* && $relay_url != *[$'\r\n\t ']* ]] || {
+        echo 'Use wss:// control and https:// relay URLs without whitespace' >&2; exit 2;
+    }
+    server_args=(--control-url "$control_url" --relay-url "$relay_url")
+fi
 desktop_user=${SUDO_USER:-}
 [[ -n $desktop_user && $desktop_user != root ]] || { echo 'Run sudo from the desktop user account' >&2; exit 2; }
 desktop_uid=$(id -u "$desktop_user")
@@ -96,15 +103,18 @@ chown -R root:wheel "$upgrade/new-support/document-runtime"
 for name in pab-mcp pab-executor pab-document-worker run-app.sh run-mcp.sh run-executor.sh uninstall.sh lifecycle.sh; do
     install -m 755 "$source_dir/$name" "$upgrade/new-support/$name"
 done
+if [[ -f $source_dir/THIRD-PARTY-NOTICES.txt ]]; then
+    install -m 644 "$source_dir/THIRD-PARTY-NOTICES.txt" "$upgrade/new-support/THIRD-PARTY-NOTICES.txt"
+fi
 "$upgrade/new-support/pab-executor" configure --config "$upgrade/new-support/config.toml" \
-    --previous "$install_dir" --control-url "$control_url" --relay-url "$relay_url"
+    --previous "$install_dir" ${server_args[@]+"${server_args[@]}"}
 chmod 644 "$upgrade/new-support/config.toml"
 
 # Stop launchd respawn before retiring the old executable paths.
 upgrade_step='停止旧版后台服务 / stopping old services'
-if launchctl print loginwindow/com.pixelsagentbridge.login-helper >/dev/null 2>&1; then
-    launchctl bootout loginwindow/com.pixelsagentbridge.login-helper
-    stopped_domains+=(loginwindow)
+if login_domain=$(pab_loginwindow_domain) && launchctl print "$login_domain/com.pixelsagentbridge.login-helper" >/dev/null 2>&1; then
+    launchctl bootout "$login_domain/com.pixelsagentbridge.login-helper"
+    stopped_domains+=("$login_domain")
     stopped_plists+=(/Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist)
 fi
 while read -r uid; do
@@ -151,6 +161,12 @@ if launchctl print "gui/$desktop_uid" >/dev/null 2>&1; then
             started_jobs+=("gui/$desktop_uid/$agent")
         fi
     done
+fi
+if login_domain=$(pab_loginwindow_domain); then
+    if ! launchctl print "$login_domain/com.pixelsagentbridge.login-helper" >/dev/null 2>&1; then
+        launchctl bootstrap "$login_domain" /Library/LaunchAgents/com.pixelsagentbridge.login-helper.plist
+        started_jobs+=("$login_domain/com.pixelsagentbridge.login-helper")
+    fi
 fi
 committed=1
 printf '%s\n' 'Installed Pixels Agent Bridge. The desktop window opens at sign-in; grant Screen Recording and Accessibility in Settings.'

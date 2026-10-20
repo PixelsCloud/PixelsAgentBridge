@@ -1,0 +1,1880 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-19",
+  "baseline_commit": "c4ec845",
+  "run": "395f4235cb61",
+  "scope": "Latest helper to the product viewer; fresh video session under bounded UDP policing; macOS online-but-inactive display fix",
+  "artifacts": {
+    "mac_common": {
+      "path": "crates/desktop-media/native/macos/common.h",
+      "sha256": "329799c0d5026ac65ac025135740d0d9578aa43fd3aca1d5f09bd99ccec8f280"
+    },
+    "mac_capture": {
+      "path": "crates/desktop-media/native/macos/capture.h",
+      "sha256": "7e050ba5d8b881fbc8d43d2cdad54e091da699d7e57536095d87f26b74262890"
+    },
+    "mac_regression": {
+      "path": "crates/desktop-media/tests/native_macos_online_display.mm",
+      "sha256": "6ba5a5729d816591673431cef4e994c1d8af25a7b9d5fbdf2e4f56c17c89cf89"
+    },
+    "software": {
+      "path": "crates/desktop-media/src/software.rs",
+      "sha256": "a0ac2e89a8c72e6be97baa33fdb240b5db29d2b38414af19c4fd5eff4d5c6092"
+    }
+  },
+  "builds": {
+    "windows_isolated_viewer": {
+      "pab-desktop.exe": "6607a2f5b696af446274e1341a5e8a072ac95ccf512c05068b71693c3e262760",
+      "pab-mcp.exe": "ee83616b7ed75a691518a0ede40bd25104bedb1adc30561b3836986f59d9c3fb"
+    },
+    "mac_initial": [
+      {
+        "step": 0,
+        "exit_code": 0,
+        "log": "/Users/huayang/Library/Application Support/PixelsRemoteDesktopAcceptance/helper-first-frame-395f4235cb61/0.log"
+      },
+      {
+        "step": 1,
+        "exit_code": 0,
+        "log": "/Users/huayang/Library/Application Support/PixelsRemoteDesktopAcceptance/helper-first-frame-395f4235cb61/1.log"
+      },
+      {
+        "step": 2,
+        "exit_code": 0,
+        "log": "/Users/huayang/Library/Application Support/PixelsRemoteDesktopAcceptance/helper-first-frame-395f4235cb61/2.log"
+      },
+      {
+        "artifact": "pab-desktop",
+        "sha256": "60486aefc500359ebb09f92aa2c8b2378f4b42a33b8ce6247976a4cdaf8e40ef",
+        "bytes": 24743952
+      },
+      {
+        "artifact": "pab-executor",
+        "sha256": "5169ed97f19dc6419a6557ec1d63b7f511f1e8a7c5bd9508616008addf902e23",
+        "bytes": 31405888
+      }
+    ],
+    "mac_online_fix": {
+      "desktop_sha256": "99d05fa76216b317ac14c7a9993fe44cd8dcefb81aa02a46289234c87a7e3cea",
+      "native_test_passed": true,
+      "build_exit_code": 0,
+      "jobs": 4
+    },
+    "mac_signed": {
+      "app": "/Users/huayang/Library/Application Support/PixelsRemoteDesktopAcceptance/Pixels Remote Desktop Test.app",
+      "sha256": "5ca5740219f6a8c7777e05d7390b5c5495089584b84adff2f5a6dcd4a3abb432",
+      "unsigned_sha256": "99d05fa76216b317ac14c7a9993fe44cd8dcefb81aa02a46289234c87a7e3cea",
+      "same_signing_identity": true,
+      "exit_code": 0,
+      "previous_sha256": "370619b884d350ea555f8bb776d09916c052fb1c6702f484f96cef2a7354509d",
+      "previous_bundle_backup": "/Users/huayang/Library/Application Support/PixelsRemoteDesktopAcceptance/helper-first-frame-395f4235cb61/online-fix/approved-app-before.app",
+      "installed_app_unchanged": true
+    },
+    "mac_software_tests": {
+      "passed": 15,
+      "failed": 0,
+      "ignored": 1,
+      "seconds": 1.01
+    },
+    "linux_software_tests": {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 1,
+      "seconds": 0.68
+    },
+    "linux_artifacts": {
+      "pab-desktop": {
+        "sha256": "11d2c50f74e28b407529f4892c5d0687999c975ceac267f5ca6380a2cb28a700",
+        "bytes": 47520200
+      },
+      "pab-executor": {
+        "sha256": "fead2d822d6b1becd53f686067b72a768da8931c03bba67fc15c86f387d23c65",
+        "bytes": 45051688
+      },
+      "pab-media-worker": {
+        "sha256": "2afa9ddc19b2c020d9e1c9ca8407fbac92cf742a3d17c3580ab232af371d03f4",
+        "bytes": 2567544
+      }
+    },
+    "jobs_mac": 4,
+    "jobs_linux_docker": 4,
+    "linux_pause_events": [
+      {
+        "action": "paused",
+        "at": 1792406481.152543,
+        "foreign_pids": [
+          49048
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406557.1229284
+      },
+      {
+        "action": "paused",
+        "at": 1792406560.973664,
+        "foreign_pids": [
+          49136
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406564.816179
+      },
+      {
+        "action": "paused",
+        "at": 1792406687.2087955,
+        "foreign_pids": [
+          52560
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406692.636448
+      },
+      {
+        "action": "paused",
+        "at": 1792406707.9290679,
+        "foreign_pids": [
+          36192
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406723.4680626
+      },
+      {
+        "action": "paused",
+        "at": 1792406806.2905333,
+        "foreign_pids": [
+          55288
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406819.5873473
+      },
+      {
+        "action": "paused",
+        "at": 1792406840.454402,
+        "foreign_pids": [
+          57588
+        ]
+      },
+      {
+        "action": "resumed",
+        "at": 1792406843.1758022
+      }
+    ]
+  },
+  "mac": {
+    "pre_fix_gui_probe": {
+      "before": [
+        {
+          "id": 2,
+          "active": false,
+          "online": true,
+          "bounds": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "phases": [],
+      "inventory_code": 1,
+      "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+      "after": [
+        {
+          "id": 2,
+          "active": false,
+          "online": true,
+          "bounds": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ]
+    },
+    "regression": {
+      "exit_code": 0,
+      "stdout": "{\"inactive_online_inventory\":true,\"primary_by_id\":true,\"unplug_rejected\":true,\"geometry_change_rejected\":true}\n",
+      "stderr": ""
+    },
+    "post_fix_product_window": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "ee2cbe13-bb35-4313-bbfc-3166ea9a6c8f",
+          "generation": 1,
+          "screen": {
+            "id": "2",
+            "name": "29C1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "2",
+            "name": "29C1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "ee2cbe13-bb35-4313-bbfc-3166ea9a6c8f",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "lock_screen_visual": {
+      "method": "PrintWindow on the isolated native surface; reviewed locally",
+      "private_path": ".build/remote-desktop/helper-first-frame-395f4235cb61/viewer/owned-surface-1792409819492344400.png",
+      "sha256": "0ab460a3582f974dc67e76a8ac2fc98811e76c0bd1b64f67ba0babe49e8f23e1"
+    },
+    "latest_dynamic_fps_passed": false,
+    "credential_submitted_this_run": false,
+    "reason_dynamic_not_measured": "Input stayed disabled at the login preflight; no credential was submitted or dynamic fixture started. Existing OS-login evidence is retained separately."
+  },
+  "linux": {
+    "baseline": {
+      "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+      "capture_method": "window",
+      "started_unix_ms": 1792409525637,
+      "finished_unix_ms": 1792409535646,
+      "source_dimensions": [
+        1306,
+        768
+      ],
+      "surface_dimensions": [
+        1650,
+        1032
+      ],
+      "surface_hwnd": 429132432,
+      "desktop_pid": 10000,
+      "surface_pid": 53388,
+      "parent_hwnd": 116531642,
+      "surface_screen_bounds": [
+        391,
+        581,
+        2041,
+        1613
+      ],
+      "sample_points": [
+        [
+          597,
+          792
+        ],
+        [
+          680,
+          792
+        ],
+        [
+          762,
+          792
+        ],
+        [
+          845,
+          792
+        ],
+        [
+          927,
+          792
+        ],
+        [
+          1010,
+          792
+        ],
+        [
+          1092,
+          792
+        ],
+        [
+          1175,
+          792
+        ],
+        [
+          1257,
+          792
+        ],
+        [
+          1340,
+          792
+        ],
+        [
+          1422,
+          792
+        ],
+        [
+          1505,
+          792
+        ],
+        [
+          1587,
+          792
+        ],
+        [
+          1670,
+          792
+        ],
+        [
+          1752,
+          792
+        ],
+        [
+          1835,
+          792
+        ],
+        [
+          597,
+          878
+        ],
+        [
+          680,
+          878
+        ],
+        [
+          762,
+          878
+        ],
+        [
+          845,
+          878
+        ],
+        [
+          927,
+          878
+        ],
+        [
+          1010,
+          878
+        ],
+        [
+          1092,
+          878
+        ],
+        [
+          1175,
+          878
+        ],
+        [
+          1257,
+          878
+        ],
+        [
+          1340,
+          878
+        ],
+        [
+          1422,
+          878
+        ],
+        [
+          1505,
+          878
+        ],
+        [
+          1587,
+          878
+        ],
+        [
+          1670,
+          878
+        ],
+        [
+          1752,
+          878
+        ],
+        [
+          1835,
+          878
+        ]
+      ],
+      "first_invalid_sample": null,
+      "first_nonmonotonic_sample": null,
+      "failure": null,
+      "seconds": 10.008673100004671,
+      "samples": 598,
+      "invalid_samples": 0,
+      "sample_hz": 59.74817980614442,
+      "threshold_failures": [],
+      "capture_timing": {
+        "calls": 598,
+        "total_seconds": 9.951743000099668,
+        "max_seconds": 0.0300196999887703,
+        "calls_above_60_hz_budget": 284,
+        "max_sample_gap_seconds": 0.030135799999698065
+      },
+      "repeated_samples": 450,
+      "unique_presentations": 148,
+      "warmup_seconds": 3,
+      "steady_fps": 14.696077064848602,
+      "longest_presentation_gap_seconds": 0.1010794000030728,
+      "events": [
+        [
+          0.02620960000785999,
+          432
+        ],
+        [
+          0.041231600000173785,
+          434
+        ],
+        [
+          0.10819890000857413,
+          436
+        ],
+        [
+          0.17401580000296235,
+          438
+        ],
+        [
+          0.25495600000431295,
+          440
+        ],
+        [
+          0.30682500000693835,
+          442
+        ],
+        [
+          0.37434760000905953,
+          444
+        ],
+        [
+          0.43935610000335146,
+          446
+        ],
+        [
+          0.5064845000015339,
+          448
+        ],
+        [
+          0.5902034000027925,
+          450
+        ],
+        [
+          0.6561939000093844,
+          452
+        ],
+        [
+          0.7243182000092929,
+          454
+        ],
+        [
+          0.7918515000055777,
+          456
+        ],
+        [
+          0.856344200001331,
+          458
+        ],
+        [
+          0.9234264000115218,
+          460
+        ],
+        [
+          0.9928866000118433,
+          462
+        ],
+        [
+          1.0582764000137104,
+          464
+        ],
+        [
+          1.1231646000087494,
+          466
+        ],
+        [
+          1.1889469000016106,
+          468
+        ],
+        [
+          1.2754295000049751,
+          470
+        ],
+        [
+          1.340305800011265,
+          472
+        ],
+        [
+          1.390826200004085,
+          474
+        ],
+        [
+          1.4547634000045946,
+          476
+        ],
+        [
+          1.5404362000117544,
+          478
+        ],
+        [
+          1.5891133000113769,
+          480
+        ],
+        [
+          1.6735775000124704,
+          482
+        ],
+        [
+          1.7398871000041254,
+          484
+        ],
+        [
+          1.8071274000103585,
+          486
+        ],
+        [
+          1.876014400011627,
+          488
+        ],
+        [
+          1.9405272000003606,
+          490
+        ],
+        [
+          2.008451100002276,
+          492
+        ],
+        [
+          2.091761300005601,
+          494
+        ],
+        [
+          2.1399040000105742,
+          496
+        ],
+        [
+          2.2229108000028646,
+          498
+        ],
+        [
+          2.289176700011012,
+          500
+        ],
+        [
+          2.356142800010275,
+          502
+        ],
+        [
+          2.4230654000130016,
+          504
+        ],
+        [
+          2.487882700006594,
+          506
+        ],
+        [
+          2.5569833000045037,
+          508
+        ],
+        [
+          2.623474100008025,
+          510
+        ],
+        [
+          2.6915230000013253,
+          512
+        ],
+        [
+          2.7567454000090947,
+          514
+        ],
+        [
+          2.840349600010086,
+          516
+        ],
+        [
+          2.8907827000075486,
+          518
+        ],
+        [
+          2.9762157000077423,
+          520
+        ],
+        [
+          3.0397174000099767,
+          522
+        ],
+        [
+          3.0897463000001153,
+          524
+        ],
+        [
+          3.190825700003188,
+          526
+        ],
+        [
+          3.2389713000011398,
+          528
+        ],
+        [
+          3.308013600006234,
+          530
+        ],
+        [
+          3.372831500004395,
+          532
+        ],
+        [
+          3.4392536000086693,
+          534
+        ],
+        [
+          3.5088874000066426,
+          536
+        ],
+        [
+          3.5901089000108186,
+          538
+        ],
+        [
+          3.640096800008905,
+          540
+        ],
+        [
+          3.7241986000008183,
+          542
+        ],
+        [
+          3.7742927000072086,
+          544
+        ],
+        [
+          3.8397098000132246,
+          546
+        ],
+        [
+          3.923575900000287,
+          548
+        ],
+        [
+          3.991998600002262,
+          550
+        ],
+        [
+          4.056443000008585,
+          552
+        ],
+        [
+          4.1236143999994965,
+          554
+        ],
+        [
+          4.189557700010482,
+          556
+        ],
+        [
+          4.256423900005757,
+          558
+        ],
+        [
+          4.339303500004462,
+          560
+        ],
+        [
+          4.3908768000110285,
+          562
+        ],
+        [
+          4.45537970001169,
+          564
+        ],
+        [
+          4.539201200008392,
+          566
+        ],
+        [
+          4.589298400009284,
+          568
+        ],
+        [
+          4.67321140000422,
+          570
+        ],
+        [
+          4.725854900010745,
+          572
+        ],
+        [
+          4.808619200004614,
+          574
+        ],
+        [
+          4.8730562000127975,
+          576
+        ],
+        [
+          4.9416588000021875,
+          578
+        ],
+        [
+          5.024776600010227,
+          580
+        ],
+        [
+          5.077035500013153,
+          582
+        ],
+        [
+          5.144376000011107,
+          584
+        ],
+        [
+          5.226107599999523,
+          586
+        ],
+        [
+          5.2775313000020105,
+          588
+        ],
+        [
+          5.359582600009162,
+          590
+        ],
+        [
+          5.412553400004981,
+          592
+        ],
+        [
+          5.493730800008052,
+          594
+        ],
+        [
+          5.561257700013812,
+          596
+        ],
+        [
+          5.626816100004362,
+          598
+        ],
+        [
+          5.690497100003995,
+          600
+        ],
+        [
+          5.760475600007339,
+          602
+        ],
+        [
+          5.826933500007726,
+          604
+        ],
+        [
+          5.893107500000042,
+          606
+        ],
+        [
+          5.979205100011313,
+          608
+        ],
+        [
+          6.03955900001165,
+          610
+        ],
+        [
+          6.088664000009885,
+          612
+        ],
+        [
+          6.172719900001539,
+          614
+        ],
+        [
+          6.238443500013091,
+          616
+        ],
+        [
+          6.2922252999997,
+          618
+        ],
+        [
+          6.373126400008914,
+          620
+        ],
+        [
+          6.439216600003419,
+          622
+        ],
+        [
+          6.5100697000016226,
+          624
+        ],
+        [
+          6.5900196000002325,
+          626
+        ],
+        [
+          6.640606800006935,
+          628
+        ],
+        [
+          6.709323900009622,
+          630
+        ],
+        [
+          6.790372400006163,
+          632
+        ],
+        [
+          6.8410406000039075,
+          634
+        ],
+        [
+          6.923431900009746,
+          636
+        ],
+        [
+          6.975824100009049,
+          638
+        ],
+        [
+          7.058974600004149,
+          640
+        ],
+        [
+          7.123056000011275,
+          642
+        ],
+        [
+          7.173253300003125,
+          644
+        ],
+        [
+          7.256641200001468,
+          646
+        ],
+        [
+          7.323497200006386,
+          648
+        ],
+        [
+          7.390367900006822,
+          650
+        ],
+        [
+          7.455538700000034,
+          652
+        ],
+        [
+          7.524204100001953,
+          654
+        ],
+        [
+          7.5904813000088325,
+          656
+        ],
+        [
+          7.67345890001161,
+          658
+        ],
+        [
+          7.7253726000053575,
+          660
+        ],
+        [
+          7.8082471000088844,
+          662
+        ],
+        [
+          7.856644500003313,
+          664
+        ],
+        [
+          7.9404593000072055,
+          666
+        ],
+        [
+          8.00884790001146,
+          668
+        ],
+        [
+          8.076081100007286,
+          670
+        ],
+        [
+          8.141752200011979,
+          672
+        ],
+        [
+          8.204655200010166,
+          674
+        ],
+        [
+          8.273191700005555,
+          676
+        ],
+        [
+          8.341633900010493,
+          678
+        ],
+        [
+          8.409359700002824,
+          680
+        ],
+        [
+          8.491179200005718,
+          682
+        ],
+        [
+          8.55716240000038,
+          684
+        ],
+        [
+          8.606545800008462,
+          686
+        ],
+        [
+          8.689813400007552,
+          688
+        ],
+        [
+          8.75631229999999,
+          690
+        ],
+        [
+          8.8231669000088,
+          692
+        ],
+        [
+          8.890511900011916,
+          694
+        ],
+        [
+          8.957084100009524,
+          696
+        ],
+        [
+          9.024769600000582,
+          698
+        ],
+        [
+          9.090431200005696,
+          700
+        ],
+        [
+          9.156221500001266,
+          702
+        ],
+        [
+          9.223634000009042,
+          704
+        ],
+        [
+          9.305808000004617,
+          706
+        ],
+        [
+          9.355887100013206,
+          708
+        ],
+        [
+          9.439947100006975,
+          710
+        ],
+        [
+          9.506334900012007,
+          712
+        ],
+        [
+          9.572629700007383,
+          714
+        ],
+        [
+          9.639508200009004,
+          716
+        ],
+        [
+          9.7068799000117,
+          718
+        ],
+        [
+          9.773826400007238,
+          720
+        ],
+        [
+          9.841446400008863,
+          722
+        ],
+        [
+          9.906851900013862,
+          724
+        ],
+        [
+          9.976648200012278,
+          726
+        ]
+      ],
+      "passed": true,
+      "sampler_exit_code": 0
+    },
+    "weak": {
+      "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+      "capture_method": "window",
+      "started_unix_ms": 1792409539027,
+      "finished_unix_ms": 1792409549048,
+      "source_dimensions": [
+        1306,
+        768
+      ],
+      "surface_dimensions": [
+        1650,
+        1032
+      ],
+      "surface_hwnd": 429329040,
+      "desktop_pid": 10000,
+      "surface_pid": 44740,
+      "parent_hwnd": 117121466,
+      "surface_screen_bounds": [
+        467,
+        657,
+        2117,
+        1689
+      ],
+      "sample_points": [
+        [
+          673,
+          868
+        ],
+        [
+          756,
+          868
+        ],
+        [
+          838,
+          868
+        ],
+        [
+          921,
+          868
+        ],
+        [
+          1003,
+          868
+        ],
+        [
+          1086,
+          868
+        ],
+        [
+          1168,
+          868
+        ],
+        [
+          1251,
+          868
+        ],
+        [
+          1333,
+          868
+        ],
+        [
+          1416,
+          868
+        ],
+        [
+          1498,
+          868
+        ],
+        [
+          1581,
+          868
+        ],
+        [
+          1663,
+          868
+        ],
+        [
+          1746,
+          868
+        ],
+        [
+          1828,
+          868
+        ],
+        [
+          1911,
+          868
+        ],
+        [
+          673,
+          954
+        ],
+        [
+          756,
+          954
+        ],
+        [
+          838,
+          954
+        ],
+        [
+          921,
+          954
+        ],
+        [
+          1003,
+          954
+        ],
+        [
+          1086,
+          954
+        ],
+        [
+          1168,
+          954
+        ],
+        [
+          1251,
+          954
+        ],
+        [
+          1333,
+          954
+        ],
+        [
+          1416,
+          954
+        ],
+        [
+          1498,
+          954
+        ],
+        [
+          1581,
+          954
+        ],
+        [
+          1663,
+          954
+        ],
+        [
+          1746,
+          954
+        ],
+        [
+          1828,
+          954
+        ],
+        [
+          1911,
+          954
+        ]
+      ],
+      "first_invalid_sample": null,
+      "first_nonmonotonic_sample": null,
+      "failure": null,
+      "seconds": 10.021053999997093,
+      "samples": 585,
+      "invalid_samples": 0,
+      "sample_hz": 58.37709286869123,
+      "threshold_failures": [
+        "observed_fps_not_above_12"
+      ],
+      "capture_timing": {
+        "calls": 585,
+        "total_seconds": 9.949276800005464,
+        "max_seconds": 0.04747390000557061,
+        "calls_above_60_hz_budget": 288,
+        "max_sample_gap_seconds": 0.047577300007105805
+      },
+      "repeated_samples": 565,
+      "unique_presentations": 20,
+      "warmup_seconds": 3,
+      "steady_fps": 1.7091450941703294,
+      "longest_presentation_gap_seconds": 0.7664351999992505,
+      "events": [
+        [
+          0.02305250000790693,
+          767
+        ],
+        [
+          0.5235208000085549,
+          769
+        ],
+        [
+          0.571093499995186,
+          805
+        ],
+        [
+          0.6056286000093678,
+          807
+        ],
+        [
+          0.6504604000074323,
+          809
+        ],
+        [
+          0.7171566000033636,
+          843
+        ],
+        [
+          1.602772600002936,
+          872
+        ],
+        [
+          2.4392278000013903,
+          898
+        ],
+        [
+          3.3233877000020584,
+          924
+        ],
+        [
+          4.087893800009624,
+          947
+        ],
+        [
+          4.854329000008875,
+          969
+        ],
+        [
+          5.5250479000096675,
+          989
+        ],
+        [
+          6.183981099995435,
+          1009
+        ],
+        [
+          6.784325700005866,
+          1026
+        ],
+        [
+          7.36928510000871,
+          1043
+        ],
+        [
+          7.890266100002918,
+          1058
+        ],
+        [
+          8.385452900009113,
+          1074
+        ],
+        [
+          8.85012679999636,
+          1087
+        ],
+        [
+          9.302588699996704,
+          1100
+        ],
+        [
+          9.754110499998205,
+          1113
+        ]
+      ],
+      "passed": false,
+      "sampler_exit_code": 1
+    },
+    "baseline_status": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "67cfe542-f77f-4219-8d5b-783ced50fe26",
+          "generation": 1,
+          "screen": {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "67cfe542-f77f-4219-8d5b-783ced50fe26",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "weak_status": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "306b9914-3618-4142-b380-16afb682677f",
+          "generation": 1,
+          "screen": {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "x11:0:Virtual1",
+            "name": "Virtual1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1306,
+            "desktop_height": 768,
+            "pixel_width": 1306,
+            "pixel_height": 768,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware",
+      "quality": {
+        "version": 1,
+        "session_id": "306b9914-3618-4142-b380-16afb682677f",
+        "generation": 1,
+        "capture_fps_milli": 15000,
+        "encoder_target_bps": 0
+      }
+    },
+    "baseline_fixture": {
+      "frames_generated": 412,
+      "width": 1306,
+      "height": 768,
+      "updated": 1792409546.7121882,
+      "age_seconds": 0.2368757724761963
+    },
+    "weak_fixture": {
+      "frames_generated": 810,
+      "width": 1306,
+      "height": 768,
+      "updated": 1792409560.269127,
+      "age_seconds": 0.07131528854370117
+    },
+    "baseline_first_frame_seconds": 11.311518799993792,
+    "weak_first_frame_seconds": 2.119441899994854,
+    "policy": {
+      "ports": [
+        39594,
+        50152
+      ],
+      "prefs": [
+        49150,
+        49151,
+        49152,
+        49153
+      ],
+      "created_clsact": true,
+      "before_qdisc": [
+        {
+          "kind": "fq_codel",
+          "handle": "0:",
+          "root": true,
+          "refcnt": 2,
+          "options": {
+            "limit": 10240,
+            "flows": 1024,
+            "quantum": 1514,
+            "target": 4999,
+            "interval": 99999,
+            "memory_limit": 33554432,
+            "ecn": true,
+            "drop_batch": 64
+          }
+        }
+      ],
+      "rate_bps": 350000,
+      "method": "egress UDP source-port policing; drop excess, no delay shaping",
+      "restored": false
+    },
+    "policy_stats": [
+      {
+        "protocol": "ip",
+        "pref": 49150,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 49150,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv4",
+            "ip_proto": "udp",
+            "src_port": 39594
+          },
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "police",
+              "index": 1,
+              "control_action": {
+                "type": "drop"
+              },
+              "overhead": 0,
+              "ref": 1,
+              "bind": 1,
+              "installed": 12,
+              "last_used": 12,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49151,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49151,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv6",
+            "ip_proto": "udp",
+            "src_port": 39594
+          },
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "police",
+              "index": 2,
+              "control_action": {
+                "type": "drop"
+              },
+              "overhead": 0,
+              "ref": 1,
+              "bind": 1,
+              "installed": 12,
+              "last_used": 12,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 49152,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 49152,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv4",
+            "ip_proto": "udp",
+            "src_port": 50152
+          },
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "police",
+              "index": 3,
+              "control_action": {
+                "type": "drop"
+              },
+              "overhead": 0,
+              "ref": 1,
+              "bind": 1,
+              "installed": 12,
+              "last_used": 0,
+              "first_used": 12,
+              "stats": {
+                "bytes": 661408,
+                "packets": 681,
+                "drops": 76,
+                "overlimits": 76,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49153,
+        "kind": "flower",
+        "chain": 0
+      },
+      {
+        "protocol": "ipv6",
+        "pref": 49153,
+        "kind": "flower",
+        "chain": 0,
+        "options": {
+          "handle": 1,
+          "keys": {
+            "eth_type": "ipv6",
+            "ip_proto": "udp",
+            "src_port": 50152
+          },
+          "not_in_hw": true,
+          "actions": [
+            {
+              "order": 1,
+              "kind": "police",
+              "index": 4,
+              "control_action": {
+                "type": "drop"
+              },
+              "overhead": 0,
+              "ref": 1,
+              "bind": 1,
+              "installed": 12,
+              "last_used": 12,
+              "stats": {
+                "bytes": 0,
+                "packets": 0,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fresh_session": true,
+    "policy_active_before_open": true,
+    "post_policing_dynamic_recovery_measured": false,
+    "first_frame_metric": "Local elapsed until first polled native-viewer frame_ready; not a capture-to-display latency measurement",
+    "limitations": [
+      "1306x768 source, not a 1080p performance pass",
+      "350kbit policing per selected UDP source port; excess packets dropped, no RTT shaping",
+      "Weak sample is valid but fails the >12 fps threshold; it only establishes fresh frames under this impaired condition",
+      "Helper Some(0) proves negotiated budget support, not a nonzero live budget transition"
+    ]
+  },
+  "excluded_trials": [
+    {
+      "trial": "initial Linux sample",
+      "reason": "Generated fixture had expired before sampling; all codes invalid. Original metadata still said 1920x1080. Not a valid FPS result."
+    },
+    {
+      "trial": "Linux v2",
+      "reason": "WebView not yet published to CDP; stopped before presentation sampling; original service restored."
+    },
+    {
+      "trial": "Linux v3",
+      "reason": "Freshness preflight incorrectly compared clocks across machines; no presentation sample; original service restored."
+    },
+    {
+      "trial": "Mac first stage",
+      "reason": "Online display inactive in GUI domain; native inventory/capture guard retired the screen. Product bug fixed by the online-display change."
+    },
+    {
+      "trial": "native regression first compile",
+      "reason": "Mock function names bounds/mode collided with local variable names; fixed only the regression harness."
+    },
+    {
+      "trial": "pre-stage Mac open",
+      "reason": "Old service did not support this media capability. Retried once after the candidate connection was verified."
+    },
+    {
+      "trial": "Mac GUI input preflight",
+      "reason": "Enable-control/legacy FPS-button automation did not leave input enabled; credential markers confirm no password submission; no post-fix login pass claimed."
+    }
+  ],
+  "restoration": {
+    "mac": {
+      "stages": [
+        {
+          "id": "395f4235cb61",
+          "restored": {
+            "original_running": true,
+            "pid": 16885,
+            "installed_files_unchanged": true
+          },
+          "jobs_disarmed": true
+        },
+        {
+          "id": "25be0e170b91",
+          "restored": {
+            "original_running": true,
+            "pid": 19371,
+            "installed_files_unchanged": true
+          },
+          "jobs_disarmed": true
+        }
+      ],
+      "probe_job_absent": true,
+      "test_app_path_signature_preserved": true
+    },
+    "linux": {
+      "stages": [
+        {
+          "id": "395f4235cb61",
+          "restored": true,
+          "jobs_inactive": true
+        },
+        {
+          "id": "f103fe59e622",
+          "restored": true,
+          "jobs_inactive": true
+        },
+        {
+          "id": "2db84ee711c9",
+          "restored": true,
+          "jobs_inactive": true
+        },
+        {
+          "id": "58509bcf1b7e",
+          "restored": true,
+          "jobs_inactive": true
+        }
+      ],
+      "network_original_restored": true,
+      "installed_binary_config_unchanged": true,
+      "media_runtime_absent": true,
+      "original_pid": "32323"
+    },
+    "windows_isolated_profile": {
+      "original_slots_unchanged": true,
+      "own_slots_absent": true,
+      "desktop_stopped": true
+    },
+    "runtime_deletions": [
+      {
+        "device_code": "419438177",
+        "path": "/Library/Application Support/PixelsAgentBridgeAcceptance/pab-rd-apple-service-395f4235cb61",
+        "request_id": "1cbc5600-5f67-40c3-bc64-8bde85656e63",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 41,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "419438177",
+        "path": "/Library/Application Support/PixelsAgentBridgeAcceptance/pab-rd-apple-service-25be0e170b91",
+        "request_id": "b8d12691-fe39-4ea6-8bb0-8cc63653bb20",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 42,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-service-395f4235cb61",
+        "request_id": "24c8e9cc-29b6-4a25-a03a-82212bb53e51",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 8,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-service-f103fe59e622",
+        "request_id": "86586ea4-151b-441d-87a4-bd87669c1f88",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 9,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-service-2db84ee711c9",
+        "request_id": "c74c0878-f6ec-4b19-90ba-2fa3d48f02e1",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 9,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-service-58509bcf1b7e",
+        "request_id": "231f01cf-4a98-470a-bfa8-b06e2fe03029",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 11,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-media-395f4235cb61",
+        "request_id": "584c2dec-978c-4dc3-98c6-7a077902a1b6",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 7,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-rd-transfer-395f4235cb61",
+        "request_id": "65bcc6fd-0596-4dba-8b30-985f86da1c66",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 4,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-viewer-hf-395f4235cb61",
+        "request_id": "ba7b242d-b93b-4c6b-889e-44c401d493ec",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 4,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-viewer-f103fe59e622",
+        "request_id": "9a57d9a6-1797-4f9b-92d0-dbf06337dc10",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 3,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-viewer-2db84ee711c9",
+        "request_id": "5e6bdd54-27ad-4a1c-ae85-a2d69777238b",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 3,
+        "partial": false,
+        "source_removed": true
+      },
+      {
+        "device_code": "556688188",
+        "path": "/tmp/pab-linux-viewer-58509bcf1b7e",
+        "request_id": "8eb96cf7-072a-42cb-a28b-a28eac8c7543",
+        "state": "completed",
+        "error": null,
+        "deleted_entries": 3,
+        "partial": false,
+        "source_removed": true
+      }
+    ],
+    "retained": [
+      "ACL-protected local acceptance profile and raw records",
+      "Mac approved fixed-path signed test App, source/build cache and signed bundle backups"
+    ],
+    "local_installed_application_updated": false,
+    "published": false,
+    "long_tests_started": false
+  },
+  "remaining": [
+    "Mac current candidate normal desktop dynamic presentation >12 fps",
+    "Latest-helper nonzero budget and recovery coverage not evidenced by Some(0) alone",
+    "Post-policing same-session dynamic recovery, RTT and path-change gaps",
+    "Final candidate platform/input/lifecycle gaps already assigned in the main checklist; no duplicate LT rows"
+  ]
+}

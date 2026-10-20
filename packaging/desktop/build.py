@@ -59,7 +59,8 @@ def package_windows():
         )),
         *(scripts / "windows" / name for name in (
             "install.ps1", "run-app.ps1", "launch-app.ps1",
-            "run-session-supervisor.ps1", "uninstall.ps1", "installer-logging.ps1", "installer-recovery.ps1", "INSTALL-WINDOWS.txt"
+            "run-session-supervisor.ps1", "uninstall.ps1", "installer-logging.ps1",
+            "installer-recovery.ps1", "INSTALL-WINDOWS.txt", "THIRD-PARTY-NOTICES.txt"
         )),
     ]
     for file in files:
@@ -84,6 +85,7 @@ def package_unix(platform, architecture, binaries):
             ("install.sh", "run-mcp.sh", "run-executor.sh", "uninstall.sh", "lifecycle.sh", "INSTALL-LINUX.txt")
         )),
     ]
+    files.append(scripts / "windows" / "THIRD-PARTY-NOTICES.txt")
     if platform == "macos":
         browser_runtime = root / '.build' / 'browser-runtime' / 'browser-runtime-macos.tar.gz'
         document_runtime = root / '.build' / 'document-runtime' / 'document-runtime-macos.tar.gz'

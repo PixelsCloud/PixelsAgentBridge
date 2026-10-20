@@ -1,0 +1,525 @@
+{
+  "date": "2026-10-18",
+  "baseline": "864bbad",
+  "product_input_changed": false,
+  "build_jobs": 1,
+  "rounds": [
+    {
+      "private_record": ".build\\remote-desktop\\control-90-6b99dea6ba99\\report.json",
+      "sha256": "031ff7ab55fd4f502d39483dcddd7d598ddea2a148d9075d81b0eba57a5607a1",
+      "binary_sha256": "70736e08b8353327b23d55145225633f7a8cf293a25fdd43ca945f89eeb6d7e1",
+      "source_sha256": "44a0b34b0e416fd9adf1eb6b081ffff4d08441072f195ff889b54c2a7d3df7bc",
+      "service_unchanged": true,
+      "temporary_binary_removed": true,
+      "cases": [
+        {
+          "mode": "external-button-self",
+          "task_id": "f13209ff-1284-4365-b9ff-04f0df48afbf",
+          "state": "failed",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514
+          ],
+          "setup": []
+        },
+        {
+          "mode": "external-normal-show-button-self",
+          "task_id": "c8cd5021-5ab1-4602-8986-4401d9d7be45",
+          "state": "succeeded",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-normal-show-doubleclick-self",
+          "task_id": "3fa165f0-2626-426d-881b-d786ed4cff9c",
+          "state": "succeeded",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 2,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514,
+            515,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-normal-show-drag-self",
+          "task_id": "ab286e50-467c-4901-abb6-d19e338f4390",
+          "state": "succeeded",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 1,
+            "drag_ends": 1,
+            "held_moves": 5,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-doubleclick-self",
+          "task_id": "e50e3c7c-2de1-414e-9b72-711f1eb1d85d",
+          "state": "failed",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 2,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 3,
+            "drag_ends": 2,
+            "held_moves": 1,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514,
+            513,
+            514
+          ],
+          "setup": []
+        },
+        {
+          "mode": "external-drag-self",
+          "task_id": "69070144-e47f-4e71-a476-629af991c36f",
+          "state": "failed",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 1,
+            "held_moves": 6,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514
+          ],
+          "setup": []
+        }
+      ]
+    },
+    {
+      "private_record": ".build\\remote-desktop\\control-90-cd18c5df79da\\report.json",
+      "sha256": "a2f3c2720e8fca73d6ff333fa21571a947df522c7be7604cd351d2a75e536882",
+      "binary_sha256": "0b765bbc454c8768aab5f7153a236c419fd702d6d7e0530c42b76559ab7edcdc",
+      "source_sha256": "0b710f6ec6b00ec285353c1ee227f968a17c5970389cf58ba4dabb2ec84ef680",
+      "service_unchanged": true,
+      "temporary_binary_removed": true,
+      "cases": [
+        {
+          "mode": "external-button-self",
+          "task_id": "2a293938-6f48-40de-b87f-ccd33525bdb8",
+          "state": "failed",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514
+          ],
+          "setup": []
+        },
+        {
+          "mode": "external-normal-show-button-self",
+          "task_id": "3548b58c-acae-4769-ae21-11b5527cc30d",
+          "state": "succeeded",
+          "result": {
+            "mode": "button-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 2,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 1,
+            "checked": 0,
+            "drag_starts": 0,
+            "drag_ends": 0,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-normal-show-doubleclick-self",
+          "task_id": "3eeb518b-0ed8-49d2-b57a-aafd993ad17d",
+          "state": "succeeded",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 2,
+            "held_moves": 0,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514,
+            515,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-normal-show-drag-self",
+          "task_id": "2c1c52b0-9438-4765-9abf-e0411b3d14e3",
+          "state": "succeeded",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 0,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 1,
+            "drag_ends": 1,
+            "held_moves": 5,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": true,
+            "interrupted_by_external_input": false,
+            "sequence_ok": true,
+            "left_held": false,
+            "passed": true
+          },
+          "removed_sequence": [
+            513,
+            514
+          ],
+          "setup": [
+            {
+              "normal_show": true,
+              "startup_flags": 256,
+              "startup_show": 0
+            },
+            {
+              "normal_show_state": true,
+              "thread_active_own": true,
+              "foreground_own": false
+            }
+          ]
+        },
+        {
+          "mode": "external-doubleclick-self",
+          "task_id": "071d4022-bed1-4946-8627-7603ee003ddb",
+          "state": "failed",
+          "result": {
+            "mode": "doubleclick-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 4,
+            "injected": true,
+            "raw_down": 2,
+            "raw_up": 2,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 3,
+            "drag_ends": 2,
+            "held_moves": 1,
+            "last_up": [
+              150,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514,
+            513,
+            514
+          ],
+          "setup": []
+        },
+        {
+          "mode": "external-drag-self",
+          "task_id": "11572a86-b956-4a2b-8af8-e668ce531010",
+          "state": "failed",
+          "result": {
+            "mode": "drag-self",
+            "initially_active": false,
+            "active_at_input": false,
+            "submitted": 7,
+            "injected": true,
+            "raw_down": 1,
+            "raw_up": 1,
+            "double_click": 1,
+            "actions": 0,
+            "checked": 0,
+            "drag_starts": 2,
+            "drag_ends": 1,
+            "held_moves": 6,
+            "last_up": [
+              250,
+              80
+            ],
+            "actions_ok": false,
+            "interrupted_by_external_input": false,
+            "sequence_ok": false,
+            "left_held": false,
+            "passed": false
+          },
+          "removed_sequence": [
+            513,
+            515,
+            514
+          ],
+          "setup": []
+        }
+      ]
+    }
+  ],
+  "final_source_sha256": "0b710f6ec6b00ec285353c1ee227f968a17c5970389cf58ba4dabb2ec84ef680",
+  "conclusion": "Normal ShowWindow startup establishes own thread active window without foreground activation; single/double/drag pass. Original SW_SHOWNOACTIVATE first-active-thread boundary still fails.",
+  "scope": "Standalone owned-window cross-process SendInput test, not product viewer input acceptance.",
+  "gate_note": "First round additionally printed a normal-start result. Final source removed that redundant gate; final round passes original unchanged baseline gates.",
+  "remaining": [
+    "Product viewer ordinary-window gesture acceptance",
+    "Uninitialized activity window edge case",
+    "Physical/virtual multiple-screen coordinate and topology change acceptance"
+  ]
+}

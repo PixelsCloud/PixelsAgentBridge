@@ -1,0 +1,142 @@
+{
+  "date": "2026-10-18",
+  "baseline": "bf2e919",
+  "scope": "Ubuntu GNOME 42.9 1314x704 simple animation -> Windows native D3D11 diagnostic; short Direct test, not full Desktop UI or 1080p acceptance",
+  "source_sha256": {
+    "crates/remote-desktop/src/flow.rs": "58afbc35adfed2d129acac12800ef7c98487c370fabcc77fb2ad998d91012245",
+    "crates/remote-desktop/src/host.rs": "84528a1aaf1477ad098bce84b80bd0f0e1c86d16b9425d33738a3b9cb802d57a",
+    "crates/desktop-media/native/linux/capture.h": "24725648353ab70e76658593640dc4ff2f4c9ec236bbd581df01a4e92ce65a3f",
+    "crates/bridge/examples/remote_desktop_check.rs": "86ac3166531e647f5d8c038ba707062bda2256294d8404ac2ac55574ea60e673",
+    "experiments/remote-desktop/linux_flow_fixture.py": "c9c9d1afe28cfa84ace6bd85b7ec2451156a3949b94bd69bf1b7f7309651486c"
+  },
+  "artifact_sha256": {
+    "pab-desktop": "6fe68abc63db46c69180c9eab20917172f286743dbff886d1e667f5869dcda7a",
+    "pab-executor": "3be28536c340748ec0f125d2f743da895e2e31efa2edfc221bf87635ffb1ec5c",
+    "manager.py": "c4ce0f00c7207bf79cbf5a8b9f78412663ab7e6b0a9d06f2fd7ec26b3e86f3ea",
+    "fixture.py": "dae02d04eb51ce797dfc42a03f631b62b45485fbe54b8040a0805b7e866c5a79"
+  },
+  "windows_diagnostic": {
+    "sha256": "a16f43e23283b63ff7bb6693eb392ab0145d6eda53744cc97d936edf175eb0e5",
+    "returncode": 0
+  },
+  "native_result": {
+    "authenticated_product_connection": true,
+    "connection_path": "Some(Direct)",
+    "device_code": "556688188",
+    "generations": [
+      {
+        "display": {
+          "decoder": "d3d11_hardware",
+          "displayed": 90,
+          "test_max_rgb_error": 0,
+          "test_pixel_checks": 0
+        },
+        "effective_display_fps": 14.38561512142207,
+        "generation": 1,
+        "parallel_environment_max_ms": 29.2451,
+        "screen": {
+          "desktop_height": 704,
+          "desktop_width": 1314,
+          "id": "gnome:Virtual-1",
+          "name": "Unknown Display",
+          "pixel_height": 704,
+          "pixel_width": 1314,
+          "primary": true,
+          "rotation": "identity",
+          "scale_milli": 1000,
+          "x": 0,
+          "y": 0
+        },
+        "timing": {
+          "capture_span_us": 5068232,
+          "finish_ms": 94.91460000000001,
+          "measured_intervals": 74,
+          "parallel_environment_max_ms": 29.2451,
+          "receive_span_ms": 5047.4853
+        },
+        "unconfirmed_presentations": 0
+      },
+      {
+        "display": {
+          "decoder": "d3d11_hardware",
+          "displayed": 90,
+          "test_max_rgb_error": 0,
+          "test_pixel_checks": 0
+        },
+        "effective_display_fps": 14.35934765292155,
+        "generation": 2,
+        "parallel_environment_max_ms": 21.94,
+        "screen": {
+          "desktop_height": 704,
+          "desktop_width": 1314,
+          "id": "gnome:Virtual-1",
+          "name": "Unknown Display",
+          "pixel_height": 704,
+          "pixel_width": 1314,
+          "primary": true,
+          "rotation": "identity",
+          "scale_milli": 1000,
+          "x": 0,
+          "y": 0
+        },
+        "timing": {
+          "capture_span_us": 5001449,
+          "finish_ms": 95.9281,
+          "measured_intervals": 74,
+          "parallel_environment_max_ms": 21.94,
+          "receive_span_ms": 5056.9364
+        },
+        "unconfirmed_presentations": 0
+      }
+    ],
+    "legacy_environment_after_close": true,
+    "measured_frames_per_generation": 75,
+    "same_screen_restart": true,
+    "second_viewer_rejected": true,
+    "target_fps": 15,
+    "warmup_frames_per_generation": 15
+  },
+  "tests": {
+    "remote_desktop_unit": 9,
+    "remote_desktop_quic": 31,
+    "bridge": 99,
+    "linux_media": 24,
+    "revised_static_unit": 1
+  },
+  "local_evidence": ".build\\remote-desktop\\formal-linux-login-18e60ef7fd5e",
+  "cleanup_record": {
+    "original": {
+      "session": "299",
+      "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "properties": {
+        "MainPID": "74428",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 03:24:16 CST] ; stop_time=[n/a] ; pid=74428 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      },
+      "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+      "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "staged_sha256": "3be28536c340748ec0f125d2f743da895e2e31efa2edfc221bf87635ffb1ec5c",
+      "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+    },
+    "restored": {
+      "original_service_restored": true,
+      "properties": {
+        "MainPID": "75255",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Sun 2026-10-18 03:30:50 CST] ; stop_time=[n/a] ; pid=75255 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      }
+    },
+    "owned_processes": [],
+    "input_devices": [],
+    "session_restored": true,
+    "rollback_trigger": "",
+    "stage_removed": true,
+    "fixture_removed": true
+  }
+}

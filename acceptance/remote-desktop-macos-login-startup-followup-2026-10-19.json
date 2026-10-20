@@ -1,0 +1,196 @@
+{
+  "date": "2026-10-19",
+  "repeat_logout_passed": true,
+  "repeat_logout_new_permission_prompt": false,
+  "first_boot_harness_failure": "macOS removed test App under /private/tmp",
+  "restaged_boot_password_login_passed": true,
+  "restaged_auto_recovery_passed": false,
+  "restaged_auto_recovery_limitation": "test stage parent permissions prevented Aqua helper startup; corrected to 0711 and restarted only owned helper",
+  "restaged_permission_prompts": [
+    "LoginWindow",
+    "Aqua"
+  ],
+  "restaged_credential_submissions": 1,
+  "build": {
+    "jobs_per_host": 4,
+    "limit_per_host": 10,
+    "seconds": 284,
+    "native_jobs": 1,
+    "task_id": "5aa96932-39c3-4c86-9489-95ba53d6d1cf",
+    "same_signing_identity": true,
+    "app_sha256": "d4b10da0bb6465f365f9b34dbe27c4b521b015ba5375bb3129b1dbda7fa40f8f",
+    "source_archive_sha256": "faa053a54fb56cd5d812ecc01b27eacd8aecf50df80a356bfd33667f629630e4"
+  },
+  "second_boot": {
+    "boot_unix_seconds": 1792377864,
+    "boot_local_time": "2026-10-19 10:44:24",
+    "console_before": 0,
+    "console_after": 501,
+    "automatically_started_loginwindow_helper_pid": 286,
+    "automatically_started_aqua_helper_pid": 1674,
+    "new_permission_prompt": false,
+    "credential_submissions": 1,
+    "automatic_recovery": true,
+    "restored_original_pid": 2042,
+    "private_stage_removed": true,
+    "installed_files_unchanged": true,
+    "after_login_viewer": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "7cd02f91-3770-4d2a-96eb-29e129f9dd85",
+          "generation": 1,
+          "screen": {
+            "id": "2",
+            "name": "29C1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "2",
+            "name": "29C1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware"
+    }
+  },
+  "screenshots": {
+    "repeat_logout": [
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-5d2bb0c9ef4b\\owned-surface-1792376021315166200.png",
+        "sha256": "f4fbbec2a75f295fd59d022b0e7bb6547f1f61ab3746e83881df760615abadb3"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-5d2bb0c9ef4b\\owned-surface-1792376100878057300.png",
+        "sha256": "770d1e2be9f22145f85e0da2d4777e694bb4672ef5c71a273775e93d5c33aa66"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-5d2bb0c9ef4b\\owned-surface-1792376154631696500.png",
+        "sha256": "fe71855cea759e27ced411b0017c947b54f3be75fb13f70602263deabb6c2149"
+      }
+    ],
+    "restaged_after_boot": [
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-d1b2f9998598\\owned-surface-1792377558790267700.png",
+        "sha256": "85aa3f6e8ef4283666ce55fd8cca2ae2e904e2ff7bd850e24328667662543ce4"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-d1b2f9998598\\owned-surface-1792377573372988800.png",
+        "sha256": "1e9d9c188d28cdde4f58486b3094e550577af6c90ac009217f4e501e6c42bf20"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-d1b2f9998598\\owned-surface-1792377663074874100.png",
+        "sha256": "e46b86e071085019e2487198e809bec2283dedeae490c5eef01ffdd1081143f9"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-d1b2f9998598\\owned-surface-1792377698843620200.png",
+        "sha256": "e18361634cac896759943cd63e79b9d8d0cce6cdf833e63d7764b6815311ef5b"
+      }
+    ],
+    "second_boot_automatic": [
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-6808bf1b7371\\owned-surface-1792377923553461200.png",
+        "sha256": "740fcc23f5db1e9ecf0c0f47af372abdcf5a6699cbe7e04f070f38b5d58981ce"
+      },
+      {
+        "local_path": ".build\\remote-desktop\\mac-login-product-6808bf1b7371\\owned-surface-1792377975371619900.png",
+        "sha256": "60016b04b57524f6996380dc37dba4c64e66ff8953b2962b44e07edc9c3b9451"
+      }
+    ]
+  },
+  "cleanup_and_native_test_evidence": [
+    {
+      "task_id": "00b3a783-e2bc-4f0a-a6bd-969288898179",
+      "evidence_sha256": "84b140b1568bfa2cb56baf46aafd7c172d687b40ebc9cab80ea22e99c25e3fd0"
+    },
+    {
+      "task_id": "0554810d-5552-47d0-b4ea-1b2bc7ebd986",
+      "evidence_sha256": "af1c039bfaebd643653054dff647a5e3baf208ffd4b9182d0fb4aaaa68c6c201"
+    },
+    {
+      "task_id": "063f1a9e-dace-4653-9e66-325fa20f5157",
+      "evidence_sha256": "bdaecb60fc6bed520357b04e949f64a4a057d39b9e87a15e687407f6e74f1acb"
+    },
+    {
+      "task_id": "14616446-1f48-4017-ae27-d8be2e93da30",
+      "evidence_sha256": "4ed4fd707fed39845c60147b6a0f18d381dd3c35ca8d28f1c6caea2c9933eadf"
+    },
+    {
+      "task_id": "19408e03-9920-40e9-a651-0086adaf89e8",
+      "evidence_sha256": "4b7d933f9adf84cef6adbd56d3cd24751ebb7f331272a594bc1aa871806aa8af"
+    },
+    {
+      "task_id": "210b5eca-a0f3-4984-a819-b9b52cc1477c",
+      "evidence_sha256": "b96be6403afd1077b310e56cedcea6aa5298087e123464dd3a3cc7f59a662d94"
+    },
+    {
+      "task_id": "2502c4df-b196-421b-a0f4-2fe06745e0ec",
+      "evidence_sha256": "a6fd94280c6c8774371a0ae8b93ec1ab8b9fb5e55919a5975c9a580e77919ef8"
+    },
+    {
+      "task_id": "4d7749f1-dbcc-4e85-bdfc-65bd8c2cd3f6",
+      "evidence_sha256": "be48ded467877f98db08192f806b64065c41fb2d542c43aeb050c50b435bce77"
+    },
+    {
+      "task_id": "598fec6c-45dd-46f1-8873-a4bf36976555",
+      "evidence_sha256": "613bdc29bdbe286e14c6c2dd363bc11bdf36c9488ad9b8cf3894d3ac04d0a9e5"
+    },
+    {
+      "task_id": "5a3a6ff2-57fe-473a-9263-67970975095a",
+      "evidence_sha256": "a94a40de7f67721ff5e5ff2a1f68884cd6ebf93090c9e2cfc92f553a3e954a5c"
+    },
+    {
+      "task_id": "5d4f4428-9cce-41c7-9bd5-cf956063f378",
+      "evidence_sha256": "3f325058760d028413542c50587acb637027575ba03d8eb2ed912b84d40690c8"
+    },
+    {
+      "task_id": "9667ed0a-dfa7-4398-8d94-a360effb275c",
+      "evidence_sha256": "5acbc10af86eebd0eabdea407b9098256e6ab9ed57bd523af56650883ee82c40"
+    },
+    {
+      "task_id": "9ce63516-69e4-4fc7-a96b-c49b74e15989",
+      "evidence_sha256": "ca3cde95747dc7c43117b7d3d56b1489685504cf3e1ea12f0986d774eb451f46"
+    },
+    {
+      "task_id": "e0403d3b-9916-42c9-adcb-4ff22b537aa4",
+      "evidence_sha256": "e775f6c00424390ac9333314bcbc93cf8cafc933796867b179661aa3ef19ad2c"
+    },
+    {
+      "task_id": "ec087b7f-212a-4133-a102-c934eb8b8592",
+      "evidence_sha256": "c0a3ff8dce06650575a2abff260d293a8e0454841ab6e9e3a7cf00caa4b4dd6f"
+    },
+    {
+      "task_id": "f39cbbe9-5e0e-471e-a0f4-d76c93ac7fb9",
+      "evidence_sha256": "c7ddf5aa4aa1f22557cc8b1a180f957eea5c01a27421334845ff7616c0aa77f6"
+    }
+  ]
+}

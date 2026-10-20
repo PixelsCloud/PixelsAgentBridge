@@ -5,13 +5,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const DEFAULT_CONTROL_URL: &str = "wss://pab.rgaa.vip/control";
-pub const DEFAULT_RELAY_URL: &str = "https://pab-relay.rgaa.vip";
+include!(concat!(env!("OUT_DIR"), "/client_defaults.rs"));
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClientConfig {
+    #[serde(default)]
     pub control_url: String,
+    #[serde(default)]
     pub relay_urls: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub control_ca_cert: Option<PathBuf>,
@@ -44,13 +45,7 @@ pub enum Role {
 
 impl ClientConfig {
     pub fn validate(&self) -> Result<(), String> {
-        validate_url(&self.control_url, "wss")?;
-        if self.relay_urls.is_empty() {
-            return Err("At least one relay URL is required".into());
-        }
-        for value in &self.relay_urls {
-            validate_url(value, "https")?;
-        }
+        crate::server_urls::validate_pair(&self.control_url, &self.relay_urls)?;
         for process in [&self.executor, &self.operator] {
             for path in [&process.data_dir, &process.log_dir] {
                 if path.as_ref().is_some_and(|p| p.as_os_str().is_empty()) {
@@ -68,9 +63,14 @@ impl ClientConfig {
     }
 
     pub fn environment(&self, path: &Path, role: Role) -> Vec<(&'static str, OsString)> {
+        let (control, relays) = if self.control_url.is_empty() {
+            (DEFAULT_CONTROL_URL.to_owned(), DEFAULT_RELAY_URL.to_owned())
+        } else {
+            (self.control_url.clone(), self.relay_urls.join(","))
+        };
         let mut values = vec![
-            ("PAB_CONTROL_URL", self.control_url.clone().into()),
-            ("PAB_RELAY_URLS", self.relay_urls.join(",").into()),
+            ("PAB_CONTROL_URL", control.into()),
+            ("PAB_RELAY_URLS", relays.into()),
         ];
         let base = path.parent().unwrap_or(Path::new("."));
         let process = match role {
@@ -100,20 +100,7 @@ impl ClientConfig {
 }
 
 pub(crate) fn validate_url(value: &str, scheme: &str) -> Result<(), String> {
-    let url = url::Url::parse(value).map_err(|_| "Invalid server URL")?;
-    if url.scheme() != scheme
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.fragment().is_some()
-        || value.chars().any(char::is_whitespace)
-        || value.contains(',')
-    {
-        return Err(
-            "Use wss:// control and https:// relay URLs without credentials or whitespace".into(),
-        );
-    }
-    Ok(())
+    crate::server_urls::validate_url(value, scheme)
 }
 
 pub fn installed_path() -> Result<PathBuf, String> {
@@ -146,9 +133,48 @@ pub fn startup(
     let values = if explicit || path.try_exists().map_err(|e| e.to_string())? {
         ClientConfig::load(&path)?.environment(&path, role)
     } else {
-        Vec::new()
+        // Keep the established environment-only development entry point, while
+        // normal installs resolve an empty TOML pair to the compiled defaults.
+        launch_environment(|name| std::env::var(name).ok())?
     };
     Ok((rest, values))
+}
+
+fn launch_environment(
+    mut lookup: impl FnMut(&str) -> Option<String>,
+) -> Result<Vec<(&'static str, OsString)>, String> {
+    let control = lookup("PAB_CONTROL_URL").unwrap_or_default();
+    let relay = lookup("PAB_RELAY_URLS").unwrap_or_default();
+    if control.is_empty() && relay.is_empty() {
+        Ok(vec![
+            ("PAB_CONTROL_URL", DEFAULT_CONTROL_URL.into()),
+            ("PAB_RELAY_URLS", DEFAULT_RELAY_URL.into()),
+        ])
+    } else {
+        crate::server_urls::validate_pair(&control, &split_relays(&relay))?;
+        Ok(vec![
+            ("PAB_CONTROL_URL", control.into()),
+            ("PAB_RELAY_URLS", relay.into()),
+        ])
+    }
+}
+
+fn split_relays(value: &str) -> Vec<String> {
+    if value.is_empty() {
+        Vec::new()
+    } else {
+        value.split(',').map(|s| s.trim().into()).collect()
+    }
+}
+
+/// Empty public builds remain installable and wait for a customer TOML pair.
+pub fn is_unconfigured() -> bool {
+    std::env::var("PAB_CONTROL_URL")
+        .unwrap_or_default()
+        .is_empty()
+        && std::env::var("PAB_RELAY_URLS")
+            .unwrap_or_default()
+            .is_empty()
 }
 
 /// Called by installers using the newly staged executable, before replacing binaries.
@@ -158,6 +184,7 @@ pub fn configure(args: &[String]) -> Result<(), String> {
     let mut previous = None;
     let mut control = None;
     let mut relay = None;
+    let mut defaults = None;
     let mut iter = args.iter();
     while let Some(flag) = iter.next() {
         let value = iter.next().ok_or("Configuration option requires a value")?;
@@ -166,6 +193,7 @@ pub fn configure(args: &[String]) -> Result<(), String> {
             "--previous" => &mut previous,
             "--control-url" => &mut control,
             "--relay-url" => &mut relay,
+            "--defaults" => &mut defaults,
             _ => return Err("Unknown configuration option".into()),
         };
         if slot.replace(value.as_str()).is_some() {
@@ -197,17 +225,22 @@ pub fn configure(args: &[String]) -> Result<(), String> {
             return super::preferences::write(target, text.as_bytes(), true);
         }
     }
-    let config = ClientConfig {
-        control_url: control.unwrap_or(DEFAULT_CONTROL_URL).into(),
-        relay_urls: relay
-            .unwrap_or(DEFAULT_RELAY_URL)
-            .split(',')
-            .map(|s| s.trim().into())
-            .collect(),
-        control_ca_cert: None,
-        relay_ca_cert: None,
-        executor: ProcessConfig::default(),
-        operator: ProcessConfig::default(),
+    let config = if let Some(path) = defaults {
+        if control.is_some() || relay.is_some() {
+            return Err("Use --defaults or an explicit server URL pair".into());
+        }
+        let mut config = ClientConfig::load(Path::new(path))?;
+        config.resolve_paths(Path::new(path).parent().unwrap_or(Path::new(".")));
+        config
+    } else {
+        ClientConfig {
+            control_url: control.unwrap_or("").into(),
+            relay_urls: split_relays(relay.unwrap_or("")),
+            control_ca_cert: None,
+            relay_ca_cert: None,
+            executor: ProcessConfig::default(),
+            operator: ProcessConfig::default(),
+        }
     };
     config.validate()?;
     let text = toml::to_string_pretty(&config).map_err(|_| "Cannot serialize configuration")?;
@@ -348,6 +381,86 @@ fn shell_literal(text: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fresh_config_is_empty_and_customer_values_override_embedded_defaults() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("config.toml");
+        configure(&["--config".into(), path.to_str().unwrap().into()]).unwrap();
+        let config = ClientConfig::load(&path).unwrap();
+        assert!(config.control_url.is_empty() && config.relay_urls.is_empty());
+        let values = config.environment(&path, Role::Operator);
+        assert!(
+            values
+                .iter()
+                .any(|(k, v)| *k == "PAB_CONTROL_URL" && v == DEFAULT_CONTROL_URL)
+        );
+        let customer: ClientConfig = toml::from_str(
+            "control_url='wss://customer.test/control'\nrelay_urls=['https://relay.test']",
+        )
+        .unwrap();
+        let values = customer.environment(&path, Role::Executor);
+        assert!(
+            values
+                .iter()
+                .any(|(k, v)| *k == "PAB_CONTROL_URL" && v == "wss://customer.test/control")
+        );
+        for raw in [
+            "control_url='wss://customer.test'",
+            "relay_urls=['https://relay.test']",
+            "control_url=''\nrelay_urls=['']",
+        ] {
+            let c: ClientConfig = toml::from_str(raw).unwrap();
+            assert!(c.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn install_defaults_are_toml_and_never_overwrite_customer_config() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("installer.toml");
+        let target = root.path().join("config.toml");
+        std::fs::write(
+            &source,
+            "control_url='wss://installer.test'\nrelay_urls=['https://relay.test']",
+        )
+        .unwrap();
+        let args = [
+            "--config".into(),
+            target.to_str().unwrap().into(),
+            "--defaults".into(),
+            source.to_str().unwrap().into(),
+        ];
+        configure(&args).unwrap();
+        assert_eq!(
+            ClientConfig::load(&target).unwrap().control_url,
+            "wss://installer.test"
+        );
+        let customer = "# preserve customer comments\ncontrol_url='wss://customer.test'\nrelay_urls=['https://customer-relay.test']\n";
+        std::fs::write(&target, customer).unwrap();
+        configure(&args).unwrap();
+        assert_eq!(std::fs::read_to_string(target).unwrap(), customer);
+    }
+
+    #[test]
+    fn environment_only_launch_preserves_a_complete_pair_and_rejects_mixing() {
+        let values = launch_environment(|_| None).unwrap();
+        assert!(values[0].1 == DEFAULT_CONTROL_URL);
+        let lookup = |key: &str| match key {
+            "PAB_CONTROL_URL" => Some("wss://developer.test".into()),
+            "PAB_RELAY_URLS" => Some("https://relay.test".into()),
+            _ => None,
+        };
+        assert_eq!(
+            launch_environment(lookup).unwrap()[0].1,
+            "wss://developer.test"
+        );
+        assert!(
+            launch_environment(
+                |key| (key == "PAB_CONTROL_URL").then(|| "wss://developer.test".into())
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn migrate_preserve_and_reject_executable_configuration() {
         let root = tempfile::tempdir().unwrap();

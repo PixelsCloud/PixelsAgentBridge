@@ -1,0 +1,6224 @@
+{
+  "date": "2026-10-19",
+  "source_commit": "90adfbc",
+  "profile": "mixed-product-966fd0257098",
+  "stage": "formal-linux-login-04590f3ba942",
+  "passed": false,
+  "requested_seconds": 1800,
+  "failure": "AssertionError: Inspect actual presentation sample",
+  "artifacts": {
+    "pab-desktop.exe": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+    "pab-mcp.exe": "f2a76f70dbb5c1947c1e027db530141ee973be239ca43a5b09eef33096b2ce93"
+  },
+  "remote_artifacts": {
+    "pab-desktop": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+    "pab-executor": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+    "manager.py": "0a3878216eeb071926ef8ff009853c231fdb626bbb84eeddab6b68fe6d752c76",
+    "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
+  },
+  "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+  "terminal_session_id": "eac84272-2060-4ca4-b573-c1bcc3b01027",
+  "completed_rounds": 36,
+  "rounds": [
+    {
+      "index": 1,
+      "elapsed": 3.5999983083456755e-06,
+      "passed": true,
+      "fps": 14.713196937710771,
+      "sample_hz": 59.99689216098163,
+      "invalid_samples": 0,
+      "host_busy_percent": 17.02819956616052,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 78408,
+          "threads": 12,
+          "cpu_ticks": 156
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 99
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44132,
+          "threads": 3,
+          "cpu_ticks": 19
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231364,
+          "threads": 11,
+          "cpu_ticks": 984
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 72204288,
+          "private": 16855040,
+          "handles": 539,
+          "threads": 45,
+          "cpu_seconds": 1.796875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 117600256,
+          "private": 44199936,
+          "handles": 1250,
+          "threads": 48,
+          "cpu_seconds": 1.109375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 105627648,
+          "private": 86880256,
+          "handles": 645,
+          "threads": 88,
+          "cpu_seconds": 0.34375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 8785920,
+          "private": 2514944,
+          "handles": 159,
+          "threads": 11,
+          "cpu_seconds": 0.03125
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36769792,
+          "private": 12537856,
+          "handles": 335,
+          "threads": 24,
+          "cpu_seconds": 0.15625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83304448,
+          "private": 138694656,
+          "handles": 734,
+          "threads": 96,
+          "cpu_seconds": 1.453125
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 19980288,
+          "private": 7741440,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 97193984,
+          "private": 56250368,
+          "handles": 305,
+          "threads": 17,
+          "cpu_seconds": 0.8125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 72269824,
+          "private": 39665664,
+          "handles": 245,
+          "threads": 14,
+          "cpu_seconds": 0.265625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 2,
+      "elapsed": 30.228561000003538,
+      "passed": true,
+      "fps": 14.69542308907698,
+      "sample_hz": 59.746317933334545,
+      "invalid_samples": 0,
+      "host_busy_percent": 20.1036866359447,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 79360,
+          "threads": 10,
+          "cpu_ticks": 264
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 118
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44132,
+          "threads": 3,
+          "cpu_ticks": 38
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231364,
+          "threads": 11,
+          "cpu_ticks": 3174
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 72409088,
+          "private": 16945152,
+          "handles": 539,
+          "threads": 45,
+          "cpu_seconds": 3.484375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 117878784,
+          "private": 44126208,
+          "handles": 1248,
+          "threads": 48,
+          "cpu_seconds": 1.25
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 106201088,
+          "private": 87465984,
+          "handles": 648,
+          "threads": 89,
+          "cpu_seconds": 0.8125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 16003072,
+          "private": 3465216,
+          "handles": 212,
+          "threads": 14,
+          "cpu_seconds": 0.046875
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36814848,
+          "private": 12587008,
+          "handles": 332,
+          "threads": 24,
+          "cpu_seconds": 0.1875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83365888,
+          "private": 138522624,
+          "handles": 734,
+          "threads": 96,
+          "cpu_seconds": 1.484375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 19980288,
+          "private": 7741440,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 98684928,
+          "private": 55439360,
+          "handles": 361,
+          "threads": 33,
+          "cpu_seconds": 1.3125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 75272192,
+          "private": 40407040,
+          "handles": 309,
+          "threads": 30,
+          "cpu_seconds": 0.328125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 3,
+      "elapsed": 60.39522980000038,
+      "passed": true,
+      "fps": 14.702982271559618,
+      "sample_hz": 59.96772836698409,
+      "invalid_samples": 0,
+      "host_busy_percent": 20.07924335378323,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 79580,
+          "threads": 10,
+          "cpu_ticks": 371
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 137
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44132,
+          "threads": 3,
+          "cpu_ticks": 58
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231364,
+          "threads": 11,
+          "cpu_ticks": 5403
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 72794112,
+          "private": 17133568,
+          "handles": 549,
+          "threads": 43,
+          "cpu_seconds": 5.53125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 123392000,
+          "private": 44285952,
+          "handles": 1254,
+          "threads": 47,
+          "cpu_seconds": 1.890625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 106545152,
+          "private": 87789568,
+          "handles": 648,
+          "threads": 86,
+          "cpu_seconds": 1.1875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11059200,
+          "private": 3129344,
+          "handles": 191,
+          "threads": 11,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36847616,
+          "private": 12120064,
+          "handles": 338,
+          "threads": 22,
+          "cpu_seconds": 0.28125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 82751488,
+          "private": 137281536,
+          "handles": 735,
+          "threads": 95,
+          "cpu_seconds": 1.484375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 100098048,
+          "private": 56582144,
+          "handles": 371,
+          "threads": 34,
+          "cpu_seconds": 1.6875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 75481088,
+          "private": 39739392,
+          "handles": 315,
+          "threads": 30,
+          "cpu_seconds": 0.375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 4,
+      "elapsed": 90.62390849999792,
+      "passed": true,
+      "fps": 14.570133286590686,
+      "sample_hz": 59.996266432372465,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.5230179028133,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81036,
+          "threads": 9,
+          "cpu_ticks": 494
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 159
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44132,
+          "threads": 3,
+          "cpu_ticks": 79
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231364,
+          "threads": 11,
+          "cpu_ticks": 7710
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 72937472,
+          "private": 17166336,
+          "handles": 549,
+          "threads": 43,
+          "cpu_seconds": 7.5625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 124489728,
+          "private": 44699648,
+          "handles": 1254,
+          "threads": 47,
+          "cpu_seconds": 2.484375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 106983424,
+          "private": 88219648,
+          "handles": 650,
+          "threads": 86,
+          "cpu_seconds": 1.59375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11067392,
+          "private": 3129344,
+          "handles": 191,
+          "threads": 11,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36835328,
+          "private": 12075008,
+          "handles": 338,
+          "threads": 21,
+          "cpu_seconds": 0.390625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 82718720,
+          "private": 119762944,
+          "handles": 737,
+          "threads": 96,
+          "cpu_seconds": 1.484375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 101076992,
+          "private": 57225216,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 1.828125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 75153408,
+          "private": 39215104,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.46875
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 5,
+      "elapsed": 120.67955639999855,
+      "passed": true,
+      "fps": 13.98433953747017,
+      "sample_hz": 58.35425609861318,
+      "invalid_samples": 0,
+      "host_busy_percent": 32.04638124362895,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81304,
+          "threads": 11,
+          "cpu_ticks": 631
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 181
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44132,
+          "threads": 3,
+          "cpu_ticks": 100
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 10062
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 72990720,
+          "private": 17276928,
+          "handles": 547,
+          "threads": 42,
+          "cpu_seconds": 9.671875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126484480,
+          "private": 45412352,
+          "handles": 1252,
+          "threads": 46,
+          "cpu_seconds": 2.75
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107446272,
+          "private": 88645632,
+          "handles": 650,
+          "threads": 86,
+          "cpu_seconds": 1.9375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11165696,
+          "private": 3043328,
+          "handles": 189,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36794368,
+          "private": 11939840,
+          "handles": 330,
+          "threads": 18,
+          "cpu_seconds": 0.4375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 82120704,
+          "private": 89387008,
+          "handles": 733,
+          "threads": 95,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 100450304,
+          "private": 56553472,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 2.234375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 74641408,
+          "private": 38694912,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.5
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 6,
+      "elapsed": 150.81500640000013,
+      "passed": true,
+      "fps": 14.142079934541073,
+      "sample_hz": 59.89769573561893,
+      "invalid_samples": 0,
+      "host_busy_percent": 30.74031600407747,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [
+        {
+          "name": "ninja.exe",
+          "pid": 2956
+        },
+        {
+          "name": "cmake.exe",
+          "pid": 45596
+        },
+        {
+          "name": "cl.exe",
+          "pid": 47904
+        },
+        {
+          "name": "cl.exe",
+          "pid": 48160
+        },
+        {
+          "name": "cl.exe",
+          "pid": 50952
+        },
+        {
+          "name": "cl.exe",
+          "pid": 56052
+        },
+        {
+          "name": "cl.exe",
+          "pid": 56308
+        }
+      ],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81348,
+          "threads": 9,
+          "cpu_ticks": 764
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 202
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 121
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 12374
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 73400320,
+          "private": 17330176,
+          "handles": 547,
+          "threads": 43,
+          "cpu_seconds": 12.09375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 125820928,
+          "private": 44662784,
+          "handles": 1247,
+          "threads": 46,
+          "cpu_seconds": 3.015625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107745280,
+          "private": 88862720,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 2.328125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11153408,
+          "private": 2998272,
+          "handles": 185,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36954112,
+          "private": 12115968,
+          "handles": 330,
+          "threads": 18,
+          "cpu_seconds": 0.515625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 82120704,
+          "private": 89387008,
+          "handles": 733,
+          "threads": 95,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 102014976,
+          "private": 57753600,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 2.46875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 75890688,
+          "private": 40464384,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.59375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 7,
+      "elapsed": 180.92560899999808,
+      "passed": true,
+      "fps": 12.838453736630356,
+      "sample_hz": 57.34156894124385,
+      "invalid_samples": 0,
+      "host_busy_percent": 51.74834099030117,
+      "compiler_processes_before": [
+        {
+          "name": "ninja.exe",
+          "pid": 2956
+        },
+        {
+          "name": "cl.exe",
+          "pid": 28352
+        },
+        {
+          "name": "cmake.exe",
+          "pid": 45596
+        },
+        {
+          "name": "link.exe",
+          "pid": 47208
+        },
+        {
+          "name": "link.exe",
+          "pid": 49072
+        },
+        {
+          "name": "cmake.exe",
+          "pid": 55520
+        }
+      ],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81608,
+          "threads": 10,
+          "cpu_ticks": 901
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 226
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 144
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 14760
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 73461760,
+          "private": 17342464,
+          "handles": 548,
+          "threads": 43,
+          "cpu_seconds": 14.140625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126173184,
+          "private": 44990464,
+          "handles": 1247,
+          "threads": 45,
+          "cpu_seconds": 3.421875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107745280,
+          "private": 88862720,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 2.765625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11128832,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36950016,
+          "private": 12111872,
+          "handles": 330,
+          "threads": 18,
+          "cpu_seconds": 0.671875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 82075648,
+          "private": 89243648,
+          "handles": 733,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103669760,
+          "private": 59555840,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 2.78125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 77045760,
+          "private": 41836544,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.65625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 8,
+      "elapsed": 211.0699007000003,
+      "passed": true,
+      "fps": 14.41688571887581,
+      "sample_hz": 54.369151487141856,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.635782747603834,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81608,
+          "threads": 10,
+          "cpu_ticks": 1023
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 247
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 165
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 17070
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 73756672,
+          "private": 17547264,
+          "handles": 548,
+          "threads": 43,
+          "cpu_seconds": 16.6875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126038016,
+          "private": 44634112,
+          "handles": 1249,
+          "threads": 45,
+          "cpu_seconds": 3.671875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107745280,
+          "private": 88862720,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 2.9375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11128832,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36978688,
+          "private": 12140544,
+          "handles": 326,
+          "threads": 18,
+          "cpu_seconds": 0.78125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83619840,
+          "private": 100659200,
+          "handles": 733,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103161856,
+          "private": 58462208,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 2.984375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 78209024,
+          "private": 42860544,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.703125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 9,
+      "elapsed": 241.18908910000027,
+      "passed": true,
+      "fps": 13.987483600043312,
+      "sample_hz": 59.962440726410854,
+      "invalid_samples": 0,
+      "host_busy_percent": 37.651975683890576,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 81608,
+          "threads": 10,
+          "cpu_ticks": 1160
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 269
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 187
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 19393
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 73445376,
+          "private": 17174528,
+          "handles": 545,
+          "threads": 42,
+          "cpu_seconds": 18.78125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126136320,
+          "private": 44691456,
+          "handles": 1245,
+          "threads": 45,
+          "cpu_seconds": 3.859375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107749376,
+          "private": 88862720,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 3.3125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11128832,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36950016,
+          "private": 12107776,
+          "handles": 326,
+          "threads": 18,
+          "cpu_seconds": 0.828125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83480576,
+          "private": 100335616,
+          "handles": 727,
+          "threads": 93,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103178240,
+          "private": 58544128,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 3.203125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 79560704,
+          "private": 44740608,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.75
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 10,
+      "elapsed": 271.27570959999866,
+      "passed": true,
+      "fps": 14.283201666499945,
+      "sample_hz": 58.89274794703089,
+      "invalid_samples": 0,
+      "host_busy_percent": 27.750127616199375,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74608,
+          "threads": 9,
+          "cpu_ticks": 1305
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 292
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 207
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 21687
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 73949184,
+          "private": 17637376,
+          "handles": 545,
+          "threads": 43,
+          "cpu_seconds": 21.359375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126177280,
+          "private": 44752896,
+          "handles": 1246,
+          "threads": 46,
+          "cpu_seconds": 4.171875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107769856,
+          "private": 88883200,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 3.90625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11128832,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36954112,
+          "private": 12111872,
+          "handles": 326,
+          "threads": 18,
+          "cpu_seconds": 0.984375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100417536,
+          "handles": 731,
+          "threads": 95,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20336640,
+          "private": 7696384,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103284736,
+          "private": 58568704,
+          "handles": 368,
+          "threads": 33,
+          "cpu_seconds": 3.328125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 80347136,
+          "private": 45428736,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.765625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 11,
+      "elapsed": 301.4162101999973,
+      "passed": true,
+      "fps": 14.545832477816136,
+      "sample_hz": 57.82876768054971,
+      "invalid_samples": 0,
+      "host_busy_percent": 26.676752395360566,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74612,
+          "threads": 11,
+          "cpu_ticks": 1433
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 312
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 228
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 24022
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74035200,
+          "private": 17854464,
+          "handles": 553,
+          "threads": 45,
+          "cpu_seconds": 23.734375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126423040,
+          "private": 44769280,
+          "handles": 1249,
+          "threads": 45,
+          "cpu_seconds": 4.453125
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107823104,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 4.3125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11161600,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 36970496,
+          "private": 12144640,
+          "handles": 326,
+          "threads": 19,
+          "cpu_seconds": 1.03125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20393984,
+          "private": 7774208,
+          "handles": 192,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103559168,
+          "private": 58572800,
+          "handles": 367,
+          "threads": 34,
+          "cpu_seconds": 3.71875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 81309696,
+          "private": 46415872,
+          "handles": 316,
+          "threads": 31,
+          "cpu_seconds": 0.8125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 12,
+      "elapsed": 331.47608420000324,
+      "passed": true,
+      "fps": 14.560129910621862,
+      "sample_hz": 59.667588565902285,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.309508615188257,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74612,
+          "threads": 9,
+          "cpu_ticks": 1557
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 332
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 248
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 26334
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74203136,
+          "private": 17862656,
+          "handles": 554,
+          "threads": 45,
+          "cpu_seconds": 26.296875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126488576,
+          "private": 44843008,
+          "handles": 1249,
+          "threads": 45,
+          "cpu_seconds": 4.703125
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107823104,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 4.59375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11161600,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37052416,
+          "private": 12230656,
+          "handles": 326,
+          "threads": 19,
+          "cpu_seconds": 1.09375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20393984,
+          "private": 7774208,
+          "handles": 192,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103403520,
+          "private": 58621952,
+          "handles": 367,
+          "threads": 34,
+          "cpu_seconds": 4.0
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 81711104,
+          "private": 46505984,
+          "handles": 316,
+          "threads": 31,
+          "cpu_seconds": 0.890625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 13,
+      "elapsed": 361.58870339999703,
+      "passed": true,
+      "fps": 14.556133194601298,
+      "sample_hz": 59.0565609465641,
+      "invalid_samples": 0,
+      "host_busy_percent": 30.095419847328245,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74620,
+          "threads": 10,
+          "cpu_ticks": 1685
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 353
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 268
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 28651
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74186752,
+          "private": 17899520,
+          "handles": 556,
+          "threads": 46,
+          "cpu_seconds": 28.34375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126689280,
+          "private": 45043712,
+          "handles": 1259,
+          "threads": 47,
+          "cpu_seconds": 4.96875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107827200,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 5.046875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11161600,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37195776,
+          "private": 12357632,
+          "handles": 329,
+          "threads": 19,
+          "cpu_seconds": 1.125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20393984,
+          "private": 7774208,
+          "handles": 192,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103596032,
+          "private": 58634240,
+          "handles": 367,
+          "threads": 34,
+          "cpu_seconds": 4.234375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 82542592,
+          "private": 47214592,
+          "handles": 316,
+          "threads": 31,
+          "cpu_seconds": 0.9375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 14,
+      "elapsed": 391.6374269000007,
+      "passed": true,
+      "fps": 14.558301766671432,
+      "sample_hz": 59.06272138212931,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.595577426982807,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74620,
+          "threads": 9,
+          "cpu_ticks": 1809
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 373
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 288
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 30942
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74362880,
+          "private": 18128896,
+          "handles": 555,
+          "threads": 44,
+          "cpu_seconds": 30.15625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126693376,
+          "private": 45015040,
+          "handles": 1259,
+          "threads": 47,
+          "cpu_seconds": 5.25
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107827200,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 5.4375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37199872,
+          "private": 12361728,
+          "handles": 329,
+          "threads": 19,
+          "cpu_seconds": 1.234375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103759872,
+          "private": 58740736,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 4.65625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 85438464,
+          "private": 47423488,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 0.984375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 15,
+      "elapsed": 421.77780070000154,
+      "passed": true,
+      "fps": 14.555447521786549,
+      "sample_hz": 59.75407540779608,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.916921508712097,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74620,
+          "threads": 8,
+          "cpu_ticks": 1933
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 394
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 308
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 33242
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74416128,
+          "private": 18202624,
+          "handles": 551,
+          "threads": 43,
+          "cpu_seconds": 32.0625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126722048,
+          "private": 45023232,
+          "handles": 1259,
+          "threads": 46,
+          "cpu_seconds": 5.328125
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 5.703125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37117952,
+          "private": 12275712,
+          "handles": 329,
+          "threads": 19,
+          "cpu_seconds": 1.296875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103833600,
+          "private": 59052032,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 4.890625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 86691840,
+          "private": 48525312,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.0
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 16,
+      "elapsed": 451.9321784999993,
+      "passed": true,
+      "fps": 14.561769333773729,
+      "sample_hz": 59.672292364471495,
+      "invalid_samples": 0,
+      "host_busy_percent": 22.26482617586912,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74620,
+          "threads": 10,
+          "cpu_ticks": 2054
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 414
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 329
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 35564
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74280960,
+          "private": 17879040,
+          "handles": 547,
+          "threads": 41,
+          "cpu_seconds": 34.1875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 127246336,
+          "private": 45604864,
+          "handles": 1251,
+          "threads": 44,
+          "cpu_seconds": 5.515625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 6.0
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37384192,
+          "private": 12513280,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 103919616,
+          "private": 58945536,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 5.171875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 87891968,
+          "private": 49782784,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.09375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 17,
+      "elapsed": 482.02102269999887,
+      "passed": true,
+      "fps": 14.570005914417928,
+      "sample_hz": 59.99589928027102,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.606850715746422,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74620,
+          "threads": 9,
+          "cpu_ticks": 2180
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 435
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 351
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 37934
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 74555392,
+          "private": 18251776,
+          "handles": 547,
+          "threads": 42,
+          "cpu_seconds": 36.46875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 126836736,
+          "private": 45092864,
+          "handles": 1247,
+          "threads": 44,
+          "cpu_seconds": 5.796875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 6.390625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37236736,
+          "private": 12353536,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.46875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83525632,
+          "private": 100380672,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 104538112,
+          "private": 59645952,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 5.40625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 86495232,
+          "private": 48005120,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.1875
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 18,
+      "elapsed": 512.1574134000039,
+      "passed": true,
+      "fps": 14.427635487258033,
+      "sample_hz": 59.99727552375215,
+      "invalid_samples": 0,
+      "host_busy_percent": 24.13087934555566,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74624,
+          "threads": 9,
+          "cpu_ticks": 2305
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 455
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 371
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 40278
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75067392,
+          "private": 18272256,
+          "handles": 552,
+          "threads": 42,
+          "cpu_seconds": 38.875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 133214208,
+          "private": 47206400,
+          "handles": 1335,
+          "threads": 55,
+          "cpu_seconds": 5.96875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 6.90625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37236736,
+          "private": 12353536,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.5
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83509248,
+          "private": 100335616,
+          "handles": 727,
+          "threads": 93,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 104591360,
+          "private": 59600896,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 5.609375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 86396928,
+          "private": 48197632,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.203125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 19,
+      "elapsed": 542.3270797000005,
+      "passed": true,
+      "fps": 14.570222157025373,
+      "sample_hz": 59.996522601525236,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.64726901480347,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74624,
+          "threads": 9,
+          "cpu_ticks": 2433
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43108,
+          "threads": 3,
+          "cpu_ticks": 476
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 392
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 42593
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75386880,
+          "private": 18575360,
+          "handles": 552,
+          "threads": 42,
+          "cpu_seconds": 40.84375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132632576,
+          "private": 46514176,
+          "handles": 1317,
+          "threads": 52,
+          "cpu_seconds": 6.171875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 7.3125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11141120,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37232640,
+          "private": 12349440,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.515625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83529728,
+          "private": 100380672,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 104611840,
+          "private": 59809792,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 5.765625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 86736896,
+          "private": 48254976,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.25
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 20,
+      "elapsed": 572.4866547999991,
+      "passed": true,
+      "fps": 14.684567924832646,
+      "sample_hz": 58.91653765441407,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.87030890988001,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74628,
+          "threads": 9,
+          "cpu_ticks": 2553
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43280,
+          "threads": 3,
+          "cpu_ticks": 497
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 413
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 44939
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75440128,
+          "private": 18640896,
+          "handles": 552,
+          "threads": 44,
+          "cpu_seconds": 42.96875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132698112,
+          "private": 46555136,
+          "handles": 1317,
+          "threads": 51,
+          "cpu_seconds": 6.5
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107835392,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 7.6875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11173888,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37236736,
+          "private": 12353536,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.59375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83529728,
+          "private": 100380672,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105574400,
+          "private": 60739584,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 6.03125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 87285760,
+          "private": 48865280,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.28125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 21,
+      "elapsed": 602.6925025000019,
+      "passed": true,
+      "fps": 14.28202095508899,
+      "sample_hz": 59.98914076572004,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.07029652351738,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74640,
+          "threads": 9,
+          "cpu_ticks": 2684
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 520
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 435
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 47261
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75169792,
+          "private": 18194432,
+          "handles": 550,
+          "threads": 44,
+          "cpu_seconds": 45.375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132276224,
+          "private": 46014464,
+          "handles": 1313,
+          "threads": 50,
+          "cpu_seconds": 6.890625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107839488,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 8.421875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11190272,
+          "private": 3035136,
+          "handles": 179,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37036032,
+          "private": 12128256,
+          "handles": 325,
+          "threads": 18,
+          "cpu_seconds": 1.703125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83533824,
+          "private": 100380672,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20418560,
+          "private": 7766016,
+          "handles": 192,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 104648704,
+          "private": 59535360,
+          "handles": 367,
+          "threads": 34,
+          "cpu_seconds": 6.375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 88006656,
+          "private": 49704960,
+          "handles": 316,
+          "threads": 31,
+          "cpu_seconds": 1.34375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 22,
+      "elapsed": 632.874324299999,
+      "passed": true,
+      "fps": 14.274494125500729,
+      "sample_hz": 59.96700495456852,
+      "invalid_samples": 0,
+      "host_busy_percent": 32.64203117144294,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74652,
+          "threads": 9,
+          "cpu_ticks": 2833
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 549
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 458
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 49747
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75980800,
+          "private": 18968576,
+          "handles": 552,
+          "threads": 44,
+          "cpu_seconds": 47.890625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132538368,
+          "private": 46350336,
+          "handles": 1313,
+          "threads": 49,
+          "cpu_seconds": 7.109375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107839488,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 8.828125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11177984,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37056512,
+          "private": 12152832,
+          "handles": 325,
+          "threads": 18,
+          "cpu_seconds": 1.75
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83533824,
+          "private": 100380672,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20418560,
+          "private": 7766016,
+          "handles": 192,
+          "threads": 9,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105185280,
+          "private": 60162048,
+          "handles": 367,
+          "threads": 34,
+          "cpu_seconds": 6.65625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 88334336,
+          "private": 49799168,
+          "handles": 316,
+          "threads": 31,
+          "cpu_seconds": 1.40625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 23,
+      "elapsed": 662.904690299998,
+      "passed": true,
+      "fps": 14.400161966169913,
+      "sample_hz": 58.01987455321871,
+      "invalid_samples": 0,
+      "host_busy_percent": 24.790396341472313,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 2966
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 576
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 480
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 51995
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 75644928,
+          "private": 18595840,
+          "handles": 552,
+          "threads": 43,
+          "cpu_seconds": 50.078125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132390912,
+          "private": 46112768,
+          "handles": 1313,
+          "threads": 49,
+          "cpu_seconds": 7.34375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 9.421875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11177984,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37191680,
+          "private": 12275712,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83533824,
+          "private": 100380672,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.5625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105381888,
+          "private": 60272640,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 6.921875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 88387584,
+          "private": 49856512,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.46875
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 24,
+      "elapsed": 693.1054341999989,
+      "passed": true,
+      "fps": 14.269162872157553,
+      "sample_hz": 56.55408034890391,
+      "invalid_samples": 0,
+      "host_busy_percent": 24.062021439509955,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 3098
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 603
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 503
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 54282
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76247040,
+          "private": 19349504,
+          "handles": 557,
+          "threads": 44,
+          "cpu_seconds": 52.53125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132673536,
+          "private": 46514176,
+          "handles": 1313,
+          "threads": 49,
+          "cpu_seconds": 7.640625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 9.890625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11177984,
+          "private": 2994176,
+          "handles": 179,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37101568,
+          "private": 12181504,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.90625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83685376,
+          "private": 102285312,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.578125
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 104632320,
+          "private": 59658240,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 7.234375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 88842240,
+          "private": 49954816,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.53125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 25,
+      "elapsed": 723.1549341999998,
+      "passed": true,
+      "fps": 14.125004952672878,
+      "sample_hz": 51.55438931623787,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.35732516590097,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 3222
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 624
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 524
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 56618
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76267520,
+          "private": 19312640,
+          "handles": 555,
+          "threads": 43,
+          "cpu_seconds": 54.96875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132423680,
+          "private": 46174208,
+          "handles": 1308,
+          "threads": 50,
+          "cpu_seconds": 7.828125
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 10.203125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37105664,
+          "private": 12185600,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.953125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83587072,
+          "private": 102187008,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.578125
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105111552,
+          "private": 59953152,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 7.453125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89186304,
+          "private": 50352128,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.5625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 26,
+      "elapsed": 753.3446805999993,
+      "passed": true,
+      "fps": 14.39967416247405,
+      "sample_hz": 57.519199329582975,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.23572884811417,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 10,
+          "cpu_ticks": 3348
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 650
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 545
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 58678
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76230656,
+          "private": 19439616,
+          "handles": 558,
+          "threads": 44,
+          "cpu_seconds": 57.515625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132976640,
+          "private": 46813184,
+          "handles": 1308,
+          "threads": 49,
+          "cpu_seconds": 7.9375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 10.71875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37412864,
+          "private": 12521472,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 1.984375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83480576,
+          "private": 101900288,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.578125
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105205760,
+          "private": 60030976,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 7.609375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89493504,
+          "private": 50708480,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.609375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 27,
+      "elapsed": 783.5499395000006,
+      "passed": true,
+      "fps": 14.282746331022548,
+      "sample_hz": 59.49134638874219,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.784839203675343,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 10,
+          "cpu_ticks": 3469
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 671
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 564
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 61022
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76427264,
+          "private": 19521536,
+          "handles": 562,
+          "threads": 44,
+          "cpu_seconds": 59.859375
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132571136,
+          "private": 46309376,
+          "handles": 1308,
+          "threads": 49,
+          "cpu_seconds": 8.171875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 11.125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37416960,
+          "private": 12521472,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.046875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83443712,
+          "private": 101863424,
+          "handles": 727,
+          "threads": 94,
+          "cpu_seconds": 1.59375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105115648,
+          "private": 59994112,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 7.828125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89767936,
+          "private": 51073024,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.640625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 28,
+      "elapsed": 813.5629333000034,
+      "passed": true,
+      "fps": 14.551462509725217,
+      "sample_hz": 59.8425230519023,
+      "invalid_samples": 0,
+      "host_busy_percent": 21.990030674846626,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 3592
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 693
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 585
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 63357
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76488704,
+          "private": 19730432,
+          "handles": 562,
+          "threads": 45,
+          "cpu_seconds": 62.25
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132972544,
+          "private": 46714880,
+          "handles": 1308,
+          "threads": 49,
+          "cpu_seconds": 8.40625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 11.375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37265408,
+          "private": 12357632,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.109375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83451904,
+          "private": 101863424,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.609375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105119744,
+          "private": 59998208,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 8.0
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89911296,
+          "private": 51191808,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.6875
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 29,
+      "elapsed": 843.7082249000014,
+      "passed": true,
+      "fps": 14.414979132896347,
+      "sample_hz": 59.06101677589391,
+      "invalid_samples": 0,
+      "host_busy_percent": 22.45158002038736,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 10,
+          "cpu_ticks": 3715
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 714
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 604
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 65681
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76500992,
+          "private": 19697664,
+          "handles": 560,
+          "threads": 44,
+          "cpu_seconds": 64.328125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132694016,
+          "private": 46292992,
+          "handles": 1304,
+          "threads": 49,
+          "cpu_seconds": 8.609375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 11.71875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37265408,
+          "private": 12357632,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.171875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83451904,
+          "private": 101863424,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.609375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105275392,
+          "private": 60129280,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 8.15625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 90124288,
+          "private": 51437568,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.734375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 30,
+      "elapsed": 873.8803937999983,
+      "passed": true,
+      "fps": 14.40121898761955,
+      "sample_hz": 58.222591899626124,
+      "invalid_samples": 0,
+      "host_busy_percent": 22.517866258295047,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 3836
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 734
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 625
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 68012
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76533760,
+          "private": 19730432,
+          "handles": 560,
+          "threads": 45,
+          "cpu_seconds": 66.546875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132870144,
+          "private": 46415872,
+          "handles": 1309,
+          "threads": 49,
+          "cpu_seconds": 9.046875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 11.9375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37269504,
+          "private": 12361728,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.3125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83451904,
+          "private": 101863424,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.609375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105246720,
+          "private": 60133376,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 8.390625
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 90038272,
+          "private": 50843648,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.8125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 31,
+      "elapsed": 903.9599968999973,
+      "passed": true,
+      "fps": 14.560085017187673,
+      "sample_hz": 58.967841298054886,
+      "invalid_samples": 0,
+      "host_busy_percent": 22.335122699386503,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 10,
+          "cpu_ticks": 3956
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 756
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 645
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 70316
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76541952,
+          "private": 19730432,
+          "handles": 562,
+          "threads": 45,
+          "cpu_seconds": 68.390625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132440064,
+          "private": 45985792,
+          "handles": 1308,
+          "threads": 50,
+          "cpu_seconds": 9.3125
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 12.1875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37339136,
+          "private": 12431360,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.40625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83451904,
+          "private": 101863424,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.609375
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20389888,
+          "private": 7712768,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105816064,
+          "private": 60956672,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 8.703125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89976832,
+          "private": 50667520,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.859375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 32,
+      "elapsed": 934.0919437999983,
+      "passed": true,
+      "fps": 14.427905683780164,
+      "sample_hz": 59.99806206259413,
+      "invalid_samples": 0,
+      "host_busy_percent": 24.76993865030675,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 9,
+          "cpu_ticks": 4074
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 777
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 667
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 72682
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76439552,
+          "private": 19726336,
+          "handles": 562,
+          "threads": 45,
+          "cpu_seconds": 70.546875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 132718592,
+          "private": 46354432,
+          "handles": 1308,
+          "threads": 50,
+          "cpu_seconds": 9.59375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 12.53125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37044224,
+          "private": 12111872,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.5
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 83451904,
+          "private": 101863424,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20385792,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105168896,
+          "private": 60100608,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 9.109375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 90730496,
+          "private": 51384320,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 1.90625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 33,
+      "elapsed": 964.2416836999982,
+      "passed": true,
+      "fps": 14.555437344168045,
+      "sample_hz": 57.15604414427897,
+      "invalid_samples": 0,
+      "host_busy_percent": 23.28346758731269,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 74656,
+          "threads": 10,
+          "cpu_ticks": 4195
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 799
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 687
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 74993
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76959744,
+          "private": 20090880,
+          "handles": 566,
+          "threads": 46,
+          "cpu_seconds": 72.1875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 134230016,
+          "private": 46551040,
+          "handles": 1343,
+          "threads": 52,
+          "cpu_seconds": 10.1875
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 12.796875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37195776,
+          "private": 12279808,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.578125
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 85749760,
+          "private": 111558656,
+          "handles": 731,
+          "threads": 95,
+          "cpu_seconds": 1.765625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20385792,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105119744,
+          "private": 59568128,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 9.53125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89075712,
+          "private": 49618944,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 2.015625
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 34,
+      "elapsed": 994.4068537999992,
+      "passed": true,
+      "fps": 14.420424712624078,
+      "sample_hz": 57.27734909950012,
+      "invalid_samples": 0,
+      "host_busy_percent": 21.579887697805002,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 95028,
+          "threads": 11,
+          "cpu_ticks": 4341
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 821
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 708
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 77349
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76689408,
+          "private": 19816448,
+          "handles": 565,
+          "threads": 45,
+          "cpu_seconds": 74.453125
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 134094848,
+          "private": 46374912,
+          "handles": 1332,
+          "threads": 50,
+          "cpu_seconds": 10.59375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 13.03125
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37195776,
+          "private": 12279808,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.6875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 85172224,
+          "private": 106319872,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.765625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20385792,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105738240,
+          "private": 60329984,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 9.859375
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89374720,
+          "private": 49668096,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 2.03125
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 35,
+      "elapsed": 1024.6008119000035,
+      "passed": true,
+      "fps": 14.558051593772877,
+      "sample_hz": 59.961432207217364,
+      "invalid_samples": 0,
+      "host_busy_percent": 22.62269938650307,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 95028,
+          "threads": 9,
+          "cpu_ticks": 4462
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 842
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 727
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 79597
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76668928,
+          "private": 19816448,
+          "handles": 567,
+          "threads": 45,
+          "cpu_seconds": 76.265625
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 134377472,
+          "private": 46764032,
+          "handles": 1332,
+          "threads": 50,
+          "cpu_seconds": 10.734375
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 13.1875
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37122048,
+          "private": 12197888,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.734375
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 85172224,
+          "private": 106319872,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.765625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20402176,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 105164800,
+          "private": 59678720,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 10.078125
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 89780224,
+          "private": 50008064,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 2.09375
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 36,
+      "elapsed": 1054.7250577000013,
+      "passed": true,
+      "fps": 14.423164802221368,
+      "sample_hz": 55.58541438726117,
+      "invalid_samples": 0,
+      "host_busy_percent": 25.22970903523094,
+      "compiler_processes_before": [],
+      "compiler_processes_after": [],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 95064,
+          "threads": 9,
+          "cpu_ticks": 4589
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 864
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 749
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 81937
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 76435456,
+          "private": 19566592,
+          "handles": 565,
+          "threads": 45,
+          "cpu_seconds": 78.75
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 134287360,
+          "private": 46555136,
+          "handles": 1330,
+          "threads": 49,
+          "cpu_seconds": 10.90625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 107847680,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 13.34375
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 11157504,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 37416960,
+          "private": 12525568,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.765625
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 85172224,
+          "private": 106319872,
+          "handles": 729,
+          "threads": 94,
+          "cpu_seconds": 1.765625
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 20402176,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 107077632,
+          "private": 61509632,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 10.296875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 90382336,
+          "private": 50675712,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 2.171875
+        }
+      ],
+      "business_completed": true
+    },
+    {
+      "index": 37,
+      "elapsed": 1084.7405346000014,
+      "passed": false,
+      "fps": 10.272665945429344,
+      "sample_hz": 29.373882506106405,
+      "invalid_samples": 0,
+      "host_busy_percent": 51.0779122541134,
+      "compiler_processes_before": [
+        {
+          "name": "cl.exe",
+          "pid": 40992
+        },
+        {
+          "name": "ninja.exe",
+          "pid": 44120
+        },
+        {
+          "name": "cl.exe",
+          "pid": 45008
+        },
+        {
+          "name": "cmake.exe",
+          "pid": 50024
+        },
+        {
+          "name": "cl.exe",
+          "pid": 53544
+        },
+        {
+          "name": "cl.exe",
+          "pid": 54724
+        },
+        {
+          "name": "cl.exe",
+          "pid": 55864
+        }
+      ],
+      "compiler_processes_after": [
+        {
+          "name": "cl.exe",
+          "pid": 1200
+        },
+        {
+          "name": "cl.exe",
+          "pid": 4912
+        },
+        {
+          "name": "cl.exe",
+          "pid": 10368
+        },
+        {
+          "name": "ninja.exe",
+          "pid": 44120
+        },
+        {
+          "name": "cl.exe",
+          "pid": 44360
+        },
+        {
+          "name": "cl.exe",
+          "pid": 45832
+        },
+        {
+          "name": "cl.exe",
+          "pid": 49712
+        },
+        {
+          "name": "cmake.exe",
+          "pid": 50024
+        },
+        {
+          "name": "cl.exe",
+          "pid": 51588
+        },
+        {
+          "name": "cl.exe",
+          "pid": 51788
+        },
+        {
+          "name": "cl.exe",
+          "pid": 54592
+        },
+        {
+          "name": "cl.exe",
+          "pid": 55988
+        }
+      ],
+      "remote_processes": [
+        {
+          "pid": 77938,
+          "mode": "executor",
+          "worker": null,
+          "fds": 35,
+          "rss_kib": 95064,
+          "threads": 9,
+          "cpu_ticks": 4743
+        },
+        {
+          "pid": 77943,
+          "mode": "--media-supervisor",
+          "worker": null,
+          "fds": 15,
+          "rss_kib": 43284,
+          "threads": 3,
+          "cpu_ticks": 897
+        },
+        {
+          "pid": 77972,
+          "mode": "--media-helper",
+          "worker": null,
+          "fds": 19,
+          "rss_kib": 44180,
+          "threads": 3,
+          "cpu_ticks": 772
+        },
+        {
+          "pid": 78184,
+          "mode": "--media-worker",
+          "worker": "capture",
+          "fds": 34,
+          "rss_kib": 231424,
+          "threads": 11,
+          "cpu_ticks": 84238
+        }
+      ],
+      "local_processes": [
+        {
+          "pid": 46228,
+          "name": "pab-desktop.exe",
+          "rss": 41033728,
+          "private": 20062208,
+          "handles": 567,
+          "threads": 45,
+          "cpu_seconds": 81.46875
+        },
+        {
+          "pid": 54648,
+          "name": "msedgewebview2.exe",
+          "rss": 19259392,
+          "private": 46878720,
+          "handles": 1330,
+          "threads": 49,
+          "cpu_seconds": 11.140625
+        },
+        {
+          "pid": 54024,
+          "name": "pab-desktop.exe",
+          "rss": 11005952,
+          "private": 88887296,
+          "handles": 642,
+          "threads": 84,
+          "cpu_seconds": 13.65625
+        },
+        {
+          "pid": 51236,
+          "name": "msedgewebview2.exe",
+          "rss": 16384,
+          "private": 2949120,
+          "handles": 179,
+          "threads": 7,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 40288,
+          "name": "msedgewebview2.exe",
+          "rss": 4927488,
+          "private": 12361728,
+          "handles": 325,
+          "threads": 17,
+          "cpu_seconds": 2.875
+        },
+        {
+          "pid": 13228,
+          "name": "msedgewebview2.exe",
+          "rss": 3805184,
+          "private": 106319872,
+          "handles": 731,
+          "threads": 94,
+          "cpu_seconds": 1.78125
+        },
+        {
+          "pid": 48780,
+          "name": "msedgewebview2.exe",
+          "rss": 16384,
+          "private": 7708672,
+          "handles": 192,
+          "threads": 8,
+          "cpu_seconds": 0.0625
+        },
+        {
+          "pid": 53908,
+          "name": "msedgewebview2.exe",
+          "rss": 37318656,
+          "private": 58753024,
+          "handles": 367,
+          "threads": 33,
+          "cpu_seconds": 10.546875
+        },
+        {
+          "pid": 27620,
+          "name": "msedgewebview2.exe",
+          "rss": 14544896,
+          "private": 50720768,
+          "handles": 316,
+          "threads": 30,
+          "cpu_seconds": 2.171875
+        }
+      ],
+      "business_completed": true
+    }
+  ],
+  "successful_sample_fps": {
+    "min": 12.838453736630356,
+    "mean": 14.396395017135713,
+    "max": 14.713196937710771
+  },
+  "failed_sample": {
+    "method": "owned native window composed pixels, 12-bit generated frame code with complement",
+    "capture_method": "window",
+    "started_unix_ms": 1792342531493,
+    "finished_unix_ms": 1792342541501,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "surface_dimensions": [
+      698,
+      436
+    ],
+    "surface_hwnd": 5708986,
+    "desktop_pid": 46228,
+    "surface_pid": 54024,
+    "parent_hwnd": 1580192,
+    "surface_screen_bounds": [
+      591,
+      207,
+      1289,
+      643
+    ],
+    "sample_points": [
+      [
+        678,
+        301
+      ],
+      [
+        713,
+        301
+      ],
+      [
+        748,
+        301
+      ],
+      [
+        783,
+        301
+      ],
+      [
+        818,
+        301
+      ],
+      [
+        853,
+        301
+      ],
+      [
+        888,
+        301
+      ],
+      [
+        923,
+        301
+      ],
+      [
+        957,
+        301
+      ],
+      [
+        992,
+        301
+      ],
+      [
+        1027,
+        301
+      ],
+      [
+        1062,
+        301
+      ],
+      [
+        1097,
+        301
+      ],
+      [
+        1132,
+        301
+      ],
+      [
+        1167,
+        301
+      ],
+      [
+        1202,
+        301
+      ],
+      [
+        678,
+        336
+      ],
+      [
+        713,
+        336
+      ],
+      [
+        748,
+        336
+      ],
+      [
+        783,
+        336
+      ],
+      [
+        818,
+        336
+      ],
+      [
+        853,
+        336
+      ],
+      [
+        888,
+        336
+      ],
+      [
+        923,
+        336
+      ],
+      [
+        957,
+        336
+      ],
+      [
+        992,
+        336
+      ],
+      [
+        1027,
+        336
+      ],
+      [
+        1062,
+        336
+      ],
+      [
+        1097,
+        336
+      ],
+      [
+        1132,
+        336
+      ],
+      [
+        1167,
+        336
+      ],
+      [
+        1202,
+        336
+      ]
+    ],
+    "first_invalid_sample": null,
+    "first_nonmonotonic_sample": null,
+    "failure": null,
+    "seconds": 10.00889140000072,
+    "samples": 294,
+    "invalid_samples": 0,
+    "repeated_samples": 191,
+    "unique_presentations": 103,
+    "warmup_seconds": 3,
+    "steady_fps": 10.272665945429344,
+    "longest_presentation_gap_seconds": 0.21561949999886565,
+    "events": [
+      [
+        0.024460000000544824,
+        41
+      ],
+      [
+        0.0909103000012692,
+        43
+      ],
+      [
+        0.1581265999993775,
+        45
+      ],
+      [
+        0.22483869999996386,
+        47
+      ],
+      [
+        0.32463629999983823,
+        49
+      ],
+      [
+        0.4245890000020154,
+        51
+      ],
+      [
+        0.5245770999972592,
+        53
+      ],
+      [
+        0.64132470000186,
+        55
+      ],
+      [
+        0.7248870999974315,
+        61
+      ],
+      [
+        0.7583086000013282,
+        64
+      ],
+      [
+        1.0082359000007273,
+        66
+      ],
+      [
+        1.0418250000002445,
+        71
+      ],
+      [
+        1.108397399999376,
+        74
+      ],
+      [
+        1.3914656999986619,
+        76
+      ],
+      [
+        1.7246432999963872,
+        82
+      ],
+      [
+        1.791868100001011,
+        84
+      ],
+      [
+        1.8247252000001026,
+        86
+      ],
+      [
+        1.8910467000023345,
+        89
+      ],
+      [
+        1.9583227999974042,
+        91
+      ],
+      [
+        2.0577144999988377,
+        93
+      ],
+      [
+        2.092279700002109,
+        95
+      ],
+      [
+        2.224426399996446,
+        97
+      ],
+      [
+        2.2918456999977934,
+        99
+      ],
+      [
+        2.324745300000359,
+        102
+      ],
+      [
+        2.4255093000028864,
+        104
+      ],
+      [
+        2.5413971000016318,
+        107
+      ],
+      [
+        2.608297999999195,
+        109
+      ],
+      [
+        2.675389500000165,
+        111
+      ],
+      [
+        2.7742874000032316,
+        113
+      ],
+      [
+        2.8412891999978456,
+        115
+      ],
+      [
+        2.8745765999992727,
+        118
+      ],
+      [
+        3.0420123000003514,
+        122
+      ],
+      [
+        3.2078364999979385,
+        124
+      ],
+      [
+        3.2420062000019243,
+        125
+      ],
+      [
+        3.3081575999967754,
+        127
+      ],
+      [
+        3.3749649000019417,
+        130
+      ],
+      [
+        3.57436140000209,
+        132
+      ],
+      [
+        3.6421011999991606,
+        135
+      ],
+      [
+        3.674769199998991,
+        136
+      ],
+      [
+        3.741197399998782,
+        137
+      ],
+      [
+        3.808302999997977,
+        141
+      ],
+      [
+        3.9077812999967136,
+        143
+      ],
+      [
+        3.9417383999971207,
+        146
+      ],
+      [
+        4.075547200001893,
+        148
+      ],
+      [
+        4.108968699998513,
+        150
+      ],
+      [
+        4.174866900000779,
+        152
+      ],
+      [
+        4.342114799997944,
+        154
+      ],
+      [
+        4.509300999998231,
+        156
+      ],
+      [
+        4.5420054999995045,
+        158
+      ],
+      [
+        4.607597900001565,
+        159
+      ],
+      [
+        4.741341900000407,
+        163
+      ],
+      [
+        4.841116600000532,
+        164
+      ],
+      [
+        4.876264699996682,
+        167
+      ],
+      [
+        5.0419504000019515,
+        169
+      ],
+      [
+        5.107825899998716,
+        171
+      ],
+      [
+        5.141446200002974,
+        174
+      ],
+      [
+        5.242856899996696,
+        176
+      ],
+      [
+        5.3078999999997905,
+        178
+      ],
+      [
+        5.375203800002055,
+        180
+      ],
+      [
+        5.441769400000339,
+        182
+      ],
+      [
+        5.609062700001232,
+        184
+      ],
+      [
+        5.642901899998833,
+        188
+      ],
+      [
+        5.858521399997699,
+        190
+      ],
+      [
+        5.893039900001895,
+        194
+      ],
+      [
+        5.957837399997516,
+        195
+      ],
+      [
+        6.024751099997957,
+        198
+      ],
+      [
+        6.12524200000189,
+        200
+      ],
+      [
+        6.1938267000005,
+        202
+      ],
+      [
+        6.2274906000020565,
+        205
+      ],
+      [
+        6.392247999996471,
+        207
+      ],
+      [
+        6.526874299997871,
+        209
+      ],
+      [
+        6.658677300001727,
+        211
+      ],
+      [
+        6.691966799997317,
+        216
+      ],
+      [
+        6.7249660000015865,
+        219
+      ],
+      [
+        6.824785500000871,
+        221
+      ],
+      [
+        6.94136250000156,
+        223
+      ],
+      [
+        7.074738499999512,
+        225
+      ],
+      [
+        7.191266599998926,
+        228
+      ],
+      [
+        7.358251700003166,
+        236
+      ],
+      [
+        7.508849400001054,
+        237
+      ],
+      [
+        7.674949499996728,
+        239
+      ],
+      [
+        7.7090122000008705,
+        244
+      ],
+      [
+        7.90852669999731,
+        246
+      ],
+      [
+        8.041382900002645,
+        249
+      ],
+      [
+        8.108066799999506,
+        254
+      ],
+      [
+        8.211246999999275,
+        256
+      ],
+      [
+        8.259433599996555,
+        259
+      ],
+      [
+        8.324953299998015,
+        264
+      ],
+      [
+        8.392792200000258,
+        265
+      ],
+      [
+        8.608229600002232,
+        267
+      ],
+      [
+        8.791953899999498,
+        270
+      ],
+      [
+        8.924745899996196,
+        274
+      ],
+      [
+        8.991529899998568,
+        283
+      ],
+      [
+        9.125175100001798,
+        285
+      ],
+      [
+        9.225671499996679,
+        287
+      ],
+      [
+        9.325559500000963,
+        288
+      ],
+      [
+        9.4754036000013,
+        296
+      ],
+      [
+        9.541766599999391,
+        299
+      ],
+      [
+        9.641973799996777,
+        301
+      ],
+      [
+        9.741526999998314,
+        303
+      ],
+      [
+        9.808752299999469,
+        306
+      ],
+      [
+        9.943011099996511,
+        308
+      ],
+      [
+        10.008510699997714,
+        310
+      ]
+    ],
+    "passed": false
+  },
+  "failed_sample_reasons": [
+    "observed_fps_not_above_12",
+    "sampling_rate_below_30_hz"
+  ],
+  "last_status": {
+    "phase": "viewing",
+    "error": null,
+    "opened": {
+      "config": {
+        "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+        "generation": 1,
+        "screen": {
+          "id": "gnome:Virtual-1",
+          "name": "Unknown Display",
+          "x": 0,
+          "y": 0,
+          "desktop_width": 1920,
+          "desktop_height": 1080,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "scale_milli": 1000,
+          "rotation": "identity",
+          "primary": true
+        },
+        "codec": "h264_annex_b",
+        "color": "bt709_limited",
+        "fps": 15
+      },
+      "screens": [
+        {
+          "id": "gnome:Virtual-1",
+          "name": "Unknown Display",
+          "x": 0,
+          "y": 0,
+          "desktop_width": 1920,
+          "desktop_height": 1080,
+          "pixel_width": 1920,
+          "pixel_height": 1080,
+          "scale_milli": 1000,
+          "rotation": "identity",
+          "primary": true
+        }
+      ],
+      "heartbeat_ms": 5000,
+      "lease_ms": 15000,
+      "input_supported": true
+    },
+    "input_ready": true,
+    "frame_ready": true,
+    "input_enabled": false,
+    "decoder": "d3d11_hardware"
+  },
+  "status_trace": {
+    "current": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+          "generation": 1,
+          "screen": {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware"
+    },
+    "events": [
+      {
+        "at_unix_ms": 1792341441612,
+        "source": "event",
+        "status": {
+          "phase": "connecting",
+          "error": null,
+          "opened": null,
+          "input_ready": false,
+          "frame_ready": false,
+          "input_enabled": false,
+          "decoder": null
+        }
+      },
+      {
+        "at_unix_ms": 1792341441612,
+        "source": "snapshot",
+        "status": {
+          "phase": "ready",
+          "error": null,
+          "opened": null,
+          "input_ready": false,
+          "frame_ready": false,
+          "input_enabled": false,
+          "decoder": null
+        }
+      },
+      {
+        "at_unix_ms": 1792341441810,
+        "source": "snapshot",
+        "status": {
+          "phase": "connecting",
+          "error": null,
+          "opened": null,
+          "input_ready": false,
+          "frame_ready": false,
+          "input_enabled": false,
+          "decoder": null
+        }
+      },
+      {
+        "at_unix_ms": 1792341442642,
+        "source": "event",
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": false,
+          "frame_ready": false,
+          "input_enabled": false,
+          "decoder": null
+        }
+      },
+      {
+        "at_unix_ms": 1792341443629,
+        "source": "event",
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+              "generation": 1,
+              "screen": {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "gnome:Virtual-1",
+                "name": "Unknown Display",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      }
+    ],
+    "dropped": 0
+  },
+  "independent_guest_busy": {
+    "started_at": 1792342434.4979832,
+    "executable_sha256": "27aef7c291a55427e5eb15daab58bb96d4ba1e4056590d75201124195d0ced19",
+    "before": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+          "generation": 1,
+          "screen": {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware"
+    },
+    "remote_input_sent": false,
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "input acceptance failed: remote desktop Busy: remote desktop Busy: this device already has a desktop viewer\n",
+    "after": {
+      "phase": "viewing",
+      "error": null,
+      "opened": {
+        "config": {
+          "session_id": "87a67372-5e28-4811-a8f6-b69955b32623",
+          "generation": 1,
+          "screen": {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          },
+          "codec": "h264_annex_b",
+          "color": "bt709_limited",
+          "fps": 15
+        },
+        "screens": [
+          {
+            "id": "gnome:Virtual-1",
+            "name": "Unknown Display",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "pixel_width": 1920,
+            "pixel_height": 1080,
+            "scale_milli": 1000,
+            "rotation": "identity",
+            "primary": true
+          }
+        ],
+        "heartbeat_ms": 5000,
+        "lease_ms": 15000,
+        "input_supported": true
+      },
+      "input_ready": true,
+      "frame_ready": true,
+      "input_enabled": false,
+      "decoder": "d3d11_hardware"
+    },
+    "finished_at": 1792342437.3127053,
+    "passed": true
+  },
+  "guest_handoff": {
+    "code": "556688188",
+    "probe_sha256": "27aef7c291a55427e5eb15daab58bb96d4ba1e4056590d75201124195d0ced19",
+    "input_sent": false,
+    "passed": true,
+    "first_presented": true,
+    "screen": {
+      "desktop_height": 1080,
+      "desktop_width": 1920,
+      "id": "gnome:Virtual-1",
+      "name": "Unknown Display",
+      "pixel_height": 1080,
+      "pixel_width": 1920,
+      "primary": true,
+      "rotation": "identity",
+      "scale_milli": 1000,
+      "x": 0,
+      "y": 0
+    },
+    "first_presented_seconds": 2.3511074999987613,
+    "closed": true,
+    "legacy_environment": true,
+    "elapsed_seconds": 2.56070219999674,
+    "exit_code": 0
+  },
+  "cleanup": {
+    "original": {
+      "session": "2",
+      "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+      "properties": {
+        "MainPID": "65661",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      },
+      "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+      "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+      "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+      "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+    },
+    "restored": {
+      "original_service_restored": true,
+      "properties": {
+        "MainPID": "81687",
+        "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 00:56:53 CST] ; stop_time=[n/a] ; pid=81687 ; code=(null) ; status=0/0 }",
+        "ActiveState": "active",
+        "SubState": "running",
+        "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+        "DropInPaths": ""
+      }
+    },
+    "owned_processes": [],
+    "input_devices": [],
+    "session_restored": true,
+    "rollback_trigger": "",
+    "stage_removed": true,
+    "fixture_removed": true
+  },
+  "layout_cleanup": {
+    "layout": {
+      "before_mode": "1694x1102@59.997711181640625",
+      "test_mode": "1920x1080@60",
+      "persistent": false,
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "temporary_idle_inhibitor": true,
+      "generated_ticks": 34547,
+      "restored": true
+    },
+    "payload_removed": true
+  },
+  "owned_surface_smoke": {
+    "size": [
+      698,
+      436
+    ],
+    "owned_surface_passed": true,
+    "wrong_owner_rejected": true,
+    "image_saved": false
+  },
+  "driver_exit_code": 1,
+  "desktop_driver_exit_code": 0,
+  "cleanup_exit_code": 0,
+  "same_account_second_viewer_tested": false,
+  "post_close_original_terminal_and_transfers_tested": false,
+  "evidence_sha256": {
+    ".build/remote-desktop/mixed-product-966fd0257098/mixed-result.json": "546a81f60240bd9dc57a587ff7afb53d442fc69a696fd0299e3e1a6a3eab8c80",
+    ".build/remote-desktop/mixed-product-966fd0257098/independent-viewer-busy.json": "03d8df98e06fa6a1fbab1c8a6bf1094352cc0d3aa1afc02d46bc5cb6e4ff52e6",
+    ".build/remote-desktop/mixed-product-966fd0257098/viewer-handoff.json": "ec5a9586829b620c89ac2bbaa7e7f03428f19613120e74e69edd1d37906395ce",
+    "experiments/remote-desktop/verify_windows_linux_mixed.py": "bfe6a79543795c816ebd7b57c93d70d09faf2b109b331cb931a11d90edd8e7f3",
+    "experiments/remote-desktop/verify_viewer_handoff.py": "93d76c31bc53b30f7f1a662e38b46d1063dd4782d55fb0f11f42cf346e70a816"
+  },
+  "sampler_after_diagnostics_sha256": "7b56f09979be2f9ccff3c9dc2eb2bdc3f3a17b9534c75cb550a7cbfcec5be27c",
+  "sampler_used_in_run": {
+    "source_commit": "90adfbc",
+    "path": "experiments/remote-desktop/windows_sample_presentation.py"
+  },
+  "short_timing_comparison": {
+    "source_commit": "6380189",
+    "profile": "mixed-product-02fc8a845a9c",
+    "passed": true,
+    "elapsed_seconds": 60.22490629999811,
+    "artifacts": {
+      "pab-desktop.exe": "ab888c15d5ed16d26767de2d9ea0ab217bb2eaf7cfdd62ec89c5e6e9304010c7",
+      "pab-mcp.exe": "f2a76f70dbb5c1947c1e027db530141ee973be239ca43a5b09eef33096b2ce93"
+    },
+    "remote_artifacts": {
+      "pab-desktop": "4dcd8c7676fd026228b5a671e52e2eb02a81bb5c37074f88eb879a17c80c20da",
+      "pab-executor": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+      "manager.py": "12462f57c3d26f4fe362584be73b4a8865a8d577d61ec48185f7e62b770f9822",
+      "fixture.py": "cae7b27fa82971f003f6f180c6dda25b22f45c5970f36f4d30ec709ad691ffb9"
+    },
+    "rounds": [
+      {
+        "round": 1,
+        "fps": 14.509193252445474,
+        "sample_hz": 30.009893494198113,
+        "threshold_failures": [],
+        "capture_timing": {
+          "calls": 301,
+          "total_seconds": 9.980966799957969,
+          "max_seconds": 0.035298800001328345,
+          "calls_above_60_hz_budget": 301,
+          "max_sample_gap_seconds": 0.035417200000665616
+        },
+        "compiler_processes_before": [],
+        "compiler_processes_after": []
+      },
+      {
+        "round": 2,
+        "fps": 14.518297203574777,
+        "sample_hz": 30.023088952333296,
+        "threshold_failures": [],
+        "capture_timing": {
+          "calls": 301,
+          "total_seconds": 9.978422000080172,
+          "max_seconds": 0.035005900004762225,
+          "calls_above_60_hz_budget": 301,
+          "max_sample_gap_seconds": 0.03509180000401102
+        },
+        "compiler_processes_before": [],
+        "compiler_processes_after": []
+      }
+    ],
+    "post_close_checks": {
+      "terminal_after_video_close": "__PAB_MIXED_9999__",
+      "command_after_video_close": "d779d7b3-5eb7-4980-81e9-8b4e79b64e72",
+      "upload_after_video_close": "3e6a392e-f003-4c29-9c25-60c877319e3e",
+      "download_after_video_close": "4a38d277-8c83-4ebc-8411-ca40119d8c1a"
+    },
+    "cleanup": {
+      "original": {
+        "session": "2",
+        "session_state": "User=1000\nType=wayland\nClass=user\nActive=yes\nLockedHint=no",
+        "properties": {
+          "MainPID": "81687",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 00:56:53 CST] ; stop_time=[n/a] ; pid=81687 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        },
+        "unit_sha256": "ed8d445478557d9d2adeda3441c14fbc476ac2d254458a00753464653cafa857",
+        "config_sha256": "0ac2b85d736a8614a8ed99b7725a39aad053ab03cfb6c91f61f260ccb3256799",
+        "staged_sha256": "e00e04e0035fab5de395c82cf5e10c327a010f6836691bef3c94a748e0ba8d14",
+        "original_sha256": "b57f3f5c78f77960ae95f2bd3d21d6befdd60c8820c2563298c2565af947169d"
+      },
+      "restored": {
+        "original_service_restored": true,
+        "properties": {
+          "MainPID": "82771",
+          "ExecStart": "{ path=/opt/pixels-agent-bridge/run-executor.sh ; argv[]=/opt/pixels-agent-bridge/run-executor.sh ; ignore_errors=no ; start_time=[Mon 2026-10-19 01:03:54 CST] ; stop_time=[n/a] ; pid=82771 ; code=(null) ; status=0/0 }",
+          "ActiveState": "active",
+          "SubState": "running",
+          "FragmentPath": "/lib/systemd/system/pixels-agent-bridge-executor.service",
+          "DropInPaths": ""
+        }
+      },
+      "owned_processes": [],
+      "input_devices": [],
+      "session_restored": true,
+      "rollback_trigger": "",
+      "stage_removed": true,
+      "fixture_removed": true
+    },
+    "layout_cleanup": {
+      "layout": {
+        "before_mode": "1694x1102@59.997711181640625",
+        "test_mode": "1920x1080@60",
+        "persistent": false,
+        "dimensions": [
+          1920,
+          1080
+        ],
+        "temporary_idle_inhibitor": true,
+        "generated_ticks": 3523,
+        "restored": true
+      },
+      "payload_removed": true
+    },
+    "raw_result_sha256": "1c1a6a97125ddb9a993dc7bdff69acf095a4c3ae3a27c5abc88e47dfe5c13a7b",
+    "driver_exit_code": 0,
+    "desktop_driver_exit_code": 0
+  }
+}

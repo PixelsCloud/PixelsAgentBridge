@@ -1,0 +1,920 @@
+{
+  "date": "2026-10-18",
+  "baseline": "e714fe0",
+  "full_portrait_passed": false,
+  "product_change": "Compare duplication mode with desktop dimensions and rotation, keep native texture encoding dimensions",
+  "desktop_sha256": "413f3a9d39835ce004210747449da2e1b3af58f9b4517ba1c94b5fd74ac4eb06",
+  "tests": {
+    "full_desktop_build": "passed, 3 jobs, 6m00s",
+    "media_tests": 23,
+    "test_log_sha256": "c1d0b936fef58ff484ede2852c8eeb250bd0a7053b01ba40c5d15d38bba85aa1"
+  },
+  "before_fix": {
+    "steps": [
+      {
+        "name": "open",
+        "time": 1792304205.625025,
+        "result": {
+          "accepted": true
+        }
+      },
+      {
+        "name": "initial",
+        "time": 1792304208.4627948,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "6e176ed2-6489-4cb3-9a94-16984b2fc1fc",
+              "generation": 1,
+              "screen": {
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              {
+                "id": "0:81493:\\\\.\\DISPLAY15",
+                "name": "\\\\.\\DISPLAY15",
+                "x": -1080,
+                "y": 0,
+                "desktop_width": 1080,
+                "desktop_height": 1920,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "clockwise90",
+                "primary": false
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      },
+      {
+        "name": "error",
+        "time": 1792304233.5926838,
+        "kind": "AssertionError",
+        "detail": "Viewer not ready: {\"phase\": \"viewing\", \"error\": null, \"opened\": {\"config\": {\"session_id\": \"f041b94d-b6d1-448b-bd45-52680e950063\", \"generation\": 1, \"screen\": {\"id\": \"0:81493:\\\\\\\\.\\\\DISPLAY1\", \"name\": \"\\\\\\\\.\\\\DISPLAY1\", \"x\": 0, \"y\": 0, \"desktop_width\": 1920, \"desktop_height\": 1080, \"pixel_width\": 1920, \"pixel_height\": 1080, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}, \"codec\": \"h264_annex_b\", \"color\": \"bt709_limited\", \"fps\": 15}, \"screens\": [{\"id\": \"0:81493:\\\\\\\\.\\\\DISPLAY1\", \"name\": \"\\\\\\\\.\\\\DISPLAY1\", \"x\": 0, \"y\": 0, \"desktop_width\": 1920, \"desktop_height\": 1080, \"pixel_width\": 1920, \"pixel_height\": 1080, \"scale_milli\": 1000, \"rotation\": \"identity\", \"primary\": true}, {\"id\": \"0:81493:\\\\\\\\.\\\\DISPLAY15\", \"name\": \"\\\\\\\\.\\\\DISPLAY15\", \"x\": -1080, \"y\": 0, \"desktop_width\": 1080, \"desktop_height\": 1920, \"pixel_width\": 1920, \"pixel_height\": 1080, \"scale_milli\": 1000, \"rotation\": \"clockwise90\", \"primary\": false}], \"heartbeat_ms\": 5000, \"lease_ms\": 15000, \"input_supported\": true}, \"input_ready\": true, \"frame_ready\": true, \"input_enabled\": false, \"decoder\": \"d3d11_hardware\"}"
+      }
+    ],
+    "native": [
+      {
+        "task": "3643bd28-1258-4c77-b1df-a12c73623e8b",
+        "results": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "output_rotation": 1,
+            "mode_width": 1920,
+            "mode_height": 1080,
+            "duplication_rotation": 1,
+            "texture_width": 1920,
+            "texture_height": 1080
+          },
+          {
+            "name": "\\\\.\\DISPLAY15",
+            "x": -1080,
+            "y": 0,
+            "desktop_width": 1080,
+            "desktop_height": 1920,
+            "output_rotation": 2,
+            "mode_width": 1080,
+            "mode_height": 1920,
+            "duplication_rotation": 2,
+            "texture_width": 1920,
+            "texture_height": 1080
+          }
+        ]
+      },
+      {
+        "task": "72c5430b-2048-4acd-8755-cafaf1d8492b",
+        "results": [
+          {
+            "exit": 1,
+            "stderr": "Screen changed; refresh generation\r\n",
+            "header": ""
+          }
+        ]
+      }
+    ],
+    "topology": [
+      {
+        "file": "lease2.stdout",
+        "sha256": "d68db7336049985487a617a961644aea3969fc7b659e0a42dc6afe88be8bfe88",
+        "samples": 69,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease3.stdout",
+        "sha256": "c169d3299e9bf53f7807b499fb6949a19215470bcb6a812fcb42249017e2e90d",
+        "samples": 19,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      }
+    ]
+  },
+  "after_mode_fix_and_diagnostics": {
+    "steps": [
+      {
+        "name": "open",
+        "time": 1792304888.0266368,
+        "result": {
+          "accepted": true
+        }
+      },
+      {
+        "name": "initial",
+        "time": 1792304890.9388053,
+        "status": {
+          "phase": "viewing",
+          "error": null,
+          "opened": {
+            "config": {
+              "session_id": "cc842b79-5b90-4e14-8a7c-fb0997df21b1",
+              "generation": 1,
+              "screen": {
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              "codec": "h264_annex_b",
+              "color": "bt709_limited",
+              "fps": 15
+            },
+            "screens": [
+              {
+                "id": "0:81493:\\\\.\\DISPLAY1",
+                "name": "\\\\.\\DISPLAY1",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "identity",
+                "primary": true
+              },
+              {
+                "id": "0:81493:\\\\.\\DISPLAY15",
+                "name": "\\\\.\\DISPLAY15",
+                "x": -1080,
+                "y": 0,
+                "desktop_width": 1080,
+                "desktop_height": 1920,
+                "pixel_width": 1920,
+                "pixel_height": 1080,
+                "scale_milli": 1000,
+                "rotation": "clockwise90",
+                "primary": false
+              }
+            ],
+            "heartbeat_ms": 5000,
+            "lease_ms": 15000,
+            "input_supported": true
+          },
+          "input_ready": true,
+          "frame_ready": true,
+          "input_enabled": false,
+          "decoder": "d3d11_hardware"
+        }
+      },
+      {
+        "name": "error",
+        "time": 1792304916.2814417,
+        "kind": "AssertionError",
+        "detail": "Viewer not ready: {\"phase\": \"reconnecting\", \"error\": null, \"opened\": null, \"input_ready\": false, \"frame_ready\": false, \"input_enabled\": false, \"decoder\": null}"
+      }
+    ],
+    "native": [
+      {
+        "task": "11d4a3dc-cc68-47a3-ba3d-710eb72fd927",
+        "results": [
+          {
+            "failure": "Frame EOF",
+            "exit": 1,
+            "stderr": "media encoder=nvenc_gpu readback_per_frame=0\r\nAcquireNextFrame HRESULT=0x887a0026\r\n"
+          }
+        ]
+      },
+      {
+        "task": "45e33a3a-f278-45e0-af79-7e2b71edb614",
+        "results": [
+          {
+            "exit": 1,
+            "stderr": "AcquireNextFrame HRESULT=0x887a0026\r\n",
+            "decoded_metadata": [
+              {
+                "sample": 0,
+                "name": "\\\\.\\DISPLAY15",
+                "x": -1080,
+                "y": 0,
+                "desktop_width": 1080,
+                "desktop_height": 1920,
+                "output_rotation": 2,
+                "mode_width": 1080,
+                "mode_height": 1920,
+                "duplication_rotation": 2,
+                "texture_width": 1920,
+                "texture_height": 1080,
+                "last_present": 0,
+                "last_mouse_update": 2258123293731,
+                "accumulated_frames": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "task": "65e00b3e-56c1-4232-b2dd-89db21e8b540",
+        "results": [
+          {
+            "failure": "Frame EOF",
+            "exit": 1,
+            "stderr": "media encoder=nvenc_gpu readback_per_frame=0\r\nAcquireNextFrame HRESULT=0x887a0026\r\n"
+          }
+        ]
+      },
+      {
+        "task": "6d093728-ea74-4543-9d32-92d472a8a750",
+        "results": [
+          {
+            "failure": "Frame EOF",
+            "exit": 1,
+            "stderr": "media encoder=nvenc_gpu readback_per_frame=0\r\nAcquireNextFrame HRESULT=0x887a0026\r\n"
+          }
+        ]
+      },
+      {
+        "task": "6f557abe-a777-4399-9f68-2aab82c561a2",
+        "results": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "output_rotation": 1,
+            "mode_width": 1920,
+            "mode_height": 1080,
+            "duplication_rotation": 1,
+            "texture_width": 1920,
+            "texture_height": 1080
+          },
+          {
+            "name": "\\\\.\\DISPLAY15",
+            "x": -1080,
+            "y": 0,
+            "desktop_width": 1080,
+            "desktop_height": 1920,
+            "output_rotation": 2,
+            "mode_width": 1080,
+            "mode_height": 1920,
+            "duplication_rotation": 2,
+            "texture_width": 1920,
+            "texture_height": 1080
+          }
+        ]
+      },
+      {
+        "task": "7676af43-11c4-4ba7-a3c9-8ad714e7a300",
+        "results": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "output_rotation": 1,
+            "mode_width": 1920,
+            "mode_height": 1080,
+            "duplication_rotation": 1,
+            "texture_width": 1920,
+            "texture_height": 1080,
+            "last_present": 0,
+            "last_mouse_update": 2254846660405,
+            "accumulated_frames": 0
+          },
+          {
+            "name": "\\\\.\\DISPLAY15",
+            "x": -1080,
+            "y": 0,
+            "desktop_width": 1080,
+            "desktop_height": 1920,
+            "output_rotation": 2,
+            "mode_width": 1080,
+            "mode_height": 1920,
+            "duplication_rotation": 2,
+            "texture_width": 1920,
+            "texture_height": 1080,
+            "last_present": 0,
+            "last_mouse_update": 2254847574089,
+            "accumulated_frames": 0
+          }
+        ]
+      },
+      {
+        "task": "8eb2b47a-765f-4f4b-a2a2-9c4b5545f051",
+        "results": [
+          {
+            "failure": "Frame EOF",
+            "exit": 1,
+            "stderr": "media encoder=openh264_software readback_per_frame=1\r\nAcquireNextFrame HRESULT=0x887a0026\r\n"
+          }
+        ]
+      },
+      {
+        "task": "93c2a296-f8aa-4e1c-bc2f-22c804291394",
+        "results": [
+          {
+            "exit": 0,
+            "stderr": "media encoder=nvenc_gpu readback_per_frame=0\r\n",
+            "header": "UEFCMYAHAAA4BAAA"
+          }
+        ]
+      },
+      {
+        "task": "a7486c28-19ea-479d-9342-40b96706aac5",
+        "results": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "x": 0,
+            "y": 0,
+            "desktop_width": 1920,
+            "desktop_height": 1080,
+            "output_rotation": 1,
+            "mode_width": 1920,
+            "mode_height": 1080,
+            "duplication_rotation": 1,
+            "texture_width": 1920,
+            "texture_height": 1080,
+            "last_present": 0,
+            "last_mouse_update": 2255859238880,
+            "accumulated_frames": 0
+          },
+          {
+            "name": "\\\\.\\DISPLAY15",
+            "x": -1080,
+            "y": 0,
+            "desktop_width": 1080,
+            "desktop_height": 1920,
+            "output_rotation": 2,
+            "mode_width": 1080,
+            "mode_height": 1920,
+            "duplication_rotation": 2,
+            "texture_width": 1920,
+            "texture_height": 1080,
+            "last_present": 0,
+            "last_mouse_update": 2255860198284,
+            "accumulated_frames": 0
+          }
+        ]
+      },
+      {
+        "task": "b79eac56-1ba5-4060-a606-d42bfacebbb4",
+        "results": [
+          {
+            "exit": 0,
+            "stderr": "",
+            "decoded_metadata": [
+              {
+                "name": "\\\\.\\DISPLAY1",
+                "x": 0,
+                "y": 0,
+                "desktop_width": 1920,
+                "desktop_height": 1080,
+                "output_rotation": 1,
+                "mode_width": 1920,
+                "mode_height": 1080,
+                "duplication_rotation": 1,
+                "texture_width": 1920,
+                "texture_height": 1080,
+                "last_present": 0,
+                "last_mouse_update": 2255877930545,
+                "accumulated_frames": 0
+              },
+              {
+                "name": "\\\\.\\DISPLAY15",
+                "x": -1080,
+                "y": 0,
+                "desktop_width": 1080,
+                "desktop_height": 1920,
+                "output_rotation": 2,
+                "mode_width": 1080,
+                "mode_height": 1920,
+                "duplication_rotation": 2,
+                "texture_width": 1920,
+                "texture_height": 1080,
+                "last_present": 0,
+                "last_mouse_update": 2255878741203,
+                "accumulated_frames": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "task": "dcab9b2e-fcfe-45bd-8dcf-a5773e305ca7",
+        "results": [
+          {
+            "failure": "Frame EOF",
+            "exit": 1,
+            "stderr": "media encoder=nvenc_gpu readback_per_frame=0\r\nAcquireNextFrame HRESULT=0x887a0026\r\n"
+          }
+        ]
+      }
+    ],
+    "topology": [
+      {
+        "file": "lease2.stdout",
+        "sha256": "d68db7336049985487a617a961644aea3969fc7b659e0a42dc6afe88be8bfe88",
+        "samples": 69,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease3.stdout",
+        "sha256": "c169d3299e9bf53f7807b499fb6949a19215470bcb6a812fcb42249017e2e90d",
+        "samples": 19,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease4.stdout",
+        "sha256": "17a9ef74f0b1f8d9a5ea9c70c0e94e5f3b64edd890ed675b4abfc33cbba37c13",
+        "samples": 39,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease5.stdout",
+        "sha256": "17a9ef74f0b1f8d9a5ea9c70c0e94e5f3b64edd890ed675b4abfc33cbba37c13",
+        "samples": 39,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease6.stdout",
+        "sha256": "17a9ef74f0b1f8d9a5ea9c70c0e94e5f3b64edd890ed675b4abfc33cbba37c13",
+        "samples": 39,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      },
+      {
+        "file": "lease7.stdout",
+        "sha256": "17a9ef74f0b1f8d9a5ea9c70c0e94e5f3b64edd890ed675b4abfc33cbba37c13",
+        "samples": 39,
+        "before": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "after": [
+          {
+            "name": "\\\\.\\DISPLAY1",
+            "description": "NVIDIA GeForce RTX 4090",
+            "flags": 5,
+            "active": true,
+            "mode_known": true,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "rotation": 0
+          }
+        ],
+        "layout_results": [
+          {
+            "layout_test": 0
+          },
+          {
+            "layout_apply": 0
+          },
+          {
+            "layout_restore": 0
+          }
+        ]
+      }
+    ],
+    "artifacts": {
+      "pab-parsec-display.exe": "294354e73df8a61cc41ed52a6e40fc51adb5a7e12a45e092acbf75d151335620",
+      "pab-two-screen-fixture.exe": "d39f05cf3a7a4b3cb9b9f71eb09078bda31bdf8682c73d5d993f030e7d937a08",
+      "lease2.ps1": "c5dbf0a13934af5d0a45db4492718416af6ead95f2f3d38ec0457e6d838ec1ee",
+      "twoscreen2.ps1": "ece087d2d1fea88508d7c2375643452557eea5cf467ee91bcbb7fa67e4690f07",
+      "pab-dxgi-layout.exe": "08d9612326c9cb0a71e0e82487168f68515b6b14d3cbb50a3c35d7ac83ff6a3d",
+      "lease3.ps1": "4400eabf38f7df6f71419fdc8365bde2737b691e912332685bbd48957083b5d6",
+      "pab-dxgi-layout-frame.exe": "cd3926b03727e5c05834c0ba4af5ab2cff54e5eadf35fc4918fde07c6c241b8a",
+      "lease4.ps1": "b6f95e32f4c93dd6a9aa1c34138b676ee3e6a44f005ee82c784f62b47f4479d0",
+      "pab-dxgi-layout-video.exe": "970c66ca21ada3f98cbc9a8200db24e14060ad9ecd5122b3f61919014ee5c750",
+      "lease5.ps1": "517b0f4ac18c68fbbc4b0db05f8fe02b9047b9f86907908573b23d93068a7fca",
+      "pab-first-frame.exe": "13747b74bdf6d3e7ec66dd014fa3dc3c31fd0ce1496aa275a2a1941d40ea5d1e",
+      "lease6.ps1": "14d4f895c93a5e3f915a1d3e035bd286c76cb349cbf716460f8cead6c228d752",
+      "fixture6.ps1": "0d7ef7893a3aec76d3d5bae273d2c295bd82eedef063aaa4cb973b0d196c5d6f",
+      "pab-order-frame.exe": "5bb27b7026e5c4e0e87b2b5e0b74931c602de8d6bad952bb621271fbb44a3ace",
+      "pab-dxgi-sequence.exe": "61012d340447611f1ea4c410c7b2036aede3034a2b708f54e23724c448f4f5df",
+      "lease7.ps1": "3937cc626a114fa38bd3df86bd4a181fe26464b1b9bef2916e5f131c1fa6a184",
+      "fixture7.ps1": "45bf8cc70d63ea26bb4aa89a9dbade8f32f1d2656846d50f92cecddcbbd51d79"
+    }
+  },
+  "reverted_experiments": [
+    "Accept first zero-presentation-time surface: still fails",
+    "Initialize encoder before duplication: still fails"
+  ],
+  "cleanup_observation": {
+    "service": "Running",
+    "restored": true,
+    "held_release_flags": 0,
+    "owned": [],
+    "tasks": [
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-fixture",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-fixture6",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-fixture7",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-foreman",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-helper",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease2",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease3",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease4",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease5",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease6",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-lease7",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-pattern",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-restore",
+        "State": 3
+      },
+      {
+        "TaskName": "PixelsRemoteDesktopAcceptance-7751a47c2390-twoscreen2",
+        "State": 3
+      }
+    ],
+    "errors": {}
+  },
+  "limitations": [
+    "No portrait frame/color/click acceptance",
+    "No FPS measurement",
+    "No mixed DPI or physical rotation acceptance",
+    "No final product fallback for observed DXGI access loss"
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/desktop-dup-api#rotating-the-desktop-image",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-changedisplaysettingsexw"
+  ],
+  "cleanup": {
+    "original_service_restored": true,
+    "owned_remote_processes": 0,
+    "input_release_flags": 0,
+    "all_temporary_topologies_restored": true,
+    "remote_stage_and_own_tasks_removed": true,
+    "local_candidate_processes": 0,
+    "local_installed_application_updated": false
+  }
+}
