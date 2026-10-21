@@ -1,0 +1,301 @@
+{
+  "platform": "windows",
+  "architecture": "x86_64",
+  "version": "1.3.14",
+  "source_commit": "9eec4e811f5b3077c8fff614c0b91c6f549ff50e",
+  "filename": "pixels-agent-bridge-windows-x86_64-release-1.3.14-setup.exe",
+  "bytes": 55109044,
+  "sha256": "d62bab6962580aefa9b0c839855f5ddb0e941efbc1ae9c486dd79f904d2723d0",
+  "download_url": "https://pixels-agent-bridge-1251612681.cos.ap-beijing.myqcloud.com/releases/windows/x86_64/1.3.14/pixels-agent-bridge-windows-x86_64-release-1.3.14-setup.exe",
+  "signed_metadata_verified": true,
+  "public_download_verified": true,
+  "update_checks": {
+    "1.3.12": {
+      "update_version": "1.3.14",
+      "passed": true
+    },
+    "1.3.14": {
+      "update_version": null,
+      "passed": true
+    }
+  },
+  "package_verification": {
+    "version": "1.3.14",
+    "source_commit": "9eec4e811f5b3077c8fff614c0b91c6f549ff50e",
+    "package_sha256": "d62bab6962580aefa9b0c839855f5ddb0e941efbc1ae9c486dd79f904d2723d0",
+    "package_bytes": 55109044,
+    "real_installer_extraction_verified": true,
+    "x64_payloads_match_build_receipt": true,
+    "stored_inner_runtime_zips_verified": true,
+    "solid_lzma_verified": true,
+    "license_notice_verified": true,
+    "public_configuration_empty": true,
+    "mcp_protocols": [
+      {
+        "protocol": "2025-11-25",
+        "tools": 122,
+        "passed": true
+      },
+      {
+        "protocol": "2026-07-28",
+        "tools": 122,
+        "passed": true
+      }
+    ],
+    "installed_application_updated": false
+  },
+  "final_package_geometry": {
+    "phase": "after",
+    "installed_app_changed": false,
+    "remote_input_injected": false,
+    "packaged_language": {
+      "passed": true,
+      "embedded_frontend": true,
+      "origin": "http://tauri.localhost",
+      "legacy_zh_tw_migrated": true,
+      "language_options": [
+        "English",
+        "简体中文"
+      ],
+      "external_development_server_used": false
+    },
+    "maximized_before": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "fullscreen_from_maximized": {
+      "client": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "full_monitor_client": true,
+    "exit": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "normal_before": {
+      "client": [
+        138,
+        162,
+        1238,
+        922
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "fullscreen_from_normal": {
+      "client": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "normal_exit": {
+      "client": [
+        138,
+        162,
+        1238,
+        922
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "final_package_sha256": "d62bab6962580aefa9b0c839855f5ddb0e941efbc1ae9c486dd79f904d2723d0",
+    "source_commit": "9eec4e811f5b3077c8fff614c0b91c6f549ff50e",
+    "actual_embedded_frontend": true,
+    "media_scope": "Local packaged viewer geometry; remote stream availability is recorded, no SAS or login operation replayed.",
+    "passed": true
+  },
+  "final_package_native_close": {
+    "installed_app_updated": false,
+    "cos_published": false,
+    "system_login_or_sas_replayed": false,
+    "observed_stream_phase": "failed",
+    "native_title": "关闭远程桌面？",
+    "native_parent_correct": true,
+    "parent_disabled_during_confirmation": true,
+    "last_native_controls": [
+      {
+        "class": "DirectUIHWND",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "ScrollBar",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "ScrollBar",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "ScrollBar",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "ScrollBar",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "SysLink",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "SysLink",
+        "caption": ""
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "Button",
+        "caption": "关闭连接"
+      },
+      {
+        "class": "CtrlNotifySink",
+        "caption": ""
+      },
+      {
+        "class": "Button",
+        "caption": "取消"
+      }
+    ],
+    "cancel_preserves_window": true,
+    "native_close_request_confirms": true,
+    "confirm_destroys_viewer": true,
+    "native_dialogs_remaining": 0,
+    "passed": true,
+    "final_package_sha256": "d62bab6962580aefa9b0c839855f5ddb0e941efbc1ae9c486dd79f904d2723d0",
+    "source_commit": "9eec4e811f5b3077c8fff614c0b91c6f549ff50e",
+    "desktop_sha256": "034b87a49793fd337531663f38ed630d11dcb47ffae3423c9f39a25a47d6a217"
+  },
+  "development_ui_cases_reused": 89,
+  "ui_scope": "86 language-related cases and 3 new close-flow cases; no completed system-login matrix repeated",
+  "solid_lzma_dictionary_mb": 64,
+  "generated_dependencies_semantically_unchanged": true,
+  "cleanup": {
+    "owned_desktop_stopped": true,
+    "fresh_slots_revoked": true,
+    "original_vault_entries_unchanged": true
+  },
+  "installed_app_updated": false,
+  "installer_executed": false,
+  "other_platforms_published": false,
+  "sas_login_replayed": false
+}
