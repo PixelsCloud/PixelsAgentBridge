@@ -1,5 +1,7 @@
 # 远程桌面与 AI 人工协助：长期开发任务
 
+2026-10-21 后续发布：Windows 1.3.12 已包含工具栏、调试开关及全屏/Esc 修复，包内 Release 实机与公开下载校验通过。手动打开默认在首帧后启用操作；显式停止后保持停止，人工协助初始只查看。原开发及发布证据见[工具栏记录](acceptance/remote-desktop-toolbar-20261021/README.md)。Mac/Linux 本次改动未发布；不重开此前通过的整套矩阵。
+
 2026-10-21 界面补充：设备菜单图标、主窗口同款标题栏、标题栏操作与右下角可收起统计浮层已实现。Windows 私有查看器实测和 11 项界面测试通过，Mac/Linux 原生代码编译检查通过；两平台本次浮层 GUI 尚未实测。Windows 本次改动已随 1.3.11 发布到 COS，公开接口与完整下载校验通过；Mac/Linux 本次界面改动仍未发布，见[界面核对记录](acceptance/remote-desktop-viewer-chrome-2026-10-21.md)。下方已发布候选检查点保持原版本，不把此前通过的矩阵重新列入待办。
 
 核对日期：2026-10-20。开发分支：`feat/remote-desktop-v1`。最新一批修复 Mac 同逻辑尺寸密度漏检及无额度等待时布局检查，完成 Mac 产品窗口和 Linux X11 原生旧输入边界，见[动态布局本批记录](acceptance/remote-desktop-macos-linux-layout-boundary-2026-10-20.md)。此前 AI 离线/删除/真实账号/新服务见[四项记录](acceptance/remote-desktop-assistance-device-service-2026-10-20.md)。Mac 媒体实体键映射及常用键/中文/释放/首击见[输入验收](acceptance/remote-desktop-input-ime-release-2026-10-20.md)；原检查点 `e0c0c5a` 的窗口恢复、隐藏显示等待及 Mac/Linux 协助证据直接复用。此前记录包括 `3d0b23d` 软件容量、`592b13a` Mac 在线显示器修复，以及 `bcadf50` 采集期间显示器唤醒和实际恢复记录：

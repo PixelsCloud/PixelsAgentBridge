@@ -1,5 +1,7 @@
 # 远程桌面工具栏与全屏调整
 
+Windows 1.3.12 已发布到 COS，安装包解包、包内 Release 查看器、公开更新接口和完整下载校验通过。以下开发阶段记录按原测试范围保留；Mac/Linux 本次改动未发布。
+
 日期：2026-10-21。分支：`fix/remote-desktop-toolbar-20261021`，基线：`b32567b`。
 
 ## 行为
@@ -30,7 +32,7 @@ Windows 原生专项使用独立的屏外生成窗口和 D3D11，不读取桌面
 
 原始结果：[后端编译](backend-check.txt)、[媒体单元测试](media-unit.txt)、[Windows 原生专项](windows-native.txt)。
 
-macOS、Linux 原生视频区域和键盘路径已同步修改，本轮未在这两个平台编译或实机验收。未发布安装包，未覆盖正在运行的本机客户端。Cargo 固定 2 个构建作业、嵌套 CMake 1 个作业，未并行运行两项 Cargo 编译。
+macOS、Linux 原生视频区域和键盘路径已同步修改，本轮未在这两个平台编译或实机验收。开发验收时未发布安装包、未覆盖本机客户端；当前 Windows 发布状态见下文发布记录。开发验收时 Cargo 固定 2 个构建作业、嵌套 CMake 1 个作业，未并行运行两项 Cargo 编译。
 
 ## 复验命令
 
@@ -47,3 +49,15 @@ node node_modules/typescript/bin/tsc --noEmit
 node node_modules/vite/bin/vite.js build
 node node_modules/@playwright/test/cli.js test tests/remote-desktop.spec.ts tests/desktop-assistance.spec.ts tests/desktop-terminal.spec.ts --reporter=list
 ```
+
+## Windows 1.3.12 发布（2026-10-21）
+
+发布源码为 `d51e0127ca50162cf7cda90dcf5e709681d7e425`，来自对本批已验收工具栏工作区的只读快照；原工作区及主工作区未修改。快照文件逐项核对，原始测试日志按原样保留，既有 44 项界面测试、33 项媒体单元测试和 Windows 原生专项直接复用。
+
+Release 使用 Cargo 6 作业、嵌套构建 1 作业、10 核亲和性和同机编译额度监控；沿用 Solid LZMA、64 MB 字典及内部运行时 ZIP 不压缩方案。安装包 [pixels-agent-bridge-windows-x86_64-release-1.3.12-setup.exe](https://pixels-agent-bridge-1251612681.cos.ap-beijing.myqcloud.com/releases/windows/x86_64/1.3.12/pixels-agent-bridge-windows-x86_64-release-1.3.12-setup.exe) 为 55,100,071 字节（52.55 MiB），SHA-256：`fac17f25643784223ae502d57c85098fcd52d6672f7489660df01b2b70e444df`。
+
+实际解包核对四个 x64 程序与构建收据哈希一致，运行时 ZIP、许可证、公开空 TOML 配置及两种 MCP 初始化/工具列表通过。未再次执行安装程序，未覆盖本机安装版。
+
+包内 Release 查看器连接 90：手动打开首帧后自动启用操作通过，随后显式停止操作再验证本地窗口；Windows 专用 Ctrl+Alt+Delete 标签、默认隐藏调试信息、标题栏显示/隐藏原生面板、42 DIP 正常顶部预留、全屏隐藏标题栏与 0 顶部预留、原生视频焦点 Esc 退出及恢复正常布局、最小化隐藏/恢复均通过。全程为同一视频 session，停止操作状态保持；没有向远端注入测试键鼠。原生 Esc 消息只投递到已核对路径和 PID 的私有视频窗口。
+
+私有 GUI 已停止，新建凭据槽撤销，原凭据未改。Cargo 自动生成文件的依赖图与版本/校验和不变，原始生成文件和核对记录保留，发布工作区恢复冻结源码。Ed25519 发布签名与服务返回一致，公开完整下载的大小与 SHA-256 一致。旧版 1.3.11 能发现 1.3.12，1.3.12 不再返回更新。详见 [机器可读发布记录](windows-release.json)。原始私有资料位于 `.build/remote-desktop/windows-toolbar-release-20261021/`；真实远端截图只保留本地。

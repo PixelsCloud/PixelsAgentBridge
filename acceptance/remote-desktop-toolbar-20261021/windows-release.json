@@ -1,0 +1,87 @@
+{
+  "platform": "windows",
+  "architecture": "x86_64",
+  "version": "1.3.12",
+  "source_commit": "d51e0127ca50162cf7cda90dcf5e709681d7e425",
+  "filename": "pixels-agent-bridge-windows-x86_64-release-1.3.12-setup.exe",
+  "bytes": 55100071,
+  "sha256": "fac17f25643784223ae502d57c85098fcd52d6672f7489660df01b2b70e444df",
+  "download_url": "https://pixels-agent-bridge-1251612681.cos.ap-beijing.myqcloud.com/releases/windows/x86_64/1.3.12/pixels-agent-bridge-windows-x86_64-release-1.3.12-setup.exe",
+  "public_download_verified": true,
+  "public_update_checks": [
+    {
+      "current": "1.3.11",
+      "update": "1.3.12",
+      "passed": true
+    },
+    {
+      "current": "1.3.12",
+      "update": null,
+      "passed": true
+    }
+  ],
+  "signed_release_metadata_verified": true,
+  "installer_extraction_verified": true,
+  "payloads_match_build_receipt": true,
+  "solid_lzma": true,
+  "dictionary_mb": 64,
+  "public_configuration_empty": true,
+  "mcp_protocols": [
+    {
+      "protocol": "2025-11-25",
+      "tools": 122,
+      "passed": true
+    },
+    {
+      "protocol": "2026-07-28",
+      "tools": 122,
+      "passed": true
+    }
+  ],
+  "development_acceptance_reused": {
+    "ui": 44,
+    "media_unit_passed": 33,
+    "media_unit_existing_ignored": 1,
+    "windows_native_escape_and_layout": true
+  },
+  "release_viewer_target": "90",
+  "release_viewer": {
+    "version": "1.3.12",
+    "source_commit": "d51e0127ca50162cf7cda90dcf5e709681d7e425",
+    "installed_app_updated": false,
+    "remote_input_events_injected": false,
+    "manual_open_auto_control": true,
+    "custom_titlebar": true,
+    "debug_hidden_by_default": true,
+    "windows_sas_label_visible": true,
+    "remote_os": "windows",
+    "connection_path": "p2p",
+    "normal_inset": 42,
+    "dpi": 96,
+    "native_debug_toggle": true,
+    "alpha": 215,
+    "anchored_bottom_right": true,
+    "titlebar_hides_native_debug": true,
+    "fullscreen_hides_titlebar": true,
+    "fullscreen_inset": 0,
+    "native_escape_exits_fullscreen": true,
+    "normal_inset_restored": true,
+    "hide_and_restore_with_viewer": true,
+    "same_video_session": true,
+    "stopped_control_preserved": true,
+    "passed": true
+  },
+  "binary_sha256": {
+    "pab-desktop.exe": "7be048453ffa11c36e594361c64a96dcf4df4a375d62909089200cf7780aa477",
+    "pab-mcp.exe": "ed1b9a929a7cfb7854a1a2e441b16c47129d473037d7239ae51d4bd283a1982e",
+    "pab-executor.exe": "feb87b755c7d2724f23adcd5e81cf4b3e14994ea92f66ee066e50b2de1f73957",
+    "pab-document-worker.exe": "138cabfab8329d934a76901b8d696d0799268a1f7f6adf36ed53be101e7426df"
+  },
+  "generated_dependency_contents_unchanged": true,
+  "private_gui_stopped": true,
+  "fresh_slots_revoked": true,
+  "original_vault_entries_unchanged": true,
+  "local_installed_app_updated": false,
+  "new_installer_executed": false,
+  "macos_and_linux_released_in_this_batch": false
+}
