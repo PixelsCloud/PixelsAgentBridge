@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-localStorage.setItem("pab.language", "en");
+localStorage.setItem("pab.language", new URLSearchParams(location.search).get("language") || "en");
+localStorage.setItem("pab.theme", new URLSearchParams(location.search).get("theme") || "light");
 const callbacks = new Map<number, (value: unknown) => void>();
 const listeners = new Map<string, number>();
 let next = 1;
@@ -8,13 +9,17 @@ const screens = [
   { id: "adapter:primary", name: "Main", desktop_width: 1920, desktop_height: 1080, primary: true },
   { id: "adapter:left", name: "Portrait", desktop_width: 1080, desktop_height: 1920, primary: false },
 ];
-let opened = { config: { screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
+let opened = { config: { session_id: "viewer-session-fixture", screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
 let phase = "viewing";
-let inputReady = true, inputEnabled = false;
+const params = new URLSearchParams(location.search);
+let inputReady = params.get("ready") !== "0", inputEnabled = inputReady, inputRequested = true;
+let fullscreen = false;
+const remoteOs = params.get("os") || "windows";
 let decoder: string | null = null;
-const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, decoder });
+const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, frame_ready: inputReady, decoder, remote_os: remoteOs, connection_path: "p2p" });
 const fixture = (window as any).fixture = {
-  calls: [] as any[], reject: false,
+  calls: [] as any[], reject: false, rejectFullscreen: false,
+  holdFullscreen: false, releaseFullscreen: undefined as (() => void) | undefined,
   assistance: [] as any[],
   holdCompletion: [] as string[],
   deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
@@ -22,7 +27,9 @@ const fixture = (window as any).fixture = {
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
   recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; decoder = null; fixture.emit(status()); },
-  ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; fixture.emit(status()); },
+  ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; inputEnabled = value && supported && inputRequested; fixture.emit(status()); },
+  fullscreen(value: boolean) { fullscreen = value; callbacks.get(listeners.get("desktop-viewer-fullscreen")!)?.({ payload: value }); },
+  nativeEscape() { fixture.fullscreen(false); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
 (window as any).__TAURI_INTERNALS__ = {
@@ -32,7 +39,16 @@ const fixture = (window as any).fixture = {
   invoke: async (command: string, args: any) => {
     fixture.calls.push({ command, args });
     if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
+    if (command === "plugin:window|is_fullscreen") return fullscreen;
+    if (command === "plugin:window|title") return "Pixels · fixture remote computer";
     if (command.startsWith("plugin:")) return null;
+    if (command === "desktop_viewer_fullscreen") {
+      if (fixture.rejectFullscreen) throw "Fullscreen unavailable";
+      fixture.fullscreen(args.fullscreen);
+      const reply = fullscreen;
+      if (fixture.holdFullscreen) await new Promise<void>(resolve => { fixture.releaseFullscreen = resolve; });
+      return reply;
+    }
     if (command === "desktop_viewer_start") return status();
     if (command === "desktop_viewer_overlay") return null;
     if (command === "desktop_viewer_assistance") return fixture.assistance;
@@ -46,10 +62,11 @@ const fixture = (window as any).fixture = {
     if (command === "desktop_viewer_control") {
       if (fixture.reject) throw "Renderer is busy; retry shortly";
       fixture.emit({ phase: "switching", opened });
-      inputEnabled = typeof args.inputEnabled === "boolean" ? args.inputEnabled : false;
+      if (typeof args.inputEnabled === "boolean") inputRequested = args.inputEnabled;
+      inputEnabled = false; inputReady = false;
       if (args.screen) opened = { ...opened, config: { ...opened.config, screen: screens.find((s) => s.id === args.screen)!, generation: opened.config.generation + 1 } };
       if (args.fps) opened = { ...opened, config: { ...opened.config, fps: args.fps } };
-      setTimeout(() => { phase = "viewing"; fixture.emit(status()); }, 40);
+      setTimeout(() => { phase = "viewing"; inputReady = true; inputEnabled = inputRequested && opened.input_supported; fixture.emit(status()); }, 40);
       return null;
     }
     throw new Error(`Unexpected viewer call: ${command}`);

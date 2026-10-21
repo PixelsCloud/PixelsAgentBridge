@@ -4,9 +4,11 @@
 // Per-window events only: no global keyboard/mouse hook, and disabled by default.
 class ViewerInput {
     bool enabled_ = false;
+    bool fullscreen_ = false, escape_held_ = false;
     unsigned buttons_ = 0;
 public:
     bool available = false;
+    void fullscreen(bool enabled) { fullscreen_ = enabled; }
     bool enabled() const { return enabled_; }
     void emit(uint8_t kind, uint16_t x = 0, uint16_t y = 0, uint16_t value = 0, bool down = false) {
         const uint8_t bytes[8]{kind, uint8_t(x), uint8_t(x >> 8), uint8_t(y), uint8_t(y >> 8),
@@ -29,6 +31,11 @@ public:
         if (available) emit(6, 0, 0, enabled_ ? 1 : 0);
     }
     bool message(HWND window, UINT message, WPARAM wparam, LPARAM lparam, const RECT& viewport) {
+        if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN || message == WM_KEYUP || message == WM_SYSKEYUP) && wparam == VK_ESCAPE) {
+            const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+            if (escape_held_) { if (!down) escape_held_ = false; return true; }
+            if (fullscreen_ && down) { escape_held_ = true; release(window); emit(8); return true; }
+        }
         if (!enabled_) return false;
         if (message == WM_KILLFOCUS || (message == WM_CAPTURECHANGED && buttons_)) { release(window); return false; }
         if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN || message == WM_KEYUP || message == WM_SYSKEYUP) {

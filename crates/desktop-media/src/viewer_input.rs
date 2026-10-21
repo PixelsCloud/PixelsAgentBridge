@@ -19,13 +19,21 @@ enum Event {
     Input(RemoteDesktopInput),
     Wheel { x: u16, y: u16, delta: i16 },
     Mode(bool),
+    ExitFullscreen,
 }
+/// Local actions cannot be serialized as remote keyboard input.
+pub enum NativeViewerEvent {
+    Input(RemoteDesktopInput),
+    ExitFullscreen,
+}
+
 type Stamped = (u64, Event);
 pub struct NativeViewerInput {
     input: Control,
     inbox: Inbox,
     reader: Option<tokio::task::JoinHandle<()>>,
     pending: Option<RemoteDesktopInput>,
+    exit_fullscreen: bool,
 }
 enum Control {
     Pipe(Arc<Mutex<ChildStdin>>),
@@ -118,6 +126,7 @@ impl NativeViewerInput {
             inbox,
             reader: Some(reader),
             pending: None,
+            exit_fullscreen: false,
         }
     }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -131,6 +140,7 @@ impl NativeViewerInput {
                 inbox,
                 reader: None,
                 pending: None,
+                exit_fullscreen: false,
             },
             sink,
         )
@@ -150,7 +160,11 @@ impl NativeViewerInput {
         // Native ACK is ordered after all events from the previous mode. Drain
         // those events; they must never be delivered under a new input lease.
         loop {
-            if let Event::Mode(actual) = self.inbox.next_raw().await? {
+            let event = self.inbox.next_raw().await?;
+            if matches!(event, Event::ExitFullscreen) {
+                self.exit_fullscreen = true;
+            }
+            if let Event::Mode(actual) = event {
                 return if actual == enabled {
                     Ok(())
                 } else {
@@ -160,17 +174,28 @@ impl NativeViewerInput {
         }
     }
     pub async fn next(&mut self) -> io::Result<RemoteDesktopInput> {
+        loop {
+            if let NativeViewerEvent::Input(input) = self.next_event().await? {
+                return Ok(input);
+            }
+        }
+    }
+    pub async fn next_event(&mut self) -> io::Result<NativeViewerEvent> {
+        if std::mem::take(&mut self.exit_fullscreen) {
+            return Ok(NativeViewerEvent::ExitFullscreen);
+        }
         if let Some(event) = self.pending.take() {
-            return Ok(event);
+            return Ok(NativeViewerEvent::Input(event));
         }
         loop {
             match self.inbox.next_raw().await? {
-                Event::Input(event) => return Ok(event),
+                Event::Input(event) => return Ok(NativeViewerEvent::Input(event)),
+                Event::ExitFullscreen => return Ok(NativeViewerEvent::ExitFullscreen),
                 Event::Wheel { x, y, delta } => {
                     // Wheel's position must precede its action even when motion
                     // was coalesced on another channel. Keep the network v2 API.
                     self.pending = Some(RemoteDesktopInput::Wheel { delta });
-                    return Ok(RemoteDesktopInput::Move { x, y });
+                    return Ok(NativeViewerEvent::Input(RemoteDesktopInput::Move { x, y }));
                 }
                 Event::Mode(_) => {}
             }
@@ -244,6 +269,34 @@ impl Inbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn local_escape_preserves_release_order_without_becoming_a_remote_key() {
+        let (sink, mut inbox) = InputSink::channel();
+        assert!(sink.emit([4, 0, 0, 0, 0, 65, 0, 1]));
+        assert!(sink.emit([5, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(sink.emit([8, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(matches!(
+            inbox.next_raw().await.unwrap(),
+            Event::Input(RemoteDesktopInput::Key {
+                virtual_key: 65,
+                down: true
+            })
+        ));
+        assert!(matches!(
+            inbox.next_raw().await.unwrap(),
+            Event::Input(RemoteDesktopInput::ReleaseAll)
+        ));
+        assert!(matches!(
+            inbox.next_raw().await.unwrap(),
+            Event::ExitFullscreen
+        ));
+        for index in 1..8 {
+            let mut packet = [8, 0, 0, 0, 0, 0, 0, 0];
+            packet[index] = 1;
+            assert!(decode(packet).is_none());
+        }
+    }
 
     #[tokio::test]
     async fn worker_failure_survives_eof_and_rejects_pending_input() {
@@ -370,6 +423,12 @@ mod tests {
     }
 }
 fn decode(packet: [u8; 8]) -> Option<Event> {
+    if packet[0] == 8 {
+        return packet[1..]
+            .iter()
+            .all(|value| *value == 0)
+            .then_some(Event::ExitFullscreen);
+    }
     if packet[7] > 1 {
         return None;
     }

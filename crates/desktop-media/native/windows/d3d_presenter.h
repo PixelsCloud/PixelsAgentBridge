@@ -22,6 +22,7 @@ class NativePresenter {
     ViewerStats stats_;
     CursorOverlay cursor_;
     bool cursor_tracking_ = false;
+    bool fullscreen_ = false;
     ViewerInput input_;
     static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
         auto* self = reinterpret_cast<NativePresenter*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -71,6 +72,10 @@ class NativePresenter {
     }
 public:
     void cursor_update(const std::vector<uint8_t>& packet) {
+        if (!packet.empty() && packet.front() == 3) {
+            if (packet.size() != 2 || packet[1] > 1) throw std::runtime_error("Invalid viewer layout");
+            fullscreen_ = packet[1] != 0; input_.fullscreen(fullscreen_); pump(); return;
+        }
         if (!packet.empty() && packet.front() == 2) {
             stats_.update(window_,packet.data()+1,packet.size()-1,[this] { input_.release(window_); });
             return;
@@ -137,7 +142,7 @@ public:
         if (!swapchain_ || !processor_ || presenting_) return;
         if (parent_) {
             RECT bounds{}; GetClientRect(parent_, &bounds);
-            const int top = MulDiv(42, GetDpiForWindow(parent_), 96);
+            const int top = fullscreen_ ? 0 : MulDiv(42, GetDpiForWindow(parent_), 96);
             RECT position{}; GetWindowRect(window_, &position);
             POINT origin{position.left, position.top}; ScreenToClient(parent_, &origin);
             if (origin.y != top || position.right-position.left != bounds.right || position.bottom-position.top != (std::max)(1L, bounds.bottom-top))

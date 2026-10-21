@@ -25,7 +25,7 @@ mod software_ffi;
 mod viewer_input;
 pub use process::{NativeBackend, NativeViewer};
 pub use renderer::NativePresentations;
-pub use viewer_input::NativeViewerInput;
+pub use viewer_input::{NativeViewerEvent, NativeViewerInput};
 
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments
 /// start with the operation (inventory, capture or render), without argv[0].

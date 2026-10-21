@@ -9,7 +9,6 @@ class ViewerStats {
     HWND window_ = nullptr, parent_ = nullptr;
     HFONT font_ = nullptr;
     UINT dpi_ = 0;
-    bool expanded_ = true;
     std::wstring text_;
     std::function<void()> clicked_;
     static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM key, LPARAM param) {
@@ -21,7 +20,7 @@ class ViewerStats {
         if (!self) return DefWindowProcW(window,message,key,param);
         if (message == WM_MOUSEACTIVATE) return MA_NOACTIVATE;
         if (message == WM_LBUTTONUP) {
-            self->clicked_(); self->expanded_ = !self->expanded_; self->layout();
+            self->clicked_();
             InvalidateRect(window,nullptr,TRUE); return 0;
         }
         if (message == WM_ERASEBKGND) return 1;
@@ -30,10 +29,8 @@ class ViewerStats {
             HBRUSH background = CreateSolidBrush(RGB(20,29,39)); FillRect(dc,&rect,background); DeleteObject(background);
             SetBkMode(dc,TRANSPARENT); SetTextColor(dc,RGB(234,243,246)); auto old = SelectObject(dc,self->font_);
             const int padding = MulDiv(12,self->dpi_,96);
-            if (self->expanded_) {
-                InflateRect(&rect,-padding,-padding);
-                DrawTextW(dc,self->text_.c_str(),-1,&rect,DT_LEFT|DT_TOP|DT_NOPREFIX|DT_WORDBREAK);
-            } else DrawTextW(dc,L"i",1,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
+            InflateRect(&rect,-padding,-padding);
+            DrawTextW(dc,self->text_.c_str(),-1,&rect,DT_LEFT|DT_TOP|DT_NOPREFIX|DT_WORDBREAK);
             SelectObject(dc,old); EndPaint(window,&paint); return 0;
         }
         return DefWindowProcW(window,message,key,param);
@@ -49,7 +46,7 @@ public:
         parent_ = parent; clicked_ = std::move(clicked);
         if (!window_ && size) {
             WNDCLASSW cls{}; cls.lpfnWndProc = procedure; cls.hInstance = GetModuleHandleW(nullptr);
-            cls.lpszClassName = L"PixelsRemoteDesktopStats"; cls.hCursor = LoadCursorW(nullptr,IDC_HAND);
+            cls.lpszClassName = L"PixelsRemoteDesktopStats"; cls.hCursor = LoadCursorW(nullptr,IDC_ARROW);
             RegisterClassW(&cls);
             window_ = CreateWindowExW(WS_EX_LAYERED|WS_EX_NOACTIVATE|WS_EX_TOOLWINDOW,cls.lpszClassName,L"",WS_POPUP,
                 0,0,1,1,GetAncestor(parent,GA_ROOT),nullptr,cls.hInstance,this);
@@ -69,8 +66,8 @@ public:
         }
         RECT bounds{}; GetClientRect(parent_,&bounds);
         const int gap = MulDiv(12,dpi_,96), lines = 1+static_cast<int>(std::count(text_.begin(),text_.end(),L'\n'));
-        const int width = (std::min)(MulDiv(expanded_ ? 244 : 30,dpi_,96),static_cast<int>((std::max)(1L,bounds.right-gap*2)));
-        const int height = (std::min)(MulDiv(expanded_ ? 24+lines*19 : 30,dpi_,96),static_cast<int>((std::max)(1L,bounds.bottom-gap*2)));
+        const int width = (std::min)(MulDiv(360,dpi_,96),static_cast<int>((std::max)(1L,bounds.right-gap*2)));
+        const int height = (std::min)(MulDiv(24+lines*19,dpi_,96),static_cast<int>((std::max)(1L,bounds.bottom-gap*2)));
         const int x = (std::max)(0L,bounds.right-width-gap), y = (std::max)(0L,bounds.bottom-height-gap);
         RECT current{}; GetWindowRect(window_,&current); POINT point{x,y}; ClientToScreen(parent_,&point);
         if (current.left!=point.x || current.top!=point.y || current.right-current.left!=width || current.bottom-current.top!=height) {

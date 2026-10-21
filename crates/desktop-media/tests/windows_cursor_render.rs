@@ -5,6 +5,24 @@ use pab_remote_desktop::{CursorUpdate, VideoFrame};
 use std::{path::PathBuf, time::Duration};
 
 #[test]
+#[ignore = "requires local D3D11; generated offscreen windows only, no desktop capture or remote input"]
+fn viewer_chrome_fullscreen_inset_and_escape_are_local() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_pab-media-worker"))
+        .arg("viewer-chrome-check")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["layout_cases"], 4);
+    assert_eq!(report["local_escape_modes"], 2);
+    assert_eq!(report["remote_escape_events"], 0);
+}
+
+#[test]
 #[ignore = "requires D3D11 GPU; generated pixels only, no visible window or desktop capture"]
 fn gpu_cursor_color_masks_scaling_clipping_and_hide_match_pixels() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_pab-media-worker"))

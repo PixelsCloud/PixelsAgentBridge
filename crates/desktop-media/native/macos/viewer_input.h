@@ -9,6 +9,7 @@ using InputPacket = std::array<uint8_t, 8>;
 struct ViewInput {
     std::function<bool(const InputPacket&)> sink;
     bool enabled = false;
+    bool fullscreen = false, escape_held = false;
     unsigned buttons = 0, width = 0, height = 0, rotation = 0;
     double wheel = 0;
     void emit(uint8_t kind, uint16_t x = 0, uint16_t y = 0, uint16_t value = 0, bool down = false) {
@@ -74,12 +75,12 @@ inline uint16_t windows_key(unsigned code) {
 - (void)setMediaInputEnabled:(BOOL)enabled;
 @end
 @implementation PABInputView
-- (BOOL)acceptsFirstResponder { return mediaInput.enabled; }
+- (BOOL)acceptsFirstResponder { return mediaInput.enabled || mediaInput.fullscreen; }
 - (BOOL)acceptsFirstMouse:(NSEvent*)event { (void)event; return YES; }
 - (BOOL)resignFirstResponder { mediaInput.release(); return [super resignFirstResponder]; }
 - (void)setMediaInputEnabled:(BOOL)enabled {
     mediaInput.enable(enabled);
-    if (mediaInput.enabled) [self.window makeFirstResponder:self];
+    if (mediaInput.enabled || mediaInput.fullscreen) [self.window makeFirstResponder:self];
     else if (self.window.firstResponder == self) [self.window makeFirstResponder:nil];
 }
 - (void)updateTrackingAreas {
@@ -90,17 +91,22 @@ inline uint16_t windows_key(unsigned code) {
     [self addTrackingArea:mediaTracking];
 }
 - (void)keyDown:(NSEvent*)event {
+    if (event.keyCode == kVK_Escape && (mediaInput.fullscreen || mediaInput.escape_held)) {
+        if (!mediaInput.escape_held) { mediaInput.escape_held = true; mediaInput.release(); mediaInput.emit(8); }
+        return;
+    }
     if (!mediaInput.enabled) return;
     const auto key = pab_mac::windows_key(event.keyCode);
     if (key) mediaInput.emit(4,0,0,key,true);
 }
 - (void)keyUp:(NSEvent*)event {
+    if (event.keyCode == kVK_Escape && mediaInput.escape_held) { mediaInput.escape_held = false; return; }
     if (!mediaInput.enabled) return;
     const auto key = pab_mac::windows_key(event.keyCode);
     if (key) mediaInput.emit(4,0,0,key,false);
 }
 - (BOOL)performKeyEquivalent:(NSEvent*)event {
-    if (!mediaInput.enabled || self.window.firstResponder != self) return NO;
+    if ((!mediaInput.enabled && !mediaInput.fullscreen) || self.window.firstResponder != self) return NO;
     [self keyDown:event]; return YES;
 }
 - (void)flagsChanged:(NSEvent*)event {

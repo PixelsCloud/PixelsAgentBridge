@@ -89,6 +89,7 @@ static void validate_wgc_desktop(const Display& selected);
 #include "cursor_fixture.h"
 #include "win32_cursor_fixture.h"
 #include "cursor_overlay_fixture.h"
+#include "viewer_chrome_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
     for (size_t i = 0; i + 4 < bytes.size(); ++i) {
         if (!bytes[i] && !bytes[i+1] && bytes[i+2] == 1 && (bytes[i+3] & 31) == 5) return true;
@@ -393,6 +394,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
     try {
         if (const auto result = user_capture::run(argc, argv)) return *result;
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (argc == 2 && std::string(argv[1]) == "viewer-chrome-check") {
+            viewer_chrome_check(); return 0;
+        }
         if (argc == 2 && std::string(argv[1]) == "cursor-win32-check") {
             win32_cursor_check(); return 0;
         }

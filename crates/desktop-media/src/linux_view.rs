@@ -217,6 +217,10 @@ pub struct LinuxCursorRenderer {
     acknowledgements: crate::renderer::CursorAcknowledgements,
 }
 impl LinuxCursorRenderer {
+    /// Local chrome command; does not affect the media generation or remote input lease.
+    pub async fn fullscreen(&mut self, enabled: bool) -> Result<(), Error> {
+        self.send(vec![3, u8::from(enabled)]).await
+    }
     pub async fn overlay(&mut self, text: &str) -> Result<(), Error> {
         if text.len() > 2048 {
             return Err("viewer statistics too large".into());

@@ -1,0 +1,57 @@
+   Compiling pab-desktop-media v0.1.0 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\crates\desktop-media)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.89s
+     Running unittests src\lib.rs (D:/GoCloud/PixelsAgentBridge/target\debug\deps\pab_desktop_media-7513351b0650023f.exe)
+
+running 34 tests
+test software::tests::bt709_primary_colors_padding_and_truncation ... ok
+test software::tests::nv12_rejects_invalid_extents_before_reading ... ok
+test software::tests::odd_source_edges_are_replicated_without_reading_stride_padding ... ok
+test process::cursor::tests::native_cursor_packet_image_hide_move_keeps_exact_framing ... ok
+test renderer::tests::unsubmitted_cursor_confirmation_is_rejected ... ok
+test software::tests::profile_1080p_software_pipeline ... ignored, manual timing on the target hardware; not a display FPS acceptance test
+test process::cursor::tests::native_cursor_rejects_header_before_waiting_or_allocating_payload ... ok
+test software::tests::nv12_borrows_even_luma_and_preserves_odd_edges_with_padded_strides ... ok
+test renderer::tests::unexpected_or_unconsumed_output_and_incomplete_drain_fail ... ok
+test renderer::tests::live_decoder_matches_native_report_and_is_not_inferred_or_reused ... ok
+test renderer::tests::truncated_worker_event_wakes_pending_submission_and_output ... ok
+test renderer::tests::decoder_path_is_reported_and_cannot_change_within_generation ... ok
+test renderer::tests::bounded_native_failure_wakes_pending_consumption ... ok
+test viewer_input::tests::local_escape_preserves_release_order_without_becoming_a_remote_key ... ok
+test viewer_input::tests::invalid_or_truncated_failure_packets_fail_without_delivering_input ... ok
+test viewer_input::tests::motion_channel_race_cannot_discard_key_release_or_mode_barrier ... ok
+test viewer_input::tests::worker_failure_survives_eof_and_rejects_pending_input ... ok
+test viewer_input::tests::motion_bursts_preserve_releases_and_overflow_fails_closed ... ok
+test software::tests::failed_preparation_or_nv12_switch_cannot_encode_old_bgra ... ok
+test process::diagnostics::tests::large_diagnostic_stream_is_drained_and_retains_final_exception ... ok
+[OpenH264] this = 0x000001E45609E170, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+[OpenH264] this = 0x000001E455C8F630, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+test software::tests::changing_frames_round_trip_without_skips_or_stale_pixels ... ok
+test software::tests::prepared_bgra_owns_converted_pixels_after_capture_buffer_is_reused ... ok
+test software::tests::nv12_dynamic_encode_decode_preserves_limited_bt709_samples ... ok
+test renderer::tests::delayed_decoder_output_is_bounded_and_does_not_grant_presentation_credit ... ok
+[OpenH264] this = 0x000001E4528C5440, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+test process::cursor::tests::native_cursor_partial_payload_has_deadline_but_idle_wait_can_cancel ... ok
+test renderer::tests::cursor_consumption_never_grants_video_credit_or_displayed_frames ... ok
+[OpenH264] this = 0x000001E452B7DA20, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E452B7DA20, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+[OpenH264] this = 0x000001E452830110, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E452830110, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+[OpenH264] this = 0x000001E452B7DCC0, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E452B54000, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E452B7DAE0, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+test software::tests::multi_slice_stream_starts_with_independently_decodable_frame ... ok
+test software::tests::high_entropy_nv12_recovers_after_an_existing_frame_without_stale_output ... ok
+test software::tests::apple_low_latency_stream_has_immediate_ordered_pixels ... ok
+test process::diagnostics::tests::an_open_diagnostic_pipe_cannot_prevent_failure_reporting ... ok
+[OpenH264] this = 0x000001E452B7DBA0, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E452B7DBA0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+[OpenH264] this = 0x000001E452B7DA50, Warning:ParamValidationExt(), slice mode = SM_SIZELIMITED_SLICE, uiSliceSizeConstraint = 8192 ,uiMaxNalsize = 8192, will take uiMaxNalsize!
+[OpenH264] this = 0x000001E453167610, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+test software::tests::odd_h264_retains_last_visible_row_and_column ... ok
+[OpenH264] this = 0x000001E452B7DB70, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+test software::tests::high_entropy_frames_decode_across_budget_changes ... ok
+test software::tests::live_bitrate_budget_preserves_every_frame_and_restores_full_quality ... ok
+test software::tests::settled_color_is_stable_after_spatial_fade ... ok
+
+test result: ok. 33 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.97s
+

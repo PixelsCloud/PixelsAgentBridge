@@ -92,6 +92,7 @@ struct TextureLease {
 class NativePresenter {
     NSWindow* __strong window_ = nil;
     PABMetalView* __strong view_ = nil;
+    NSLayoutConstraint* __strong top_constraint_ = nil;
     id<MTLDevice> __strong device_ = nil;
     id<MTLCommandQueue> __strong queue_ = nil;
     id<MTLRenderPipelineState> __strong pipeline_ = nil;
@@ -274,10 +275,11 @@ public:
             // The guide follows titlebar/fullscreen and window size changes;
             // autoresizing alone keeps a stale top inset after those changes.
             NSLayoutGuide* layout = window_.contentLayoutGuide;
+            top_constraint_ = [view_.topAnchor constraintEqualToAnchor:layout.topAnchor constant:42];
             [NSLayoutConstraint activateConstraints:@[
                 [view_.leadingAnchor constraintEqualToAnchor:layout.leadingAnchor],
                 [view_.trailingAnchor constraintEqualToAnchor:layout.trailingAnchor],
-                [view_.topAnchor constraintEqualToAnchor:layout.topAnchor constant:42],
+                top_constraint_,
                 [view_.bottomAnchor constraintEqualToAnchor:layout.bottomAnchor]
             ]];
             [parent layoutSubtreeIfNeeded];
@@ -326,6 +328,15 @@ public:
     }
     void input_sink(std::function<bool(const InputPacket&)> sink) { require_main(); view_->mediaInput.sink = std::move(sink); }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0] == 3) {
+            require_main();
+            if (size != 2 || bytes[1] > 1) throw std::runtime_error("Invalid viewer layout");
+            view_->mediaInput.fullscreen = bytes[1] != 0;
+            top_constraint_.constant = bytes[1] ? 0 : 42;
+            [view_.superview layoutSubtreeIfNeeded];
+            if (bytes[1]) [view_.window makeFirstResponder:view_];
+            view_.needsMediaRedraw = YES; return;
+        }
         if (size && bytes[0] == 2) {
             require_main();
             if (size > 2049) throw std::runtime_error("Viewer statistics too large");

@@ -9,7 +9,20 @@ use pab_protocol::DesktopOpened;
 use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::sync::{mpsc, watch};
+mod chrome;
 mod recovery;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[tauri::command]
+pub async fn desktop_viewer_fullscreen(
+    window: WebviewWindow,
+    state: State<'_, RemoteDesktopState>,
+    fullscreen: bool,
+) -> Result<bool, String> {
+    let owner = state.owner(&window).await?;
+    chrome::set_fullscreen(&window, &owner, fullscreen)?;
+    Ok(fullscreen)
+}
 
 #[derive(Clone, Default, Serialize)]
 pub struct ViewerStatus {
@@ -21,6 +34,8 @@ pub struct ViewerStatus {
     input_enabled: bool,
     decoder: Option<&'static str>,
     quality: Option<pab_protocol::DesktopQualitySnapshot>,
+    remote_os: Option<pab_protocol::OsFamily>,
+    connection_path: Option<&'static str>,
 }
 enum Command {
     Screen(String),
@@ -115,6 +130,8 @@ struct Owner {
     requests: Mutex<Option<mpsc::Receiver<Command>>>,
     status: watch::Sender<ViewerStatus>,
     overlay: watch::Sender<String>,
+    fullscreen: watch::Sender<bool>,
+    input_requested: AtomicBool,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 #[derive(Default)]
@@ -242,14 +259,15 @@ pub(crate) async fn open_window(
         {
             if let Some(window) = app.get_webview_window(label) {
                 if for_assistance {
+                    owner.input_requested.store(false, Ordering::Relaxed);
                     let status = owner.status.borrow().clone();
-                    if status.input_enabled {
-                        if let Some(opened) = status.opened {
-                            owner
-                                .commands
-                                .try_send(Command::Input(false, InputGeneration::from(&opened)))
-                                .map_err(|_| "viewer is busy; retry opening assistance")?;
-                        }
+                    // Also cover a first-frame enable that is still awaiting
+                    // its native ACK and has not published input_enabled yet.
+                    if let Some(opened) = status.opened.filter(|opened| opened.input_supported) {
+                        owner
+                            .commands
+                            .try_send(Command::Input(false, InputGeneration::from(&opened)))
+                            .map_err(|_| "viewer is busy; retry opening assistance")?;
                     }
                 }
                 if let Some(screen) = initial_screen {
@@ -281,6 +299,8 @@ pub(crate) async fn open_window(
         status,
         task: Mutex::new(None),
         overlay: watch::channel(String::new()).0,
+        fullscreen: watch::channel(false).0,
+        input_requested: AtomicBool::new(!for_assistance),
     });
     owners.insert(label.clone(), owner);
     let title = format!(
@@ -382,7 +402,10 @@ pub async fn desktop_viewer_control(
         (None, Some(fps @ (15 | 30)), None, None, None) => Command::Fps(fps),
         (None, None, Some(true), None, None) => Command::Retry,
         (None, None, None, Some(enabled), None) => Command::Input(enabled, input_generation()?),
-        (None, None, None, None, Some(true)) if status.input_enabled => {
+        (None, None, None, None, Some(true))
+            if status.input_enabled
+                && status.remote_os == Some(pab_protocol::OsFamily::Windows) =>
+        {
             Command::SecureAttention(input_generation()?)
         }
         _ => return Err("invalid remote desktop command".into()),
@@ -424,6 +447,8 @@ fn publish(
         input_enabled: false,
         decoder: None,
         quality: None,
+        remote_os: owner.status.borrow().remote_os,
+        connection_path: owner.status.borrow().connection_path,
     };
     owner.status.send_replace(status.clone());
     let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
@@ -529,7 +554,7 @@ async fn run(
                     );
                     if error.renderer && !software_decoder {
                         // Decode/render failure gets one software attempt in a
-                        // fresh, view-only session. Network/auth failures never
+                        // fresh session and input lease. Network/auth failures never
                         // change codec selection or replay previous input.
                         software_decoder = true;
                         failures += 1;
@@ -597,6 +622,26 @@ async fn stream(
         .resolve_device_code(owner.code)
         .await
         .map_err(StreamFailure::from)?;
+    // The verified target environment identifies the remote OS, never the host OS.
+    let remote_os = owner
+        .runtime
+        .current_environment(device)
+        .await
+        .ok()
+        .map(|target| target.execution.os_family);
+    let connection_path = owner
+        .runtime
+        .connection_path(device)
+        .await
+        .map(|path| match path {
+            ConnectionPath::Direct => "p2p",
+            ConnectionPath::Relay => "relay",
+            ConnectionPath::Unknown => "unknown",
+        });
+    owner.status.send_modify(|status| {
+        status.remote_os = remote_os;
+        status.connection_path = connection_path;
+    });
     let opened = owner
         .runtime
         .open_remote_desktop(device, screen.clone(), *fps)
@@ -609,7 +654,7 @@ async fn stream(
             },
         ))) if screen.is_some() => {
             // Open's NotFound means the selected output disappeared. A fresh
-            // primary-screen session is view-only; never replay old input.
+            // primary-screen session waits for its first frame; never replay old input.
             *screen = None;
             owner
                 .runtime
@@ -664,7 +709,9 @@ async fn stream(
             let mut source = cursor_source;
             let mut renderer = cursor_renderer;
             let mut overlay = owner.overlay.subscribe();
+            let mut fullscreen = owner.fullscreen.subscribe();
             overlay.mark_changed();
+            fullscreen.mark_changed();
             loop {
                 // Keep an in-progress cursor read alive across local HUD updates.
                 // Cancelling/restarting it could discard a partial cursor packet.
@@ -679,6 +726,13 @@ async fn stream(
                     loop {
                         tokio::select! {
                             update = &mut next => break update,
+                            changed = fullscreen.changed() => {
+                                changed.map_err(|_| StreamFailure::renderer("viewer layout closed"))?;
+                                let enabled = *fullscreen.borrow_and_update();
+                                tokio::time::timeout(Duration::from_secs(5), renderer.fullscreen(enabled)).await
+                                    .map_err(|_| StreamFailure::renderer("viewer layout submission timed out"))?
+                                    .map_err(StreamFailure::renderer)?;
+                            }
                             changed = overlay.changed() => {
                                 changed.map_err(|_| StreamFailure::renderer("viewer overlay closed"))?;
                                 let text = overlay.borrow_and_update().clone();
@@ -791,12 +845,12 @@ async fn stream(
                         .map_err(StreamFailure::from)?;
                     if !*ready.borrow() {
                         first_presented.get_or_insert_with(Instant::now);
-                        ready.send_replace(true);
                         owner.status.send_modify(|status| {
                             status.frame_ready = true;
                             status.decoder = presentations.decoder();
                         });
                         publish_input(window, owner, supported, false);
+                        ready.send_replace(true);
                     }
                 }
                 #[allow(unreachable_code)]
@@ -812,6 +866,7 @@ async fn stream(
                     biased;
                     command = commands.recv() => match command {
                         Some(Command::Input(value, target)) if target == input_generation => {
+                            owner.input_requested.store(value, Ordering::Relaxed);
                             if value && (!supported || !*ready_rx.borrow_and_update()) {
                                 publish_input(window, owner, supported && *ready_rx.borrow(), false);
                                 continue;
@@ -843,9 +898,27 @@ async fn stream(
                         Some(Command::Input(..) | Command::SecureAttention(_)) => continue,
                         other => return Ok::<_, StreamFailure>(other),
                     },
-                    event = native_input.next() => {
-                        let event = event.map_err(StreamFailure::renderer)?;
-                        if enabled { control.send(event).await.map_err(StreamFailure::from)?; }
+                    ready = ready_rx.changed() => {
+                        if ready.is_err() { return Ok(None); }
+                        if *ready_rx.borrow_and_update() && supported && owner.input_requested.load(Ordering::Relaxed) {
+                            control.set_enabled(true).await.map_err(StreamFailure::from)?;
+                            tokio::time::timeout(Duration::from_secs(3), native_input.set_enabled(true)).await
+                                .map_err(|_| StreamFailure::renderer("native input mode timed out"))?
+                                .map_err(StreamFailure::renderer)?;
+                            enabled = true;
+                            publish_input(window, owner, true, true);
+                        }
+                    }
+                    event = native_input.next_event() => {
+                        match event.map_err(StreamFailure::renderer)? {
+                            pab_desktop_media::NativeViewerEvent::Input(event) => {
+                                if enabled { control.send(event).await.map_err(StreamFailure::from)?; }
+                            }
+                            pab_desktop_media::NativeViewerEvent::ExitFullscreen => {
+                                // Native focus must consume Esc locally, including its key-up.
+                                chrome::set_fullscreen(window, owner, false).map_err(StreamFailure::renderer)?;
+                            }
+                        }
                     }
                 }
             }

@@ -2,6 +2,9 @@ html:has(.remote-desktop), body:has(.remote-desktop), #root:has(.remote-desktop)
 .remote-desktop { height: 100vh; background: #101820; color: #183144; font: 13px "Segoe UI", system-ui, sans-serif; }
 .remote-desktop * { box-sizing: border-box; }
 .remote-desktop-toolbar { gap: 8px; padding: 0; }
+.remote-desktop-toolbar[hidden], .remote-desktop-statistics[hidden] { display: none; }
+.remote-desktop-fullscreen .remote-desktop-placeholder { height: 100%; }
+.remote-desktop-phase { color: #647c85; font-size: 11px; white-space: nowrap; }
 .remote-desktop-title { min-width: 0; flex: 1; padding-left: 12px; }
 .remote-desktop-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .remote-desktop-controls { display: flex; align-items: center; flex-shrink: 0; gap: 6px; }
@@ -17,13 +20,21 @@ html:has(.remote-desktop), body:has(.remote-desktop), #root:has(.remote-desktop)
 .remote-desktop-toolbar > [role=alert] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #bc4d53; }
 .remote-desktop-placeholder { box-sizing: border-box; height: calc(100% - 42px); display: grid; place-items: center; color: #c0d0d9; padding: 0 24px; }
 .remote-desktop-placeholder [role=alert] { color: #ffb8b8; white-space: pre-wrap; max-width: 700px; overflow-wrap: anywhere; }
-.remote-desktop-statistics { position: fixed; right: 12px; bottom: 12px; display: block; min-width: 30px; max-width: min(244px, calc(100vw - 24px)); padding: 12px; border: 1px solid #ffffff1f; border-radius: 9px; background: #141d27d6; backdrop-filter: blur(8px); color: #eaf3f6; text-align: left; font: 12px/19px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+.remote-desktop-statistics { position: fixed; right: 12px; bottom: 12px; display: block; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100vh - 66px); overflow: hidden; padding: 12px; border: 1px solid #ffffff1f; border-radius: 9px; background: #141d27d6; backdrop-filter: blur(8px); color: #eaf3f6; text-align: left; font: 12px/19px "Segoe UI", system-ui, sans-serif; pointer-events: none; }
+.remote-desktop-fullscreen .remote-desktop-statistics { max-height: calc(100vh - 24px); }
 .remote-desktop-statistics strong { display: block; }
 .remote-desktop-statistics span { display: block; }
 .remote-desktop-statistics [hidden] { display: none; }
-.remote-desktop-statistics[aria-expanded=false] { width: 30px; height: 30px; padding: 0; text-align: center; }
+.remote-desktop-statistics dl { margin: 8px 0; }
+.remote-desktop-statistics dl>div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 1.4fr); gap: 12px; padding-block: 3px; }
+.remote-desktop-statistics dt { color: #adc3cd; }
+.remote-desktop-statistics dd { margin: 0; overflow-wrap: anywhere; }
+.remote-desktop-statistics small { display: block; padding-top: 8px; border-top: 1px solid #ffffff20; color: #adc3cd; font-size: 10px; line-height: 1.6; }
+@media (max-height: 500px) { .remote-desktop-statistics dl>div { padding-block: 0; } .remote-desktop-statistics small { padding-top: 4px; } }
 .remote-desktop-view-only { color: #a4e2cf; }
 .remote-desktop-quality { color: #f3ce8c; }
 [data-theme="dark"] .remote-desktop-controls select, [data-theme="dark"] .remote-desktop-controls button { background: #2b3038; border-color: #434b55; color: #f0f3f5; }
 @media (max-width: 950px) { .remote-desktop-title strong { display: none; } .remote-desktop-title { flex: 0 0 30px; } .remote-desktop-controls { margin-left: auto; } .remote-desktop-toolbar .window-controls button { width: 36px; } .remote-desktop-theme { display: none !important; } }
+@media (max-width: 1100px) { .remote-desktop-phase { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+@media (max-width: 760px) { .remote-desktop-controls .remote-desktop-sas { font-size: 11px; padding-inline: 5px; } }
 @media (max-width: 760px) { .remote-desktop-control-toggle span { display: none; } .remote-desktop-toolbar { gap: 5px; } .remote-desktop-assistance { max-width: 90px; } }

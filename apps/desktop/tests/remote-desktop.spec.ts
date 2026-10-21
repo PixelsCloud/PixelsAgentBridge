@@ -1,99 +1,139 @@
 import { test, expect } from "@playwright/test";
 
-test("window chrome keeps controls in one titlebar and statistics toggle locally", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+const viewer = "http://127.0.0.1:1429/tests/remote-desktop.html";
+
+for (const theme of ["light", "dark"]) test(`Chinese toolbar fits the minimum window with Windows actions (${theme})`, async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 640, height: 400 });
+  await page.goto(viewer + `?language=zh-CN&theme=${theme}`);
+  await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Ctrl + Alt + Delete", exact: true })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "关闭窗口", exact: true })).toBeInViewport();
+  await page.getByRole("button", { name: "调试信息", exact: true }).click();
+  await expect(page.getByRole("complementary", { name: "调试信息" })).toBeVisible();
+  expect(await page.getByRole("complementary", { name: "调试信息" }).evaluate(node => node.getBoundingClientRect().top)).toBeGreaterThanOrEqual(42);
+  expect(await page.locator("html").evaluate(node => node.scrollWidth)).toBe(640);
+  await page.screenshot({ path: testInfo.outputPath(`toolbar-${theme}.png`) });
+});
+
+test("control starts enabled and Debug is a titlebar toggle with detailed local information", async ({ page }) => {
+  await page.goto(viewer);
   const header = page.locator(".titlebar");
-  await expect(header.getByRole("combobox", { name: "Display" })).toBeVisible();
-  await expect(header.getByRole("button", { name: "Enable control" })).toBeVisible();
-  const panel = page.getByRole("button", { name: "Statistics", exact: true });
-  await expect(panel).toHaveAttribute("aria-expanded", "true");
-  const box = await panel.boundingBox();
-  expect(box!.x + box!.width).toBe(page.viewportSize()!.width - 12);
-  expect(box!.y + box!.height).toBe(page.viewportSize()!.height - 12);
-  await panel.click(); await expect(panel).toHaveAttribute("aria-expanded", "false");
-  await panel.click(); await expect(panel).toHaveAttribute("aria-expanded", "true");
-  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control"))).toEqual([]);
+  await expect(header.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
+  const toggle = header.getByRole("button", { name: "Debug information", exact: true });
+  const panel = page.getByRole("complementary", { name: "Debug information" });
+  await expect(toggle.locator("svg.lucide-bug")).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(panel).toBeHidden();
+  await toggle.click(); await expect(panel).toBeVisible();
+  await expect(panel).toContainText("viewer-session-fixture");
+  await expect(panel).toContainText("Connection path"); await expect(panel).toContainText("P2P");
+  await expect(panel).toContainText("Encoder target (not measured)");
+  await toggle.click(); await expect(panel).toBeHidden();
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls.filter((call: any) => call.command === "desktop_viewer_control")).toEqual([]);
+  expect(calls.filter((call: any) => call.command === "desktop_viewer_overlay").at(-1).args.text).toBe("");
   await header.getByRole("button", { name: "Maximize", exact: true }).click();
   await header.getByRole("button", { name: "Minimize", exact: true }).click();
-  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => ["plugin:window|toggle_maximize", "plugin:window|minimize"].includes(c.command)).map((c: any) => c.command))).toEqual(["plugin:window|toggle_maximize", "plugin:window|minimize"]);
   await page.setViewportSize({ width: 640, height: 400 });
   await expect(header.getByRole("button", { name: "Close window", exact: true })).toBeInViewport();
   await expect(header.getByRole("combobox", { name: "Display" })).toBeInViewport();
   expect(await page.locator("html").evaluate(node => node.scrollWidth)).toBe(640);
 });
 
-test("decoder badge uses actual reports and clears during recovery", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
-  await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
-  for (const [kind, label] of [["d3d11_hardware", "Hardware decoding"], ["openh264_software", "Software decoding"], ["videotoolbox_hardware", "Hardware decoding"]]) {
-    await page.evaluate((value) => (window as any).fixture.decoder(value), kind);
-    await expect(page.locator(".remote-desktop-decoder")).toHaveText(label);
-    expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(42);
-  }
-  await page.evaluate(() => (window as any).fixture.decoder("unknown_future_decoder"));
-  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
-  await page.evaluate(() => { (window as any).fixture.decoder("openh264_software"); (window as any).fixture.recover(); });
-  await expect(page.getByRole("status")).toHaveText("Restoring desktop");
-  await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
+test("fullscreen hides the titlebar, changes its icon and Esc restores normal layout", async ({ page }) => {
+  await page.goto(viewer);
+  await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
+  await expect(page.locator("header")).toBeHidden();
+  await expect(page.locator(".remote-desktop")).toHaveClass(/remote-desktop-fullscreen/);
+  await expect(page.locator('button[aria-label="Exit fullscreen (Esc)"] svg.lucide-shrink')).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("header")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Fullscreen", exact: true }).locator("svg.lucide-expand")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control"))).toEqual([]);
 });
-test("viewer uses stable screen IDs and bounded controls without frame or input IPC", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
-  await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(page.getByText("View only", { exact: true })).toBeVisible();
-  expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(42);
+
+test("native-focus Escape and fullscreen failure synchronize the same local state", async ({ page }) => {
+  await page.goto(viewer); await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
+  await expect(page.locator("header")).toBeHidden();
+  await page.evaluate(() => (window as any).fixture.nativeEscape());
+  await expect(page.locator("header")).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.rejectFullscreen = true; });
+  await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
+  await expect(page.locator("header")).toBeVisible();
+  await expect(page.locator("header").getByRole("alert")).toContainText("Fullscreen unavailable");
+});
+
+for (const native of [false, true]) test(`Esc wins over a delayed fullscreen reply (native focus: ${native})`, async ({ page }) => {
+  await page.goto(viewer);
+  await expect(page.getByRole("button", { name: "Stop control" })).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_viewer_fullscreen"))).toBe(true);
+  await page.evaluate(() => { (window as any).fixture.holdFullscreen = true; });
+  await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
+  await expect(page.locator("header")).toBeHidden();
+  if (native) await page.evaluate(() => (window as any).fixture.nativeEscape());
+  else await page.keyboard.press("Escape");
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.holdFullscreen = false; f.releaseFullscreen();
+  });
+  await expect(page.locator("header")).toBeVisible();
+  await expect(page.locator(".remote-desktop")).not.toHaveClass(/remote-desktop-fullscreen/);
+});
+
+for (const os of ["windows", "linux", "macos", "android", "unknown"]) test(`secure attention is literal text and Windows-only (${os})`, async ({ page }) => {
+  await page.goto(viewer + `?os=${os}`);
+  const sas = page.getByRole("button", { name: "Ctrl + Alt + Delete", exact: true });
+  if (os !== "windows") { await expect(sas).toHaveCount(0); return; }
+  await expect(sas).toBeEnabled(); await expect(sas.locator("svg")).toHaveCount(0);
+  await sas.click();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args))).toEqual([{ secureAttention: true }]);
+});
+
+test("decoder and capture target details use reported values without inventing measured rates", async ({ page }) => {
+  await page.goto(viewer); await page.getByRole("button", { name: "Debug information" }).click();
+  for (const [kind, label] of [["d3d11_hardware", "Hardware decoding"], ["openh264_software", "Software decoding"], ["videotoolbox_hardware", "Hardware decoding"]]) {
+    await page.evaluate(value => (window as any).fixture.decoder(value), kind);
+    await expect(page.locator(".remote-desktop-decoder")).toContainText(label);
+    expect(await page.locator("header").evaluate(node => node.getBoundingClientRect().height)).toBe(42);
+  }
+  await page.evaluate(() => (window as any).fixture.recover());
+  await expect(page.locator(".remote-desktop-decoder")).toHaveText("Not reported");
+  await expect(page.getByRole("status")).toHaveText("Restoring desktop");
+});
+
+test("controls keep stable screen IDs and the user can leave input stopped across screen changes", async ({ page }) => {
+  await page.goto(viewer);
+  await page.getByRole("button", { name: "Stop control" }).click();
+  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(page.getByRole("combobox", { name: "Display" })).toHaveValue("adapter:left");
+  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
   await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
-  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => !c.command.startsWith("plugin:")));
-  expect(calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args)).toEqual([{ screen: "adapter:left" }, { fps: 30 }]);
-  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control", "desktop_viewer_assistance", "desktop_viewer_overlay"].includes(c.command))).toBe(true);
+  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
+  expect(calls).toEqual([{ inputEnabled: false }, { screen: "adapter:left" }, { fps: 30 }]);
 });
-test("secure attention requires control and recovery never restores input automatically", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
-  const sas = page.getByRole("button", { name: "Ctrl+Alt+Delete", exact: true });
-  await expect(sas).toBeDisabled();
-  await page.getByRole("button", { name: "Enable control" }).click();
-  await expect(sas).toBeEnabled();
-  await sas.click();
-  await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(sas).toBeDisabled();
-  const commands = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
-  expect(commands).toEqual([{ inputEnabled: true }, { secureAttention: true }]);
-  await page.evaluate(() => (window as any).fixture.recover());
-  await expect(page.getByRole("status")).toHaveText("Restoring desktop");
+
+test("input remains gated by the first presented frame and unsupported peers", async ({ page }) => {
+  await page.goto(viewer + "?ready=0");
   await expect(page.getByRole("button", { name: "Enable control" })).toBeDisabled();
-  await expect(sas).toBeDisabled();
-  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).fixture.ready(true));
+  await expect(page.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
+  await page.evaluate(() => (window as any).fixture.ready(true, false));
+  await expect(page.getByRole("button", { name: "Enable control" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ctrl + Alt + Delete" })).toBeDisabled();
 });
+
 test("control errors remain above native surface and capture failure can reconnect", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
-  await expect(page.getByRole("status")).toHaveText("Connected");
-  await page.evaluate(() => { (window as any).fixture.reject = true; });
+  await page.goto(viewer); await page.evaluate(() => { (window as any).fixture.reject = true; });
   await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
   await expect(page.locator("header").getByRole("alert")).toContainText("Renderer is busy");
   await page.evaluate(() => { (window as any).fixture.reject = false; (window as any).fixture.fail(); });
   await expect(page.getByRole("alert")).toContainText("Capture helper unavailable");
   await page.getByRole("button", { name: "Reconnect" }).click();
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("button", { name: "Stop control" })).toBeEnabled();
 });
-test("control requires the first frame and resets to viewing on a new screen", async ({ page }) => {
-  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
-  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
-  await page.evaluate(() => (window as any).fixture.ready(false));
-  await expect(page.getByRole("button", { name: "Enable control" })).toBeDisabled();
-  await page.evaluate(() => (window as any).fixture.ready(true));
-  await page.getByRole("button", { name: "Enable control" }).click();
-  await expect(page.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("Control enabled", { exact: true })).toBeVisible();
-  await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
-  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByText("View only", { exact: true })).toBeVisible();
-  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
-  expect(calls).toEqual([{ inputEnabled: true }, { screen: "adapter:left" }]);
-});
+
 test("assistance requires explicit completion and cannot complete during recovery", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
   await page.evaluate(() => { (window as any).fixture.assistance = [{ assistance_id: "first", status: "active", request: { expected_action: "Inspect generated UI" } }]; });
@@ -172,5 +212,5 @@ test("current completion failure stays visible above the native surface and can 
   await complete.click();
   await expect(complete).toHaveCount(0);
   await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
-  await expect(page.getByText("View only", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
 });

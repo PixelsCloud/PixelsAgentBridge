@@ -42,6 +42,7 @@ class ViewInput {
     GtkWidget* window_;
     unsigned width_,height_,rotation_;
     bool enabled_=false;
+    bool fullscreen_=false, escape_held_=false;
     bool cursor_tracking_=false;
     GdkWindow* cursor_window_=nullptr;
     GdkCursor* blank_cursor_=nullptr;
@@ -145,7 +146,13 @@ class ViewInput {
         return TRUE;
     }
     static gboolean key(GtkWidget*,GdkEventKey* event,gpointer data) noexcept {
-        auto& self=*static_cast<ViewInput*>(data); if (!self.enabled_) return FALSE;
+        auto& self=*static_cast<ViewInput*>(data);
+        const bool pressed=event->type==GDK_KEY_PRESS;
+        if (event->keyval==GDK_KEY_Escape) {
+            if (self.escape_held_) { if (!pressed) self.escape_held_=false; return TRUE; }
+            if (self.fullscreen_ && pressed) { self.escape_held_=true; self.release(); self.emit(8); return TRUE; }
+        }
+        if (!self.enabled_) return FALSE;
         const auto vk=windows_key(event->hardware_keycode);
         if (!vk) return TRUE;
         const bool down=event->type==GDK_KEY_PRESS;
@@ -212,11 +219,15 @@ public:
         if (enabled_) emit(5);
         buttons_=0; keys_.fill(false); wheel_=0;
     }
+    void fullscreen(bool value) {
+        fullscreen_=value; gtk_widget_set_can_focus(area_,value || enabled_);
+        if (value) gtk_widget_grab_focus(area_);
+    }
     void cursor_tracking(bool value) { cursor_tracking_=value; refresh_pointer(); }
     void sink(std::function<bool(const InputPacket&)> sink) { release(); enabled_=false; sink_=std::move(sink); refresh_pointer(); }
     void enable(bool value) {
         release(); enabled_=value && bool(sink_);
-        gtk_widget_set_can_focus(area_,enabled_);
+        gtk_widget_set_can_focus(area_,enabled_ || fullscreen_);
         if (enabled_) gtk_widget_grab_focus(area_);
         if (!emit(6,0,0,enabled_ ? 1 : 0)) throw std::runtime_error("Native input queue unavailable");
         refresh_pointer();

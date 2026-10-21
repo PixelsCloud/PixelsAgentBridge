@@ -15,12 +15,11 @@ class Presenter {
     GtkWidget* hosted_root_ = nullptr;
     GtkWidget* overlay_ = nullptr;
     GtkWidget* statistics_ = nullptr;
-    bool statistics_expanded_ = true;
     std::string statistics_text_;
     void statistics_label() {
-        gtk_button_set_label(GTK_BUTTON(statistics_),statistics_expanded_ ? statistics_text_.c_str() : "i");
-        gtk_label_set_xalign(GTK_LABEL(gtk_bin_get_child(GTK_BIN(statistics_))),statistics_expanded_ ? 0 : .5);
-        gtk_widget_set_size_request(statistics_,statistics_expanded_ ? 244 : 30,statistics_expanded_ ? -1 : 30);
+        gtk_button_set_label(GTK_BUTTON(statistics_),statistics_text_.c_str());
+        gtk_label_set_xalign(GTK_LABEL(gtk_bin_get_child(GTK_BIN(statistics_))),0);
+        gtk_widget_set_size_request(statistics_,360,-1);
     }
     void statistics(const uint8_t* bytes,size_t size) {
         if (size>2048 || !g_utf8_validate(reinterpret_cast<const char*>(bytes),size,nullptr)) throw std::runtime_error("Invalid viewer statistics");
@@ -36,7 +35,8 @@ class Presenter {
             gtk_style_context_add_provider(gtk_widget_get_style_context(statistics_),GTK_STYLE_PROVIDER(style),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION); g_object_unref(style);
             gtk_overlay_add_overlay(GTK_OVERLAY(overlay_),statistics_);
             g_signal_connect(statistics_,"clicked",G_CALLBACK(+[](GtkButton*,gpointer data) {
-                auto& view=*static_cast<Presenter*>(data); view.input_->release(); view.statistics_expanded_=!view.statistics_expanded_; view.statistics_label();
+                auto& view=*static_cast<Presenter*>(data); view.input_->release(); // Visibility belongs to the titlebar Debug button.
+                view.statistics_label();
             }),this);
         }
         if (statistics_) { statistics_label(); gtk_widget_set_visible(statistics_,size!=0); }
@@ -264,6 +264,12 @@ public:
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
     }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0]==3) {
+            poll_events(false);
+            if (size!=2 || bytes[1]>1) throw std::runtime_error("Invalid viewer layout");
+            if (hosted_root_) gtk_widget_set_margin_top(area_,bytes[1] ? 0 : 42);
+            input_->fullscreen(bytes[1]!=0); gtk_gl_area_queue_render(GTK_GL_AREA(area_)); return;
+        }
         if (size && bytes[0]==2) { poll_events(false); statistics(bytes+1,size-1); return; }
         poll_events(false); cursor_.update(bytes,size);
         input_->cursor_tracking(cursor_.tracking());

@@ -1,0 +1,6 @@
+   Compiling pab-service-config v1.2.48 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\crates\service-config)
+    Checking pab-desktop-media v0.1.0 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\crates\desktop-media)
+    Checking pab-bridge v1.2.48 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\crates\bridge)
+    Checking pab-executor v1.2.48 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\crates\executor)
+    Checking pab-desktop v1.2.49 (D:\GoCloud\PixelsAgentBridge-remote-desktop-toolbar-20261021\apps\desktop\src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.24s
