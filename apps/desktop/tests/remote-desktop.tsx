@@ -20,6 +20,8 @@ const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: i
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false, rejectFullscreen: false,
   holdFullscreen: false, releaseFullscreen: undefined as (() => void) | undefined,
+  closeAnswers: [] as boolean[], closeDialogs: 0, closed: false, rejectClose: false,
+  holdClose: false, releaseClose: undefined as (() => void) | undefined,
   assistance: [] as any[],
   holdCompletion: [] as string[],
   deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
@@ -30,6 +32,7 @@ const fixture = (window as any).fixture = {
   ready(value: boolean, supported = true) { inputReady = value; opened.input_supported = supported; inputEnabled = value && supported && inputRequested; fixture.emit(status()); },
   fullscreen(value: boolean) { fullscreen = value; callbacks.get(listeners.get("desktop-viewer-fullscreen")!)?.({ payload: value }); },
   nativeEscape() { fixture.fullscreen(false); },
+  nativeClose() { callbacks.get(listeners.get("desktop-viewer-close-requested")!)?.({ payload: null }); },
 };
 (window as any).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
 (window as any).__TAURI_INTERNALS__ = {
@@ -50,6 +53,14 @@ const fixture = (window as any).fixture = {
       return reply;
     }
     if (command === "desktop_viewer_start") return status();
+    if (command === "desktop_viewer_close") {
+      fixture.closeDialogs++;
+      if (fixture.holdClose) await new Promise<void>(resolve => { fixture.releaseClose = resolve; });
+      if (fixture.rejectClose) throw "Could not show close confirmation";
+      const confirmed = fixture.closeAnswers.shift() ?? false;
+      if (confirmed) fixture.closed = true;
+      return confirmed;
+    }
     if (command === "desktop_viewer_overlay") return null;
     if (command === "desktop_viewer_assistance") return fixture.assistance;
     if (command === "desktop_viewer_assistance_complete") {

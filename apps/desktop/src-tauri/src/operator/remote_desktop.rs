@@ -10,8 +10,18 @@ use std::time::{Duration, Instant};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::sync::{mpsc, watch};
 mod chrome;
+mod close;
 mod recovery;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[tauri::command]
+pub async fn desktop_viewer_close(
+    window: WebviewWindow,
+    state: State<'_, RemoteDesktopState>,
+    english: bool,
+) -> Result<bool, String> {
+    close::request(&window, &state, english).await
+}
 
 #[tauri::command]
 pub async fn desktop_viewer_fullscreen(
@@ -134,6 +144,7 @@ struct Owner {
     #[cfg(windows)]
     restore_maximized: AtomicBool,
     input_requested: AtomicBool,
+    close_request: Mutex<()>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 #[derive(Default)]
@@ -165,7 +176,7 @@ impl RemoteDesktopState {
         for label in labels {
             self.close(&label).await;
             if let Some(window) = app.get_webview_window(&label) {
-                if let Err(error) = window.close() {
+                if let Err(error) = window.destroy() {
                     tracing::warn!(%error, window = label, "could not close removed device viewer");
                 }
             }
@@ -305,6 +316,7 @@ pub(crate) async fn open_window(
         #[cfg(windows)]
         restore_maximized: AtomicBool::new(false),
         input_requested: AtomicBool::new(!for_assistance),
+        close_request: Mutex::new(()),
     });
     owners.insert(label.clone(), owner);
     let title = format!(
@@ -336,7 +348,18 @@ pub(crate) async fn open_window(
     match builder.build() {
         Ok(created) => {
             let closed_label = label.clone();
+            let closing_window = created.clone();
             created.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    if let Err(error) = closing_window.emit_to(
+                        closing_window.label(),
+                        "desktop-viewer-close-requested",
+                        (),
+                    ) {
+                        tracing::warn!(%error, "could not request remote desktop close confirmation");
+                    }
+                }
                 if matches!(event, tauri::WindowEvent::Destroyed) {
                     let app = app.clone();
                     let label = closed_label.clone();

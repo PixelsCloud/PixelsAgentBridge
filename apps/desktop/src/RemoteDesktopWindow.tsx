@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Bug, Expand, Maximize2, Minus, Moon, MousePointer2, Shrink, Sun, X } from "lucide-react";
@@ -32,7 +32,21 @@ export default function RemoteDesktopWindow() {
   const [statisticsExpanded, setStatisticsExpanded] = useState(false);
   const [title, setTitle] = useState(text.title);
   const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
+  const closePending = useRef(false);
   const { appWindow, fullscreen, toggleFullscreen } = useViewerFullscreen(setError);
+  async function requestClose() {
+    if (closePending.current) return;
+    closePending.current = true;
+    setError("");
+    try { await invoke("desktop_viewer_close", { english }); }
+    catch (cause) { setError(String(cause)); }
+    finally { closePending.current = false; }
+  }
+  useEffect(() => {
+    let active = true;
+    const subscription = listen("desktop-viewer-close-requested", () => { if (active) void requestClose(); });
+    return () => { active = false; void subscription.then(unlisten => unlisten()); };
+  }, []);
   useEffect(() => { void appWindow.title().then(value => { if (value) setTitle(value); }).catch(() => {}); }, [appWindow]);
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
   useEffect(() => {
@@ -143,7 +157,7 @@ export default function RemoteDesktopWindow() {
         <button className="remote-desktop-theme" aria-label={english ? "Switch theme" : "切换主题"} title={english ? "Switch theme" : "切换主题"} onClick={() => { const next = !dark; localStorage.setItem("pab.theme", next ? "dark" : "light"); setDark(next); }}>{dark ? <Sun /> : <Moon />}</button>
         <button aria-label={english ? "Minimize" : "最小化"} title={english ? "Minimize" : "最小化"} onClick={() => windowAction(appWindow.minimize())}><Minus /></button>
         <button aria-label={english ? "Maximize" : "最大化"} title={english ? "Maximize" : "最大化"} onClick={() => windowAction(appWindow.toggleMaximize())}><Maximize2 /></button>
-        <button className="close" aria-label={english ? "Close window" : "关闭窗口"} title={english ? "Close window" : "关闭窗口"} onClick={() => windowAction(appWindow.close())}><X /></button>
+        <button className="close" aria-label={english ? "Close window" : "关闭窗口"} title={english ? "Close window" : "关闭窗口"} onClick={() => void requestClose()}><X /></button>
       </div>
     </header>
     <section className="remote-desktop-placeholder">

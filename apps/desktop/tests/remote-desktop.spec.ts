@@ -2,6 +2,36 @@ import { test, expect } from "@playwright/test";
 
 const viewer = "http://127.0.0.1:1429/tests/remote-desktop.html";
 
+for (const language of ["en", "zh-CN"]) test(`viewer close asks natively, cancellation keeps control and confirmation closes (${language})`, async ({ page }) => {
+  await page.goto(viewer + `?language=${language}`);
+  const close = page.getByRole("button", { name: language === "en" ? "Close window" : "关闭窗口", exact: true });
+  await close.click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.closeDialogs)).toBe(1);
+  expect(await page.evaluate(() => (window as any).fixture.closed)).toBe(false);
+  await expect(page.locator(".remote-desktop-control-toggle")).toHaveAttribute("aria-pressed", "true");
+  await page.evaluate(() => { (window as any).fixture.closeAnswers = [true]; });
+  await close.click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.closed)).toBe(true);
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls.filter((c: any) => c.command === "desktop_viewer_close").map((c: any) => c.args)).toEqual([{ english: language === "en" }, { english: language === "en" }]);
+  expect(calls.filter((c: any) => ["plugin:window|close", "desktop_viewer_control"].includes(c.command))).toEqual([]);
+});
+
+test("native close and repeated clicks share one pending confirmation and can retry a failed dialog", async ({ page }) => {
+  await page.goto(viewer);
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_viewer_start"))).toBe(true);
+  await page.evaluate(() => { (window as any).fixture.holdClose = true; (window as any).fixture.nativeClose(); });
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.closeDialogs)).toBe(1);
+  await page.getByRole("button", { name: "Close window", exact: true }).click();
+  await page.evaluate(() => (window as any).fixture.nativeClose());
+  expect(await page.evaluate(() => (window as any).fixture.closeDialogs)).toBe(1);
+  await page.evaluate(() => { const f = (window as any).fixture; f.rejectClose = true; f.holdClose = false; f.releaseClose(); });
+  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not show close confirmation");
+  await page.evaluate(() => { const f = (window as any).fixture; f.rejectClose = false; f.closeAnswers = [true]; f.nativeClose(); });
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.closed)).toBe(true);
+  await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
+});
+
 for (const theme of ["light", "dark"]) test(`Chinese toolbar fits the minimum window with Windows actions (${theme})`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 640, height: 400 });
   await page.goto(viewer + `?language=zh-CN&theme=${theme}`);

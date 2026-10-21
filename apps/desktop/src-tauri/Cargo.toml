@@ -43,6 +43,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 url = "2"
 webbrowser = "1"
 encoding_rs = "0.8"
+rfd = { version = "0.16", default-features = false, features = ["gtk3", "common-controls-v6"] }
 
 [dev-dependencies]
 futures-util = "0.3"
