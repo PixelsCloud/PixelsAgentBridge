@@ -25,10 +25,11 @@ if (params.get("repair")) states.codex.enabled = false;
 const callbacks = new Map<number, (event: any) => void>();
 const listeners = new Map<number, { event: string; handler: number }>();
 let sequence = 0;
-const account = { username: params.get("longName") ? "Pixels-very-long-account-name-for-layout" : "Pixels", userId: "user-123", serverAdmin: false, revision: 1 };
+const account = { username: params.get("longName") ? "Pixels-very-long-account-name-for-layout" : "Pixels", userId: params.has("longId") ? "7dd29e34-8a55-415f-831c-1502271dcaf1" : "user-123", serverAdmin: false, revision: 1 };
 let activeScope = params.has("signedIn") ? account : null;
 const fixture = (window as any).fixture = { calls, states, release: null as null | (() => void),
   loginError: params.has("loginError"), logoutError: params.has("logoutError"), scopeError: params.has("scopeError"),
+  consoleError: params.has("consoleError"), consoleOpens: 0,
   listeners, emit: (event: string, payload: unknown) => {
     for (const [id, listener] of listeners) if (listener.event === event) callbacks.get(listener.handler)?.({ id, event, payload });
   } };
@@ -50,6 +51,10 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
     return account;
   }
   if (command === "operator_use_guest_scope") { if (fixture.logoutError) throw Error("Sign out failed"); activeScope = null; return; }
+  if (command === "open_account_console") { if (fixture.consoleError) throw Error("No browser available"); fixture.consoleOpens++; return; }
+  if (command === "device_account_status") return { account_revision: 1, pending: false, device: { status: "associated", revision: 1 } };
+  if (command === "account_catalog_status") return { account_revision: 1, pending: 0, syncing: false, local_import_count: 0, conflicts: [] };
+  if (command === "github_status") return { enabled: true, login: null, password_enabled: true };
   if (command === "device_status") return { device_code: "123456789", device_id: "fixture", temporary_password: "fixture", executor_running: true, control_phase: "authenticated" };
   if (command === "get_operator_server_settings") return { controlUrl: "", relayUrl: "" };
   if (command === "operator_bootstrap") return { devices: [], tasks: [], operations: [], taskBefore: null, operationBeforeStartedAtUnixMs: null, operationBeforeId: null, hasMoreTasks: false, hasMoreOperations: false, totalCount: 0 };

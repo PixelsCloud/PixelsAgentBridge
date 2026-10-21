@@ -1,5 +1,104 @@
 import { test, expect } from '@playwright/test';
 
+const connectionEntries = [
+  { en:'Remote desktop', zh:'远程桌面', command:'desktop_viewer_window', args:{code:'123456789'} },
+  { en:'Remote terminal', zh:'远程终端', command:'desktop_terminal_window', args:{code:'123456789',mode:'console'} },
+  { en:'Remote terminal (System)', zh:'远程终端（System）', command:'desktop_terminal_window', args:{code:'123456789',mode:'system'} },
+  { en:'Connect', zh:'连接', command:null, args:null },
+];
+
+for (const entry of connectionEntries) {
+  for (const language of ['en','zh-CN']) test(`${entry.en} reports a wrong password and resumes the selected action after correction (${language})`,async({page})=>{
+    const chinese=language==='zh-CN';
+    await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?language=${language}&connection-error=the%20device%20rejected%20authentication`);
+    await page.getByText('Original',{exact:true}).first().click({button:'right'});
+    await page.getByRole('menuitem',{name:chinese?entry.zh:entry.en,exact:true}).click();
+    const dialog=page.getByRole('dialog');
+    await expect(dialog.locator('.saved-connect-error')).toContainText(chinese?'设备验证失败，请检查密码':'Device authentication failed. Check the password');
+    await expect(dialog.getByRole('button',{name:chinese?'重试':'Retry',exact:true})).toBeDisabled();
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([]);
+    await dialog.locator('#saved-connect-password').fill('correct-device-password');
+    await dialog.locator('#saved-connect-password').press('Enter');
+    if(entry.command){
+      await expect(dialog).toBeHidden();
+      expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([{command:entry.command,args:entry.args}]);
+    }else await expect(dialog).toContainText(chinese?'设备已连接':'Device connected');
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect').map((c:any)=>c.args))).toEqual([{code:'123456789',password:'correct-device-password'}]);
+  });
+
+  test(`${entry.en} reports offline and retries with saved credentials`,async({page})=>{
+    await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?connection-error=the%20device%20is%20offline');
+    await page.getByText('Original',{exact:true}).first().click({button:'right'});
+    await page.getByRole('menuitem',{name:entry.en,exact:true}).click();
+    const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText('Device is offline');
+    await expect(dialog.getByRole('button',{name:'Retry',exact:true})).toBeEnabled();
+    await page.evaluate(()=>{(window as any).fixture.connectionError=null;});
+    await dialog.getByRole('button',{name:'Retry',exact:true}).click();
+    if(entry.command){
+      await expect(dialog).toBeHidden();
+      expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([{command:entry.command,args:entry.args}]);
+    }else await expect(dialog).toContainText('Device connected');
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect_saved').length)).toBe(2);
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect'))).toEqual([]);
+  });
+
+  test(`${entry.en} rechecks a stale connected card before opening`,async({page})=>{
+    await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=online&connected&connection-error=the%20device%20is%20offline');
+    await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+    await page.getByText('Original',{exact:true}).first().click({button:'right'});
+    await page.getByRole('menuitem',{name:entry.en,exact:true}).click();
+    await expect(page.getByRole('dialog').locator('.saved-connect-error')).toContainText('Device is offline');
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect_saved').length)).toBe(1);
+    expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([]);
+    await expect(page.locator('.home-recent-connection')).not.toContainText('Connected');
+  });
+}
+
+test('a window startup failure stays visible and retry preserves the terminal mode and authenticated state',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=online');
+  await page.evaluate(()=>{(window as any).fixture.launchError='Could not create the native window';});
+  await page.getByText('Original',{exact:true}).first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'Remote terminal (System)',exact:true}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText('Could not create the native window');
+  await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+  await page.evaluate(()=>{(window as any).fixture.launchError=null;});
+  await dialog.getByRole('button',{name:'Retry',exact:true}).click();await expect(dialog).toBeHidden();
+  expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_terminal_window').map((c:any)=>c.args.mode))).toEqual(['system','system']);
+});
+
+test('closing a pending request prevents its late result from opening a window or replacing a newer action',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?hold-connect');
+  await page.getByText('Original',{exact:true}).first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'Remote desktop',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingConnections.length)).toBe(1);
+  await page.getByRole('dialog').locator('.ant-modal-footer').getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByText('Original',{exact:true}).first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'Remote terminal (System)',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingConnections.length)).toBe(2);
+  await page.evaluate(()=>(window as any).fixture.pendingConnections[0]());
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.connected)).toBe(true);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([]);
+  await page.evaluate(()=>(window as any).fixture.pendingConnections[1]());
+  await expect(page.getByRole('dialog')).toBeHidden();
+  expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([{command:'desktop_terminal_window',args:{code:'123456789',mode:'system'}}]);
+});
+
+for(const [error,message,needsPassword] of [
+  ['endpoint control was rejected with InvalidCredentials: invalid credential','Device authentication failed. Check the password',true],
+  ['endpoint control was rejected with PermissionDenied: denied','Connection permission denied',false],
+  ['endpoint control was rejected with NotFound: device not found','Device not found or connection details are no longer valid',false],
+  ['PAB connection operation timed out','Connection timed out. Try again',false],
+  ['the endpoint control supervisor is unavailable','The control service is unavailable',false],
+] as const) test(`remote entry displays a readable connection error: ${error}`,async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?connection-error='+encodeURIComponent(error));
+  await page.getByText('Original',{exact:true}).first().click({button:'right'});
+  await page.getByRole('menuitem',{name:'Remote desktop',exact:true}).click();
+  const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText(message);
+  if(needsPassword)await expect(dialog.getByRole('button',{name:'Retry',exact:true})).toBeDisabled();
+  else await expect(dialog.getByRole('button',{name:'Retry',exact:true})).toBeEnabled();
+});
+
 test('manual refresh reloads saved devices and presence without resetting a live connection', async ({page}) => {
   await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=offline&connected');
   await expect(page.locator('.home-recent-connection')).toContainText('Connected');

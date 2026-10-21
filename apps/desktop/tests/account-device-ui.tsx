@@ -4,6 +4,7 @@ import type { View } from '../src/App';
 import { ConfigProvider, App } from 'antd';
 import { OperatorPanel } from '../src/OperatorPanel';
 import { GithubAccount } from '../src/GithubAccount';
+import type { Language } from '../src/i18n';
 import '../src/App.css';
 import '../src/theme.css';
 
@@ -19,10 +20,10 @@ const listeners = new Map<string, number>();
 const fixture=(window as any).fixture={calls:[] as any[],cancel:null as null|(()=>void),signedIn:false,
   connected:parameters.has('connected'),presence:parameters.get('presence')==='online' ? true : parameters.get('presence')==='offline' ? false : null,
   presenceError:parameters.get('presence')==='error',holdPaths:parameters.has('hold-paths'),pendingPaths:[] as {resolve:(value:unknown)=>void;reject:(error:unknown)=>void}[],
+  connectionError:parameters.get('connection-error'),launchError:null as string|null,holdConnections:parameters.has('hold-connect'),pendingConnections:[] as (()=>void)[],
   emitConnection(phase:string){fixture.connected=phase==='connected';const handler=listeners.get('operator-device-connection');if(handler)callbacks.get(handler)?.({payload:{deviceId:'fixture-one',phase}});},
 };
-if(presenceScenario)devices[0].connected=fixture.connected;
-const connectionFailure = new URLSearchParams(location.search).get('connection-error');
+if(presenceScenario || parameters.has('connected'))devices[0].connected=fixture.connected;
 (window as any).__TAURI_INTERNALS__={transformCallback:(callback:(event:unknown)=>void)=>{const id=callbacks.size+1;callbacks.set(id,callback);return id;},unregisterCallback:()=>{},invoke:async(command:string,args:any)=>{
   fixture.calls.push({command,args});
   if(command==='operator_bootstrap')return {...history,devices};
@@ -35,7 +36,8 @@ const connectionFailure = new URLSearchParams(location.search).get('connection-e
     return [{deviceCode:devices[0].deviceCode,path:fixture.connected?'p2p':null}];
   }
   if(command==='operator_connect_saved'){
-    if(connectionFailure)throw connectionFailure;
+    if(fixture.holdConnections)await new Promise<void>(resolve=>fixture.pendingConnections.push(resolve));
+    if(fixture.connectionError)throw fixture.connectionError;
     fixture.connected=true;
     return {...devices[0],connected:true};
   }
@@ -46,6 +48,10 @@ const connectionFailure = new URLSearchParams(location.search).get('connection-e
     return {...devices[0],connected:true};
   }
   if(command==='operator_history_page')return history;
+  if(command==='desktop_viewer_window' || command==='desktop_terminal_window'){
+    if(fixture.launchError)throw fixture.launchError;
+    return null;
+  }
   if(command==='operator_rename_device'){devices[0].alias=args.alias.trim();return devices[0].alias;}
   if(command==='github_enabled')return true;
   if(command==='github_login')return new Promise((_,reject)=>{fixture.cancel=()=>reject('github_cancelled');});
@@ -57,7 +63,7 @@ function FixtureApp(){
   const [view,setView]=useState<View>(/logged-out|expired|manual/.test(location.search)||parameters.has('home')?'home':'remote');
   fixture.setView=setView;
   return <ConfigProvider><App>
-    {location.search.includes('github')?<GithubAccount language="en" onSignedIn={()=>{fixture.signedIn=true;}}/>:<OperatorPanel signedIn={!location.search.includes("logged-out")} onSignIn={()=>{fixture.signedIn=true;}} language="en" view={view} onOpenRemote={()=>setView('remote')}/>}
+    {location.search.includes('github')?<GithubAccount language="en" onSignedIn={()=>{fixture.signedIn=true;}}/>:<OperatorPanel signedIn={!location.search.includes("logged-out")} onSignIn={()=>{fixture.signedIn=true;}} language={(parameters.get('language') || 'en') as Language} view={view} onOpenRemote={()=>setView('remote')}/>}
   </App></ConfigProvider>;
 }
 createRoot(document.getElementById('root')!).render(<FixtureApp/>);

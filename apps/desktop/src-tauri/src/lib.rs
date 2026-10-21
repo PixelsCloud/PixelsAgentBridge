@@ -531,6 +531,7 @@ pub fn run() {
                 mcp_tool_settings::get_mcp_tool_settings,
                 mcp_tool_settings::save_mcp_tool_settings,
                 server_settings::get_operator_server_settings,
+                server_settings::open_account_console,
                 server_settings::validate_operator_server,
                 server_settings::save_operator_server_settings,
                 server_settings::restart_desktop,

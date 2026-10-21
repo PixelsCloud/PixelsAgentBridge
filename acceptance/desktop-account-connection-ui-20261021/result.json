@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-21",
+  "base_commit": "6af2e0451cc577f1f9996e7e94bf23d4ed793701",
+  "source_changes_verified": true,
+  "published": false,
+  "local_installed_app_changed": false,
+  "connection_ui_suite": { "passed": 51, "new_cases": 23, "final_changed_case_recheck_passed": 1 },
+  "account_ui": { "new_cases_passed": 7, "existing_cases_passed": 2, "narrow_layout_initial_failures_fixed": 2 },
+  "production_url_function_tests": { "passed": 2, "method": "extracted production functions and test module in a lightweight Rust harness", "url_version": "2.5.8" },
+  "native_release_check_including_tests": "passed",
+  "frontend_assets_build": "passed before final CSS width adjustment; final CSS loaded by passing UI tests",
+  "native_browser_launch_end_to_end": "not exercised",
+  "max_build_cores_per_machine": 10
+}

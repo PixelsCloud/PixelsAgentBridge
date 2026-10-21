@@ -69,8 +69,24 @@ h1, h2, h3, p { margin: 0; }
 .page-content { display: grid; gap: 17px; flex: 1; min-height: 0; }
 .page-home { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
 .page-remote { grid-template-columns: 290px minmax(0, 1fr); }
-.page-me { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-.page-me .home-account { width: min(100%, 620px); align-self: start; }
+.page-me { display: block; overflow-y: auto; }
+.page-me .home-account { width: min(100%, 720px); }
+.account-page { display: grid; gap: 20px; }
+.account-page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.account-page .account-page-heading h2 { margin: 0; }
+.account-profile-card { display: grid; gap: 16px; padding: 18px; border: 1px solid #e1e8ed; border-radius: 12px; background: #f8fafb; }
+.account-page .account-profile-heading { margin: 0; }
+.account-profile-name { display: grid; gap: 4px; min-width: 0; }
+.account-profile-name > span, .account-profile-id > span:first-child { color: #718796; font-size: 12px; }
+.account-profile-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; min-width: 0; }
+.account-profile-id .ant-typography { min-width: 0; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; font-size: 12px; font-variant-numeric: tabular-nums; }
+.account-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+.account-section { min-width: 0; padding: 16px; border: 1px solid #e1e8ed; border-radius: 12px; line-height: 1.65; }
+.account-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 16px; border-top: 1px solid #e1e8ed; }
+.account-page .account-actions .home-account-disconnect { margin: 0 0 0 auto; }
+[data-theme="dark"] .account-profile-card { border-color: var(--dark-border); background: var(--dark-input); }
+[data-theme="dark"] .account-section, [data-theme="dark"] .account-actions { border-color: var(--dark-border); }
+[data-theme="dark"] .account-profile-name > span, [data-theme="dark"] .account-profile-id > span:first-child { color: var(--dark-muted); }
 .page-activity { grid-template-columns: minmax(0, 1fr); }
 .page-mcp { grid-template-columns: minmax(0, 1fr); }
 .page-settings { grid-template-columns: 245px minmax(0, 1fr); }

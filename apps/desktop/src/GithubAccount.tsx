@@ -10,7 +10,7 @@ const words = {
 };
 type Status = { enabled:boolean; login:string|null; password_enabled:boolean };
 
-export function GithubAccount({language, signedIn=false, disabled=false, onSignedIn, onBusy}: {language:Language; signedIn?:boolean; disabled?:boolean; onSignedIn?:(scope:ScopeStatus)=>void; onBusy?:(busy:boolean)=>void}) {
+export function GithubAccount({language, signedIn=false, disabled=false, compact=false, onSignedIn, onBusy}: {language:Language; signedIn?:boolean; disabled?:boolean; compact?:boolean; onSignedIn?:(scope:ScopeStatus)=>void; onBusy?:(busy:boolean)=>void}) {
   const t=words[language]; const [status,setStatus]=useState<Status>(); const [busy,setBusy]=useState(false); const [error,setError]=useState('');
   async function refresh(){
     if(signedIn)setStatus(await invoke<Status>('github_status'));
@@ -28,9 +28,9 @@ export function GithubAccount({language, signedIn=false, disabled=false, onSigne
     finally{setBusy(false);onBusy?.(false);}
   }
   if(!status?.enabled && !status?.login)return null;
-  return <Space orientation="vertical" style={{width:'100%',marginTop:12}}>
+  return <Space orientation={compact ? 'horizontal' : 'vertical'} wrap={compact} style={{width:compact?'auto':'100%',marginTop:compact?0:12}}>
     {status?.login && <Typography.Text>GitHub: {status.login}</Typography.Text>}
-    {status?.login ? <Button disabled={disabled||busy||!status.password_enabled} onClick={()=>void run(true)}>{t.unlink}</Button> : <Button block disabled={disabled&&!busy} loading={busy} onClick={()=>void run()}>{signedIn?t.bind:t.signIn}</Button>}
+    {status?.login ? <Button disabled={disabled||busy||!status.password_enabled} onClick={()=>void run(true)}>{t.unlink}</Button> : <Button block={!compact} disabled={disabled&&!busy} loading={busy} onClick={()=>void run()}>{signedIn?t.bind:t.signIn}</Button>}
     {status?.login && !status.password_enabled && <Typography.Text type="secondary">{t.last}</Typography.Text>}
     {busy && <><Typography.Text type="secondary">{t.waiting}</Typography.Text><Button onClick={()=>void invoke('github_cancel')}>{t.cancel}</Button></>}
     {error && <Alert type="error" title={error} showIcon/>}

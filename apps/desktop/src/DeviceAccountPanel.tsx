@@ -26,7 +26,7 @@ export function DeviceAccountPanel({ language, accountRevision }: { language: La
     } catch { setError(true); } finally { setBusy(false); }
   }
   const current = status?.device?.status;
-  return <Space orientation="vertical" style={{ width: "100%", marginTop: 16 }}>
+  return <Space orientation="vertical" style={{ width: "100%" }}>
     <Typography.Text strong>{t.deviceAccountTitle}</Typography.Text>
     <Typography.Text type="secondary">{current === "associated" ? t.deviceAccountAssociated : current === "unlinked" ? t.deviceAccountUnlinked : t.deviceAccountPending}</Typography.Text>
     {status?.device && current !== "associated" && <Button loading={busy} onClick={() => void associate()}>{t.deviceAccountAssociate}</Button>}

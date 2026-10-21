@@ -52,6 +52,25 @@ pub fn get_operator_server_settings() -> Result<ServerSettings, String> {
     ServerSettings::load(&settings_path()?)
 }
 
+fn account_console_url(control_url: &str) -> Result<String, String> {
+    pab_agent_core::account::account_origin(control_url)
+        .map(|origin| format!("{origin}/"))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn open_account_console(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("only the main window can open the account console".into());
+    }
+    // Use the running account service, including --config and embedded defaults.
+    // Saved settings may be blank, or awaiting restart; never fall back to an
+    // official website when a custom service is selected. No token enters the URL.
+    let target = account_console_url(&effective_environment().control_url)?;
+    webbrowser::open(&target)
+        .map_err(|_| "could not open the account console in the default browser".into())
+}
+
 #[tauri::command]
 pub async fn validate_operator_server(
     kind: pab_agent_core::server_probe::ServerKind,
@@ -132,4 +151,39 @@ fn clear_server_accounts(current: &str, next: &str) -> Result<Option<u64>, Strin
 #[tauri::command]
 pub fn restart_desktop(app: tauri::AppHandle) {
     app.restart();
+}
+
+#[cfg(test)]
+mod console_tests {
+    use super::account_console_url;
+
+    #[test]
+    fn console_follows_the_current_account_service_origin() {
+        for (control, expected) in [
+            ("wss://default.invalid/control", "https://default.invalid/"),
+            (
+                "wss://customer.invalid:8443/control",
+                "https://customer.invalid:8443/",
+            ),
+            (
+                "wss://[::1]:9443/nested/control?session=private",
+                "https://[::1]:9443/",
+            ),
+        ] {
+            assert_eq!(account_console_url(control).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn missing_or_unsafe_services_never_fall_back_to_another_site() {
+        for control in [
+            "",
+            "javascript:alert(1)",
+            "http://customer.invalid/control",
+            "wss://user:secret@customer.invalid/control",
+            "wss://customer.invalid/control#fragment",
+        ] {
+            assert!(account_console_url(control).is_err());
+        }
+    }
 }

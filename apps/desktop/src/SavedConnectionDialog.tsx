@@ -4,8 +4,11 @@ import { RotateCw } from "lucide-react";
 import { formatDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
+export type SavedConnectionAction = "connect" | "desktop" | "terminal-console" | "terminal-system";
+
 export type SavedConnection = {
   mode: "manual" | "saved";
+  action?: SavedConnectionAction;
   deviceId: string;
   deviceCode: string;
   name: string;
@@ -31,7 +34,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
     setPassword("");
     submitted.current = false;
   }, [connection.attempt]);
-  const passwordRequired = /device password has not been entered|the device rejected authentication/i.test(connection.message);
+  const passwordRequired = /device password has not been entered|the device rejected authentication|authenticationrejected|invalidcredentials|(?:incorrect|invalid|wrong) (?:device )?password/i.test(connection.message);
   function retry() {
     if (connection.phase !== "failed" || submitted.current || (passwordRequired && !password)) return;
     submitted.current = true;
@@ -89,11 +92,12 @@ function connectionErrorMessage(message: string, language: Language): string {
   const t = messages[language];
   const text = message.toLowerCase();
   if (text.includes("device password has not been entered")) return t.connectEnterPassword;
-  if (text.includes("the device is offline")) return t.connectDeviceOffline;
-  if (text.includes("the device rejected authentication")) return t.connectPasswordRejected;
-  if (text.includes("permissiondenied") || text.includes("invalidcredentials")) return t.connectPermissionDenied;
+  if (/device (?:is |was )?(?:offline|not online)|deviceoffline/.test(text)) return t.connectDeviceOffline;
+  if (/the device rejected authentication|authenticationrejected|invalidcredentials|(?:incorrect|invalid|wrong) (?:device )?password/.test(text)) return t.connectPasswordRejected;
+  if (text.includes("permissiondenied")) return t.connectPermissionDenied;
   if (text.includes("ratelimited")) return t.connectRateLimited;
-  if (text.includes("notfound")) return t.connectDeviceNotFound;
-  if (text.includes("timed out")) return t.connectTimedOut;
+  if (text.includes("notfound") || text.includes("saved device was not found")) return t.connectDeviceNotFound;
+  if (/timed out|timeout/.test(text)) return t.connectTimedOut;
+  if (/endpoint control supervisor is unavailable|endpoint control connection closed/.test(text)) return t.connectServiceUnavailable;
   return message;
 }

@@ -1,5 +1,48 @@
 import { test, expect } from "@playwright/test";
 
+for (const language of ['zh-CN','en']) for (const theme of ['light','dark']) test(`account page has clear sections and a native console action (${language}, ${theme})`,async({page},testInfo)=>{
+  await page.setViewportSize({width:1000,height:640});
+  await page.goto(`http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&signedIn&longName=true&longId&language=${language}&theme=${theme}`);
+  await page.locator('.sidebar-account').click();
+  const account=page.locator('.account-page');
+  await expect(account.locator('.account-profile-name strong')).toHaveText('Pixels-very-long-account-name-for-layout');
+  await expect(account.locator('.account-profile-id')).toContainText('7dd29e34-8a55-415f-831c-1502271dcaf1');
+  await expect(account.locator('.account-section')).toHaveCount(2);
+  const open=account.getByRole('button',{name:language==='en'?'Open console':'打开后台',exact:true});
+  await expect(open).toBeInViewport();
+  await expect(account.getByRole('button',{name:language==='en'?'Sign out':'退出账号',exact:true})).toBeInViewport();
+  expect(await account.evaluate(node=>node.scrollWidth-node.clientWidth)).toBeLessThanOrEqual(1);
+  await open.click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.consoleOpens)).toBe(1);
+  const call=await page.evaluate(()=>(window as any).fixture.calls.find((c:any)=>c.command==='open_account_console'));
+  expect(call.args??{}).toEqual({});
+  await account.screenshot({path:testInfo.outputPath(`account-${language}-${theme}.png`)});
+});
+
+for (const theme of ['light','dark']) test(`account page stacks narrow sections and allows scrolling (${theme})`,async({page},testInfo)=>{
+  await page.setViewportSize({width:760,height:580});
+  await page.goto(`http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&signedIn&longName=true&longId&language=zh-CN&theme=${theme}`);
+  await page.locator('.sidebar-account').click();
+  const account=page.locator('.account-page');await expect(account).toBeVisible();
+  const boxes=await account.locator('.account-section').evaluateAll(nodes=>nodes.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,top:b.top,bottom:b.bottom}}));
+  expect(Math.abs(boxes[0].left-boxes[1].left)).toBeLessThanOrEqual(1);expect(boxes[1].top).toBeGreaterThanOrEqual(boxes[0].bottom);
+  expect(await account.evaluate(n=>n.scrollWidth-n.clientWidth)).toBeLessThanOrEqual(1);
+  await account.getByRole('button',{name:'退出账号',exact:true}).scrollIntoViewIfNeeded();
+  await expect(account.getByRole('button',{name:'退出账号',exact:true})).toBeInViewport();
+  await page.screenshot({path:testInfo.outputPath(`account-narrow-${theme}.png`)});
+});
+
+test('console launch failure is readable and can retry without signing out',async({page})=>{
+  await page.goto('http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&signedIn&consoleError&language=zh-CN');
+  await page.locator('.sidebar-account').click();const account=page.locator('.account-page');
+  await account.getByRole('button',{name:'打开后台',exact:true}).click();
+  await expect(account.getByRole('alert')).toContainText('无法打开后台');
+  await page.evaluate(()=>{(window as any).fixture.consoleError=false;});
+  await account.getByRole('button',{name:'打开后台',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).fixture.consoleOpens)).toBe(1);
+  await expect(account.getByRole('alert')).toHaveCount(0);await expect(account).toBeVisible();
+});
+
 test("removed Traditional Chinese preference migrates to Simplified Chinese", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&language=zh-TW");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");

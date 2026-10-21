@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Alert, Avatar, Button, Descriptions, Input, Modal, Typography } from "antd";
+import { Alert, Avatar, Button, Input, Modal, Typography } from "antd";
+import { ExternalLink, LogOut } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { ScopeStatus } from "./operatorTypes";
 import { DeviceAccountPanel } from "./DeviceAccountPanel";
@@ -15,6 +16,15 @@ export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
   const t = messages[language];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [openingConsole, setOpeningConsole] = useState(false);
+
+  async function openConsole() {
+    if (openingConsole) return;
+    setOpeningConsole(true); setError("");
+    try { await invoke("open_account_console"); }
+    catch { setError(t.accountConsoleOpenFailed); }
+    finally { setOpeningConsole(false); }
+  }
 
   async function disconnect() {
     if (busy) return;
@@ -31,20 +41,26 @@ export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
   }
 
   return (
-    <section className="surface home-account">
-      <h2>{t.nav.me}</h2>
-      <div className="account-profile-heading">
-        <Avatar size={56}>{Array.from(activeScope.username)[0]?.toUpperCase()}</Avatar>
-        <strong>{activeScope.username}</strong>
+    <section className="surface home-account account-page">
+      <header className="account-page-heading">
+        <h2>{t.nav.me}</h2>
+        <Button type="primary" icon={<ExternalLink size={15} />} loading={openingConsole} onClick={() => void openConsole()}>{t.accountOpenConsole}</Button>
+      </header>
+      <div className="account-profile-card">
+        <div className="account-profile-heading">
+          <Avatar size={48}>{Array.from(activeScope.username)[0]?.toUpperCase()}</Avatar>
+          <div className="account-profile-name"><span>{t.accountName}</span><strong>{activeScope.username}</strong></div>
+        </div>
+        <div className="account-profile-id"><span>{t.accountId}</span><Typography.Text copyable>{activeScope.userId}</Typography.Text></div>
       </div>
-      <Descriptions column={1} size="small" items={[
-        { key: "username", label: t.accountName, children: activeScope.username },
-        { key: "id", label: t.accountId, children: activeScope.userId },
-      ]} />
-      <DeviceAccountPanel key={activeScope.revision} language={language} accountRevision={activeScope.revision} />
-      <AccountCatalogPanel key={`catalog-${activeScope.revision}`} language={language} accountRevision={activeScope.revision} />
-      <Button className="home-account-disconnect" loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
-      <GithubAccount key={activeScope.userId} language={language} signedIn disabled={busy} onBusy={setBusy}/>
+      <div className="account-sections">
+        <section className="account-section" aria-label={t.deviceAccountTitle}><DeviceAccountPanel key={activeScope.revision} language={language} accountRevision={activeScope.revision} /></section>
+        <section className="account-section" aria-label={t.accountDeviceSync}><AccountCatalogPanel key={`catalog-${activeScope.revision}`} language={language} accountRevision={activeScope.revision} /></section>
+      </div>
+      <footer className="account-actions">
+        <GithubAccount key={activeScope.userId} language={language} signedIn compact disabled={busy} onBusy={setBusy}/>
+        <Button className="home-account-disconnect" icon={<LogOut size={14} />} danger loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
+      </footer>
       {error && <Alert className="account-error" type="error" showIcon title={error} />}
     </section>
   );

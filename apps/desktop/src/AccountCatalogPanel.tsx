@@ -21,7 +21,7 @@ export function AccountCatalogPanel({ language, accountRevision }: { language: L
     try { await invoke('account_catalog_action', { revision: accountRevision, action, device }); setConfirm(false); setRefresh(v => v + 1); }
     catch { setError(true); } finally { setBusy(false); }
   }
-  return <Space orientation="vertical" style={{ width: '100%', marginTop: 16 }}>
+  return <Space orientation="vertical" style={{ width: '100%' }}>
     <Typography.Text strong>{t.title}</Typography.Text>
     <Space wrap><Typography.Text type="secondary">{status?.syncing ? t.syncing : !status || status.pending ? `${t.pending}${status ? ` (${status.pending})` : ''}` : t.synced}</Typography.Text><Button size="small" loading={busy} onClick={() => void action('retry')}>{t.retry}</Button>
       {!!status?.local_import_count && <Button size="small" disabled={busy} onClick={() => setConfirm(true)}>{t.import} ({status.local_import_count})</Button>}</Space>

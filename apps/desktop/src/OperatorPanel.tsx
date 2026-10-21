@@ -14,7 +14,7 @@ import { mergeTransferUpdate } from "./transferUpdates";
 import { formatDeviceCode } from "./deviceCode";
 import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
 import { OsLogo } from "./OsLogo";
-import { SavedConnectionDialog, type SavedConnection } from "./SavedConnectionDialog";
+import { SavedConnectionDialog, type SavedConnection, type SavedConnectionAction } from "./SavedConnectionDialog";
 import { deviceOnline } from "./deviceAvailability";
 
 const ActivityPanel = lazy(() => import("./ActivityPanel").then(({ ActivityPanel }) => ({ default: ActivityPanel })));
@@ -71,6 +71,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const [startingTransfer, setStartingTransfer] = useState(false);
   const tasksRef = useRef(tasks);
   const savedConnectionAttemptRef = useRef(0);
+  const savedConnectionPendingRef = useRef<{ attempt: number; code: string; action: SavedConnectionAction } | null>(null);
   const connectionRevisionRef = useRef(0);
   const deviceRefreshRef = useRef(false);
   const presenceRequestRef = useRef(0);
@@ -80,6 +81,15 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const selected = devices.find((device) => device.deviceCode === selectedCode);
   const connectedCodes = devices.filter((device) => device.connected).map((device) => device.deviceCode).join(",");
   const savedCodes = devices.map((device) => device.deviceCode).join(",");
+
+  useEffect(() => () => { savedConnectionAttemptRef.current += 1; savedConnectionPendingRef.current = null; }, []);
+  useEffect(() => {
+    if (!signedIn) {
+      savedConnectionAttemptRef.current += 1;
+      savedConnectionPendingRef.current = null;
+      setSavedConnection(null);
+    }
+  }, [signedIn]);
 
   function updateDeviceConnections(update: SetStateAction<ConnectedDevice[]>) {
     connectionRevisionRef.current += 1;
@@ -226,9 +236,9 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         { key: "delete", icon: <Trash2 size={16} />, label: t.deleteDevice, danger: true },
       ],
       onClick: ({ key }) => {
-        if (key === "desktop-viewer") void openRemoteDesktop(device);
-        if (key === "desktop-terminal") void openDesktopTerminal(device, "console");
-        if (key === "desktop-terminal-system") void openDesktopTerminal(device, "system");
+        if (key === "desktop-viewer") void connectSaved(device, undefined, "desktop");
+        if (key === "desktop-terminal") void connectSaved(device, undefined, "terminal-console");
+        if (key === "desktop-terminal-system") void connectSaved(device, undefined, "terminal-system");
         if (key === "connect") void connectSaved(device);
         if (key === "disconnect") {
           setDisconnectError("");
@@ -248,34 +258,6 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     };
   }
 
-  async function openDesktopTerminal(device: ConnectedDevice, mode: "console" | "system") {
-    if (!signedIn) { onSignIn(); return; }
-    try {
-      if (!device.connected) {
-        const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
-        updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
-      }
-      await invoke("desktop_terminal_window", { code: device.deviceCode, mode });
-    } catch (cause) {
-      if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
-      notification.error({ message: language === "en" ? "Could not open remote terminal" : "无法打开远程终端", description: String(cause), placement: "bottomRight" });
-    }
-  }
-
-  async function openRemoteDesktop(device: ConnectedDevice) {
-    if (!signedIn) { onSignIn(); return; }
-    try {
-      if (!device.connected) {
-        const connected = await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode });
-        updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
-      }
-      await invoke("desktop_viewer_window", { code: device.deviceCode });
-    } catch (cause) {
-      if (/login required|account unavailable/i.test(String(cause))) { onSignIn(); return; }
-      notification.error({ message: language === "en" ? "Could not open remote desktop" : "无法打开远程桌面", description: String(cause), placement: "bottomRight" });
-    }
-  }
-
   async function copyDeviceInfo(device: ConnectedDevice) {
     const name = device.alias || devicePresence[device.deviceCode]?.name || t.unnamedDevice;
     const info = `${t.deviceCode}: ${device.deviceCode.replace(/\s/g, "")}\n${t.deviceInfoName}: ${name}`;
@@ -287,41 +269,52 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     }
   }
 
-  async function connectSaved(device: ConnectedDevice, replacementPassword?: string) {
+  async function connectSaved(device: ConnectedDevice, replacementPassword?: string, action: SavedConnectionAction = "connect") {
     if (!signedIn) { onSignIn(); return; }
+    if (savedConnectionPendingRef.current?.code === device.deviceCode && savedConnectionPendingRef.current.action === action) return;
     const attempt = ++savedConnectionAttemptRef.current;
+    savedConnectionPendingRef.current = { attempt, code: device.deviceCode, action };
     setSavedConnection({
       mode: "saved",
+      action,
       deviceId: device.deviceId,
       deviceCode: device.deviceCode,
       name: device.alias || devicePresence[device.deviceCode]?.name || t.unnamedDevice,
-      phase: device.connected ? "connected" : "preparing",
-      step: device.connected ? 3 : 0,
+      phase: "preparing",
+      step: 0,
       message: "",
       attempt,
     });
-    if (device.connected) {
-      setSelectedCode(device.deviceCode);
-      setAliasDraft(device.alias);
-      return;
-    }
+    let authenticated = false;
     try {
+      // Refresh the connection even when a card still shows an older connected
+      // state. Presence is a hint, not a reason to bypass or reject this attempt.
       const connected = replacementPassword === undefined
         ? await invoke<ConnectedDevice>("operator_connect_saved", { code: device.deviceCode })
         : await invoke<ConnectedDevice>("operator_connect", { code: device.deviceCode, password: replacementPassword });
+      authenticated = true;
+      if (savedConnectionAttemptRef.current !== attempt) return;
       updateDeviceConnections((current) => [connected, ...current.filter((item) => item.deviceCode !== connected.deviceCode)]);
       setSelectedCode(connected.deviceCode);
       setAliasDraft(connected.alias);
+      if (action !== "connect") {
+        setSavedConnection((current) => current?.attempt === attempt ? { ...current, phase: "checking", step: 2 } : current);
+        if (action === "desktop") await invoke("desktop_viewer_window", { code: device.deviceCode });
+        else await invoke("desktop_terminal_window", { code: device.deviceCode, mode: action === "terminal-system" ? "system" : "console" });
+        if (savedConnectionAttemptRef.current === attempt) setSavedConnection(null);
+        return;
+      }
       setSavedConnection((current) => current?.attempt === attempt
         ? { ...current, phase: "connected", step: 3, message: "" }
         : current);
     } catch (cause) {
+      if (savedConnectionAttemptRef.current !== attempt) return;
       if (/login required|account unavailable/i.test(String(cause))) {
         setSavedConnection(null);
         onSignIn();
         return;
       }
-      if (savedConnectionAttemptRef.current === attempt) {
+      if (!authenticated) {
         updateDeviceConnections((current) => current.map((item) => item.deviceId === device.deviceId
           ? { ...item, connected: false, connectionPath: null }
           : item));
@@ -329,6 +322,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       setSavedConnection((current) => current?.attempt === attempt
         ? { ...current, phase: "failed", message: String(cause) }
         : current);
+    } finally {
+      if (savedConnectionPendingRef.current?.attempt === attempt) savedConnectionPendingRef.current = null;
     }
   }
 
@@ -1071,13 +1066,13 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         <SavedConnectionDialog
           language={language}
           connection={savedConnection}
-          onClose={() => setSavedConnection(null)}
+          onClose={() => { savedConnectionAttemptRef.current += 1; savedConnectionPendingRef.current = null; setSavedConnection(null); }}
           onRetry={(replacementPassword) => {
             if (savedConnection.mode === "manual") {
               void connect(savedConnection.deviceCode, replacementPassword ?? password);
             } else {
               const device = devices.find((item) => item.deviceId === savedConnection.deviceId);
-              if (device) void connectSaved(device, replacementPassword);
+              if (device) void connectSaved(device, replacementPassword, savedConnection.action);
             }
           }}
           onOpen={() => {

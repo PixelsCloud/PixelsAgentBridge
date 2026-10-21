@@ -67,11 +67,16 @@ objc2-foundation = { version = "=0.3.2", default-features = false, features = ["
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 xcap = "=0.8.2"
 [profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
+# Desktop releases favor short edit/build cycles over whole-program optimization.
+codegen-units = 16
+lto = false
+opt-level = 2
+incremental = true
 panic = "abort"
 strip = true
+
+[profile.release.package."*"]
+opt-level = 3
 
 [patch.crates-io]
 enigo = { path = "../../../vendor/enigo" }
