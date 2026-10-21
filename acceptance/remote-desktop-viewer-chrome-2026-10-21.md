@@ -1,6 +1,6 @@
 # 远程桌面标题栏与统计浮层
 
-本次为 `feat/remote-desktop-v1` 在 `77dbf60` 之后的界面改动，尚未打包发布。已发布的 Windows 1.3.10、Mac 1.2.75、Linux Desktop 1.0.4 不包含本次改动。
+本次为 `feat/remote-desktop-v1` 在 `77dbf60` 之后的界面改动。Windows 已作为 1.3.11 发布到 COS，并验证公开更新接口及完整下载；Mac 1.2.75、Linux Desktop 1.0.4 仍不包含本次界面改动。
 
 ## 实现
 
@@ -23,7 +23,7 @@
 | Linux 原生代码 | Ubuntu 22.04 依赖镜像中 `g++ -fsyntax-only` 通过，1 CPU；本次原生浮层尚未做 Linux 操作端 GUI 实测 |
 | 清理与隔离 | 仅运行私有 Windows GUI；测试结束关闭窗口、停止私有进程、撤销新增凭据槽，原凭据条目不变；未替换本机安装版 |
 
-Windows 实际查看器二进制 SHA-256：`bb011ddcd4387fe5b9e3d1032af0e8179c461a236f7da7782c0cd93e78bb2e6e`。
+开发验收使用的 Windows Debug 查看器二进制 SHA-256：`bb011ddcd4387fe5b9e3d1032af0e8179c461a236f7da7782c0cd93e78bb2e6e`。
 
 ## 保留的失败与边界
 
@@ -32,3 +32,15 @@ Windows 实际查看器二进制 SHA-256：`bb011ddcd4387fe5b9e3d1032af0e8179c46
 实际查看器核对中，最初用 `WS_CAPTION` 位判断是否有系统标题栏，不适用于 Tauri 保留窗口阴影样式的实现；随后改为核对实际客户区与 42 DIP 视频起点。另一次截图准备把主窗口临时设成 topmost，跨进程浮层未随之升为 topmost；撤销测试驱动人为增加的置顶状态后，普通窗口的命中、截图与收起/展开均通过。产品没有新增置顶功能，也不将置顶场景记为通过。
 
 原始构建、探针、GUI 状态与截图保存在忽略目录 `.build/remote-desktop/viewer-chrome-20261021/`。截图含测试机画面，仅保留本地，不提交到仓库。不重复此前已通过的整套远控矩阵；2/8 小时测试继续暂缓。
+
+## Windows 1.3.11 发布（2026-10-21）
+
+冻结并推送的源码为 `b32567bf63d2aa6d0aad2d0fa3186ac577d8a14a`，使用独立发布工作区构建 Release 安装包，未包含其他进行中的夹具修改。Cargo 使用 6 个作业、嵌套构建 1 个作业，并由同机编译额度监控和 10 核亲和性约束；沿用 Solid LZMA、64 MB 字典与内部运行时 ZIP 不压缩的方案。
+
+安装包为 [pixels-agent-bridge-windows-x86_64-release-1.3.11-setup.exe](https://pixels-agent-bridge-1251612681.cos.ap-beijing.myqcloud.com/releases/windows/x86_64/1.3.11/pixels-agent-bridge-windows-x86_64-release-1.3.11-setup.exe)，55,103,256 字节（52.55 MiB），SHA-256：`3e82ccf623c60c1ae8550ceef24446760db06e3831826e78ead505c7502aad1d`。
+
+从实际 NSIS 安装包解出四个 x64 程序，与构建收据哈希全部一致；内部运行时 ZIP、许可证、公开 TOML 空服务配置和两种 MCP 初始化/工具列表检查通过。安装脚本与之前通过升级验收的候选一致，本批没有再次执行安装程序。
+
+用包内 Release 查看器实际查看 Linux 虚拟机：42 DIP 标题栏、右下角 alpha=215 统计浮层、点击收起/展开、最小化隐藏及恢复通过；全程保持同一视频 session 与只查看模式。私有 GUI 已停止，新建凭据槽撤销，原凭据未变，本机安装版未更新。
+
+Tauri 自动生成的 Cargo 文件经 TOML 解析核对，只有包顺序和换行差异，版本、校验和及依赖内容不变；原始生成文件与核对证据保存在私有构建目录，发布工作区已恢复冻结源码。Ed25519 发布元数据签名及服务返回值一致，公开更新接口为 1.3.11，完整公开下载字节数和 SHA-256 一致。机器可读结果见 [Windows 发布记录](remote-desktop-windows-viewer-release-2026-10-21.json)。
