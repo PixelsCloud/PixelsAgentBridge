@@ -223,6 +223,12 @@ pub struct MacCursorRenderer {
     acknowledgements: crate::renderer::CursorAcknowledgements,
 }
 impl MacCursorRenderer {
+    pub async fn overlay(&mut self, text: &str) -> Result<(), Error> {
+        if text.len() > 2048 {
+            return Err("viewer statistics too large".into());
+        }
+        self.send([&[2][..], text.as_bytes()].concat()).await
+    }
     pub async fn submit(&mut self, update: &pab_remote_desktop::CursorUpdate) -> Result<(), Error> {
         let next = self
             .next_sequence

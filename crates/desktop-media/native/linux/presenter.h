@@ -14,6 +14,33 @@ class Presenter {
     GtkWidget* area_ = nullptr;
     GtkWidget* hosted_root_ = nullptr;
     GtkWidget* overlay_ = nullptr;
+    GtkWidget* statistics_ = nullptr;
+    bool statistics_expanded_ = true;
+    std::string statistics_text_;
+    void statistics_label() {
+        gtk_button_set_label(GTK_BUTTON(statistics_),statistics_expanded_ ? statistics_text_.c_str() : "i");
+        gtk_label_set_xalign(GTK_LABEL(gtk_bin_get_child(GTK_BIN(statistics_))),statistics_expanded_ ? 0 : .5);
+        gtk_widget_set_size_request(statistics_,statistics_expanded_ ? 244 : 30,statistics_expanded_ ? -1 : 30);
+    }
+    void statistics(const uint8_t* bytes,size_t size) {
+        if (size>2048 || !g_utf8_validate(reinterpret_cast<const char*>(bytes),size,nullptr)) throw std::runtime_error("Invalid viewer statistics");
+        statistics_text_.assign(reinterpret_cast<const char*>(bytes),size);
+        if (!overlay_) return; // Standalone codec diagnostics have no host chrome.
+        if (!statistics_ && size) {
+            statistics_=gtk_button_new(); g_object_ref_sink(statistics_);
+            gtk_widget_set_can_focus(statistics_,FALSE); gtk_widget_set_focus_on_click(statistics_,FALSE);
+            gtk_widget_set_halign(statistics_,GTK_ALIGN_END); gtk_widget_set_valign(statistics_,GTK_ALIGN_END);
+            gtk_widget_set_margin_end(statistics_,12); gtk_widget_set_margin_bottom(statistics_,12);
+            auto* style=gtk_css_provider_new();
+            gtk_css_provider_load_from_data(style,"button { background-image:none; background-color:rgba(20,29,39,.84); color:#eaf3f6; border:1px solid rgba(255,255,255,.12); border-radius:9px; padding:10px 12px; box-shadow:none; font:12px Sans; }",-1,nullptr);
+            gtk_style_context_add_provider(gtk_widget_get_style_context(statistics_),GTK_STYLE_PROVIDER(style),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION); g_object_unref(style);
+            gtk_overlay_add_overlay(GTK_OVERLAY(overlay_),statistics_);
+            g_signal_connect(statistics_,"clicked",G_CALLBACK(+[](GtkButton*,gpointer data) {
+                auto& view=*static_cast<Presenter*>(data); view.input_->release(); view.statistics_expanded_=!view.statistics_expanded_; view.statistics_label();
+            }),this);
+        }
+        if (statistics_) { statistics_label(); gtk_widget_set_visible(statistics_,size!=0); }
+    }
     std::unique_ptr<ViewInput> input_;
     CursorOverlay cursor_;
     GdkFrameClock* clock_ = nullptr;
@@ -167,7 +194,7 @@ public:
             gtk_container_remove(GTK_CONTAINER(window_), hosted_root_);
             gtk_container_add(GTK_CONTAINER(overlay_), hosted_root_);
             gtk_container_add(GTK_CONTAINER(window_), overlay_);
-            gtk_widget_set_margin_top(area_, 72);
+            gtk_widget_set_margin_top(area_, 42);
             gtk_widget_set_hexpand(area_, TRUE); gtk_widget_set_vexpand(area_, TRUE);
             gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), area_);
             gtk_widget_show(area_); gtk_widget_show(overlay_);
@@ -184,6 +211,10 @@ public:
     Presenter(const Presenter&) = delete;
     Presenter& operator=(const Presenter&) = delete;
     ~Presenter() {
+        if (statistics_) {
+            g_signal_handlers_disconnect_by_data(statistics_,this);
+            gtk_widget_destroy(statistics_); g_object_unref(statistics_); statistics_=nullptr;
+        }
         input_.reset();
         if (clock_) {
             if (g_signal_handler_is_connected(clock_, painted_signal_)) g_signal_handler_disconnect(clock_, painted_signal_);
@@ -233,6 +264,7 @@ public:
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
     }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0]==2) { poll_events(false); statistics(bytes+1,size-1); return; }
         poll_events(false); cursor_.update(bytes,size);
         input_->cursor_tracking(cursor_.tracking());
         // Cursor-only redraws keep the last uploaded NV12 textures and do not

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Expand, Keyboard, Maximize2, Minus, Moon, MousePointer2, Sun, X } from "lucide-react";
+import brand from "./assets/brand.svg";
+import "./windowChrome.css";
 import "./remoteDesktop.css";
 import type { Assistance } from "./DesktopAssistanceNotice";
 import { initialLanguage } from "./i18n";
@@ -22,6 +25,12 @@ export default function RemoteDesktopWindow() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [assistance, setAssistance] = useState<Assistance[]>([]);
+  const [statisticsExpanded, setStatisticsExpanded] = useState(true);
+  const [title, setTitle] = useState(text.title);
+  const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
+  const appWindow = getCurrentWindow();
+  useEffect(() => { void getCurrentWindow().title().then(value => { if (value) setTitle(value); }).catch(() => {}); }, []);
+  useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
   useEffect(() => {
     let active = true; let pending = false;
     const refresh = async () => {
@@ -73,17 +82,32 @@ export default function RemoteDesktopWindow() {
     ? (english ? "Software decoding" : "软件解码")
     : ["d3d11_hardware", "videotoolbox_hardware"].includes(status.decoder || "")
       ? (english ? "Hardware decoding" : "硬件解码") : null;
+  const statisticsTitle = english ? "Statistics" : "统计信息";
+  const captureLimit = `${english ? "Capture limit" : "采集上限"}: ${((quality?.capture_fps_milli ?? (opened?.config.fps || 15) * 1000) / 1000).toFixed(0)} FPS`;
+  const statisticsText = [statisticsTitle, `${phase} · ${status.input_enabled ? inputText.active : text.view}`,
+    opened && `${opened.config.screen.desktop_width} × ${opened.config.screen.desktop_height} · H.264`,
+    decoder, opened && captureLimit, qualityText].filter(Boolean).join("\n");
+  useEffect(() => {
+    if (status.phase !== "viewing") return;
+    // Local native chrome only; a DOM overlay sits below native video surfaces.
+    void invoke("desktop_viewer_overlay", { text: statisticsText }).catch(cause => setError(String(cause)));
+  }, [statisticsText, status.phase]);
+  const windowAction = (action: Promise<unknown>) => { void action.catch(cause => setError(String(cause))); };
   return <main className="remote-desktop">
-    <header className="remote-desktop-toolbar">
-      <div className="remote-desktop-status"><strong>{text.title}</strong><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span><span role={error ? "alert" : "status"} title={error || undefined}>{error || phase}</span>
-        {status.phase === "viewing" && decoder && <span className="remote-desktop-decoder">{decoder}</span>}
-        {status.phase === "viewing" && qualityText && <span className="remote-desktop-quality"
-          title={english ? "Adaptive encoder target and capture limit, not measured bitrate or displayed FPS"
-            : "当前编码码率目标与采集上限，非实测码率或显示帧率"}>{qualityText}</span>}
-        {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
-          request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
-          onComplete={(id) => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id))} />}
-      </div>
+    <header className="titlebar remote-desktop-toolbar"
+      onMouseDown={event => {
+        if (event.button !== 0 || event.detail !== 1 || (event.target as HTMLElement).closest("button, select, .remote-desktop-controls, .window-controls")) return;
+        event.preventDefault(); windowAction(appWindow.startDragging());
+      }}
+      onDoubleClick={event => {
+        if ((event.target as HTMLElement).closest("button, select, .remote-desktop-controls, .window-controls")) return;
+        windowAction(appWindow.toggleMaximize());
+      }}>
+      <div className="titlebar-identity remote-desktop-title" title={title}><img className="brand-mark" src={brand} alt="" /><strong>{title}</strong></div>
+      {error && <span className="remote-desktop-control-error" role="alert" title={error}>{error}</span>}
+      {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
+        request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
+        onComplete={(id) => setAssistance((rows) => rows.filter((row) => row.assistance_id !== id))} />}
       <div className="remote-desktop-controls">
         <select aria-label={text.screen} disabled={busy || status.phase !== "viewing"} value={opened?.config.screen.id || ""} onChange={(event) => void control({ screen: event.target.value })}>
           {!opened && <option value="">{text.screen}</option>}
@@ -92,15 +116,31 @@ export default function RemoteDesktopWindow() {
         <select aria-label="FPS" value={opened?.config.fps || 15} disabled={busy || status.phase !== "viewing"} onChange={(event) => void control({ fps: Number(event.target.value) })}>
           <option value={15}>15 FPS</option><option value={30}>30 FPS</option>
         </select>
-        <button aria-pressed={Boolean(status.input_enabled)} disabled={busy || status.phase !== "viewing" || !status.input_ready} onClick={() => void control({ inputEnabled: !status.input_enabled })}>{status.input_enabled ? inputText.disable : inputText.enable}</button>
-        <button disabled={busy || status.phase !== "viewing" || !status.input_enabled} onClick={() => void control({ secureAttention: true })}>Ctrl+Alt+Delete</button>
-        <button onClick={() => void getCurrentWindow().isFullscreen().then((full) => getCurrentWindow().setFullscreen(!full)).catch((cause) => setError(String(cause)))}>{text.full}</button>
+        <button className="remote-desktop-control-toggle" aria-label={status.input_enabled ? inputText.disable : inputText.enable} title={status.input_enabled ? inputText.disable : inputText.enable} aria-pressed={Boolean(status.input_enabled)} disabled={busy || status.phase !== "viewing" || !status.input_ready} onClick={() => void control({ inputEnabled: !status.input_enabled })}><MousePointer2 size={14} /><span>{status.input_enabled ? inputText.disable : inputText.enable}</span></button>
+        <button className="remote-desktop-icon-button" aria-label="Ctrl+Alt+Delete" title="Ctrl+Alt+Delete" disabled={busy || status.phase !== "viewing" || !status.input_enabled} onClick={() => void control({ secureAttention: true })}><Keyboard size={16} /></button>
+        <button className="remote-desktop-icon-button" aria-label={text.full} title={text.full} onClick={() => windowAction(appWindow.isFullscreen().then(full => appWindow.setFullscreen(!full)))}><Expand size={15} /></button>
         {status.phase === "failed" && <button disabled={busy} onClick={() => void control({ retry: true })}>{text.retry}</button>}
+      </div>
+      <div className="window-controls">
+        <button className="remote-desktop-theme" aria-label={english ? "Switch theme" : "切换主题"} title={english ? "Switch theme" : "切换主题"} onClick={() => { const next = !dark; localStorage.setItem("pab.theme", next ? "dark" : "light"); setDark(next); }}>{dark ? <Sun /> : <Moon />}</button>
+        <button aria-label={english ? "Minimize" : "最小化"} title={english ? "Minimize" : "最小化"} onClick={() => windowAction(appWindow.minimize())}><Minus /></button>
+        <button aria-label={english ? "Maximize" : "最大化"} title={english ? "Maximize" : "最大化"} onClick={() => windowAction(appWindow.toggleMaximize())}><Maximize2 /></button>
+        <button className="close" aria-label={english ? "Close window" : "关闭窗口"} title={english ? "Close window" : "关闭窗口"} onClick={() => windowAction(appWindow.close())}><X /></button>
       </div>
     </header>
     <section className="remote-desktop-placeholder">
       {(error || status.error) ? <p role="alert">{error || status.error}</p> : <p>{status.phase === "ended" ? text.ended : text.waiting}</p>}
     </section>
+    <button className="remote-desktop-statistics" aria-label={statisticsTitle} aria-expanded={statisticsExpanded} onClick={() => setStatisticsExpanded(value => !value)}>
+      <strong>{statisticsExpanded ? statisticsTitle : "i"}</strong>
+      <div hidden={!statisticsExpanded}>
+        <span role="status">{phase}</span><span className="remote-desktop-view-only">{status.input_enabled ? inputText.active : text.view}</span>
+        {opened && <span>{opened.config.screen.desktop_width} × {opened.config.screen.desktop_height} · H.264</span>}
+        {status.phase === "viewing" && decoder && <span className="remote-desktop-decoder">{decoder}</span>}
+        {opened && <span>{captureLimit}</span>}
+        {status.phase === "viewing" && qualityText && <span className="remote-desktop-quality" title={english ? "Encoder target, not measured bitrate" : "编码码率目标，非实测码率"}>{qualityText}</span>}
+      </div>
+    </button>
   </main>;
 }
 

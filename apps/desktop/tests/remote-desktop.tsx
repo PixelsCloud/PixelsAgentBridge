@@ -34,6 +34,7 @@ const fixture = (window as any).fixture = {
     if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
     if (command.startsWith("plugin:")) return null;
     if (command === "desktop_viewer_start") return status();
+    if (command === "desktop_viewer_overlay") return null;
     if (command === "desktop_viewer_assistance") return fixture.assistance;
     if (command === "desktop_viewer_assistance_complete") {
       if (fixture.holdCompletion.includes(args.id)) {

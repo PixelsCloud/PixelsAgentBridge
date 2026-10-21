@@ -16,6 +16,13 @@ pub struct NativeCursorRenderer {
     acknowledgements: CursorAcknowledgements,
 }
 impl NativeCursorRenderer {
+    /// Local overlay data shares the serialized native UI lane, never the wire.
+    pub async fn overlay(&mut self, text: &str) -> Result<(), Error> {
+        if text.len() > 2048 {
+            return Err("viewer statistics too large".into());
+        }
+        self.send([&[2][..], text.as_bytes()].concat()).await
+    }
     pub(crate) fn new(
         pipe: &Arc<Mutex<ChildStdin>>,
         config: DesktopVideoConfig,

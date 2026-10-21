@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "viewer_input.h"
+#include "viewer_stats.h"
 #include "cursor_overlay.h"
 #include "video_shader.h"
 #include "../software_codec_ffi.h"
@@ -14,6 +15,7 @@
 @interface PABMetalView : PABInputView
 @property(nonatomic) BOOL needsMediaRedraw;
 @property(nonatomic) BOOL tracksRemoteCursor;
+@property(nonatomic, strong) PABViewerStats* statisticsOverlay;
 @end
 @implementation PABMetalView
 - (void)resetCursorRects {
@@ -59,6 +61,7 @@
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)layout {
     [super layout];
+    [self.statisticsOverlay placeInViewer];
     CAMetalLayer* metal = (CAMetalLayer*)self.layer;
     const NSRect backing = [self convertRectToBacking:self.bounds];
     metal.contentsScale = self.window.backingScaleFactor ?: 1.0;
@@ -251,10 +254,10 @@ public:
         auto frame = parent.bounds;
         if (!owns_window_) {
             // Full-size content views include the titlebar. Match the WebView's
-            // unobscured content area before reserving its 72-point toolbar.
+            // unobscured content area before reserving its shared titlebar.
             frame = [parent convertRect:window_.contentLayoutRect fromView:nil];
-            frame.size.height = std::max(0.0,frame.size.height-72);
-            if (parent.flipped) frame.origin.y += 72;
+            frame.size.height = std::max(0.0,frame.size.height-42);
+            if (parent.flipped) frame.origin.y += 42;
         }
         view_ = [[PABMetalView alloc] initWithFrame:frame];
         view_->mediaInput.width = width; view_->mediaInput.height = height; view_->mediaInput.rotation = rotation;
@@ -274,7 +277,7 @@ public:
             [NSLayoutConstraint activateConstraints:@[
                 [view_.leadingAnchor constraintEqualToAnchor:layout.leadingAnchor],
                 [view_.trailingAnchor constraintEqualToAnchor:layout.trailingAnchor],
-                [view_.topAnchor constraintEqualToAnchor:layout.topAnchor constant:72],
+                [view_.topAnchor constraintEqualToAnchor:layout.topAnchor constant:42],
                 [view_.bottomAnchor constraintEqualToAnchor:layout.bottomAnchor]
             ]];
             [parent layoutSubtreeIfNeeded];
@@ -323,6 +326,21 @@ public:
     }
     void input_sink(std::function<bool(const InputPacket&)> sink) { require_main(); view_->mediaInput.sink = std::move(sink); }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0] == 2) {
+            require_main();
+            if (size > 2049) throw std::runtime_error("Viewer statistics too large");
+            NSString* text = [[NSString alloc] initWithBytes:bytes+1 length:size-1 encoding:NSUTF8StringEncoding];
+            if (!text) throw std::runtime_error("Invalid viewer statistics text");
+            if (!view_.statisticsOverlay && text.length) {
+                view_.statisticsOverlay = [[PABViewerStats alloc] initWithFrame:NSZeroRect];
+                [view_ addSubview:view_.statisticsOverlay positioned:NSWindowAbove relativeTo:nil];
+            }
+            view_.statisticsOverlay.statisticsText = text;
+            view_.statisticsOverlay.hidden = !text.length;
+            [view_.statisticsOverlay setAccessibilityLabel:[text componentsSeparatedByString:@"\n"].firstObject];
+            [view_.statisticsOverlay placeInViewer]; view_.statisticsOverlay.needsDisplay = YES;
+            return;
+        }
         require_main(); cursor_.update(device_,bytes,size);
         if (view_.tracksRemoteCursor != cursor_.tracking()) {
             view_.tracksRemoteCursor = cursor_.tracking();

@@ -3,5 +3,5 @@
   "identifier": "desktop-viewer",
   "description": "Independent remote desktop windows",
   "windows": ["desktop-viewer-*"],
-  "permissions": ["core:default", "core:window:allow-set-fullscreen"]
+  "permissions": ["core:default", "core:window:allow-set-fullscreen", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "core:window:allow-start-dragging"]
 }

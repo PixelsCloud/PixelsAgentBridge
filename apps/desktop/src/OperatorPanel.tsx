@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type SetStateAction } from
 import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowUpRight, Copy, Pencil, Trash2, Unplug, Terminal as TerminalIcon } from "lucide-react";
+import { ArrowUpRight, Copy, Monitor, Pencil, Trash2, Unplug, Terminal as TerminalIcon } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { View } from "./App";
 import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, TaskEntry, TaskUpdate, TransferUpdate } from "./operatorTypes";
@@ -215,7 +215,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   function deviceMenu(device: ConnectedDevice): MenuProps {
     return {
       items: [
-        { key: "desktop-viewer", label: language === "en" ? "Remote desktop" : language === "zh-TW" ? "遠端桌面" : "远程桌面" },
+        { key: "desktop-viewer", icon: <Monitor size={16} />, label: language === "en" ? "Remote desktop" : language === "zh-TW" ? "遠端桌面" : "远程桌面" },
         { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : language === "zh-TW" ? "遠端終端" : "远程终端" },
         { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : language === "zh-TW" ? "遠端終端（System）" : "远程终端（System）" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },

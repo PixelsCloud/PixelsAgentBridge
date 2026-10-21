@@ -114,6 +114,7 @@ struct Owner {
     commands: mpsc::Sender<Command>,
     requests: Mutex<Option<mpsc::Receiver<Command>>>,
     status: watch::Sender<ViewerStatus>,
+    overlay: watch::Sender<String>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 #[derive(Default)]
@@ -279,6 +280,7 @@ pub(crate) async fn open_window(
         requests: Mutex::new(Some(requests)),
         status,
         task: Mutex::new(None),
+        overlay: watch::channel(String::new()).0,
     });
     owners.insert(label.clone(), owner);
     let title = format!(
@@ -297,7 +299,8 @@ pub(crate) async fn open_window(
     .title(title)
     .inner_size(1100.0, 760.0)
     .min_inner_size(640.0, 400.0)
-    .resizable(true);
+    .resizable(true)
+    .decorations(false);
     // All WebViews sharing the acceptance profile must use identical WebView2
     // environment arguments, as the terminal and main window already do.
     #[cfg(all(windows, debug_assertions))]
@@ -389,6 +392,19 @@ pub async fn desktop_viewer_control(
         .try_send(command)
         .map_err(|_| "remote desktop is busy or closed; retry shortly".into())
 }
+/// Local viewer chrome only: never forwards text or clicks to the remote peer.
+#[tauri::command]
+pub async fn desktop_viewer_overlay(
+    window: WebviewWindow,
+    state: State<'_, RemoteDesktopState>,
+    text: String,
+) -> Result<(), String> {
+    if text.len() > 2048 || text.contains('\0') {
+        return Err("invalid viewer statistics".into());
+    }
+    state.owner(&window).await?.overlay.send_replace(text);
+    Ok(())
+}
 fn publish(
     window: &WebviewWindow,
     owner: &Owner,
@@ -396,6 +412,9 @@ fn publish(
     opened: Option<DesktopOpened>,
     error: Option<String>,
 ) {
+    if phase != "viewing" {
+        owner.overlay.send_replace(String::new());
+    }
     let status = ViewerStatus {
         phase: phase.into(),
         opened,
@@ -639,39 +658,60 @@ async fn stream(
             None
         };
         #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
-        let cursor_renderer = if cursor_source.is_some() {
-            Some(viewer.cursor_renderer().map_err(StreamFailure::renderer)?)
-        } else {
-            None
-        };
+        let cursor_renderer = viewer.cursor_renderer().map_err(StreamFailure::renderer)?;
         #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
         let cursor_work = async move {
-            if let (Some(mut source), Some(mut renderer)) = (cursor_source, cursor_renderer) {
-                loop {
-                    let update = match source.next_update().await {
-                        Ok(update) => update,
-                        Err(error) => {
-                            tracing::warn!(%error, "independent remote cursor source ended");
-                            // Remote cursor failure is independent of video and
-                            // input. Erase its last image and leave the viewer.
-                            tokio::time::timeout(Duration::from_secs(5), renderer.clear())
-                                .await
-                                .map_err(|_| {
-                                    StreamFailure::renderer("native cursor clear timed out")
-                                })?
-                                .map_err(StreamFailure::renderer)?;
-                            break;
+            let mut source = cursor_source;
+            let mut renderer = cursor_renderer;
+            let mut overlay = owner.overlay.subscribe();
+            overlay.mark_changed();
+            loop {
+                // Keep an in-progress cursor read alive across local HUD updates.
+                // Cancelling/restarting it could discard a partial cursor packet.
+                let received = {
+                    let next = async {
+                        match source.as_mut() {
+                            Some(source) => source.next_update().await,
+                            None => std::future::pending().await,
                         }
                     };
-                    // A local partial pipe write cannot be reused. Such an
-                    // error retires this native generation, like video IO.
-                    tokio::time::timeout(Duration::from_secs(5), renderer.submit(&update))
-                        .await
-                        .map_err(|_| StreamFailure::renderer("native cursor submission timed out"))?
-                        .map_err(StreamFailure::renderer)?;
-                }
+                    tokio::pin!(next);
+                    loop {
+                        tokio::select! {
+                            update = &mut next => break update,
+                            changed = overlay.changed() => {
+                                changed.map_err(|_| StreamFailure::renderer("viewer overlay closed"))?;
+                                let text = overlay.borrow_and_update().clone();
+                                tokio::time::timeout(Duration::from_secs(5), renderer.overlay(&text)).await
+                                    .map_err(|_| StreamFailure::renderer("viewer overlay submission timed out"))?
+                                    .map_err(StreamFailure::renderer)?;
+                            }
+                        }
+                    }
+                };
+                let update = match received {
+                    Ok(update) => update,
+                    Err(error) => {
+                        tracing::warn!(%error, "independent remote cursor source ended");
+                        // Remote cursor failure is independent of video and
+                        // input. Erase its last image and leave the viewer.
+                        tokio::time::timeout(Duration::from_secs(5), renderer.clear())
+                            .await
+                            .map_err(|_| StreamFailure::renderer("native cursor clear timed out"))?
+                            .map_err(StreamFailure::renderer)?;
+                        source = None;
+                        continue;
+                    }
+                };
+                // A local partial pipe write cannot be reused. Such an
+                // error retires this native generation, like video IO.
+                tokio::time::timeout(Duration::from_secs(5), renderer.submit(&update))
+                    .await
+                    .map_err(|_| StreamFailure::renderer("native cursor submission timed out"))?
+                    .map_err(StreamFailure::renderer)?;
             }
-            std::future::pending::<Result<(), StreamFailure>>().await
+            #[allow(unreachable_code)]
+            Ok::<(), StreamFailure>(())
         };
         #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
         let cursor_work = std::future::pending::<Result<(), StreamFailure>>();

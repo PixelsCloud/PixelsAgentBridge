@@ -8,6 +8,7 @@
 #include "../software_codec_ffi.h"
 #include "cursor_overlay.h"
 #include "presentation_history.h"
+#include "viewer_stats.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -18,6 +19,7 @@ inline std::array<float, 4> test_color(uint64_t frame, unsigned quadrant) {
 }
 
 class NativePresenter {
+    ViewerStats stats_;
     CursorOverlay cursor_;
     bool cursor_tracking_ = false;
     ViewerInput input_;
@@ -69,6 +71,10 @@ class NativePresenter {
     }
 public:
     void cursor_update(const std::vector<uint8_t>& packet) {
+        if (!packet.empty() && packet.front() == 2) {
+            stats_.update(window_,packet.data()+1,packet.size()-1,[this] { input_.release(window_); });
+            return;
+        }
         cursor_.update(device_.Get(), packet);
         cursor_tracking_ = !packet.empty() && packet.front() == 1;
         refresh_local_cursor();
@@ -131,13 +137,14 @@ public:
         if (!swapchain_ || !processor_ || presenting_) return;
         if (parent_) {
             RECT bounds{}; GetClientRect(parent_, &bounds);
-            const int top = MulDiv(72, GetDpiForWindow(parent_), 96);
+            const int top = MulDiv(42, GetDpiForWindow(parent_), 96);
             RECT position{}; GetWindowRect(window_, &position);
             POINT origin{position.left, position.top}; ScreenToClient(parent_, &origin);
             if (origin.y != top || position.right-position.left != bounds.right || position.bottom-position.top != (std::max)(1L, bounds.bottom-top))
                 SetWindowPos(window_, HWND_TOP, 0, top, (std::max)(1L, bounds.right), (std::max)(1L, bounds.bottom-top), SWP_NOACTIVATE);
         }
         RECT client{}; GetClientRect(window_, &client);
+        stats_.layout();
         if (client.right <= 0 || client.bottom <= 0 || IsIconic(parent_ ? parent_ : window_)) {
             // The native child belongs to this process, while its Tauri owner
             // may belong to another. Minimizing the owner need not deliver

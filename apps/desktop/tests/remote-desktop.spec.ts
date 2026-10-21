@@ -1,5 +1,27 @@
 import { test, expect } from "@playwright/test";
 
+test("window chrome keeps controls in one titlebar and statistics toggle locally", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  const header = page.locator(".titlebar");
+  await expect(header.getByRole("combobox", { name: "Display" })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Enable control" })).toBeVisible();
+  const panel = page.getByRole("button", { name: "Statistics", exact: true });
+  await expect(panel).toHaveAttribute("aria-expanded", "true");
+  const box = await panel.boundingBox();
+  expect(box!.x + box!.width).toBe(page.viewportSize()!.width - 12);
+  expect(box!.y + box!.height).toBe(page.viewportSize()!.height - 12);
+  await panel.click(); await expect(panel).toHaveAttribute("aria-expanded", "false");
+  await panel.click(); await expect(panel).toHaveAttribute("aria-expanded", "true");
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control"))).toEqual([]);
+  await header.getByRole("button", { name: "Maximize", exact: true }).click();
+  await header.getByRole("button", { name: "Minimize", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => ["plugin:window|toggle_maximize", "plugin:window|minimize"].includes(c.command)).map((c: any) => c.command))).toEqual(["plugin:window|toggle_maximize", "plugin:window|minimize"]);
+  await page.setViewportSize({ width: 640, height: 400 });
+  await expect(header.getByRole("button", { name: "Close window", exact: true })).toBeInViewport();
+  await expect(header.getByRole("combobox", { name: "Display" })).toBeInViewport();
+  expect(await page.locator("html").evaluate(node => node.scrollWidth)).toBe(640);
+});
+
 test("decoder badge uses actual reports and clears during recovery", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
   await expect(page.getByRole("status")).toHaveText("Connected");
@@ -7,7 +29,7 @@ test("decoder badge uses actual reports and clears during recovery", async ({ pa
   for (const [kind, label] of [["d3d11_hardware", "Hardware decoding"], ["openh264_software", "Software decoding"], ["videotoolbox_hardware", "Hardware decoding"]]) {
     await page.evaluate((value) => (window as any).fixture.decoder(value), kind);
     await expect(page.locator(".remote-desktop-decoder")).toHaveText(label);
-    expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(72);
+    expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(42);
   }
   await page.evaluate(() => (window as any).fixture.decoder("unknown_future_decoder"));
   await expect(page.locator(".remote-desktop-decoder")).toHaveCount(0);
@@ -19,7 +41,7 @@ test("viewer uses stable screen IDs and bounded controls without frame or input 
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.getByText("View only", { exact: true })).toBeVisible();
-  expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(72);
+  expect(await page.locator(".remote-desktop-toolbar").evaluate((node) => node.getBoundingClientRect().height)).toBe(42);
   await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.getByRole("combobox", { name: "Display" })).toHaveValue("adapter:left");
@@ -27,7 +49,7 @@ test("viewer uses stable screen IDs and bounded controls without frame or input 
   await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => !c.command.startsWith("plugin:")));
   expect(calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args)).toEqual([{ screen: "adapter:left" }, { fps: 30 }]);
-  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control", "desktop_viewer_assistance"].includes(c.command))).toBe(true);
+  expect(calls.every((c: any) => ["desktop_viewer_start", "desktop_viewer_control", "desktop_viewer_assistance", "desktop_viewer_overlay"].includes(c.command))).toBe(true);
 });
 test("secure attention requires control and recovery never restores input automatically", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
