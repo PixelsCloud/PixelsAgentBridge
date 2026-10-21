@@ -17,7 +17,7 @@ import type { ExecutionIdentity } from "./operatorTypes";
 type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string; os_family?: "windows" | "linux" | "macos" };
 type LaunchMode = "console" | "system" | null;
 const language = localStorage.getItem("pab.language");
-const text = desktopTerminalText[language === "zh-TW" ? "zh-TW" : language === "en" ? "en" : "zh-CN"];
+const text = desktopTerminalText[language === "en" ? "en" : "zh-CN"];
 const dark = localStorage.getItem("pab.theme") === "dark";
 
 export default function DesktopTerminalWindow() {

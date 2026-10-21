@@ -11,18 +11,6 @@ export const macosPermissionText = {
     restart: "重启主程序", restartService: "重启后台服务", restartTitle: "重启主程序？", restartBody: "会中断这台 Mac 的截图和桌面控制，并重新打开 Pixels。", serviceRestartTitle: "重启后台服务？", serviceRestartBody: "会中断这台 Mac 的远程终端、任务和连接，并要求管理员确认。", confirmRestart: "确认重启", cancel: "取消",
     serviceRestarted: "已请求重启，请等待服务恢复。", checkFailed: "无法确认最新权限状态，请重试。", loadError: "无法读取程序路径。", notInstalled: "程序未找到，请检查安装。", settingsOpened: "已打开系统设置，请开启相应开关。",
   },
-  "zh-TW": {
-    granted: "已授權", screenConsentNote: "開始分享螢幕時，macOS 可能另外要求直接存取螢幕。請在 Pixels Agent Bridge 的系統提示中點選「允許」；此處的授權狀態不代表這項確認已完成。",
-    fileAccess: "檔案存取", fileNote: "檢測下載、文件、桌面目錄的實際存取能力；完整磁碟存取權開關以系統設定為準。", configure: "設定權限", checking: "檢測中", failed: "檢測失敗", restricted: "存取受限", notChecked: "尚未檢測", timedOut: "檢測逾時，請完成系統授權後再試", enableTarget: "請在「完整磁碟存取權」清單中開啟：", manageDisk: "管理完整磁碟存取權",
-    more: "更多操作", notListed: "系統設定中找不到這個程式？",
-    title: "macOS 權限", desktop: "Pixels Agent Bridge", executor: "pab-executor", executorNote: "Pixels 背景服務，也是我們的程式。",
-    screen: "螢幕錄製", input: "輔助使用", disk: "完整磁碟存取權", normal: "正常", missing: "未授權", request: "申請授權", refresh: "重新整理狀態",
-    diskNote: "磁碟權限需在系統設定確認，兩個程式都要開啟。", diskHelp: "在系統設定開啟這個程式的開關。清單裡沒有它？點「＋」，按 ⌘⇧G，貼上下面的路徑加入。",
-    screenHelp: "在系統設定開啟 Pixels Agent Bridge 的螢幕錄製開關。", inputHelp: "在系統設定開啟 Pixels Agent Bridge 的輔助使用開關。",
-    open: "開啟系統設定", reveal: "在 Finder 中顯示", copyPath: "複製路徑", copied: "路徑已複製", done: "完成", repair: "授權後仍無法使用？", repairBody: "移除系統清單中的舊程式，重新加入目前程式；系統要求時再重新啟動。",
-    restart: "重新啟動主程式", restartService: "重新啟動背景服務", restartTitle: "重新啟動主程式？", restartBody: "會中斷這台 Mac 的畫面擷取與桌面控制，並重新開啟 Pixels。", serviceRestartTitle: "重新啟動背景服務？", serviceRestartBody: "會中斷這台 Mac 的遠端終端、工作與連線，並要求管理員確認。", confirmRestart: "確認重新啟動", cancel: "取消",
-    serviceRestarted: "已要求重新啟動，請等待服務恢復。", checkFailed: "無法確認最新權限狀態，請重試。", loadError: "無法讀取程式路徑。", notInstalled: "找不到程式，請檢查安裝。", settingsOpened: "已開啟系統設定，請開啟對應開關。",
-  },
   en: {
     granted: "Granted", screenConsentNote: "When screen sharing starts, macOS may also ask for direct screen access. Choose Allow in the system prompt for Pixels Agent Bridge. The permission status here does not confirm that this additional step is complete.",
     fileAccess: "File access", fileNote: "Checks access to Downloads, Documents and Desktop. The Full Disk Access switch is managed in System Settings.", configure: "Set permissions", checking: "Checking", failed: "Check failed", restricted: "Access restricted", notChecked: "Not checked", timedOut: "Check timed out. Complete system authorization and try again.", enableTarget: "In Full Disk Access, enable: ", manageDisk: "Manage Full Disk Access",

@@ -118,8 +118,7 @@ pub fn prevent_exit(app: &tauri::AppHandle, code: Option<i32>) -> bool {
 #[tauri::command]
 pub fn set_tray_language(app: tauri::AppHandle, language: &str) -> Result<(), String> {
     let (show, quit) = match language {
-        "zh-CN" => ("显示窗口", "退出"),
-        "zh-TW" => ("顯示視窗", "結束程式"),
+        "zh-CN" | "zh-TW" => ("显示窗口", "退出"),
         "en" => ("Show window", "Exit"),
         _ => return Err("Unsupported tray language".into()),
     };

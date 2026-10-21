@@ -6,7 +6,6 @@ import type { ScopeStatus } from './operatorTypes';
 
 const words = {
   'zh-CN': { signIn:'使用 GitHub 登录', bind:'绑定 GitHub', unlink:'解除绑定', cancel:'取消', waiting:'请在浏览器中完成 GitHub 授权', failed:'GitHub 授权未完成，请重试。', last:'这是唯一的登录方式，无法解绑。', conflict:'该 GitHub 已绑定其他账号。', expired:'授权已过期，请重试。', unavailable:'暂时无法连接 GitHub，请稍后重试。', closed:'当前不开放新账号注册。' },
-  'zh-TW': { signIn:'使用 GitHub 登入', bind:'綁定 GitHub', unlink:'解除綁定', cancel:'取消', waiting:'請在瀏覽器中完成 GitHub 授權', failed:'GitHub 授權未完成，請重試。', last:'這是唯一的登入方式，無法解除綁定。', conflict:'此 GitHub 已綁定其他帳號。', expired:'授權已過期，請重試。', unavailable:'暫時無法連線 GitHub，請稍後重試。', closed:'目前不開放新帳號註冊。' },
   en: { signIn:'Continue with GitHub', bind:'Link GitHub', unlink:'Unlink', cancel:'Cancel', waiting:'Complete GitHub authorization in your browser', failed:'GitHub authorization did not finish. Please try again.', last:'Keep at least one sign-in method.', conflict:'This GitHub identity is linked to another account.', expired:'Authorization expired. Please try again.', unavailable:'GitHub is unavailable. Please try again later.', closed:'New account registration is disabled.' },
 };
 type Status = { enabled:boolean; login:string|null; password_enabled:boolean };

@@ -9,7 +9,8 @@ import "../src/theme.css";
 const params = new URLSearchParams(location.search);
 const dark = params.get("theme") === "dark";
 if (params.has("app")) {
-  localStorage.setItem("pab.language", params.get("language") ?? "en");
+  if (params.has("followSystem")) localStorage.removeItem("pab.language");
+  else localStorage.setItem("pab.language", params.get("language") ?? "en");
   localStorage.setItem("pab.theme", dark ? "dark" : "light");
 }
 document.documentElement.dataset.theme = dark ? "dark" : "light";

@@ -39,7 +39,7 @@ test('offline service disables password refresh',async({page})=>{
   expect(await page.evaluate(()=>(window as any).fixture.calls)).toEqual([]);
 });
 
-for (const [language,label] of [['zh-CN','刷新密码'],['zh-TW','重新產生密碼'],['en','Refresh password']]) {
+for (const [language,label] of [['zh-CN','刷新密码'],['en','Refresh password']]) {
   test(`password controls fit the home card in ${language}`,async({page})=>{
     await page.goto(`http://127.0.0.1:1429/tests/device-credentials.html?language=${language}`);
     await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();

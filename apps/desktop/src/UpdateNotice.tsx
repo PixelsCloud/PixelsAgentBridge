@@ -28,9 +28,7 @@ export function UpdateNotice({ language, onOpen }: { language: Language; onOpen:
 
   const copy = language === "en"
     ? { title: "Update", action: "View update" }
-    : language === "zh-TW"
-      ? { title: "新版本", action: "查看更新" }
-      : { title: "新版本", action: "查看更新" };
+    : { title: "新版本", action: "查看更新" };
 
   const label = `${copy.title} V${available.version}`;
   return <div className="sidebar-update" role="status" aria-live="polite">

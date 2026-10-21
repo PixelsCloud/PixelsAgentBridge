@@ -12,7 +12,7 @@ Pixels Agent Bridge gives AI agents access to your computers through MCP. Use na
 - **Files:** upload, download, search, edit, copy, and archive files, with background transfers and progress tracking.
 - **Desktop automation:** capture JPEG screenshots, inspect windows and UI controls, and send mouse and keyboard input on Windows and macOS.
 - **System and development tools:** inspect system resources, processes, and networks; work with supported service, Git, and Docker operations.
-- **Desktop app:** manage devices, view local task history, and monitor each agent's MCP connections. Includes English, Simplified Chinese, Traditional Chinese, and light/dark themes.
+- **Desktop app:** manage devices, view local task history, and monitor each agent's MCP connections. Includes English, Simplified Chinese, and light/dark themes.
 - **Accounts and Web console:** register and sign in, view devices and online status, manage accounts, and configure user Relay bandwidth limits. Task history stays local and is not uploaded to the server.
 
 Built-in setup supports **Codex, Kimi Code, Claude Code, DeepSeek Harness, and OpenCode**. Other clients can use the stdio MCP entry point.

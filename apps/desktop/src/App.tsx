@@ -5,7 +5,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { App as AntdApp, Avatar, Button, ConfigProvider, Menu, theme as antdTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
-import zhTW from "antd/locale/zh_TW";
 import { Check, Copy, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, Settings2, Sun, UserRound, X } from "lucide-react";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
@@ -179,7 +178,7 @@ function App() {
 
   return (
     <ConfigProvider
-      locale={language === "zh-CN" ? zhCN : language === "zh-TW" ? zhTW : enUS}
+      locale={language === "zh-CN" ? zhCN : enUS}
       theme={{
         algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {

@@ -215,9 +215,9 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   function deviceMenu(device: ConnectedDevice): MenuProps {
     return {
       items: [
-        { key: "desktop-viewer", icon: <Monitor size={16} />, label: language === "en" ? "Remote desktop" : language === "zh-TW" ? "遠端桌面" : "远程桌面" },
-        { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : language === "zh-TW" ? "遠端終端" : "远程终端" },
-        { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : language === "zh-TW" ? "遠端終端（System）" : "远程终端（System）" },
+        { key: "desktop-viewer", icon: <Monitor size={16} />, label: language === "en" ? "Remote desktop" : "远程桌面" },
+        { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : "远程终端" },
+        { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : "远程终端（System）" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
         { key: "disconnect", icon: <Unplug size={16} />, label: t.disconnectDevice, disabled: !device.connected },
         { key: "rename", icon: <Pencil size={16} />, label: t.renameDevice },

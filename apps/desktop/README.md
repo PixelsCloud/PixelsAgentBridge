@@ -4,8 +4,9 @@ The Tauri 2 application uses React, TypeScript, and Ant Design. It displays this
 computer's device code and password, manages remembered devices, runs remote tools,
 and shows task history. The Executor remains a background process from the same installation.
 
-The interface supports Simplified Chinese, Traditional Chinese, and English, with
-system-language detection and a saved manual choice. Light and dark themes use
+The interface supports Simplified Chinese and English, with system-language
+detection and a saved manual choice. Older Traditional Chinese preferences migrate
+to Simplified Chinese. Light and dark themes use
 separate palettes. Device details contain basic information, device-filtered history,
 and remote tools; global and per-device task histories support pagination.
 

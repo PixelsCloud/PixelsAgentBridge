@@ -62,9 +62,7 @@ function AssistancePrompt({ current, language }: { current: Assistance; language
   }, [opened, current.assistance_id]);
   const t = language === "en"
     ? { title: "AI requests your help", reason: "Reason", action: "Please help with", open: "Open remote desktop", cancel: "Decline", hint: "The window opens in view-only mode. When finished, choose Complete assistance in that window.", failed: "Could not update the assistance request." }
-    : language === "zh-TW"
-      ? { title: "AI 請求您協助", reason: "原因", action: "需要協助的操作", open: "打開遠端桌面", cancel: "取消協助", hint: "打開後預設僅查看。處理完畢，請在遠端桌面窗口點擊「完成協助」。", failed: "無法更新協助請求。" }
-      : { title: "AI 请求您协助", reason: "原因", action: "需要协助的操作", open: "打开远程桌面", cancel: "取消协助", hint: "打开后默认仅查看。处理完毕，请在远程桌面窗口点击“完成协助”。", failed: "无法更新协助请求。" };
+    : { title: "AI 请求您协助", reason: "原因", action: "需要协助的操作", open: "打开远程桌面", cancel: "取消协助", hint: "打开后默认仅查看。处理完毕，请在远程桌面窗口点击“完成协助”。", failed: "无法更新协助请求。" };
   async function act(command: string) {
     setBusy(true); setError("");
     try { await invoke(command, { id: current.assistance_id }); }

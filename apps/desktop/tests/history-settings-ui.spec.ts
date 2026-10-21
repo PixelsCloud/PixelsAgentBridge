@@ -15,7 +15,7 @@ test("completion arriving during a byte read drains the final stdout and stderr"
   expect(calls[1].args.stdoutOffset).toBe(6);
   expect(calls[1].args.stderrOffset).toBe(0);
 });
-for (const [language, label] of [["en", "English"], ["zh-CN", "简体中文"], ["zh-TW", "繁體中文"]]) {
+for (const [language, label] of [["en", "English"], ["zh-CN", "简体中文"],]) {
   test(`explicitly choosing the current ${language} default is remembered`, async ({ page }) => {
     await page.goto(`${url}?panel=settings&language=${language}`);
     expect(await page.evaluate(() => localStorage.getItem("pab.language"))).toBeNull();
@@ -68,7 +68,7 @@ test("changing output encoding rereads the completed task and drops a delayed ol
     call.args.taskId === "long-title" && call.args.stdoutOffset === 0 && call.args.stderrOffset === 0)).toBeTruthy();
 });
 
-for (const language of ["zh-CN", "zh-TW", "en"]) {
+for (const language of ["zh-CN", "en"]) {
   test(`server overrides stay empty by default and can be restored in ${language}`, async ({ page }) => {
     await page.goto(`${url}?panel=settings&section=server&language=${language}`);
     const fields = page.locator(".settings-fields input");
@@ -102,7 +102,7 @@ test("server settings cannot overwrite an unreadable configuration", async ({ pa
   await expect(page.locator(".settings-actions button").first()).toBeDisabled();
 });
 
-for (const language of ["zh-CN", "zh-TW", "en"]) {
+for (const language of ["zh-CN", "en"]) {
   test(`server verification is independent and does not save in ${language}`, async ({ page }) => {
     await page.goto(`${url}?panel=settings&section=server&language=${language}`);
     const control = page.locator('[data-server-kind="control"]');

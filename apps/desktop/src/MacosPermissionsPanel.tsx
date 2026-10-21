@@ -24,7 +24,6 @@ export function requestMacosPermissionsAtStartup(): Promise<void> {
 }
 const missingCopy = {
   "zh-CN": { title: "权限待开启", screen: "屏幕录制当前不可用，无法截图。", input: "辅助功能当前不可用，无法控制桌面。" },
-  "zh-TW": { title: "權限待開啟", screen: "螢幕錄製目前無法使用，無法擷取畫面。", input: "輔助使用目前無法使用，無法控制桌面。" },
   en: { title: "Permissions needed", screen: "Screen Recording is unavailable; screenshots cannot be taken.", input: "Accessibility is unavailable; desktop control cannot be used." },
 };
 function useMacosPermissions() {

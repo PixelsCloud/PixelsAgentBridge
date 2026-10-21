@@ -1,0 +1,259 @@
+{
+  "build_passed": true,
+  "latest_rust_source_check_passed": true,
+  "compile_jobs": 6,
+  "nested_jobs": 1,
+  "affinity_cores": 10,
+  "capacity_pause_events": 10,
+  "before": {
+    "phase": "before",
+    "installed_app_changed": false,
+    "remote_input_injected": false,
+    "maximized_before": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "fullscreen_from_maximized": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "full_monitor_client": false,
+    "exit": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "passed": true
+  },
+  "after": {
+    "phase": "after",
+    "installed_app_changed": false,
+    "remote_input_injected": false,
+    "maximized_before": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "fullscreen_from_maximized": {
+      "client": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "full_monitor_client": true,
+    "exit": {
+      "client": [
+        0,
+        32,
+        1920,
+        1079
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": true,
+      "child": null
+    },
+    "normal_before": {
+      "client": [
+        138,
+        162,
+        1238,
+        922
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "fullscreen_from_normal": {
+      "client": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "normal_exit": {
+      "client": [
+        138,
+        162,
+        1238,
+        922
+      ],
+      "monitor": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "work": [
+        0,
+        32,
+        1920,
+        1080
+      ],
+      "maximized": false,
+      "child": null
+    },
+    "passed": true
+  },
+  "native_test_scope": "Real isolated Tauri client-area geometry; no native video child was opened because 90 already had the user viewer. UI served from the configured local HTTP development origin.",
+  "sas_diagnosis": {
+    "remote": "90",
+    "timezone": "Asia/Shanghai",
+    "evidence": [
+      {
+        "time": "2026-10-21 12:55:51.102",
+        "log": "executor.log",
+        "event": "remote desktop MediaUnavailable: local WebSocket closed"
+      },
+      {
+        "time": "2026-10-21 12:55:51.124",
+        "log": "session-helper-winlogon.log",
+        "event": "session helper paused for desktop switch"
+      },
+      {
+        "time": "2026-10-21 12:55:56.122",
+        "log": "executor.log",
+        "event": "remote desktop MediaUnavailable: local WebSocket closed"
+      },
+      {
+        "time": "2026-10-21 12:55:56.132",
+        "log": "session-helper-winlogon.log",
+        "event": "session helper paused for desktop switch"
+      }
+    ],
+    "conclusion": "Remote local media socket closure coincides with Windows desktop handover. Preserve typed RuntimeError at the SecureAttention request boundary so existing recoverable media/transport failures can use bounded recovery without replaying the SAS action.",
+    "operator_same_session_log_available": false,
+    "sas_retriggered": false,
+    "remote_restarted": false,
+    "auth_policy_changed": false
+  },
+  "isolated_profiles_cleaned": true,
+  "installed_application_updated": false,
+  "published": false,
+  "source_sha256": {
+    "apps/desktop/src-tauri/src/operator/remote_desktop.rs": "bdffc946fe9087bd2114d08747a07b4f32cfd9d0abd96f92370a5bc5f1e3fc84",
+    "apps/desktop/src-tauri/src/operator/remote_desktop/chrome.rs": "d81cb63cbcdf4b39a8272d48711bdbc351f334ac3908eda3772dc7e6e950357b"
+  }
+}

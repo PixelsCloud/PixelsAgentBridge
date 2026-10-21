@@ -1,5 +1,27 @@
 import { test, expect } from "@playwright/test";
 
+test("removed Traditional Chinese preference migrates to Simplified Chinese", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&language=zh-TW");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  expect(await page.evaluate(() => localStorage.getItem("pab.language"))).toBe("zh-CN");
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.locator(".settings-language").click();
+  await expect(page.locator(".ant-select-dropdown:visible").getByRole("option")).toHaveCount(2);
+  await expect(page.locator(".ant-select-dropdown:visible")).toContainText("简体中文");
+  await expect(page.locator(".ant-select-dropdown:visible")).toContainText("English");
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "set_tray_language" && c.args.language === "zh-CN"))).toBe(true);
+});
+
+for (const locale of ["zh-TW", "zh-HK", "zh-Hant"]) test(`Chinese system locale ${locale} selects Simplified Chinese`, async ({ browser }) => {
+  const context = await browser.newContext({ locale });
+  try {
+    const page = await context.newPage();
+    await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&followSystem=true");
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    await expect(page.locator(".sidebar-menu").getByRole("menuitem", { name: "设置", exact: true })).toBeVisible();
+  } finally { await context.close(); }
+});
+
 test("connection names identify agents while preserving separate sessions and raw details", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?connections=true");
   const names = page.locator(".ant-collapse-header strong");
@@ -51,7 +73,6 @@ test("titlebar close uses the native close handler and tray language follows pre
 for (const [language, devices, mcp, settings] of [
   ["en", "Device list", "MCP connections", "Settings"],
   ["zh-CN", "设备列表", "MCP 连接", "设置"],
-  ["zh-TW", "裝置列表", "MCP 連線", "設定"],
 ]) for (const theme of ["light", "dark"]) {
   test(`MCP has a dedicated sidebar page in ${language}/${theme}`, async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 700 });
@@ -88,7 +109,7 @@ for (const [language, devices, mcp, settings] of [
   });
 }
 
-for (const language of ["en", "zh-CN", "zh-TW"]) for (const theme of ["light", "dark"]) {
+for (const language of ["en", "zh-CN",]) for (const theme of ["light", "dark"]) {
   test(`agent rows stay inside a narrow panel in ${language}/${theme}`, async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 700 });
     await page.goto(`${url}?language=${language}&theme=${theme}`);
@@ -140,7 +161,6 @@ test("failed writes do not show configured and stale entries can be repaired", a
 for (const [language, signIn, me, signOut, guest] of [
   ["en", "Sign in", "Me", "Sign out", "Not signed in"],
   ["zh-CN", "登录账号", "我的", "退出账号", "未登录"],
-  ["zh-TW", "登入賬號", "我的", "退出賬號", "未登入"],
 ]) for (const theme of ["light", "dark"]) {
   test(`sidebar account signs in and shows profile in ${language}/${theme}`, async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 700 });

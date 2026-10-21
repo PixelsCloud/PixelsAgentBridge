@@ -131,6 +131,8 @@ struct Owner {
     status: watch::Sender<ViewerStatus>,
     overlay: watch::Sender<String>,
     fullscreen: watch::Sender<bool>,
+    #[cfg(windows)]
+    restore_maximized: AtomicBool,
     input_requested: AtomicBool,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
@@ -300,6 +302,8 @@ pub(crate) async fn open_window(
         task: Mutex::new(None),
         overlay: watch::channel(String::new()).0,
         fullscreen: watch::channel(false).0,
+        #[cfg(windows)]
+        restore_maximized: AtomicBool::new(false),
         input_requested: AtomicBool::new(!for_assistance),
     });
     owners.insert(label.clone(), owner);
@@ -891,8 +895,11 @@ async fn stream(
                                 .map_err(|_| StreamFailure::renderer("native input mode timed out"))?.map_err(StreamFailure::renderer)?;
                             control.set_enabled(false).await.map_err(StreamFailure::from)?;
                             publish_input(window, owner, false, false);
+                            // Desktop handover may close the helper before its SAS reply.
+                            // Preserve lifecycle errors so the outer loop restores video
+                            // without sending SecureAttention a second time.
                             owner.runtime.desktop_input(device, pab_protocol::DesktopInputEvent::SecureAttention)
-                                .await.map_err(|e| e.to_string())?;
+                                .await.map_err(StreamFailure::from)?;
                             return Ok(Some(Command::Retry));
                         }
                         Some(Command::Input(..) | Command::SecureAttention(_)) => continue,

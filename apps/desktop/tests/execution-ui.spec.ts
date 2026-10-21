@@ -92,12 +92,12 @@ test("a delayed terminal open is closed when switching devices", async ({ page }
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "operator_terminal_close").map((c: any) => c.args.id))).toEqual([id]);
 });
 
-for (const language of ["en", "zh-CN", "zh-TW"]) for (const theme of ["light", "dark"]) {
+for (const language of ["en", "zh-CN",]) for (const theme of ["light", "dark"]) {
   test(`application layout ${language} ${theme}`, async ({ page }, info) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${url}?language=${language}&theme=${theme}`);
-    const applications = page.getByRole("menuitem", { name: language === "en" ? "Applications" : language === "zh-TW" ? "應用管理" : "应用管理" });
+    const applications = page.getByRole("menuitem", { name: language === "en" ? "Applications" : "应用管理" });
     await applications.click();
     await expect(applications).toHaveClass(/ant-menu-item-selected/);
     await expect(page.locator(".application-browser")).toBeVisible();

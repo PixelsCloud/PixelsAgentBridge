@@ -91,7 +91,6 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
           onSelect={(value: Language) => onLanguageChange(value)}
           options={[
             { value: "zh-CN", label: "简体中文" },
-            { value: "zh-TW", label: "繁體中文" },
             { value: "en", label: "English" },
           ]} />
       </div>}
