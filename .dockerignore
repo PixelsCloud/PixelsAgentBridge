@@ -51,3 +51,18 @@ AGENTS.md
 !/design/brand/
 /logs/
 /coscli_output/
+
+# Consolidated local originals and private signing material.
+/BROWSER_AUTOMATION.md
+/REMOTE_DESKTOP_ASSISTANCE.md
+/GITHUB_LOGIN_SETUP.md
+/WEB_DEPLOYMENT.md
+/DEVELOPMENT.md
+/STARTUP_DEFAULTS.md
+**/.env.*
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/id_rsa
+**/id_ed25519

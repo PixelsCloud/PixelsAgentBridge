@@ -25,12 +25,10 @@
 
 网络和前台服务等普通声明权限由 Android 安装时处理。不会请求项目未使用的相机、联系人、定位等权限，也不会新增证书或账号流程。
 
-这台 MIUI 真机在安装独立 APK 时还要求小米账号验证，在 Pixels 首次打开测试应用时显示“允许打开其他应用”。这些是厂商在具体操作时追加的系统确认，不能通过普通 Android 权限接口在启动时统一授予。账号验证由用户在手机上亲自完成；不收集账号密码，也不关闭或绕过系统确认。
+部分厂商系统还可能要求账号验证或确认允许打开其他应用。这些是厂商在具体操作时追加的系统确认，不能通过普通 Android 权限接口在启动时统一授予。账号验证由用户在手机上亲自完成；不收集账号密码，也不关闭或绕过系统确认。
 
 “仅使用工作目录”的选择以 `no_backup/permission-setup.toml` 保存，单独使用原子文件写入，不修改连接设置、凭据、设备身份或暂停状态。Activity 实例状态保存当前步骤和已尝试项目；系统页面未返回时不会再次启动同一请求。进程或页面重建后重新读取实际系统授权及本地选择。
 
 代码分为纯 Kotlin 的 `PermissionSetupSequence`、Activity 的 `StartupPermissions`、Compose 提示界面和独立 TOML 选择存储。三个核心测试验证已授权跳过、拒绝后不循环，以及状态恢复／重试。
 
-USB 真机验收脚本为 `scripts/test_android_startup_permissions.py`，通过普通本地界面检查启动提示、目录选择器取消、工作区选择、重新检查／推迟、停止连接时不被授权流程重新连接，以及核验当前应用进程后注入重启故障并确认选择保留。已有工作目录选择时使用 `--prepared`。这台 MIUI 真机在 SIGKILL 后会把无障碍服务标为崩溃；测试通过已有 `android_accessibility.py` 在正常系统界面恢复绑定，不能记作系统自动恢复。没有用 shell 权限命令授予或撤销权限，也不会清空应用数据。完整 APK 包管理随后经公网认证 relay 单独验收。
-
-系统特殊权限需要用户在系统设置页确认，见 [Android 特殊权限流程](https://developer.android.com/training/permissions/requesting-special)。屏幕捕获授权属于会话，不能永久预先获取，见 [MediaProjection 会话授权](https://developer.android.com/media/grow/media-projection)。Android 9 目前按用户要求不使用模拟器实测，最低 API 28 由构建与 Lint 校验。
+系统特殊权限需要用户在系统设置页确认，见 [Android 特殊权限流程](https://developer.android.com/training/permissions/requesting-special)。屏幕捕获授权属于会话，不能永久预先获取，见 [MediaProjection 会话授权](https://developer.android.com/media/grow/media-projection)。最低系统版本为 Android 9（API 28）。

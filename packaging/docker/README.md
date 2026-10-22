@@ -39,7 +39,7 @@ pab-relay-server --config /etc/pab/pab-relay-server.toml
    `relay-cert.pem`, `relay-key.pem`, `relay-ca.pem` from the certificate directory. Certificates
    must match the names used by clients, reverse proxy and Compose health checks.
    Set the two Compose DNS aliases to names present in their certificate SANs.
-7. Optionally enable `[github]` in Server TOML. See [GitHub setup](../../GITHUB_LOGIN_SETUP.md).
+7. Optionally enable `[github]` in Server TOML. See [GitHub setup](../../docs/GITHUB_LOGIN_SETUP.md).
 
 Real TOMLs and private directories are excluded from Git and Docker's build
 context. Restrict permissions while allowing the container's `pab` user to read
@@ -129,5 +129,5 @@ control connections also verify TLS. The iroh captive
 portal stays on an automatically assigned loopback port.
 
 BuildKit retains Cargo caches. Use the [build entry point](../../BUILDING.md) for
-versioned incremental builds. See [Web deployment](../../WEB_DEPLOYMENT.md) for
+versioned incremental builds. See [Web deployment](../../docs/WEB_DEPLOYMENT.md) for
 proxy setup. Task history stays local; Server/Web neither receive nor display it.

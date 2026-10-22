@@ -351,7 +351,7 @@ server {
 
 - [Server TOML ↗](../packaging/docker/pab-server.example.toml)
 - [Relay TOML ↗](../packaging/docker/pab-relay-server.example.toml)
-- [可选：GitHub 登录 ↗](../GITHUB_LOGIN_SETUP.md)
+- [可选：GitHub 登录 ↗](../docs/GITHUB_LOGIN_SETUP.md)
 
 <a id="deploy-start"></a>
 
@@ -460,7 +460,7 @@ docker compose --env-file packaging/docker/private.env -f packaging/docker/compo
 docker compose --env-file packaging/docker/private.env -f packaging/docker/compose.yaml up -d --no-deps --force-recreate backend
 ```
 
-[完整部署与升级说明 ↗](../WEB_DEPLOYMENT.md)
+[完整部署与升级说明 ↗](../docs/WEB_DEPLOYMENT.md)
 
 <a id="questions"></a>
 

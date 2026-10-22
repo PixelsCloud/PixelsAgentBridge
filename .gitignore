@@ -85,3 +85,31 @@ Thumbs.db
 *.pyo
 *.jks
 *.keystore
+
+# Maintained documentation; root copies remain local after consolidation.
+!/docs/BROWSER_AUTOMATION.md
+!/docs/REMOTE_DESKTOP_ASSISTANCE.md
+!/docs/GITHUB_LOGIN_SETUP.md
+!/docs/WEB_DEPLOYMENT.md
+/BROWSER_AUTOMATION.md
+/REMOTE_DESKTOP_ASSISTANCE.md
+/GITHUB_LOGIN_SETUP.md
+/WEB_DEPLOYMENT.md
+/DEVELOPMENT.md
+/STARTUP_DEFAULTS.md
+
+# Private keys, signing stores, credential overrides and database snapshots.
+*.key
+*.pem
+*.p12
+*.pfx
+*.mobileprovision
+id_rsa
+id_ed25519
+.env.*
+!.env.example
+!.env.*.example
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm

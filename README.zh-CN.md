@@ -38,7 +38,7 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用
 
 发起控制的 Desktop／MCP 必须登录账号才能添加和控制设备，请先在 Desktop 注册或登录。被控设备可不登录账号，以无人值守服务运行。登录后保持登录状态，主动退出才注销。已经运行的 MCP 会自动同步账号变化。用户登录不能代替目标设备密码。
 
-启用 GitHub 登录的服务可直接点击**「使用 GitHub 登录」**，无需另填注册表或设置密码，首次授权会自动创建普通账号。已有账号可以在「我的」中绑定 GitHub。自部署请配置自己的 [GitHub App](GITHUB_LOGIN_SETUP.md)。
+启用 GitHub 登录的服务可直接点击**「使用 GitHub 登录」**，无需另填注册表或设置密码，首次授权会自动创建普通账号。已有账号可以在「我的」中绑定 GitHub。自部署请配置自己的 [GitHub App](docs/GITHUB_LOGIN_SETUP.md)。
 
 ## 工作方式
 
@@ -63,7 +63,7 @@ python scripts/build.py desktop --profile release --package
 
 产物位于 `.build/packages/`。安装包版本自动递增，内部组件版本独立维护，构建会复用缓存。
 
-自部署请按 [Web 部署指南](WEB_DEPLOYMENT.md)和 [Docker Compose 说明](packaging/docker/README.md)配置。Server、Relay 和客户端需要使用兼容版本；开发阶段清库重建后，设备需要重新注册。
+自部署请按 [Web 部署指南](docs/WEB_DEPLOYMENT.md)和 [Docker Compose 说明](packaging/docker/README.md)配置。Server、Relay 和客户端需要使用兼容版本；开发阶段清库重建后，设备需要重新注册。
 
 ## 更多文档
 
@@ -73,7 +73,7 @@ python scripts/build.py desktop --profile release --package
 - [配置参考](docs/CONFIGURATION.md)
 - [Relay 集群运维](docs/RELAY_CLUSTER_OPERATIONS.md)
 - [文档解析与 OCR](docs/DOCUMENTS.md)
-- [开发说明](DEVELOPMENT.md)
+- [开发说明](BUILDING.md#development)
 
 ## 许可证
 

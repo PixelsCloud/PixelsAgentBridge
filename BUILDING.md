@@ -58,8 +58,6 @@ macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_
 
 ## 增量构建
 
-2026-10-08 按用户最新要求，以下“仅安装包递增”规则取代之前的“受影响组件同步版本”方案。
-
 沿用原命令即可，不执行 `cargo clean`，也不再维护组件版本指纹。
 
 本机开发、编译和发版只在主仓库 `D:/GoCloud/PixelsAgentBridge` 中进行，不新建 Git worktree，也不复制源码到 `.build` 或其他目录。其他会话正在修改构建输入或占用编译预算时等待。Windows Desktop 与后台默认共用主仓库 `target`，Linux GUI 将主仓库直接挂载到构建容器；版本目录仅存放产物。Desktop Release 关闭 LTO、开启增量编译并使用优化等级 2，详见 [Windows 构建缓存说明](packaging/desktop/WINDOWS_RELEASE_BUILD.md)。
@@ -106,14 +104,6 @@ python -m unittest discover -s scripts -p 'test_build*.py' -v
 
 覆盖首次编译、连续递增、两级进位、非法版本、所有内部清单/锁文件逐字节不变、失败重试、跨进程互斥、多目标只分配一次，以及打包版本和产物哈希匹配。测试在临时目录运行，不消耗正式版本号。
 
-2026-10-08 早期增量构建回归（后被“仅安装包递增”规则替代）：23 项通过，包含 UI 单独变化、MCP 单独变化、共享依赖变化、源码删除、依赖锁变化、损坏指纹、Windows/macOS/Linux 目标选择。临时 Rust 工作空间实际运行两次 Cargo，第二次只改 UI 并分配新产品版本，服务/MCP/公共库三个产物均报告 `fresh=true`。当前 Windows 1.2.48 完整产物经哈希核验后已记为后续构建基线。
-
-2026-10-04 验证：9项自动化测试通过；`python scripts/build.py desktop server --package` 完成首次 `1.2.0` 实际构建，版本计数为1。Windows 客户端 ZIP/NSIS、Server/Relay/Web 归档均生成成功，Desktop 与安装器的 ProductVersion/FileVersion 均为 `1.2.0`。17个自有 Rust 包版本一致，两份 Cargo.lock 的第三方条目未变。构建日志 `.build/versioned-build.log`。本轮未执行 Linux/Docker 镜像实际构建。
-
-2026-10-04 合并后验证：快进同步远端 `1691883`，该提交已合并 macOS 原生支持、双架构安装工具与上述版本管理功能，无需再次处理文本冲突。在 Windows 上通过9项版本测试、1项包含 Windows/Linux/macOS 归档的测试、3项 macOS 安装器输入校验测试，以及 Desktop `tsc --noEmit` 和 `cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml`。Rust 检查日志 `.build/merge-macos-windows-check.log`。未执行 macOS 原生编译、PKG 构建或安装；macOS 独立构建脚本尚未接入统一版本递增，归档沿用已编译 App 的版本。此次检查不消耗产品版本，仍为 `1.2.0`、计数1。
-
-2026-10-04 macOS 入口已接入：通过 Pixels MCP 在设备603527578的 `/Users/huayang/source/PixelsAgentBridge`，以仓库用户 huayang 运行 `bash packaging/desktop/build-macos.sh debug all`。本轮从 `1.2.0` 计数1递增到 `1.2.1` 计数2，ARM/Intel 均成功编译并生成 tar.gz、PKG。两套安装包均通过展开、架构、App 签名完整性、内嵌版本和SHA-256验证；每种架构的5项PKG测试全部通过。另通过13项版本测试和三平台归档回归。重新打包测试后版本计数仍为2。本机版本清单已同步此远端构建结果，不再次分配版本。远端构建日志 `.build/macos-versioned-build.log`。本轮仅构建和展开验证，没有安装、更新运行中的服务，也未在 Intel 实机执行程序。
-
 
 ## Linux 图形桌面独立构建
 
@@ -123,4 +113,62 @@ Ubuntu 22.04 x86_64 GUI 使用独立入口，不改变已发布的 glibc 2.31 �
 python scripts/build_linux_desktop.py --version 1.0.0 --package --headless-package PATH_TO_VERIFIED_TAR --headless-sha256 VERIFIED_SHA256
 ```
 
-该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)。GUI V1.0.1 已签名发布到官网/COS，当前通过新版 deb 覆盖升级。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。
+该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。
+
+## Development
+
+Use the pinned Rust toolchain and checked-in Cargo/npm lockfiles. Build prerequisites,
+platform packaging and version allocation are described in [BUILDING.md](BUILDING.md).
+Keep the combined Cargo, CMake, Gradle and nested build concurrency at or below
+10 jobs per machine. Ordinary checks do not allocate release versions.
+
+### Repository layout
+
+- `crates/`: shared protocol, transport, client, executor, server and Relay code.
+- `apps/`: Desktop, Web, Android and agent integrations.
+- `packaging/` and `scripts/`: reproducible builds, deployment templates and checks.
+- `vendor/` and `patches/`: pinned third-party code, local patches and licenses.
+- `acceptance/fixtures/`: deterministic test inputs; `acceptance/tool-coverage.json`
+  is the MCP test contract. Keep these inputs in Git.
+- `experiments/remote-desktop/reliable_media.rs` and `media_child.rs`: source inputs
+  of the registered `reliable-media` Cargo example; keep both in Git.
+
+### Checks
+
+Run from the repository root, selecting the packages affected by a change:
+
+```powershell
+cargo fmt --all -- --check
+python scripts/verify_iroh_vendor.py
+cargo test -p <package> -j 8
+cargo clippy -p <package> --all-targets -j 8 -- -D warnings
+```
+
+Frontend commands live in each app's `package.json`. Install dependencies with
+`npm ci` from that app before running its tests. For Desktop page work, run
+`npm run dev:desktop` in `apps/desktop`; restart after Rust changes. A browser
+opening the Vite URL does not provide Tauri's native APIs.
+
+Integration tests must use isolated databases, test accounts and temporary
+directories. Never point test configuration at a production database. Hardware
+and installed-package checks require their actual target platform; a source
+check is not a substitute for those checks.
+
+### Files that stay local
+
+Keep task plans, progress histories, one-off experiments, screenshots, run reports,
+machine instructions (`AGENTS.md`) and private credentials on the development
+machine. The ignore rules retain these files locally while excluding them from
+future commits. Use `.build/` for generated reports and build artifacts;
+`acceptance/` for local run evidence, apart from the tracked fixtures and contract;
+`design/` for mockups, apart from reusable `design/brand/` assets.
+
+Commit source, reusable automated tests, lockfiles, configuration examples,
+licenses, build scripts and maintained usage/deployment documentation. Do not
+force-add ignored run evidence. Removing a tracked file with `git rm --cached`
+keeps its local contents; it does not erase that file from earlier commits.
+
+Project-owned application settings use TOML. Secrets and live deployment settings
+belong in ignored local storage, not example files. Preserve user configuration,
+credentials and device identities during upgrades. See [configuration](docs/CONFIGURATION.md),
+[deployment](docs/WEB_DEPLOYMENT.md) and [release instructions](docs/RELEASE.md).

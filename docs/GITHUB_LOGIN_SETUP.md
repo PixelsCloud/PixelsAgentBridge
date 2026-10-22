@@ -10,8 +10,8 @@ GitHub 登录已实现。用户点击「使用 GitHub 登录」并授权后即�
 | 字段 | 内容 |
 | --- | --- |
 | GitHub App name | Pixels Agent Bridge；如重名，添加账号名后缀 |
-| Homepage URL | `https://pab.rgaa.vip` |
-| Callback URL | `https://pab.rgaa.vip/api/account/github/callback` |
+| Homepage URL | `https://bridge.example.com` |
+| Callback URL | `https://bridge.example.com/api/account/github/callback` |
 | Webhook → Active | 取消勾选 |
 | Repository / Organization permissions | 无需申请 |
 | Where can this GitHub App be installed? | Any account |
@@ -38,11 +38,11 @@ client_secret = "填入刚生成的文本 Client Secret"
 
 默认使用正常域名解析和 HTTPS。需要专用出口时，在 `pab-server.toml` 的 `[github]` 中配置 `proxy_url`。支持 HTTP、HTTPS CONNECT 和 SOCKS5H；SOCKS5H 在代理端解析域名。该配置只用于 GitHub HTTP 客户端，不改变 Relay、设备控制、浏览器或 Desktop 的路径；不设置时直连，不再隐式继承系统代理环境变量。
 
-可复用已有的受管理代理，或使用 OpenSSH 动态转发；示例见 [GitHub 出口运维](packaging/network/README.md)。出口应限制在私网并具备开机启动、断线恢复和健康监测。代理地址如含凭据，应保留在私有配置，不提交 Git。
+可复用已有的受管理代理，或使用 OpenSSH 动态转发；示例见 [GitHub 出口运维](../packaging/network/README.md)。出口应限制在私网并具备开机启动、断线恢复和健康监测。代理地址如含凭据，应保留在私有配置，不提交 Git。
 
 建连超时为 5 秒，单次请求总超时为 15 秒。只对尚未发送 HTTP 请求的连接错误重试一次；收到响应、读取失败或响应超时后不自动重放一次性授权码。服务端日志记录 token/profile 阶段、连接/超时/配置/授权码错误分类及 HTTP 状态，不记录授权码、令牌、Secret、完整 URL 或上游错误描述。GitHub 返回 HTTP 200 的 OAuth 错误也按错误处理。失败后应重新点击登录，不刷新旧回调。
 
-Client ID 与 Client Secret 都只保留在私有的 Server TOML 中。开源仓库、测试数据及日志不得包含部署者的真实 ID 或密钥。Desktop、MCP 和 Relay 不读取 GitHub Secret。
+Client ID 与 Client Secret 都只保留在私有的 Server TOML 中。源码仓库、测试数据及日志不得包含部署者的真实 ID 或密钥。Desktop、MCP 和 Relay 不读取 GitHub Secret。
 
 启动服务使用 `pab-server serve --config /etc/pab/pab-server.toml`。Docker 将 Server TOML 只读挂载给 Backend；不再需要独立 JSON、应用环境变量或 `compose.github.yaml`。修改文件后重新创建 Backend，使替换后的文件重新挂载：
 
@@ -50,8 +50,8 @@ Client ID 与 Client Secret 都只保留在私有的 Server TOML 中。开源仓
 docker compose --env-file private.env -f compose.yaml up -d --no-deps --force-recreate backend
 ```
 
-让容器的 `pab` 用户能够读取该文件，并限制其他用户访问；配置文件不进入镜像。完整部署步骤与模板见 [部署配置](packaging/docker/README.md)。
+让容器的 `pab` 用户能够读取该文件，并限制其他用户访问；配置文件不进入镜像。完整部署步骤与模板见 [部署配置](../packaging/docker/README.md)。
 
-数据库新增迁移 5，升级前先备份。升级后若需暂时关闭 GitHub，可移除 GitHub 配置并继续使用新版本服务端；不要直接把旧版二进制运行在已升级数据库上，也不要用旧备份覆盖正在使用的数据。
+升级前先备份数据库。升级后若需暂时关闭 GitHub，可移除 GitHub 配置并继续使用新版本服务端；不要直接把旧版二进制运行在已升级数据库上，也不要用旧备份覆盖正在使用的数据。
 
 参考：[GitHub 创建 App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)、[用户授权流程](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app)。

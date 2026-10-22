@@ -38,7 +38,7 @@ Capabilities depend on the target OS and permissions. macOS screen capture and i
 
 The initiating Desktop or MCP must be signed in to add or control devices. Register or sign in through Desktop; the receiving device can run unattended without account login. Sign-in is retained until you sign out; already running MCPs pick up account changes automatically. Signing in does not replace the target device's password.
 
-When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in without a separate registration form or password. Your first authorization creates an ordinary account automatically. Existing users can link GitHub from their account page. Self-hosted instances configure their own [GitHub App](GITHUB_LOGIN_SETUP.md).
+When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in without a separate registration form or password. Your first authorization creates an ordinary account automatically. Existing users can link GitHub from their account page. Self-hosted instances configure their own [GitHub App](docs/GITHUB_LOGIN_SETUP.md).
 
 ## How it works
 
@@ -63,7 +63,7 @@ python scripts/build.py desktop --profile release --package
 
 Packages are written to `.build/packages/`. Installer versions increment automatically; internal component versions remain independent, and builds reuse cached artifacts.
 
-For your own server, follow the [Web deployment guide](WEB_DEPLOYMENT.md) and [Docker Compose instructions](packaging/docker/README.md). Keep Server, Relay, and clients on compatible releases. Development schema resets require devices to register again.
+For your own server, follow the [Web deployment guide](docs/WEB_DEPLOYMENT.md) and [Docker Compose instructions](packaging/docker/README.md). Keep Server, Relay, and clients on compatible releases. Development schema resets require devices to register again.
 
 ## More documentation
 
@@ -73,7 +73,7 @@ For your own server, follow the [Web deployment guide](WEB_DEPLOYMENT.md) and [D
 - [Relay cluster operations](docs/RELAY_CLUSTER_OPERATIONS.md)
 - [Installer publishing and online updates](docs/RELEASE.md)
 - [Document parsing and OCR tools](docs/DOCUMENTS.md)
-- [Development guide](DEVELOPMENT.md)
+- [Development guide](BUILDING.md#development)
 
 ## License
 
