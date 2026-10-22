@@ -33,6 +33,128 @@ fn config() -> RelayClusterConfig {
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn one_host_bandwidth_node_uses_directory_budgets_and_survives_disabled_restart(
+    pool: PgPool,
+) {
+    let store = PostgresStore::from_pool(pool.clone());
+    store.initialize_settings().await.unwrap();
+    let mut directory = config();
+    directory.nodes.truncate(1);
+    directory.nodes[0].capacity_mbps = 0;
+    directory.validate().unwrap();
+    store.configure_relay_cluster(&directory).await.unwrap();
+    store.relay_directory(15).await.unwrap().validate().unwrap();
+    let control =
+        pab_server::ControlPlane::new(store.clone(), pab_server::PasswordPolicy::default())
+            .unwrap();
+    let user = control
+        .register_account("single-host", "isolated single host password")
+        .await
+        .unwrap();
+    let boot = uuid::Uuid::new_v4();
+    let instance = uuid::Uuid::new_v4();
+    store
+        .register_relay_boot("windows-a", boot, "test", true, &directory, instance)
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        store
+            .heartbeat_relay("windows-a", boot, true, &directory)
+            .await
+            .unwrap();
+    }
+    let budget = store
+        .relay_budgets("windows-a", boot, &[user.id], &directory)
+        .await
+        .unwrap();
+    assert_eq!(budget.node_capacity_bytes_per_second, 0);
+    assert_eq!(budget.grants[0].bytes_per_second, 1_250_000);
+    assert!(
+        store
+            .set_relay_state(
+                "windows-a",
+                RelayAdminState::Maintenance,
+                uuid::Uuid::new_v4(),
+                user.id.as_uuid(),
+                false,
+                0,
+                15
+            )
+            .await
+            .is_err()
+    );
+    store
+        .set_relay_state(
+            "windows-a",
+            RelayAdminState::Disabled,
+            uuid::Uuid::new_v4(),
+            user.id.as_uuid(),
+            true,
+            0,
+            15,
+        )
+        .await
+        .unwrap();
+    store.retire_relay("windows-a", boot).await.unwrap();
+    let replacement = uuid::Uuid::new_v4();
+    store
+        .register_relay_boot("windows-a", replacement, "test", true, &directory, instance)
+        .await
+        .unwrap();
+    for _ in 0..2 {
+        store
+            .heartbeat_relay("windows-a", replacement, true, &directory)
+            .await
+            .unwrap();
+    }
+    assert!(
+        store
+            .relay_budgets("windows-a", replacement, &[user.id], &directory)
+            .await
+            .is_err()
+    );
+    store
+        .set_relay_state(
+            "windows-a",
+            RelayAdminState::Active,
+            uuid::Uuid::new_v4(),
+            user.id.as_uuid(),
+            false,
+            0,
+            15,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        store.relay_directory(15).await.unwrap().nodes[0].admin_state,
+        RelayAdminState::Active
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn legacy_toml_normalizes_registered_identity_without_changing_secret_or_history(
+    pool: PgPool,
+) {
+    let store = PostgresStore::from_pool(pool.clone());
+    sqlx::query("INSERT INTO relay_nodes(node_id,public_url,offered_policy_version,server_instance,last_seen_at) VALUES('old-node','https://relay.example/',1,gen_random_uuid(),clock_timestamp()-interval '70 seconds')").execute(&pool).await.unwrap();
+    let legacy = pab_server::config::RelayConfig {
+        control_secret: "old-shared-secret-retained-01234567890123456789".into(),
+        cluster: None,
+    };
+    let directory = legacy.resolved_directory(&store).await.unwrap().unwrap();
+    assert_eq!(directory.nodes[0].node_id, "old-node");
+    assert_eq!(directory.nodes[0].control_secret, legacy.control_secret);
+    assert_eq!(directory.nodes[0].capacity_mbps, 0);
+    store.configure_relay_cluster(&directory).await.unwrap();
+    let old_rows: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM relay_nodes WHERE node_id='old-node'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(old_rows, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn directory_readers_do_not_wait_for_writers_and_keep_revision_consistent(pool: PgPool) {
     let store = PostgresStore::from_pool(pool.clone());
     store.configure_relay_cluster(&config()).await.unwrap();
@@ -319,7 +441,10 @@ async fn config_reload_preserves_maintenance_intent_and_removes_old_nodes(pool: 
 #[sqlx::test(migrations = "./migrations")]
 async fn account_budget_is_reserved_across_nodes_restarts_and_concurrent_calls(pool: PgPool) {
     let store = PostgresStore::from_pool(pool.clone());
-    let config = config();
+    let mut config = config();
+    for node in &mut config.nodes {
+        node.capacity_mbps = 0;
+    }
     store.initialize_settings().await.unwrap();
     store.configure_relay_cluster(&config).await.unwrap();
     let control =
@@ -531,7 +656,7 @@ async fn maintenance_is_idempotent_bounded_and_abandoned_lock_is_recoverable(poo
         )
         .await
         .unwrap();
-    assert_eq!(first.remaining_capacity_mbps, 100);
+    assert_eq!(first.remaining_capacity_mbps, Some(100));
     let again = store
         .set_relay_state(
             "windows-a",
@@ -547,6 +672,9 @@ async fn maintenance_is_idempotent_bounded_and_abandoned_lock_is_recoverable(poo
     assert_eq!(again.id, first.id);
     assert_eq!(again.phase, "ready");
     assert_eq!(again.deadline_unix_ms, first.deadline_unix_ms);
+    assert_eq!(again.remaining_capacity_mbps, Some(100));
+    assert_eq!(again.actor, "maintenance-test");
+    assert!(again.server_now_unix_ms >= again.started_at_unix_ms);
     assert!(
         store
             .set_relay_state(
@@ -659,6 +787,76 @@ async fn maintenance_is_idempotent_bounded_and_abandoned_lock_is_recoverable(poo
         store.relay_directory(15).await.unwrap().nodes[0].admin_state,
         RelayAdminState::Maintenance
     );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn maintenance_poll_expires_without_another_mutation_and_samples_live_capacity(pool: PgPool) {
+    let store = PostgresStore::from_pool(pool.clone());
+    store.initialize_settings().await.unwrap();
+    store.configure_relay_cluster(&config()).await.unwrap();
+    let control =
+        pab_server::ControlPlane::new(store.clone(), pab_server::PasswordPolicy::default())
+            .unwrap();
+    let account = control
+        .register_account("operation-samples", "isolated password long enough")
+        .await
+        .unwrap();
+    sqlx::query("UPDATE relay_cluster_nodes SET health='healthy',last_seen_at=clock_timestamp()")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let id = uuid::Uuid::new_v4();
+    let waiting = store
+        .set_relay_state(
+            "windows-a",
+            RelayAdminState::Maintenance,
+            id,
+            account.id.as_uuid(),
+            false,
+            30,
+            15,
+        )
+        .await
+        .unwrap();
+    assert_eq!(waiting.phase, "waiting");
+    assert_eq!(waiting.remaining_capacity_mbps, Some(100));
+    sqlx::query("UPDATE relay_cluster_nodes SET last_seen_at=clock_timestamp()-interval '20 seconds' WHERE node_id='linux-b'")
+        .execute(&pool).await.unwrap();
+    let stale = store.relay_maintenance_operation(id).await.unwrap();
+    assert_eq!(stale.remaining_capacity_mbps, Some(0));
+    assert!(stale.capacity_sampled_at_unix_ms >= waiting.capacity_sampled_at_unix_ms);
+    sqlx::query("UPDATE relay_maintenance_operations SET deadline_at=clock_timestamp()-interval '6 minutes' WHERE id=$1")
+        .bind(id).execute(&pool).await.unwrap();
+    let failed = store.relay_maintenance_operation(id).await.unwrap();
+    assert_eq!(failed.phase, "failed");
+    assert_eq!(failed.error_code.as_deref(), Some("operator_lease_expired"));
+    assert!(failed.completed_at_unix_ms.is_some());
+    let state: String =
+        sqlx::query_scalar("SELECT admin_state FROM relay_cluster_nodes WHERE node_id='windows-a'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(state, "maintenance");
+    // Operations created before migration 0008 must not fabricate zero capacity.
+    sqlx::query("UPDATE relay_maintenance_operations SET offline_seconds=NULL WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        store
+            .relay_maintenance_operation(id)
+            .await
+            .unwrap()
+            .remaining_capacity_mbps,
+        None
+    );
+    assert!(matches!(
+        store
+            .relay_maintenance_operation(uuid::Uuid::new_v4())
+            .await,
+        Err(pab_server::StoreError::NotFound)
+    ));
 }
 
 #[sqlx::test(migrations = "./migrations")]

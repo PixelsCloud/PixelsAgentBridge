@@ -27,6 +27,7 @@ pub(super) async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
         .unwrap();
     Arc::new(BridgeRuntime {
         account_task: tokio::spawn(async {}),
+        usage_task: tokio::spawn(async {}),
         inner: Arc::new(RuntimeInner {
             account_store,
             presence: std::sync::Mutex::new(crate::desktop_presence::RuntimeReport {

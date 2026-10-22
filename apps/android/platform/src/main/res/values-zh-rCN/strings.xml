@@ -1,0 +1,10 @@
+<resources>
+    <string name="notification_listener_name">Pixels Agent Bridge 通知使用权</string>
+    <string name="capture_channel">屏幕捕获</string>
+    <string name="capture_active">Pixels Agent Bridge 屏幕捕获已开启</string>
+    <string name="accessibility_service_name">Pixels Agent Bridge device control</string>
+    <string name="accessibility_service_description">允许已授权的 Pixels Agent Bridge 代理读取屏幕，执行点击、滑动与文字输入。仅在你希望远程控制的设备上启用此服务。</string>
+    <string name="package_confirmation_channel">应用变更</string>
+    <string name="package_confirmation_title">确认应用安装或卸载</string>
+    <string name="package_confirmation_text">点击返回系统确认页面。</string>
+</resources>

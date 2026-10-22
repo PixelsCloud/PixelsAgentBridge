@@ -12,10 +12,22 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
 
+#[path = "web_cases/account_support.rs"]
+mod account_support;
+#[path = "web_cases/audit_management.rs"]
+mod audit_management;
 #[path = "web_cases/personal_catalog_usage.rs"]
 mod personal_catalog_usage;
 #[path = "web_cases/personal_devices.rs"]
 mod personal_devices;
+#[path = "web_cases/relay_management.rs"]
+mod relay_management;
+#[path = "web_cases/service_diagnostics.rs"]
+mod service_diagnostics;
+#[path = "web_cases/usage_management.rs"]
+mod usage_management;
+#[path = "web_cases/overview_dashboard.rs"]
+mod overview_dashboard;
 
 async fn unclaimed_fixture(pool: &PgPool) -> pab_server::RegisteredEndpoint {
     let tenant = uuid::Uuid::new_v4();

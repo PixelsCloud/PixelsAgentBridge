@@ -14,6 +14,7 @@ mod relay_cache;
 pub mod server_probe;
 mod storage_paths;
 mod supervisor;
+mod device_name;
 mod tls;
 pub mod usage_spool;
 

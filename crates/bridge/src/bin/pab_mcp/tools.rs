@@ -1,9 +1,15 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
+
 use pab_agent_core::DataPaths;
 use pab_bridge::output_text::{OutputEncoding, decode_output};
 use pab_bridge::{BridgeLocalStore, BridgeRuntime};
 use pab_protocol::{DeviceCode, OutputStream, RequestId, TaskId, TaskRef};
 use serde_json::{Value, json};
+
+pub(super) fn connection_mode(arguments: &Value) -> Result<Option<pab_bridge::ConnectionMode>, String> {
+    arguments.get("connection_mode").cloned().map(serde_json::from_value)
+        .transpose().map_err(|_| "connection_mode must be auto or relay".to_owned())
+}
 
 pub(super) async fn call_tool(
     runtime: &BridgeRuntime,
@@ -74,14 +80,154 @@ pub(super) async fn call_tool(
         | "pab_archive_create"
         | "pab_archive_extract" => super::mcp_filesystem::call(runtime, name, arguments).await,
         "pab_list_devices" => list_local_devices().await,
+        "pab_list_saved_devices" => {
+            let database = DataPaths::for_operator()
+                .map_err(|error| error.to_string())?
+                .bridge_database();
+            let store = BridgeLocalStore::open(&database)
+                .await
+                .map_err(|error| error.to_string())?;
+            let saved = store
+                .account_catalog_devices()
+                .await
+                .map_err(|error| error.to_string())?;
+            let mut devices: Vec<Value> = Vec::with_capacity(saved.len());
+            for device in &saved {
+                let paired = store
+                    .has_device_credential(device.device_ref.device_id)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                devices.push(json!({
+                    "device_code": device.code,
+                    "name": device.name,
+                    "alias": device.alias,
+                    "os": device.system,
+                    "online": device.online,
+                    "paired": paired,
+                }));
+            }
+            Ok(json!({ "devices": devices }))
+        }
+        "pab_device_presence" => {
+            let code: DeviceCode = required_text(arguments, "device_code")?
+                .parse()
+                .map_err(|error: pab_protocol::DeviceCodeError| error.to_string())?;
+            let presence = runtime
+                .device_presence(code)
+                .await
+                .map_err(|error| error.to_string())?;
+            Ok(json!({
+                "device_code": presence.code,
+                "name": presence.name,
+                "online": presence.online
+            }))
+        }
+        "pab_list_history" => {
+            let device_ref = resolve_target(runtime, arguments).await?;
+            let limit = arguments
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(30)
+                .clamp(1, 100) as u32;
+            let task_before: Option<RequestId> = match arguments
+                .get("task_before")
+                .and_then(Value::as_str)
+            {
+                Some(raw) => Some(raw.parse().map_err(|_| "invalid task_before")?),
+                None => None,
+            };
+            let operation_before = match (
+                arguments
+                    .get("operation_before_started_at_unix_ms")
+                    .and_then(Value::as_i64),
+                arguments
+                    .get("operation_before_id")
+                    .and_then(Value::as_str),
+            ) {
+                (Some(started_at), Some(id)) => Some((started_at, id)),
+                _ => None,
+            };
+
+            let database = DataPaths::for_operator()
+                .map_err(|error| error.to_string())?
+                .bridge_database();
+            let store = BridgeLocalStore::open(&database)
+                .await
+                .map_err(|error| error.to_string())?;
+            let tasks = store
+                .tasks_page_for_device(device_ref, task_before, limit)
+                .await
+                .map_err(|error| error.to_string())?;
+            let operations = store
+                .operations_page_for_device(device_ref, operation_before, limit)
+                .await
+                .map_err(|error| error.to_string())?;
+            let total = store
+                .history_count(Some(device_ref))
+                .await
+                .map_err(|error| error.to_string())?;
+
+            let task_rows: Vec<Value> = tasks
+                .iter()
+                .map(|task| {
+                    let snapshot = task.snapshot.as_ref();
+                    json!({
+                        "id": task.request_id.to_string(),
+                        "program": task.command.as_ref().map(|command| command.program.clone()),
+                        "args": task.command.as_ref().map(|command| command.args.clone()).unwrap_or_default(),
+                        "cwd": task.command.as_ref().and_then(|command| command.cwd.clone()),
+                        "summary": snapshot.map(|value| value.display_summary.clone()),
+                        "state": snapshot
+                            .map(|value| serde_json::to_value(&value.state).unwrap_or(Value::Null))
+                            .unwrap_or(Value::Null),
+                        "complete": task.is_complete(),
+                        "started_at_unix_ms": snapshot.and_then(|value| value.started_at_unix_ms),
+                        "finished_at_unix_ms": snapshot.and_then(|value| value.finished_at_unix_ms),
+                    })
+                })
+                .collect();
+            let operation_rows: Vec<Value> = operations
+                .iter()
+                .map(|operation| {
+                    json!({
+                        "id": operation.id,
+                        "kind": operation.kind,
+                        "direction": operation.direction,
+                        "source": operation.source,
+                        "destination": operation.destination,
+                        "state": operation.state,
+                        "size": operation.size,
+                        "started_at_unix_ms": operation.started_at_unix_ms,
+                        "finished_at_unix_ms": operation.finished_at_unix_ms,
+                        "message": operation.message,
+                        "initiated_by": operation.initiated_by,
+                        "device_code": serde_json::to_value(&operation.device_code).unwrap_or(Value::Null),
+                    })
+                })
+                .collect();
+
+            Ok(json!({
+                "tasks": task_rows,
+                "operations": operation_rows,
+                "total": total,
+                "limit": limit,
+            }))
+        }
         "pab_connect" => {
+            let mode = connection_mode(arguments)?;
             let device_ref = resolve_target(runtime, arguments).await?;
             let context = runtime
-                .connect_device(device_ref)
+                .connect_device_with_mode(device_ref, mode)
                 .await
                 .map_err(|error| error.to_string())?;
             Ok(json!({
                 "device_ref": device_ref,
+                "connection_mode": runtime.connection_mode(device_ref).await,
+                "connection_path": match runtime.connection_path(device_ref).await {
+                    Some(pab_bridge::ConnectionPath::Direct) => "p2p",
+                    Some(pab_bridge::ConnectionPath::Relay) => "relay",
+                    _ => "unknown",
+                },
                 "target": context,
                 "os_reminder": context.compact_reminder()
             }))

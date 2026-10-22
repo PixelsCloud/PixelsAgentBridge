@@ -83,7 +83,37 @@ Units are decimal **Mbps**, not MB/s: 10 Mbps = 1.25 MB/s before overhead.
 Forwarding uses a token bucket at `Mbps * 1_000_000 / 8` bytes/second with 100 ms
 of burst credit. Excess traffic waits. All MCP connections for a user share one
 bucket, including uploads and downloads. Unauthenticated operator endpoints cannot forward traffic. P2P
-traffic bypasses Relay limits. Buckets are per Relay node, not cluster-wide.
+traffic bypasses Relay limits. One account allowance is shared across all Relay
+nodes, including a deployment with only one node.
+
+Configure nodes under `[relay.directory]` / `[[relay.directory.nodes]]`; the old
+`relay.cluster` table remains a read alias. Omitted `capacity_mbps` defaults to 200 Mbps; explicit `0` retains full host
+bandwidth without an additional node cap. Administrators can set positive node
+capacity in the Web console. These database-backed administrative values override
+the TOML value across reloads and restarts; removing a node does not erase its
+saved capacity. The console also accepts an optional machine IPv4/IPv6 for identification.
+It takes precedence over service-URL DNS results, which may be container or proxy
+addresses. Clearing this field restores DNS display; it does not change routing. Use `weight` for routing preference.
+The Relay service no longer needs a mode flag; existing `cluster_enabled` keys
+are accepted during upgrades. Each node keeps its stable ID and control secret.
+An old server TOML can recover one previously reported node and its public URL
+from the database. If that address has never been reported, add the directory
+explicitly using the example. Multiple historical identities require an explicit
+directory rather than guessing which credentials belong to which node.
+
+When migrating an old Relay, stop it and wait out its 60-second policy lifetime
+before starting the unified node directory. Do not delete usage volumes or
+accounts. A rollback must embed the additive migrations and retain P2P counter
+fields; stop the unified Relay and wait for outstanding budget leases to expire.
+
+Updated controlling clients record P2P upload/download bytes from direct QUIC
+paths, including QUIC overhead and retransmissions, and persist samples locally
+every five seconds even when the control server is unreachable. Only the
+controller reports; the controlled device does not add a second copy. Reports
+are retried with immutable IDs. The usage page, ranking and CSV separate P2P
+from Relay traffic and completed file sizes. These metrics must not be added
+together. Older clients and historical periods have no P2P measurement and are
+shown as unreported, rather than measured zero. P2P traffic is never limited.
 
 ## Persistence and health
 

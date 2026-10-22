@@ -119,6 +119,13 @@ impl ControlPlane {
     }
 
     pub async fn reload_relay_config(&self) -> Result<(), StoreError> {
+        self.reload_relay_config_audited(None).await
+    }
+
+    pub(crate) async fn reload_relay_config_audited(
+        &self,
+        audit: Option<crate::audit::AuditRecord>,
+    ) -> Result<(), StoreError> {
         let _guard = self.relay_reload_lock.lock().await;
         let (path, secret) = self.relay_config_source.as_ref().ok_or_else(|| {
             StoreError::InvalidState("configuration reload is not configured".into())
@@ -137,15 +144,35 @@ impl ControlPlane {
                 "changing the legacy control credential requires a service restart".into(),
             ));
         }
-        if new.relay.cluster.is_some() != self.relay_config().is_some() {
+        let directory = new.relay.resolved_directory(&self.store).await?;
+        if directory.is_some() != self.relay_config().is_some() {
             return Err(StoreError::InvalidState(
-                "changing cluster mode requires a coordinated service restart".into(),
+                "initial node directory activation requires a coordinated service restart".into(),
             ));
         }
-        if let Some(config) = new.relay.cluster {
-            self.store.configure_relay_cluster(&config).await?;
+        if let Some(mut config) = directory {
+            self.store.apply_relay_capacity_overrides(&mut config).await?;
+            self.store
+                .configure_relay_cluster_audited(&config, audit)
+                .await?;
             self.relay_cluster.send_replace(Some(Arc::new(config)));
             self.web_changed();
+        } else if let Some(mut record) = audit {
+            let mut tx = self.store.pool().begin().await?;
+            sqlx::query("SELECT pg_advisory_xact_lock(26035001)")
+                .execute(&mut *tx)
+                .await?;
+            let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id=$1 AND status='active' AND server_admin)").bind(record.actor).fetch_one(&mut *tx).await?;
+            if !allowed {
+                return Err(StoreError::PermissionDenied);
+            }
+            record.before = Some(crate::audit::AuditValues {
+                nodes: Some(Vec::new()),
+                ..Default::default()
+            });
+            record.after = record.before.clone();
+            self.store.insert_audit(&mut tx, record).await?;
+            tx.commit().await?;
         }
         Ok(())
     }
@@ -155,6 +182,7 @@ impl ControlPlane {
         config: Option<crate::relay_cluster::RelayClusterConfig>,
     ) -> Result<Self, StoreError> {
         if let Some(mut config) = config {
+            self.store.apply_relay_capacity_overrides(&mut config).await?;
             config
                 .validate()
                 .map_err(|e| StoreError::InvalidInput(e.into()))?;
@@ -166,6 +194,19 @@ impl ControlPlane {
         Ok(self)
     }
 
+    pub(crate) async fn set_relay_capacity(
+        &self, node: &str, capacity: u32, machine_ip: Option<String>, actor: uuid::Uuid, request_id: uuid::Uuid,
+    ) -> Result<(), StoreError> {
+        let _guard = self.relay_reload_lock.lock().await;
+        let mut config = self.relay_config().ok_or_else(|| StoreError::InvalidState("Relay directory is not enabled".into()))?.as_ref().clone();
+        let entry = config.nodes.iter_mut().find(|entry| entry.node_id == node).ok_or(StoreError::NotFound)?;
+        entry.capacity_mbps = capacity;
+        self.store.set_relay_capacity_audited(node, capacity, machine_ip, actor, request_id).await?;
+        self.relay_cluster.send_replace(Some(Arc::new(config)));
+        self.web_changed();
+        Ok(())
+    }
+
     pub async fn initialize_settings(&self) -> Result<(), ServiceError> {
         Ok(self.store.initialize_settings().await?)
     }
@@ -175,6 +216,18 @@ impl ControlPlane {
         username: &str,
         password: &str,
     ) -> Result<Account, ServiceError> {
+        self.register_account_with_policy(username, password, None)
+            .await
+    }
+
+    // Trusted administrative callers retain their existing explicit creation
+    // path. Every public self-registration supplies its deployment default.
+    pub(crate) async fn register_account_with_policy(
+        &self,
+        username: &str,
+        password: &str,
+        registration_default: Option<bool>,
+    ) -> Result<Account, ServiceError> {
         let (username, username_key) = normalize_username(username)?;
         let passwords = self.passwords.clone();
         let password = password.to_owned();
@@ -183,7 +236,12 @@ impl ControlPlane {
             .map_err(ServiceError::PasswordTask)??;
         Ok(self
             .store
-            .register_account(&username, &username_key, &password_hash)
+            .register_account(
+                &username,
+                &username_key,
+                &password_hash,
+                registration_default,
+            )
             .await?)
     }
 

@@ -6,10 +6,8 @@ Windows/macOS installed-client acceptance does not depend on Python packages.
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
-import fitz
+import pymupdf as fitz
 from PIL import Image, ImageDraw, ImageFont
-from openpyxl import Workbook
-from pptx import Presentation
 
 ROOT = Path(__file__).resolve().parent
 
@@ -51,7 +49,29 @@ def pdfs(scan):
     locked.close()
 
 
+
+def chinese_pdfs():
+    # Explicit ToUnicode text is readable without OCR; a legacy CID font with
+    # no reliable Unicode mapping must remain an explicit OCR-required case.
+    for filename, embedded in (("native-zh-multipage.pdf", True), ("cid-without-unicode.pdf", False)):
+        with fitz.open() as pdf:
+            page = pdf.new_page()
+            page.insert_text((72, 90), "First page evidence")
+            page = pdf.new_page()
+            font_name = "china-s"
+            if embedded:
+                font_name = "fixture_cjk"
+                font = fitz.Font("cjk")
+                page.insert_font(fontname=font_name, fontbuffer=font.buffer)
+            page.insert_text((72, 90), "中文风险条款", fontname=font_name, fontsize=18)
+            if embedded:
+                pdf.subset_fonts()
+            pdf.save(ROOT / filename, deflate=True)
+
+
 def spreadsheet():
+    from openpyxl import Workbook
+
     book = Workbook()
     first = book.active
     first.title = "Revenue"
@@ -67,6 +87,8 @@ def spreadsheet():
 
 
 def presentation():
+    from pptx import Presentation
+
     deck = Presentation()
     first = deck.slides.add_slide(deck.slide_layouts[1])
     first.shapes.title.text = "风险汇报"
@@ -112,6 +134,7 @@ def ooxml():
 if __name__ == "__main__":
     image = png_scan()
     pdfs(image)
+    chinese_pdfs()
     spreadsheet()
     presentation()
     compressed_bomb()

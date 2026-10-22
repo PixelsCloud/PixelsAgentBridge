@@ -119,8 +119,8 @@ async fn relay_control_upgrade(
     )
     .as_bytes();
     websocket
-        .max_message_size(MAX_CONTROL_MESSAGE_BYTES)
-        .max_frame_size(MAX_CONTROL_MESSAGE_BYTES)
+        .max_message_size(2 * 1024 * 1024 + 16 * 1024)
+        .max_frame_size(2 * 1024 * 1024 + 16 * 1024)
         .on_upgrade(move |socket| run_relay_socket(socket, state, identity, binding))
 }
 

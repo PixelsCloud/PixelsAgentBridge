@@ -1,0 +1,10 @@
+<resources>
+    <string name="notification_listener_name">Pixels Agent Bridge notification access</string>
+    <string name="package_confirmation_channel">App changes</string>
+    <string name="package_confirmation_title">Confirm app installation or removal</string>
+    <string name="package_confirmation_text">Tap to return to the system confirmation.</string>
+    <string name="capture_channel">Screen capture</string>
+    <string name="capture_active">Pixels Agent Bridge screen capture active</string>
+    <string name="accessibility_service_name">Pixels Agent Bridge device control</string>
+    <string name="accessibility_service_description">Allows your authorized Pixels Agent Bridge agents to read the current screen and perform taps, swipes and text input. Enable this service only for a device you intend to control remotely.</string>
+</resources>

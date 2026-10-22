@@ -6,6 +6,10 @@
 .window-controls button:hover { background: #e6eeef; }
 .window-controls button.close:hover { color: #fff; background: #d4474d; }
 .window-controls svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.window-controls .titlebar-refresh:disabled { cursor: default; opacity: .55; }
+.titlebar-refresh.is-refreshing svg { animation: titlebar-refresh-spin 1s linear infinite; }
+@keyframes titlebar-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .titlebar-refresh.is-refreshing svg { animation: none; } }
 [data-theme="dark"] .titlebar { border-color: #343a43; color: #f0f3f5; background: var(--app-background, #202329); }
 [data-theme="dark"] .window-controls button { color: #afb9c2; }
 [data-theme="dark"] .window-controls button:hover { background: #353b43; }

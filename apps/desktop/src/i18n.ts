@@ -2,6 +2,9 @@ export type Language = "zh-CN" | "en";
 
 export const messages = {
   "zh-CN": {
+    refreshAll: "刷新全部信息",
+    refreshAllBusy: "正在刷新…",
+    refreshAllFailed: "部分信息刷新失败，请检查服务连接后重试。",
     executionIdentity: "执行身份",
     executionSession: "会话",
     executionNotRecorded: "未记录",
@@ -401,6 +404,9 @@ export const messages = {
     phaseDisconnected: "已断开",
   },
   en: {
+    refreshAll: "Refresh all information",
+    refreshAllBusy: "Refreshing…",
+    refreshAllFailed: "Some information could not be refreshed. Check the service connection and try again.",
     executionIdentity: "Executed as",
     executionSession: "Session",
     executionNotRecorded: "Not recorded",

@@ -85,6 +85,10 @@ pub(crate) async fn native_viewer(
 pub(super) async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewer, WebError> {
     let row = sqlx::query("SELECT u.id, u.username, u.server_admin, u.auth_revision, p.tenant_id FROM web_sessions s JOIN users u ON u.id=s.user_id JOIN personal_tenants p ON p.user_id=u.id WHERE s.token_hash=$1 AND u.status='active'")
         .bind(hash).fetch_optional(state.control.store().pool()).await?.ok_or_else(WebError::unauthorized)?;
+    // Activity is informational, never an expiry/authorization condition. The
+    // predicate limits writes even with concurrent HTTP requests and WS polls.
+    sqlx::query("UPDATE web_sessions SET last_active_at=clock_timestamp() WHERE token_hash=$1 AND (last_active_at IS NULL OR last_active_at<clock_timestamp()-interval '5 minutes')")
+        .bind(hash).execute(state.control.store().pool()).await?;
     Ok(Viewer {
         id: row.try_get("id")?,
         username: row.try_get("username")?,
@@ -94,10 +98,15 @@ pub(super) async fn viewer_by_hash(state: &WebState, hash: &str) -> Result<Viewe
     })
 }
 
-pub(crate) async fn config(State(state): State<WebState>) -> Json<Value> {
-    Json(
-        json!({"registration_enabled":state.registration_enabled,"github_enabled":state.github.is_some(),"version":env!("CARGO_PKG_VERSION")}),
-    )
+pub(crate) async fn config(State(state): State<WebState>) -> Result<Json<Value>, WebError> {
+    let policy = state
+        .control
+        .store()
+        .registration_policy(state.registration_enabled)
+        .await?;
+    Ok(Json(
+        json!({"registration_enabled":policy.effective,"github_enabled":state.github.is_some(),"version":env!("CARGO_PKG_VERSION")}),
+    ))
 }
 pub(crate) async fn current(
     State(state): State<WebState>,
@@ -115,7 +124,9 @@ pub(crate) struct Credentials {
     password: String,
 }
 
-pub(super) async fn login_permit(state: &WebState) -> Result<tokio::sync::SemaphorePermit<'_>, WebError> {
+pub(super) async fn login_permit(
+    state: &WebState,
+) -> Result<tokio::sync::SemaphorePermit<'_>, WebError> {
     let limited = || WebError::new(StatusCode::TOO_MANY_REQUESTS, "rate_limited");
     let permit = state.login_slots.try_acquire().map_err(|_| limited())?;
     let mut budget = state.login_budget.lock().await;
@@ -164,7 +175,16 @@ async fn establish(
         .control
         .authenticate(&input.username, &input.password)
         .await?;
-    let token = issue_token(state, account.id.as_uuid(), revision.ok_or_else(WebError::unauthorized)?).await?;
+    let token = issue_token_in_channel(
+        state,
+        account.id.as_uuid(),
+        revision.ok_or_else(WebError::unauthorized)?,
+        match channel {
+            SessionChannel::Browser => "browser",
+            SessionChannel::Native => "native",
+        },
+    )
+    .await?;
     let me = viewer_by_hash(state, &hash_token(&token)).await?;
     Ok(match channel {
         SessionChannel::Browser => {
@@ -174,7 +194,21 @@ async fn establish(
     })
 }
 
-pub(super) async fn issue_token(state: &WebState, user_id: Uuid, revision: i64) -> Result<String, WebError> {
+pub(super) async fn issue_token(
+    state: &WebState,
+    user_id: Uuid,
+    revision: i64,
+) -> Result<String, WebError> {
+    // This entry point is used by the browser GitHub callback.
+    issue_token_in_channel(state, user_id, revision, "browser").await
+}
+
+async fn issue_token_in_channel(
+    state: &WebState,
+    user_id: Uuid,
+    revision: i64,
+    channel: &str,
+) -> Result<String, WebError> {
     let mut random = [0u8; 32];
     OsRng.fill_bytes(&mut random);
     let token: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
@@ -185,8 +219,8 @@ pub(super) async fn issue_token(state: &WebState, user_id: Uuid, revision: i64) 
         .bind(user_id)
         .execute(&mut *tx)
         .await?;
-    let inserted = sqlx::query("INSERT INTO web_sessions (token_hash,user_id) SELECT $1,id FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
-        .bind(&hash).bind(user_id).bind(revision).execute(&mut *tx).await?;
+    let inserted = sqlx::query("INSERT INTO web_sessions (token_hash,user_id,channel) SELECT $1,id,$4 FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
+        .bind(&hash).bind(user_id).bind(revision).bind(channel).execute(&mut *tx).await?;
     if inserted.rows_affected() != 1 {
         return Err(WebError::unauthorized());
     }
@@ -198,7 +232,13 @@ pub(crate) async fn register(
     State(state): State<WebState>,
     Json(input): Json<Credentials>,
 ) -> Result<Response, WebError> {
-    if !state.registration_enabled {
+    if !state
+        .control
+        .store()
+        .registration_policy(state.registration_enabled)
+        .await?
+        .effective
+    {
         return Err(WebError::new(
             StatusCode::FORBIDDEN,
             "registration_disabled",
@@ -207,7 +247,11 @@ pub(crate) async fn register(
     let _permit = login_permit(&state).await?;
     state
         .control
-        .register_account(&input.username, &input.password)
+        .register_account_with_policy(
+            &input.username,
+            &input.password,
+            Some(state.registration_enabled),
+        )
         .await?;
     establish(&state, input, SessionChannel::Browser).await
 }
@@ -248,7 +292,13 @@ pub(crate) async fn native_register(
     State(state): State<WebState>,
     Json(input): Json<Credentials>,
 ) -> Result<Response, WebError> {
-    if !state.registration_enabled {
+    if !state
+        .control
+        .store()
+        .registration_policy(state.registration_enabled)
+        .await?
+        .effective
+    {
         return Err(WebError::new(
             StatusCode::FORBIDDEN,
             "registration_disabled",
@@ -257,7 +307,11 @@ pub(crate) async fn native_register(
     let _permit = login_permit(&state).await?;
     state
         .control
-        .register_account(&input.username, &input.password)
+        .register_account_with_policy(
+            &input.username,
+            &input.password,
+            Some(state.registration_enabled),
+        )
         .await?;
     establish(&state, input, SessionChannel::Native).await
 }
@@ -325,8 +379,17 @@ pub(crate) async fn change_password(
     if update.rows_affected() != 1 {
         return Err(WebError::new(StatusCode::CONFLICT, "conflict"));
     }
-    sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES ($1,'account.password_changed',$1)")
-        .bind(me.id).execute(&mut *tx).await?;
+    let mut record = crate::audit::AuditRecord::new(
+        Some(me.id),
+        crate::audit::AuditAction::PasswordChanged,
+        crate::audit::AuditResource::Account(me.id),
+    );
+    record.request_id = super::audit_context::request_id(&headers);
+    record.after = Some(crate::audit::AuditValues {
+        password_changed: Some(true),
+        ..Default::default()
+    });
+    state.control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }

@@ -112,6 +112,7 @@ impl Drop for MediaChild {
     }
 }
 pub struct NativeBackend {
+    clipboard: crate::clipboard::NativeClipboard,
     executable: PathBuf,
     prefix: Vec<String>,
     gate: Arc<Mutex<()>>,
@@ -125,6 +126,7 @@ pub struct NativeBackend {
 impl NativeBackend {
     pub fn new(executable: PathBuf, prefix: Vec<String>) -> Self {
         Self {
+            clipboard: crate::clipboard::NativeClipboard::new(executable.clone(), prefix.clone()),
             executable,
             prefix,
             gate: Arc::new(Mutex::new(())),
@@ -225,6 +227,13 @@ impl DesktopSource for NativeSource {
     }
 }
 impl DesktopBackend for NativeBackend {
+    fn supports_clipboard(&self) -> bool { cfg!(any(windows, target_os = "macos", target_os = "linux")) }
+    fn clipboard(&self, config: DesktopVideoConfig, operation: DesktopClipboardOperation) -> MediaFuture<'_, DesktopClipboardSnapshot> {
+        Box::pin(async move {
+            config.validate().map_err(media_error)?;
+            self.clipboard.exchange(operation).await.map_err(|_| media_error("system text clipboard is temporarily unavailable"))
+        })
+    }
     fn supports_cursor(&self) -> bool {
         #[cfg(target_os = "linux")]
         {

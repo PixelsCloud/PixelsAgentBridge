@@ -588,6 +588,10 @@ async fn identify(
     .await?;
     let binding: Option<Uuid> = flow.try_get("user_id")?;
     let user = if let Some(user) = binding {
+        sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
         let valid: Option<i64> = sqlx::query_scalar("SELECT u.auth_revision FROM users u JOIN web_sessions s ON s.user_id=u.id WHERE u.id=$1 AND u.status='active' AND u.auth_revision=$2 AND s.token_hash=$3 FOR UPDATE OF u FOR SHARE OF s")
             .bind(user).bind(flow.try_get::<i64,_>("auth_revision")?).bind(flow.try_get::<String,_>("session_hash")?).fetch_optional(&mut *tx).await?;
         if valid.is_none() {
@@ -601,12 +605,9 @@ async fn identify(
     } else if let Some(user) = existing {
         user
     } else {
-        if !state.registration_enabled {
-            return Err(WebError::new(
-                StatusCode::FORBIDDEN,
-                "registration_disabled",
-            ));
-        }
+        crate::PostgresStore::require_registration(&mut tx, state.registration_enabled)
+            .await
+            .map_err(crate::ServiceError::from)?;
         let user = Uuid::new_v4();
         let tenant = Uuid::new_v4();
         let name = format!(
@@ -686,7 +687,7 @@ pub(super) async fn redeem(
         .execute(&mut *tx)
         .await?;
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-    let inserted = sqlx::query("INSERT INTO web_sessions(token_hash,user_id) SELECT $1,id FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
+    let inserted = sqlx::query("INSERT INTO web_sessions(token_hash,user_id,channel) SELECT $1,id,'native' FROM users WHERE id=$2 AND auth_revision=$3 AND status='active'")
         .bind(hash(&token)).bind(user).bind(revision).execute(&mut *tx).await?;
     if inserted.rows_affected() != 1 {
         return Err(WebError::unauthorized());

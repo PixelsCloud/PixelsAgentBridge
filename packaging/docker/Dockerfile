@@ -34,6 +34,7 @@ COPY --from=builder /out/pab-server /usr/local/bin/pab-server
 COPY --from=builder /out/pab-relay-server /usr/local/bin/pab-relay-server
 COPY --from=builder /out/pab-relay-healthcheck /usr/local/bin/pab-relay-healthcheck
 COPY --from=web-builder /web/dist /usr/local/bin/web
+COPY LICENSE NOTICE COMMERCIAL_LICENSE.md /usr/share/doc/pixels-agent-bridge/
 
 USER pab:pab
 EXPOSE 8443/tcp 31443/tcp 7842/udp

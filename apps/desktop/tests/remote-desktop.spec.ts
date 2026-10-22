@@ -2,6 +2,32 @@ import { test, expect } from "@playwright/test";
 
 const viewer = "http://127.0.0.1:1429/tests/remote-desktop.html";
 
+test("text clipboard sync toggles independently without restarting video or input", async ({ page }) => {
+  await page.goto(viewer);
+  const toggle = page.getByRole("button", { name: "Disable text clipboard sync", exact: true });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(page.getByRole("button", { name: "Enable text clipboard sync", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Stop control", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Enable text clipboard sync", exact: true }).click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  const calls = await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "desktop_viewer_control"));
+  expect(calls.map((call: any) => call.args)).toEqual([{ clipboardEnabled: false }, { clipboardEnabled: true }]);
+});
+
+test("clipboard failures and old peers remain visible without failing the desktop", async ({ page }) => {
+  await page.goto(viewer + "?language=zh-CN");
+  const toggle = page.getByRole("button", { name: "关闭文字剪贴板同步", exact: true });
+  await page.evaluate(() => (window as any).fixture.clipboard("unsupported"));
+  await expect(toggle).toHaveAttribute("title", "文字剪贴板：请升级远端程序");
+  await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
+  await page.evaluate(() => (window as any).fixture.clipboard("paste_failed"));
+  await expect(page.locator("header").getByRole("alert")).toContainText("未发送粘贴");
+  await page.evaluate(() => (window as any).fixture.clipboard("active"));
+  await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("title", "文字剪贴板：同步中");
+});
+
 for (const language of ["en", "zh-CN"]) test(`viewer close asks natively, cancellation keeps control and confirmation closes (${language})`, async ({ page }) => {
   await page.goto(viewer + `?language=${language}`);
   const close = page.getByRole("button", { name: language === "en" ? "Close window" : "关闭窗口", exact: true });

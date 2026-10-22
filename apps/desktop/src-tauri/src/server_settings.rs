@@ -85,7 +85,11 @@ pub async fn validate_operator_server(
         .map(std::fs::read)
         .transpose()
         .map_err(|_| ProbeError::Tls)?;
-    pab_agent_core::server_probe::probe(kind, &url, ca.as_deref()).await
+    let ca = ca.as_deref().or_else(|| {
+        let pem = pab_service_config::client::DEFAULT_RELAY_CA_PEM.as_bytes();
+        (matches!(kind, ServerKind::Relay) && !pem.is_empty()).then_some(pem)
+    });
+    pab_agent_core::server_probe::probe(kind, &url, ca).await
 }
 
 #[tauri::command]

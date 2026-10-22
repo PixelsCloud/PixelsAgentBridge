@@ -1,4 +1,5 @@
 [package]
+license.workspace = true
 name = "pab-system-log-store"
 version = "1.2.48"
 edition.workspace = true

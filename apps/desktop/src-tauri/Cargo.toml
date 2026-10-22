@@ -1,4 +1,5 @@
 [package]
+license = "PolyForm-Noncommercial-1.0.0"
 name = "pab-desktop"
 version = "1.2.49"
 description = "Pixels Agent Bridge desktop application"
@@ -79,5 +80,6 @@ strip = true
 opt-level = 3
 
 [patch.crates-io]
+iroh = { path = "../../../vendor/iroh" }
 enigo = { path = "../../../vendor/enigo" }
 libspa = { path = "../../../vendor/libspa" }

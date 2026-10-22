@@ -1,0 +1,52 @@
+.console-content .account-page { display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
+.console-content .account-page .page-heading { min-height: 0; margin: 0; }
+.console-content .account-page .page-heading h2 { margin: 0 0 5px; }
+.console-content .account-page .page-heading .ant-typography-secondary { font-size: 13px; }
+.console-content .account-page .account-summary > .ant-card-body { display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; padding: 13px 18px; }
+.console-content .account-page .account-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.console-content .account-page .account-identity > div { min-width: 0; }
+.console-content .account-page .account-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.console-content .account-page .account-label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.console-content .account-page .account-identity-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.console-content .account-page .account-identity-line strong { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console-content .account-page .ant-tag { font-size: 13px; margin-inline-end: 0; }
+.console-content .account-page .account-github { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px 16px; min-width: 0; max-width: 65%; }
+.console-content .account-page .account-github .account-label { margin: 0; }
+.console-content .account-page .account-github .ant-space { width: auto; }
+.console-content .account-page .account-github .ant-typography { font-size: 14px; overflow-wrap: anywhere; }
+.console-content .account-page .account-security-grid { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); align-items: start; gap: 16px; }
+.console-content .account-page .account-sessions-only { grid-template-columns: minmax(0, 1fr); }
+.console-content .account-page .account-security-grid > .ant-card { min-width: 0; }
+.console-content .account-page .account-security-grid .ant-card-head { min-height: 46px; padding: 0 18px; }
+.console-content .account-page .account-security-grid .ant-card-head-title { padding: 12px 0; font-size: 16px; }
+.console-content .account-page .account-security-grid > .ant-card > .ant-card-body { padding: 14px 18px; }
+.console-content .account-page .account-section-title { display: flex; align-items: center; gap: 8px; }
+.console-content .account-page .account-section-title svg { color: var(--accent); }
+.console-content .account-page .ant-form-item { margin-bottom: 14px; }
+.console-content .account-page .ant-form-item-label { padding-bottom: 5px; }
+.console-content .account-page .ant-form-item-label > label { font-size: 14px; }
+.console-content .account-page .ant-form-item-extra { font-size: 13px; min-height: 0; margin-top: 4px; line-height: 1.5; }
+.console-content .account-page .account-password-actions { display: flex; justify-content: flex-end; }
+.console-content .account-page .account-password-error { margin-bottom: 12px; }
+.console-content .account-page .account-session-hint { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: 13px; line-height: 1.5; }
+.console-content .account-page .account-session-hint svg { flex-shrink: 0; cursor: help; }
+.console-content .account-page .account-session-actions { margin-bottom: 12px; }
+.console-content .account-page .account-sessions .ant-table { font-size: 13px; }
+.console-content .account-page .account-sessions .ant-table-thead > tr > th { font-size: 13px; padding: 9px 10px; }
+.console-content .account-page .account-sessions .ant-table-tbody > tr > td { padding: 8px 10px; }
+.console-content .account-page .account-session-id { display: block; margin-top: 3px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.console-content .account-page .account-sessions .ant-pagination { padding: 0; margin-block: 12px 0; }
+.console-content .account-page .account-sessions .ant-table-container { overflow: hidden; }
+@media (max-width: 1100px) {
+  .console-content .account-page .account-security-grid { grid-template-columns: minmax(0, 1fr); }
+  .console-content .account-page .account-password form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; }
+  .console-content .account-page .account-password-actions, .console-content .account-page .account-password-error { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .console-content .account-page .account-summary > .ant-card-body { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .console-content .account-page .account-github { justify-content: flex-start; max-width: 100%; padding-top: 12px; border-top: 1px solid var(--line); width: 100%; }
+  .console-content .account-page .account-password form { grid-template-columns: minmax(0, 1fr); }
+  .console-content .account-page .account-identity-line { flex-wrap: wrap; }
+  .console-content .account-page .account-identity-line strong { max-width: 100%; }
+  .console-content .account-page .account-security-grid > .ant-card > .ant-card-body { padding: 14px; }
+}

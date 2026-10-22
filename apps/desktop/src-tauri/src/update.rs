@@ -50,6 +50,7 @@ fn platform() -> Result<(&'static str, &'static str), String> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("windows", "x86_64") => Ok(("windows", "x86_64")),
         ("macos", "aarch64") => Ok(("macos", "aarch64")),
+        ("macos", "x86_64") => Ok(("macos", "x86_64")),
         _ => Err("No installer is published for this platform".into()),
     }
 }

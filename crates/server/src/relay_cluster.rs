@@ -25,6 +25,8 @@ pub struct RelayNodeConfig {
     pub region: String,
     #[serde(default = "weight")]
     pub weight: u32,
+    /// Omitted capacity defaults to 200 Mbps; explicit zero retains uncapped mode.
+    #[serde(default = "default_capacity_mbps")]
     pub capacity_mbps: u32,
     pub control_secret: String,
 }
@@ -42,6 +44,9 @@ fn maintenance_seconds() -> u64 {
 }
 fn weight() -> u32 {
     100
+}
+pub const fn default_capacity_mbps() -> u32 {
+    200
 }
 
 impl std::fmt::Debug for RelayClusterConfig {
@@ -73,7 +78,6 @@ impl RelayClusterConfig {
                 || !ids.insert(node.node_id.clone())
                 || node.weight == 0
                 || node.weight > 1000
-                || node.capacity_mbps == 0
                 || node.capacity_mbps > i32::MAX as u32
                 || node.region.len() > 64
                 || node.region.chars().any(char::is_control)
@@ -126,6 +130,17 @@ mod tests {
                 capacity_mbps: 100,
                 control_secret: "private-credential-must-never-appear-in-errors".into(),
             }],
+        }
+    }
+    #[test]
+    fn omitted_capacity_defaults_to_200_and_explicit_values_are_preserved() {
+        let mut value = serde_json::json!({"node_id":"test", "url":"https://relay.example/", "control_secret":"isolated-secret-at-least-32-characters"});
+        let node: RelayNodeConfig = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(node.capacity_mbps, 200);
+        for capacity in [0, 50, 1000] {
+            value["capacity_mbps"] = serde_json::json!(capacity);
+            let node: RelayNodeConfig = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(node.capacity_mbps, capacity);
         }
     }
     #[test]

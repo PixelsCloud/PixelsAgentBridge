@@ -2,6 +2,7 @@ use super::{
     WebError, WebState,
     session::{Viewer, viewer},
 };
+use crate::audit::{AuditAction, AuditRecord, AuditResource, AuditValues};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -30,12 +31,12 @@ pub(crate) async fn administrator(
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PageQuery {
-    page: Option<u32>,
-    page_size: Option<u32>,
-    q: Option<String>,
+    pub(super) page: Option<u32>,
+    pub(super) page_size: Option<u32>,
+    pub(super) q: Option<String>,
 }
 impl PageQuery {
-    fn values(&self) -> Result<(i64, i64, &str), WebError> {
+    pub(super) fn values(&self) -> Result<(i64, i64, &str), WebError> {
         let page = self.page.unwrap_or(1);
         let size = self.page_size.unwrap_or(20);
         let search = self.q.as_deref().unwrap_or("").trim();
@@ -54,10 +55,7 @@ async fn paged(
     sql: &str,
 ) -> Result<Json<Value>, WebError> {
     let (page, size, search) = query.values()?;
-    let mut tx = state.control.store().pool().begin().await?;
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        .execute(&mut *tx)
-        .await?;
+    let mut tx = state.control.store().begin_snapshot(true).await?;
     let total: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM ({sql}) visible"))
         .bind(me.server_admin)
         .bind(me.id)
@@ -144,33 +142,32 @@ pub(crate) async fn update_account(
             return Err(WebError::new(StatusCode::CONFLICT, "last_admin"));
         }
     }
-    sqlx::query("UPDATE users SET status=$1,server_admin=$2,auth_revision=auth_revision+1,updated_at=now() WHERE id=$3").bind(input.status).bind(input.server_admin).bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE users SET status=$1,server_admin=$2,auth_revision=auth_revision+1,updated_at=now() WHERE id=$3").bind(&input.status).bind(input.server_admin).bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
         .execute(&mut *tx)
         .await?;
-    sqlx::query(
-        "INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'account.updated',$2)",
-    )
-    .bind(me.id)
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
+    let mut record = AuditRecord::new(
+        Some(me.id),
+        AuditAction::AccountUpdated,
+        AuditResource::Account(id),
+    );
+    record.request_id = super::audit_context::request_id(&headers);
+    record.before = Some(AuditValues {
+        status: Some(row.try_get("status")?),
+        server_admin: Some(row.try_get("server_admin")?),
+        revision: Some(input.revision),
+        ..Default::default()
+    });
+    record.after = Some(AuditValues {
+        status: Some(input.status),
+        server_admin: Some(input.server_admin),
+        revision: Some(input.revision + 1),
+        ..Default::default()
+    });
+    state.control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     state.control.web_changed();
     Ok(Json(json!({"revision":input.revision+1})))
-}
-
-pub(crate) async fn service_config(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, WebError> {
-    administrator(&state, &headers).await?;
-    let row = sqlx::query("SELECT policy_revision FROM server_settings WHERE singleton")
-        .fetch_one(state.control.store().pool())
-        .await?;
-    Ok(Json(
-        json!({"registration_enabled":state.registration_enabled,"version":env!("CARGO_PKG_VERSION"),"policy_revision":row.try_get::<i64,_>("policy_revision")?,"session_expires":false}),
-    ))
 }
 
 #[derive(Deserialize)]
@@ -190,6 +187,11 @@ pub(crate) async fn update_user_limit(
         return Err(WebError::invalid());
     }
     let mut tx = state.control.store().pool().begin().await?;
+    let before: i32 =
+        sqlx::query_scalar("SELECT relay_limit_mbps FROM users WHERE id=$1 FOR UPDATE")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     let updated = sqlx::query("UPDATE users SET relay_limit_mbps=$1,updated_at=now() WHERE id=$2")
         .bind(input.mbps)
         .bind(id)
@@ -201,21 +203,24 @@ pub(crate) async fn update_user_limit(
     sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1 WHERE singleton")
         .execute(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'account.relay_limit_updated',$2)").bind(me.id).bind(id).execute(&mut *tx).await?;
+    let mut record = AuditRecord::new(
+        Some(me.id),
+        AuditAction::BandwidthUpdated,
+        AuditResource::Account(id),
+    );
+    record.request_id = super::audit_context::request_id(&headers);
+    record.before = Some(AuditValues {
+        mbps: Some(before),
+        ..Default::default()
+    });
+    record.after = Some(AuditValues {
+        mbps: Some(input.mbps),
+        ..Default::default()
+    });
+    state.control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     state.control.web_changed();
     Ok(Json(json!({"mbps":input.mbps})))
-}
-
-pub(crate) async fn audit(
-    State(state): State<WebState>,
-    headers: HeaderMap,
-    Query(query): Query<PageQuery>,
-) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',e.id,'actor',COALESCE(u.username,e.actor),'action',e.action,'resource_id',e.resource,'resource_name',COALESCE((SELECT name FROM devices WHERE id=e.resource),(SELECT username FROM users WHERE id=e.resource)),'created_at',(extract(epoch from e.at)*1000)::bigint)::text payload FROM (
-      SELECT 'web:'||id::text id, actor_id::text actor,action,resource_id resource,created_at at FROM web_admin_events
-      ) e LEFT JOIN users u ON u.id::text=e.actor WHERE $1 AND $2::uuid IS NOT NULL AND (position(lower($3) in lower(e.action))>0 OR position(lower($3) in lower(COALESCE(u.username,e.actor,'')))>0) ORDER BY e.at DESC,e.id DESC"#).await
 }
 
 pub(crate) async fn traffic(
@@ -233,24 +238,10 @@ pub(crate) async fn traffic(
 pub(crate) async fn relays(
     State(state): State<WebState>,
     headers: HeaderMap,
-    Query(query): Query<PageQuery>,
+    Query(query): Query<super::relay_status::RelayQuery>,
 ) -> Result<Json<Value>, WebError> {
-    let me = administrator(&state, &headers).await?;
-    if let Some(config) = state.control.relay_config() {
-        state
-            .control
-            .store()
-            .relay_directory(config.offline_seconds)
-            .await
-            .map_err(crate::ServiceError::from)?;
-        let sql = "SELECT jsonb_build_object('id',node_id,'url',public_url,'region',region,'weight',weight,'capacity_mbps',capacity_mbps,'admin_state',admin_state,'health',health,'agent_version',agent_version,'boot_id',boot_id,'operation_id',operation_id,'last_seen',(extract(epoch from last_seen_at)*1000)::bigint,'online',health='healthy','applied_policy_version',(SELECT applied_policy_version FROM relay_nodes r WHERE r.node_id=relay_cluster_nodes.node_id),'offered_policy_version',(SELECT offered_policy_version FROM relay_nodes r WHERE r.node_id=relay_cluster_nodes.node_id),'connections',connections,'uploaded_bytes',uploaded_bytes,'downloaded_bytes',downloaded_bytes)::text payload FROM relay_cluster_nodes WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(node_id))>0 ORDER BY node_id";
-        return paged(&state, &me, query, sql).await;
-    }
-    let instance = state.server_instance;
-    let sql = format!(
-        "SELECT jsonb_build_object('id',node_id,'agent_version',agent_version,'applied_policy_version',applied_policy_version,'offered_policy_version',offered_policy_version,'last_seen',(extract(epoch from last_seen_at)*1000)::bigint,'online',server_instance='{instance}'::uuid AND last_seen_at>now()-interval '120 seconds')::text payload FROM relay_nodes WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(node_id))>0 ORDER BY node_id"
-    );
-    paged(&state, &me, query, &sql).await
+    administrator(&state, &headers).await?;
+    Ok(Json(super::relay_status::snapshot(&state, query).await?))
 }
 
 #[derive(Deserialize)]
@@ -278,7 +269,7 @@ pub(crate) async fn relay_state(
     let operation = state
         .control
         .store()
-        .set_relay_state(
+        .set_relay_state_audited(
             &node,
             input.state,
             input.operation_id.unwrap_or_else(Uuid::new_v4),
@@ -286,6 +277,8 @@ pub(crate) async fn relay_state(
             input.allow_outage,
             config.maintenance_seconds,
             config.offline_seconds,
+            Some(state.server_instance),
+            super::audit_context::request_id(&headers),
         )
         .await
         .map_err(|e| match e {
@@ -313,7 +306,7 @@ pub(crate) async fn relay_operation(
     let operation = state
         .control
         .store()
-        .relay_maintenance_operation(id)
+        .relay_maintenance_operation_in_instance(id, Some(state.server_instance))
         .await
         .map_err(crate::ServiceError::from)?;
     Ok(Json(
@@ -321,19 +314,42 @@ pub(crate) async fn relay_operation(
     ))
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RelayCapacityInput {
+    capacity_mbps: u32,
+    machine_ip: Option<String>,
+}
+
+pub(crate) async fn relay_capacity(
+    State(state): State<WebState>, headers: HeaderMap,
+    Path(node): Path<String>, Json(input): Json<RelayCapacityInput>,
+) -> Result<Json<Value>, WebError> {
+    let me = administrator(&state, &headers).await?;
+    if !pab_protocol::valid_relay_node_id(&node) || input.capacity_mbps == 0 || input.capacity_mbps > i32::MAX as u32 {
+        return Err(WebError::invalid());
+    }
+    let machine_ip = input.machine_ip.map(|ip| {
+        let ip = ip.trim();
+        if ip.is_empty() { return Ok(String::new()); }
+        ip.parse::<std::net::IpAddr>().map(|ip| ip.to_string()).map_err(|_| WebError::invalid())
+    }).transpose()?;
+    state.control.set_relay_capacity(&node, input.capacity_mbps, machine_ip, me.id, super::audit_context::request_id(&headers))
+        .await.map_err(crate::ServiceError::from)?;
+    Ok(Json(json!({"capacity_mbps":input.capacity_mbps})))
+}
+
 pub(crate) async fn reload_relays(
     State(state): State<WebState>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
-    state
-        .control
-        .reload_relay_config()
+    let mut record = AuditRecord::new(Some(me.id), AuditAction::RelayReload, AuditResource::Server);
+    record.request_id = super::audit_context::request_id(&headers);
+    let control = state.control.clone();
+    tokio::spawn(async move { control.reload_relay_config_audited(Some(record)).await })
         .await
+        .map_err(|_| WebError::new(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?
         .map_err(crate::ServiceError::from)?;
-    sqlx::query("INSERT INTO web_admin_events(actor_id,action) VALUES($1,'relay_config_reloaded')")
-        .bind(me.id)
-        .execute(state.control.store().pool())
-        .await?;
     Ok(Json(json!({"reloaded":true})))
 }

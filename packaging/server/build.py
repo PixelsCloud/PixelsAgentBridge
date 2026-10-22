@@ -25,12 +25,13 @@ if not (web / 'index.html').is_file():
 allowed = {'.html', '.js', '.css', '.svg', '.png', '.ico', '.woff2'}
 for path in sorted(web.rglob('*')):
     if path.is_file():
-        if path.is_symlink() or path.suffix not in allowed:
+        if path.is_symlink() or (path.suffix not in allowed and path.relative_to(web).as_posix() != 'license.txt'):
             raise SystemExit(f'Unexpected production Web asset: {path.name}')
         files.append((path, 'web/' + path.relative_to(web).as_posix()))
 version = verify_artifacts(root, 'server', args.profile, {member: path for path, member in files})
 files.append((root / 'WEB_DEPLOYMENT.md', 'WEB_DEPLOYMENT.md'))
-files.append((root / 'WEB_DEVELOPMENT.md', 'WEB_DEVELOPMENT.md'))
+files.append((root / 'DEVELOPMENT.md', 'DEVELOPMENT.md'))
+files.extend((root / name, name) for name in ('LICENSE', 'NOTICE', 'COMMERCIAL_LICENSE.md'))
 files.append((root / 'BUILDING.md', 'BUILDING.md'))
 files.append((root / 'packaging/server/cluster.example.toml', 'cluster.example.toml'))
 files.append((root / 'scripts/roll_relays.py', 'roll_relays.py'))

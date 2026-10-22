@@ -1,5 +1,186 @@
 import { test, expect } from "@playwright/test";
 
+for (const [language, theme, label, themeLabel] of [
+  ["zh-CN", "light", "刷新全部信息", "切换为暗色"],
+  ["en", "dark", "Refresh all information", "Switch to light theme"],
+]) test(`global refresh sits before theme control (${language}, ${theme})`, async ({ page }, testInfo) => {
+  await page.goto(`http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn&language=${language}&theme=${theme}`);
+  const controls = page.locator(".window-controls button");
+  await expect(controls.nth(0)).toHaveAccessibleName(label);
+  await expect(controls.nth(1)).toHaveAccessibleName(themeLabel);
+  await expect(controls.nth(0)).toBeEnabled();
+  await page.locator(".titlebar").screenshot({ path: testInfo.outputPath(`global-refresh-${language}-${theme}.png`) });
+});
+
+test("global refresh updates local status and saved devices while retaining inputs and connections", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.devices = [{ deviceId: "remote-1", deviceCode: "987654321", alias: "Company", osFamily: "windows", osReminder: "", connected: true, connectionPath: "p2p" }];
+    f.presence = true;
+  });
+  await refresh.click();
+  const card = page.locator(".home-recent-device");
+  await expect(card).toContainText("Company");
+  await expect(card.locator(".home-recent-connection")).toContainText("P2P");
+  await page.locator(".home-connect-form input").first().fill("111222333");
+  await page.locator("#home-connect-password").fill("unsent password");
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.device = { ...f.device, device_code: "222333444", control_phase: "disconnected" };
+    f.devices[0].alias = "Company updated";
+    f.devices.push({ deviceId: "remote-2", deviceCode: "666777888", alias: "New device", osFamily: "linux", osReminder: "", connected: false });
+    f.calls.length = 0;
+  });
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator(".home-credential strong").first()).toHaveText("222 333 444");
+  await expect(page.locator(".sidebar-status-group")).toContainText("Server disconnected");
+  await expect(card).toHaveCount(2);
+  await expect(card.filter({ hasText: "Company updated" }).locator(".home-recent-connection")).toContainText("P2P");
+  await expect(card.filter({ hasText: "New device" })).toContainText("Online");
+  await expect(page.locator(".home-connect-form input").first()).toHaveValue("111 222 333");
+  await expect(page.locator("#home-connect-password")).toHaveValue("unsent password");
+  const commands = await page.evaluate(() => (window as any).fixture.calls.map((c: any) => c.command));
+  for (const command of ["operator_current_traffic_scope", "device_status", "operator_bootstrap", "operator_saved_device_presence", "operator_operations"]) expect(commands).toContain(command);
+  expect(commands.filter((c: string) => /^(operator_connect|operator_connect_saved|operator_disconnect_device|refresh_device_password)$/.test(c))).toEqual([]);
+});
+
+test("global refresh joins an ongoing device refresh and prevents duplicate clicks", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "Device list", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Refresh device list", exact: true })).toBeEnabled();
+  await page.evaluate(() => { const f = (window as any).fixture; f.slowBootstrap = true; f.calls.length = 0; });
+  await page.getByRole("button", { name: "Refresh device list", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.release)).toBe("function");
+  await refresh.click();
+  await expect(refresh).toBeDisabled();
+  await expect(refresh).toHaveAttribute("aria-busy", "true");
+  await refresh.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "operator_current_traffic_scope").length)).toBe(1);
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "operator_bootstrap").length)).toBe(1);
+  await page.evaluate(() => { const f = (window as any).fixture; f.slowBootstrap = false; f.release(); });
+  await expect(refresh).toBeEnabled();
+  await expect(refresh).toHaveAttribute("aria-busy", "false");
+});
+
+test("global refresh reports partial failures, retains account identity and can retry", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.evaluate(() => { (window as any).fixture.bootstrapError = true; });
+  await refresh.click();
+  await expect(page.locator(".toast.error")).toContainText("Some information could not be refreshed");
+  await expect(page.locator(".sidebar-account")).toContainText("Pixels");
+  await expect(page.locator(".home-credential strong").first()).toHaveText("123 456 789");
+  await page.evaluate(() => { const f = (window as any).fixture; f.bootstrapError = false; f.scopeError = true; });
+  await refresh.click();
+  await expect(page.locator(".sidebar-account")).toContainText("Could not load account");
+  await expect(page.locator(".home-connect-form button[type=submit]")).toBeDisabled();
+  await page.evaluate(() => { (window as any).fixture.scopeError = false; });
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator(".toast.error")).toHaveCount(0);
+  await expect(page.locator(".sidebar-account")).toContainText("Pixels");
+});
+
+test("global refresh discovers external login and logout without opening a login dialog", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(page.locator(".sidebar-account")).toContainText("Not signed in");
+  await page.evaluate(() => { (window as any).fixture.scope = { userId: "external-user", username: "External account", revision: 2, serverAdmin: false }; });
+  await refresh.click();
+  await expect(page.locator(".sidebar-account")).toContainText("External account");
+  await page.locator(".sidebar-account").click();
+  await expect(page.locator(".page-me")).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.scope = null; });
+  await refresh.click();
+  await expect(page.locator(".sidebar-account")).toContainText("Not signed in");
+  await expect(page.locator(".page-home")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("global refresh reads profile panels and preserves unsaved server settings", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await page.locator(".sidebar-account").click();
+  await expect(page.locator(".page-me")).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.calls.length = 0; });
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  const commands = await page.evaluate(() => (window as any).fixture.calls.map((c: any) => c.command));
+  for (const command of ["device_account_status", "account_catalog_status", "github_status"]) expect(commands).toContain(command);
+  expect(commands).not.toContain("github_login");
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "Settings", exact: true }).click();
+  await page.locator(".settings-menu").getByRole("menuitem", { name: "Network connection", exact: true }).click();
+  const input = page.locator(".settings-fields input").first();
+  await expect(input).toBeEnabled();
+  await input.fill("wss://my-unsaved-server.example/control");
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(input).toHaveValue("wss://my-unsaved-server.example/control");
+  expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "save_operator_server_settings"))).toBe(false);
+});
+
+test("global refresh recovers MCP status and refreshes visible AI integration status", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.evaluate(() => { (window as any).fixture.mcpError = true; });
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "MCP connections", exact: true }).click();
+  await expect(page.locator(".mcp-reporting-panel").getByRole("alert")).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.mcpError = false; });
+  await refresh.click();
+  await expect(page.locator(".mcp-reporting-panel").getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".ant-collapse-header strong")).toHaveCount(9);
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "Settings", exact: true }).click();
+  await page.locator(".settings-menu").getByRole("menuitem", { name: "AI Agent", exact: true }).click();
+  const claude = page.getByTestId("agent-claude");
+  await expect(claude.getByRole("button", { name: "Enable", exact: true })).toBeEnabled();
+  await page.evaluate(() => { (window as any).fixture.states.claude.detected = false; });
+  await refresh.click();
+  await expect(claude.getByText("Client not detected", { exact: true })).toBeVisible();
+});
+
+test("global refresh loads new task history on the activity page", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "Activity", exact: true }).click();
+  await expect(page.locator(".page-activity")).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).fixture.historyTasks = [{ id: "new-task", deviceCode: "987654321", initiatedBy: "fixture", program: "echo", args: ["Global refresh marker"], cwd: null,
+      startedAtUnixMs: Date.now(), state: "succeeded", complete: true, stdout: "Global refresh marker", stderr: "", stdoutOffset: 21, stderrOffset: 0 }];
+  });
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator(".page-activity")).toContainText("Global refresh marker");
+  await expect(page.locator(".toast.error")).toHaveCount(0);
+});
+
+test("a stale global account refresh cannot overwrite a subsequent successful login", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app");
+  const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.evaluate(() => { (window as any).fixture.slowScope = true; });
+  await refresh.click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.release)).toBe("function");
+  await page.locator(".sidebar-account").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#account-login-username").fill("Pixels");
+  await dialog.locator("#account-login-password").fill("fixture password");
+  await dialog.locator("button[type=submit]").click();
+  await expect(page.locator(".page-me")).toBeVisible();
+  await page.evaluate(() => { const f = (window as any).fixture; f.slowScope = false; f.release(); });
+  await expect(refresh).toBeEnabled();
+  await expect(page.locator(".sidebar-account")).toContainText("Pixels");
+  await expect(page.locator(".page-me")).toBeVisible();
+});
+
 for (const language of ['zh-CN','en']) for (const theme of ['light','dark']) test(`account page has clear sections and a native console action (${language}, ${theme})`,async({page},testInfo)=>{
   await page.setViewportSize({width:1000,height:640});
   await page.goto(`http://127.0.0.1:1429/tests/agent-integrations-ui.html?app=true&signedIn&longName=true&longId&language=${language}&theme=${theme}`);

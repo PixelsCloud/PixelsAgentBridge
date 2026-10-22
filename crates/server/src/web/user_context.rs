@@ -52,6 +52,8 @@ pub(crate) async fn update(
         return Err(WebError::new(StatusCode::FORBIDDEN, "unknown_endpoint"));
     }
     let user = if let Some(hash) = &digest {
+        sqlx::query("SELECT id FROM users WHERE id=(SELECT user_id FROM web_sessions WHERE token_hash=$1) FOR SHARE")
+            .bind(hash).execute(&mut *tx).await?;
         // Lock the session against concurrent logout until the binding commits.
         let row = sqlx::query("SELECT u.id,u.username,u.status FROM web_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 FOR SHARE OF s,u")
             .bind(hash).fetch_optional(&mut *tx).await?.ok_or_else(WebError::unauthorized)?;

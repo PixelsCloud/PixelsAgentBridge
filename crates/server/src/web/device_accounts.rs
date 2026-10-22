@@ -35,6 +35,11 @@ async fn lock_session(
     hash: &str,
     user: Uuid,
 ) -> Result<(), WebError> {
+    // User before session, matching password recovery and bulk session revocation.
+    sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
+        .bind(user)
+        .execute(&mut **tx)
+        .await?;
     let exists: Option<Uuid> = sqlx::query_scalar("SELECT u.id FROM web_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND u.id=$2 AND u.status='active' FOR SHARE OF s,u")
         .bind(hash).bind(user).fetch_optional(&mut **tx).await?;
     exists.ok_or_else(WebError::unauthorized)?;
@@ -199,8 +204,26 @@ pub(crate) async fn associate(
         .bind(input.challenge_id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'device.associated',$2)")
-        .bind(me.id).bind(id).execute(&mut *tx).await?;
+    let mut record = crate::audit::AuditRecord::new(
+        Some(me.id),
+        crate::audit::AuditAction::DeviceAssociated,
+        crate::audit::AuditResource::Device(id),
+    );
+    record.request_id = super::audit_context::request_id(&headers);
+    record.operation_id = Some(input.challenge_id);
+    record.before = Some(crate::audit::AuditValues {
+        user_id: owner,
+        associated: Some(owner.is_some()),
+        revision: Some(revision),
+        ..Default::default()
+    });
+    record.after = Some(crate::audit::AuditValues {
+        user_id: Some(me.id),
+        associated: Some(true),
+        revision: Some(next),
+        ..Default::default()
+    });
+    state.control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     state.control.web_changed();
     Ok(Json(status(Some(me.id), next, me.id)))
@@ -211,6 +234,7 @@ async fn unlink(
     user: Uuid,
     id: Uuid,
     expected: i64,
+    request_id: Uuid,
 ) -> Result<Json<DeviceAccountState>, WebError> {
     let mut tx = state.control.store().pool().begin().await?;
     lock_device(&mut tx, id).await?;
@@ -231,8 +255,24 @@ async fn unlink(
     .bind(id)
     .execute(&mut *tx)
     .await?;
-    sqlx::query("INSERT INTO web_admin_events(actor_id,action,resource_id) VALUES($1,'device.disassociated',$2)")
-        .bind(user).bind(id).execute(&mut *tx).await?;
+    let mut record = crate::audit::AuditRecord::new(
+        Some(user),
+        crate::audit::AuditAction::DeviceDisassociated,
+        crate::audit::AuditResource::Device(id),
+    );
+    record.request_id = request_id;
+    record.before = Some(crate::audit::AuditValues {
+        user_id: Some(user),
+        associated: Some(true),
+        revision: Some(revision),
+        ..Default::default()
+    });
+    record.after = Some(crate::audit::AuditValues {
+        associated: Some(false),
+        revision: Some(next),
+        ..Default::default()
+    });
+    state.control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     state.control.web_changed();
     Ok(Json(status(None, next, user)))
@@ -245,7 +285,14 @@ pub(crate) async fn web_unlink(
     Json(input): Json<DeviceAccountUnlink>,
 ) -> Result<Json<DeviceAccountState>, WebError> {
     let me = session::viewer(&state, &headers).await?;
-    unlink(state, me.id, id, input.revision).await
+    unlink(
+        state,
+        me.id,
+        id,
+        input.revision,
+        super::audit_context::request_id(&headers),
+    )
+    .await
 }
 
 pub(crate) async fn native_unlink(
@@ -255,5 +302,12 @@ pub(crate) async fn native_unlink(
     Json(input): Json<DeviceAccountUnlink>,
 ) -> Result<Json<DeviceAccountState>, WebError> {
     let me = session::native_viewer(&state, &headers).await?;
-    unlink(state, me.id, id, input.revision).await
+    unlink(
+        state,
+        me.id,
+        id,
+        input.revision,
+        super::audit_context::request_id(&headers),
+    )
+    .await
 }

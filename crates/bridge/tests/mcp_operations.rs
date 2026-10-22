@@ -104,6 +104,23 @@ async fn registered_catalog_has_coverage_and_exports_real_schemas() {
 }
 
 #[tokio::test]
+async fn connect_mode_contract_is_exposed_over_real_stdio() {
+    let directory = tempfile::tempdir().unwrap();
+    let (client, child) = start(directory.path(), &directory.path().join("catalog.sqlite3"), 1).await;
+    let listed = client.list_all_tools().await.unwrap();
+    let connect = listed.iter().find(|tool| tool.name == "pab_connect").unwrap();
+    assert_eq!(connect.input_schema["properties"]["connection_mode"]["enum"], json!(["auto", "relay"]));
+    assert_eq!(connect.input_schema["required"], json!(["device_code"]));
+    assert!(connect.description.as_deref().unwrap().contains("When the user asks to connect using Relay"));
+    for mode in [json!(true), json!("p2p"), json!(null)] {
+        let response = call(&client, "pab_connect", json!({"device_code":"123456789", "connection_mode":mode})).await;
+        assert_eq!(response.is_error, Some(true));
+        assert_eq!(response.structured_content.unwrap()["error"]["code"], "invalid_arguments");
+    }
+    stop(client, child).await;
+}
+
+#[tokio::test]
 async fn catalog_supports_modern_metadata_and_legacy_handshake() {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     for modern in [false, true] {
@@ -474,14 +491,21 @@ async fn short_connection_wait_keeps_stdio_responsive_and_validation_is_structur
             call(
                 &client,
                 "pab_connect",
-                json!({"device_code":"123456789","wait_ms":10}),
+                json!({"device_code":"123456789","connection_mode":"relay","wait_ms":10}),
             )
             .await,
         );
         assert_eq!(response["state"], "connecting");
         assert_eq!(response["wait_expired"], true);
         assert_eq!(response["connection_ref"]["device_code"], "123456789");
+        assert_eq!(response["connection_ref"]["connection_mode"], "relay");
         let _ = result(call(&client, "pab_list_devices", json!({})).await);
+    }
+    let pending = result(call(&client,"pab_connect",json!({"device_code":"123456789","wait_ms":10})).await);
+    assert_eq!(pending["connection_ref"]["connection_mode"], "relay", "polling without a mode must preserve the original request");
+    for mode in [json!("auto"), json!("invalid"), json!(true), json!(null)] {
+        let response = call(&client,"pab_connect",json!({"device_code":"123456789","connection_mode":mode,"wait_ms":10})).await;
+        assert_eq!(response.is_error, Some(true), "conflicting or invalid mode must not silently reuse the Relay job");
     }
     let disconnected = result(
         call(

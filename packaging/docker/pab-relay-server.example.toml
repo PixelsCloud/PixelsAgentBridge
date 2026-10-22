@@ -1,6 +1,10 @@
 # Copy to config/pab-relay-server.toml. Never commit real credentials.
 # Each Relay instance needs a distinct, stable node ID and persistent usage path.
 node_id = "primary"
+# Optional public address shown in node management; never use a bind/control URL.
+# public_url = "https://relay.example.com/"
+# Every Relay uses the server's node directory; no mode switch is needed.
+# Node bandwidth defaults to the full host bandwidth.
 usage_dir = "/var/lib/pab/usage"
 https_bind = "0.0.0.0:31443"
 quic_bind = "0.0.0.0:7842"

@@ -14,6 +14,8 @@ use tokio::sync::{Notify, watch};
 use tokio::time::Instant;
 #[path = "host_cursor.rs"]
 mod cursor;
+#[path = "host_clipboard.rs"]
+mod clipboard;
 
 const HEARTBEAT_MS: u32 = 5000;
 const LEASE_MS: u32 = 15000;
@@ -48,6 +50,10 @@ pub trait DesktopInputSink: Send {
     fn apply(&mut self, event: RemoteDesktopInput) -> MediaFuture<'_, ()>;
 }
 pub trait DesktopBackend: Send + Sync {
+    fn supports_clipboard(&self) -> bool { false }
+    fn clipboard(&self, _config: DesktopVideoConfig, _operation: DesktopClipboardOperation) -> MediaFuture<'_, DesktopClipboardSnapshot> {
+        Box::pin(async { Err(DesktopError::reject(DesktopErrorCode::Unsupported, "text clipboard is unavailable")) })
+    }
     fn screens(&self) -> MediaFuture<'_, Vec<DesktopScreen>>;
     /// First frame must initialize H.264 decoding (IDR + SPS/PPS). One source per
     /// generation; no native capture starts before the video stream is attached.
@@ -263,6 +269,9 @@ impl DesktopHost {
             .as_ref()
             .map(|_| REMOTE_DESKTOP_SCHEMA_VERSION)
     }
+    pub fn supported_clipboard_version(&self) -> Option<u16> {
+        self.shared.backend.as_ref().filter(|backend| backend.supports_clipboard()).map(|_| DESKTOP_CLIPBOARD_VERSION)
+    }
     pub fn supported_cursor_version(&self) -> Option<u16> {
         self.shared
             .backend
@@ -473,6 +482,9 @@ impl DesktopHost {
         timeout: Duration,
     ) -> Result<()> {
         match request {
+            RemoteDesktopRequest::Clipboard { version, session_id, generation, request } => {
+                self.serve_clipboard(owner, account, version, session_id, generation, request, stream, timeout).await?;
+            }
             RemoteDesktopRequest::Quality { version, session_id, generation } => {
                 let result = self.entry(owner, account, session_id, false)
                     .and_then(|entry| entry.video(generation))

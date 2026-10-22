@@ -11,7 +11,9 @@ from build_version import build_lock, reserve_version, record_artifacts, macos_a
 
 ROOT = Path(__file__).resolve().parents[1]
 CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve()
-TAURI_TARGET = CARGO_TARGET if 'CARGO_TARGET_DIR' in os.environ else ROOT / 'apps/desktop/src-tauri/target'
+# Desktop and workspace builds share one persistent cache in the main checkout.
+TAURI_TARGET = CARGO_TARGET
+os.environ['CARGO_TARGET_DIR'] = str(CARGO_TARGET)
 CARGO_JOBS = max(1, min(10, int(os.environ.get('CARGO_BUILD_JOBS', '10'))))
 os.environ['CARGO_BUILD_JOBS'] = str(CARGO_JOBS)
 os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = '1'
@@ -42,9 +44,9 @@ def macos_architectures(selection):
 
 def build_macos(version, profile, architectures, package, installer_identity=None):
     from macos_signing import sign, IDENTIFIERS
-    if package:
-        run([sys.executable, 'browser-runtime/build.py'])
     for architecture in architectures:
+        if package:
+            run([sys.executable, 'browser-runtime/build.py', '--arch', architecture])
         target = f'{architecture}-apple-darwin'
         flags = ['--release'] if profile == 'release' else []
         run(['cargo', 'build', '--locked', '--target', target, *flags,
@@ -73,7 +75,7 @@ def build_macos(version, profile, architectures, package, installer_identity=Non
 
 def main():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('targets', nargs='+', choices=['desktop', 'server', 'web', 'desktop-web', 'docker', 'linux', 'macos'])
+    parser.add_argument('targets', nargs='+', choices=['desktop', 'server', 'web', 'desktop-web', 'docker', 'linux', 'macos', 'dsh-pab'])
     parser.add_argument('--profile', choices=['debug', 'release'], default='debug')
     parser.add_argument('--package', action='store_true', help='Also package desktop/server artifacts; does not increment again')
     parser.add_argument('--image', help='Docker image tag (default: pixels-agent-bridge:<version>)')
@@ -104,7 +106,7 @@ def main():
     if 'docker' in targets and args.profile != 'release':
         parser.error('docker uses release binaries; specify --profile release explicitly')
     needs_node = any(t not in ('docker', 'linux') for t in targets)
-    required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
+    required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos', 'dsh-pab']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
     if 'macos' in targets:
         required += ['node', 'rustup'] + (['/usr/bin/pkgbuild', '/usr/bin/productbuild'] if args.package else [])
     if 'desktop' in targets or ('macos' in targets and 'x86_64' in architectures):
@@ -157,6 +159,10 @@ def main():
                     run([sys.executable, 'packaging/desktop/build.py', '--platform', 'windows', '--profile', args.profile,
                          '--windows-bin-dir', CARGO_TARGET / args.profile, '--windows-desktop-bin', files['pab-desktop.exe']])
                     run([sys.executable, 'packaging/desktop/build_nsis.py', '--profile', args.profile])
+            elif target == 'dsh-pab':
+                # Release packaging: build pab-mcp and fold it into a self-contained
+                # plugin directory plus npm tarball under .build/packages/.
+                run([sys.executable, 'scripts/package_dsh_plugin.py', '--profile', args.profile, '--build'])
             elif target == 'server':
                 frontend('web')
                 run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-server', '--bin', 'pab-server', '-p', 'pab-relay', '--bin', 'pab-relay-server', '--bin', 'pab-relay-healthcheck'])

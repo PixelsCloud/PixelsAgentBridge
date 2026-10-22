@@ -62,12 +62,14 @@ macOS 的 `--macos-arch` 支持 `native`（默认）、`aarch64`/`arm64`、`x86_
 
 沿用原命令即可，不执行 `cargo clean`，也不再维护组件版本指纹。
 
+本机开发、编译和发版只在主仓库 `D:/GoCloud/PixelsAgentBridge` 中进行，不新建 Git worktree，也不复制源码到 `.build` 或其他目录。其他会话正在修改构建输入或占用编译预算时等待。Windows Desktop 与后台默认共用主仓库 `target`，Linux GUI 将主仓库直接挂载到构建容器；版本目录仅存放产物。Desktop Release 关闭 LTO、开启增量编译并使用优化等级 2，详见 [Windows 构建缓存说明](packaging/desktop/WINDOWS_RELEASE_BUILD.md)。
+
 - 只递增安装包版本：内部清单和锁文件完全不变，Cargo 复用全部可用缓存。
 - 只改 UI：重编前端和必要的 Desktop 资源；Executor、MCP 复用缓存。
 - 修改 Rust 源码、共享依赖、编译器或选项：Cargo 正常重编受影响部分，内部版本仍固定。
 - Windows/macOS 使用相同规则，Linux 无界面版继续通过现有 Docker 入口构建。
 
-Linux 无界面版以 Debian 11（glibc 2.31）及其固定软件源快照构建，兼容 Ubuntu 20.04 及以上。构建缓存使用 `.build/linux-target-bullseye`，与此前 Debian 12 的缓存分开，避免复用引用新版 glibc 的本地库。Linux 构建使用 Cargo 8 个任务和 CMake 2 个任务，总并发不超过 10。
+Linux 无界面版以 Debian 11（glibc 2.31）及其固定软件源快照构建，兼容 Ubuntu 20.04 及以上。构建缓存使用 `.build/linux-target-bullseye`，与此前 Debian 12 的缓存分开，避免复用引用新版 glibc 的本地库。Linux 后台和 Desktop 构建默认最多 10 个 Cargo 作业，也可通过 `CARGO_BUILD_JOBS` 调低以共享机器预算。容器内取消 `CMAKE_BUILD_PARALLEL_LEVEL` 覆盖，由 cmake crate 把 Cargo jobserver 交给 GNU Make，原生依赖与 Rust 共享同一个作业池；不另外增加 CMake 作业，也不强制把 OCR 原生构建串行化。每台机器所有会话合计仍不得超过 10 个构建作业。Windows/macOS/Android 的嵌套构建限制保持不变。
 
 安装包发布版本与程序内部版本独立。构建记录同时记录发布版本、组件版本和产物 SHA-256；打包仍逐项核验哈希。内部关于页、MCP 握手、设备与 Relay 上报继续显示各组件自己的版本，不伪装成安装包版本。
 
@@ -121,4 +123,4 @@ Ubuntu 22.04 x86_64 GUI 使用独立入口，不改变已发布的 glibc 2.31 �
 python scripts/build_linux_desktop.py --version 1.0.0 --package --headless-package PATH_TO_VERIFIED_TAR --headless-sha256 VERIFIED_SHA256
 ```
 
-该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)，实测结果见 [Ubuntu 桌面验收](acceptance/linux-desktop-2026-10-16/README.md)。GUI V1.0.1 已签名发布到官网/COS，当前通过新版 deb 覆盖升级。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。
+该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)。GUI V1.0.1 已签名发布到官网/COS，当前通过新版 deb 覆盖升级。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。

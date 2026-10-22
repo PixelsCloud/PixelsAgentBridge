@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity android:name=".fixture.UnifiedToolsFixtureActivity" android:exported="true" android:permission="android.permission.DUMP" />
+        <provider android:name=".fixture.SlowDocumentsProvider"
+            android:authorities="${applicationId}.slow-documents"
+            android:process=":storageFixture"
+            android:enabled="false" android:exported="true" android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
+        <!-- Internal file consumer for deterministic QA; deliberately not an external app link. -->
+        <activity android:name=".fixture.FileViewFixtureActivity" android:exported="false" android:enabled="false"
+            tools:ignore="AppLinkUrlError">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".fixture.AutomationFixtureActivity" android:exported="true" />
+        <activity android:name=".fixture.SlowStorageConsentActivity" android:exported="true"
+            android:permission="android.permission.DUMP" />
+        <activity android:name=".fixture.ProductionProbeActivity" android:exported="true"
+            android:permission="android.permission.DUMP" />
+        <receiver android:name=".fixture.ProductionProbeReceiver" android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>

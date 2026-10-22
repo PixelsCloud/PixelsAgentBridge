@@ -16,7 +16,8 @@ let inputReady = params.get("ready") !== "0", inputEnabled = inputReady, inputRe
 let fullscreen = false;
 const remoteOs = params.get("os") || "windows";
 let decoder: string | null = null;
-const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, frame_ready: inputReady, decoder, remote_os: remoteOs, connection_path: "p2p" });
+let clipboardEnabled = true, clipboardState = "active";
+const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: inputEnabled, frame_ready: inputReady, decoder, remote_os: remoteOs, connection_path: "p2p", clipboard_enabled: clipboardEnabled, clipboard_state: clipboardState });
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false, rejectFullscreen: false,
   holdFullscreen: false, releaseFullscreen: undefined as (() => void) | undefined,
@@ -26,6 +27,7 @@ const fixture = (window as any).fixture = {
   holdCompletion: [] as string[],
   deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
   decoder(value: string | null) { decoder = value; fixture.emit(status()); },
+  clipboard(value: string) { clipboardState = value; fixture.emit(status()); },
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },
   recover() { phase = "reconnecting"; inputEnabled = false; inputReady = false; decoder = null; fixture.emit(status()); },
@@ -72,6 +74,7 @@ const fixture = (window as any).fixture = {
     }
     if (command === "desktop_viewer_control") {
       if (fixture.reject) throw "Renderer is busy; retry shortly";
+      if (typeof args.clipboardEnabled === "boolean") { clipboardEnabled = args.clipboardEnabled; clipboardState = clipboardEnabled ? "active" : "disabled"; fixture.emit(status()); return null; }
       fixture.emit({ phase: "switching", opened });
       if (typeof args.inputEnabled === "boolean") inputRequested = args.inputEnabled;
       inputEnabled = false; inputReady = false;

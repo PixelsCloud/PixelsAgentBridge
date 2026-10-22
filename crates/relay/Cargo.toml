@@ -1,4 +1,5 @@
 [package]
+license.workspace = true
 name = "pab-relay"
 version = "1.2.48"
 edition.workspace = true
@@ -27,6 +28,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 rustls-pemfile = "2"
 serde_json.workspace = true
 serde.workspace = true
+sysinfo = { version = "=0.39.6", default-features = false, features = ["system"] }
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true

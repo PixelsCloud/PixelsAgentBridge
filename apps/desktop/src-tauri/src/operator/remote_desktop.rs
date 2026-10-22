@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, watch};
 mod chrome;
 mod close;
 mod recovery;
+mod clipboard;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[tauri::command]
@@ -42,6 +43,8 @@ pub struct ViewerStatus {
     input_ready: bool,
     frame_ready: bool,
     input_enabled: bool,
+    clipboard_enabled: bool,
+    clipboard_state: &'static str,
     decoder: Option<&'static str>,
     quality: Option<pab_protocol::DesktopQualitySnapshot>,
     remote_os: Option<pab_protocol::OsFamily>,
@@ -144,6 +147,7 @@ struct Owner {
     #[cfg(windows)]
     restore_maximized: AtomicBool,
     input_requested: AtomicBool,
+    clipboard_requested: AtomicBool,
     close_request: Mutex<()>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
@@ -299,6 +303,8 @@ pub(crate) async fn open_window(
     let (commands, requests) = mpsc::channel(2);
     let (status, _) = watch::channel(ViewerStatus {
         phase: "ready".into(),
+        clipboard_enabled: true,
+        clipboard_state: "waiting",
         ..Default::default()
     });
     let owner = Arc::new(Owner {
@@ -316,6 +322,7 @@ pub(crate) async fn open_window(
         #[cfg(windows)]
         restore_maximized: AtomicBool::new(false),
         input_requested: AtomicBool::new(!for_assistance),
+        clipboard_requested: AtomicBool::new(true),
         close_request: Mutex::new(()),
     });
     owners.insert(label.clone(), owner);
@@ -410,9 +417,20 @@ pub async fn desktop_viewer_control(
     retry: Option<bool>,
     input_enabled: Option<bool>,
     secure_attention: Option<bool>,
+    clipboard_enabled: Option<bool>,
 ) -> Result<(), String> {
     let owner = state.owner(&window).await?;
     let status = owner.status.borrow().clone();
+    if let Some(enabled) = clipboard_enabled {
+        if screen.is_some() || fps.is_some() || retry.is_some() || input_enabled.is_some() || secure_attention.is_some() { return Err("invalid remote desktop command".into()); }
+        owner.clipboard_requested.store(enabled, Ordering::Release);
+        let mut status = status;
+        status.clipboard_enabled = enabled;
+        status.clipboard_state = if enabled { "waiting" } else { "disabled" };
+        owner.status.send_replace(status.clone());
+        let _ = window.emit_to(window.label(), "desktop-viewer-status", status);
+        return Ok(());
+    }
     let input_generation = || {
         status
             .opened
@@ -472,6 +490,8 @@ fn publish(
         input_ready: false,
         frame_ready: false,
         input_enabled: false,
+        clipboard_enabled: owner.clipboard_requested.load(Ordering::Acquire),
+        clipboard_state: if owner.clipboard_requested.load(Ordering::Acquire) { "waiting" } else { "disabled" },
         decoder: None,
         quality: None,
         remote_os: owner.status.borrow().remote_os,
@@ -804,6 +824,9 @@ async fn stream(
             None,
         );
         let control = session.input_control();
+        let clipboard = clipboard::Bridge::new(window, owner, InputGeneration::from(session.opened()), session.clipboard_control())
+            .map_err(StreamFailure::renderer)?;
+        let clipboard_work = clipboard.run();
         let supported = session.opened().input_supported;
         let input_generation = InputGeneration::from(session.opened());
         let (ready, mut ready_rx) = watch::channel(false);
@@ -888,11 +911,13 @@ async fn stream(
         };
         let interaction = async {
             let mut enabled = false;
+            let mut clipboard_shortcuts = clipboard::Shortcuts::default();
             loop {
                 tokio::select! {
                     biased;
                     command = commands.recv() => match command {
                         Some(Command::Input(value, target)) if target == input_generation => {
+                            clipboard_shortcuts = clipboard::Shortcuts::default();
                             owner.input_requested.store(value, Ordering::Relaxed);
                             if value && (!supported || !*ready_rx.borrow_and_update()) {
                                 publish_input(window, owner, supported && *ready_rx.borrow(), false);
@@ -910,6 +935,7 @@ async fn stream(
                             publish_input(window, owner, supported && *ready_rx.borrow(), enabled);
                         }
                         Some(Command::SecureAttention(target)) if target == input_generation => {
+                            clipboard_shortcuts = clipboard::Shortcuts::default();
                             if !enabled { continue; }
                             // Stop local collection and retire held remote keys
                             // before the system changes desktops. SAS is sent
@@ -942,7 +968,13 @@ async fn stream(
                     event = native_input.next_event() => {
                         match event.map_err(StreamFailure::renderer)? {
                             pab_desktop_media::NativeViewerEvent::Input(event) => {
-                                if enabled { control.send(event).await.map_err(StreamFailure::from)?; }
+                                if enabled {
+                                    if !matches!(event, pab_protocol::RemoteDesktopInput::ReleaseAll) { clipboard.activate(); }
+                                    let (paste, copied) = clipboard_shortcuts.observe(&event);
+                                    if paste && !clipboard.before_paste().await { continue; }
+                                    control.send(event).await.map_err(StreamFailure::from)?;
+                                    if copied { clipboard.copied(); }
+                                }
                             }
                             pab_desktop_media::NativeViewerEvent::ExitFullscreen => {
                                 // Native focus must consume Esc locally, including its key-up.
@@ -958,6 +990,7 @@ async fn stream(
             result = interaction => result,
             result = cursor_work => result.map(|_| None),
             _ = quality_work => unreachable!("quality polling does not complete the viewer"),
+            _ = clipboard_work => unreachable!("clipboard polling does not complete the viewer"),
         };
         drop(viewer);
         let command = match outcome {

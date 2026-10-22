@@ -25,7 +25,7 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用
 | macOS | 桌面应用、后台设备服务、MCP |
 | Linux | 无界面设备服务和 MCP，暂无桌面应用 |
 
-具体能力取决于目标系统和权限。macOS 截图、键鼠控制需要相应的系统授权。项目仍在开发中，已测试场景和待验范围见[验收记录](acceptance/README.md)。
+具体能力取决于目标系统和权限。macOS 截图、键鼠控制需要相应的系统授权。配置步骤与平台要求见[使用指南](docs/USAGE_AND_SELF_HOSTING.md)。
 
 ## 快速开始
 
@@ -69,10 +69,21 @@ python scripts/build.py desktop --profile release --package
 
 - [使用指南与自我部署](docs/USAGE_AND_SELF_HOSTING.md)（与官网文档同步维护）
 - [构建与版本规则](BUILDING.md)
+- [安装包发布与在线更新](docs/RELEASE.md)
+- [配置参考](docs/CONFIGURATION.md)
+- [Relay 集群运维](docs/RELAY_CLUSTER_OPERATIONS.md)
+- [文档解析与 OCR](docs/DOCUMENTS.md)
 - [开发说明](DEVELOPMENT.md)
-- [macOS 安装与权限](MACOS.md)
-- [账号功能与验收](acceptance/user-accounts-2026-10-08.md)
-- [AI Agent 接入](acceptance/agent-integrations-2026-10-08.md)
-- [测试范围与平台限制](acceptance/README.md)
+
+## 许可证
+
+项目自有代码采用 [PolyForm Noncommercial License 1.0.0](LICENSE)。超出该许可证
+允许用途的商业使用，必须事先取得单独书面授权；这包括以商业目的用于企业内部业务。
+标准条款对教育、公益、公共研究和政府等列明机构的许可范围保持不变。
+详情见[商业授权说明](COMMERCIAL_LICENSE.md)，联系邮箱：
+[pixels.save@gmail.com](mailto:pixels.save@gmail.com)。
+
+本项目属于源码可用（source-available）软件。第三方组件保留各自的许可证与声明，
+参见 [NOTICE](NOTICE) 及各组件附带的许可文件。
 
 遇到问题可[提交 Issue](https://github.com/PixelsCloud/PixelsAgentBridge/issues)，附上系统、复现步骤和去除凭据后的日志。

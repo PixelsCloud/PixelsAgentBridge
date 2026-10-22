@@ -626,6 +626,7 @@ impl TaskService {
             DeviceTaskRequest::GetEnvironment { .. } => Ok(DeviceTaskResponse::Environment {
                 remote_desktop_schema_version: self.remote_desktop.supported_version(),
                 remote_desktop_cursor_schema_version: self.remote_desktop.supported_cursor_version(),
+                remote_desktop_clipboard_schema_version: self.remote_desktop.supported_clipboard_version(),
                 command_schema_version: Some(3),
                 terminal_schema_version: Some(2),
                 desktop_terminal_schema_version: Some(

@@ -126,7 +126,16 @@ impl BridgeClient {
         device_ref: DeviceRef,
         password: Zeroizing<String>,
     ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
-        self.connector.connect_device(device_ref, password).await
+        self.connect_device_with_mode(device_ref, password, pab_transport::ConnectionMode::Auto).await
+    }
+
+    pub async fn connect_device_with_mode(
+        &self,
+        device_ref: DeviceRef,
+        password: Zeroizing<String>,
+        mode: pab_transport::ConnectionMode,
+    ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
+        self.connector.connect_device_with_mode(device_ref, password, mode).await
     }
 
     pub async fn shutdown(self) -> Result<(), BridgeError> {
@@ -163,6 +172,15 @@ impl BridgeConnector {
         device_ref: DeviceRef,
         password: Zeroizing<String>,
     ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
+        self.connect_device_with_mode(device_ref, password, pab_transport::ConnectionMode::Auto).await
+    }
+
+    pub async fn connect_device_with_mode(
+        &self,
+        device_ref: DeviceRef,
+        password: Zeroizing<String>,
+        mode: pab_transport::ConnectionMode,
+    ) -> Result<AuthenticatedDeviceConnection, BridgeError> {
         if password.is_empty() || password.len() > MAX_DEVICE_PASSWORD_BYTES {
             return Err(BridgeError::InvalidDevicePassword);
         }
@@ -173,10 +191,11 @@ impl BridgeConnector {
         };
         let connection = self
             .endpoint
-            .connect(
+            .connect_with_mode(
                 *snapshot.endpoint_key.as_bytes(),
                 &address,
                 self.config.operation_timeout,
+                mode,
             )
             .await?;
         let mut stream = connection.open_bi(self.config.operation_timeout).await?;
@@ -757,6 +776,7 @@ impl BridgeError {
 
     pub const fn is_recoverable_connection(&self) -> bool {
         match self {
+            Self::Endpoint(PabEndpointError::NoRemoteRelay) => false,
             Self::NetworkResolution(
                 DeviceNetworkResolutionError::Unavailable
                 | DeviceNetworkResolutionError::Timeout

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { App as AntdApp, Avatar, Button, ConfigProvider, Menu, theme as antdTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
-import { Check, Copy, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, Settings2, Sun, UserRound, X } from "lucide-react";
+import { Check, Copy, List, Minus, Monitor, MonitorSmartphone, Moon, Plug, RotateCw, Settings2, Sun, UserRound, X } from "lucide-react";
+import { AppRefreshContext, useAppRefreshRegistry } from "./appRefresh";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
@@ -51,17 +52,40 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedField, setCopiedField] = useState<"code" | "password" | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshPending = useRef(false);
+  const accountRequest = useRef(0);
+  const scopeRef = useRef<ScopeStatus | null>(null);
+  const refreshRegistry = useAppRefreshRegistry();
   const t = messages[language];
   const appWindow = getCurrentWindow();
 
-  useEffect(() => {
-    let active = true;
-    void invoke<ScopeStatus | null>("operator_current_traffic_scope")
-      .then((scope) => { if (active) setActiveScope(scope); })
-      .catch(() => { if (active) setAccountLoadFailed(true); })
-      .finally(() => { if (active) setAccountLoading(false); });
-    return () => { active = false; };
+  function acceptScope(scope: ScopeStatus | null) {
+    accountRequest.current += 1;
+    scopeRef.current = scope;
+    setActiveScope(scope);
+    setAccountLoadFailed(false);
+  }
+
+  const refreshAccount = useCallback(async () => {
+    const request = ++accountRequest.current;
+    try {
+      const scope = await invoke<ScopeStatus | null>("operator_current_traffic_scope");
+      if (request !== accountRequest.current) return;
+      scopeRef.current = scope;
+      setActiveScope(scope);
+      setAccountLoadFailed(false);
+      if (!scope) setView(current => current === "me" ? "home" : current);
+    } catch (cause) {
+      if (request === accountRequest.current) setAccountLoadFailed(true);
+      throw cause;
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshAccount().catch(() => {}).finally(() => setAccountLoading(false));
+    return () => { accountRequest.current += 1; };
+  }, [refreshAccount]);
 
   async function openAccount() {
     if (accountLoading) return;
@@ -69,9 +93,8 @@ function App() {
     if (accountLoadFailed) {
       setAccountLoading(true);
       try {
-        scope = await invoke<ScopeStatus | null>("operator_current_traffic_scope");
-        setActiveScope(scope);
-        setAccountLoadFailed(false);
+        await refreshAccount();
+        scope = scopeRef.current;
       } catch {
         return;
       } finally {
@@ -132,6 +155,27 @@ function App() {
       setLoading(false);
     }
   }, []);
+
+  async function refreshAll() {
+    if (refreshPending.current || accountLoading) return;
+    refreshPending.current = true;
+    setRefreshing(true);
+    setError("");
+    try {
+      const results = await Promise.allSettled([
+        refreshAccount(),
+        refreshRegistry.refresh(),
+        invoke<DeviceStatus>("device_status").then(next => {
+          setDevice(current => currentDeviceStatus(current, next));
+          setLoading(false);
+        }),
+      ]);
+      if (results.some(result => result.status === "rejected")) setError(t.refreshAllFailed);
+    } finally {
+      refreshPending.current = false;
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     void refresh();
@@ -210,6 +254,7 @@ function App() {
       }}
     >
     <AntdApp className="desktop-ant-app">
+    <AppRefreshContext.Provider value={refreshRegistry}>
     <div className="window-frame">
       <BrowserHandoffNotice language={language} />
       <div
@@ -226,6 +271,11 @@ function App() {
           <span>Pixels Agent Bridge (V{__PAB_RELEASE_VERSION__})</span>
         </div>
         <div className="window-controls">
+          <button type="button" className={`titlebar-refresh${refreshing ? " is-refreshing" : ""}`}
+            aria-label={t.refreshAll} title={refreshing ? t.refreshAllBusy : t.refreshAll}
+            aria-busy={refreshing} disabled={refreshing || accountLoading} onClick={() => void refreshAll()}>
+            <RotateCw aria-hidden="true" />
+          </button>
           <button
             aria-label={theme === "dark" ? t.switchToLight : t.switchToDark}
             title={theme === "dark" ? t.switchToLight : t.switchToDark}
@@ -299,18 +349,19 @@ function App() {
 
             {view === "settings" ? <SettingsPanel language={language} onLanguageChange={changeLanguage} section={settingsSection} onSectionChange={setSettingsSection} />
               : view === "mcp" ? <section className="surface mcp-connections-page"><McpConnectionsPanel language={language} /></section>
-                : view === "me" && activeScope ? <AccountConnectionPanel language={language} activeScope={activeScope} onSignOut={() => { setActiveScope(null); setView("home"); }} />
-                  : <OperatorPanel language={language} view={view} signedIn={!!activeScope} onSignIn={() => setLoginOpen(true)} onOpenRemote={() => setView("remote")} />}
+                : view === "me" && activeScope ? <AccountConnectionPanel language={language} activeScope={activeScope} onSignOut={() => { acceptScope(null); setView("home"); }} />
+                  : <OperatorPanel key={`${activeScope?.userId ?? "guest"}:${activeScope?.revision ?? 0}`} language={language} view={view} signedIn={!!activeScope} onSignIn={() => setLoginOpen(true)} onOpenRemote={() => setView("remote")} />}
           </div>
         </main>
       </div>
       <AccountLoginDialog language={language} open={loginOpen} onClose={() => setLoginOpen(false)} onSignedIn={(scope) => {
-        setActiveScope(scope);
+        acceptScope(scope);
         setLoginOpen(false);
         setView("me");
       }} />
       <DesktopAssistanceNotice language={language} />
     </div>
+    </AppRefreshContext.Provider>
     </AntdApp>
     </ConfigProvider>
   );

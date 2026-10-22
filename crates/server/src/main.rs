@@ -118,8 +118,9 @@ async fn run(
                 return Err("server settings are not initialized; run pab-server init".into());
             }
             let maintenance_store = store.clone();
+            let directory = config.relay.resolved_directory(&store).await?;
             let control_plane = ControlPlane::new(store, PasswordPolicy::default())?
-                .with_relay_cluster(config.relay.cluster.clone())
+                .with_relay_cluster(directory.clone())
                 .await?
                 .with_relay_config_source(path.clone(), &config.relay.control_secret);
             let address = config.listen;
@@ -127,7 +128,7 @@ async fn run(
             let private_key_path = config.tls.key.clone();
             let registration_enabled = config.web.registration_enabled;
             let relay_auth = RelayControlAuth::new(&config.relay.control_secret)?
-                .with_cluster(config.relay.cluster.as_ref());
+                .with_cluster(directory.as_ref());
             let presence_control = control_plane.clone();
             let github = config.github_config()?;
             let state = ControlApiState::new(

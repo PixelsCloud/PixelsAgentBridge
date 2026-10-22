@@ -14,7 +14,7 @@ pub use connection::{
     DesktopTerminalSession, FileSystemResult, Screenshot, TaskSubscription, TransferControl,
     RemoteDesktopSession,
 };
-pub use pab_transport::ConnectionPath;
+pub use pab_transport::{ConnectionMode, ConnectionPath};
 pub use pab_remote_desktop::DesktopError as RemoteDesktopError;
 pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, CatalogStatus, DeviceConnectionPhase,

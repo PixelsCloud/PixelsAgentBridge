@@ -43,6 +43,8 @@ pub use desktop_cursor::*;
 mod file_transfer;
 mod relay_cluster;
 mod relay_control;
+mod relay_diagnostics;
+pub use relay_diagnostics::*;
 pub use relay_cluster::*;
 mod relay_policy;
 mod screenshot;
@@ -99,7 +101,7 @@ pub use platform::{
     TargetContextSource,
 };
 pub use relay_control::{
-    RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage,
+    RelayControlClientMessage, RelayControlErrorCode, RelayControlServerMessage, RelayNodeTelemetry,
 };
 pub use relay_policy::{
     DEFAULT_RELAY_MBPS, LimitConfigError, RELAY_MBPS_OPTIONS, RELAY_POLICY_SCHEMA_VERSION,

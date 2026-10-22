@@ -258,6 +258,24 @@ impl RuntimeStore {
         tx.commit().await?;
         Ok(())
     }
+    /// Full saved-device rows for the signed-in account, including the server's
+    /// online flag. `catalog_list` keeps only what pairing needs.
+    pub(super) async fn catalog_saved_devices(
+        &self,
+        scope: &str,
+    ) -> Result<Vec<SavedDevice>, RuntimeStoreError> {
+        let rows: Vec<String> = sqlx::query_scalar(
+            "SELECT item_json FROM account_catalog WHERE scope=? ORDER BY rowid DESC",
+        )
+        .bind(scope)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|item| serde_json::from_str::<SavedDevice>(&item).map_err(Into::into))
+            .collect::<Result<Vec<_>, RuntimeStoreError>>()
+            .map(|items| items.into_iter().filter(|item| !item.deleted).collect())
+    }
+
     pub(super) async fn catalog_list(
         &self,
         scope: &str,

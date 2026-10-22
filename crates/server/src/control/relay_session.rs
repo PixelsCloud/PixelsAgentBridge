@@ -19,6 +19,7 @@ pub(super) async fn run_relay_socket(
     let (mut sender, mut receiver) = socket.split();
     let mut changes = state.control.web_changes();
     let mut boot_id = None;
+    let mut legacy_reporter = super::relay_telemetry::LegacyReporter::new();
     loop {
         let next = tokio::select! {
             next = tokio::time::timeout(RELAY_IDLE_TIMEOUT, receiver.next()) => next,
@@ -36,8 +37,15 @@ pub(super) async fn run_relay_socket(
         let response = match message {
             Message::Text(text) => match serde_json::from_str(text.as_str()) {
                 Ok(message) => {
-                    handle_message(&state, identity.as_deref(), binding, &mut boot_id, message)
-                        .await
+                    handle_message(
+                        &state,
+                        identity.as_deref(),
+                        binding,
+                        &mut boot_id,
+                        &mut legacy_reporter,
+                        message,
+                    )
+                    .await
                 }
                 Err(_) => error(
                     None,
@@ -67,6 +75,7 @@ async fn handle_message(
     identity: Option<&str>,
     binding: [u8; 32],
     boot: &mut Option<uuid::Uuid>,
+    legacy_reporter: &mut super::relay_telemetry::LegacyReporter,
     message: RelayControlClientMessage,
 ) -> RelayControlServerMessage {
     if let Some(expected) = identity {
@@ -163,6 +172,7 @@ async fn handle_message(
             connections,
             received_bytes,
             sent_bytes,
+            diagnostics,
         } => {
             if identity != Some(node_id.as_str())
                 || *boot != Some(boot_id)
@@ -177,9 +187,14 @@ async fn handle_message(
                 );
             }
             match sqlx::query("UPDATE relay_cluster_nodes SET connections=$3,uploaded_bytes=$4,downloaded_bytes=$5 WHERE node_id=$1 AND boot_id=$2 AND configured")
-                .bind(node_id).bind(boot_id).bind(connections as i64).bind(received_bytes as i64).bind(sent_bytes as i64)
+                .bind(&node_id).bind(boot_id).bind(connections as i64).bind(received_bytes as i64).bind(sent_bytes as i64)
                 .execute(state.control.store().pool()).await {
-                Ok(result) if result.rows_affected()==1=>RelayControlServerMessage::HeartbeatAccepted{request_id},
+                Ok(result) if result.rows_affected()==1=>{
+                    if let Some(sample)=diagnostics {
+                        if !state.relay_diagnostics.record(&node_id,boot_id,sample){tracing::warn!(node=%node_id,"Relay diagnostics unavailable");}
+                    }
+                    RelayControlServerMessage::HeartbeatAccepted{request_id}
+                },
                 _=>error(Some(request_id),RelayControlErrorCode::InvalidMessage,"Relay telemetry process is no longer active"),
             }
         }
@@ -289,6 +304,7 @@ async fn handle_message(
                         .map(|n| u64::from(n.capacity_mbps) * 1_000_000 / 8)
                         .unwrap_or(0);
                     RelayControlServerMessage::HelloAccepted {
+                        diagnostics_version: Some(pab_protocol::RELAY_DIAGNOSTICS_VERSION),
                         request_id,
                         heartbeat_seconds: config.heartbeat_seconds,
                         capacity_bytes_per_second,
@@ -312,6 +328,7 @@ async fn handle_message(
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
                 || batch.counters.values()[2..].iter().any(|v| *v != 0)
+                || batch.counters.p2p_reported
             {
                 return error(
                     Some(request_id),
@@ -343,7 +360,17 @@ async fn handle_message(
             known_policy_version,
             node_id,
             agent_version,
+            telemetry,
         } => {
+            if let Some(sample) = telemetry.as_ref() {
+                if identity.is_some() || !legacy_reporter.validate(node_id.as_deref(), sample) {
+                    return error(
+                        Some(request_id),
+                        RelayControlErrorCode::InvalidMessage,
+                        "invalid Relay telemetry",
+                    );
+                }
+            }
             let head = sqlx::query_scalar::<_, i64>(
                 "SELECT policy_revision FROM server_settings WHERE singleton",
             )
@@ -407,6 +434,9 @@ async fn handle_message(
                     .checked_add(state.config.relay_policy_validity)
                     .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
                     .and_then(|time| i64::try_from(time.as_millis()).ok());
+                if let (Some(node), Some(sample)) = (node_id.as_deref(), telemetry.as_ref()) {
+                    legacy_reporter.record(state, node, sample).await;
+                }
                 return match expires {
                     Some(expires_at_unix_ms) => RelayControlServerMessage::PolicyUnchanged {
                         request_id,
@@ -439,7 +469,7 @@ async fn handle_message(
                     );
                 }
             };
-            if let Some(node_id) = node_id {
+            if let Some(node_id) = node_id.as_deref() {
                 if node_id.is_empty()
                     || node_id.len() > 64
                     || !node_id
@@ -469,6 +499,9 @@ async fn handle_message(
                         tracing::warn!("could not record Relay node status");
                     }
                 }
+            }
+            if let (Some(node), Some(sample)) = (node_id.as_deref(), telemetry.as_ref()) {
+                legacy_reporter.record(state, node, sample).await;
             }
             match known_policy_version {
                 Some(version) if version > snapshot.policy_version => error(

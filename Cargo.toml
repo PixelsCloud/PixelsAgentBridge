@@ -33,6 +33,7 @@ resolver = "2"
 exclude = ["apps/desktop/src-tauri"]
 
 [workspace.package]
+license = "PolyForm-Noncommercial-1.0.0"
 edition = "2024"
 rust-version = "1.95"
 
@@ -46,6 +47,7 @@ tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-
 uuid = { version = "1", features = ["serde", "v4"] }
 
 [patch.crates-io]
+iroh = { path = "vendor/iroh" }
 iroh-relay = { path = "vendor/iroh-relay" }
 enigo = { path = "vendor/enigo" }
 

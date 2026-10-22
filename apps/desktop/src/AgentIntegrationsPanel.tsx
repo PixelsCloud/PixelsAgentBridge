@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Alert, Button, Space, Tag } from "antd";
 import { RotateCw } from "lucide-react";
 import { messages, type Language } from "./i18n";
+import { useAppRefresh } from "./appRefresh";
 
 const clients = [
   { id: "codex", name: "Codex" }, { id: "kimi", name: "Kimi Code" },
@@ -21,16 +22,17 @@ function AgentRow({ id, name, language }: { id: AgentId; name: string; language:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const revision = useRef(0);
-  async function refresh() {
+  async function refresh(reportFailure = false) {
     const current = ++revision.current;
     setBusy(true);
     setError("");
     try {
       const result = await invoke<Integration>("agent_integration_status", { id });
       if (current === revision.current) setState(result);
-    } catch (reason) { if (current === revision.current) setError(String(reason)); }
+    } catch (reason) { if (current === revision.current) setError(String(reason)); if (reportFailure) throw reason; }
     finally { if (current === revision.current) setBusy(false); }
   }
+  useAppRefresh(async () => { if (!busy) await refresh(true); });
   useEffect(() => { void refresh(); return () => { revision.current++; }; }, [id]);
   async function change(enabled: boolean) {
     const current = ++revision.current;

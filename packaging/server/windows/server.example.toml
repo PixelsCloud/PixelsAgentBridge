@@ -10,7 +10,12 @@ registration_enabled = true
 assets = "../web"
 [relay]
 control_secret = "replace-with-distinct-legacy-secret-at-least-32-bytes"
-# Add [relay.cluster] and [[relay.cluster.nodes]] as shown in the cluster example.
+[relay.directory]
+[[relay.directory.nodes]]
+node_id = "win-90-test"
+url = "https://relay-windows.example:31443/"
+control_secret = "replace-with-this-nodes-own-control-secret-at-least-32-bytes"
+# Omitted capacity_mbps defaults to 200 Mbps; explicit 0 removes the node cap.
 [log]
 directory = "../logs/server"
 level = "info"

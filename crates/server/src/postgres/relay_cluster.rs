@@ -1,8 +1,6 @@
 use super::{PostgresStore, StoreError};
 use crate::relay_cluster::RelayClusterConfig;
-use pab_protocol::{
-    RELAY_CLUSTER_SCHEMA_VERSION, RelayAdminState, RelayDirectory, RelayDirectoryNode, RelayHealth,
-};
+use pab_protocol::{RelayAdminState, RelayDirectory, RelayDirectoryNode, RelayHealth};
 use sqlx::Row;
 
 impl PostgresStore {
@@ -53,9 +51,9 @@ impl PostgresStore {
         }
         let row = sqlx::query("SELECT boot_id,retired,configured,admin_state,last_seen_at > clock_timestamp()-($2::bigint*interval '1 second') AS alive FROM relay_cluster_nodes WHERE node_id=$1 FOR UPDATE")
             .bind(node_id).bind(config.offline_seconds as i64).fetch_optional(&mut *tx).await?.ok_or(StoreError::PermissionDenied)?;
-        if !row.try_get::<bool, _>("configured")?
-            || row.try_get::<&str, _>("admin_state")? == "disabled"
-        {
+        // Disabled nodes still report and can be resumed after a restart.
+        // Admission/forwarding budgets remain governed by administrative state.
+        if !row.try_get::<bool, _>("configured")? {
             return Err(StoreError::PermissionDenied);
         }
         let old: Option<uuid::Uuid> = row.try_get("boot_id")?;
@@ -98,7 +96,7 @@ impl PostgresStore {
         sqlx::query("SELECT revision FROM relay_cluster_state WHERE singleton FOR UPDATE")
             .fetch_one(&mut *tx)
             .await?;
-        let row = sqlx::query("SELECT health,healthy_since IS NOT NULL AND healthy_since <= clock_timestamp()-($3::bigint*interval '1 second') AS recovered FROM relay_cluster_nodes WHERE node_id=$1 AND boot_id=$2 AND NOT retired AND configured AND admin_state<>'disabled' FOR UPDATE")
+        let row = sqlx::query("SELECT health,healthy_since IS NOT NULL AND healthy_since <= clock_timestamp()-($3::bigint*interval '1 second') AS recovered FROM relay_cluster_nodes WHERE node_id=$1 AND boot_id=$2 AND NOT retired AND configured FOR UPDATE")
             .bind(node_id).bind(boot_id).bind(config.recovery_seconds as i64).fetch_optional(&mut *tx).await?.ok_or(StoreError::PermissionDenied)?;
         let old: &str = row.try_get("health")?;
         let health = if policy_applied && row.try_get::<bool, _>("recovered")? {
@@ -123,12 +121,60 @@ impl PostgresStore {
         &self,
         config: &RelayClusterConfig,
     ) -> Result<(), StoreError> {
+        self.configure_relay_cluster_audited(config, None).await
+    }
+
+    pub(crate) async fn configure_relay_cluster_audited(
+        &self,
+        config: &RelayClusterConfig,
+        mut audit: Option<crate::audit::AuditRecord>,
+    ) -> Result<(), StoreError> {
         let mut tx = self.pool.begin().await?;
+        if let Some(record) = &audit {
+            sqlx::query("SELECT pg_advisory_xact_lock(26035001)")
+                .execute(&mut *tx)
+                .await?;
+            let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id=$1 AND status='active' AND server_admin)").bind(record.actor).fetch_one(&mut *tx).await?;
+            if !allowed {
+                return Err(StoreError::PermissionDenied);
+            }
+        }
         let enabled: bool = sqlx::query_scalar(
             "SELECT enabled FROM relay_cluster_state WHERE singleton FOR UPDATE",
         )
         .fetch_one(&mut *tx)
         .await?;
+        if let Some(record) = &mut audit {
+            let rows=sqlx::query("SELECT node_id,weight,capacity_mbps FROM relay_cluster_nodes WHERE configured ORDER BY node_id").fetch_all(&mut *tx).await?;
+            let nodes = rows
+                .into_iter()
+                .map(|row| {
+                    Ok(crate::audit::AuditRelayNode {
+                        node_id: row.try_get("node_id")?,
+                        weight: row.try_get::<i32, _>("weight")? as u32,
+                        capacity_mbps: row.try_get::<i32, _>("capacity_mbps")? as u32,
+                    })
+                })
+                .collect::<Result<Vec<_>, sqlx::Error>>()?;
+            record.before = Some(crate::audit::AuditValues {
+                nodes: Some(nodes),
+                ..Default::default()
+            });
+            record.after = Some(crate::audit::AuditValues {
+                nodes: Some(
+                    config
+                        .nodes
+                        .iter()
+                        .map(|node| crate::audit::AuditRelayNode {
+                            node_id: node.node_id.clone(),
+                            weight: node.weight,
+                            capacity_mbps: node.capacity_mbps,
+                        })
+                        .collect(),
+                ),
+                ..Default::default()
+            });
+        }
         if !enabled {
             let legacy_alive:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM relay_nodes WHERE last_seen_at>clock_timestamp()-interval '60 seconds')").fetch_one(&mut *tx).await?;
             if legacy_alive {
@@ -138,7 +184,7 @@ impl PostgresStore {
         sqlx::query("UPDATE relay_cluster_nodes SET configured=false,admin_state=CASE WHEN admin_state='active' THEN 'maintenance' ELSE admin_state END,maintenance_started_at=COALESCE(maintenance_started_at,clock_timestamp()) WHERE NOT(node_id=ANY($1))")
             .bind(config.nodes.iter().map(|n| n.node_id.clone()).collect::<Vec<_>>()).execute(&mut *tx).await?;
         for node in &config.nodes {
-            sqlx::query("INSERT INTO relay_cluster_nodes(node_id,public_url,region,weight,capacity_mbps) VALUES($1,$2,$3,$4,$5) ON CONFLICT(node_id) DO UPDATE SET public_url=excluded.public_url,region=excluded.region,weight=excluded.weight,capacity_mbps=excluded.capacity_mbps,configured=true")
+            sqlx::query("INSERT INTO relay_cluster_nodes(node_id,public_url,region,weight,capacity_mbps) VALUES($1,$2,$3,$4,$5) ON CONFLICT(node_id) DO UPDATE SET public_url=excluded.public_url,region=excluded.region,weight=excluded.weight,capacity_mbps=COALESCE(relay_cluster_nodes.capacity_override_mbps,excluded.capacity_mbps),configured=true")
                 .bind(&node.node_id).bind(&node.url).bind(&node.region).bind(node.weight as i32)
                 .bind(i32::try_from(node.capacity_mbps).map_err(|_| StoreError::InvalidInput("node capacity exceeds storage range".into()))?)
                 .execute(&mut *tx).await?;
@@ -148,6 +194,9 @@ impl PostgresStore {
         )
         .execute(&mut *tx)
         .await?;
+        if let Some(record) = audit {
+            self.insert_audit(&mut tx, record).await?;
+        }
         tx.commit().await?;
         Ok(())
     }
@@ -234,7 +283,7 @@ impl PostgresStore {
             });
         }
         Ok(RelayDirectory {
-            schema_version: RELAY_CLUSTER_SCHEMA_VERSION,
+            schema_version: pab_protocol::RELAY_DIRECTORY_SCHEMA_VERSION,
             revision: revision as u64,
             nodes,
         })

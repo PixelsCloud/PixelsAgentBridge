@@ -11,26 +11,26 @@ registration_enabled = true
 assets = "web"
 [relay]
 control_secret = "replace-with-a-distinct-legacy-secret-at-least-32-bytes"
-[relay.cluster]
+[relay.directory]
 heartbeat_seconds = 5
 offline_seconds = 15
 recovery_seconds = 10
 maintenance_seconds = 30
 
-[[relay.cluster.nodes]]
+[[relay.directory.nodes]]
 node_id = "linux-a"
 url = "https://relay-a.example:31443"
 region = "test-a"
 weight = 100
-capacity_mbps = 100
+# capacity_mbps = 200 # Defaults to 200 Mbps; explicit 0 retains uncapped mode.
 control_secret = "replace-with-unique-linux-a-node-secret-at-least-32-bytes"
 
-[[relay.cluster.nodes]]
+[[relay.directory.nodes]]
 node_id = "windows-90"
 url = "https://relay-b.example:31443"
 region = "test-b"
 weight = 100
-capacity_mbps = 100
+# capacity_mbps = 200
 control_secret = "replace-with-unique-windows-b-node-secret-at-least-32-bytes"
 
 [log]

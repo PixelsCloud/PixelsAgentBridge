@@ -1,0 +1,17 @@
+Pixels Agent Bridge
+Required Notice: Copyright (c) 2026 Pixels
+Required Notice: https://github.com/PixelsCloud/PixelsAgentBridge
+
+Except for components carrying their own license, Pixels Agent Bridge is
+available under the PolyForm Noncommercial License 1.0.0:
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Uses outside the purposes permitted by that license require a separate written
+commercial license from the applicable copyright holder. Contact:
+pixels.save@gmail.com
+https://github.com/PixelsCloud/PixelsAgentBridge/blob/main/COMMERCIAL_LICENSE.md
+
+The PolyForm license's express permitted purposes and statutory rights remain
+unchanged. This notice is not a commercial license. Third-party components,
+including vendored code, runtimes, fonts and icons, retain their own licenses
+and notices. The project license does not relicense those components.

@@ -10,6 +10,10 @@ use crate::{
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ControlClientMessage {
+    RenameOwnDevice {
+        request_id: RequestId,
+        name: String,
+    },
     GetRelayDirectory {
         request_id: RequestId,
         schema_version: u16,
@@ -107,6 +111,7 @@ pub enum ControlClientMessage {
 impl ControlClientMessage {
     pub const fn request_id(&self) -> RequestId {
         match self {
+            Self::RenameOwnDevice { request_id, .. } => *request_id,
             Self::GetRelayDirectory { request_id, .. } => *request_id,
             Self::RegisterAccount { request_id, .. }
             | Self::Login { request_id, .. }
@@ -143,6 +148,10 @@ pub enum EndpointRegistration {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ControlServerMessage {
+    OwnDeviceRenamed {
+        request_id: RequestId,
+        name: String,
+    },
     RelayDirectory {
         request_id: RequestId,
         /// None means legacy single-node mode, not an empty active cluster.

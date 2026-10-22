@@ -106,6 +106,8 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         connection_intents: vec![],
     }));
     let server_policy = policy.clone();
+    let telemetry = Arc::new(Mutex::new(Vec::new()));
+    let observed_telemetry = telemetry.clone();
     let (applied, mut version) = watch::channel(0);
     let control_server = tokio::spawn(async move {
         let (socket, _) = listener.accept().await.unwrap();
@@ -121,12 +123,16 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
                 request_id,
                 known_policy_version,
                 node_id,
+                telemetry,
                 ..
             } = serde_json::from_str(text.as_str()).unwrap()
             else {
                 panic!("policy test received unexpected message");
             };
             assert_eq!(node_id.as_deref(), Some("configured-relay-node"));
+            if let Some(sample) = telemetry {
+                observed_telemetry.lock().unwrap().push(sample);
+            }
             let mut snapshot = server_policy.lock().unwrap().clone();
             snapshot.issued_at_unix_ms = now_ms() - 1;
             snapshot.expires_at_unix_ms = now_ms() + 60_000;
@@ -155,6 +161,7 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
     });
     let relay = start_relay_service(RelayServiceConfig {
         cluster_enabled: false,
+        public_url: Some("https://relay.example.test/".into()),
         node_id: "configured-relay-node".into(),
         usage_dir: directory.path().join("usage"),
         control_url,
@@ -251,6 +258,8 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         started.elapsed()
     );
     assert_eq!(*version.borrow_and_update(), 2);
+    assert_eq!(connection.direct_traffic().uploaded_bytes, 0);
+    assert_eq!(connection.direct_traffic().downloaded_bytes, 0);
 
     // Endpoint admission must also refresh a newly registered key instead of
     // waiting for the next periodic snapshot and triggering client backoff.
@@ -272,6 +281,24 @@ async fn first_relay_connection_refreshes_a_new_grant_before_timeout() {
         .await
         .expect("new endpoint admission waited for periodic policy refresh");
     assert_eq!(*version.borrow_and_update(), 3);
+    {
+        let samples = telemetry.lock().unwrap();
+        let latest = samples
+            .last()
+            .expect("real Relay must report process counters");
+        assert_eq!(
+            latest.public_url.as_deref(),
+            Some("https://relay.example.test/")
+        );
+        assert!(!latest.boot_id.is_nil());
+        assert!(latest.connections >= 2);
+        assert!(latest.received_bytes > 0 && latest.sent_bytes > 0);
+        assert!(
+            samples
+                .iter()
+                .all(|sample| sample.boot_id == latest.boot_id)
+        );
+    }
     fresh.close().await;
     connection.close(b"test complete");
     accepted.close(b"test complete");

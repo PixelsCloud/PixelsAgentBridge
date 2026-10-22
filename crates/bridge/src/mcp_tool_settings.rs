@@ -32,6 +32,9 @@ impl ToolGroup {
         match self {
             Self::Core => &[
                 "pab_list_devices",
+                "pab_list_saved_devices",
+                "pab_list_history",
+                "pab_device_presence",
                 "pab_list_execution_contexts",
                 "pab_connect",
                 "pab_run_command",

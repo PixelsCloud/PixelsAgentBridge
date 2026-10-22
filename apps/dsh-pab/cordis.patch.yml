@@ -1,0 +1,7 @@
+# The layer this bundle contributes to a profile.
+# The row name is the bare package name on purpose: the client module system
+# attaches a package's browser half only to a row whose specifier is exactly
+# the package name.
+- insert:
+    - id: dsh-pab
+      name: 'dsh-pab'

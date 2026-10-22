@@ -1,7 +1,7 @@
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
     },
     time::Duration,
 };
@@ -21,6 +21,7 @@ pub(super) struct DeviceSession {
     connection: RwLock<Option<Arc<AuthenticatedDeviceConnection>>>,
     connect_lock: Mutex<()>,
     manually_disconnected: AtomicBool,
+    connection_mode: AtomicU8,
     runtime: Arc<RuntimeInner>,
 }
 
@@ -34,11 +35,12 @@ impl DeviceSession {
         if let Err(error) = self
             .runtime
             .store
-            .sample_connection(
+            .sample_connection_traffic(
                 &self.runtime.session_id,
                 self.device_ref.device_id,
                 id,
                 scope,
+                connection.as_ref().map(|c| c.connection().direct_traffic()),
             )
             .await
         {
@@ -50,6 +52,7 @@ impl DeviceSession {
     }
     pub(super) async fn close_for_account_change(&self) {
         if let Some(connection) = self.connection.write().await.take() {
+            self.finish_usage(&connection).await;
             connection.as_ref().clone().close();
             self.runtime.publish(RuntimeEventKind::DeviceConnection {
                 device_ref: self.device_ref,
@@ -70,12 +73,27 @@ impl DeviceSession {
             connection: RwLock::new(None),
             connect_lock: Mutex::new(()),
             manually_disconnected: AtomicBool::new(false),
+            connection_mode: AtomicU8::new(0),
             runtime,
         }
     }
 
     pub(super) fn resume(&self) {
         self.manually_disconnected.store(false, Ordering::Release);
+    }
+
+    pub(super) fn connection_mode(&self) -> crate::ConnectionMode {
+        if self.connection_mode.load(Ordering::Acquire) == 1 { crate::ConnectionMode::Relay } else { crate::ConnectionMode::Auto }
+    }
+
+    pub(super) async fn set_connection_mode(&self, mode: crate::ConnectionMode) {
+        let mut connection = self.connection.write().await;
+        if self.connection_mode() == mode { return; }
+        self.connection_mode.store(u8::from(mode == crate::ConnectionMode::Relay), Ordering::Release);
+        if let Some(previous) = connection.take() {
+            self.finish_usage(&previous).await;
+            previous.as_ref().clone().close();
+        }
     }
 
     pub(super) async fn selected_path(&self) -> Option<ConnectionPath> {
@@ -91,6 +109,11 @@ impl DeviceSession {
     }
 
     pub(super) async fn disconnect(&self) {
+        self.manually_disconnected.store(true, Ordering::Release);
+        if let Some(connection) = self.connection.write().await.take() {
+            self.finish_usage(&connection).await;
+            connection.as_ref().clone().close();
+        }
         let _ = self
             .runtime
             .store
@@ -101,16 +124,29 @@ impl DeviceSession {
                 None,
             )
             .await;
-        self.manually_disconnected.store(true, Ordering::Release);
-        if let Some(connection) = self.connection.write().await.take() {
-            connection.as_ref().clone().close();
-        }
         self.runtime.publish(RuntimeEventKind::DeviceConnection {
             device_ref: self.device_ref,
             phase: DeviceConnectionPhase::Disconnected,
             retry_in_ms: None,
             message: None,
         });
+    }
+
+    async fn finish_usage(&self, connection: &AuthenticatedDeviceConnection) {
+        if let Err(error) = self
+            .runtime
+            .store
+            .sample_connection_traffic(
+                &self.runtime.session_id,
+                self.device_ref.device_id,
+                None,
+                None,
+                Some(connection.connection().direct_traffic()),
+            )
+            .await
+        {
+            tracing::warn!(%error, "final connection usage sample unavailable");
+        }
     }
 
     fn ensure_enabled(&self) -> Result<(), RuntimeError> {
@@ -181,14 +217,21 @@ impl DeviceSession {
                     return Err(error.into());
                 }
             };
-            match connector.connect_device(self.device_ref, password).await {
+            let mode = self.connection_mode();
+            match connector.connect_device_with_mode(self.device_ref, password, mode).await {
                 Ok(connection) => {
                     if self.manually_disconnected.load(Ordering::Acquire) {
                         connection.close();
                         return Err(RuntimeError::DeviceDisconnected);
                     }
+                    let mut cached = self.connection.write().await;
+                    if self.connection_mode() != mode {
+                        connection.close();
+                        continue;
+                    }
                     let connection = Arc::new(connection);
-                    *self.connection.write().await = Some(Arc::clone(&connection));
+                    *cached = Some(Arc::clone(&connection));
+                    drop(cached);
                     let scope = {
                         let presence = self
                             .runtime
@@ -252,6 +295,7 @@ impl DeviceSession {
             .as_ref()
             .is_some_and(|current| Arc::ptr_eq(current, failed))
         {
+            self.finish_usage(failed).await;
             tracing::warn!(device_id = %self.device_ref.device_id, %error,
                 "replacing failed device connection; connection-bound sessions will end");
             connection.take();
@@ -275,6 +319,37 @@ pub(super) enum BridgeAvailability {
     Connecting,
     Connected(Box<BridgeConnector>),
     Stopped(String),
+}
+
+#[cfg(test)]
+mod mode_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn changing_mode_closes_the_cached_connection_and_keeps_other_device_choices() {
+        let dir = tempfile::tempdir().unwrap();
+        let runtime = crate::runtime::test_support::runtime(dir.path()).await;
+        let (_a, _b, client, peer) = crate::connection::test_connection_pair().await;
+        let device_ref = client.device_ref();
+        let device = runtime.inner.device(device_ref).await;
+        let other = runtime.inner.device(DeviceRef { device_id: pab_protocol::DeviceId::new(), ..device_ref }).await;
+        let transport = client.connection().clone();
+        device.set_test_connection(client).await;
+        device.set_connection_mode(crate::ConnectionMode::Auto).await;
+        assert!(device.cached_connection().await.is_some(), "repeating the current choice must reuse the connection");
+        device.set_connection_mode(crate::ConnectionMode::Relay).await;
+        assert!(device.cached_connection().await.is_none());
+        tokio::time::timeout(Duration::from_secs(5), transport.closed()).await.unwrap();
+        assert_eq!(device.connection_mode(), crate::ConnectionMode::Relay);
+        assert_eq!(other.connection_mode(), crate::ConnectionMode::Auto);
+        // Reconnects and implicit operations preserve the session preference.
+        device.resume();
+        assert_eq!(device.connection_mode(), crate::ConnectionMode::Relay);
+        device.set_connection_mode(crate::ConnectionMode::Auto).await;
+        assert_eq!(device.connection_mode(), crate::ConnectionMode::Auto);
+        peer.close(b"test done");
+        Arc::try_unwrap(runtime).ok().unwrap().shutdown().await.unwrap();
+    }
 }
 
 pub(super) async fn run_bridge_supervisor(

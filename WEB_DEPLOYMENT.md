@@ -75,7 +75,7 @@ For Compose, run this command in the backend container with its existing environ
 
 ## Tests / 测试
 
-Use an isolated PostgreSQL database through `DATABASE_URL`; never point integration tests at production. Full plan and measured results: [WEB_DEVELOPMENT.md](WEB_DEVELOPMENT.md).
+Use an isolated PostgreSQL database through `DATABASE_URL`; never point integration tests at production. See the [development guide](DEVELOPMENT.md) for repository and test conventions.
 
 ```sh
 cargo test -p pab-server --test web_management

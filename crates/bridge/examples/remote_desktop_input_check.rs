@@ -3,7 +3,7 @@
 use pab_agent_core::DataPaths;
 use pab_bridge::{BridgeConfig, BridgeRuntime, BridgeRuntimeConfig, SqliteDevicePasswordProvider};
 use pab_desktop_media::NativeViewer;
-use pab_protocol::RemoteDesktopInput;
+use pab_protocol::{RemoteDesktopInput, DesktopClipboardOperation};
 use std::{sync::Arc, time::Duration};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
@@ -13,6 +13,8 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 enum Command {
     Enable { enabled: bool },
     Input { event: RemoteDesktopInput },
+    ClipboardWrite { text: String },
+    ClipboardCheck { expected: Option<String> },
     Close,
 }
 fn main() -> std::process::ExitCode {
@@ -77,6 +79,7 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
     .await?;
     let screen = session.opened().config.screen.clone();
     let control = session.input_control();
+    let mut clipboard = session.clipboard_control();
     let acknowledgements = session.presentation_control();
     let mut presentations = viewer.presentations();
     let (ready, mut ready_rx) = tokio::sync::watch::channel(false);
@@ -103,7 +106,7 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
     let inputs = async {
         let mut lines = BufReader::new(tokio::io::stdin()).lines();
         while let Some(line) = lines.next_line().await? {
-            if line.len() > 1024 {
+            if line.len() > pab_protocol::DESKTOP_CLIPBOARD_JSON_BYTES {
                 return Err("input acceptance command too long".into());
             }
             // Parse errors are deliberately generic; serde errors can echo values.
@@ -117,6 +120,14 @@ async fn drive(runtime: &BridgeRuntime, code: pab_protocol::DeviceCode) -> Resul
                     control.set_enabled(enabled).await?;
                 }
                 Command::Input { event } => control.send(event).await?,
+                Command::ClipboardWrite { text } => {
+                    clipboard.exchange(DesktopClipboardOperation::Write { text }).await?;
+                }
+                Command::ClipboardCheck { expected } => {
+                    let snapshot = clipboard.exchange(DesktopClipboardOperation::Read { after: None }).await?;
+                    if snapshot.text != expected { return Err("native clipboard content did not match the expected test text".into()); }
+                    println!("{{\"clipboard_checked\":true}}");
+                }
                 Command::Close => break,
             }
             println!("{{\"applied\":true}}");

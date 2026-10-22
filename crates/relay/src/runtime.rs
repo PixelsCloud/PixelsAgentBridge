@@ -30,6 +30,7 @@ pub struct RelayPolicyRuntime {
     probes: Arc<Mutex<Option<crate::probes::RelayProbes>>>,
     clock: Arc<Mutex<Option<(i64, Instant)>>>,
     cluster_mode: Arc<std::sync::atomic::AtomicBool>,
+    diagnostics: Arc<crate::diagnostics::Diagnostics>,
 }
 
 impl RelayPolicyRuntime {
@@ -57,7 +58,12 @@ impl RelayPolicyRuntime {
             probes: Arc::new(Mutex::new(None)),
             clock: Arc::default(),
             cluster_mode: Arc::default(),
+            diagnostics: Arc::default(),
         }
+    }
+
+    pub(crate) fn diagnostics_snapshot(&self, metrics: &iroh_relay::server::Metrics) -> Option<pab_protocol::RelayDiagnosticsSnapshot> {
+        self.diagnostics.snapshot(metrics)
     }
 
     pub(crate) fn enable_cluster(&self, node_id: String, boot_id: uuid::Uuid) {
@@ -273,6 +279,7 @@ impl AccessControl for RelayPolicyRuntime {
                 .lock()
                 .is_ok_and(|state| self.policy_now().is_ok_and(|now| state.is_current(now)))
         {
+            self.diagnostics.connected(request.endpoint_id(),request.connection_id(),true);
             return Access::Allow;
         }
         // Registration and address lookup commit before a client uses Relay,
@@ -285,11 +292,14 @@ impl AccessControl for RelayPolicyRuntime {
                 tokio::time::timeout(std::time::Duration::from_secs(3), completed.changed()).await;
         }
         match self.endpoint_owner(request.endpoint_id()) {
-            Ok(Some(_)) => Access::Allow,
+            Ok(Some(_)) => { self.diagnostics.connected(request.endpoint_id(),request.connection_id(),false);Access::Allow },
             Ok(None) | Err(_) => Access::Deny {
                 reason: Some("endpoint is not admitted by a current policy".to_owned()),
             },
         }
+    }
+    fn on_disconnect(&self, endpoint: EndpointId, connection: iroh_relay::server::ConnectionId) {
+        self.diagnostics.disconnected(endpoint, connection);
     }
 }
 
@@ -314,6 +324,7 @@ impl ForwardingControl for RelayPolicyRuntime {
             return;
         }
         let user = scope.and_then(|v| v.user_id());
+        self.diagnostics.forwarded(src,dst,bytes);
         let upload = !matches!(
             state.endpoint_owner(endpoint_key(src), now),
             Some(RelayEndpointOwner::Device { .. })

@@ -3,6 +3,44 @@ use pab_agent_core::account::{AccountClient, AccountError, AccountStore};
 use pab_protocol::{RequestId, UsageBatch, UsageCounters};
 use sqlx::{Row, Sqlite, Transaction};
 
+/// Local sampling must continue while the control server is unreachable.
+pub(super) async fn run_sampler(
+    inner: std::sync::Arc<super::RuntimeInner>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    let mut tick = tokio::time::interval(std::time::Duration::from_secs(5));
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => break,
+            _ = tick.tick() => {}
+        }
+        let devices = inner
+            .devices
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        for device in devices {
+            // Preserve the last server-confirmed owner in the SQLite
+            // transaction. A pending local login must not reattribute traffic
+            // still authorized under the previous account.
+            device.sample_usage(None).await;
+        }
+    }
+    let devices = inner
+        .devices
+        .lock()
+        .await
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    for device in devices {
+        device.close_for_account_change().await;
+    }
+}
+
 async fn add(
     tx: &mut Transaction<'_, Sqlite>,
     scope: &str,
@@ -96,6 +134,18 @@ impl RuntimeStore {
         connection_id: Option<i64>,
         scope: Option<&str>,
     ) -> Result<(), RuntimeStoreError> {
+        self.sample_connection_traffic(session, device, connection_id, scope, None)
+            .await
+    }
+
+    pub(super) async fn sample_connection_traffic(
+        &self,
+        session: &str,
+        device: pab_protocol::DeviceId,
+        connection_id: Option<i64>,
+        scope: Option<&str>,
+        traffic: Option<pab_transport::DirectTraffic>,
+    ) -> Result<(), RuntimeStoreError> {
         let now = super::unix_millis();
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let previous =
@@ -104,6 +154,20 @@ impl RuntimeStore {
                 .bind(device.to_string())
                 .fetch_optional(&mut *tx)
                 .await?;
+        let remembered_scope = if scope.is_none() && connection_id.is_some() {
+            let Some(row) = previous
+                .as_ref()
+                .filter(|row| connection_id == Some(row.get::<i64, _>("connection_id")))
+            else {
+                // Initial attribution belongs to the authenticated account
+                // synchronization, never the network-independent sampler.
+                return Ok(());
+            };
+            row.get::<Option<String>, _>("scope")
+        } else {
+            None
+        };
+        let scope = scope.or(remembered_scope.as_deref());
         if let Some(previous) = &previous {
             if let Some(old_scope) = previous.try_get::<Option<String>, _>("scope")? {
                 let start = previous.try_get::<i64, _>("last_ms")?;
@@ -137,6 +201,51 @@ impl RuntimeStore {
                 }
             }
         }
+        if let Some(traffic) = traffic {
+            let same_connection = previous.as_ref().is_some_and(|row| {
+                connection_id.is_none_or(|id| row.get::<i64, _>("connection_id") == id)
+            });
+            let (before_upload, before_download) = if same_connection {
+                let row = previous.as_ref().unwrap();
+                (
+                    row.get::<String, _>("p2p_upload")
+                        .parse::<u64>()
+                        .unwrap_or(0),
+                    row.get::<String, _>("p2p_download")
+                        .parse::<u64>()
+                        .unwrap_or(0),
+                )
+            } else {
+                (0, 0)
+            };
+            // Attribute bytes to the scope that owned the sampled interval.
+            let owner = if same_connection {
+                previous
+                    .as_ref()
+                    .and_then(|row| row.get::<Option<String>, _>("scope"))
+            } else {
+                scope.map(str::to_owned)
+            };
+            if let Some(owner) = owner {
+                add(
+                    &mut tx,
+                    &owner,
+                    now,
+                    &UsageCounters {
+                        p2p_upload_bytes: traffic.uploaded_bytes.saturating_sub(before_upload),
+                        p2p_download_bytes: traffic
+                            .downloaded_bytes
+                            .saturating_sub(before_download),
+                        p2p_reported: true,
+                        incomplete: traffic.incomplete
+                            || traffic.uploaded_bytes < before_upload
+                            || traffic.downloaded_bytes < before_download,
+                        ..Default::default()
+                    },
+                )
+                .await?;
+            }
+        }
         if let Some(connection_id) = connection_id {
             if previous
                 .as_ref()
@@ -155,8 +264,10 @@ impl RuntimeStore {
                     .await?;
                 }
             }
-            sqlx::query("INSERT INTO connection_usage(session_id,device_id,connection_id,scope,last_ms) VALUES(?,?,?,?,?) ON CONFLICT(session_id,device_id) DO UPDATE SET connection_id=excluded.connection_id,scope=excluded.scope,last_ms=excluded.last_ms")
-                .bind(session).bind(device.to_string()).bind(connection_id).bind(scope).bind(now).execute(&mut *tx).await?;
+            let traffic = traffic.unwrap_or_default();
+            sqlx::query("INSERT INTO connection_usage(session_id,device_id,connection_id,scope,last_ms,p2p_upload,p2p_download) VALUES(?,?,?,?,?,?,?) ON CONFLICT(session_id,device_id) DO UPDATE SET connection_id=excluded.connection_id,scope=excluded.scope,last_ms=excluded.last_ms,p2p_upload=excluded.p2p_upload,p2p_download=excluded.p2p_download")
+                .bind(session).bind(device.to_string()).bind(connection_id).bind(scope).bind(now)
+                .bind(traffic.uploaded_bytes.to_string()).bind(traffic.downloaded_bytes.to_string()).execute(&mut *tx).await?;
         } else {
             sqlx::query("DELETE FROM connection_usage WHERE session_id=? AND device_id=?")
                 .bind(session)
@@ -274,6 +385,71 @@ impl RuntimeStore {
 mod tests {
     use super::*;
     use pab_protocol::{DeviceId, DeviceRef, TenantId, UserAttribution, UserId};
+    #[tokio::test]
+    async fn direct_bytes_are_durable_incremental_and_keep_the_interval_owner() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p2p.db");
+        let store = RuntimeStore::open(&path).await.unwrap();
+        store.start_session("p2p").await.unwrap();
+        let device = DeviceId::new();
+        let sample = |upload, download| {
+            Some(pab_transport::DirectTraffic {
+                uploaded_bytes: upload,
+                downloaded_bytes: download,
+                incomplete: false,
+            })
+        };
+        // A network-independent sample cannot invent an owner before the
+        // authenticated account synchronization has attributed this connection.
+        store
+            .sample_connection_traffic("p2p", device, Some(1), None, sample(50, 80))
+            .await
+            .unwrap();
+        store
+            .sample_connection_traffic("p2p", device, Some(1), Some("A"), sample(100, 200))
+            .await
+            .unwrap();
+        store
+            .sample_connection_traffic("p2p", device, Some(1), Some("A"), sample(100, 200))
+            .await
+            .unwrap();
+        store.close().await;
+        let store = RuntimeStore::open(&path).await.unwrap();
+        store
+            .sample_connection_traffic("p2p", device, Some(1), None, sample(130, 230))
+            .await
+            .unwrap();
+        assert_eq!(total(&store, "A").await.p2p_upload_bytes, 130);
+        assert_eq!(total(&store, "B").await.p2p_upload_bytes, 0);
+        store
+            .sample_connection_traffic("p2p", device, Some(1), Some("B"), sample(150, 260))
+            .await
+            .unwrap();
+        assert_eq!(total(&store, "A").await.p2p_upload_bytes, 150);
+        assert_eq!(total(&store, "A").await.p2p_download_bytes, 260);
+        store
+            .sample_connection_traffic("p2p", device, None, None, sample(170, 300))
+            .await
+            .unwrap();
+        let b = total(&store, "B").await;
+        assert_eq!((b.p2p_upload_bytes, b.p2p_download_bytes), (20, 40));
+        assert!(b.p2p_reported);
+        // Retrying the final sample cannot attribute a second copy.
+        store
+            .sample_connection_traffic("p2p", device, None, None, sample(170, 300))
+            .await
+            .unwrap();
+        assert_eq!(total(&store, "B").await.p2p_download_bytes, 40);
+        // New connection has independent counters, not a negative old delta.
+        store
+            .sample_connection_traffic("p2p", device, Some(2), Some("B"), sample(5, 8))
+            .await
+            .unwrap();
+        assert_eq!(total(&store, "B").await.p2p_upload_bytes, 25);
+        assert_eq!(total(&store, "B").await.p2p_download_bytes, 48);
+        assert_eq!(total(&store, "B").await.relay_upload_bytes, 0);
+        store.close().await;
+    }
     async fn total(store: &RuntimeStore, scope: &str) -> UsageCounters {
         let rows: Vec<String> =
             sqlx::query_scalar("SELECT counters FROM client_usage_accumulators WHERE scope=?")

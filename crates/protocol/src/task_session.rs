@@ -484,6 +484,8 @@ pub enum DeviceTaskResponse {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         remote_desktop_cursor_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        remote_desktop_clipboard_schema_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         filesystem_schema_version: Option<u16>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         transfer_schema_version: Option<u16>,

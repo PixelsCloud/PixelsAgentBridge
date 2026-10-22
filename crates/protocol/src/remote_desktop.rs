@@ -2,6 +2,9 @@
 //! belong in these JSON messages; compressed video uses a separate binary flow.
 use crate::RequestId;
 use serde::{Deserialize, Serialize};
+#[path = "desktop_clipboard.rs"]
+mod clipboard;
+pub use clipboard::*;
 
 pub const REMOTE_DESKTOP_SCHEMA_VERSION: u16 = 2;
 pub const DESKTOP_VIDEO_CHUNK_BYTES: usize = 64 * 1024;
@@ -175,6 +178,12 @@ impl DesktopOpened {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopRequest {
+    Clipboard {
+        version: u16,
+        session_id: RequestId,
+        generation: u64,
+        request: DesktopClipboardRequest,
+    },
     Open {
         version: u16,
         session_id: RequestId,
@@ -217,6 +226,12 @@ pub enum DesktopErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopReply {
+    Clipboard {
+        version: u16,
+        revision: u64,
+        changed: bool,
+        bytes: Option<u32>,
+    },
     Opened {
         opened: DesktopOpened,
     },

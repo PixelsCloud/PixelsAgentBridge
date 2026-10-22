@@ -24,6 +24,58 @@ pub struct ControlAgent {
 }
 
 impl ControlAgent {
+    pub fn rename_device(
+        config: &AndroidConfig,
+        key: &[u8],
+        registration: &str,
+        name: &str,
+    ) -> Result<Value, &'static str> {
+        config.validate()?;
+        if name.trim() != name
+            || name.is_empty()
+            || name.chars().count() > 80
+            || name.chars().any(char::is_control)
+        {
+            return Err("invalid_device_name");
+        }
+        let registration: EndpointRegistrationResult =
+            serde_json::from_str(registration).map_err(|_| "invalid_registration")?;
+        let EndpointRegistrationResult::Device {
+            tenant_id,
+            device_id,
+            ..
+        } = registration
+        else {
+            return Err("invalid_registration");
+        };
+        let connector = tls_connector(config.trusted_ca_pem.as_deref().map(str::as_bytes))
+            .map_err(|_| "invalid_ca")?;
+        runtime()?.block_on(async {
+            let mut connection = pab_agent_core::AuthenticatedControlConnection::connect(
+                &EndpointControlConfig {
+                    url: config.control_url.clone(),
+                    tenant_id,
+                    principal: EndpointProofPrincipal::Device { device_id },
+                    operation_timeout: Duration::from_secs(8),
+                },
+                &secret(key)?,
+                connector,
+            )
+            .await
+            .map_err(|_| "device_rename_failed")?;
+            connection
+                .rename_own_device(name, Duration::from_secs(8))
+                .await
+                .map_err(|error| match error {
+                    pab_agent_core::EndpointControlError::Server {
+                        code: pab_protocol::ControlErrorCode::RateLimited,
+                        ..
+                    } => "device_rename_rate_limited",
+                    _ => "device_rename_failed",
+                })?;
+            Ok(json!({"name":name}))
+        })
+    }
     /// A stored registration avoids registering an already claimed device again.
     /// The caller persists the returned registration before calling `start`.
     pub fn register(config: &AndroidConfig, key: &[u8]) -> Result<Value, &'static str> {
@@ -157,6 +209,16 @@ impl ControlAgent {
             runtime,
             registration,
         })
+    }
+
+    pub fn update_password(
+        &self,
+        credential: pab_device_session::DevicePassword,
+    ) -> Result<(), &'static str> {
+        if let Some(peer) = &self.peer {
+            peer.update_password(credential)?;
+        }
+        Ok(())
     }
 
     pub fn status(&self) -> Value {

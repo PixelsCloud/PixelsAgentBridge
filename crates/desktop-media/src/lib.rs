@@ -1,6 +1,7 @@
 //! Platform media workers. The authenticated session/transport crate contains
 //! no native FFI. Compressed video and bounded cursor snapshots cross private pipes.
 mod input;
+pub mod clipboard;
 #[cfg(target_os = "linux")]
 mod linux_view;
 #[cfg(target_os = "linux")]
@@ -30,6 +31,8 @@ pub use viewer_input::{NativeViewerEvent, NativeViewerInput};
 /// Invoke only in a dedicated child, before starting a GUI/runtime. Arguments
 /// start with the operation (inventory, capture or render), without argv[0].
 pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
+    let arguments = arguments.into_iter().collect::<Vec<_>>();
+    if arguments.as_slice() == ["clipboard"] { return clipboard::worker_main(); }
     #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     {
         use std::ffi::{CString, c_char};

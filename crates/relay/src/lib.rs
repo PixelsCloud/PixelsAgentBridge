@@ -2,6 +2,7 @@
 
 mod budgets;
 mod control_client;
+mod diagnostics;
 mod limiter;
 mod policy;
 mod probes;

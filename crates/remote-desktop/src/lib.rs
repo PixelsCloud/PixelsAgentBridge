@@ -14,6 +14,7 @@ pub use host::{
 };
 mod client;
 pub use client::{
+    RemoteDesktopClipboardControl,
     RemoteDesktopCursor, RemoteDesktopInputControl, RemoteDesktopPresentationControl,
     RemoteDesktopSession,
     RemoteDesktopQualityControl,

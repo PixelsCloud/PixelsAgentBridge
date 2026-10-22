@@ -35,8 +35,50 @@ fn enabled() -> bool {
 #[serde(deny_unknown_fields)]
 pub struct RelayConfig {
     pub control_secret: String,
-    /// Absent keeps legacy single-node operation and its wire contract unchanged.
+    /// Canonical node directory; the historical table name remains a read alias.
+    #[serde(rename = "directory", alias = "cluster")]
     pub cluster: Option<crate::relay_cluster::RelayClusterConfig>,
+}
+
+impl RelayConfig {
+    /// Normalize a previously installed single Relay into the same directory
+    /// used by every node. Never guess identities or duplicate shared secrets.
+    pub async fn resolved_directory(
+        &self,
+        store: &crate::PostgresStore,
+    ) -> Result<Option<crate::relay_cluster::RelayClusterConfig>, crate::StoreError> {
+        if let Some(directory) = &self.cluster {
+            return Ok(Some(directory.clone()));
+        }
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT node_id,public_url FROM relay_nodes WHERE public_url IS NOT NULL ORDER BY node_id"
+        ).fetch_all(store.pool()).await?;
+        if rows.is_empty() {
+            return Ok(None);
+        } // wire adapter for an unregistered old deployment
+        if rows.len() != 1 {
+            return Err(crate::StoreError::InvalidInput("configure relay.directory explicitly when migrating multiple historical Relay identities".into()));
+        }
+        let (node_id, url) = rows.into_iter().next().unwrap();
+        let mut directory = crate::relay_cluster::RelayClusterConfig {
+            heartbeat_seconds: 5,
+            offline_seconds: 15,
+            recovery_seconds: 10,
+            maintenance_seconds: 30,
+            nodes: vec![crate::relay_cluster::RelayNodeConfig {
+                node_id,
+                url,
+                region: String::new(),
+                weight: 100,
+                capacity_mbps: crate::relay_cluster::default_capacity_mbps(),
+                control_secret: self.control_secret.clone(),
+            }],
+        };
+        directory
+            .validate()
+            .map_err(|error| crate::StoreError::InvalidInput(error.into()))?;
+        Ok(Some(directory))
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -92,15 +134,6 @@ impl ServerConfig {
             .map_err(|_| Invalid("relay.control_secret requires at least 32 bytes"))?;
         if let Some(cluster) = &mut self.relay.cluster {
             cluster.validate().map_err(Invalid)?;
-            if cluster
-                .nodes
-                .iter()
-                .any(|node| node.control_secret == self.relay.control_secret)
-            {
-                return Err(Invalid(
-                    "cluster node secret must differ from legacy control_secret",
-                ));
-            }
         }
         // Validate optional OAuth credentials and proxy before connecting to the database.
         self.github_config().map_err(Invalid)?;

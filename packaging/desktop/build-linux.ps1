@@ -13,6 +13,7 @@ if (-not $ComponentsOnly) {
 $dockerfile = Join-Path $PSScriptRoot 'Dockerfile.linux'
 $mount = "type=bind,source=$root,target=/src"
 $image = 'pab-linux-headless-build-deps:bullseye'
+$cargoJobs = if ($env:CARGO_BUILD_JOBS) { [Math]::Min(10, [Math]::Max(1, [int]$env:CARGO_BUILD_JOBS)) } else { 10 }
 
 & docker build --target dependencies -t $image -f $dockerfile $root
 if ($LASTEXITCODE -ne 0) {
@@ -22,7 +23,10 @@ if ($LASTEXITCODE -ne 0) {
 $cargoFlags = if ($Profile -eq 'release') { '--release' } else { '' }
 $buildScript = @"
 set -eu
-cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp -p pab-document --bin pab-document-worker -j 8
+# Linux Makefile builds share Cargo's jobserver, including native dependencies.
+# An explicit CMake parallel limit overrides that pool and serializes OCR builds.
+unset CMAKE_BUILD_PARALLEL_LEVEL
+cargo build --locked $cargoFlags -p pab-executor --bin pab-executor -p pab-bridge --bin pab-mcp -p pab-document --bin pab-document-worker -j $cargoJobs
 mkdir -p .build/guest-desktop-linux-$Profile
 cp .build/linux-target-bullseye/$Profile/pab-executor .build/linux-target-bullseye/$Profile/pab-mcp .build/linux-target-bullseye/$Profile/pab-document-worker .build/guest-desktop-linux-$Profile/
 "@
@@ -42,8 +46,7 @@ if (Test-Path Env:PAB_CLIENT_DEFAULTS_FILE) {
     --env CARGO_HOME=/src/.build/linux-cargo-home `
     --env CARGO_TARGET_DIR=/src/.build/linux-target-bullseye `
     --cpus 10 `
-    --env CARGO_BUILD_JOBS=8 `
-    --env CMAKE_BUILD_PARALLEL_LEVEL=1 `
+    --env "CARGO_BUILD_JOBS=$cargoJobs" `
     --env PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin `
     @defaultsArguments $image sh -c $buildScript
 if ($LASTEXITCODE -ne 0) {

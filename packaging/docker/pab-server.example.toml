@@ -19,6 +19,14 @@ assets = "/usr/local/bin/web"
 control_secret = "replace-with-a-random-secret-at-least-32-bytes"
 # Account bandwidth is selected in Web administration; new accounts receive 10 Mbps.
 
+[relay.directory]
+[[relay.directory.nodes]]
+node_id = "primary"
+url = "https://relay.example.com/"
+# Omitted capacity_mbps defaults to 200 Mbps. Account limits still apply; 0 removes the node cap.
+# Give every additional node its own control secret, matching its Relay TOML.
+control_secret = "replace-with-a-random-secret-at-least-32-bytes"
+
 # Optional. Omit the entire section to disable GitHub login.
 # [github]
 # client_id = "your-client-id"

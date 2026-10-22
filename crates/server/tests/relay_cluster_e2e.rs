@@ -70,6 +70,8 @@ async fn echo(a: &PabEndpoint, b: &PabEndpoint) {
                 .unwrap();
         };
         tokio::join!(send, receive);
+        assert_eq!(client.direct_traffic().uploaded_bytes, 0);
+        assert_eq!(client.direct_traffic().downloaded_bytes, 0);
         client.close(b"probe complete");
         server.close(b"probe complete");
     })
@@ -153,6 +155,20 @@ async fn large_transfer(a: &PabEndpoint, b: &PabEndpoint, count: usize) {
 
 #[sqlx::test(migrations = "./migrations")]
 async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
+    cluster_failover(pool, false, false).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn three_nodes_forward_and_fail_over_twice_without_overlapping_maintenance(pool: PgPool) {
+    cluster_failover(pool, true, false).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn diagnostics_follow_real_relay_only_forwarding_and_disconnects(pool:PgPool) {
+    cluster_failover(pool,false,true).await;
+}
+
+async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let store = PostgresStore::from_pool(pool.clone());
     store.initialize_settings().await.unwrap();
@@ -161,6 +177,7 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
         .register_account("cluster-e2e", "isolated test password long enough")
         .await
         .unwrap();
+    if diagnostics_only {pab_server::web::bootstrap_admin(&base,"cluster-e2e").await.unwrap();}
     let operator = SecretKey::from_bytes(&[211; 32]);
     let device = SecretKey::from_bytes(&[212; 32]);
     let device_id = DeviceId::new();
@@ -206,9 +223,10 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
         .bind(operator.public().as_bytes().as_slice()).bind(device_id.as_uuid()).execute(&pool).await.unwrap();
     let reserved_a = reserve();
     let reserved_b = reserve();
+    let reserved_c = three_nodes.then(reserve);
     let port_a = reserved_a.local_addr().unwrap().port();
     let port_b = reserved_b.local_addr().unwrap().port();
-    let config = RelayClusterConfig {
+    let mut config = RelayClusterConfig {
         heartbeat_seconds: 1,
         offline_seconds: 3,
         recovery_seconds: 0,
@@ -219,7 +237,7 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
                 url: format!("https://localhost:{port_a}/"),
                 region: "test".into(),
                 weight: 100,
-                capacity_mbps: 100,
+                capacity_mbps: if three_nodes { 100 } else { 0 },
                 control_secret: "isolated-cluster-node-a-01234567890123456789".into(),
             },
             RelayNodeConfig {
@@ -227,17 +245,32 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
                 url: format!("https://localhost:{port_b}/"),
                 region: "test".into(),
                 weight: 100,
-                capacity_mbps: 100,
+                capacity_mbps: if three_nodes { 100 } else { 0 },
                 control_secret: "isolated-cluster-node-b-01234567890123456789".into(),
             },
         ],
     };
+    if let Some(listener) = &reserved_c {
+        config.nodes.push(RelayNodeConfig {
+            node_id: "c".into(),
+            url: format!(
+                "https://localhost:{}/",
+                listener.local_addr().unwrap().port()
+            ),
+            region: "test".into(),
+            weight: 100,
+            capacity_mbps: if three_nodes { 100 } else { 0 },
+            control_secret: "isolated-cluster-node-c-01234567890123456789".into(),
+        });
+    }
     let control = base.with_relay_cluster(Some(config.clone())).await.unwrap();
     // Start B in maintenance so initial traffic is provably carried by A.
-    sqlx::query("UPDATE relay_cluster_nodes SET admin_state='maintenance' WHERE node_id='b'")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE relay_cluster_nodes SET admin_state='maintenance' WHERE node_id IN ('b','c')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     let auth = RelayControlAuth::new("isolated-legacy-control-01234567890123456789")
         .unwrap()
         .with_cluster(Some(&config));
@@ -269,6 +302,7 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
     });
     let relay_config = |index: usize| RelayServiceConfig {
         cluster_enabled: true,
+        public_url: None,
         node_id: config.nodes[index].node_id.clone(),
         usage_dir: root.path().join(format!("usage-{index}")),
         control_url: format!("wss://localhost:{port}/relay-control"),
@@ -276,9 +310,15 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
         control_ca_cert: Some(cert.clone()),
         tls_cert: cert.clone(),
         tls_key: key.clone(),
-        https_bind: format!("127.0.0.1:{}", if index == 0 { port_a } else { port_b })
-            .parse()
-            .unwrap(),
+        https_bind: format!(
+            "127.0.0.1:{}",
+            url::Url::parse(&config.nodes[index].url)
+                .unwrap()
+                .port()
+                .unwrap()
+        )
+        .parse()
+        .unwrap(),
         captive_bind: "127.0.0.1:0".parse().unwrap(),
         quic_bind: "127.0.0.1:0".parse().unwrap(),
         policy_refresh_interval: Duration::from_secs(1),
@@ -288,7 +328,13 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
     drop(reserved_a);
     let relay_a = start_relay_service(relay_config(0)).await.unwrap();
     drop(reserved_b);
-    let relay_b = start_relay_service(relay_config(1)).await.unwrap();
+    let mut relay_b = Some(start_relay_service(relay_config(1)).await.unwrap());
+    let relay_c = if three_nodes {
+        drop(reserved_c);
+        Some(start_relay_service(relay_config(2)).await.unwrap())
+    } else {
+        None
+    };
     let seed: iroh_base::RelayUrl = config.nodes[0].url.parse().unwrap();
     let ep_config = || {
         PabEndpointConfig::new(vec![seed.clone()])
@@ -359,6 +405,32 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
     wait_home(&a, &config.nodes[0].url).await;
     wait_home(&b, &config.nodes[0].url).await;
     echo(&a, &b).await;
+    if diagnostics_only {
+        let client=reqwest::Client::builder().no_proxy().add_root_certificate(reqwest::Certificate::from_pem(certified.cert.pem().as_bytes()).unwrap()).build().unwrap();
+        let origin=format!("https://localhost:{port}");
+        let login=client.post(format!("{origin}/api/web/session")).header("Origin",&origin).json(&serde_json::json!({"username":"cluster-e2e","password":"isolated test password long enough"})).send().await.unwrap();assert!(login.status().is_success());
+        let cookie=login.headers()["set-cookie"].to_str().unwrap().split(';').next().unwrap().to_owned();
+        let endpoint=format!("{origin}/api/web/relays/a/runtime?view=links");
+        let sample=tokio::time::timeout(Duration::from_secs(12),async {loop{
+            let sample:serde_json::Value=client.get(&endpoint).header("cookie",&cookie).send().await.unwrap().json().await.unwrap();
+            if sample["fresh"]==true&&sample["summary"]["active_links"].as_u64().unwrap_or(0)>0 {break sample;}
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }}).await.expect("real forwarding inventory must be reported");
+        assert_eq!(sample["summary"]["connected_endpoints"],2);
+        let link=&sample["items"][0];assert_eq!(link["status"],"active");
+        let bytes=link["a_to_b_bytes"].as_str().unwrap().parse::<u64>().unwrap()+link["b_to_a_bytes"].as_str().unwrap().parse::<u64>().unwrap();assert!(bytes>12_000);
+        assert!(link["a"]["name"]=="cluster fixture"||link["b"]["name"]=="cluster fixture");
+        assert!(link["a"]["username"]=="cluster-e2e"||link["b"]["username"]=="cluster-e2e");
+        assert!(sample["host"]["logical_cpus"].as_u64().unwrap()>0);
+        a.close().await;
+        tokio::time::timeout(Duration::from_secs(10),async {loop{
+            let sample:serde_json::Value=client.get(&endpoint).header("cookie",&cookie).send().await.unwrap().json().await.unwrap();
+            if sample["items"].as_array().is_some_and(|rows|rows.iter().any(|row|row["status"]=="closed")){break;}
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }}).await.expect("disconnects must close observed pairs");
+        b.close().await;operator_control.shutdown().await.unwrap();device_control.shutdown().await.unwrap();network_task.abort();
+        relay_a.shutdown().await.unwrap();relay_b.take().unwrap().shutdown().await.unwrap();handle.shutdown();server.await.unwrap();return;
+    }
     large_transfer(&a, &b, 1024).await;
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
@@ -487,12 +559,87 @@ async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(resolved.relay_urls, vec![config.nodes[1].url.clone()]);
+    if three_nodes {
+        // The first maintenance operation still owns the maintenance slot even
+        // after the node goes offline. Another node cannot silently overlap it.
+        assert!(matches!(
+            store
+                .set_relay_state(
+                    "b",
+                    RelayAdminState::Maintenance,
+                    uuid::Uuid::new_v4(),
+                    account.id.as_uuid(),
+                    true,
+                    0,
+                    3
+                )
+                .await,
+            Err(pab_server::StoreError::Conflict(_))
+        ));
+        store
+            .set_relay_state(
+                "a",
+                RelayAdminState::Disabled,
+                uuid::Uuid::new_v4(),
+                account.id.as_uuid(),
+                false,
+                0,
+                3,
+            )
+            .await
+            .unwrap();
+        store
+            .set_relay_state(
+                "c",
+                RelayAdminState::Active,
+                uuid::Uuid::new_v4(),
+                account.id.as_uuid(),
+                false,
+                0,
+                3,
+            )
+            .await
+            .unwrap();
+        store
+            .set_relay_state(
+                "b",
+                RelayAdminState::Maintenance,
+                uuid::Uuid::new_v4(),
+                account.id.as_uuid(),
+                false,
+                0,
+                3,
+            )
+            .await
+            .unwrap();
+        relay_b.take().unwrap().shutdown().await.unwrap();
+        let second_switch = std::time::Instant::now();
+        wait_home(&a, &config.nodes[2].url).await;
+        wait_home(&b, &config.nodes[2].url).await;
+        echo(&a, &b).await;
+        assert!(second_switch.elapsed() < Duration::from_secs(30));
+        let resolved = operator_control
+            .device_network_resolver()
+            .resolve(device_ref)
+            .await
+            .unwrap();
+        assert_eq!(resolved.relay_urls, vec![config.nodes[2].url.clone()]);
+        eprintln!(
+            "three-node matrix: A -> B -> C, both Relay-only application echoes matched, second_switch_ms={}",
+            second_switch.elapsed().as_millis()
+        );
+    }
     a.close().await;
     b.close().await;
     operator_control.shutdown().await.unwrap();
     device_control.shutdown().await.unwrap();
     network_task.abort();
-    relay_b.shutdown().await.unwrap();
+    if let Some(relay) = relay_b {
+        relay.shutdown().await.unwrap();
+    }
+    if let Some(relay) = relay_c {
+        relay.shutdown().await.unwrap();
+    }
     handle.shutdown();
     server.await.unwrap();
 }

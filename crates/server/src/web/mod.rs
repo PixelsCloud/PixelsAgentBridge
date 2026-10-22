@@ -11,6 +11,9 @@ use tokio::sync::{Mutex, Semaphore};
 
 use crate::{ControlApiState, ControlPlane};
 
+mod account_support;
+mod audit;
+mod audit_context;
 mod device_accounts;
 mod devices;
 mod events;
@@ -18,7 +21,11 @@ mod github;
 pub use github::GithubConfig;
 mod management;
 mod relay_probe;
+mod relay_status;
+mod relay_addresses;
+mod relay_diagnostics;
 mod saved_devices;
+mod service_settings;
 mod session;
 mod support;
 mod usage;
@@ -33,7 +40,10 @@ struct WebState {
     login_slots: Arc<Semaphore>,
     login_budget: Arc<Mutex<(Instant, u32)>>,
     subscriptions: Arc<Semaphore>,
+    exports: Arc<Semaphore>,
     server_instance: uuid::Uuid,
+    relay_diagnostics:Arc<crate::relay_diagnostics::RelayDiagnostics>,
+    relay_addresses: Arc<relay_addresses::RelayAddressCache>,
     github: Option<Arc<GithubConfig>>,
     origin: Option<String>,
 }
@@ -45,7 +55,10 @@ pub fn router(control: ControlApiState) -> Router {
         login_slots: Arc::new(Semaphore::new(4)),
         login_budget: Arc::new(Mutex::new((Instant::now(), 0))),
         subscriptions: Arc::new(Semaphore::new(256)),
+        exports: Arc::new(Semaphore::new(2)),
         server_instance: control.server_instance,
+        relay_diagnostics:control.relay_diagnostics,
+        relay_addresses: Arc::new(relay_addresses::RelayAddressCache::default()),
         github: control.github,
         origin: control.config.web_origin,
     };
@@ -64,11 +77,14 @@ pub fn router(control: ControlApiState) -> Router {
         )
         .route("/api/web/password", post(session::change_password))
         .route("/api/web/devices", get(devices::list))
+        .route("/api/web/devices/diagnostics", get(devices::diagnostics))
         .route(
             "/api/web/saved-devices",
             get(saved_devices::web_changes).post(saved_devices::web_mutate),
         )
         .route("/api/web/usage", get(usage::summary))
+        .route("/api/web/usage/ranking", get(usage::ranking))
+        .route("/api/web/usage/export", get(usage::export))
         .route(
             "/api/web/devices/{id}/association",
             axum::routing::delete(device_accounts::web_unlink),
@@ -82,16 +98,40 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/accounts", get(management::accounts))
         .route(
             "/api/web/accounts/{id}",
-            axum::routing::patch(management::update_account),
+            get(account_support::detail).patch(management::update_account),
+        )
+        .route(
+            "/api/web/accounts/{id}/password-reset",
+            post(account_support::reset_password),
+        )
+        .route(
+            "/api/web/accounts/{id}/sessions",
+            get(account_support::sessions),
+        )
+        .route(
+            "/api/web/accounts/{id}/sessions/revoke",
+            post(account_support::revoke_sessions),
+        )
+        .route("/api/web/sessions", get(account_support::own_sessions))
+        .route(
+            "/api/web/sessions/revoke",
+            post(account_support::revoke_own_sessions),
+        )
+        .route(
+            "/api/web/account-operations/{id}",
+            get(account_support::operation),
         )
         .route(
             "/api/web/accounts/{id}/traffic",
             axum::routing::put(management::update_user_limit),
         )
-        .route("/api/web/audit", get(management::audit))
+        .route("/api/web/audit", get(audit::list))
+        .route("/api/web/audit/export", get(audit::export))
         .route("/api/web/traffic", get(management::traffic))
         .route("/api/web/relays", get(management::relays))
+        .route("/api/web/relays/{node}/runtime", get(relay_diagnostics::get))
         .route("/api/web/relays/reload", post(management::reload_relays))
+        .route("/api/web/relays/{node}/capacity", axum::routing::patch(management::relay_capacity))
         .route(
             "/api/web/relays/{node}/state",
             axum::routing::patch(management::relay_state),
@@ -100,7 +140,10 @@ pub fn router(control: ControlApiState) -> Router {
             "/api/web/relay-operations/{id}",
             get(management::relay_operation),
         )
-        .route("/api/web/service", get(management::service_config))
+        .route(
+            "/api/web/service",
+            get(service_settings::get).patch(service_settings::update),
+        )
         .route(
             "/api",
             any(|| async { WebError::new(axum::http::StatusCode::NOT_FOUND, "not_found") }),
@@ -122,6 +165,7 @@ pub fn router(control: ControlApiState) -> Router {
             get(relay_probe::status).delete(relay_probe::remove),
         )
         .route("/api/admin/relays/reload", post(management::reload_relays))
+        .route("/api/admin/relays/{node}/capacity", axum::routing::patch(management::relay_capacity))
         .route("/api/admin/relays", get(management::relays))
         .route(
             "/api/admin/relays/{node}/state",
@@ -182,8 +226,14 @@ pub fn router(control: ControlApiState) -> Router {
     let oauth = Router::new()
         .route("/api/account/github/authorize", get(github::authorize))
         .route("/api/account/github/callback", get(github::callback))
-        .with_state(state);
-    browser.merge(native).merge(oauth)
+        .with_state(state.clone());
+    browser
+        .merge(native)
+        .layer(middleware::from_fn_with_state(
+            state,
+            audit_context::context,
+        ))
+        .merge(oauth)
 }
 
 pub fn assets(
@@ -207,6 +257,10 @@ pub async fn bootstrap_admin(control: &ControlPlane, username: &str) -> Result<(
     sqlx::query("SELECT pg_advisory_xact_lock(26035001)")
         .execute(&mut *tx)
         .await?;
+    let before: bool = sqlx::query_scalar("SELECT server_admin FROM users WHERE id=$1")
+        .bind(id.as_uuid())
+        .fetch_one(&mut *tx)
+        .await?;
     let changed =
         sqlx::query("UPDATE users SET server_admin = true WHERE id = $1 AND status = 'active'")
             .bind(id.as_uuid())
@@ -215,8 +269,20 @@ pub async fn bootstrap_admin(control: &ControlPlane, username: &str) -> Result<(
     if changed.rows_affected() != 1 {
         return Err(WebError::invalid());
     }
-    sqlx::query("INSERT INTO web_admin_events (actor_id, action, resource_id) VALUES ($1, 'admin.bootstrap', $1)")
-        .bind(id.as_uuid()).execute(&mut *tx).await?;
+    let mut record = crate::audit::AuditRecord::new(
+        Some(id.as_uuid()),
+        crate::audit::AuditAction::Bootstrap,
+        crate::audit::AuditResource::Account(id.as_uuid()),
+    );
+    record.before = Some(crate::audit::AuditValues {
+        server_admin: Some(before),
+        ..Default::default()
+    });
+    record.after = Some(crate::audit::AuditValues {
+        server_admin: Some(true),
+        ..Default::default()
+    });
+    control.store().insert_audit(&mut tx, record).await?;
     tx.commit().await?;
     Ok(())
 }

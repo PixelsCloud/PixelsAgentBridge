@@ -4,6 +4,7 @@ use crate::ControlPlane;
 
 mod relay_auth;
 mod relay_session;
+mod relay_telemetry;
 mod session;
 mod session_error;
 mod transport;
@@ -37,6 +38,7 @@ pub struct ControlApiState {
     pub(crate) config: ControlApiConfig,
     pub(super) relay_auth: RelayControlAuth,
     pub(crate) server_instance: uuid::Uuid,
+    pub(crate) relay_diagnostics:Arc<crate::relay_diagnostics::RelayDiagnostics>,
     pub(crate) github: Option<Arc<crate::web::GithubConfig>>,
 }
 
@@ -51,6 +53,7 @@ impl ControlApiState {
             config,
             relay_auth,
             server_instance: uuid::Uuid::new_v4(),
+            relay_diagnostics:Arc::default(),
             github: None,
         }
     }

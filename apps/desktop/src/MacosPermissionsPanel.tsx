@@ -6,6 +6,7 @@ import type { CSSProperties } from "react";
 import { macosPermissionText } from "./macosPermissionText";
 import "./macosPermissions.css";
 import type { Language } from "./i18n";
+import { useAppRefresh } from "./appRefresh";
 
 type Permissions = { screenRecording: boolean; accessibility: boolean };
 type Target = "desktop" | "executor";
@@ -30,6 +31,7 @@ function useMacosPermissions() {
   const [permissions, setPermissions] = useState<Permissions | null>(null);
   const [error, setError] = useState("");
   const refresh = useCallback(() => invoke<Permissions | null>("macos_permissions").then((value) => { setPermissions(value); setError(""); return true; }).catch((e) => { setError(String(e)); return false; }), []);
+  useAppRefresh(async () => { if (!await refresh()) throw new Error("Permission status unavailable"); });
   useEffect(() => {
     void refresh();
     const onFocus = () => void refresh();

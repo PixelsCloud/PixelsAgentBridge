@@ -4,7 +4,7 @@ On macOS, run `bash packaging/desktop/build-macos.sh debug all` after installing
 frontend dependencies. This delegates to `scripts/build.py macos --macos-arch all
 --package`: both architectures share one version allocation, while tar/PKG creation
 does not allocate another version. The wrapper selects Python 3.12+ and Homebrew
-tools for non-interactive builds. See [MACOS.md](../../MACOS.md).
+tools for non-interactive builds. See [build prerequisites](../../BUILDING.md).
 
 ## macOS
 
@@ -23,8 +23,8 @@ Unpack the complete archive and, from a desktop user account, run
 Open the app from Applications and grant Screen Recording and Accessibility as
 needed. Upgrading automatically stops the installed PAB processes; finish active
 tasks first. Agent hosts remain open and may need to reconnect Pixels MCP.
-Uninstallation preserves machine and user data. See [MACOS.md](../../MACOS.md)
-for exact paths, permissions, account semantics and verification limitations.
+Uninstallation preserves machine and user data. See the [usage and self-hosting guide](../../docs/USAGE_AND_SELF_HOSTING.md)
+for setup and permission requirements.
 Windows/Linux use their existing scripts unchanged.
 
 ### Double-click macOS installer
@@ -44,6 +44,11 @@ defaults in the ignored `.env/client-defaults.toml` before compiling all client
 binaries, or set `PAB_CLIENT_DEFAULTS_FILE`. Missing defaults produce an unconfigured
 public build. Customer TOML/settings take priority; installed files and settings
 inputs do not reveal the compiled defaults. See [configuration](../../docs/CONFIGURATION.md).
+For private-CA Relays, add `relay_ca_cert = "relay-ca.pem"` to that ignored build
+TOML. The PEM path is relative to the TOML or absolute. Only public certificates
+are embedded in client binaries; private keys are rejected and must stay outside
+Git and installer inputs. Clients retain certificate-chain and hostname checks.
+Keep a new private-CA node in maintenance until the supported client rollout.
 `--control-url` and `--relay-url` explicitly set a new installation's customer
 configuration; they never replace an existing TOML. No UUID is requested.
 

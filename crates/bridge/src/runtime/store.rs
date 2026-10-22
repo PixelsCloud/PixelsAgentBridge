@@ -191,6 +191,21 @@ impl RuntimeStore {
         // must never appear as the identity that actually executed an operation.
         sqlx::query("CREATE VIEW IF NOT EXISTS runtime_operation_identity AS SELECT o.id, CASE WHEN o.kind = 'terminal' THEN t.identity_json WHEN o.kind = 'file_transfer' THEN json_extract(c.context_json, '$.identity') WHEN f.id IS NOT NULL THEN json_extract(f.reply_json, '$.execution_context.identity') ELSE json_extract(q.reply_json, '$.execution_context.identity') END AS identity_json FROM runtime_operations o LEFT JOIN runtime_terminal_identity t ON t.id=o.id LEFT JOIN runtime_transfer_context c ON c.id=o.id LEFT JOIN runtime_filesystem_results f ON f.id=o.id LEFT JOIN runtime_system_results q ON q.id=o.id")
             .execute(&mut *tx).await?;
+        let columns = sqlx::query("PRAGMA table_info(connection_usage)")
+            .fetch_all(&mut *tx)
+            .await?;
+        for column in ["p2p_upload", "p2p_download"] {
+            if !columns
+                .iter()
+                .any(|row| row.get::<String, _>("name") == column)
+            {
+                sqlx::query(&format!(
+                    "ALTER TABLE connection_usage ADD COLUMN {column} TEXT NOT NULL DEFAULT '0'"
+                ))
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
         tx.commit().await?;
         let account_origin = std::env::var("PAB_CONTROL_URL")
             .ok()

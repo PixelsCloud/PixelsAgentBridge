@@ -7,12 +7,52 @@ use crate::{
 use jni::{
     JNIEnv,
     objects::{JByteArray, JObject, JString},
-    sys::{jboolean, jstring},
+    sys::{jboolean, jlong, jstring},
 };
 use serde_json::{Value, json};
 use std::sync::Mutex;
 
 static AGENT: Mutex<Option<ControlAgent>> = Mutex::new(None);
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_pixels_agent_transport_NativeBridge_renameDevice(
+    env: JNIEnv<'_>,
+    _object: JObject<'_>,
+    toml: JString<'_>,
+    identity: JByteArray<'_>,
+    registration: JString<'_>,
+    name: JString<'_>,
+) -> jstring {
+    reply(env, |env| {
+        let config = AndroidConfig::parse(&string(env, &toml, MAX_CONFIG_BYTES)?)?;
+        let identity = key(env, &identity)?;
+        ControlAgent::rename_device(
+            &config,
+            &identity,
+            &string(env, &registration, 4096)?,
+            &string(env, &name, 1024)?,
+        )
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_pixels_agent_transport_NativeBridge_updateAccessPassword(
+    env: JNIEnv<'_>,
+    _object: JObject<'_>,
+    hash: JString<'_>,
+    version: jlong,
+) -> jstring {
+    reply(env, |env| {
+        let version = u64::try_from(version).map_err(|_| "invalid_access_password")?;
+        let credential =
+            pab_device_session::DevicePassword::from_phc(version, string(env, &hash, 1024)?)
+                .map_err(|_| "invalid_access_password")?;
+        if let Some(agent) = AGENT.lock().map_err(|_| "lifecycle_unavailable")?.as_ref() {
+            agent.update_password(credential)?;
+        }
+        Ok(json!({"updated":true}))
+    })
+}
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_pixels_agent_transport_NativeBridge_recentActivity(

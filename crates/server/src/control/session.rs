@@ -66,7 +66,10 @@ impl ControlSession {
                 if self.endpoint.is_none() {
                     return error_response(Some(request_id), ControlSessionError::NotAuthenticated);
                 }
-                if schema_version != pab_protocol::RELAY_CLUSTER_SCHEMA_VERSION {
+                if !matches!(
+                    schema_version,
+                    1 | pab_protocol::RELAY_DIRECTORY_SCHEMA_VERSION
+                ) {
                     return ControlServerMessage::Error {
                         request_id: Some(request_id),
                         code: pab_protocol::ControlErrorCode::InvalidMessage,
@@ -83,9 +86,22 @@ impl ControlSession {
                         .store()
                         .relay_directory(config.offline_seconds)
                         .await
-                        .map(|directory| ControlServerMessage::RelayDirectory {
-                            request_id,
-                            directory: Some(directory),
+                        .map(|mut directory| {
+                            directory.schema_version = schema_version;
+                            if schema_version == 1 {
+                                // Schema 1 used capacity as a routing multiplier
+                                // and rejects zero. A neutral multiplier keeps
+                                // old clients connected without inventing or
+                                // enforcing a host bandwidth limit. Actual node
+                                // capacity is exposed by the management API.
+                                for node in &mut directory.nodes {
+                                    node.capacity_mbps = 1;
+                                }
+                            }
+                            ControlServerMessage::RelayDirectory {
+                                request_id,
+                                directory: Some(directory),
+                            }
                         })
                         .map_err(|e| ControlSessionError::Service(e.into())),
                 }
@@ -150,6 +166,19 @@ impl ControlSession {
                 .complete_endpoint_authentication(proof)
                 .await
                 .map(|result| ControlServerMessage::EndpointAuthenticated { request_id, result }),
+            ControlClientMessage::RenameOwnDevice { name, .. } => {
+                match self.endpoint.as_ref() {
+                    Some(endpoint) => match self.control.store().rename_own_device(endpoint, &name).await {
+                        Ok(Some(name)) => {
+                            self.control.web_changed();
+                            Ok(ControlServerMessage::OwnDeviceRenamed { request_id, name })
+                        }
+                        Ok(None) => Err(ControlSessionError::RateLimited),
+                        Err(error) => Err(ControlSessionError::Service(error.into())),
+                    },
+                    None => Err(ControlSessionError::DeviceEndpointRequired),
+                }
+            },
             ControlClientMessage::PublishDeviceHello { hello, .. } => self
                 .publish_device_hello(&hello)
                 .await
@@ -239,10 +268,25 @@ impl ControlSession {
         if self.pending_proof.is_some() {
             return Err(ControlSessionError::ProofPending);
         }
-        if !self.config.registration_enabled {
+        if !self
+            .control
+            .store()
+            .registration_policy(self.config.registration_enabled)
+            .await
+            .map_err(crate::StoreError::from)
+            .map_err(crate::ServiceError::from)?
+            .effective
+        {
             return Err(ControlSessionError::RegistrationDisabled);
         }
-        let account = self.control.register_account(username, password).await?;
+        let account = self
+            .control
+            .register_account_with_policy(
+                username,
+                password,
+                Some(self.config.registration_enabled),
+            )
+            .await?;
         self.account = Some(account.clone());
         Ok(authenticated_response(request_id, account))
     }

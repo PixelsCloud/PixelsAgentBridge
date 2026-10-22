@@ -15,6 +15,87 @@ use iroh_relay::server::{
 };
 use pab_transport::{ConnectionPath, PabEndpoint, PabEndpointAddress, PabEndpointConfig};
 
+#[tokio::test]
+async fn production_relay_mode_overrides_cached_direct_routes_without_affecting_other_devices() {
+    use pab_transport::{ConnectionMode, PabConnection};
+    const TIMEOUT: Duration = Duration::from_secs(15);
+    async fn dial(a: &PabEndpoint, b: &PabEndpoint, mode: ConnectionMode) -> (PabConnection, PabConnection) {
+        let mut addresses = b.watch_address();
+        tokio::time::timeout(TIMEOUT, async {
+            while addresses.borrow().direct_addresses.is_empty() || addresses.borrow().relay_urls.is_empty() {
+                addresses.changed().await.unwrap();
+            }
+        }).await.unwrap();
+        let address = addresses.borrow().clone();
+        let (outgoing, incoming) = tokio::time::timeout(TIMEOUT, async {
+            tokio::join!(a.connect_with_mode(*b.id().as_bytes(), &address, TIMEOUT, mode), b.accept())
+        }).await.unwrap();
+        (outgoing.unwrap(), incoming.unwrap().unwrap())
+    }
+    async fn path(connection: &PabConnection, expected: ConnectionPath) {
+        tokio::time::timeout(TIMEOUT, async {
+            while connection.selected_path() != Some(expected) { tokio::time::sleep(Duration::from_millis(20)).await; }
+        }).await.expect("requested path must become selected");
+    }
+    async fn echo(a: &PabConnection, b: &PabConnection) {
+        tokio::time::timeout(TIMEOUT, async {
+            let send = async {
+                let mut stream = a.open_bi(TIMEOUT).await.unwrap();
+                stream.send_json(&vec![42u8; 12000], TIMEOUT).await.unwrap();
+                let result: Vec<u8> = stream.receive_json(TIMEOUT).await.unwrap();
+                assert_eq!(result, vec![42u8; 12000]);
+            };
+            let receive = async {
+                let mut stream = b.accept_bi(TIMEOUT).await.unwrap();
+                let value: Vec<u8> = stream.receive_json(TIMEOUT).await.unwrap();
+                stream.send_json(&value, TIMEOUT).await.unwrap();
+            };
+            tokio::join!(send, receive);
+        }).await.unwrap();
+    }
+    let (certs, tls) = testing::self_signed_tls_certs_and_config();
+    let node = node(tls).await;
+    let config = || PabEndpointConfig::new(vec![node.url.clone()]).unwrap().with_extra_ca_certificates(certs.clone());
+    // All three endpoints keep IP transports enabled. The production parameter,
+    // rather than the test-only endpoint switch, must enforce the restriction.
+    let a = PabEndpoint::bind(config(), SecretKey::generate()).await.unwrap();
+    let b = PabEndpoint::bind(config(), SecretKey::generate()).await.unwrap();
+    let c = PabEndpoint::bind(config(), SecretKey::generate()).await.unwrap();
+    for endpoint in [&a, &b, &c] { endpoint.wait_online(TIMEOUT).await.unwrap(); }
+    let (first, first_peer) = dial(&a, &b, ConnectionMode::Auto).await;
+    path(&first, ConnectionPath::Direct).await;
+    echo(&first, &first_peer).await;
+    first.close(b"change mode"); first_peer.close(b"change mode");
+    let (forced, forced_peer) = dial(&a, &b, ConnectionMode::Relay).await;
+    echo(&forced, &forced_peer).await;
+    path(&forced, ConnectionPath::Relay).await;
+    path(&forced_peer, ConnectionPath::Relay).await;
+    let (other, other_peer) = dial(&a, &c, ConnectionMode::Auto).await;
+    path(&other, ConnectionPath::Direct).await;
+    echo(&other, &other_peer).await;
+    // The upstream periodic path-upgrade check runs every 60 seconds. Keep
+    // this real connection alive beyond a full period; do not mock the timer.
+    tokio::time::sleep(Duration::from_secs(65)).await;
+    echo(&forced, &forced_peer).await;
+    assert_eq!(forced.selected_path(), Some(ConnectionPath::Relay));
+    assert_eq!(forced_peer.selected_path(), Some(ConnectionPath::Relay));
+    assert_eq!(forced.direct_traffic().uploaded_bytes, 0);
+    assert_eq!(forced.direct_traffic().downloaded_bytes, 0);
+    assert!(node.traffic.0.load(Ordering::Relaxed) > 24000);
+    forced.close(b"reconnect"); forced_peer.close(b"reconnect");
+    let (retry, retry_peer) = dial(&a, &b, ConnectionMode::Relay).await;
+    echo(&retry, &retry_peer).await;
+    assert_eq!(retry.selected_path(), Some(ConnectionPath::Relay));
+    retry.close(b"restore auto"); retry_peer.close(b"restore auto");
+    let (automatic, automatic_peer) = dial(&a, &b, ConnectionMode::Auto).await;
+    path(&automatic, ConnectionPath::Direct).await;
+    echo(&automatic, &automatic_peer).await;
+    let no_relay = PabEndpointAddress { relay_urls: vec![], direct_addresses: b.address().ip_addrs().copied().collect() };
+    assert!(matches!(a.connect_with_mode(*b.id().as_bytes(), &no_relay, TIMEOUT, ConnectionMode::Relay).await, Err(pab_transport::PabEndpointError::NoRemoteRelay)));
+    for endpoint in [&a, &b, &c] { endpoint.close().await; }
+    node.server.shutdown().await.unwrap();
+}
+
 #[derive(Debug, Default)]
 struct Traffic(AtomicU64);
 impl ForwardingControl for Traffic {

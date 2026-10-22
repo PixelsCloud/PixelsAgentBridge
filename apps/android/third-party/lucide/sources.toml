@@ -1,0 +1,110 @@
+version = "0.468.0"
+upstream = "https://github.com/lucide-icons/lucide"
+
+[[source]]
+path = "icons/house.svg"
+sha256 = "1d3bb0587b8ffbe5e59de3436f880785c3eec7911bd06aabd7932195448b120b"
+
+[[source]]
+path = "icons/folder.svg"
+sha256 = "f0d92b94b797a8ab7d4c4ae33c3236c47f64068351b4e14bdb5014ee42898a39"
+
+[[source]]
+path = "icons/list.svg"
+sha256 = "e7b0d1d0515c85a22e9996c2a2dee1a89f4729fda46570bb52eafd6e61b31833"
+
+[[source]]
+path = "icons/settings.svg"
+sha256 = "3c7bee2696ce0c2d48d34e813f4fcda31f0ad21ab9309aee3751cde4280ad737"
+
+[[source]]
+path = "icons/chevron-right.svg"
+sha256 = "2758143d7b2434e4aa7307dfd34405c87909ff4052f21b5f3f40d45224b4f19b"
+
+[[source]]
+path = "icons/copy.svg"
+sha256 = "ea80e566c7a12628a447cb53179b19aea4f60b9143e2becd0d0f20bf260e5718"
+
+[[source]]
+path = "icons/eye.svg"
+sha256 = "5bf90197dd7629cad64a2e48d1186a71559deb6121207d10e3dc5b19ebaffdcf"
+
+[[source]]
+path = "icons/eye-off.svg"
+sha256 = "774bcd975c5de781a4ee778c76e5591bcdeb409955f7054847e7e6003da0a520"
+
+[[source]]
+path = "icons/rotate-cw.svg"
+sha256 = "ddcfe6d87240475946935e77411cd4d15a06f3d28a9b921bafed224ebe953668"
+
+[[source]]
+path = "icons/pause.svg"
+sha256 = "0f4280e6dcc1047551bbc6ef8a9f1a34959de13c7f077d9667d12ab90c8fbca7"
+
+[[source]]
+path = "icons/check.svg"
+sha256 = "7f33acc9a77a61659531044525fc008edebe215bf4dcf1c789c8674ad3277db0"
+
+[[source]]
+path = "icons/monitor.svg"
+sha256 = "d1a443233345724859de8e4fb48968ba91e885e12ddbd710701548bd91b39428"
+
+[[source]]
+path = "icons/bell.svg"
+sha256 = "394889e9631fe3a9a63be9a479a95b451b708e432d895978d21d9130b5ee5dbe"
+
+[[source]]
+path = "icons/smartphone.svg"
+sha256 = "f9fdb700b50feb5fc6436f53eb9813e9eb56a9071ac4cdcba69c7f7c1c13877d"
+
+[[source]]
+path = "icons/lock-keyhole.svg"
+sha256 = "fc0b8b7590d1d9e9bb0112c5c2e15a78ade0bfeca6d6f8c79fbbe149236d74be"
+
+[[source]]
+path = "icons/palette.svg"
+sha256 = "fbe81d6b4e00ee35dfc9100ddeaaee72e2e1aeb4acb16568b768c316588d104d"
+
+[[source]]
+path = "icons/globe.svg"
+sha256 = "82c6b8fa0b8e8d775ec9becd86f74a4e50bff7bee4c81f7362de45348504f14d"
+
+[[source]]
+path = "icons/link.svg"
+sha256 = "4f3237183dcaabfac92f4e94c776a9a9e45c3c5e77a921061a6b34b61eb5413f"
+
+[[source]]
+path = "icons/circle-help.svg"
+sha256 = "975db087da041530dbf59ba1e61a7b99c3519fad43dae6375e42ccc74ba63924"
+
+[[source]]
+path = "icons/info.svg"
+sha256 = "bc977a64eb96f3e9c1041ffd09a3fceb70e3e65c02b571f76064062ed31f3cb9"
+
+[[source]]
+path = "icons/ellipsis-vertical.svg"
+sha256 = "655ee2104d9540cc9377c83f3b9fea628d78d9f4e1cdca7c1b36e952599944d7"
+
+[[source]]
+path = "icons/circle-plus.svg"
+sha256 = "6fa978530075df975ad05e2742896a1950b74c2b133a0d208891b038a4a41c17"
+
+[[source]]
+path = "icons/arrow-left.svg"
+sha256 = "c5f4b88076108eb1a0d95336e1aa7e7bb1419a3a92af96f6247d88cd3456f933"
+
+[[source]]
+path = "icons/file-text.svg"
+sha256 = "486fab70d8ad3cdc69b5ff9b6c356a58d41fcc4c885359cbf9d6e088a7c47f70"
+
+[[source]]
+path = "icons/upload.svg"
+sha256 = "04b9443355c959b3477b7856ee40dffa79438e5bfdb4e9dbf5159341ace26408"
+
+[[source]]
+path = "icons/mouse-pointer-2.svg"
+sha256 = "a87128b1d33024c22ab598d1ce313081ce8942efd1a70274215bcc53421b7c7e"
+
+[[source]]
+path = "LICENSE"
+sha256 = "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc"

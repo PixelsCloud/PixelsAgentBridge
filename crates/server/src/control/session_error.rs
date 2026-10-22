@@ -115,6 +115,14 @@ pub(super) fn error_response(
             ControlErrorCode::InvalidMessage,
             "request input is invalid".to_owned(),
         ),
+        ControlSessionError::Service(ServiceError::Store(StoreError::InvalidState(message)))
+            if message == "registration_disabled" =>
+        {
+            (
+                ControlErrorCode::RegistrationDisabled,
+                "account registration is disabled".to_owned(),
+            )
+        }
         ControlSessionError::Service(ServiceError::Store(StoreError::InvalidState(_))) => (
             ControlErrorCode::InvalidState,
             "resource is not in the required state".to_owned(),

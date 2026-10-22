@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, Button, Space, Typography } from "antd";
 import { messages, type Language } from "./i18n";
+import { useAppRefresh } from "./appRefresh";
 
 type Status = { account_revision: number; pending: boolean; device?: { status: "associated" | "available" | "unlinked" | "other_account"; revision: number } };
 
@@ -10,6 +11,10 @@ export function DeviceAccountPanel({ language, accountRevision }: { language: La
   const [status, setStatus] = useState<Status>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  useAppRefresh(async () => {
+    const value = await invoke<Status>("device_account_status");
+    if (value.account_revision === accountRevision) { setStatus(value); setError(false); }
+  });
   useEffect(() => {
     let alive = true;
     setStatus(undefined); setError(false);

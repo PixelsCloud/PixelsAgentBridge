@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Alert, Button, Space, Typography } from 'antd';
 import type { Language } from './i18n';
 import type { ScopeStatus } from './operatorTypes';
+import { useAppRefresh } from './appRefresh';
 
 const words = {
   'zh-CN': { signIn:'使用 GitHub 登录', bind:'绑定 GitHub', unlink:'解除绑定', cancel:'取消', waiting:'请在浏览器中完成 GitHub 授权', failed:'GitHub 授权未完成，请重试。', last:'这是唯一的登录方式，无法解绑。', conflict:'该 GitHub 已绑定其他账号。', expired:'授权已过期，请重试。', unavailable:'暂时无法连接 GitHub，请稍后重试。', closed:'当前不开放新账号注册。' },
@@ -16,6 +17,7 @@ export function GithubAccount({language, signedIn=false, disabled=false, compact
     if(signedIn)setStatus(await invoke<Status>('github_status'));
     else setStatus({enabled:await invoke<boolean>('github_enabled'),login:null,password_enabled:false});
   }
+  useAppRefresh(async () => { if (!busy) await refresh(); });
   useEffect(()=>{void refresh().catch(()=>{});return ()=>{void invoke('github_cancel').catch(()=>{});};},[signedIn]);
   function failure(e:unknown){const s=String(e);setError(s.includes('last_login_method')?t.last:s.includes('github_already_linked')?t.conflict:s.includes('github_expired')?t.expired:s.includes('github_unavailable')?t.unavailable:s.includes('registration_disabled')?t.closed:t.failed);}
   async function run(unlink=false){

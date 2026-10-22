@@ -10,21 +10,30 @@ use time::OffsetDateTime;
 
 use crate::domain::{Account, AccountCredential, Device, RegisteredEndpoint};
 
+mod account_support;
 mod accounts;
+mod registration_policy;
+pub use registration_policy::RegistrationPolicy;
+mod audit;
+pub(crate) use account_support::{SupportActor, SupportMutation};
 mod connection_intents;
 mod device_discovery;
 mod device_network;
 mod device_presence;
 mod device_runtime;
+mod device_name;
 mod endpoints;
+mod migration;
 mod relay_budget;
 mod relay_cluster;
+mod relay_capacity;
 mod relay_maintenance;
 pub use relay_maintenance::RelayMaintenanceOperation;
 mod guest_access;
 mod guest_registration;
 mod peer_authorization;
 mod saved_devices;
+mod snapshot;
 mod support;
 mod traffic;
 mod usage;
@@ -52,8 +61,7 @@ impl PostgresStore {
     }
 
     pub async fn migrate(&self) -> Result<(), StoreError> {
-        sqlx::migrate!("./migrations").run(&self.pool).await?;
-        Ok(())
+        migration::run(&self.pool).await
     }
 
     pub async fn initialize_settings(&self) -> Result<(), StoreError> {

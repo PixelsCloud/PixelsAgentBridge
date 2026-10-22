@@ -15,9 +15,13 @@ pub(crate) struct RelayBudgets {
     leases: HashMap<UserId, (u64, Instant)>,
     demands: HashMap<UserId, Instant>,
     limiter: AggregateLimiter,
+    host_bandwidth: bool,
 }
 impl RelayBudgets {
     pub fn acquire_node(&mut self, bytes: u64, now: Instant) -> Acquire {
+        if self.host_bandwidth {
+            return Acquire::Ready;
+        }
         self.limiter
             .acquire_keys(&[LimitKey::RelayNode], bytes, now)
     }
@@ -29,6 +33,7 @@ impl RelayBudgets {
             leases: HashMap::new(),
             demands: HashMap::new(),
             limiter: AggregateLimiter::default(),
+            host_bandwidth: false,
         }
     }
     pub fn demand(&mut self, user: UserId, now: Instant) -> bool {
@@ -41,6 +46,7 @@ impl RelayBudgets {
         true
     }
     pub fn set_node_capacity(&mut self, bytes_per_second: u64, now: Instant) {
+        self.host_bandwidth = bytes_per_second == 0;
         if let Some(rate) = Rate::with_capacity(bytes_per_second, (bytes_per_second / 10).max(1)) {
             self.limiter.set_rate(LimitKey::RelayNode, rate, now);
         }
@@ -64,8 +70,9 @@ impl RelayBudgets {
         {
             return Acquire::Missing(LimitKey::User(user));
         }
+        let keys = [LimitKey::User(user), LimitKey::RelayNode];
         self.limiter
-            .acquire_keys(&[LimitKey::User(user), LimitKey::RelayNode], bytes, now)
+            .acquire_keys(&keys[..if self.host_bandwidth { 1 } else { 2 }], bytes, now)
     }
     /// Bound validity by REQUEST START, not response receipt or the Relay's
     /// wall clock. Network/DB delay can only shorten a lease, never extend it.
@@ -80,7 +87,6 @@ impl RelayBudgets {
             || snapshot.boot_id != self.boot_id
             || snapshot.revision <= self.revision
             || snapshot.requested_users.len() > MAX_RELAY_BUDGET_DEMANDS
-            || snapshot.node_capacity_bytes_per_second == 0
         {
             return Err("invalid or stale Relay budget snapshot");
         }
@@ -141,6 +147,23 @@ impl RelayBudgets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn host_bandwidth_removes_only_node_cap_and_keeps_account_lease_and_limit() {
+        let user = UserId::new();
+        let boot = uuid::Uuid::new_v4();
+        let now = Instant::now();
+        let mut state = RelayBudgets::new("a".into(), boot);
+        let mut grant = snapshot(user, boot);
+        grant.node_capacity_bytes_per_second = 0;
+        state.apply(grant, now, now).unwrap();
+        assert_eq!(state.acquire_node(1_000_000_000, now), Acquire::Ready);
+        assert_eq!(state.acquire(user, 100, now), Acquire::Ready);
+        assert!(matches!(state.acquire(user, 1, now), Acquire::Wait(_)));
+        assert!(matches!(
+            state.acquire(user, 1, now + Duration::from_secs(16)),
+            Acquire::Missing(_)
+        ));
+    }
     fn snapshot(user: UserId, boot: uuid::Uuid) -> RelayBudgetSnapshot {
         RelayBudgetSnapshot {
             schema_version: 1,

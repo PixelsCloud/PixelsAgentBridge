@@ -11,6 +11,8 @@ const MIN_CONTROL_SECRET_BYTES: usize = 32;
 
 pub struct RelayServiceConfig {
     pub cluster_enabled: bool,
+    /// Published HTTPS address. Bind addresses and control credentials are never reported.
+    pub public_url: Option<String>,
     pub node_id: String,
     pub usage_dir: PathBuf,
     pub control_url: String,
@@ -28,6 +30,13 @@ pub struct RelayServiceConfig {
 
 impl RelayServiceConfig {
     pub fn validate(&self) -> Result<(), RelayServiceConfigError> {
+        if self
+            .public_url
+            .as_deref()
+            .is_some_and(|value| !valid_public_url(value))
+        {
+            return Err(RelayServiceConfigError::InvalidPublicUrl);
+        }
         if !self.control_url.starts_with("wss://") {
             return Err(RelayServiceConfigError::ControlUrlMustUseTls);
         }
@@ -51,6 +60,8 @@ impl RelayServiceConfig {
 }
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum RelayServiceConfigError {
+    #[error("public_url requires an HTTPS address without credentials, query or fragment")]
+    InvalidPublicUrl,
     #[error("control.url must use wss://")]
     ControlUrlMustUseTls,
     #[error("control.secret must contain at least 32 bytes")]
@@ -66,6 +77,7 @@ pub enum RelayServiceConfigError {
 pub struct RelayFileConfig {
     #[serde(default)]
     pub cluster_enabled: bool,
+    pub public_url: Option<String>,
     pub node_id: String,
     pub usage_dir: PathBuf,
     pub https_bind: SocketAddr,
@@ -85,6 +97,15 @@ pub struct ControlConfig {
 impl RelayFileConfig {
     pub fn load(path: &Path) -> Result<Self, ConfigError> {
         let mut config: Self = load(path)?;
+        if config
+            .public_url
+            .as_deref()
+            .is_some_and(|value| !valid_public_url(value))
+        {
+            return Err(ConfigError::Invalid(
+                "invalid public_url; expected HTTPS without credentials, query or fragment",
+            ));
+        }
         let valid_url = config
             .control
             .url
@@ -129,7 +150,10 @@ impl RelayFileConfig {
     }
     pub fn into_service(self) -> RelayServiceConfig {
         RelayServiceConfig {
-            cluster_enabled: self.cluster_enabled,
+            // The old flag is accepted on disk for upgrades; every shipped
+            // service now uses the same node handshake and account budget path.
+            cluster_enabled: true,
+            public_url: self.public_url,
             node_id: self.node_id,
             usage_dir: self.usage_dir,
             control_url: self.control.url,
@@ -140,11 +164,23 @@ impl RelayFileConfig {
             https_bind: self.https_bind,
             quic_bind: self.quic_bind,
             captive_bind: "127.0.0.1:0".parse().expect("fixed loopback address"),
-            policy_refresh_interval: Duration::from_secs(if self.cluster_enabled { 5 } else { 20 }),
+            policy_refresh_interval: Duration::from_secs(5),
             reconnect_interval: Duration::from_secs(3),
             limiter_burst: Duration::from_millis(100),
         }
     }
+}
+
+fn valid_public_url(value: &str) -> bool {
+    value.len() <= 2048
+        && reqwest::Url::parse(value).is_ok_and(|url| {
+            url.scheme() == "https"
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none()
+        })
 }
 #[cfg(test)]
 mod file_tests {

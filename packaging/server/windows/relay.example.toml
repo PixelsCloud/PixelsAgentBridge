@@ -1,5 +1,4 @@
 node_id = "win-90-test"
-cluster_enabled = true
 usage_dir = "../data/relay"
 https_bind = "0.0.0.0:31443"
 quic_bind = "0.0.0.0:7842"

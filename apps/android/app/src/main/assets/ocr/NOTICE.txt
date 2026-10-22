@@ -1,0 +1,14 @@
+Offline document OCR
+
+Tesseract4Android 4.9.0 (standard build), Apache License 2.0
+https://github.com/adaptech-cz/Tesseract4Android/tree/4.9.0
+Tesseract OCR, Apache License 2.0
+Leptonica, BSD-style license
+libpng, PNG Reference Library License
+Independent JPEG Group software (libjpeg); see libjpeg-README.txt.
+This software is based in part on the work of the Independent JPEG Group.
+
+Simplified Chinese model with Latin characters: tesseract-ocr/tessdata_fast
+revision 87416418657359cb625c412a48b6e1d6d41c29bd, Apache License 2.0.
+The model and runtime are bundled; no document or image is sent to an OCR server.
+Original license texts are included alongside this notice.

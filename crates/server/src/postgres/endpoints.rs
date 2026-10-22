@@ -167,10 +167,7 @@ impl PostgresStore {
                 "relay policy validity must be greater than zero".to_owned(),
             ));
         }
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-            .execute(&mut *tx)
-            .await?;
+        let mut tx = self.begin_snapshot(true).await?;
         let settings = sqlx::query("SELECT policy_revision FROM server_settings WHERE singleton")
             .fetch_optional(&mut *tx)
             .await?

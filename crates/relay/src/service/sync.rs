@@ -9,6 +9,8 @@ const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct PolicySyncSettings {
+    pub process_boot_id: uuid::Uuid,
+    pub public_url: Option<String>,
     pub metrics: Option<std::sync::Arc<iroh_relay::server::Metrics>>,
     pub boot_id: Option<uuid::Uuid>,
     pub node_id: String,
@@ -75,7 +77,25 @@ pub fn spawn_refresh_loop(
             // Coalesce packet-triggered refreshes and bound database work even
             // when an admitted client continually sends to an unauthorized peer.
             tokio::time::sleep_until(last_refresh + MIN_REFRESH_INTERVAL).await;
-            match client.sync_policy(&runtime).await {
+            let telemetry = if settings.boot_id.is_none() {
+                settings
+                    .metrics
+                    .as_ref()
+                    .map(|metrics| pab_protocol::RelayNodeTelemetry {
+                        boot_id: settings.process_boot_id,
+                        public_url: settings.public_url.clone(),
+                        connections: metrics
+                            .accepts
+                            .get()
+                            .saturating_sub(metrics.disconnects.get()),
+                        received_bytes: metrics.bytes_recv.get(),
+                        sent_bytes: metrics.bytes_sent.get(),
+                        diagnostics: None,
+                    })
+            } else {
+                None
+            };
+            match client.sync_policy_with_telemetry(&runtime, telemetry).await {
                 Ok(PolicySync::Updated { policy_version }) => {
                     tracing::info!(policy_version, on_demand, "relay policy updated");
                     if let Err(error) = client.sync_policy(&runtime).await {
@@ -98,7 +118,7 @@ pub fn spawn_refresh_loop(
                 refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             }
             if let (Some(boot), Some(metrics)) = (settings.boot_id, settings.metrics.as_ref()) {
-                if let Err(error) = client.heartbeat(boot, metrics).await {
+                if let Err(error) = client.heartbeat(boot, metrics, &runtime).await {
                     tracing::debug!(%error,"Relay telemetry report failed");
                 }
             }

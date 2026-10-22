@@ -35,9 +35,20 @@ fn main() {
         Err(_) => panic!("Cannot read private client defaults TOML"),
     };
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("client_defaults.rs");
+    let relay_ca_pem = if let Some(certificate) = &defaults.relay_ca_cert {
+        let certificate = if certificate.is_absolute() {
+            certificate.clone()
+        } else {
+            path.parent().unwrap().join(certificate)
+        };
+        println!("cargo:rerun-if-changed={}", certificate.display());
+        build_support::read_relay_ca(&certificate).unwrap_or_else(|error| panic!("{error}"))
+    } else {
+        String::new()
+    };
     // Debug string literals escape TOML values as data, never as Rust source.
     fs::write(output, format!(
-        "pub const DEFAULT_CONTROL_URL: &str = {:?};\npub const DEFAULT_RELAY_URLS: &[&str] = &{:?};\npub const DEFAULT_RELAY_URL: &str = {:?};\n",
-        defaults.control_url, defaults.relay_urls, defaults.relay_urls.join(",")
+        "pub const DEFAULT_CONTROL_URL: &str = {:?};\npub const DEFAULT_RELAY_URLS: &[&str] = &{:?};\npub const DEFAULT_RELAY_URL: &str = {:?};\npub const DEFAULT_RELAY_CA_PEM: &str = {:?};\n",
+        defaults.control_url, defaults.relay_urls, defaults.relay_urls.join(","), relay_ca_pem
     )).expect("Cannot generate client defaults");
 }

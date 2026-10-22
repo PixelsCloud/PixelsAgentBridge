@@ -15,6 +15,7 @@ const WAIT: Duration = Duration::from_secs(5);
 mod cursor_sessions;
 mod cursor_wire;
 mod flow_recovery;
+mod clipboard_sessions;
 mod input_wire;
 mod quality_feedback;
 

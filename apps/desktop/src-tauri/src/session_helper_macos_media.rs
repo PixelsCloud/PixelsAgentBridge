@@ -37,6 +37,10 @@ impl DesktopInputSink for Input {
     }
 }
 impl DesktopBackend for Backend {
+    fn supports_clipboard(&self) -> bool { self.media.supports_clipboard() }
+    fn clipboard(&self, config: DesktopVideoConfig, operation: pab_protocol::DesktopClipboardOperation) -> MediaFuture<'_, pab_protocol::DesktopClipboardSnapshot> {
+        self.media.clipboard(config, operation)
+    }
     fn supports_cursor(&self) -> bool {
         self.media.supports_cursor()
     }

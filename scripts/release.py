@@ -151,8 +151,8 @@ def main():
     parser.add_argument('--headless-sha256', help='Expected SHA-256 of that archive')
     args = parser.parse_args()
     arch = args.arch or ('aarch64' if args.platform == 'macos' else 'x86_64')
-    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64'), ('linux', 'x86_64'), ('linux-desktop', 'x86_64')):
-        parser.error('Stable supports Windows/Linux x86_64 and macOS aarch64')
+    if (args.platform, arch) not in (('windows', 'x86_64'), ('macos', 'aarch64'), ('macos', 'x86_64'), ('linux', 'x86_64'), ('linux-desktop', 'x86_64')):
+        parser.error('Stable supports Windows/Linux x86_64 and macOS aarch64/x86_64')
     if args.platform == 'linux-desktop' and not (args.headless_package and args.headless_sha256):
         parser.error('Linux desktop requires --headless-package and --headless-sha256')
     base = args.site.rstrip('/')

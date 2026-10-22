@@ -16,6 +16,7 @@ import { HomeDeviceConnectionPanel } from "./HomeDeviceConnectionPanel";
 import { OsLogo } from "./OsLogo";
 import { SavedConnectionDialog, type SavedConnection, type SavedConnectionAction } from "./SavedConnectionDialog";
 import { deviceOnline } from "./deviceAvailability";
+import { useAppRefresh } from "./appRefresh";
 
 const ActivityPanel = lazy(() => import("./ActivityPanel").then(({ ActivityPanel }) => ({ default: ActivityPanel })));
 const DeviceHistoryPanel = lazy(() => import("./DeviceHistoryPanel").then(({ DeviceHistoryPanel }) => ({ default: DeviceHistoryPanel })));
@@ -73,7 +74,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const savedConnectionAttemptRef = useRef(0);
   const savedConnectionPendingRef = useRef<{ attempt: number; code: string; action: SavedConnectionAction } | null>(null);
   const connectionRevisionRef = useRef(0);
-  const deviceRefreshRef = useRef(false);
+  const deviceRefreshRef = useRef<Promise<boolean> | null>(null);
   const presenceRequestRef = useRef(0);
   const historyRefreshRef = useRef<Promise<void> | null>(null);
   const refreshingRef = useRef(new Set<string>());
@@ -119,32 +120,46 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     }
   }
 
-  async function refreshDeviceList() {
-    if (deviceRefreshRef.current || !signedIn) return;
-    deviceRefreshRef.current = true;
-    setRefreshingDevices(true);
-    setError("");
-    const revision = connectionRevisionRef.current;
-    try {
-      const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
-      setDevices((current) => {
-        const known = new Map(current.map((device) => [device.deviceCode, device]));
-        const next = saved.devices.map((device) => {
-          const previous = known.get(device.deviceCode);
-          return previous ? { ...device, connected: previous.connected, connectionPath: previous.connectionPath } : device;
+  function refreshDeviceList(): Promise<boolean> {
+    if (deviceRefreshRef.current) return deviceRefreshRef.current;
+    if (!signedIn) return Promise.resolve(true);
+    const request = (async () => {
+      setRefreshingDevices(true);
+      setError("");
+      const revision = connectionRevisionRef.current;
+      try {
+        const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
+        setDevices((current) => {
+          const known = new Map(current.map((device) => [device.deviceCode, device]));
+          const next = saved.devices.map((device) => {
+            const previous = known.get(device.deviceCode);
+            return previous ? { ...device, connected: previous.connected, connectionPath: previous.connectionPath } : device;
+          });
+          const savedCodes = new Set(next.map((device) => device.deviceCode));
+          return revision === connectionRevisionRef.current ? next : [...next, ...current.filter((device) => !savedCodes.has(device.deviceCode))];
         });
-        const savedCodes = new Set(next.map((device) => device.deviceCode));
-        return revision === connectionRevisionRef.current ? next : [...next, ...current.filter((device) => !savedCodes.has(device.deviceCode))];
-      });
-      setDevicesLoaded(true);
-      await refreshDevicePresence();
-    } catch {
-      setError(t.refreshDevicesFailed);
-    } finally {
-      deviceRefreshRef.current = false;
-      setRefreshingDevices(false);
-    }
+        setDevicesLoaded(true);
+        await refreshDevicePresence();
+        return true;
+      } catch {
+        setError(t.refreshDevicesFailed);
+        return false;
+      } finally {
+        deviceRefreshRef.current = null;
+        setRefreshingDevices(false);
+      }
+    })();
+    deviceRefreshRef.current = request;
+    return request;
   }
+
+  useAppRefresh(async () => {
+    const results = await Promise.allSettled([
+      refreshDeviceList().then(ok => { if (!ok) throw new Error("Device refresh failed"); }),
+      view === "activity" ? refreshActivity() : refreshOperations(),
+    ]);
+    if (results.some(result => result.status === "rejected")) throw new Error("Operator refresh incomplete");
+  });
 
   useEffect(() => {
     if (view !== "remote") return;

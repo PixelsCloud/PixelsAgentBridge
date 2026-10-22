@@ -112,7 +112,18 @@ def verify_binaries(payload, architecture):
         with tempfile.TemporaryDirectory() as folder:
             library = Path(folder) / 'libpdfium.dylib'
             library.write_bytes(runtime.extractfile(member).read())
+            if subprocess.check_output(['/usr/bin/lipo', '-archs', str(library)], text=True).split() != [architecture]:
+                raise ValueError('PDFium runtime architecture does not match the installer')
             verify(library, IDENTIFIERS['pdfium'], fingerprint)
+    with tarfile.open(payload / 'browser-runtime-macos.tar.gz') as runtime:
+        member = runtime.getmember('browser-runtime/node')
+        if not member.isfile() or member.size > 128 * 1024 * 1024:
+            raise ValueError('Invalid browser Node runtime')
+        with tempfile.TemporaryDirectory() as folder:
+            node = Path(folder) / 'node'
+            node.write_bytes(runtime.extractfile(member).read())
+            if subprocess.check_output(['/usr/bin/lipo', '-archs', str(node)], text=True).split() != [architecture]:
+                raise ValueError('Browser runtime architecture does not match the installer')
 
 
 def prepare_scripts(destination, arch, control_url, relay_url):

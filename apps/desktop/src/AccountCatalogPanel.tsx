@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Alert, Button, Modal, Space, Typography } from 'antd';
 import type { Language } from './i18n';
+import { useAppRefresh } from './appRefresh';
 
 const text = {
   'zh-CN': { title: '远程设备列表同步', synced: '已同步', pending: '待同步', syncing: '正在同步', retry: '重试同步', error: '同步暂未完成，设备连接仍可正常使用。', import: '导入本地设备列表', importHint: '将本机游客模式保存的设备导入当前账号，仅上传设备码、名称、系统和备注。密码保留在本地；不会获得新的控制权限，也不会恢复已经移除的条目。', conflict: '列表已在另一客户端修改', local: '使用我的修改', remote: '保留云端修改', removed: '移除条目', actionFailed: '操作未完成，请刷新后重试。' },
@@ -11,6 +12,10 @@ type Status = { account_revision: number; pending: number; syncing: boolean; err
 
 export function AccountCatalogPanel({ language, accountRevision }: { language: Language; accountRevision: number }) {
   const t = text[language]; const [status, setStatus] = useState<Status>(); const [busy, setBusy] = useState(false); const [error, setError] = useState(false); const [confirm, setConfirm] = useState(false); const [refresh, setRefresh] = useState(0);
+  useAppRefresh(async () => {
+    const value = await invoke<Status>('account_catalog_status');
+    if (value.account_revision === accountRevision) { setStatus(value); setError(false); }
+  });
   useEffect(() => {
     let alive = true;
     const update = () => void invoke<Status>('account_catalog_status').then(value => { if (alive && value.account_revision === accountRevision) setStatus(value); }).catch(() => { if (alive) setError(true); });

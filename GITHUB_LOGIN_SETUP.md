@@ -2,7 +2,7 @@
 
 GitHub 登录已实现。用户点击「使用 GitHub 登录」并授权后即可进入：首次使用会自动创建普通账号，不需要另外填写注册表或设置密码；再次登录会进入同一账号。已有密码账号可在「我的」中主动绑定 GitHub。
 
-公开服务已部署 GitHub 登录入口；真实用户授权与 Desktop 实机验收进度见 [验收记录](acceptance/github-login-20261009.md)。以下是独立部署的配置步骤。
+以下是独立部署 GitHub 登录的配置步骤。
 
 1. 登录管理项目的 GitHub 账号，打开 <https://github.com/settings/apps/new>。
 2. 按下表填写，其余权限保持默认不申请。
@@ -54,4 +54,4 @@ docker compose --env-file private.env -f compose.yaml up -d --no-deps --force-re
 
 数据库新增迁移 5，升级前先备份。升级后若需暂时关闭 GitHub，可移除 GitHub 配置并继续使用新版本服务端；不要直接把旧版二进制运行在已升级数据库上，也不要用旧备份覆盖正在使用的数据。
 
-参考：[GitHub 创建 App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)、[用户授权流程](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app)。完整开发范围见 `USER_ACCOUNT_PLAN.md` 第 14 节。
+参考：[GitHub 创建 App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)、[用户授权流程](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app)。

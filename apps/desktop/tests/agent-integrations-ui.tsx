@@ -28,6 +28,12 @@ let sequence = 0;
 const account = { username: params.get("longName") ? "Pixels-very-long-account-name-for-layout" : "Pixels", userId: params.has("longId") ? "7dd29e34-8a55-415f-831c-1502271dcaf1" : "user-123", serverAdmin: false, revision: 1 };
 let activeScope = params.has("signedIn") ? account : null;
 const fixture = (window as any).fixture = { calls, states, release: null as null | (() => void),
+  get scope() { return activeScope; }, set scope(value: typeof activeScope) { activeScope = value; },
+  slowScope: false, slowBootstrap: false, bootstrapError: false, presence: false,
+  devices: [] as { deviceId: string; deviceCode: string; alias: string; osFamily: string; osReminder: string; connected: boolean; connectionPath?: string }[],
+  device: { device_code: "123456789", device_id: "fixture", temporary_password: "fixture", executor_running: true, control_phase: "authenticated" },
+  mcpRevision: 1, mcpError: false,
+  historyTasks: [] as unknown[],
   loginError: params.has("loginError"), logoutError: params.has("logoutError"), scopeError: params.has("scopeError"),
   consoleError: params.has("consoleError"), consoleOpens: 0,
   listeners, emit: (event: string, payload: unknown) => {
@@ -43,7 +49,12 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
   if (command.startsWith("plugin:window|")) return;
   if (command === "set_tray_language") return;
   if (command === "macos_permissions") return null;
-  if (command === "operator_current_traffic_scope") { if (fixture.scopeError) throw Error("Scope unavailable"); return activeScope; }
+  if (command === "operator_current_traffic_scope") {
+    const snapshot = activeScope;
+    if (fixture.slowScope) await new Promise<void>(resolve => { fixture.release = resolve; });
+    if (fixture.scopeError) throw Error("Scope unavailable");
+    return snapshot;
+  }
   if (["operator_login_account", "operator_register_account"].includes(command)) {
     if (params.has("slowLogin")) await new Promise<void>(resolve => { fixture.release = resolve; });
     if (fixture.loginError) throw Error("Invalid credentials");
@@ -55,11 +66,21 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
   if (command === "device_account_status") return { account_revision: 1, pending: false, device: { status: "associated", revision: 1 } };
   if (command === "account_catalog_status") return { account_revision: 1, pending: 0, syncing: false, local_import_count: 0, conflicts: [] };
   if (command === "github_status") return { enabled: true, login: null, password_enabled: true };
-  if (command === "device_status") return { device_code: "123456789", device_id: "fixture", temporary_password: "fixture", executor_running: true, control_phase: "authenticated" };
+  if (command === "device_status") return { ...fixture.device };
+  if (command === "update_status") return null;
   if (command === "get_operator_server_settings") return { controlUrl: "", relayUrl: "" };
-  if (command === "operator_bootstrap") return { devices: [], tasks: [], operations: [], taskBefore: null, operationBeforeStartedAtUnixMs: null, operationBeforeId: null, hasMoreTasks: false, hasMoreOperations: false, totalCount: 0 };
+  if (command === "operator_bootstrap") {
+    if (fixture.slowBootstrap) await new Promise<void>(resolve => { fixture.release = resolve; });
+    if (fixture.bootstrapError) throw Error("Device list unavailable");
+    return { devices: [...fixture.devices], tasks: [], operations: [], taskBefore: null, operationBeforeStartedAtUnixMs: null, operationBeforeId: null, hasMoreTasks: false, hasMoreOperations: false, totalCount: 0 };
+  }
+  if (command === "operator_saved_device_presence") return fixture.devices.map(device => ({ deviceCode: device.deviceCode, name: device.alias, online: fixture.presence }));
+  if (command === "operator_connection_paths") return fixture.devices.map(device => ({ deviceCode: device.deviceCode, path: device.connected ? "p2p" : null }));
   if (command === "operator_operations") return [];
-  if (command === "mcp_reporting_status") return { revision: 1, running: true, count: 9, error: null,
+  if (command === "operator_history_page") return { tasks: fixture.historyTasks, operations: [], totalCount: fixture.historyTasks.length,
+    taskBefore: null, operationBeforeStartedAtUnixMs: null, operationBeforeId: null, hasMoreTasks: false, hasMoreOperations: false };
+  if (command === "mcp_reporting_status" && fixture.mcpError) throw Error("Reporting unavailable");
+  if (command === "mcp_reporting_status") return { revision: fixture.mcpRevision, running: true, count: 9, error: null,
     clients: ["kimi-code", "kimi-code", "claude-code", "codex_cli_rs", "dsh-mcp-client", "cursor-agent", "opencode", "Custom Agent", null].map((clientName, index) => ({
       report: { sessionId: `session-${index}`, processId: 1000 + index, version: "fixture", os: "windows", architecture: "x86_64",
         startedAtUnixMs: 1, updatedAtUnixMs: 1, clientName, clientVersion: "client-version", activeCalls: [], recentCalls: [], runtime: null },

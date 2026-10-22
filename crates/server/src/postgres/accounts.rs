@@ -6,10 +6,15 @@ impl PostgresStore {
         username: &str,
         username_key: &str,
         password_hash: &str,
+        registration_default: Option<bool>,
     ) -> Result<Account, StoreError> {
         let user_id = UserId::new();
         let tenant_id = TenantId::new();
         let mut tx = self.pool.begin().await?;
+
+        if let Some(default) = registration_default {
+            Self::require_registration(&mut tx, default).await?;
+        }
 
         let insert = sqlx::query(
             r#"

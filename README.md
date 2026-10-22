@@ -25,7 +25,7 @@ Built-in setup supports **Codex, Kimi Code, Claude Code, DeepSeek Harness, and O
 | macOS | Desktop app, background device service, MCP |
 | Linux | Headless device service and MCP; no desktop app |
 
-Capabilities depend on the target OS and permissions. macOS screen capture and input require the corresponding system permissions. The project is in active development; see the [acceptance reports](acceptance/README.md) for tested scenarios and remaining limits.
+Capabilities depend on the target OS and permissions. macOS screen capture and input require the corresponding system permissions. See the [usage and self-hosting guide](docs/USAGE_AND_SELF_HOSTING.md) for setup and platform requirements.
 
 ## Quick start
 
@@ -69,12 +69,22 @@ For your own server, follow the [Web deployment guide](WEB_DEPLOYMENT.md) and [D
 
 - [Usage and self-hosting guide (Chinese)](docs/USAGE_AND_SELF_HOSTING.md) (kept in sync with the website documentation)
 - [Builds and versioning](BUILDING.md)
+- [Configuration reference](docs/CONFIGURATION.md)
+- [Relay cluster operations](docs/RELAY_CLUSTER_OPERATIONS.md)
 - [Installer publishing and online updates](docs/RELEASE.md)
 - [Document parsing and OCR tools](docs/DOCUMENTS.md)
 - [Development guide](DEVELOPMENT.md)
-- [macOS setup and permissions](MACOS.md)
-- [Account implementation and verification](acceptance/user-accounts-2026-10-08.md)
-- [AI agent integrations](acceptance/agent-integrations-2026-10-08.md)
-- [Test coverage and platform limits](acceptance/README.md)
+
+## License
+
+Project-owned code is available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Commercial use outside that license's permitted purposes requires a separate written
+license. This includes commercial-purpose internal business use; the standard
+license's express permissions for the organizations it lists remain unchanged.
+See [commercial licensing](COMMERCIAL_LICENSE.md) or contact
+[pixels.save@gmail.com](mailto:pixels.save@gmail.com).
+
+Pixels Agent Bridge is source-available. Third-party components retain their own
+licenses and notices; see [NOTICE](NOTICE) and the notices accompanying each component.
 
 [Report an issue](https://github.com/PixelsCloud/PixelsAgentBridge/issues) with your platform, reproduction steps, and logs with credentials removed.

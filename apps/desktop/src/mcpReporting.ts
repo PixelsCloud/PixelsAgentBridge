@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useAppRefresh } from "./appRefresh";
 
 export type DeviceRef = { tenant_id: string; device_id: string };
 export type ToolCall = {
@@ -49,6 +50,13 @@ export type ReportingStatus = {
 export function useMcpReporting() {
   const [status, setStatus] = useState<ReportingStatus | null>(null);
   const [error, setError] = useState("");
+  useAppRefresh(async () => {
+    try {
+      const next = await invoke<ReportingStatus>("mcp_reporting_status");
+      setStatus(current => !current || next.revision >= current.revision ? next : current);
+      setError("");
+    } catch (cause) { setError(String(cause)); throw cause; }
+  });
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | undefined;

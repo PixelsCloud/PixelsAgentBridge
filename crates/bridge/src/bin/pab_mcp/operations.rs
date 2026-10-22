@@ -26,6 +26,7 @@ type MonitorSlot = Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>;
 type ConnectionJob = (
     watch::Receiver<Option<Result<Value, String>>>,
     JoinHandle<()>,
+    Option<pab_bridge::ConnectionMode>,
 );
 const MAX_JOBS: usize = 8;
 
@@ -82,6 +83,7 @@ struct FileArgs {
 
 impl OperationManager {
     async fn connect(self: &Arc<Self>, args: &Value) -> Result<Value, String> {
+        let requested_mode = super::mcp_tools::connection_mode(args)?;
         let code: DeviceCode = args["device_code"]
             .as_str()
             .ok_or("device_code required")?
@@ -93,14 +95,18 @@ impl OperationManager {
         }
         let previous = connections
             .get(&code)
-            .and_then(|(rx, _)| rx.borrow().clone());
+            .and_then(|(rx, _, _)| rx.borrow().clone());
         if let Some(result) = previous {
             connections.remove(&code);
             result?;
         }
+        if let Some((_, _, pending_mode)) = connections.get(&code)
+            && requested_mode.is_some() && requested_mode != *pending_mode {
+            return Err("connection_mode_conflict: disconnect this device before changing an in-flight connection attempt".into());
+        }
         if !connections.contains_key(&code) {
             if connections.len() >= 64 {
-                connections.retain(|_, (rx, job)| rx.borrow().is_none() && !job.is_finished());
+                connections.retain(|_, (rx, job, _)| rx.borrow().is_none() && !job.is_finished());
             }
             if connections.len() >= 64 {
                 return Err("connection capacity reached".into());
@@ -129,9 +135,10 @@ impl OperationManager {
                 };
                 let _ = tx.send(Some(result));
             });
-            connections.insert(code, (rx, job));
+            connections.insert(code, (rx, job, requested_mode));
         }
         let mut receiver = connections[&code].0.clone();
+        let pending_mode = connections[&code].2;
         drop(connections);
         let deadline = tokio::time::Instant::now()
             + Duration::from_millis(args["wait_ms"].as_u64().unwrap_or(5000));
@@ -143,8 +150,10 @@ impl OperationManager {
                 .await
                 .is_err()
             {
+                let mut connection_ref = json!({"device_code": code});
+                if let Some(mode) = pending_mode { connection_ref["connection_mode"] = json!(mode); }
                 return Ok(
-                    json!({"connected":false,"state":"connecting","connection_ref":{"device_code":code},"wait_expired":true,"next_action":"pab_connect"}),
+                    json!({"connected":false,"state":"connecting","connection_ref":connection_ref,"wait_expired":true,"next_action":"pab_connect"}),
                 );
             }
             if receiver.borrow().is_none() && receiver.has_changed().is_err() {
@@ -933,7 +942,7 @@ impl OperationManager {
         }
         let pending = self.connections.lock().await.remove(&code);
         let had_pending = pending.is_some();
-        let connected_device = pending.as_ref().and_then(|(receiver, _)| {
+        let connected_device = pending.as_ref().and_then(|(receiver, _, _)| {
             receiver
                 .borrow()
                 .as_ref()
@@ -941,7 +950,7 @@ impl OperationManager {
                 .and_then(|value| value.get("device_ref"))
                 .and_then(|value| serde_json::from_value::<DeviceRef>(value.clone()).ok())
         });
-        if let Some((_, job)) = pending {
+        if let Some((_, job, _)) = pending {
             job.abort();
             let _ = job.await;
         }
@@ -972,7 +981,7 @@ impl OperationManager {
 
     pub async fn shutdown(&self) {
         self.closed.store(true, Ordering::Release);
-        for (_, (_, job)) in self.connections.lock().await.drain() {
+        for (_, (_, job, _)) in self.connections.lock().await.drain() {
             job.abort();
             let _ = job.await;
         }

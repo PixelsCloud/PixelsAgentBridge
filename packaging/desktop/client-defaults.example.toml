@@ -3,3 +3,6 @@
 # Fill in a paired WSS control URL and one or more HTTPS relay URLs locally.
 control_url = ""
 relay_urls = []
+# Optional private Relay CA certificate bundle, relative to this TOML or absolute.
+# Only public PEM certificates are embedded; keep CA files and keys out of Git.
+# relay_ca_cert = "relay-ca.pem"

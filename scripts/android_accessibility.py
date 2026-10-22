@@ -32,7 +32,8 @@ def set_enabled(serial, enabled):
         time.sleep(.3)
 
     def own(node):
-        return node.get('text', '').startswith(('Pixels device control', 'Pixels Android'))
+        return node.get('text', '').startswith(
+            ('Pixels Agent Bridge device control', 'Pixels device control', 'Pixels Android'))
 
     # MIUI may reuse an unrelated Settings child unless its test task is recreated.
     adb(serial, 'shell', 'am', 'start', '-f', '0x10008000', '-a', 'android.settings.ACCESSIBILITY_SETTINGS')

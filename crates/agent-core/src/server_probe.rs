@@ -71,9 +71,14 @@ async fn check(kind: ServerKind, url: url::Url, ca: Option<&[u8]>) -> Result<(),
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(8));
     if let Some(pem) = ca {
-        builder = builder.add_root_certificate(
-            reqwest::Certificate::from_pem(pem).map_err(|_| ProbeError::Tls)?,
-        );
+        let certificates =
+            reqwest::Certificate::from_pem_bundle(pem).map_err(|_| ProbeError::Tls)?;
+        if certificates.is_empty() {
+            return Err(ProbeError::Tls);
+        }
+        for certificate in certificates {
+            builder = builder.add_root_certificate(certificate);
+        }
     }
     let client = builder.build().map_err(|_| ProbeError::Unreachable)?;
     let mut health = url.clone();

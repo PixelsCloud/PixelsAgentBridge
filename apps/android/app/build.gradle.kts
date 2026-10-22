@@ -1,0 +1,50 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.compiler)
+}
+
+android {
+    namespace = "com.pixels.agent"
+    compileSdk = 36
+    ndkVersion = "29.0.14206865"
+    defaultConfig {
+        applicationId = "com.pixels.agent"
+        minSdk = 28
+        targetSdk = 36
+        versionCode = providers.gradleProperty("pixelsVersionCode").map(String::toInt).getOrElse(1)
+        versionName = providers.gradleProperty("pixelsVersionName").getOrElse("0.1.0-dev")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+    }
+    buildTypes { debug { applicationIdSuffix = ".debug" } }
+    buildFeatures { compose = true }
+    sourceSets["main"]
+        .assets
+        .srcDir(rootProject.file("../../.build/android/document-runtime/assets"))
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin { compilerOptions { freeCompilerArgs.add("-Xbackend-threads=1") } }
+
+dependencies {
+    implementation(project(":core"))
+    implementation(project(":platform"))
+    implementation(project(":transport"))
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui)
+    implementation(libs.activity.compose)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.coroutines.android)
+    // Verified and staged by build_android.py; standard flavor has no OpenMP fan-out.
+    runtimeOnly(
+        files(rootProject.file("../../.build/android/document-runtime/tesseract4android-4.9.0.aar"))
+    )
+    androidTestImplementation(libs.test.junit)
+    androidTestImplementation(libs.test.runner)
+    androidTestImplementation(libs.test.uiautomator)
+}

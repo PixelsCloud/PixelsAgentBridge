@@ -4,9 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 import { ArrowDownToLine, ChevronRight } from "lucide-react";
 import type { Language } from "./i18n";
 import type { UpdateInfo } from "./UpdatePanel";
+import { useAppRefresh } from "./appRefresh";
 
 export function UpdateNotice({ language, onOpen }: { language: Language; onOpen: () => void }) {
   const [available, setAvailable] = useState<UpdateInfo | null>(null);
+  useAppRefresh(async () => setAvailable(await invoke<UpdateInfo | null>("update_status")));
 
   useEffect(() => {
     let active = true;

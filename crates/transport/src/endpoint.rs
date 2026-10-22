@@ -13,6 +13,14 @@ use crate::PabConnection;
 
 pub const PAB_ALPN: &[u8] = b"pixels-agent-bridge/1";
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionMode {
+    #[default]
+    Auto,
+    Relay,
+}
+
 #[derive(Debug, Clone)]
 pub struct PabEndpointConfig {
     relay_urls: Vec<RelayUrl>,
@@ -31,12 +39,18 @@ impl PabEndpointConfig {
                 return Err(PabEndpointError::RelayTlsRequired(relay_url.to_string()));
             }
         }
-        Ok(Self {
+        let config = Self {
             relay_urls,
             tls: CaTlsConfig::embedded(),
             #[cfg(any(debug_assertions, feature = "test-utils"))]
             relay_only_for_testing: false,
-        })
+        };
+        let private_ca = pab_service_config::client::DEFAULT_RELAY_CA_PEM.as_bytes();
+        if private_ca.is_empty() {
+            Ok(config)
+        } else {
+            config.with_extra_ca_pem(private_ca)
+        }
     }
 
     pub fn with_extra_ca_pem(mut self, pem: &[u8]) -> Result<Self, PabEndpointError> {
@@ -262,6 +276,16 @@ impl PabEndpoint {
         address: &PabEndpointAddress,
         timeout: Duration,
     ) -> Result<PabConnection, PabEndpointError> {
+        self.connect_with_mode(endpoint_key, address, timeout, ConnectionMode::Auto).await
+    }
+
+    pub async fn connect_with_mode(
+        &self,
+        endpoint_key: [u8; 32],
+        address: &PabEndpointAddress,
+        timeout: Duration,
+        mode: ConnectionMode,
+    ) -> Result<PabConnection, PabEndpointError> {
         if timeout.is_zero() {
             return Err(PabEndpointError::InvalidConnectionTimeout);
         }
@@ -277,11 +301,20 @@ impl PabEndpoint {
             }
             endpoint_address = endpoint_address.with_relay_url(relay_url);
         }
-        for direct_address in &address.direct_addresses {
-            endpoint_address = endpoint_address.with_ip_addr(*direct_address);
+        if mode == ConnectionMode::Relay && address.relay_urls.is_empty() {
+            return Err(PabEndpointError::NoRemoteRelay);
+        }
+        if mode == ConnectionMode::Auto {
+            for direct_address in &address.direct_addresses {
+                endpoint_address = endpoint_address.with_ip_addr(*direct_address);
+            }
         }
         let connection =
-            tokio::time::timeout(timeout, self.inner.connect(endpoint_address, PAB_ALPN))
+            tokio::time::timeout(timeout, async {
+                self.inner.connect_with_opts(endpoint_address, PAB_ALPN,
+                    iroh::endpoint::ConnectOptions::new().with_relay_only(mode == ConnectionMode::Relay))
+                    .await.map_err(|e| e.to_string())?.await.map_err(|e| e.to_string())
+            })
                 .await
                 .map_err(|_| PabEndpointError::ConnectionTimeout)?
                 .map_err(|error| PabEndpointError::Connect(error.to_string()))?;
@@ -349,6 +382,8 @@ fn convert_address(address: &EndpointAddr) -> PabEndpointAddress {
 
 #[derive(Debug, Error)]
 pub enum PabEndpointError {
+    #[error("relay_connection_unavailable: the remote device has no Relay address; direct fallback is disabled")]
+    NoRemoteRelay,
     #[error("invalid Relay directory")]
     InvalidRelayDirectory,
     #[error("endpoint is closed")]

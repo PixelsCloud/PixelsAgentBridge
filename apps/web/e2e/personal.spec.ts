@@ -1,18 +1,21 @@
+import { fixtureConfig, isolatedFixture } from './support/isolatedFixture';
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
+test.skip(!fixtureConfig, 'Requires the explicitly selected task-owned database');
+
 test('personal device proof, two-client catalog sync, usage, unlink and account isolation', async ({ page, browser }) => {
   test.setTimeout(120000);
   const root = resolve(import.meta.dirname, '../../..');
-  const origin = 'https://localhost:38443';
+  const origin = isolatedFixture().origin;
   const username = `personal-${Date.now()}`; const password = 'personal-test-password';
   const response = await page.request.post(`${origin}/api/account/register`, { data: { username, password } });
   expect(response.ok()).toBeTruthy(); const native = await response.json();
   const bearer = { Authorization: `Bearer ${native.access_token}` };
   expect((await page.request.post('/api/web/session', { headers: { Origin: origin }, data: { username, password } })).ok()).toBeTruthy();
-  const child = spawn(resolve(root, `target/debug/examples/web-device-fixture${process.platform === 'win32' ? '.exe' : ''}`), [`wss://localhost:38443/control`, resolve(root, '.build/web-test/cert.pem'), 'Personal E2E machine'], { windowsHide: true });
+  const child = spawn(process.env.PAB_WEB_FIXTURE_BIN ?? resolve(root, `target/debug/examples/web-device-fixture${process.platform === 'win32' ? '.exe' : ''}`), [origin.replace('https:', 'wss:') + '/control', isolatedFixture().cert, 'Personal E2E machine'], { windowsHide: true });
   const lines = createInterface({ input: child.stdout }); const messages: Record<string, any>[] = []; let failure = '';
   lines.on('line', line => { try { messages.push(JSON.parse(line)); } catch { failure += line; } });
   child.stderr.on('data', chunk => { failure += String(chunk); });

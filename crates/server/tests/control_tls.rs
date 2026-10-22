@@ -547,12 +547,15 @@ async fn tls_account_flow(pool: PgPool) {
         )
         .await;
         let response = receive(&mut endpoint_socket).await;
-        assert!(matches!(
-            response,
-            ControlServerMessage::Error { request_id: Some(id), code: ControlErrorCode::NotFound, .. }
-                | ControlServerMessage::DevicePresenceFound { request_id: id, .. }
-                if id == request_id
-        ), "unexpected presence response: {response:?}");
+        assert!(
+            matches!(
+                response,
+                ControlServerMessage::Error { request_id: Some(id), code: ControlErrorCode::NotFound, .. }
+                    | ControlServerMessage::DevicePresenceFound { request_id: id, .. }
+                    if id == request_id
+            ),
+            "unexpected presence response: {response:?}"
+        );
     }
     for value in 800_000_000..800_000_040 {
         let request_id = RequestId::new();
@@ -574,7 +577,10 @@ async fn tls_account_flow(pool: PgPool) {
     let request_id = RequestId::new();
     send(
         &mut endpoint_socket,
-        &ControlClientMessage::ResolveDeviceCode { request_id, device_code },
+        &ControlClientMessage::ResolveDeviceCode {
+            request_id,
+            device_code,
+        },
     )
     .await;
     assert!(matches!(
@@ -1032,6 +1038,7 @@ async fn tls_account_flow(pool: PgPool) {
         Duration::from_secs(30),
         start_relay_service(RelayServiceConfig {
             cluster_enabled: false,
+            public_url: Some("https://relay.example.test/".into()),
             node_id: "primary".into(),
             usage_dir: certificate_directory.path().join("usage"),
             control_url: format!("wss://localhost:{}/relay-control", address.port()),
@@ -1930,6 +1937,14 @@ async fn tls_account_flow(pool: PgPool) {
         relay_nodes, 1,
         "real Relay policy polling must report its applied revision"
     );
+    tokio::time::timeout(Duration::from_secs(6), async {
+        loop {
+            let live: bool = sqlx::query_scalar("SELECT telemetry_boot_id IS NOT NULL AND public_url='https://relay.example.test/' AND telemetry_connections>0 AND telemetry_received_bytes>0 AND telemetry_sent_bytes>0 FROM relay_nodes WHERE node_id='primary'")
+                .fetch_one(&pool).await.unwrap();
+            if live { break; }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }).await.expect("real Relay traffic must reach Server telemetry storage");
     eprintln!("TLS fixture stage: guest_connection.close();");
     guest_connection.close();
     tokio::time::timeout(Duration::from_secs(5), guest_server)

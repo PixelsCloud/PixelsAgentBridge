@@ -54,6 +54,8 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     let connector = control_connector(config.control_ca_cert.as_deref())?;
     let runtime = RelayPolicyRuntime::new(RelayPolicyState::new(config.limiter_burst)?);
     let mut sync_settings = PolicySyncSettings {
+        process_boot_id: uuid::Uuid::new_v4(),
+        public_url: config.public_url,
         metrics: None,
         boot_id: config.cluster_enabled.then(uuid::Uuid::new_v4),
         node_id: config.node_id.clone(),

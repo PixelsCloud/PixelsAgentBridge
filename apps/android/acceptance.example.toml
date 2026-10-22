@@ -1,0 +1,21 @@
+# Copy to .build/android/acceptance.toml. Use a new UUID after any APK change.
+[acceptance]
+run_id = "00000000-0000-4000-8000-000000000001"
+
+[device]
+serial = "YOUR_USB_SERIAL"
+emulator = "emulator-5554"
+
+[build]
+# Reserve the remaining eight jobs for other sessions.
+jobs = 2
+
+# Optional public phases require the normal phone/account pairing to be prepared.
+# Do not store a password in this configuration. Metadata belongs to its run directory.
+# [public]
+# run_id = "00000000-0000-4000-8000-000000000002"
+
+# The phone monitor and remote android_standby.py must use the same fresh soak UUID.
+# [soak]
+# run_id = "00000000-0000-4000-8000-000000000003"
+# seconds = 28890

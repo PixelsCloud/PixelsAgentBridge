@@ -671,7 +671,9 @@ fn ranked_relay_urls(directory: &pab_protocol::RelayDirectory, identity: &[u8; 3
             let bytes = hash.finalize();
             let score = u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap());
             let uniform = (score as f64 + 1.0) / (u64::MAX as f64 + 1.0);
-            let rank = -uniform.ln() / (f64::from(node.weight) * f64::from(node.capacity_mbps));
+            // Routing weights are explicit; an unspecified host capacity is not
+            // a measured network speed and must not bias placement.
+            let rank = -uniform.ln() / f64::from(node.weight);
             (rank, node.url.clone())
         })
         .collect();

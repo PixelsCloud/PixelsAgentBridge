@@ -244,7 +244,14 @@ async fn run_qad(args: &[String]) -> Result<()> {
     let server_addr: SocketAddr = required(args, 2, "QUIC server address")?.parse()?;
     let tls_name = required(args, 3, "TLS server name")?;
     let endpoint = noq::Endpoint::client((Ipv4Addr::UNSPECIFIED, 0).into())?;
-    let tls = CaTlsConfig::embedded().client_config(default_provider())?;
+    let mut tls = CaTlsConfig::embedded();
+    let mut pem = pab_service_config::client::DEFAULT_RELAY_CA_PEM.as_bytes();
+    if !pem.is_empty() {
+        tls = tls.with_extra_roots(
+            rustls_pemfile::certs(&mut pem).collect::<std::io::Result<Vec<_>>>()?,
+        );
+    }
+    let tls = tls.client_config(default_provider())?;
     let client = QuicClient::new(endpoint.clone(), tls);
     let connection = tokio::time::timeout(
         Duration::from_secs(15),

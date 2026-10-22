@@ -8,13 +8,13 @@ mod directory;
 mod document;
 mod event;
 mod filesystem;
+mod mobile;
 mod operation;
 mod port_forward;
 mod presence;
 mod reconciliation;
 mod remembered;
 mod screenshot;
-mod mobile;
 mod session;
 mod store;
 #[cfg(test)]
@@ -139,8 +139,34 @@ impl BridgeLocalStore {
         Ok(())
     }
 
+    /// Whether this computer already holds the device password, i.e. whether a
+    /// catalog entry can be connected to without asking for it again.
+    pub async fn has_device_credential(
+        &self,
+        device_id: pab_protocol::DeviceId,
+    ) -> Result<bool, RuntimeStoreError> {
+        let found: Option<i64> = sqlx::query_scalar(
+            "SELECT 1 FROM device_credentials WHERE device_id = ?",
+        )
+        .bind(device_id.to_string())
+        .fetch_optional(&self.store.pool)
+        .await?;
+        Ok(found.is_some())
+    }
+
     pub async fn remembered_devices(&self) -> Result<Vec<RememberedDevice>, RuntimeStoreError> {
         self.store.remembered_devices().await
+    }
+
+    /// Devices saved in the signed-in account's server catalog, including the
+    /// server-reported online flag. Requires an account session.
+    pub async fn account_catalog_devices(
+        &self,
+    ) -> Result<Vec<pab_protocol::SavedDevice>, RuntimeStoreError> {
+        let Some(scope) = catalog::scope(&self.store)? else {
+            return Ok(Vec::new());
+        };
+        self.store.catalog_saved_devices(&scope).await
     }
 
     pub async fn forget_device(
@@ -320,6 +346,7 @@ pub struct BridgeRuntime {
     heartbeat_task: JoinHandle<()>,
     reconciliation_task: JoinHandle<()>,
     account_task: JoinHandle<()>,
+    usage_task: JoinHandle<()>,
 }
 
 impl BridgeRuntime {
@@ -460,6 +487,7 @@ impl BridgeRuntime {
             inner.session_id.clone(),
             shutdown.subscribe(),
         ));
+        let usage_task = tokio::spawn(usage::run_sampler(Arc::clone(&inner), shutdown.subscribe()));
         let reconciliation_task =
             tokio::spawn(run_reconciliation(Arc::clone(&inner), shutdown.subscribe()));
         let runtime = Self {
@@ -469,6 +497,7 @@ impl BridgeRuntime {
             heartbeat_task,
             reconciliation_task,
             account_task,
+            usage_task,
         };
         if runtime_config.resume_incomplete_on_start {
             for record in runtime.inner.store.incomplete().await? {
@@ -697,8 +726,22 @@ impl BridgeRuntime {
         &self,
         device_ref: DeviceRef,
     ) -> Result<TargetContext, RuntimeError> {
-        self.inner.device(device_ref).await.resume();
+        self.connect_device_with_mode(device_ref, None).await
+    }
+
+    pub async fn connect_device_with_mode(
+        &self,
+        device_ref: DeviceRef,
+        mode: Option<crate::ConnectionMode>,
+    ) -> Result<TargetContext, RuntimeError> {
+        let device = self.inner.device(device_ref).await;
+        if let Some(mode) = mode { device.set_connection_mode(mode).await; }
+        device.resume();
         self.current_environment(device_ref).await
+    }
+
+    pub async fn connection_mode(&self, device_ref: DeviceRef) -> crate::ConnectionMode {
+        self.inner.device(device_ref).await.connection_mode()
     }
 
     pub async fn disconnect_device(&self, device_ref: DeviceRef) {
@@ -908,6 +951,7 @@ impl BridgeRuntime {
         self.heartbeat_task.await?;
         self.reconciliation_task.await?;
         self.account_task.await?;
+        self.usage_task.await?;
         self.inner
             .store
             .stop_session(&self.inner.session_id)

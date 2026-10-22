@@ -36,6 +36,7 @@ pub struct PeerRuntime {
     pub system: Option<Arc<crate::system::SystemService>>,
     pub documents: Option<Arc<crate::documents::DocumentService>>,
     pub execution: Option<Arc<crate::execution::ExecutionService>>,
+    password: Arc<std::sync::RwLock<DevicePassword>>,
     task: JoinHandle<()>,
 }
 
@@ -141,8 +142,11 @@ impl PeerRuntime {
         options: RuntimeOptions,
         digest_key: [u8; 32],
     ) -> Result<Self, &'static str> {
-        let credential = DevicePassword::from_phc(options.password_version, options.password_hash)
-            .map_err(|_| "invalid_access_password")?;
+        let password = Arc::new(std::sync::RwLock::new(
+            DevicePassword::from_phc(options.password_version, options.password_hash)
+                .map_err(|_| "invalid_access_password")?,
+        ));
+        let credentials = Arc::clone(&password);
         let path = Path::new(&options.database_file);
         if !path.is_absolute() {
             return Err("invalid_runtime_path");
@@ -204,7 +208,7 @@ impl PeerRuntime {
                     incoming=listener.accept()=>{
                         let Ok(Some(connection))=incoming else {break};
                         let Ok(permit)=Arc::clone(&limit).try_acquire_owned() else {connection.close(b"busy");continue};
-                        let authorizer=authorizer.clone();let credential=credential.clone();let attempts=attempts.clone();let broker=Arc::clone(&platform);let context=SessionContext {execution:execution.clone(),broker,active:active.clone(),files:file_service.clone(),system:system_service.clone(),documents:document_service.clone(),commands:command_service.clone(),forwards:forwards.clone()};
+                        let authorizer=authorizer.clone();let credential=credentials.read().expect("access credential lock").clone();let attempts=attempts.clone();let broker=Arc::clone(&platform);let context=SessionContext {execution:execution.clone(),broker,active:active.clone(),files:file_service.clone(),system:system_service.clone(),documents:document_service.clone(),commands:command_service.clone(),forwards:forwards.clone()};
                         sessions.spawn(async move {let _permit=permit;let _=session(connection,authorizer,credential,attempts,device,context).await;});
                     }
                     _=sessions.join_next(), if !sessions.is_empty()=>{}
@@ -218,8 +222,16 @@ impl PeerRuntime {
             system,
             documents,
             execution: commands,
+            password,
             task,
         })
+    }
+    pub fn update_password(&self, credential: DevicePassword) -> Result<(), &'static str> {
+        *self
+            .password
+            .write()
+            .map_err(|_| "credential_unavailable")? = credential;
+        Ok(())
     }
     pub async fn stop(self) {
         if let Some(execution) = &self.execution {
@@ -325,7 +337,7 @@ async fn session(
                         let response=if request.schema_version()!=DEVICE_TASK_SCHEMA_VERSION {unsupported()} else { match request {
                             DeviceTaskRequest::GetEnvironment {..}=>DeviceTaskResponse::Environment {
                                 context:Box::new(TargetContext {device_ref:device,execution,source:TargetContextSource::ExecutorVerified,observed_at_unix_ms:now_ms(),freshness:ContextFreshness::Current}),
-                                command_schema_version:commands.as_ref().map(|_|2),terminal_schema_version:commands.as_ref().map(|_|1),desktop_terminal_schema_version:None,filesystem_schema_version:files.as_ref().map(|_|4),transfer_schema_version:files.as_ref().map(|_|FILE_TRANSFER_SCHEMA_VERSION),system_query_schema_version:system.as_ref().map(|_|SYSTEM_QUERY_SCHEMA_VERSION),screenshot_schema_version:Some(SCREENSHOT_SCHEMA_VERSION),document_schema_version:documents.as_ref().map(|_|DOCUMENT_SCHEMA_VERSION),port_forward_schema_version:forwards.as_ref().map(|_|PORT_FORWARD_SCHEMA_VERSION),mobile_schema_version:Some(MOBILE_SCHEMA_VERSION),
+                                command_schema_version:commands.as_ref().map(|_|2),terminal_schema_version:commands.as_ref().map(|_|1),desktop_terminal_schema_version:None,remote_desktop_schema_version:None,remote_desktop_cursor_schema_version:None,remote_desktop_clipboard_schema_version:None,filesystem_schema_version:files.as_ref().map(|_|4),transfer_schema_version:files.as_ref().map(|_|FILE_TRANSFER_SCHEMA_VERSION),system_query_schema_version:system.as_ref().map(|_|SYSTEM_QUERY_SCHEMA_VERSION),screenshot_schema_version:Some(SCREENSHOT_SCHEMA_VERSION),document_schema_version:documents.as_ref().map(|_|DOCUMENT_SCHEMA_VERSION),port_forward_schema_version:forwards.as_ref().map(|_|PORT_FORWARD_SCHEMA_VERSION),mobile_schema_version:Some(MOBILE_SCHEMA_VERSION),
                             },
                             DeviceTaskRequest::Document {request,..} if documents.is_some()=>DeviceTaskResponse::Document {reply:Box::new(documents.as_ref().expect("document capability").request(&owner,request).await)},
                             DeviceTaskRequest::GetDocument {request_id,..} if documents.is_some()=>DeviceTaskResponse::Document {reply:Box::new(documents.as_ref().expect("document capability").authorized_lookup(&owner,request_id).await)},

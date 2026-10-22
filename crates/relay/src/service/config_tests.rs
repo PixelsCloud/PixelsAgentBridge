@@ -5,6 +5,7 @@ use super::config::{RelayServiceConfig, RelayServiceConfigError};
 fn config() -> RelayServiceConfig {
     RelayServiceConfig {
         cluster_enabled: false,
+        public_url: None,
         node_id: "primary".into(),
         usage_dir: "unused-test-usage".into(),
         control_url: "wss://localhost/control".to_owned(),
@@ -39,4 +40,23 @@ fn keeps_the_upstream_captive_portal_on_loopback() {
         config.validate(),
         Err(RelayServiceConfigError::CaptivePortalMustBeLoopback)
     );
+}
+
+#[test]
+fn public_metadata_never_contains_control_credentials() {
+    let mut config = config();
+    for value in [
+        "http://relay.example/",
+        "https://user:password@relay.example/",
+        "https://relay.example/?token=secret",
+        "https://relay.example/#secret",
+    ] {
+        config.public_url = Some(value.into());
+        assert_eq!(
+            config.validate(),
+            Err(RelayServiceConfigError::InvalidPublicUrl)
+        );
+    }
+    config.public_url = Some("https://relay.example/".into());
+    config.validate().unwrap();
 }

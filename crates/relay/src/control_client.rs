@@ -19,6 +19,7 @@ pub struct RelayControlClient {
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
     node_id: String,
     heartbeat_interval: Option<Duration>,
+    diagnostics_supported: bool,
 }
 
 impl RelayControlClient {
@@ -69,6 +70,7 @@ impl RelayControlClient {
         &mut self,
         boot_id: uuid::Uuid,
         metrics: &iroh_relay::server::Metrics,
+        runtime: &RelayPolicyRuntime,
     ) -> Result<(), RelayControlClientError> {
         let request_id = RequestId::new();
         let request = RelayControlClientMessage::Heartbeat {
@@ -81,6 +83,7 @@ impl RelayControlClient {
                 .saturating_sub(metrics.disconnects.get()),
             received_bytes: metrics.bytes_recv.get(),
             sent_bytes: metrics.bytes_sent.get(),
+            diagnostics: if self.diagnostics_supported { runtime.diagnostics_snapshot(metrics) } else {None},
         };
         match self.exchange(&request).await? {
             RelayControlServerMessage::HeartbeatAccepted { request_id: id } if id == request_id => {
@@ -140,11 +143,10 @@ impl RelayControlClient {
                 request_id: id,
                 heartbeat_seconds,
                 capacity_bytes_per_second,
-            } if id == request_id
-                && (1..=30).contains(&heartbeat_seconds)
-                && capacity_bytes_per_second > 0 =>
-            {
+                diagnostics_version,
+            } if id == request_id && (1..=30).contains(&heartbeat_seconds) => {
                 self.heartbeat_interval = Some(Duration::from_secs(heartbeat_seconds));
+                self.diagnostics_supported=diagnostics_version==Some(pab_protocol::RELAY_DIAGNOSTICS_VERSION);
                 Ok((
                     Duration::from_secs(heartbeat_seconds),
                     capacity_bytes_per_second,
@@ -274,6 +276,7 @@ impl RelayControlClient {
             socket,
             node_id: "primary".into(),
             heartbeat_interval: None,
+            diagnostics_supported: false,
         })
     }
 
@@ -286,6 +289,14 @@ impl RelayControlClient {
         &mut self,
         runtime: &RelayPolicyRuntime,
     ) -> Result<PolicySync, RelayControlClientError> {
+        self.sync_policy_with_telemetry(runtime, None).await
+    }
+
+    pub(crate) async fn sync_policy_with_telemetry(
+        &mut self,
+        runtime: &RelayPolicyRuntime,
+        telemetry: Option<pab_protocol::RelayNodeTelemetry>,
+    ) -> Result<PolicySync, RelayControlClientError> {
         let started = std::time::Instant::now();
         let request_id = RequestId::new();
         let request = RelayControlClientMessage::GetPolicy {
@@ -293,6 +304,7 @@ impl RelayControlClient {
             known_policy_version: runtime.policy_version()?,
             node_id: Some(self.node_id.clone()),
             agent_version: Some(env!("CARGO_PKG_VERSION").to_owned()),
+            telemetry,
         };
         let encoded = serde_json::to_string(&request)?;
         tokio::time::timeout(

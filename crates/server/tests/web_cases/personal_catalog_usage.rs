@@ -40,33 +40,73 @@ async fn thousand_saved_devices_page_with_changes_without_losing_tombstones(pool
     let (app, _) = app(pool.clone(), true).await;
     let (token, user, _) = account(&app, "catalog-scale").await;
     let (_, _, other) = account(&app, "catalog-other").await;
-    let tenant: Uuid = user["personal_tenant_id"].as_str().unwrap().parse().unwrap();
+    let tenant: Uuid = user["personal_tenant_id"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
     let user_id: Uuid = user["id"].as_str().unwrap().parse().unwrap();
     sqlx::query("INSERT INTO devices(id,tenant_id,code,name) SELECT gen_random_uuid(),$1,710000000+i,'Saved '||i FROM generate_series(1,1000) i").bind(tenant).execute(&pool).await.unwrap();
-    sqlx::query("INSERT INTO user_catalog_versions(user_id,revision) VALUES($1,1000)").bind(user_id).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO user_catalog_versions(user_id,revision) VALUES($1,1000)")
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO user_saved_devices(user_id,device_id,revision,saved_name,saved_system,verified_until) SELECT $1,id,code-710000000,name,'windows',to_timestamp(0) FROM devices").bind(user_id).execute(&pool).await.unwrap();
     let start = std::time::Instant::now();
-    let mut cursor = 0; let mut seen = std::collections::HashSet::new(); let mut mutation = None;
+    let mut cursor = 0;
+    let mut seen = std::collections::HashSet::new();
+    let mut mutation = None;
     loop {
-        let page = native_call(&app,"GET",&format!("/api/account/saved-devices?after={cursor}&limit=200"),&token,Value::Null).await;
+        let page = native_call(
+            &app,
+            "GET",
+            &format!("/api/account/saved-devices?after={cursor}&limit=200"),
+            &token,
+            Value::Null,
+        )
+        .await;
         assert_eq!(page.0, StatusCode::OK);
         for item in page.1["items"].as_array().unwrap() {
             seen.insert(item["device_ref"]["device_id"].as_str().unwrap().to_owned());
             assert!(item["online"].is_null());
             if mutation.is_none() {
-                mutation = Some(json!({"id":Uuid::new_v4(),"device_id":item["device_ref"]["device_id"],"expected_revision":item["revision"],"alias":"","deleted":true}));
+                mutation = Some(
+                    json!({"id":Uuid::new_v4(),"device_id":item["device_ref"]["device_id"],"expected_revision":item["revision"],"alias":"","deleted":true}),
+                );
             }
         }
         cursor = page.1["cursor"].as_i64().unwrap();
         if cursor == 200 {
-            assert_eq!(native_call(&app,"POST","/api/account/saved-devices",&token,mutation.clone().unwrap()).await.0,StatusCode::OK);
+            assert_eq!(
+                native_call(
+                    &app,
+                    "POST",
+                    "/api/account/saved-devices",
+                    &token,
+                    mutation.clone().unwrap()
+                )
+                .await
+                .0,
+                StatusCode::OK
+            );
         }
-        if !page.1["has_more"].as_bool().unwrap() {break;}
+        if !page.1["has_more"].as_bool().unwrap() {
+            break;
+        }
     }
-    assert_eq!(seen.len(),1000);
-    assert_eq!(cursor,1001);
-    assert_eq!(call(&app,"GET","/api/web/saved-devices",&other,Value::Null).await.2["items"],json!([]));
-    eprintln!("1000 saved devices with concurrent deletion: {:?}", start.elapsed());
+    assert_eq!(seen.len(), 1000);
+    assert_eq!(cursor, 1001);
+    assert_eq!(
+        call(&app, "GET", "/api/web/saved-devices", &other, Value::Null)
+            .await
+            .2["items"],
+        json!([])
+    );
+    eprintln!(
+        "1000 saved devices with concurrent deletion: {:?}",
+        start.elapsed()
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -214,6 +254,9 @@ async fn usage_retries_are_atomic_and_personal_queries_cannot_read_other_account
         counters: UsageCounters {
             uploaded_files: 1,
             uploaded_bytes: 1234,
+            p2p_upload_bytes: 1536,
+            p2p_download_bytes: 2048,
+            p2p_reported: true,
             ..Default::default()
         },
     };
@@ -260,6 +303,9 @@ async fn usage_retries_are_atomic_and_personal_queries_cannot_read_other_account
     assert_eq!(result.2["counters"]["uploaded_bytes"], 1234);
     assert_eq!(result.2["counters"]["uploaded_files"], 1);
     assert_eq!(result.2["counters"]["relay_download_bytes"], 200);
+    assert_eq!(result.2["counters_exact"]["p2p_upload_bytes"], "1536");
+    assert_eq!(result.2["counters_exact"]["p2p_download_bytes"], "2048");
+    assert_eq!(result.2["p2p_reported"], true);
     assert_eq!(
         call(&app, "GET", &path, &cookie_b, Value::Null).await.2["counters"]["uploaded_bytes"],
         0

@@ -53,10 +53,7 @@ async fn fixture(pool: PgPool, registration: bool) -> Fixture {
     .unwrap();
     let control =
         ControlPlane::new(PostgresStore::from_pool(pool), PasswordPolicy::default()).unwrap();
-    control
-        .initialize_settings()
-        .await
-        .unwrap();
+    control.initialize_settings().await.unwrap();
     let api = ControlApiState::new(
         control.clone(),
         ControlApiConfig {
@@ -74,7 +71,10 @@ async fn fixture(pool: PgPool, registration: bool) -> Fixture {
         login_slots: Arc::new(Semaphore::new(4)),
         login_budget: Arc::new(Mutex::new((std::time::Instant::now(), 0))),
         subscriptions: Arc::new(Semaphore::new(1)),
+        exports: Arc::new(Semaphore::new(2)),
         server_instance: Uuid::new_v4(),
+        relay_diagnostics: api.relay_diagnostics.clone(),
+        relay_addresses: Arc::new(super::super::relay_addresses::RelayAddressCache::default()),
     };
     Fixture {
         app: crate::web::router(api),
@@ -183,7 +183,7 @@ async fn password_user(f: &Fixture, name: &str) -> (Uuid, String) {
 
 #[test]
 fn native_redirect_and_cookie_boundary() {
-    assert!(random().len()>=32);
+    assert!(random().len() >= 32);
     assert!(valid_loopback("http://127.0.0.1:49152/github/callback"));
     for bad in [
         "http://localhost:49152/github/callback",
@@ -207,23 +207,67 @@ fn native_redirect_and_cookie_boundary() {
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn redeem_expiry_disabled_user_and_session_revision_are_enforced(pool:PgPool) {
-    let f=fixture(pool.clone(),true).await;let(user,_)=password_user(&f,"redemption-boundary").await;
-    let verifier="a".repeat(64);
-    for (index,mode) in ["expired","disabled","changed"].into_iter().enumerate(){
-        let code=format!("fixture-code-{index}");
-        sqlx::query("UPDATE users SET status='active',auth_revision=1 WHERE id=$1").bind(user).execute(&pool).await.unwrap();
+async fn redeem_expiry_disabled_user_and_session_revision_are_enforced(pool: PgPool) {
+    let f = fixture(pool.clone(), true).await;
+    let (user, _) = password_user(&f, "redemption-boundary").await;
+    let verifier = "a".repeat(64);
+    for (index, mode) in ["expired", "disabled", "changed"].into_iter().enumerate() {
+        let code = format!("fixture-code-{index}");
+        sqlx::query("UPDATE users SET status='active',auth_revision=1 WHERE id=$1")
+            .bind(user)
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO github_redemptions(code_hash,proof_hash,user_id,auth_revision,expires_at) VALUES ($1,$2,$3,1,now()+interval '1 minute')")
             .bind(hash(&code)).bind(hash(&verifier)).bind(user).execute(&pool).await.unwrap();
-        match mode{
-            "expired"=>{sqlx::query("UPDATE github_redemptions SET expires_at=now()-interval '1 second'").execute(&pool).await.unwrap();},
-            "disabled"=>{sqlx::query("UPDATE users SET status='disabled' WHERE id=$1").bind(user).execute(&pool).await.unwrap();},
-            _=>{sqlx::query("UPDATE users SET auth_revision=2 WHERE id=$1").bind(user).execute(&pool).await.unwrap();},
+        match mode {
+            "expired" => {
+                sqlx::query("UPDATE github_redemptions SET expires_at=now()-interval '1 second'")
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            "disabled" => {
+                sqlx::query("UPDATE users SET status='disabled' WHERE id=$1")
+                    .bind(user)
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            _ => {
+                sqlx::query("UPDATE users SET auth_revision=2 WHERE id=$1")
+                    .bind(user)
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
         }
-        let status=call(&f,"POST","/api/account/github/redeem","","",json!({"code":code,"verifier":verifier})).await.0;
-        assert_eq!(status,if mode=="expired"{StatusCode::BAD_REQUEST}else{StatusCode::UNAUTHORIZED});
+        let status = call(
+            &f,
+            "POST",
+            "/api/account/github/redeem",
+            "",
+            "",
+            json!({"code":code,"verifier":verifier}),
+        )
+        .await
+        .0;
+        assert_eq!(
+            status,
+            if mode == "expired" {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::UNAUTHORIZED
+            }
+        );
     }
-    assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM web_sessions").fetch_one(&pool).await.unwrap(),1);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM web_sessions")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        1
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -488,4 +532,31 @@ async fn closed_registration_allows_existing_identity_and_concurrent_login_is_un
     f.profile.lock().await["id"] = json!(9999);
     let (s, c) = begin(&f, "", false).await;
     assert!(location(&finish(&f, &s, &c, "good").await.1).contains("registration_disabled"));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn runtime_override_controls_github_first_identity_but_preserves_existing_login(
+    pool: PgPool,
+) {
+    let f = fixture(pool.clone(), false).await;
+    sqlx::query("UPDATE server_settings SET registration_override=true WHERE singleton")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, c) = begin(&f, "", false).await;
+    assert_eq!(location(&finish(&f, &s, &c, "good").await.1), "/");
+    sqlx::query("UPDATE server_settings SET registration_override=false WHERE singleton")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, c) = begin(&f, "", false).await;
+    assert_eq!(location(&finish(&f, &s, &c, "good").await.1), "/");
+    f.profile.lock().await["id"] = json!(987654);
+    let (s, c) = begin(&f, "", false).await;
+    assert!(location(&finish(&f, &s, &c, "good").await.1).contains("registration_disabled"));
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
 }

@@ -102,10 +102,16 @@ pub enum ConnectionPath {
 #[derive(Clone)]
 pub struct PabConnection {
     inner: Connection,
+    traffic: std::sync::Arc<std::sync::Mutex<crate::traffic::PathTraffic>>,
 }
 
 impl PabConnection {
     pub(crate) fn new(inner: Connection) -> Self {
+        let traffic =
+            std::sync::Arc::new(std::sync::Mutex::new(crate::traffic::PathTraffic::default()));
+        let events_traffic = traffic.clone();
+        // Subscribe before inspecting paths, so closing paths retain their final counters.
+        let mut events = inner.path_events();
         let initial = inner.paths();
         if let Some(path) = initial.iter().find(|path| path.is_selected()) {
             let selected = if path.is_ip() {
@@ -117,9 +123,30 @@ impl PabConnection {
             };
             tracing::info!(selected_path = selected, "PAB connection path selected");
         }
-        let mut events = inner.path_events();
         tokio::spawn(async move {
             while let Some(event) = events.next().await {
+                match &event {
+                    PathEvent::Closed {
+                        id,
+                        remote_addr,
+                        last_stats,
+                        ..
+                    } if remote_addr.is_ip() => {
+                        if let Ok(mut counters) = events_traffic.lock() {
+                            counters.observe(
+                                id.to_string(),
+                                last_stats.udp_tx.bytes,
+                                last_stats.udp_rx.bytes,
+                            );
+                        }
+                    }
+                    PathEvent::Lagged { .. } => {
+                        if let Ok(mut counters) = events_traffic.lock() {
+                            counters.mark_incomplete();
+                        }
+                    }
+                    _ => {}
+                }
                 if let PathEvent::Selected { remote_addr, .. } = event {
                     let selected = if remote_addr.is_ip() {
                         "direct"
@@ -132,7 +159,27 @@ impl PabConnection {
                 }
             }
         });
-        Self { inner }
+        Self { inner, traffic }
+    }
+
+    /// UDP payload bytes on direct QUIC paths, including QUIC overhead and
+    /// retransmissions. Only the controlling endpoint reports these counters.
+    pub fn direct_traffic(&self) -> crate::DirectTraffic {
+        let Ok(mut counters) = self.traffic.lock() else {
+            return crate::DirectTraffic {
+                incomplete: true,
+                ..Default::default()
+            };
+        };
+        for path in self.inner.paths().iter().filter(|path| path.is_ip()) {
+            let stats = path.stats();
+            counters.observe(
+                path.id().to_string(),
+                stats.udp_tx.bytes,
+                stats.udp_rx.bytes,
+            );
+        }
+        counters.total()
     }
 
     pub fn remote_endpoint_key(&self) -> [u8; 32] {
@@ -498,4 +545,68 @@ pub enum PabConnectionError {
     Stream(String),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+}
+
+#[cfg(test)]
+mod traffic_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn direct_quic_transfer_counts_real_bytes_in_both_directions() {
+        let bind = |key| {
+            iroh::Endpoint::builder(iroh::endpoint::presets::Minimal)
+                .secret_key(iroh::SecretKey::from_bytes(&[key; 32]))
+                .alpns(vec![crate::PAB_ALPN.to_vec()])
+                .relay_mode(iroh::RelayMode::Disabled)
+                .bind()
+        };
+        let a = bind(41).await.unwrap();
+        let b = bind(42).await.unwrap();
+        let peer = b.addr();
+        let (outgoing, incoming) = tokio::join!(a.connect(peer, crate::PAB_ALPN), async {
+            b.accept().await.unwrap().await.unwrap()
+        });
+        let a_connection = PabConnection::new(outgoing.unwrap());
+        let b_connection = PabConnection::new(incoming);
+        let payload = vec![17_u8; 32 * 1024];
+        let before = a_connection.direct_traffic();
+        let sender = async {
+            let mut stream = a_connection.open_bi(Duration::from_secs(10)).await.unwrap();
+            stream
+                .send_binary_frame(&payload, Duration::from_secs(10))
+                .await
+                .unwrap();
+            let reply = stream
+                .receive_binary_frame(Duration::from_secs(10))
+                .await
+                .unwrap();
+            assert_eq!(reply, payload);
+        };
+        let receiver = async {
+            let mut stream = b_connection
+                .accept_bi(Duration::from_secs(10))
+                .await
+                .unwrap();
+            let received = stream
+                .receive_binary_frame(Duration::from_secs(10))
+                .await
+                .unwrap();
+            stream
+                .send_binary_frame(&received, Duration::from_secs(10))
+                .await
+                .unwrap();
+        };
+        tokio::time::timeout(Duration::from_secs(20), async {
+            tokio::join!(sender, receiver);
+        })
+        .await
+        .unwrap();
+        let after = a_connection.direct_traffic();
+        assert!(after.uploaded_bytes > before.uploaded_bytes + 32 * 1024);
+        assert!(after.downloaded_bytes > before.downloaded_bytes + 32 * 1024);
+        assert!(!after.incomplete);
+        a_connection.close(b"done");
+        a.close().await;
+        b.close().await;
+    }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Bug, Expand, Maximize2, Minus, Moon, MousePointer2, Shrink, Sun, X } from "lucide-react";
+import { Bug, Clipboard, Expand, Maximize2, Minus, Moon, MousePointer2, Shrink, Sun, X } from "lucide-react";
 import brand from "./assets/brand.svg";
 import "./windowChrome.css";
 import "./remoteDesktop.css";
@@ -14,6 +14,7 @@ type Quality = { session_id: string; generation: number; capture_fps_milli: numb
 type Status = {
   phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; frame_ready?: boolean;
   decoder?: string | null; quality?: Quality | null; remote_os?: string | null; connection_path?: string | null;
+  clipboard_enabled?: boolean; clipboard_state?: string;
   opened?: { config: { session_id: string; screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean };
 };
 const english = initialLanguage() === "en";
@@ -23,6 +24,9 @@ const text = english
 const inputText = english
   ? { enable: "Enable control", disable: "Stop control", active: "Control enabled" }
   : { enable: "启用操作", disable: "停止操作", active: "可操作" };
+const clipboardText = english
+  ? { enable: "Enable text clipboard sync", disable: "Disable text clipboard sync", waiting: "Text clipboard: waiting for control", active: "Text clipboard: syncing", disabled: "Text clipboard: off", unsupported: "Text clipboard: update the remote app to enable", unavailable: "Text clipboard is temporarily unavailable; retrying", paste_failed: "Clipboard sync failed. Paste was not sent; please try again." }
+  : { enable: "开启文字剪贴板同步", disable: "关闭文字剪贴板同步", waiting: "文字剪贴板：等待启用操作", active: "文字剪贴板：同步中", disabled: "文字剪贴板：已关闭", unsupported: "文字剪贴板：请升级远端程序", unavailable: "文字剪贴板暂不可用，正在重试", paste_failed: "剪贴板同步失败，未发送粘贴，请重试。" };
 
 export default function RemoteDesktopWindow() {
   const [status, setStatus] = useState<Status>({ phase: "ready" });
@@ -32,6 +36,9 @@ export default function RemoteDesktopWindow() {
   const [statisticsExpanded, setStatisticsExpanded] = useState(false);
   const [title, setTitle] = useState(text.title);
   const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
+  const clipboardEnabled = status.clipboard_enabled !== false;
+  const clipboardState = status.clipboard_state || "waiting";
+  const clipboardHint = clipboardText[clipboardState as keyof typeof clipboardText] || clipboardText.waiting;
   const closePending = useRef(false);
   const { appWindow, fullscreen, toggleFullscreen } = useViewerFullscreen(setError);
   async function requestClose() {
@@ -111,6 +118,7 @@ export default function RemoteDesktopWindow() {
     [english ? "Encoder target (not measured)" : "编码目标码率（非实测）", budget],
     [english ? "First frame / input ready" : "首帧／输入就绪", `${status.frame_ready ? "✓" : "—"} / ${status.input_ready ? "✓" : "—"}`],
     [english ? "Input supported" : "远端输入支持", opened ? (opened.input_supported ? "✓" : "—") : unknown],
+    [english ? "Text clipboard" : "文字剪贴板", clipboardHint],
     [english ? "Generation" : "会话代次", opened ? String(opened.config.generation) : unknown],
     [english ? "Session" : "会话标识", opened?.config.session_id || unknown],
   ];
@@ -136,6 +144,7 @@ export default function RemoteDesktopWindow() {
       <div className="titlebar-identity remote-desktop-title" title={title}><img className="brand-mark" src={brand} alt="" /><strong>{title}</strong></div>
       <span className="remote-desktop-phase" role="status">{phase}</span>
       {error && <span className="remote-desktop-control-error" role="alert" title={error}>{error}</span>}
+      {status.clipboard_state === "paste_failed" && <span className="remote-desktop-control-error" role="alert" title={clipboardText.paste_failed}>{english ? "Paste not sent" : "未发送粘贴"}</span>}
       {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
         request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
         onComplete={id => setAssistance(rows => rows.filter(row => row.assistance_id !== id))} />}
@@ -148,6 +157,9 @@ export default function RemoteDesktopWindow() {
           <option value={15}>15 FPS</option><option value={30}>30 FPS</option>
         </select>
         <button className="remote-desktop-control-toggle" aria-label={status.input_enabled ? inputText.disable : inputText.enable} title={status.input_enabled ? inputText.disable : inputText.enable} aria-pressed={Boolean(status.input_enabled)} disabled={busy || status.phase !== "viewing" || !status.input_ready || !opened?.input_supported} onClick={() => void control({ inputEnabled: !status.input_enabled })}><MousePointer2 size={14} /><span>{status.input_enabled ? inputText.disable : inputText.enable}</span></button>
+        <button className="remote-desktop-icon-button" aria-label={clipboardEnabled ? clipboardText.disable : clipboardText.enable}
+          title={clipboardHint} aria-pressed={clipboardEnabled} disabled={busy || status.phase !== "viewing"}
+          onClick={() => void control({ clipboardEnabled: !clipboardEnabled })}><Clipboard size={15} /></button>
         {status.remote_os === "windows" && <button className="remote-desktop-sas" disabled={busy || status.phase !== "viewing" || !status.input_enabled} onClick={() => void control({ secureAttention: true })}>Ctrl + Alt + Delete</button>}
         <button className="remote-desktop-icon-button" aria-label={statisticsTitle} title={statisticsTitle} aria-expanded={statisticsExpanded} aria-pressed={statisticsExpanded} onClick={() => setStatisticsExpanded(value => !value)}><Bug size={16} /></button>
         <button className="remote-desktop-icon-button" aria-label={fullscreen ? text.exitFull : text.full} title={fullscreen ? text.exitFull : text.full} aria-pressed={fullscreen} onClick={() => void toggleFullscreen()}>{fullscreen ? <Shrink size={15} /> : <Expand size={15} />}</button>

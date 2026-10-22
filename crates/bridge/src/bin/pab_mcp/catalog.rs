@@ -12,8 +12,61 @@ pub(super) fn tools() -> Vec<Value> {
             }),
         ),
         tool(
+            "pab_list_saved_devices",
+            "List the devices saved in the signed-in account's server catalog, with the server's online flag and whether this computer already holds the device password. Requires a signed-in account and a completed catalog sync.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }),
+        ),
+        tool(
+            "pab_list_history",
+            "Page through the local task and operation history for one device: command executions with state and timing, plus transfers and other operations. Newest first; pass the returned cursors to read the next page.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "device_code": {
+                        "type": "string",
+                        "pattern": "^[0-9]{9}$"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "task_before": {
+                        "type": "string"
+                    },
+                    "operation_before_started_at_unix_ms": {
+                        "type": "integer"
+                    },
+                    "operation_before_id": {
+                        "type": "string"
+                    }
+                },
+                "required": ["device_code"],
+                "additionalProperties": false
+            }),
+        ),
+        tool(
+            "pab_device_presence",
+            "Report whether one device remembered on this computer is online right now. Requires the control server and a signed-in account; pab_list_devices stays available offline.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "device_code": {
+                        "type": "string",
+                        "pattern": "^[0-9]{9}$"
+                    }
+                },
+                "required": ["device_code"],
+                "additionalProperties": false
+            }),
+        ),
+        tool(
             "pab_connect",
-            "Authenticate to one device and return its verified OS and shell context. Call this before native commands.",
+            "Authenticate to one device and return its verified OS and shell context. Call this before native commands. When the user asks to connect using Relay, set connection_mode=relay; this strictly prevents direct P2P and remains in effect for this device's commands, transfers and reconnects in the current MCP session. Set auto to restore automatic P2P/Relay selection. Omitting the parameter preserves this device's current choice (initially auto). Changing mode reconnects this device and ends its connection-bound sessions.",
             json!({
                 "type": "object",
                 "properties": {
@@ -289,6 +342,9 @@ pub(super) fn tools() -> Vec<Value> {
             entry["description"] = json!(format!("{description} {note}"));
         }
         let properties = entry["inputSchema"]["properties"].as_object_mut().unwrap();
+        if name == "pab_connect" {
+            properties.insert("connection_mode".into(), json!({"type":"string","enum":["auto","relay"],"description":"Use relay when the user explicitly requests a Relay connection. Omit to preserve the current session choice; new devices default to auto."}));
+        }
         if matches!(
             name.as_str(),
             "pab_run_command"

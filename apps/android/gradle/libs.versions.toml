@@ -1,0 +1,33 @@
+[versions]
+agp = "9.1.1"
+kotlin = "2.4.10"
+compose = "2025.06.00"
+activity = "1.8.2"
+lifecycle = "2.9.1"
+coroutines = "1.10.2"
+spotless = "8.0.0"
+
+[libraries]
+rustls-verifier = { module = "rustls:rustls-platform-verifier", version = "0.1.1" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit = { module = "junit:junit", version = "4.13.2" }
+androidx-annotation = { module = "androidx.annotation:annotation", version = "1.9.1" }
+test-junit = { module = "androidx.test.ext:junit", version = "1.1.5" }
+test-runner = { module = "androidx.test:runner", version = "1.5.2" }
+test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version = "2.2.0" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

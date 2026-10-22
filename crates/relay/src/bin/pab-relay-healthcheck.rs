@@ -123,6 +123,13 @@ async fn exchange(
     let mut tls = CaTlsConfig::embedded();
     if let Some(path) = config.relay_ca_cert.as_ref().or(config.ca_cert.as_ref()) {
         tls = tls.with_extra_roots(roots(path)?);
+    } else {
+        let mut pem = pab_service_config::client::DEFAULT_RELAY_CA_PEM.as_bytes();
+        if !pem.is_empty() {
+            tls = tls.with_extra_roots(
+                rustls_pemfile::certs(&mut pem).collect::<std::io::Result<Vec<_>>>()?,
+            );
+        }
     }
     let tls = tls.client_config(default_provider())?;
     let first_id = first.public();

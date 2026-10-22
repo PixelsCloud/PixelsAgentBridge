@@ -1,0 +1,48 @@
+# Build inputs, not device configuration. Offline OCR assets are bundled in the APK.
+[[artifact]]
+path = "tesseract4android-4.9.0.aar"
+url = "https://jitpack.io/cz/adaptech/tesseract4android/tesseract4android/4.9.0/tesseract4android-4.9.0.aar"
+size = 12848454
+sha256 = "bce5d6413a1a5ae3d7240033fbbc851ba3217d0a08d9769400e17a077f42cb2a"
+
+[[artifact]]
+path = "assets/ocr/chi_sim.traineddata"
+url = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/chi_sim.traineddata"
+size = 2469156
+sha256 = "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730"
+
+[[artifact]]
+path = "assets/ocr/LICENSE.txt"
+url = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/87416418657359cb625c412a48b6e1d6d41c29bd/LICENSE"
+size = 11358
+sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
+[[artifact]]
+path = "assets/ocr/Tesseract4Android-LICENSE.txt"
+url = "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/4.9.0/LICENSE"
+size = 11357
+sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+
+[[artifact]]
+path = "assets/ocr/Leptonica-LICENSE.txt"
+url = "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/4.9.0/tesseract4android/src/main/cpp/leptonica/src/leptonica-license.txt"
+size = 1521
+sha256 = "87829abb5bbb00b55a107365da89e9a33f86c4250169e5a1e5588505be7d5806"
+
+[[artifact]]
+path = "assets/ocr/libpng-LICENSE.txt"
+url = "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/4.9.0/tesseract4android/src/main/cpp/libpng/src/LICENSE"
+size = 5345
+sha256 = "16d9daaafbf63a31a5bdc91d4600972548fef5aaa1244202393288dbd079c49a"
+
+[[artifact]]
+path = "assets/ocr/Tesseract-LICENSE.txt"
+url = "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/4.9.0/tesseract4android/src/main/cpp/tesseract/src/LICENSE"
+size = 11358
+sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+
+[[artifact]]
+path = "assets/ocr/libjpeg-README.txt"
+url = "https://raw.githubusercontent.com/adaptech-cz/Tesseract4Android/4.9.0/tesseract4android/src/main/cpp/libjpeg/src/README"
+size = 18719
+sha256 = "7c25493a9f64fed34d01445467341bda77bc1cdbeccbe33558659ef173fb9ff2"

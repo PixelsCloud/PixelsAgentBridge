@@ -3,6 +3,7 @@ use crate::UserId;
 use serde::{Deserialize, Serialize};
 
 pub const RELAY_CLUSTER_SCHEMA_VERSION: u16 = 1;
+pub const RELAY_DIRECTORY_SCHEMA_VERSION: u16 = 2;
 pub const MAX_RELAY_NODES: usize = 64;
 pub const MAX_RELAY_BUDGET_DEMANDS: usize = 256;
 
@@ -73,7 +74,8 @@ pub struct RelayDirectory {
 
 impl RelayDirectory {
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.schema_version != RELAY_CLUSTER_SCHEMA_VERSION || self.revision == 0 {
+        if !matches!(self.schema_version, 1 | RELAY_DIRECTORY_SCHEMA_VERSION) || self.revision == 0
+        {
             return Err("unsupported Relay directory version");
         }
         if self.nodes.len() > MAX_RELAY_NODES {
@@ -85,7 +87,7 @@ impl RelayDirectory {
             if !valid_relay_node_id(&node.node_id)
                 || node.weight == 0
                 || node.weight > 1000
-                || node.capacity_mbps == 0
+                || (self.schema_version == 1 && node.capacity_mbps == 0)
                 || node.region.len() > 64
                 || node.region.chars().any(char::is_control)
                 || node.url.len() > 2048

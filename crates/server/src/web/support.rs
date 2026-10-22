@@ -14,6 +14,8 @@ pub struct WebError {
     pub(crate) status: StatusCode,
     pub(crate) code: &'static str,
 }
+#[derive(Clone, Copy)]
+pub(super) struct AuditErrorCode(pub &'static str);
 impl WebError {
     pub(crate) const fn new(status: StatusCode, code: &'static str) -> Self {
         Self { status, code }
@@ -27,7 +29,9 @@ impl WebError {
 }
 impl IntoResponse for WebError {
     fn into_response(self) -> Response {
-        (self.status, Json(json!({"code": self.code}))).into_response()
+        let mut response = (self.status, Json(json!({"code": self.code}))).into_response();
+        response.extensions_mut().insert(AuditErrorCode(self.code));
+        response
     }
 }
 impl From<sqlx::Error> for WebError {
@@ -55,6 +59,11 @@ impl From<ServiceError> for WebError {
                 Self::new(StatusCode::CONFLICT, "conflict")
             }
             ServiceError::Store(StoreError::InvalidInput(_)) => Self::invalid(),
+            ServiceError::Store(StoreError::InvalidState(message))
+                if message == "registration_disabled" =>
+            {
+                Self::new(StatusCode::FORBIDDEN, "registration_disabled")
+            }
             _ => Self::new(StatusCode::INTERNAL_SERVER_ERROR, "server_error"),
         }
     }

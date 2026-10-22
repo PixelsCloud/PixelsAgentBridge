@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
@@ -38,6 +39,28 @@ def digest(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b''):
             value.update(chunk)
     return value.hexdigest()
+
+
+def host_architecture():
+    machine = platform.machine()
+    return {'AMD64': 'x86_64', 'aarch64': 'arm64'}.get(machine, machine)
+
+
+def checked_node_version(node, platform_name, architecture):
+    if platform_name == 'macos':
+        with node.open('rb') as source:
+            header = source.read(8)
+        expected_cpu = {'arm64': 0x0100000C, 'x86_64': 0x01000007}[architecture]
+        if len(header) != 8 or struct.unpack('<II', header) != (0xFEEDFACF, expected_cpu):
+            raise ValueError(f'Pinned Node executable is not macOS {architecture}')
+    if architecture != host_architecture():
+        # The archive is SHA-256 pinned before extraction. Cross builds must not
+        # execute the target binary or require Rosetta on an Apple Silicon host.
+        return VERSION
+    version = subprocess.check_output([str(node), '--version'], text=True).strip()
+    if version != VERSION:
+        raise ValueError(f'Node must be {VERSION}, got {version}')
+    return version
 
 
 def pinned_node(platform_name, architecture, override):
@@ -81,16 +104,16 @@ def main():
     parser.add_argument('--node', type=Path, help='already downloaded pinned Windows node.exe')
     parser.add_argument('--platform', choices=('windows', 'macos', 'linux'),
                         default={'Windows': 'windows', 'Darwin': 'macos', 'Linux': 'linux'}[platform.system()])
+    parser.add_argument('--arch', choices=('native', 'aarch64', 'arm64', 'x86_64'), default='native',
+                        help='runtime CPU architecture; defaults to the build host')
     args = parser.parse_args()
-    architecture = {'AMD64':'x86_64', 'x86_64':'x86_64', 'arm64':'arm64', 'aarch64':'arm64'}.get(platform.machine(), platform.machine())
+    architecture = host_architecture() if args.arch == 'native' else {'aarch64': 'arm64'}.get(args.arch, args.arch)
     if args.platform != {'Windows':'windows','Darwin':'macos','Linux':'linux'}[platform.system()]:
         parser.error('build the browser runtime on its target OS')
     if args.node and not args.node.is_file():
         parser.error('--node must name an existing file')
     node = pinned_node(args.platform, architecture, args.node)
-    version = subprocess.check_output([str(node), '--version'], text=True).strip()
-    if version != VERSION:
-        parser.error(f'Node must be {VERSION}, got {version}')
+    version = checked_node_version(node, args.platform, architecture)
     package = json.loads((SOURCE / 'package.json').read_text(encoding='utf-8'))
     if package['dependencies']['@playwright/mcp'] != MCP_VERSION:
         parser.error('Playwright MCP pin changed')
