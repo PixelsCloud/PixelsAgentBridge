@@ -167,14 +167,14 @@ test('maintenance tracks server phases and restores the operation after reload',
   await expect(panel.getByText('Waiting for node confirmation', { exact: true })).toBeVisible();
   await expect(panel).toContainText('100 Mbps');
   await expect(panel).toContainText('30 s');
-  await expect(panel).not.toContainText('Ready means the maintenance wait has ended.');
+  await expect(panel).not.toContainText('The node confirmed that admission and forwarding stopped and Relay connections closed.');
   const id = state.current!.id;
   await page.reload();
   await expect(panel).toContainText(id);
   await expect(panel.getByText('Waiting for node confirmation', { exact: true })).toBeVisible();
   state.current!.phase = 'ready';
   await expect(panel.getByText('Ready for operations', { exact: true })).toBeVisible({ timeout: 10000 });
-  await expect(panel).toContainText('Ready means the maintenance wait has ended. It does not confirm an upgrade or drained sessions.');
+  await expect(panel).toContainText('The node confirmed that admission and forwarding stopped and Relay connections closed. Operations may continue; software upgrades must be verified separately.');
   expect(state.writes).toHaveLength(1);
   await expect(panel).toContainText('End-to-end forwarding probe: not run by this page.');
 });

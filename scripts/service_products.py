@@ -8,6 +8,7 @@ BINARIES = {
 }
 WEB_PRODUCTS = frozenset(('management', 'server'))
 WEB_EXTENSIONS = {'.html', '.js', '.css', '.svg', '.png', '.ico', '.woff2'}
+WEB_LICENSES = frozenset(('license.txt', 'assets/OFL-10Pixel.txt'))
 
 
 def artifacts(root, product, platform, binary_dir):
@@ -23,7 +24,7 @@ def artifacts(root, product, platform, binary_dir):
                 raise ValueError(f'Symlinks are not production Web assets: {path.name}')
             if path.is_file():
                 relative = path.relative_to(web).as_posix()
-                if path.suffix not in WEB_EXTENSIONS and relative != 'license.txt':
+                if path.suffix not in WEB_EXTENSIONS and relative not in WEB_LICENSES:
                     raise ValueError(f'Unexpected production Web asset: {path.name}')
                 files['web/' + relative] = path
     for path in files.values():

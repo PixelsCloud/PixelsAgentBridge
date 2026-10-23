@@ -203,6 +203,20 @@ class ProductArchives(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unexpected production Web asset'):
             self.make('management', 'windows')
 
+    def test_font_license_ships_but_other_text_files_are_rejected(self):
+        self.prepare('management', 'windows')
+        web = self.root / 'apps/web/dist'
+        license = web / 'assets/OFL-10Pixel.txt'
+        license.parent.mkdir()
+        license.write_text('SIL OPEN FONT LICENSE Version 1.1')
+        files = artifacts(self.root, 'management', 'windows', self.binary_dir)
+        record_artifacts(self.root, 'management', 'release', '1.2.3', files)
+        with zipfile.ZipFile(self.make('management', 'windows')['archive']) as source:
+            self.assertEqual(source.read('web/assets/OFL-10Pixel.txt'), license.read_bytes())
+        (web / 'assets/debug-notes.txt').write_text('not a public asset')
+        with self.assertRaisesRegex(ValueError, 'Unexpected production Web asset'):
+            artifacts(self.root, 'management', 'windows', self.binary_dir)
+
     def test_symlinked_binary_is_rejected(self):
         self.prepare('relay', 'windows')
         real = Path.is_symlink
