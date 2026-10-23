@@ -49,7 +49,7 @@ def build_macos(version, profile, architectures, package, installer_identity=Non
              '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp',
              '-p', 'pab-document', '--bin', 'pab-document-worker', '-j', str(CARGO_JOBS)])
         run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--target', target,
-             '--bundles', 'app', *(['--debug'] if profile == 'debug' else [])], ROOT / 'apps/desktop')
+             '--bundles', 'app', *(['--debug'] if profile == 'debug' else []), '--', '--locked'], ROOT / 'apps/desktop')
         binaries = CARGO_TARGET / target / profile
         app = TAURI_TARGET / target / profile / 'bundle/macos/Pixels Agent Bridge.app'
         macos_app_version(app)  # Validate the independent, stable app version.
@@ -157,7 +157,7 @@ def main():
                     run([sys.executable, 'packaging/desktop/document_runtime.py', '--platform', 'windows'])
                 run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-executor', '--bin', 'pab-executor', '-p', 'pab-bridge', '--bin', 'pab-mcp',
                      '-p', 'pab-document', '--bin', 'pab-document-worker', '-j', str(CARGO_JOBS)])
-                run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--no-bundle', *(['--debug'] if args.profile == 'debug' else [])], ROOT / 'apps/desktop')
+                run(['node', 'node_modules/@tauri-apps/cli/tauri.js', 'build', '--no-bundle', *(['--debug'] if args.profile == 'debug' else []), '--', '--locked'], ROOT / 'apps/desktop')
                 built_frontends.add('desktop')
                 files = {name: CARGO_TARGET / args.profile / name for name in ['pab-executor.exe', 'pab-mcp.exe', 'pab-document-worker.exe']}
                 files['pab-desktop.exe'] = TAURI_TARGET / args.profile / 'pab-desktop.exe'

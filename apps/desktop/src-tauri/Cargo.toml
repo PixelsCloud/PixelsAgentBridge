@@ -81,5 +81,6 @@ opt-level = 3
 
 [patch.crates-io]
 iroh = { path = "../../../vendor/iroh" }
+iroh-relay = { path = "../../../vendor/iroh-relay" }
 enigo = { path = "../../../vendor/enigo" }
 libspa = { path = "../../../vendor/libspa" }

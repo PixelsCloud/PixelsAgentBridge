@@ -165,6 +165,7 @@ class Versions(TestCase):
         self.assertEqual(sum(cmd[0] == 'cargo' for cmd in commands), 2)
         self.assertEqual(sum('packaging/desktop/build_macos_pkg.py' in cmd for cmd in commands), 2)
         self.assertTrue(all('--debug' in cmd for cmd in commands if cmd[0] == 'node'))
+        self.assertTrue(all(cmd[-2:] == ['--', '--locked'] for cmd in commands if cmd[0] == 'node'))
 
     def test_missing_macos_target_does_not_consume_version(self):
         import build

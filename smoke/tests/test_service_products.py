@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import sys
 import tarfile
+import tomllib
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -16,6 +17,23 @@ import build
 from build_version import record_artifacts
 from package_services import deployment_files, package
 from service_products import artifacts
+
+
+class SharedCargoSources(unittest.TestCase):
+    def test_desktop_uses_the_same_patched_sources_as_the_workspace(self):
+        desktop = ROOT / 'apps/desktop/src-tauri'
+        workspace = tomllib.loads((ROOT / 'Cargo.toml').read_text(encoding='utf-8'))
+        standalone = tomllib.loads((desktop / 'Cargo.toml').read_text(encoding='utf-8'))
+        overrides = standalone['patch']['crates-io']
+        for name, source in workspace['patch']['crates-io'].items():
+            with self.subTest(crate=name):
+                self.assertIn(name, overrides)
+                self.assertEqual((ROOT / source['path']).resolve(),
+                                 (desktop / overrides[name]['path']).resolve())
+        lock = tomllib.loads((desktop / 'Cargo.lock').read_text(encoding='utf-8'))
+        relay = [package for package in lock['package'] if package['name'] == 'iroh-relay']
+        self.assertEqual(len(relay), 1)
+        self.assertNotIn('source', relay[0], 'Desktop must use the vendored Relay dependency')
 
 
 class BuildProducts(unittest.TestCase):

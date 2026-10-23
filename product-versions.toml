@@ -1,12 +1,12 @@
 schema_version = 1
 
 [management]
-version = "1.3.7"
-build_count = 2
+version = "1.3.8"
+build_count = 3
 
 [relay]
-version = "1.3.7"
-build_count = 2
+version = "1.3.8"
+build_count = 3
 
 [legacy_server]
 version = "1.3.6"
