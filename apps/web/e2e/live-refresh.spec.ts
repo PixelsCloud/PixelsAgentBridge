@@ -73,7 +73,7 @@ test('operation polling pauses while hidden and stops after completion', async (
     return route.fulfill({ json: { id, phase, node_id: 'ap-east-primary', action: 'maintenance', actor: 'pixels-team', started_at_unix_ms: Date.now(), deadline_unix_ms: Date.now() + 30000, completed_at_unix_ms: null, server_now_unix_ms: Date.now(), capacity_sampled_at_unix_ms: Date.now(), remaining_capacity_mbps: null, error_code: null, allow_outage: false } });
   });
   await page.goto('/relay'); await expect.poll(() => reads).toBe(1);
-  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for transition');
+  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for node confirmation');
   await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 500);
   await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
   state.send(); await page.clock.runFor(10_000); expect(reads).toBe(1);

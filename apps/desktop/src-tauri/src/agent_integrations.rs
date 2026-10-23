@@ -12,6 +12,7 @@ use toml_edit::{DocumentMut, value};
 mod config;
 mod discovery;
 mod json_clients;
+pub(crate) mod automatic;
 #[cfg(test)]
 use std::fs;
 #[cfg(test)]
@@ -30,7 +31,6 @@ pub enum AgentId {
 }
 
 impl AgentId {
-    #[cfg(test)]
     const ALL: [Self; 5] = [
         Self::Codex,
         Self::Kimi,
@@ -461,6 +461,7 @@ fn prepare(
 
 #[tauri::command]
 pub async fn agent_integration_status(id: AgentId) -> AgentIntegration {
+    let _guard = UPDATE_LOCK.lock().await;
     status(id).await
 }
 
@@ -479,7 +480,9 @@ pub async fn set_agent_integration(id: AgentId, enabled: bool) -> Result<AgentIn
         }
     }
     // Validate every configuration before starting the probe or changing files.
-    let edits = prepare(id, &paths, &mcp, enabled)?;
+    let mut edits = prepare(id, &paths, &mcp, enabled)?;
+    // Commit the user's choice with the host edits, including rollback on failure.
+    edits.push(automatic::preference_edit(&automatic::settings_path()?, id, enabled)?);
     if enabled {
         tokio::time::timeout(Duration::from_secs(12), verify_mcp(&mcp))
             .await

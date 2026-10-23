@@ -446,6 +446,7 @@ pub fn run() {
                 .inner()
                 .clone();
             tauri::async_runtime::block_on(mcp_reporting::start(app.handle().clone(), reporting));
+            agent_integrations::automatic::start();
             desktop_assistance::start(
                 app.handle().clone(),
                 app.state::<desktop_assistance::AssistanceState>()

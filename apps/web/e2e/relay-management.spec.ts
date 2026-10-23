@@ -164,14 +164,14 @@ test('resume service displays rejection outside a dialog and can retry', async (
 test('maintenance tracks server phases and restores the operation after reload', async ({ page }) => {
   const state = await fixture(page); await maintain(page);
   const panel = page.getByTestId('relay-operation');
-  await expect(panel.getByText('Waiting for transition', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Waiting for node confirmation', { exact: true })).toBeVisible();
   await expect(panel).toContainText('100 Mbps');
   await expect(panel).toContainText('30 s');
   await expect(panel).not.toContainText('Ready means the maintenance wait has ended.');
   const id = state.current!.id;
   await page.reload();
   await expect(panel).toContainText(id);
-  await expect(panel.getByText('Waiting for transition', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Waiting for node confirmation', { exact: true })).toBeVisible();
   state.current!.phase = 'ready';
   await expect(panel.getByText('Ready for operations', { exact: true })).toBeVisible({ timeout: 10000 });
   await expect(panel).toContainText('Ready means the maintenance wait has ended. It does not confirm an upgrade or drained sessions.');
@@ -181,7 +181,7 @@ test('maintenance tracks server phases and restores the operation after reload',
 
 test('closing and reopening the page restores the same operation without another write', async ({ page }) => {
   const state = await fixture(page); await maintain(page);
-  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for transition');
+  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for node confirmation');
   const id = state.current!.id;
   const context = page.context();
   await page.close();
@@ -190,7 +190,7 @@ test('closing and reopening the page restores the same operation without another
   restored.current = state.current;
   await reopened.goto('/relay');
   await expect(reopened.getByTestId('relay-operation')).toContainText(id);
-  await expect(reopened.getByTestId('relay-operation')).toContainText('Waiting for transition');
+  await expect(reopened.getByTestId('relay-operation')).toContainText('Waiting for node confirmation');
   expect(state.writes).toHaveLength(1);
   expect(restored.writes).toHaveLength(0);
 });
@@ -204,7 +204,7 @@ test('lost responses retain the original request across reload and block new act
   await page.reload();
   await expect(panel).toContainText(id);
   await panel.getByRole('button', { name: 'Retry original request', exact: true }).click();
-  await expect(panel.getByText('Waiting for transition', { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(panel.getByText('Waiting for node confirmation', { exact: true })).toBeVisible({ timeout: 10000 });
   expect(state.writes).toHaveLength(2);
   expect(state.writes[1]).toEqual(state.writes[0]);
 });
@@ -216,7 +216,7 @@ test('no backup requires explicit outage consent before creating an operation', 
   expect(state.current).toBeUndefined();
   await dialog.getByRole('checkbox').check();
   await dialog.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for transition');
+  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for node confirmation');
   expect(state.writes.map(item => item.allow_outage)).toEqual([false, true]);
 });
 
@@ -244,7 +244,7 @@ test('Relay classification filters preserve the same status across reload', asyn
 
 test('node details preserve exact counters and request failures replace healthy status with unknown', async ({ page }) => {
   const state = await fixture(page); await maintain(page);
-  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for transition');
+  await expect(page.getByTestId('relay-operation')).toContainText('Waiting for node confirmation');
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.locator('.relay-detail')).toContainText('8 PiB');
   await expect(page.locator('.relay-detail span[title="9007199254740993 B"]')).toBeVisible();
@@ -338,7 +338,7 @@ for (const language of ['en', 'zh-CN']) for (const theme of ['light', 'dark']) f
     await page.addInitScript(value => localStorage.setItem('pab-relay-operation:relay-test-admin', JSON.stringify({ id: value, unconfirmed: false })), id);
     await page.goto('/relay');
     const panel = page.getByTestId('relay-operation');
-    await expect(panel).toContainText(language === 'en' ? 'Waiting for transition' : language === 'zh-CN' ? '等待过渡' : '等待過渡');
+    await expect(panel).toContainText(language === 'en' ? 'Waiting for node confirmation' : '等待节点确认');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await expect(panel).toContainText('100 Mbps');
     // Horizontal table scrolling is contained; the document must fit the viewport.
