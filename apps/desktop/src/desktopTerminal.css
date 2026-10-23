@@ -4,6 +4,7 @@ html:has(.desktop-terminal), body:has(.desktop-terminal), #root:has(.desktop-ter
 .desktop-terminal-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .desktop-terminal-title strong { flex-shrink: 0; font-size: 12px; }
 .desktop-terminal-title > span { color: #536575; font-size: 12px; font-weight: 400; }
+.desktop-terminal-title > span:not(.ant-tag):not(.desktop-terminal-path) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .desktop-terminal-title .brand-mark, .desktop-terminal-title .ant-tag { flex-shrink: 0; }
 .desktop-terminal-title .ant-tag { margin: 0; }
 .desktop-terminal-path { flex-shrink: 0; }

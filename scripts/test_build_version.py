@@ -1,6 +1,7 @@
 """Version rollover, persistence, concurrency and package provenance regressions."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase, main
 from unittest.mock import patch
 import json
@@ -111,8 +112,6 @@ class Versions(TestCase):
 
     def test_linux_build_requires_no_node_and_records_only_headless_binaries(self):
         import build
-        if build.os.name != 'nt':
-            self.skipTest('Linux Docker orchestration currently runs on Windows')
         commands = []
 
         def fake_run(command, cwd=None):
@@ -122,13 +121,25 @@ class Versions(TestCase):
             for name in ('pab-mcp', 'pab-executor', 'pab-document-worker'):
                 (folder / name).write_bytes(b'fixture')
 
-        with patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: None if x in ('npm', 'node') else x), patch.object(sys, 'argv', ['build.py', 'linux']):
+        # Mock the orchestrator's host without changing pathlib's actual host.
+        windows = SimpleNamespace(name='nt', environ=build.os.environ)
+        with patch.object(build, 'os', windows), patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run), patch.object(build.shutil, 'which', side_effect=lambda x: None if x in ('npm', 'node') else x), patch.object(sys, 'argv', ['build.py', 'linux']):
             build.main()
         self.assertEqual(len(commands), 1)
         self.assertIn('-ComponentsOnly', commands[0])
         record = json.loads((self.root / '.build/builds/linux-debug.json').read_text())
         self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor', 'pab-document-worker'})
         self.assertEqual(read_state(self.root)['build_count'], 1)
+
+    def test_linux_windows_host_orchestrator_rejects_other_hosts_before_reserving(self):
+        import build
+        posix = SimpleNamespace(name='posix', environ=build.os.environ)
+        with patch.object(build, 'os', posix), patch.object(build, 'ROOT', self.root), patch.object(build, 'run') as run, patch.object(sys, 'argv', ['build.py', 'linux']):
+            with self.assertRaises(SystemExit) as error:
+                build.main()
+        self.assertEqual(error.exception.code, 2)
+        self.assertEqual(read_state(self.root)['build_count'], 0)
+        run.assert_not_called()
 
     def test_macos_both_architectures_share_one_reserved_version(self):
         import build
