@@ -27,6 +27,9 @@ nodes = ["test-relay-a", "test-relay-b"]
 # Prepared native host only. Windows identity tests require a privileged service
 # and an interactive session; Unix requires a dedicated test UID. Docker must
 # already contain debian:bookworm-slim. Platform GUI/keychain prerequisites also apply.
+# On Windows run the native suite as LocalSystem: desktop unit tests run in the
+# selected interactive session, while user-switch tests retain service privileges.
+# Discover the current session ID before testing; do not assume it is 1.
 enabled = false
 worker = "target/debug/pab-executor.exe"
 process_fixture = "target/debug/examples/process_fixture.exe"

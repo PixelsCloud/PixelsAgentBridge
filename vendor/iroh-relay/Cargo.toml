@@ -109,10 +109,7 @@ tls-ring = [
 
 [lib]
 name = "iroh_relay"
-crate-type = [
-    "lib",
-    "cdylib",
-]
+crate-type = ["lib"]
 path = "src/lib.rs"
 
 [[bin]]

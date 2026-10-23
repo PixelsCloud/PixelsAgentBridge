@@ -20,6 +20,14 @@ from service_products import artifacts
 
 
 class SharedCargoSources(unittest.TestCase):
+    def test_shared_rust_dependencies_do_not_emit_colliding_ffi_artifacts(self):
+        # Combining lib and cdylib emits an unhashed rlib. Different feature
+        # graphs in the root and standalone Desktop then overwrite that rlib.
+        for name in ('iroh', 'iroh-relay'):
+            with self.subTest(crate=name):
+                manifest = tomllib.loads((ROOT / 'vendor' / name / 'Cargo.toml').read_text(encoding='utf-8'))
+                self.assertEqual(manifest['lib'].get('crate-type', ['lib']), ['lib'])
+
     def test_desktop_uses_the_same_patched_sources_as_the_workspace(self):
         desktop = ROOT / 'apps/desktop/src-tauri'
         workspace = tomllib.loads((ROOT / 'Cargo.toml').read_text(encoding='utf-8'))

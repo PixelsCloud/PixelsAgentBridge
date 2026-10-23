@@ -55,6 +55,8 @@ def command_for(adapter, directory, lab):
             command = [sys.executable, str(ROOT / "smoke/executor.py"), "--output", str(directory)]
             if native.get("enabled") is True:
                 command.append("--native")
+                if os.name == "nt" and native.get("user") is not None:
+                    command += ["--unit-user", str(int(native["user"]))]
                 for key, variable in (("worker", "PAB_EXECUTION_TEST_WORKER"),
                                       ("worker", "PAB_DESKTOP_TERMINAL_TEST_WORKER"),
                                       ("process_fixture", "PAB_PROCESS_TEST_FIXTURE")):

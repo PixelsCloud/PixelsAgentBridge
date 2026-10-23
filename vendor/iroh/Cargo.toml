@@ -100,10 +100,7 @@ unstable-net-report = []
 
 [lib]
 name = "iroh"
-crate-type = [
-    "lib",
-    "cdylib",
-]
+crate-type = ["lib"]
 path = "src/lib.rs"
 
 [[example]]

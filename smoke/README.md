@@ -203,6 +203,8 @@ python smoke/android_network.py --serial SERIAL --operator-config smoke/local/op
 
 `AUTO-08` 默认执行 Executor 普通测试，并把未执行的原生测试保留为阻塞。准备好原生测试主机后，在 `lab.toml` 显式启用 `[native_executor]`：设置专用 worker、Windows 登录会话 ID 或 Unix UID、进程夹具；准备 Docker 镜像及相应桌面/钥匙串环境。入口会先枚举所有原生测试，再逐个使用独立进程执行，每项都必须实际产生一个测试结果。不会因普通单元测试通过就漏掉原生项目。已有测试二进制也可在目标主机通过 `python smoke/executor.py --binary PATH --native --output smoke/runs/UNIQUE_NATIVE_RUN` 执行，所需 `PAB_*_TEST_*` 环境变量由测试主机设置。
 
+Windows 原生验收由准备好的 LocalSystem 测试服务运行。先用 `query user` 确认本次交互会话 ID，再填写 `native_executor.user`，不要固定假设为 `1`。入口将普通桌面测试放到该用户会话中运行，切换用户等原生验收保留服务权限；不同身份的结果统一计数，任一失败仍阻止通过。直接使用预构建测试程序时添加 `--unit-user SESSION_ID`。用户进程通过系统用户令牌启动，不传递服务端凭据或完整服务环境。
+
 ```sh
 python smoke/run.py gate --report smoke/runs/RUN_ID/report.json --artifact PATH_TO_EXACT_INSTALLER
 ```

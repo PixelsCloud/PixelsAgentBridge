@@ -13,3 +13,9 @@ Other remote actors keep the default path selection and IP transports.
 
 Coverage is in `crates/relay/tests/cluster_transport.rs`, using real TLS relays
 and locally reachable IP transports, including mode changes and peer isolation.
+
+The `iroh` and `iroh-relay` Cargo libraries emit Rust libraries only. The
+application does not consume an FFI dynamic library from either crate. Emitting
+both `lib` and `cdylib` creates an unhashed rlib that can be overwritten when the
+root and standalone Desktop build graphs share a target directory. Removing
+the unused dynamic output preserves Cargo's feature-specific library artifacts.

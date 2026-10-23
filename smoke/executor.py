@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from smoke.adapters import counts_for
 
 
-def execute(binary, directory, native):
+def execute(binary, directory, native, unit_user=None):
     directory.mkdir(parents=True, exist_ok=True)
     listing = subprocess.run([str(binary), "--ignored", "--list", "--format=terse"],
                              capture_output=True, text=True, encoding="utf-8", check=True)
@@ -27,7 +27,11 @@ def execute(binary, directory, native):
                      for index, name in enumerate(ignored)]
     (directory / "native-tests.json").write_text(json.dumps(ignored, indent=2), encoding="utf-8")
     for label, command in commands:
-        result = subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace")
+        if label == "unit" and unit_user is not None:
+            from smoke.windows_test_user import run
+            result = run(command, directory / "desktop-user", unit_user)
+        else:
+            result = subprocess.run(command, capture_output=True, encoding="utf-8", errors="replace")
         output = result.stdout + result.stderr
         (directory / (label + ".log")).write_text(output, encoding="utf-8")
         row = counts_for("libtest", directory, output)
@@ -54,6 +58,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--binary", type=Path, help="Prebuilt native Executor libtest executable on the test host")
     parser.add_argument("--native", action="store_true", help="Explicitly enable all native tests on a prepared test host")
+    parser.add_argument("--unit-user", type=int, help="Windows interactive session for desktop unit tests; native tests keep the service identity")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     binary = args.binary
@@ -75,7 +80,7 @@ def main():
         if len(binaries) != 1:
             raise RuntimeError("Expected exactly one Executor libtest binary")
         binary = binaries[0]
-    return execute(binary.resolve(strict=True), args.output, args.native)
+    return execute(binary.resolve(strict=True), args.output, args.native, args.unit_user)
 
 
 if __name__ == "__main__":
