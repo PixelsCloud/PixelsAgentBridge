@@ -48,7 +48,8 @@ python scripts/release_service.py verify-file --artifact DOWNLOADED_ARTIFACT --m
 
 镜像 tar 验证后通过 `docker load --input DOWNLOADED_ARTIFACT` 导入，再使用已签名清单的
 `image_id` 设置本机部署标签。Compose 必须分别选择管理平台和 Relay 镜像；保留原有配置与卷。
-发布门禁要求完成 `smoke/compatibility.toml` 的四个新旧组件组合，升级顺序是管理平台、分批 Relay、客户端。
+开发阶段统一使用最新版管理平台、Relay 和客户端，发布门禁保留 `INT-01` 整套联调，
+不要求新旧版本混用测试。各产品分别计数，发布版本号无需相同。
 
 ## 客户端发布
 

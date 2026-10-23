@@ -68,7 +68,7 @@ python scripts/build.py docker --profile release
 
 管理平台、Relay 和客户端继续共享本仓库的协议与基础 crates。三个产品分别分配版本，
 构建输出复用主仓库缓存，不依赖其他产品的安装包。服务发布使用独立的
-[发布入口与签名域](docs/RELEASE.md)，跨版本验收定义在 `smoke/compatibility.toml`。
+[发布入口与签名域](docs/RELEASE.md)，最新版整套联调由 `smoke/cases.toml` 的 `INT-01` 验收。
 Docker 产品目标添加 `--package` 时，按不可变镜像 ID 导出 tar 与发布清单，供同一服务发布入口验收。
 
 默认使用 debug；只有明确指定 `--profile release` 才使用 release。Docker 服务端镜像固定使用 release，因此该目标要求明确指定。`--image` 可指定 Docker 标签。不要用 `docker compose build` 代替统一入口；构建后将 Compose 的镜像变量指向生成的标签，再使用 `up -d --no-build`。

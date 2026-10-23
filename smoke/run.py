@@ -144,9 +144,6 @@ def verify_binding(report):
         raise ValueError("Source changed; create a new run instead of reusing old results")
     if report["catalog_sha256"] != digest(HOME / "cases.toml"):
         raise ValueError("Case definitions changed")
-    if "COMPAT-01" in {c["id"] for c in report["cases"]}:
-        if report.get("compatibility_sha256") != digest(HOME / "compatibility.toml"):
-            raise ValueError("Compatibility matrix changed")
 
 
 def required_results(report):
@@ -212,8 +209,6 @@ def validate_observation(value, case, report):
                 or any(s.get("step") != i or s.get("passed") is not True
                        or len(str(s.get("observed", "")).strip()) < 10 for i, s in enumerate(steps, 1))):
             raise ValueError("Every manual step needs an actual observation; cleanup must be verified")
-        if case["id"] == "COMPAT-01":
-            validate_compatibility(value)
         if case["id"] == "MCP-01":
             expected = set(json.loads((HOME / "tool-coverage.json").read_text(encoding="utf-8"))["tools"])
             tools = value.get("tools", [])
@@ -224,24 +219,6 @@ def validate_observation(value, case, report):
                     raise ValueError("MCP tool results need actual postconditions or platform contract evidence")
                 if tool["status"] == "not_applicable" and not tool.get("platform_contract"):
                     raise ValueError("Unsupported tools need explicit platform contract evidence")
-
-
-def validate_compatibility(value):
-    matrix = tomllib.loads((HOME / 'compatibility.toml').read_text(encoding='utf-8'))
-    expected = {c['id']: c for c in matrix['combination']}
-    observed = value.get('combinations', [])
-    if len(observed) != len(expected) or {c.get('id') for c in observed} != set(expected):
-        raise ValueError('Compatibility observation requires every declared combination exactly once')
-    for cell in observed:
-        if cell.get('outcome') not in ('pass', 'declared_rejection') or len(cell.get('observed', '').strip()) < 10:
-            raise ValueError('Compatibility requires actual results for each combination')
-        for role in ('management', 'relay', 'client'):
-            artifact = cell.get(role, {})
-            if not artifact.get('version') or not re.fullmatch(r'[a-f0-9]{64}', artifact.get('sha256', '')):
-                raise ValueError('Compatibility must identify all three tested artifacts')
-        if cell['outcome'] == 'declared_rejection' and (
-                not expected[cell['id']]['allow_declared_rejection'] or not cell.get('unsupported_contract')):
-            raise ValueError('Rejection needs an explicitly unsupported wire contract')
 
 
 def run_case(case, item, path, report, lab):
@@ -357,7 +334,6 @@ def main():
             report = {"schema_version": 1, "run_id": str(uuid.uuid4()), "started_at": now(),
                       "target": args.target, "arch": args.arch, "profile": args.profile, "version": args.version,
                       "source": source_state(), "catalog_sha256": digest(HOME / "cases.toml"),
-                      "compatibility_sha256": digest(HOME / "compatibility.toml"),
                       "artifact": {"sha256": digest(args.artifact), "bytes": args.artifact.stat().st_size,
                                    "name": args.artifact.name} if args.artifact else {},
                       "cases": [{"id": c["id"], "status": "not_run", "attempts": []} for c in cases],
@@ -386,11 +362,6 @@ def main():
             if case["id"] == "MCP-01":
                 value["tools"] = [{"name": name, "status": "unconfirmed", "observed": "", "operation_id": "",
                                    "platform_contract": ""} for name in json.loads((HOME / "tool-coverage.json").read_text(encoding="utf-8"))["tools"]]
-            if case['id'] == 'COMPAT-01':
-                matrix = tomllib.loads((HOME / 'compatibility.toml').read_text(encoding='utf-8'))
-                value['combinations'] = [dict(id=c['id'], outcome='unconfirmed', observed='', unsupported_contract='',
-                    **{role: {'version': '', 'sha256': ''} for role in ('management', 'relay', 'client')})
-                    for c in matrix['combination']]
             output = path.parent / f"{case['id']}-observation-template.json"
             output.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
             print(output); return 0

@@ -1,7 +1,6 @@
-"""Independent counters and cross-version evidence cannot silently affect client releases."""
+"""Independent product counters and latest-version service smoke scopes."""
 import json
 from pathlib import Path
-import re
 import sys
 from tempfile import TemporaryDirectory
 import tomllib
@@ -81,72 +80,13 @@ class ProductVersions(unittest.TestCase):
                 self.assertNotEqual(run.source_state()['sha256'], before['sha256'])
 
 
-class Compatibility(unittest.TestCase):
-    def observation(self):
-        matrix = tomllib.loads((ROOT / 'smoke/compatibility.toml').read_text())
-        artifact = {'version': 'fixture', 'sha256': 'a' * 64}
-        return {'combinations': [dict(id=c['id'], outcome='pass', observed='Real isolated connection succeeded',
-                                     management=dict(artifact), relay=dict(artifact), client=dict(artifact))
-                                 for c in matrix['combination']]}
-
-    def test_all_combinations_require_actual_artifact_identification(self):
-        value = self.observation()
-        run.validate_compatibility(value)
-        value['combinations'][0]['relay'].pop('sha256')
-        with self.assertRaisesRegex(ValueError, 'three tested artifacts'):
-            run.validate_compatibility(value)
-
-    def test_omitted_or_duplicated_combinations_are_rejected(self):
-        value = self.observation()
-        for entries in (value['combinations'][:-1], value['combinations'] + value['combinations'][:1]):
-            with self.assertRaisesRegex(ValueError, 'every declared combination'):
-                run.validate_compatibility({'combinations': entries})
-
-    def test_old_service_rejection_needs_contract_evidence_and_current_services_must_work(self):
-        value = self.observation()
-        cell = value['combinations'][0]
-        cell['outcome'] = 'declared_rejection'
-        with self.assertRaisesRegex(ValueError, 'unsupported wire contract'):
-            run.validate_compatibility(value)
-        cell['unsupported_contract'] = 'baseline node does not support lifecycle acknowledgement'
-        run.validate_compatibility(value)
-        value['combinations'][-1].update(outcome='declared_rejection', unsupported_contract='not supported')
-        with self.assertRaisesRegex(ValueError, 'unsupported wire contract'):
-            run.validate_compatibility(value)
-
-    def test_matrix_protocol_numbers_match_implementation(self):
-        protocol = tomllib.loads((ROOT / 'smoke/compatibility.toml').read_text())['protocol']
-        for key, file, name in (
-            ('relay_policy', 'relay_policy.rs', 'RELAY_POLICY_SCHEMA_VERSION'),
-            ('relay_directory', 'relay_cluster.rs', 'RELAY_DIRECTORY_SCHEMA_VERSION'),
-            ('relay_node_control', 'relay_cluster.rs', 'RELAY_NODE_CONTROL_VERSION')):
-            source = (ROOT / 'crates/protocol/src' / file).read_text()
-            number = re.search(r'pub const ' + name + r': u16 = (\d+);', source)
-            self.assertIsNotNone(number)
-            self.assertEqual(protocol[key], int(number[1]))
-
+class ServiceSmokeScopes(unittest.TestCase):
     def test_relay_smoke_does_not_select_web_suites(self):
         cases = run.selected('relay', 'release')
-        self.assertIn('COMPAT-01', {c['id'] for c in cases})
+        self.assertIn('INT-01', {c['id'] for c in cases})
         self.assertIn('AUTO-14', {c['id'] for c in cases})
         self.assertFalse(any(c.get('adapter', '').startswith('web-') for c in cases))
         self.assertIn('AUTO-11', {c['id'] for c in run.selected('management', 'release')})
-
-    def test_modified_matrix_invalidates_existing_report(self):
-        with TemporaryDirectory() as directory:
-            home = Path(directory)
-            (home / 'cases.toml').write_text('case definitions')
-            matrix = home / 'compatibility.toml'
-            matrix.write_text('original matrix')
-            source = {'commit': 'fixture', 'sha256': 'fixture', 'dirty': False}
-            report = {'source': source, 'cases': [{'id': 'COMPAT-01'}],
-                      'catalog_sha256': run.digest(home / 'cases.toml'), 'compatibility_sha256': run.digest(matrix)}
-            with patch.object(run, 'HOME', home), patch.object(run, 'source_state', return_value=source):
-                run.verify_binding(report)
-                matrix.write_text('changed matrix')
-                with self.assertRaisesRegex(ValueError, 'Compatibility matrix changed'):
-                    run.verify_binding(report)
-
 
 if __name__ == '__main__':
     unittest.main()

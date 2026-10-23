@@ -239,9 +239,7 @@ python -m unittest discover -s smoke/tests -v
 正式版本仍须运行服务端、Web、双 Relay 与客户端的适用集成项目。
 
 独立产品使用 `--target management` 或 `--target relay`；Relay 范围不选择 Web 测试。
-两者均包含服务集成与 `COMPAT-01`，另有 Relay 独立部署升级用例。完整报告还要求
-`compatibility.toml` 中的全部组合。为该用例记录人工观察时，提供 `combinations` 数组，
-每项含 `id`、`outcome`（`pass` 或允许的 `declared_rejection`）、实际 `observed`，以及
-`management`、`relay`、`client` 三个对象的 `version` 与 `sha256`。安全拒绝旧服务组合时
-还必须提供 `unsupported_contract`；候选服务搭配新旧客户端必须成功。
-报告同时绑定兼容矩阵指纹；遗漏组合、修改矩阵、无产物身份或未声明的不兼容都会阻断。
+两者均包含服务集成与 `INT-01` 最新版整套联调，另有 Relay 独立部署升级用例。
+开发阶段管理平台、Relay 和客户端统一使用最新候选产物，记录实际版本与哈希，
+验证登录、P2P/Relay 传输、策略、维护恢复、统计与重启后的数据保留。
+该用例使用标准逐步观察模板，不要求新旧版本组合或额外矩阵材料。
