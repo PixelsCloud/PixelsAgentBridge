@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from build_version import build_lock, reserve_version, record_artifacts, macos_artifacts, macos_app_version, parse_version
+from build_version import build_lock, reserve_product_version, product_for_target, record_artifacts, macos_artifacts, macos_app_version, parse_version
 from service_products import BINARIES, artifacts as service_artifacts
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,10 +121,18 @@ def main():
         if missing:
             parser.error('Install required targets first: rustup target add ' + ' '.join(missing))
     with build_lock(ROOT):
-        version = args.installer_version or reserve_version(ROOT)
-        os.environ['PAB_INSTALLER_VERSION'] = version
-        print(f'Building Pixels Agent Bridge {version}', flush=True)
-        print('Only the installer release version increments; Rust, npm and Tauri versions stay unchanged.', flush=True)
+        versions = {}
+        for target in targets:
+            product = product_for_target(target)
+            if product not in versions:
+                versions[product] = args.installer_version or reserve_product_version(ROOT, product)
+        source_before = None
+        if (ROOT / '.git').exists() and any(t in BINARIES or t in ('docker-management', 'docker-relay') for t in targets):
+            sys.path.insert(0, str(ROOT))
+            from smoke.run import source_state
+            source_before = source_state()
+        print('Building ' + ', '.join(f'{p} {v}' for p, v in versions.items()), flush=True)
+        print('Only product release counters advance; Rust, npm and Tauri versions stay unchanged.', flush=True)
         print('Cargo reuses cached artifacts and rebuilds only changed inputs.', flush=True)
         npm = shutil.which('npm')
         profile_flags = ['--release'] if args.profile == 'release' else []
@@ -136,6 +144,8 @@ def main():
                 built_frontends.add(app)
 
         for target in targets:
+            version = versions[product_for_target(target)]
+            os.environ['PAB_INSTALLER_VERSION'] = version
             if target in ('web', 'desktop-web'):
                 frontend('web' if target == 'web' else 'desktop')
             elif target == 'macos':
@@ -171,7 +181,9 @@ def main():
                 run(command)
                 service_platform = 'windows' if os.name == 'nt' else 'linux'
                 files = service_artifacts(ROOT, target, service_platform, CARGO_TARGET / args.profile)
-                record_artifacts(ROOT, target, args.profile, version, files)
+                if source_before is not None and source_state() != source_before:
+                    raise RuntimeError('Sources changed during service build; rebuild before packaging')
+                record_artifacts(ROOT, target, args.profile, version, files, source=source_before)
                 if args.package:
                     run([sys.executable, 'packaging/server/build.py', '--product', target, '--platform', service_platform,
                          '--profile', args.profile, '--binary-dir', CARGO_TARGET / args.profile])
@@ -180,9 +192,18 @@ def main():
                 command = ['docker', 'build', '-f', 'packaging/docker/Dockerfile']
                 if product:
                     command += ['--target', product]
+                    command += ['--build-arg', f'PAB_RELEASE_VERSION={version}']
+                    if source_before is not None:
+                        command += ['--build-arg', f'PAB_RELEASE_COMMIT={source_before["commit"]}',
+                                    '--build-arg', f'PAB_SOURCE_SHA256={source_before["sha256"]}']
                 repository = 'pixels-agent-bridge' + ('-' + product if product else '')
                 image = args.image or f'{repository}:{version}'
                 run([*command, '-t', image, '.'])
+                if product and args.package:
+                    if source_before is not None and source_state() != source_before:
+                        raise RuntimeError('Sources changed during image build; rebuild before exporting')
+                    from package_service_image import package_image
+                    print(package_image(ROOT, product, version, image, source_before), flush=True)
             elif target == 'linux':
                 run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
                 files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp', 'pab-document-worker']}
@@ -190,7 +211,7 @@ def main():
                 if args.package:
                     run([sys.executable, 'packaging/desktop/document_runtime.py', '--platform', 'linux'])
                     run([sys.executable, 'packaging/desktop/build.py', '--platform', 'linux', '--profile', args.profile])
-        print(f'Build complete: {version}', flush=True)
+        print('Build complete: ' + ', '.join(f'{p} {v}' for p, v in versions.items()), flush=True)
 
 
 if __name__ == '__main__':

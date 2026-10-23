@@ -171,7 +171,7 @@ def main():
         parser.error('PAB_MACOS_NOTARY_PROFILE requires PAB_MACOS_INSTALLER_IDENTITY')
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if not args.allow_dirty and subprocess.check_output(
-        ['git', 'status', '--porcelain', '--untracked-files=no', '--', '.', ':!build-version.json'], cwd=ROOT
+        ['git', 'status', '--porcelain', '--untracked-files=no', '--', '.', ':!build-version.json', ':!product-versions.toml'], cwd=ROOT
     ).strip():
         parser.error('Commit tracked changes before publishing, or use --allow-dirty for a rehearsal')
     state_path = ROOT / '.build' / f'release-{args.platform}-{arch}.json'

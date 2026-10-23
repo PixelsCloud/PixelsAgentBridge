@@ -1,0 +1,23 @@
+schema_version = 1
+
+[protocol]
+# These are wire capabilities, not product release versions.
+relay_policy = 6
+relay_directory = 2
+relay_node_control = 1
+
+[[combination]]
+id = "new-management-old-relay"
+allow_declared_rejection = true
+
+[[combination]]
+id = "old-management-new-relay"
+allow_declared_rejection = true
+
+[[combination]]
+id = "new-services-old-client"
+allow_declared_rejection = false
+
+[[combination]]
+id = "new-services-new-client"
+allow_declared_rejection = false

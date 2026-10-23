@@ -44,12 +44,26 @@ USER pab:pab
 ENTRYPOINT []
 
 FROM runtime-base AS management
+ARG PAB_RELEASE_VERSION=development
+ARG PAB_RELEASE_COMMIT=unknown
+ARG PAB_SOURCE_SHA256=unknown
+LABEL vip.rgaa.pab.product="management" \
+      org.opencontainers.image.version=$PAB_RELEASE_VERSION \
+      org.opencontainers.image.revision=$PAB_RELEASE_COMMIT \
+      vip.rgaa.pab.source-sha256=$PAB_SOURCE_SHA256
 COPY --from=management-builder /out/pab-server /usr/local/bin/pab-server
 COPY --from=web-builder /web/dist /usr/local/bin/web
 EXPOSE 8443/tcp
 CMD ["pab-server", "serve", "--config", "/etc/pab/pab-server.toml"]
 
 FROM runtime-base AS relay
+ARG PAB_RELEASE_VERSION=development
+ARG PAB_RELEASE_COMMIT=unknown
+ARG PAB_SOURCE_SHA256=unknown
+LABEL vip.rgaa.pab.product="relay" \
+      org.opencontainers.image.version=$PAB_RELEASE_VERSION \
+      org.opencontainers.image.revision=$PAB_RELEASE_COMMIT \
+      vip.rgaa.pab.source-sha256=$PAB_SOURCE_SHA256
 COPY --from=relay-builder /out/pab-relay-server /usr/local/bin/pab-relay-server
 COPY --from=relay-builder /out/pab-relay-healthcheck /usr/local/bin/pab-relay-healthcheck
 EXPOSE 31443/tcp 7842/udp

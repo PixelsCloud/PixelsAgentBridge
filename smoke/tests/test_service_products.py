@@ -83,10 +83,22 @@ class BuildProducts(unittest.TestCase):
         self.exercise(['server'])
         self.assertEqual(len(self.receipt('server')['files']), 4)
 
-    def test_two_products_have_distinct_receipts_and_one_build_reservation(self):
+    def test_two_products_have_distinct_receipts_without_consuming_client_versions(self):
         self.exercise(['management', 'relay'])
         self.assertEqual(self.receipt('management')['version'], self.receipt('relay')['version'])
-        self.assertEqual(json.loads((self.root / 'build-version.json').read_text())['build_count'], 1)
+        self.assertEqual(json.loads((self.root / 'build-version.json').read_text())['build_count'], 0)
+
+    def test_mixed_build_allows_products_at_different_versions(self):
+        self.exercise(['relay'])
+        self.exercise(['relay'])
+        self.exercise(['management', 'relay'])
+        self.assertEqual(self.receipt('management')['version'], '1.2.0')
+        self.assertEqual(self.receipt('relay')['version'], '1.2.2')
+
+    def test_web_and_management_share_one_product_reservation_and_frontend_build(self):
+        self.exercise(['web', 'management'])
+        self.assertEqual(sum('build:assets' in command for command in self.commands), 1)
+        self.assertEqual(self.receipt('management')['version'], '1.2.0')
 
     def test_docker_targets_need_only_docker_and_use_distinct_stages_and_tags(self):
         self.exercise(['docker-management', 'docker-relay', '--profile', 'release'], unavailable=('npm', 'node', 'cargo'))

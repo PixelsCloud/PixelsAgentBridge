@@ -62,6 +62,12 @@ BuildKit locks the shared native target cache so the legacy combined image canno
 compile both native stages concurrently. Each native stage retains the existing
 8 Cargo + 2 nested build job limit.
 
+The two targets reserve separate versions in `product-versions.toml`; building
+one does not advance the other or the client installer counter. Add `--package`
+to export an image tar by immutable image ID. Labels and its manifest bind the
+product, version, commit and source fingerprint. Both native service packages
+and exported images use the smoke-gated [service release flow](../../docs/RELEASE.md).
+
 Existing deployments may keep their current image tags. The old `docker` build
 target still produces the combined image, and Compose retains its old fallback
 from `PAB_RELAY_IMAGE` to `PAB_SERVER_IMAGE`. When switching to the separate images,

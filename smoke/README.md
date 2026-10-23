@@ -217,7 +217,9 @@ python scripts/release.py windows --prepare-only --notes-zh "更新说明" --not
 python scripts/release.py windows --resume --smoke-report smoke/runs/RUN_ID/report.json --notes-zh "更新说明" --notes-en "Release notes"
 ```
 
-上传和 finalize 前必须提供匹配报告；不会在测试后重新构建替换候选包。候选版本文件 `build-version.json` 的构建修改可保留，但其内容也被指纹绑定；其他源码应先提交。`--allow-dirty` 只可用于构建演练，不能绕过发布门禁。已发布阶段的恢复只核对公开更新接口，不补发上传。
+上传和 finalize 前必须提供匹配报告；不会在测试后重新构建替换候选包。`build-version.json` 和
+`product-versions.toml` 是版本分配记录，不进入源码指纹，报告直接绑定发布版本及产物哈希；
+其他源码应先提交。`--allow-dirty` 只可用于构建演练，不能绕过发布门禁。已发布阶段的恢复只核对公开更新接口，不补发上传。
 
 ## 敏感数据与清理
 
@@ -235,3 +237,11 @@ python -m unittest discover -s smoke/tests -v
 `tests/test_service_products.py` 中。它验证真实 ZIP/tar 内容、归档串包和产物变更拒绝，
 并检查 Docker 阶段依赖；使用合成二进制，不代表真实程序或镜像已经完成发布验收。
 正式版本仍须运行服务端、Web、双 Relay 与客户端的适用集成项目。
+
+独立产品使用 `--target management` 或 `--target relay`；Relay 范围不选择 Web 测试。
+两者均包含服务集成与 `COMPAT-01`，另有 Relay 独立部署升级用例。完整报告还要求
+`compatibility.toml` 中的全部组合。为该用例记录人工观察时，提供 `combinations` 数组，
+每项含 `id`、`outcome`（`pass` 或允许的 `declared_rejection`）、实际 `observed`，以及
+`management`、`relay`、`client` 三个对象的 `version` 与 `sha256`。安全拒绝旧服务组合时
+还必须提供 `unsupported_contract`；候选服务搭配新旧客户端必须成功。
+报告同时绑定兼容矩阵指纹；遗漏组合、修改矩阵、无产物身份或未声明的不兼容都会阻断。

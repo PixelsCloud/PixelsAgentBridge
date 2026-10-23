@@ -35,6 +35,7 @@ def deployment_files(root, product, host):
 def package(root, product, host, profile, binary_dir, output_dir, architecture):
     files = artifacts(root, product, host, binary_dir)
     version = verify_artifacts(root, product, profile, files)
+    receipt = json.loads((root / f'.build/builds/{product}-{profile}.json').read_text(encoding='utf-8'))
     binaries = set(files) - {name for name in files if name.startswith('web/')}
     files.update(deployment_files(root, product, host))
     for name, path in files.items():
@@ -57,7 +58,8 @@ def package(root, product, host, profile, binary_dir, output_dir, architecture):
                     info.mode = 0o755 if member in binaries else 0o644
                     return info
                 out.add(path, arcname=member, recursive=False, filter=permissions)
-    manifest = {'archive': archive.name, 'product': product, 'platform': host, 'architecture': architecture,
+    manifest = {'archive': archive.name, 'kind': 'native', 'product': product, 'platform': host, 'architecture': architecture,
+                'source': receipt.get('source'),
                 'version': version, 'sha256': sha256(archive.read_bytes()).hexdigest(),
                 'files': {member: sha256(path.read_bytes()).hexdigest() for member, path in files.items()}}
     archive.with_suffix(archive.suffix + '.manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf8')

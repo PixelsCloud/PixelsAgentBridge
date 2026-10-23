@@ -86,6 +86,45 @@ def reserve_version(root):
     return version
 
 
+def product_for_target(target):
+    if target in ('management', 'web', 'docker-management'):
+        return 'management'
+    if target in ('relay', 'docker-relay'):
+        return 'relay'
+    if target in ('server', 'docker'):
+        return 'legacy_server'
+    if target in ('desktop', 'macos', 'linux', 'desktop-web', 'dsh-pab'):
+        return 'client'
+    raise ValueError('Unknown build target')
+
+
+def reserve_product_version(root, product):
+    """Call under build_lock. Existing client counters and remote reservations stay intact."""
+    if product == 'client':
+        return reserve_version(root)
+    products = ('management', 'relay', 'legacy_server')
+    if product not in products:
+        raise ValueError('Unknown product')
+    path = root / 'product-versions.toml'
+    data = (tomllib.loads(path.read_text(encoding='utf-8')) if path.is_file() else
+            {'schema_version': 1, **{p: {'version': read_state(root)['version'], 'build_count': 0} for p in products}})
+    if set(data) != {'schema_version', *products} or type(data['schema_version']) is not int or data['schema_version'] != 1:
+        raise ValueError('Unsupported product version file; preserve it for recovery')
+    for name in products:
+        entry = data[name]
+        parse_version(entry['version'])
+        if set(entry) != {'version', 'build_count'} or type(entry['build_count']) is not int or entry['build_count'] < 0:
+            raise ValueError('Invalid product build count')
+    state = data[product]
+    version = next_version(state['version']) if state['build_count'] else state['version']
+    state.update(version=version, build_count=state['build_count'] + 1)
+    text = 'schema_version = 1\n'
+    for name in products:
+        text += f'\n[{name}]\nversion = "{data[name]["version"]}"\nbuild_count = {data[name]["build_count"]}\n'
+    write_text(path, text)
+    return version
+
+
 def digest(path):
     result = sha256()
     with path.open('rb') as source:
@@ -94,7 +133,7 @@ def digest(path):
     return result.hexdigest()
 
 
-def record_artifacts(root, target, profile, version, files):
+def record_artifacts(root, target, profile, version, files, *, source=None):
     folder = root / '.build/builds'
     folder.mkdir(parents=True, exist_ok=True)
     components = {}
@@ -106,6 +145,7 @@ def record_artifacts(root, target, profile, version, files):
             components[name] = tomllib.loads(manifest.read_text(encoding='utf-8'))['package']['version']
     write_json(folder / f'{target}-{profile}.json', {
         'version': version,
+        'source': source,
         'components': components,
         'files': {name: digest(path) for name, path in files.items()},
     })

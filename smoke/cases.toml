@@ -2,9 +2,29 @@
 schema_version = 1
 
 [[case]]
+id = "COMPAT-01"
+title = "管理平台、Relay 与客户端跨版本兼容"
+targets = ["management","relay","server","windows","macos","linux","linux-desktop","android"]
+level = "release"
+prerequisite = "准备 compatibility.toml 中每个组合的正式基线与候选产物，记录各角色版本及 SHA-256；使用隔离数据库与双 Relay。"
+steps = ["逐项执行 compatibility.toml 的四个组合，完成登录、实际 Relay 传输与 P2P 连接。", "验证策略 schema、节点控制能力、维护/恢复、统计与控制服务断线重连。", "按管理平台先行、Relay 分批、客户端最后的顺序升级并核对持久化数据。"]
+expected = ["每个组合有实际版本、哈希和结果；旧组件只有在明确不支持的协议上才允许被安全拒绝。", "不支持时明确拒绝且不伪装可用；支持组合的转发、计量与操作确认正确。", "候选服务配旧/新客户端均可工作，设备身份、账号、用量与配置保留。"]
+cleanup = "恢复测试节点，清理本次会话与独立数据库；观察文件提供完整 combinations 数组，不以版本号相等推断兼容。"
+
+[[case]]
+id = "SRV-02"
+title = "Relay 独立部署、升级与恢复"
+targets = ["relay"]
+level = "release"
+prerequisite = "仅使用 Relay 候选归档或镜像及已准备的隔离管理平台；记录节点 ID、证书、配置与用量存储摘要。"
+steps = ["仅用 Relay 产物在测试主机部署并连接管理平台，执行真实中继传输。", "进入维护，升级一个节点，验证备用节点与原连接的实际行为。", "恢复节点并演练受支持的回退，核对原身份、配置及用量。"]
+expected = ["无需客户端安装包或 Web 资源，探针与真实传输均成功。", "升级只更换目标 Relay，备用服务可用，不修改管理平台数据库。", "身份、证书、配置和待报用量保留，新链路实际可用。"]
+cleanup = "恢复测试节点与连接状态，不清空用量卷，不替换私钥或设备身份。"
+
+[[case]]
 id = "AUTO-14"
 title = "服务端数据库、TLS 与双 Relay 集成"
-targets = ["server"]
+targets = ["server","management","relay"]
 level = "release"
 adapter = "cargo-service"
 prerequisite = "已创建归本次测试所有的 loopback PostgreSQL 夹具；Rust 依赖完整。"
@@ -37,7 +57,7 @@ cleanup = "移除测试创建的临时目录，不安装或改变本机产品。
 [[case]]
 id = "AUTO-01"
 title = "测试入口与门禁自检"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web","relay"]
 level = "quick"
 adapter = "selftest"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -48,7 +68,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-02"
 title = "构建版本与既有验收报告回归"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web"]
 level = "quick"
 adapter = "python"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -70,7 +90,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-04"
 title = "Web 统计与操作模型回归"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "quick"
 adapter = "web-model"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -92,7 +112,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-06"
 title = "协议与终端回归"
-targets = ["windows","macos","linux","linux-desktop","android","server"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","relay"]
 level = "release"
 adapter = "cargo-core"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -125,7 +145,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-09"
 title = "Relay 策略与运行时回归"
-targets = ["server"]
+targets = ["server","management","relay"]
 level = "release"
 adapter = "cargo-relay"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -136,7 +156,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-10"
 title = "Web 下拉、弹窗、刷新与布局回归（模拟 API）"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 adapter = "web-ui"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -147,7 +167,7 @@ cleanup = "确认子进程退出；日志和测试产物仅保留在本次运行
 [[case]]
 id = "AUTO-11"
 title = "真实 HTTPS 账号、用量、审计与服务设置"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 adapter = "web-live"
 prerequisite = "安装对应测试依赖；预检通过；测试数据与生产隔离。需要构建时确认本机其他会话的并发占用。"
@@ -198,7 +218,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "AUTH-01"
 title = "账号登录与会话撤销"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["注册测试账号、登录、退出，再登录。","修改密码，验证旧密码和被撤销会话。","禁用测试账号并从已连接操作端发起受保护操作，再恢复账号。"]
@@ -208,7 +228,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "AUTH-02"
 title = "权限与跨账号隔离"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["普通用户直接请求管理接口并访问另一测试用户的设备、用量和操作。","管理员完成一次授权管理动作。","检查错误返回与审计记录。"]
@@ -218,7 +238,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "AUTH-03"
 title = "GitHub 登录与绑定"
-targets = ["windows","macos","linux-desktop","web","server"]
+targets = ["windows","macos","linux-desktop","web","server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["在专用 OAuth 测试应用完成授权、取消授权和错误回调。","绑定已有账号，再次登录并尝试冲突绑定。","验证 GitHub-only 账号不能误删唯一登录方式。"]
@@ -228,7 +248,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "DEV-01"
 title = "设备发现与真实诊断"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["让 Windows、macOS、Linux、Android 测试设备上线并上报。","核对名称、设备码、账号、系统、架构和客户端版本。","断开一台设备再恢复，修改名称并刷新。"]
@@ -248,7 +268,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "NET-02"
 title = "强制 Relay 与自动回退"
-targets = ["windows","macos","linux","linux-desktop","android","server"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["指定使用 Relay 连接目标并验证实际节点。","阻断测试环境中的直连路径，用自动模式重新连接。","恢复网络并重复一次读取及双向文件传输。"]
@@ -268,7 +288,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "RELAY-01"
 title = "节点维护与恢复的完整链路"
-targets = ["server","web"]
+targets = ["server","management","web","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["在两个测试 Relay 上建立已知链路，点击开始维护并确认。","观察维护阶段、新连接选路及已有链路在约定等待策略下的行为。","恢复服务，再创建新连接，重开页面核对状态。"]
@@ -278,7 +298,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "RELAY-02"
 title = "节点故障、停用及容量规则"
-targets = ["server"]
+targets = ["server","management","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["停用一个测试节点并发起 P2P 探测与 Relay 连接。","关闭节点进程，验证过期心跳和备用节点，再恢复。","验证未配置容量与显式带宽额度，做受控 Relay 传输。"]
@@ -288,7 +308,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "RELAY-03"
 title = "机器与链路诊断"
-targets = ["server","web"]
+targets = ["server","management","web","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["建立一条已知 Relay 链路，打开节点详情 modal。","核对连接的机器、端点、链路数、开始时间、持续时长和收发统计。","停止链路、重启节点、等待一次上报过期，分别刷新。"]
@@ -468,7 +488,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "WEB-01"
 title = "管理页面全流程"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["以管理员和普通用户遍历概览、设备、账号、用量、Relay、审计、设置及我的账号页面。","逐个操作下拉、筛选、分页、刷新、详情弹窗和可用表单，刷新页面复查。","验证简体中文/英文、亮暗主题、窄屏及键盘操作。"]
@@ -478,7 +498,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "WEB-02"
 title = "刷新频率与竞态"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["在概览和用量观察正常 5s/10s 轮询，记录网络请求和 DOM 变化。","快速切换本周、本月和自定义范围，延迟或打乱响应。","切换后台标签页、恢复前台、hover 退出按钮并等待登录请求。"]
@@ -488,7 +508,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "USAGE-01"
 title = "Relay 与 P2P 用量端到端"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["在独立账号下记录基线，分别完成可识别的 Relay 和 P2P 受控传输。","等待上报、入库和聚合，比较设备、用户、全站和 CSV，重送同一批上报。","结束已知时长会话，再查询累计时长与连接数。"]
@@ -498,7 +518,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "USAGE-02"
 title = "统计边界与大计数"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["切换默认 7 天、本周、本月、自定义区间和粒度，跨越日界线。","比较卡片、趋势、历史、排行及 CSV 的相同过滤范围。","加入超出 JS 安全整数的受控计数和缺失上一周期样本。"]
@@ -508,7 +528,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "AUDIT-01"
 title = "审计与导出"
-targets = ["web","server"]
+targets = ["web","server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["执行测试账号、服务策略和 Relay 管理操作，筛选审计并导出。","翻页期间新增另一操作，检查当前快照并手动刷新。","以普通用户请求管理员审计，检查导出及日志中的敏感数据。"]
@@ -518,7 +538,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "SRV-01"
 title = "部署、迁移与备份恢复"
-targets = ["server"]
+targets = ["server","management"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["使用部署文档和候选包在空的独立数据库部署 Server、Web 和双 Relay。","备份上一正式版测试库，升级并核对账号、会话、设备、用量和审计摘要。","在另一独立库恢复备份，演练支持的应用回退，再恢复候选环境。"]
@@ -528,7 +548,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "TLS-01"
 title = "证书与服务边界"
-targets = ["windows","macos","linux","linux-desktop","android","server"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","relay"]
 level = "release"
 prerequisite = "使用本次候选产物和独立测试账号、设备；记录操作端与被控端版本和系统。"
 steps = ["使用合法链和主机名连接控制服务与两个 Relay。","测试错误主机名、过期证书和不可信 CA。","检查客户端包、前端资源及日志中的私钥、凭据和内部测试材料。"]
@@ -538,7 +558,7 @@ cleanup = "撤销本用例创建的测试资源，恢复原有状态；保留本
 [[case]]
 id = "SOAK-01"
 title = "长时间运行与资源趋势"
-targets = ["windows","macos","linux","linux-desktop","android","server","web"]
+targets = ["windows","macos","linux","linux-desktop","android","server","management","web","relay"]
 level = "soak"
 prerequisite = "首个正式版本和连接、生命周期或资源管理改动必须完成；独立测试设备和完整采样。"
 steps = ["保持真实连接和轻量操作至少 8 小时，定时采集内存、句柄/线程及连接数。","期间执行断网、重连、前后台和休眠恢复。","结束后停止所有会话并对比资源基线。"]
@@ -548,7 +568,7 @@ cleanup = "停止测试任务，核对全部 run_id 资源；保留脱敏趋势�
 [[case]]
 id = "SOAK-02"
 title = "并发与故障压力"
-targets = ["server","windows","macos","linux","linux-desktop","android"]
+targets = ["server","management","windows","macos","linux","linux-desktop","android","relay"]
 level = "soak"
 prerequisite = "记录本版本容量目标，不以任意测试规模宣称最大容量。"
 steps = ["多个控制端并发执行只读及独立目录写入，达到明确记录的发布目标规模。","注入慢存储、丢包、节点重启与重复请求。","查询原请求结果并清理，再跑一次正常核心链路。"]

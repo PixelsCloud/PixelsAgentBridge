@@ -1,0 +1,14 @@
+schema_version = 1
+
+[management]
+version = "1.3.6"
+build_count = 0
+
+[relay]
+version = "1.3.6"
+build_count = 0
+
+# Compatibility bundles have their own counter; they do not consume client versions.
+[legacy_server]
+version = "1.3.6"
+build_count = 0

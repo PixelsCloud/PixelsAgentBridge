@@ -12,11 +12,15 @@ macOS PKG 打包需要 Python 3.12+。Mac 的便捷入口会选取可用的 Pyth
 
 ## 版本规则
 
-`build-version.json` 是版本来源，随代码提交。首次整体编译使用 `1.2.0`，随后每次构建 patch 加1；`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`。minor、patch 范围均为0–99。
+客户端保留 `build-version.json` 构建记录及官网的正式版本预留机制。管理平台和 Relay
+分别使用 `product-versions.toml` 中的 `management`、`relay` 计数；旧组合入口使用独立的
+`legacy_server` 兼容计数。`web` 属于管理平台，`desktop-web` 属于客户端，Docker 产品
+目标与对应原生目标共享产品计数。首次服务构建从已登记的 `1.3.6` 开始，此后仅推进
+所构建产品的 patch；`1.2.99 → 1.3.0`，`1.99.99 → 2.0.0`，minor、patch 均为 0–99。
 
-统一入口在启动子组件前分配一次安装包发布版本，只更新 `build-version.json`。**不修改任何 Rust crate、Cargo.lock、npm package/lock 或 Tauri 配置中的内部版本号**，即使对应源码有变化也不自动递增内部版本。源码或依赖变化由 Cargo 自身决定重编译。一个命令内所有安装包共用一次发布版本，打包不再次递增；失败或中断也占用该版本。同一工作目录的并发构建由系统锁阻止，锁随进程退出释放。
+统一入口在启动子组件前为每个涉及的产品各分配一次发布版本。**不修改任何 Rust crate、Cargo.lock、npm package/lock 或 Tauri 配置中的内部版本号**。同一产品的多个目标共用一次预留；不同产品允许版本不同，打包不再次递增，失败或中断也占用版本。同一工作目录的并发构建由系统锁阻止，锁随进程退出释放。
 
-版本文件应随代码提交。此计数在当前 Git 工作目录中分配，不是跨克隆的中央发号服务；正式构建使用同一个发布工作目录。
+版本记录应随代码提交。服务计数在当前 Git 工作目录中分配，不是跨克隆的中央发号服务；同一发布流使用固定工作目录。客户端正式发版继续使用官网预留版本。
 
 ## 常用命令（仓库根目录）
 
@@ -33,7 +37,7 @@ python scripts/build.py relay --package
 # 兼容旧流程：Server、Relay、转发健康探针与 Web 的组合归档
 python scripts/build.py server --package
 
-# 一次构建多个目标，共用一个产品/安装包版本号
+# 一次构建多个目标；各产品分别预留自己的版本
 python scripts/build.py desktop server --package
 
 # 只编译前端，每次命令同样递增一次
@@ -62,9 +66,10 @@ python scripts/build.py docker --profile release
 探针程序 `pab-relay-healthcheck` 运行在升级操控机器上；混合部署需要分别构建目标平台的包，
 不要把 Windows EXE 当作 Linux 程序分发。
 
-管理平台、Relay 和客户端继续共享本仓库的协议与基础 crates。当前阶段先分离构建、
-归档和镜像，沿用现有发布版本分配规则；独立版本分配、发布门禁及兼容矩阵尚待接入。
-三个产品的构建输出均复用主仓库缓存，不依赖其他产品的安装包。
+管理平台、Relay 和客户端继续共享本仓库的协议与基础 crates。三个产品分别分配版本，
+构建输出复用主仓库缓存，不依赖其他产品的安装包。服务发布使用独立的
+[发布入口与签名域](docs/RELEASE.md)，跨版本验收定义在 `smoke/compatibility.toml`。
+Docker 产品目标添加 `--package` 时，按不可变镜像 ID 导出 tar 与发布清单，供同一服务发布入口验收。
 
 默认使用 debug；只有明确指定 `--profile release` 才使用 release。Docker 服务端镜像固定使用 release，因此该目标要求明确指定。`--image` 可指定 Docker 标签。不要用 `docker compose build` 代替统一入口；构建后将 Compose 的镜像变量指向生成的标签，再使用 `up -d --no-build`。
 
