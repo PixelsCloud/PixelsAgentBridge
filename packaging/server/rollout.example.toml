@@ -26,7 +26,7 @@ known_hosts = "known_hosts"
 install_directory = "/opt/pixels-relay"
 service_name = "pixels-agent-bridge-relay"
 config_file = "/etc/pixels-relay/relay.toml"
-artifact = "pixels-agent-bridge-server-linux-x86_64-release.tar.gz"
+artifact = "pixels-agent-bridge-relay-linux-x86_64-release-VERSION.tar.gz"
 sha256 = "REPLACE_WITH_ARCHIVE_SHA256"
 
 # Container alternative: replace a native [[nodes]] entry with the following.
@@ -58,5 +58,5 @@ known_hosts = "known_hosts"
 install_directory = 'C:\PixelsRelay'
 service_name = "PixelsAgentBridgeRelay"
 config_file = 'C:\PixelsRelay\relay.toml'
-artifact = "pixels-agent-bridge-server-windows-x86_64-release.zip"
+artifact = "pixels-agent-bridge-relay-windows-x86_64-release-VERSION.zip"
 sha256 = "REPLACE_WITH_ARCHIVE_SHA256"

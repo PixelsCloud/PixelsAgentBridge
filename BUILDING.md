@@ -24,7 +24,13 @@ macOS PKG 打包需要 Python 3.12+。Mac 的便捷入口会选取可用的 Pyth
 # Windows Desktop、Executor、MCP；同时生成 ZIP 和带版本号的 EXE 安装包
 python scripts/build.py desktop --package
 
-# Server、Relay、转发健康探针与 Web；生成当前宿主平台归档
+# 管理平台：只构建 Server 与 Web，生成独立归档
+python scripts/build.py management --package
+
+# Relay：只构建中继与健康探针，不需要 Node/npm 或 Web 产物
+python scripts/build.py relay --package
+
+# 兼容旧流程：Server、Relay、转发健康探针与 Web 的组合归档
 python scripts/build.py server --package
 
 # 一次构建多个目标，共用一个产品/安装包版本号
@@ -43,10 +49,22 @@ python3.13 scripts/build.py macos --macos-arch all --package
 bash packaging/desktop/build-macos.sh debug all
 
 # 正式 Docker 镜像，显式使用 release；默认标签为产品版本号
+python scripts/build.py docker-management --profile release
+python scripts/build.py docker-relay --profile release
+# 兼容旧流程的组合镜像
 python scripts/build.py docker --profile release
 ```
 
-Server 归档同时包含原生 Windows/systemd 安装助手、`roll_relays.py`、TOML 样例及 [Relay 集群运维指南](docs/RELAY_CLUSTER_OPERATIONS.md)。探针程序 `pab-relay-healthcheck` 运行在升级操控机器上；混合部署需要分别构建目标平台的 Server/Relay 包，不要把 Windows EXE 当作 Linux 程序分发。
+管理平台归档包含 Server、Web、配置样例与原生 Windows/systemd 安装助手；Relay
+归档包含中继、健康探针、原生/容器部署助手、`roll_relays.py` 与
+[Relay 集群运维指南](docs/RELAY_CLUSTER_OPERATIONS.md)。两种归档分别校验自己的构建记录，
+文件名包含产品、平台、架构、profile 和发布版本。旧 `server` 组合归档保留原名称。
+探针程序 `pab-relay-healthcheck` 运行在升级操控机器上；混合部署需要分别构建目标平台的包，
+不要把 Windows EXE 当作 Linux 程序分发。
+
+管理平台、Relay 和客户端继续共享本仓库的协议与基础 crates。当前阶段先分离构建、
+归档和镜像，沿用现有发布版本分配规则；独立版本分配、发布门禁及兼容矩阵尚待接入。
+三个产品的构建输出均复用主仓库缓存，不依赖其他产品的安装包。
 
 默认使用 debug；只有明确指定 `--profile release` 才使用 release。Docker 服务端镜像固定使用 release，因此该目标要求明确指定。`--image` 可指定 Docker 标签。不要用 `docker compose build` 代替统一入口；构建后将 Compose 的镜像变量指向生成的标签，再使用 `up -d --no-build`。
 

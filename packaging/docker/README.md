@@ -47,12 +47,26 @@ its file. Each service mounts **only its own** TOML read-only; GitHub secrets ar
 not mounted into Relay. Configuration is never copied into the image.
 
 ```sh
-python scripts/build.py docker --profile release
-# Set PAB_SERVER_IMAGE in private.env to the version printed by the build.
-# PAB_RELAY_IMAGE may select an independently updated Relay image.
+python scripts/build.py docker-management --profile release
+python scripts/build.py docker-relay --profile release
+# Set BOTH image tags in private.env to their actual build output versions:
+# PAB_SERVER_IMAGE=pixels-agent-bridge-management:<management-build-version>
+# PAB_RELAY_IMAGE=pixels-agent-bridge-relay:<relay-build-version>
 docker compose --env-file packaging/docker/private.env -f packaging/docker/compose.yaml up -d --no-build
 docker compose --env-file packaging/docker/private.env -f packaging/docker/compose.yaml ps
 ```
+
+The management image contains Server and Web; the Relay image contains only
+Relay and its health probe. Building Relay does not execute the Node/Web stage.
+BuildKit locks the shared native target cache so the legacy combined image cannot
+compile both native stages concurrently. Each native stage retains the existing
+8 Cargo + 2 nested build job limit.
+
+Existing deployments may keep their current image tags. The old `docker` build
+target still produces the combined image, and Compose retains its old fallback
+from `PAB_RELAY_IMAGE` to `PAB_SERVER_IMAGE`. When switching to the separate images,
+explicitly set both variables; a management-only image cannot run a Relay node.
+Image separation does not change the TOML paths, service names or data volumes.
 
 After editing TOML, recreate the affected container to remount atomically replaced
 files. Changing the shared secret requires updating both services. Configuration

@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from build_version import build_lock, reserve_version, record_artifacts, macos_artifacts, macos_app_version, parse_version
+from service_products import BINARIES, artifacts as service_artifacts
 
 ROOT = Path(__file__).resolve().parents[1]
 CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve()
@@ -23,11 +24,6 @@ def run(command, cwd=ROOT):
     command = [str(part) for part in command]
     print('> ' + ' '.join(command), flush=True)
     subprocess.run(command, cwd=cwd, check=True)
-
-
-def web_files():
-    folder = ROOT / 'apps/web/dist'
-    return {'web/' + path.relative_to(folder).as_posix(): path for path in sorted(folder.rglob('*')) if path.is_file()}
 
 
 def macos_architectures(selection):
@@ -75,10 +71,10 @@ def build_macos(version, profile, architectures, package, installer_identity=Non
 
 def main():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument('targets', nargs='+', choices=['desktop', 'server', 'web', 'desktop-web', 'docker', 'linux', 'macos', 'dsh-pab'])
+    parser.add_argument('targets', nargs='+', choices=['desktop', 'management', 'relay', 'server', 'web', 'desktop-web', 'docker-management', 'docker-relay', 'docker', 'linux', 'macos', 'dsh-pab'])
     parser.add_argument('--profile', choices=['debug', 'release'], default='debug')
-    parser.add_argument('--package', action='store_true', help='Also package desktop/server artifacts; does not increment again')
-    parser.add_argument('--image', help='Docker image tag (default: pixels-agent-bridge:<version>)')
+    parser.add_argument('--package', action='store_true', help='Also package desktop/service artifacts; does not increment again')
+    parser.add_argument('--image', help='Override the image tag for one Docker target')
     parser.add_argument('--macos-arch', choices=['native', 'arm64', 'aarch64', 'x86_64', 'all'], default=None)
     parser.add_argument('--installer-version', help='Version reserved by the release service; does not change local build-version.json')
     parser.add_argument('--macos-installer-identity', help='Developer ID Installer identity for the macOS PKG')
@@ -101,12 +97,13 @@ def main():
         parser.error('desktop builds the Windows installer components; use linux for Linux Docker builds')
     if 'linux' in targets and os.name != 'nt':
         parser.error('linux currently uses the Windows-host Docker build script')
-    if args.image and 'docker' not in targets:
-        parser.error('--image requires the docker target')
-    if 'docker' in targets and args.profile != 'release':
-        parser.error('docker uses release binaries; specify --profile release explicitly')
-    needs_node = any(t not in ('docker', 'linux') for t in targets)
-    required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'server', 'macos', 'dsh-pab']) else []) + (['docker'] if any(t in targets for t in ['docker', 'linux']) else [])
+    docker_targets = [t for t in targets if t in ('docker', 'docker-management', 'docker-relay')]
+    if args.image and len(docker_targets) != 1:
+        parser.error('--image requires exactly one Docker target')
+    if docker_targets and args.profile != 'release':
+        parser.error('Docker targets use release binaries; specify --profile release explicitly')
+    needs_node = any(t in ('desktop', 'management', 'server', 'web', 'desktop-web', 'macos', 'dsh-pab') for t in targets)
+    required = (['npm'] if needs_node else []) + (['cargo'] if any(t in targets for t in ['desktop', 'management', 'relay', 'server', 'macos', 'dsh-pab']) else []) + (['docker'] if docker_targets or 'linux' in targets else [])
     if 'macos' in targets:
         required += ['node', 'rustup'] + (['/usr/bin/pkgbuild', '/usr/bin/productbuild'] if args.package else [])
     if 'desktop' in targets or ('macos' in targets and 'x86_64' in architectures):
@@ -163,17 +160,29 @@ def main():
                 # Release packaging: build pab-mcp and fold it into a self-contained
                 # plugin directory plus npm tarball under .build/packages/.
                 run([sys.executable, 'scripts/package_dsh_plugin.py', '--profile', args.profile, '--build'])
-            elif target == 'server':
-                frontend('web')
-                run(['cargo', 'build', '--locked', *profile_flags, '-p', 'pab-server', '--bin', 'pab-server', '-p', 'pab-relay', '--bin', 'pab-relay-server', '--bin', 'pab-relay-healthcheck'])
-                suffix = '.exe' if os.name == 'nt' else ''
-                files = {name + suffix: CARGO_TARGET / args.profile / (name + suffix) for name in ['pab-server', 'pab-relay-server', 'pab-relay-healthcheck']}
-                record_artifacts(ROOT, target, args.profile, version, files | web_files())
+            elif target in BINARIES:
+                if target in ('management', 'server'):
+                    frontend('web')
+                command = ['cargo', 'build', '--locked', *profile_flags, '-j', str(CARGO_JOBS)]
+                if target in ('management', 'server'):
+                    command += ['-p', 'pab-server', '--bin', 'pab-server']
+                if target in ('relay', 'server'):
+                    command += ['-p', 'pab-relay', '--bin', 'pab-relay-server', '--bin', 'pab-relay-healthcheck']
+                run(command)
+                service_platform = 'windows' if os.name == 'nt' else 'linux'
+                files = service_artifacts(ROOT, target, service_platform, CARGO_TARGET / args.profile)
+                record_artifacts(ROOT, target, args.profile, version, files)
                 if args.package:
-                    run([sys.executable, 'packaging/server/build.py', '--platform', 'windows' if os.name == 'nt' else 'linux',
+                    run([sys.executable, 'packaging/server/build.py', '--product', target, '--platform', service_platform,
                          '--profile', args.profile, '--binary-dir', CARGO_TARGET / args.profile])
-            elif target == 'docker':
-                run(['docker', 'build', '-f', 'packaging/docker/Dockerfile', '-t', args.image or f'pixels-agent-bridge:{version}', '.'])
+            elif target in docker_targets:
+                product = target.removeprefix('docker-') if target != 'docker' else None
+                command = ['docker', 'build', '-f', 'packaging/docker/Dockerfile']
+                if product:
+                    command += ['--target', product]
+                repository = 'pixels-agent-bridge' + ('-' + product if product else '')
+                image = args.image or f'{repository}:{version}'
+                run([*command, '-t', image, '.'])
             elif target == 'linux':
                 run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
                 files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp', 'pab-document-worker']}
