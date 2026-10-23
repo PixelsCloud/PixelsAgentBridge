@@ -738,8 +738,16 @@ mod tests {
     fn every_tool_has_exactly_one_group_and_filtered_schemas_are_unchanged() {
         use pab_bridge::mcp_tool_settings::{McpToolSettings, ToolGroup};
         let all = tools();
-        assert_eq!(all.len(), 122);
-        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), 122);
+        let contract: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../smoke/tool-coverage.json"
+        ))
+        .unwrap();
+        let expected = contract["tools"].as_object().unwrap();
+        assert_eq!(all.len(), expected.len());
+        assert_eq!(enabled_tools(&McpToolSettings::default()).len(), expected.len());
+        for tool in &all {
+            assert!(expected.contains_key(tool["name"].as_str().unwrap()));
+        }
         for group in ToolGroup::ALL {
             let settings = McpToolSettings {
                 version: 3,

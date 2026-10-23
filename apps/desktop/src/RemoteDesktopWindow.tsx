@@ -8,12 +8,14 @@ import "./remoteDesktop.css";
 import type { Assistance } from "./DesktopAssistanceNotice";
 import { initialLanguage } from "./i18n";
 import { useViewerFullscreen } from "./useViewerFullscreen";
+import { pipelineRows, type PipelinePerformance } from "./remoteDesktopDiagnostics";
 
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
 type Quality = { session_id: string; generation: number; capture_fps_milli: number; encoder_target_bps: number | null };
 type Status = {
   phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; frame_ready?: boolean;
   decoder?: string | null; quality?: Quality | null; remote_os?: string | null; connection_path?: string | null;
+  performance?: PipelinePerformance | null;
   clipboard_enabled?: boolean; clipboard_state?: string;
   opened?: { config: { session_id: string; screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean };
 };
@@ -95,6 +97,16 @@ export default function RemoteDesktopWindow() {
     try { await invoke("desktop_viewer_control", arguments_); }
     catch (cause) { setError(String(cause)); setBusy(false); }
   }
+  useEffect(() => {
+    let active = true;
+    const subscription = listen<PipelinePerformance>("desktop-viewer-performance", ({ payload }) => {
+      if (active) setStatus(current => current.phase === "viewing"
+        && current.opened?.config.session_id === payload.session_id
+        && current.opened.config.generation === payload.generation
+        ? { ...current, performance: payload, connection_path: payload.connection_path } : current);
+    });
+    return () => { active = false; void subscription.then(unlisten => unlisten()); };
+  }, []);
   const opened = status.opened;
   const quality = status.phase === "viewing" ? status.quality : null;
   const phase = text[status.phase as keyof typeof text] || status.phase;
@@ -116,19 +128,24 @@ export default function RemoteDesktopWindow() {
     [english ? "Requested limit" : "请求帧率上限", opened ? `${opened.config.fps} FPS` : unknown],
     [english ? "Capture limit" : "采集上限", quality ? `${(quality.capture_fps_milli / 1000).toFixed(1)} FPS` : unknown],
     [english ? "Encoder target (not measured)" : "编码目标码率（非实测）", budget],
+    ...(status.phase === "viewing" && status.performance ? pipelineRows(status.performance, english) : []),
     [english ? "First frame / input ready" : "首帧／输入就绪", `${status.frame_ready ? "✓" : "—"} / ${status.input_ready ? "✓" : "—"}`],
     [english ? "Input supported" : "远端输入支持", opened ? (opened.input_supported ? "✓" : "—") : unknown],
     [english ? "Text clipboard" : "文字剪贴板", clipboardHint],
     [english ? "Generation" : "会话代次", opened ? String(opened.config.generation) : unknown],
     [english ? "Session" : "会话标识", opened?.config.session_id || unknown],
   ];
-  const statisticsText = [statisticsTitle, ...diagnostics.map(([label, value]) => `${label}: ${value}`)].join("\n");
+  // Native overlays have a bounded 2048-byte command. Prefer live timings;
+  // the full session/input metadata remains available in the DOM panel.
+  const overlayRows = status.performance ? [...diagnostics.slice(0, 6), ...diagnostics.slice(9, 17)] : diagnostics;
+  const statisticsText = [statisticsTitle, ...overlayRows.map(([label, value]) => `${label}: ${value}`)].join("\n");
+  const overlayText = statisticsExpanded ? statisticsText : "";
   useEffect(() => {
     if (status.phase !== "viewing") return;
     // Native video covers DOM panels. Visibility belongs to this titlebar button.
-    void invoke("desktop_viewer_overlay", { text: statisticsExpanded ? statisticsText : "" })
+    void invoke("desktop_viewer_overlay", { text: overlayText })
       .catch(cause => setError(String(cause)));
-  }, [statisticsText, statisticsExpanded, status.phase]);
+  }, [overlayText, status.phase]);
   const windowAction = (action: Promise<unknown>) => { void action.catch(cause => setError(String(cause))); };
 
   return <main className={`remote-desktop${fullscreen ? " remote-desktop-fullscreen" : ""}`}>
@@ -178,7 +195,7 @@ export default function RemoteDesktopWindow() {
     <aside className="remote-desktop-statistics" aria-label={statisticsTitle} hidden={!statisticsExpanded}>
       <strong>{statisticsTitle}</strong><dl>{diagnostics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd
         className={label === (english ? "Decoder" : "解码器") ? "remote-desktop-decoder" : undefined}>{value}</dd></div>)}</dl>
-      <small>{english ? "Limits and encoder targets are not measured FPS or bitrate." : "帧率上限和编码目标不代表实际帧率或实测码率。"}</small>
+      <small>{english ? "RTT is round trip. Receive-to-display includes decoder queues and rendering. Capture wait includes static desktop idle time." : "网络耗时为往返；接收到显示包含解码排队和渲染；采集等待包含桌面静止时间。"}</small>
     </aside>
   </main>;
 }

@@ -18,6 +18,8 @@
     <string name="product_name_failed">设备名称更新失败，请重试。</string>
     <string name="product_copy_code">复制设备代码</string>
     <string name="product_code_copied">设备代码已复制</string>
+    <string name="product_copy_password">复制密码</string>
+    <string name="product_password_copied">密码已复制</string>
     <string name="product_online">在线</string>
     <string name="product_offline">离线</string>
     <string name="product_control_paused">远程控制已暂停</string>

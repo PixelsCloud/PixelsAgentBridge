@@ -17,6 +17,7 @@ export function RelayOperationPanel({ id, onConfirmed, onRetry, busy }: {
   const [clock, setClock] = useState({ received: performance.now(), elapsed: 0 });
   const operation = resource.data;
   const expired = operation?.error_code === 'operator_lease_expired';
+  const superseded = operation?.error_code === 'superseded';
   useEffect(() => {
     if (!operation) return;
     setClock({ received: performance.now(), elapsed: 0 });
@@ -41,7 +42,7 @@ export function RelayOperationPanel({ id, onConfirmed, onRetry, busy }: {
     <Typography.Text copyable>{id}</Typography.Text>
     {resource.error && <Alert type="warning" showIcon title={t('relayUnconfirmed')} description={t(resource.error)} action={<Button onClick={resource.refresh}>{t('retry')}</Button>}/>}
     {operation && <>
-      <Tag color={resource.error || expired ? 'default' : operation.phase === 'failed' ? 'error' : operation.phase === 'waiting' ? 'processing' : 'success'}>{t(expired ? 'relayOperationExpired' : `relayPhase.${operation.phase}`)}</Tag>
+      <Tag color={resource.error || expired || superseded ? 'default' : operation.phase === 'failed' ? 'error' : operation.phase === 'waiting' ? 'processing' : 'success'}>{t(superseded ? 'relayOperationSuperseded' : expired ? 'relayOperationExpired' : `relayPhase.${operation.phase}`)}</Tag>
       <Descriptions column={{ xs: 1, sm: 2 }} items={[
         { key: 'node', label: t('name'), children: operation.node_id },
         { key: 'action', label: t('action'), children: t(`relayAction.${operation.action}`) },
@@ -54,7 +55,7 @@ export function RelayOperationPanel({ id, onConfirmed, onRetry, busy }: {
         { key: 'completed', label: t('relayCompletedAt'), children: operation.completed_at_unix_ms === null ? '—' : date(operation.completed_at_unix_ms) },
         { key: 'outage', label: t('relayAllowOutage'), children: t(operation.allow_outage ? 'enabled' : 'disabled') },
       ]}/>
-      {operation.phase === 'failed' && <Alert type={expired ? 'info' : 'error'} title={t(expired ? 'relayLeaseExpired' : 'relayOperationFailed')} description={expired ? t('relayExpiredRecordHint') : operation.error_code ?? t('unknown')}/>}
+      {operation.phase === 'failed' && <Alert type={expired ? 'info' : 'error'} title={t(expired ? 'relayLeaseExpired' : 'relayOperationFailed')} description={expired ? t('relayExpiredRecordHint') : operation.error_code === 'node_confirmation_timeout' ? t('relayNodeConfirmationTimeout') : operation.error_code ?? t('unknown')}/>}
       {operation.phase === 'ready' && <Typography.Paragraph type="secondary">{t('relayReadyHint')}</Typography.Paragraph>}
     </>}
     {!operation && !resource.error && <Typography.Text>{t('loading')}</Typography.Text>}

@@ -58,7 +58,7 @@ test('real administrator ranking links keep account, population and window for C
     await report(target, user, hour, '9007199254740993');
     const config = path.resolve(fixtureConfig!);
     expect(config).toBe(isolatedFixture().config);
-    execFileSync(path.join(path.dirname(config), 'pab-server.exe'), ['web-admin', administrator.username, '--config', config], { stdio: 'pipe' });
+    execFileSync(isolatedFixture().executable, ['web-admin', administrator.username, '--config', config], { stdio: 'pipe' });
     const range = `from=${hour}&until=${hour + 3600000}&interval=hour&population=users`;
     const ranking = await (await admin.get(`/api/web/usage/ranking?scope=all&${range}&sort=uploaded_bytes&page_size=1`)).json();
     expect(ranking.items[0].counters_exact.uploaded_bytes).toBe('9007199254740993');

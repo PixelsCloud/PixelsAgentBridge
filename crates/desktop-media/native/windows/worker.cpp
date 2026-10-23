@@ -205,10 +205,13 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
             write_value(applied ? magic : magic + 1);
             continue;
         }
-        if (command != 1) throw std::runtime_error("Invalid capture command");
+        if (command != 1 && command != 3) throw std::runtime_error("Invalid capture command");
+        const auto capture_started = Clock::now();
         std::this_thread::sleep_until(next);
         std::vector<uint8_t> packet;
         auto sampled = Clock::now();
+        Clock::time_point encode_started;
+        uint64_t encode_us = 0;
         {
             FrameLease lease{nullptr};
             if (synthetic) {
@@ -251,7 +254,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                 }
                 sampled = Clock::now();
             }
+            encode_started = Clock::now();
             encoder.encode(texture.Get(), index, packet);
+            encode_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-encode_started).count());
             // Keep backend switching outside the outstanding DXGI frame lease.
             // Here only reject a layout transition before publishing the frame.
             if (!synthetic) validate_display_layout(display);
@@ -261,6 +266,10 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         write_value(static_cast<uint32_t>(packet.size())); write_value(index);
         write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(sampled-start).count()));
         write_value(static_cast<uint32_t>(idr(packet)));
+        if (command == 3) {
+            write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(encode_started-capture_started).count()));
+            write_value(encode_us);
+        }
         write_bytes(packet.data(), static_cast<uint32_t>(packet.size()));
         ++index;
         next = (std::max)(next + std::chrono::microseconds(1000000/fps), Clock::now());

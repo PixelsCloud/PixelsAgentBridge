@@ -13,6 +13,9 @@ pub const DESKTOP_MAX_IN_FLIGHT: u64 = 4;
 pub const DESKTOP_CONTROL_BYTES: usize = 64 * 1024;
 pub const DESKTOP_MAX_SCREENS: usize = 32;
 pub const DESKTOP_QUALITY_SCHEMA_VERSION: u16 = 1;
+#[path = "desktop_diagnostics.rs"]
+mod diagnostics;
+pub use diagnostics::*;
 
 /// Optional diagnostics on a separate stream; existing v2 media stays unchanged.
 /// Cadence/budget are sender targets, never measured FPS or delivered bitrate.
@@ -208,6 +211,11 @@ pub enum RemoteDesktopRequest {
         session_id: RequestId,
         generation: u64,
     },
+    Diagnostics {
+        version: u16,
+        session_id: RequestId,
+        generation: u64,
+    },
     Close {
         session_id: RequestId,
     },
@@ -241,6 +249,9 @@ pub enum RemoteDesktopReply {
     },
     Quality {
         snapshot: DesktopQualitySnapshot,
+    },
+    Diagnostics {
+        snapshot: DesktopDiagnosticsSnapshot,
     },
     Closed,
     Error {

@@ -1,6 +1,6 @@
 use pab_protocol::{RelayAdminState, RelayHealth};
 use pab_server::{
-    PostgresStore,
+    PostgresStore, ControlPlane, PasswordPolicy,
     relay_cluster::{RelayClusterConfig, RelayNodeConfig},
 };
 use sqlx::PgPool;
@@ -144,7 +144,10 @@ async fn legacy_toml_normalizes_registered_identity_without_changing_secret_or_h
     let directory = legacy.resolved_directory(&store).await.unwrap().unwrap();
     assert_eq!(directory.nodes[0].node_id, "old-node");
     assert_eq!(directory.nodes[0].control_secret, legacy.control_secret);
-    assert_eq!(directory.nodes[0].capacity_mbps, 0);
+    assert_eq!(
+        directory.nodes[0].capacity_mbps,
+        pab_server::relay_cluster::default_capacity_mbps()
+    );
     store.configure_relay_cluster(&directory).await.unwrap();
     let old_rows: i64 =
         sqlx::query_scalar("SELECT count(*) FROM relay_nodes WHERE node_id='old-node'")
@@ -670,7 +673,7 @@ async fn maintenance_is_idempotent_bounded_and_abandoned_lock_is_recoverable(poo
         .await
         .unwrap();
     assert_eq!(again.id, first.id);
-    assert_eq!(again.phase, "ready");
+    assert_eq!(again.phase, "waiting", "elapsed time cannot prove node acknowledgement");
     assert_eq!(again.deadline_unix_ms, first.deadline_unix_ms);
     assert_eq!(again.remaining_capacity_mbps, Some(100));
     assert_eq!(again.actor, "maintenance-test");
@@ -1130,4 +1133,42 @@ async fn automation_management_requires_admin_bearer_and_never_accepts_cookie_fa
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["code"], "probe_endpoint_registered");
+}
+
+
+#[sqlx::test(migrations = "./migrations")]
+async fn node_control_requires_matching_ack_and_actual_zero_connections(pool: PgPool) {
+    use pab_protocol::RelayNodeControlAck;
+    let store=PostgresStore::from_pool(pool.clone());store.initialize_settings().await.unwrap();let config=config();store.configure_relay_cluster(&config).await.unwrap();
+    let control=ControlPlane::new(store.clone(),PasswordPolicy::default()).unwrap();let account=control.register_account("node-control-ack","isolated node control password").await.unwrap();
+    let instance=uuid::Uuid::new_v4();let boot=uuid::Uuid::new_v4();
+    for node in ["windows-a","linux-b"] {
+        store.register_relay_boot(node,boot,"test",true,&config,instance).await.unwrap();
+        store.heartbeat_relay(node,boot,true,&config).await.unwrap();store.heartbeat_relay(node,boot,true,&config).await.unwrap();
+    }
+    let disable=uuid::Uuid::new_v4();
+    let op=store.set_relay_state("windows-a",RelayAdminState::Disabled,disable,account.id.as_uuid(),false,30,15).await.unwrap();assert_eq!(op.phase,"waiting");
+    let snapshot=store.relay_node_control("windows-a",boot,instance,&config,None,4).await.unwrap();assert_eq!(snapshot.state,RelayAdminState::Disabled);
+    let mut ack=RelayNodeControlAck{operation_id:Some(disable),state:RelayAdminState::Disabled,accepting:false,forwarding:true};
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(disable).await.unwrap().phase,"waiting");
+    ack.forwarding=false;ack.operation_id=Some(uuid::Uuid::new_v4());
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(disable).await.unwrap().phase,"waiting");
+    ack.operation_id=Some(disable);
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),1).await.unwrap();assert_eq!(store.relay_maintenance_operation(disable).await.unwrap().phase,"waiting");
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(disable).await.unwrap().phase,"completed");
+    assert!(store.relay_budgets("windows-a",boot,&[account.id],&config).await.is_err());
+    let resume=uuid::Uuid::new_v4();store.set_relay_state("windows-a",RelayAdminState::Active,resume,account.id.as_uuid(),false,30,15).await.unwrap();
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(resume).await.unwrap().phase,"waiting");
+    ack=RelayNodeControlAck{operation_id:Some(resume),state:RelayAdminState::Active,accepting:true,forwarding:true};
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(resume).await.unwrap().phase,"completed");
+    let maintenance=uuid::Uuid::new_v4();store.set_relay_state("windows-a",RelayAdminState::Maintenance,maintenance,account.id.as_uuid(),false,30,15).await.unwrap();
+    assert!(store.relay_budgets("windows-a",boot,&[account.id],&config).await.is_ok(),"existing traffic retains budgets during maintenance grace");
+    sqlx::query("UPDATE relay_maintenance_operations SET deadline_at=clock_timestamp()-interval '1 second' WHERE id=$1").bind(maintenance).execute(&pool).await.unwrap();
+    assert!(store.relay_budgets("windows-a",boot,&[account.id],&config).await.is_err());
+    assert_eq!(store.relay_maintenance_operation(maintenance).await.unwrap().phase,"waiting");
+    ack=RelayNodeControlAck{operation_id:Some(maintenance),state:RelayAdminState::Maintenance,accepting:false,forwarding:false};
+    store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.unwrap();assert_eq!(store.relay_maintenance_operation(maintenance).await.unwrap().phase,"ready");
+    let replacement=uuid::Uuid::new_v4();store.retire_relay("windows-a",boot).await.unwrap();store.register_relay_boot("windows-a",replacement,"test",true,&config,instance).await.unwrap();
+    assert!(store.relay_node_control("windows-a",boot,instance,&config,Some(&ack),0).await.is_err());
+    assert_eq!(sqlx::query_scalar::<_,bool>("SELECT state_applied_boot_id IS NULL FROM relay_cluster_nodes WHERE node_id='windows-a'").fetch_one(&pool).await.unwrap(),true);
 }

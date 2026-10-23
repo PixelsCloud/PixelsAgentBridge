@@ -208,6 +208,13 @@ impl PabConnection {
                 .unwrap_or(ConnectionPath::Unknown),
         )
     }
+    /// QUIC's estimate for the currently selected path. This is round trip,
+    /// independent of video PTS and includes Relay transit when relayed.
+    pub fn selected_path_rtt(&self) -> Option<Duration> {
+        if self.inner.close_reason().is_some() { return None; }
+        self.inner.paths().iter().find(|path| path.is_selected())
+            .and_then(|path| self.inner.rtt(path.id()))
+    }
 
     pub async fn open_bi(&self, timeout: Duration) -> Result<PabBiStream, PabConnectionError> {
         let (send, receive) = tokio::time::timeout(timeout, self.inner.open_bi())

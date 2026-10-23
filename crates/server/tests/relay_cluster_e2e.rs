@@ -155,20 +155,44 @@ async fn large_transfer(a: &PabEndpoint, b: &PabEndpoint, count: usize) {
 
 #[sqlx::test(migrations = "./migrations")]
 async fn directory_and_budget_control_drive_real_relay_failover(pool: PgPool) {
-    cluster_failover(pool, false, false).await;
+    cluster_failover(pool, false, false, false).await;
 }
 
 #[sqlx::test(migrations = "./migrations")]
 async fn three_nodes_forward_and_fail_over_twice_without_overlapping_maintenance(pool: PgPool) {
-    cluster_failover(pool, true, false).await;
+    cluster_failover(pool, true, false, false).await;
 }
 
 #[sqlx::test(migrations = "./migrations")]
 async fn diagnostics_follow_real_relay_only_forwarding_and_disconnects(pool:PgPool) {
-    cluster_failover(pool,false,true).await;
+    cluster_failover(pool,false,true,false).await;
 }
 
-async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool) {
+#[sqlx::test(migrations = "./migrations")]
+async fn disable_closes_real_sockets_denies_reconnect_and_preserves_p2p(pool: PgPool) {
+    cluster_failover(pool,false,false,true).await;
+}
+
+async fn wait_operation(store:&PostgresStore, id:uuid::Uuid, phase:&str) {
+    tokio::time::timeout(Duration::from_secs(20),async {loop {
+        let operation=store.relay_maintenance_operation(id).await.unwrap();
+        if operation.phase==phase {break;}
+        assert_ne!(operation.phase,"failed","node operation failed: {:?}",operation);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }}).await.expect("node confirmation must arrive");
+}
+async fn set_web_state(client:&reqwest::Client,origin:&str,cookie:&str,node:&str,state:&str)->uuid::Uuid {
+    let id=uuid::Uuid::new_v4();let result=client.patch(format!("{origin}/api/web/relays/{node}/state")).header("Origin",origin).header("cookie",cookie).json(&serde_json::json!({"state":state,"operation_id":id})).send().await.unwrap();
+    assert!(result.status().is_success(),"state request: {:?}",result.text().await.unwrap());id
+}
+async fn direct_echo(client:&pab_transport::PabConnection,server:&pab_transport::PabConnection) {
+    assert_eq!(client.selected_path(),Some(ConnectionPath::Direct));
+    let send=async {let mut stream=client.open_bi(Duration::from_secs(5)).await.unwrap();stream.send_json(&"direct still works",Duration::from_secs(5)).await.unwrap();let answer:String=stream.receive_json(Duration::from_secs(5)).await.unwrap();assert_eq!(answer,"direct still works");};
+    let receive=async {let mut stream=server.accept_bi(Duration::from_secs(5)).await.unwrap();let data:String=stream.receive_json(Duration::from_secs(5)).await.unwrap();stream.send_json(&data,Duration::from_secs(5)).await.unwrap();};
+    tokio::join!(send,receive);
+}
+
+async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool, node_control_only:bool) {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let store = PostgresStore::from_pool(pool.clone());
     store.initialize_settings().await.unwrap();
@@ -177,7 +201,7 @@ async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool
         .register_account("cluster-e2e", "isolated test password long enough")
         .await
         .unwrap();
-    if diagnostics_only {pab_server::web::bootstrap_admin(&base,"cluster-e2e").await.unwrap();}
+    if diagnostics_only || node_control_only {pab_server::web::bootstrap_admin(&base,"cluster-e2e").await.unwrap();}
     let operator = SecretKey::from_bytes(&[211; 32]);
     let device = SecretKey::from_bytes(&[212; 32]);
     let device_id = DeviceId::new();
@@ -230,7 +254,7 @@ async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool
         heartbeat_seconds: 1,
         offline_seconds: 3,
         recovery_seconds: 0,
-        maintenance_seconds: 0,
+        maintenance_seconds: if node_control_only {2} else {0},
         nodes: vec![
             RelayNodeConfig {
                 node_id: "a".into(),
@@ -405,6 +429,39 @@ async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool
     wait_home(&a, &config.nodes[0].url).await;
     wait_home(&b, &config.nodes[0].url).await;
     echo(&a, &b).await;
+    if node_control_only {
+        let client=reqwest::Client::builder().no_proxy().add_root_certificate(reqwest::Certificate::from_pem(certified.cert.pem().as_bytes()).unwrap()).build().unwrap();
+        let origin=format!("https://localhost:{port}");
+        let login=client.post(format!("{origin}/api/web/session")).header("Origin",&origin).json(&serde_json::json!({"username":"cluster-e2e","password":"isolated test password long enough"})).send().await.unwrap();assert!(login.status().is_success());
+        let cookie=login.headers()["set-cookie"].to_str().unwrap().split(';').next().unwrap().to_owned();
+        let resumed=set_web_state(&client,&origin,&cookie,"b","active").await;wait_operation(&store,resumed,"completed").await;
+        // An independent real P2P connection keeps the original node as its seed.
+        let direct_operator=SecretKey::from_bytes(&[216;32]);let direct_device=SecretKey::from_bytes(&[217;32]);let direct_device_id=DeviceId::new();
+        sqlx::query("INSERT INTO devices(id,tenant_id,name,code) VALUES($1,$2,'direct node control fixture',619438179)").bind(direct_device_id.as_uuid()).bind(account.personal_tenant_id.as_uuid()).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,user_id) VALUES($1,$2,'user',$3)").bind(direct_operator.public().as_bytes().as_slice()).bind(account.personal_tenant_id.as_uuid()).bind(account.id.as_uuid()).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO endpoints(endpoint_key,tenant_id,owner_kind,device_id) VALUES($1,$2,'device',$3)").bind(direct_device.public().as_bytes().as_slice()).bind(account.personal_tenant_id.as_uuid()).bind(direct_device_id.as_uuid()).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO endpoint_user_contexts(endpoint_key,token_hash,revision) VALUES($1,$2,1)").bind(direct_operator.public().as_bytes().as_slice()).bind(&hash).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO device_connection_intents(operator_endpoint_key,device_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '5 minutes')").bind(direct_operator.public().as_bytes().as_slice()).bind(direct_device_id.as_uuid()).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE server_settings SET policy_revision=policy_revision+1").execute(&pool).await.unwrap();
+        let normal=|| PabEndpointConfig::new(vec![seed.clone()]).unwrap().with_extra_ca_certificates(vec![certified.cert.der().clone()]);
+        let direct_a=PabEndpoint::bind(normal(),direct_operator).await.unwrap();let direct_b=PabEndpoint::bind(normal(),direct_device).await.unwrap();
+        direct_a.wait_online(Duration::from_secs(10)).await.unwrap();direct_b.wait_online(Duration::from_secs(10)).await.unwrap();
+        let direct_address=PabEndpointAddress{relay_urls:vec![],direct_addresses:direct_b.address().ip_addrs().copied().collect()};assert!(!direct_address.direct_addresses.is_empty());
+        let (held_client,held_server)=tokio::join!(direct_a.connect(*direct_b.id().as_bytes(),&direct_address,Duration::from_secs(10)),direct_b.accept());let held_client=held_client.unwrap();let held_server=held_server.unwrap().unwrap();direct_echo(&held_client,&held_server).await;
+        let disabled=set_web_state(&client,&origin,&cookie,"a","disabled").await;wait_operation(&store,disabled,"completed").await;
+        let count:i64=sqlx::query_scalar("SELECT connections FROM relay_cluster_nodes WHERE node_id='a'").fetch_one(&pool).await.unwrap();assert_eq!(count,0,"all accepted Relay sockets must actually close");
+        let denied=PabEndpoint::bind(ep_config(),device.clone()).await.unwrap();assert!(denied.wait_online(Duration::from_secs(3)).await.is_err(),"a known identity cannot reconnect to a disabled node");denied.close().await;
+        direct_echo(&held_client,&held_server).await;
+        wait_home(&a,&config.nodes[1].url).await;wait_home(&b,&config.nodes[1].url).await;echo(&a,&b).await;
+        let resumed=set_web_state(&client,&origin,&cookie,"a","active").await;wait_operation(&store,resumed,"completed").await;
+        let accepted=PabEndpoint::bind(ep_config(),device.clone()).await.unwrap();accepted.wait_online(Duration::from_secs(10)).await.unwrap();
+        let maintenance=set_web_state(&client,&origin,&cookie,"a","maintenance").await;wait_operation(&store,maintenance,"ready").await;
+        assert_eq!(sqlx::query_scalar::<_,i64>("SELECT connections FROM relay_cluster_nodes WHERE node_id='a'").fetch_one(&pool).await.unwrap(),0);
+        let denied=PabEndpoint::bind(ep_config(),device.clone()).await.unwrap();assert!(denied.wait_online(Duration::from_secs(3)).await.is_err());denied.close().await;
+        direct_echo(&held_client,&held_server).await;
+        accepted.close().await;held_client.close(b"node control test complete");held_server.close(b"node control test complete");direct_a.close().await;direct_b.close().await;
+        a.close().await;b.close().await;operator_control.shutdown().await.unwrap();device_control.shutdown().await.unwrap();network_task.abort();relay_a.shutdown().await.unwrap();relay_b.take().unwrap().shutdown().await.unwrap();handle.shutdown();server.await.unwrap();return;
+    }
     if diagnostics_only {
         let client=reqwest::Client::builder().no_proxy().add_root_certificate(reqwest::Certificate::from_pem(certified.cert.pem().as_bytes()).unwrap()).build().unwrap();
         let origin=format!("https://localhost:{port}");

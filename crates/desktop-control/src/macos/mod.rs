@@ -287,7 +287,40 @@ fn set_geometry(window: &Owned, p: Point, s: Size) -> Result<(), String> {
     let position = Owned::new(unsafe { AXValueCreate(1, (&p as *const Point).cast()) })?;
     let size = Owned::new(unsafe { AXValueCreate(2, (&s as *const Size).cast()) })?;
     window.set("AXPosition", position.0)?;
-    window.set("AXSize", size.0)
+    window.set("AXSize", size.0)?;
+    // AppKit may constrain the first move using the old window size. Position
+    // once more after resizing; the caller still verifies the exact final frame.
+    window.set("AXPosition", position.0)
+}
+
+fn maximize_geometry(window: &Owned) -> Result<(Point, Size), String> {
+    use crate::macos_window_geometry::{Rect, maximize_rect};
+    let (position, size) = geometry(window)?;
+    let screens = dispatch2::run_on_main(|mtm| {
+        let rect = |r: objc2_foundation::NSRect| Rect {
+            x: r.origin.x,
+            y: r.origin.y,
+            width: r.size.width,
+            height: r.size.height,
+        };
+        objc2_app_kit::NSScreen::screens(mtm)
+            .iter()
+            .map(|screen| (rect(screen.frame()), rect(screen.visibleFrame())))
+            .collect::<Vec<_>>()
+    });
+    let rect = maximize_rect(
+        Rect {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+        },
+        &screens,
+    )?;
+    Ok((
+        Point { x: rect.x, y: rect.y },
+        Size { width: rect.width, height: rect.height },
+    ))
 }
 fn matches_geometry(a: (Point, Size), b: (Point, Size)) -> bool {
     [
@@ -423,6 +456,20 @@ fn is_focused(w: &Window) -> Result<bool, String> {
 pub fn focused(id: u32) -> Result<bool, String> {
     crate::on_input_thread(|| focused_on_main(id))
 }
+pub fn maximized(id: u32) -> Result<bool, String> {
+    crate::on_input_thread(|| {
+        let windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
+        let w = windows
+            .values()
+            .find(|w| w.id == id)
+            .ok_or("stale window reference")?;
+        present(w)?;
+        Ok(matches_geometry(
+            geometry(&w.element)?,
+            maximize_geometry(&w.element)?,
+        ))
+    })
+}
 fn focused_on_main(id: u32) -> Result<bool, String> {
     let windows = WINDOWS.lock().map_err(|_| "window registry unavailable")?;
     is_focused(
@@ -486,25 +533,11 @@ pub fn act(
                 w.element.attribute("AXCloseButton")?.action("AXPress")?
             }
             Some(WindowControlAction::Maximize) => {
-                let window = xcap::Window::all()
-                    .map_err(|e| e.to_string())?
-                    .into_iter()
-                    .find(|v| v.id().ok() == Some(id))
-                    .ok_or("window unavailable")?;
-                let monitor = window.current_monitor().map_err(|e| e.to_string())?;
-                let rect = (
-                    Point {
-                        x: monitor.x().map_err(|e| e.to_string())? as f64,
-                        y: monitor.y().map_err(|e| e.to_string())? as f64,
-                    },
-                    Size {
-                        width: monitor.width().map_err(|e| e.to_string())? as f64,
-                        height: monitor.height().map_err(|e| e.to_string())? as f64,
-                    },
-                );
+                let rect = maximize_geometry(&w.element)?;
                 if w.restore.is_none() {
                     w.restore = Some(geometry(&w.element)?);
                 }
+                w.element.set("AXMinimized", unsafe { kCFBooleanFalse })?;
                 set_geometry(&w.element, rect.0, rect.1)?;
                 expected_rect = Some(rect);
             }

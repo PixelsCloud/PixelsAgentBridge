@@ -147,6 +147,8 @@ def main():
     parser.add_argument('--notes-en', required=True)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--allow-dirty', action='store_true', help='For release rehearsals only')
+    parser.add_argument('--prepare-only', action='store_true', help='Build a candidate without uploading; run smoke before --resume')
+    parser.add_argument('--smoke-report', type=Path, help='Matching smoke/runs/<id>/report.json required before publication')
     parser.add_argument('--headless-package', type=Path, help='Verified backend archive for the Linux desktop build')
     parser.add_argument('--headless-sha256', help='Expected SHA-256 of that archive')
     args = parser.parse_args()
@@ -169,7 +171,7 @@ def main():
         parser.error('PAB_MACOS_NOTARY_PROFILE requires PAB_MACOS_INSTALLER_IDENTITY')
     commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if not args.allow_dirty and subprocess.check_output(
-        ['git', 'status', '--porcelain', '--untracked-files=no'], cwd=ROOT
+        ['git', 'status', '--porcelain', '--untracked-files=no', '--', '.', ':!build-version.json'], cwd=ROOT
     ).strip():
         parser.error('Commit tracked changes before publishing, or use --allow-dirty for a rehearsal')
     state_path = ROOT / '.build' / f'release-{args.platform}-{arch}.json'
@@ -207,6 +209,18 @@ def main():
         state['phase'] = 'built'
         write_state(state_path, state)
     path, size, hash_value = package_info(args.platform, arch, version)
+    if args.prepare_only:
+        if state['phase'] != 'built':
+            raise RuntimeError('--prepare-only requires a built, not uploaded candidate')
+        print(f'Candidate ready: {path}. Run smoke/run.py, then --resume --smoke-report REPORT.')
+        return
+    if state['phase'] != 'published':
+        if not args.smoke_report:
+            raise RuntimeError('Publication blocked: run release smoke for this candidate and resume with --smoke-report')
+        sys.path.insert(0, str(ROOT))
+        from smoke.run import validate_release_report
+        validate_release_report(args.smoke_report, platform=args.platform, arch=arch, artifact=path,
+                                version=version, commit=state['commit'])
     signature = b64encode(private.sign(canonical(args.platform, arch, version, path.name, size, hash_value))).decode()
     if state['phase'] == 'built':
         created = request_json(base, '/api/admin/upload-sessions', token=token, body={

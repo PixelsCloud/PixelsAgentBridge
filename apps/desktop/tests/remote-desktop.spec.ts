@@ -2,6 +2,45 @@ import { test, expect } from "@playwright/test";
 
 const viewer = "http://127.0.0.1:1429/tests/remote-desktop.html";
 
+for (const language of ["en", "zh-CN"]) test(`pipeline measurements update without restarting video and reject obsolete generations (${language})`, async ({ page }) => {
+  await page.goto(viewer + `?language=${language}`);
+  await page.getByRole("button", { name: language === "en" ? "Debug information" : "调试信息", exact: true }).click();
+  const payload = {
+    session_id: "viewer-session-fixture", generation: 1, visible: true, network_rtt_ms: 23.25,
+    connection_path: "relay", remote_age_ms: 10,
+    local: { received_frame_id: 32, submitted_frame_id: 32, presented_frame_id: 30,
+      receive_fps_milli: 15000, present_fps_milli: 14000, bitrate_bps: 2500000,
+      last_received_ms: 3, last_presented_ms: 80, pending_frames: 2, oldest_pending_ms: 81,
+      submit_last_us: 1250, receive_to_present_last_us: 15600, stage: "presentation" },
+    remote: { stage: "capture", stage_age_ms: 2, produced_frames: 33, sent_frame_id: 33,
+      presented_frame_id: 30, capture: { wait_us: 15000, encode_us: 3200 },
+      source_last_us: 20000, send_last_us: 500, presentation_ack_last_us: 35000, oldest_unpresented_ms: 81 },
+  };
+  await page.evaluate(value => (window as any).fixture.performance(value), payload);
+  const panel = page.getByRole("complementary");
+  await expect(panel).toContainText("15.0 / 14.0 FPS · 2.50 Mbps");
+  await expect(panel).toContainText("15.0 ms / 3.2 ms");
+  await expect(panel).toContainText("23.3 ms / 0.5 ms");
+  await expect(panel).toContainText("32 / 32 / 30");
+  await page.evaluate(value => (window as any).fixture.performance(value), { ...payload, generation: 99,
+    local: { ...payload.local, received_frame_id: 999 } });
+  await expect(panel).not.toContainText("999");
+  const calls = await page.evaluate(() => (window as any).fixture.calls);
+  expect(calls.filter((call: any) => call.command === "desktop_viewer_control")).toEqual([]);
+  const overlay = calls.filter((call: any) => call.command === "desktop_viewer_overlay").at(-1).args.text;
+  expect(new TextEncoder().encode(overlay).length).toBeLessThanOrEqual(2048);
+  expect(overlay).toContain("32 / 32 / 30");
+  await page.evaluate(value => (window as any).fixture.performance(value), { ...payload, remote_age_ms: 10000 });
+  await expect(panel).not.toContainText("15.0 ms / 3.2 ms");
+  await expect(panel).toContainText("1.3 ms / 15.6 ms");
+  await page.getByRole("button", { name: language === "en" ? "Debug information" : "调试信息", exact: true }).click();
+  await expect(panel).toBeHidden();
+  const overlayCount = await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "desktop_viewer_overlay").length);
+  await page.evaluate(value => (window as any).fixture.performance(value), payload);
+  await expect(page.locator(".remote-desktop-statistics")).toContainText("15.0 ms / 3.2 ms");
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "desktop_viewer_overlay").length)).toBe(overlayCount);
+});
+
 test("text clipboard sync toggles independently without restarting video or input", async ({ page }) => {
   await page.goto(viewer);
   const toggle = page.getByRole("button", { name: "Disable text clipboard sync", exact: true });

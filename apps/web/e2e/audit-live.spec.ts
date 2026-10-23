@@ -18,7 +18,7 @@ test('real HTTPS audit freezes a filtered view, exports it, and refreshes later 
   try {
     expect((await admin.post('/api/web/register', { data: { username: adminName, password } })).ok()).toBeTruthy();
     const created = await user.post('/api/web/register', { data: { username, password } }); expect(created.ok()).toBeTruthy(); const account = await created.json();
-    execFileSync(path.join(path.dirname(config), 'pab-server.exe'), ['web-admin', adminName, '--config', config], { stdio: 'pipe' });
+    execFileSync(isolatedFixture().executable, ['web-admin', adminName, '--config', config], { stdio: 'pipe' });
     const route = `/api/web/accounts/${account.id}/traffic`;
     const first = await admin.put(route, { data: { mbps: 10 } }); expect(first.ok()).toBeTruthy(); const requestId = first.headers()['x-pixels-request-id']; expect(requestId).toMatch(/^[0-9a-f-]{36}$/);
     await page.context().addCookies((await admin.storageState()).cookies);

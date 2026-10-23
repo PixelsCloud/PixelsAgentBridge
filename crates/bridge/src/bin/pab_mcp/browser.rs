@@ -89,7 +89,7 @@ fn fields(action: BrowserAction) -> (Value, Vec<&'static str>, &'static str) {
         FillForm => (
             json!({"fields":{"type":"array","minItems":1,"maxItems":20,"items":{"type":"object","properties":{"name":string(256),"type":{"type":"string","enum":["textbox","checkbox","radio","combobox","slider"]},"target":string(256),"value":{"type":"string","maxLength":4096}},"required":["name","type","target","value"],"additionalProperties":false}}}),
             vec!["fields"],
-            "Fill several normal fields in order; partial effects are never replayed automatically. Use user handoff for passwords, verification codes, and other sign-in secrets.",
+            "Fill several normal fields in order; partial effects are never replayed automatically. A combobox field value is its visible option label (case-sensitive), not the HTML option value; pab_browser_select_option accepts option values. Checkbox/radio values are strings true or false. Use user handoff for passwords, verification codes, and other sign-in secrets.",
         ),
         PressKey => (
             json!({"key":string(128)}),

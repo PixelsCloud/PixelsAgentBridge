@@ -12,7 +12,7 @@ use support::{Client, stop};
 // implementation. Adding a tool still requires an explicit coverage entry.
 fn expected_tool_count() -> usize {
     let coverage: Value =
-        serde_json::from_str(include_str!("../../../acceptance/tool-coverage.json")).unwrap();
+        serde_json::from_str(include_str!("../../../smoke/tool-coverage.json")).unwrap();
     coverage["tools"].as_object().unwrap().len()
 }
 
@@ -75,7 +75,7 @@ async fn registered_catalog_has_coverage_and_exports_real_schemas() {
     .await;
     let listed = client.list_all_tools().await.unwrap();
     let coverage: Value =
-        serde_json::from_str(include_str!("../../../acceptance/tool-coverage.json")).unwrap();
+        serde_json::from_str(include_str!("../../../smoke/tool-coverage.json")).unwrap();
     let expected: std::collections::BTreeSet<_> = coverage["tools"]
         .as_object()
         .unwrap()

@@ -1,0 +1,16 @@
+# Copy only the devices needed by the selected live runner into smoke/local/.
+# Pair through the normal application first. These are illustrative device codes.
+[[device]]
+name = "Windows test host"
+code = "123456789"
+os = "windows"
+# Required by live_browser.py: exact account from pab_list_execution_contexts.
+user = 'TEST-PC\smoke'
+
+[[device]]
+name = "Mac test host"
+code = "987654321"
+os = "macos"
+user = "smoke"
+# Optional for live_system.py; all sources come from the target inventory.
+log_source = "unified:local"

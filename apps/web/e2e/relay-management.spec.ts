@@ -386,3 +386,14 @@ test('failed bandwidth saves remain editable and show the error', async ({ page 
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
   await expect(page.getByRole('dialog').getByRole('spinbutton')).toBeEnabled();
 });
+
+
+test('disabled nodes keep real counts until confirmed and hide stale counts when offline', async ({ page }) => {
+  await fixture(page, { telemetry: true });
+  let applied=false;let online=true;
+  await page.route('**/api/web/relays?*',route=>route.fulfill({json:{mode:'cluster',items:[{id:'relay-a',admin_state:'disabled',operation_id:'00000000-0000-4000-8000-000000000001',state_applied:applied,state_drained:applied,node_control_version:1,online,health:online?'healthy':'offline',configured:true,capacity_mbps:200,capacity_mode:'configured',connections_exact:applied?'0':'6',telemetry_current:online,sample_current_instance:true}],total:1,page:1,page_size:20}}));
+  await page.goto('/relay');const row=page.locator('.ant-table-tbody>.ant-table-row');
+  await expect(row).toContainText('Disable pending confirmation');await expect(row.locator('td').nth(5)).toHaveText('6');
+  applied=true;await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(row).not.toContainText('Disable pending confirmation');await expect(row.locator('td').nth(5)).toHaveText('0');
+  online=false;applied=false;await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(row.locator('td').nth(5)).toHaveText('Unknown');
+});

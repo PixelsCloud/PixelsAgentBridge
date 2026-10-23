@@ -3,6 +3,29 @@ use crate::UserId;
 use serde::{Deserialize, Serialize};
 
 pub const RELAY_CLUSTER_SCHEMA_VERSION: u16 = 1;
+pub const RELAY_NODE_CONTROL_VERSION: u16 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelayNodeControl {
+    pub node_id: String,
+    pub boot_id: uuid::Uuid,
+    pub revision: u64,
+    pub operation_id: Option<uuid::Uuid>,
+    pub state: RelayAdminState,
+    pub issued_at_unix_ms: i64,
+    pub expires_at_unix_ms: i64,
+    pub drain_at_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelayNodeControlAck {
+    pub operation_id: Option<uuid::Uuid>,
+    pub state: RelayAdminState,
+    pub accepting: bool,
+    pub forwarding: bool,
+}
 pub const RELAY_DIRECTORY_SCHEMA_VERSION: u16 = 2;
 pub const MAX_RELAY_NODES: usize = 64;
 pub const MAX_RELAY_BUDGET_DEMANDS: usize = 256;

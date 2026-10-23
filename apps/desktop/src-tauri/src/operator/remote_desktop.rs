@@ -47,8 +47,20 @@ pub struct ViewerStatus {
     clipboard_state: &'static str,
     decoder: Option<&'static str>,
     quality: Option<pab_protocol::DesktopQualitySnapshot>,
+    performance: Option<ViewerPerformance>,
     remote_os: Option<pab_protocol::OsFamily>,
     connection_path: Option<&'static str>,
+}
+#[derive(Clone, Serialize)]
+struct ViewerPerformance {
+    session_id: RequestId,
+    generation: u64,
+    local: pab_remote_desktop::ViewerDiagnosticsSnapshot,
+    remote: Option<pab_protocol::DesktopDiagnosticsSnapshot>,
+    remote_age_ms: Option<u64>,
+    network_rtt_ms: Option<f64>,
+    connection_path: Option<&'static str>,
+    visible: bool,
 }
 enum Command {
     Screen(String),
@@ -494,6 +506,7 @@ fn publish(
         clipboard_state: if owner.clipboard_requested.load(Ordering::Acquire) { "waiting" } else { "disabled" },
         decoder: None,
         quality: None,
+        performance: None,
         remote_os: owner.status.borrow().remote_os,
         connection_path: owner.status.borrow().connection_path,
     };
@@ -835,8 +848,65 @@ async fn stream(
         let mut presentations = viewer.presentations();
         let acknowledgements = session.presentation_control();
         let mut quality = session.quality_control();
+        let mut diagnostics = quality.clone();
+        let network = quality.clone();
+        let counters = std::sync::Mutex::new(pab_remote_desktop::ViewerDiagnostics::new(Instant::now()));
+        let remote = std::sync::Mutex::new(None::<(pab_protocol::DesktopDiagnosticsSnapshot, Instant)>);
+        let diagnostics_work = async {
+            let mut timer = tokio::time::interval(Duration::from_secs(2));
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                timer.tick().await;
+                match diagnostics.diagnostics().await {
+                    Ok(snapshot) => *remote.lock().unwrap() = Some((snapshot, Instant::now())),
+                    Err(error) => {
+                        // Unsupported old peers keep their original video and
+                        // quality streams. Do not retry or restart media here.
+                        tracing::debug!(%error, "remote desktop pipeline diagnostics unavailable");
+                        break;
+                    }
+                }
+            }
+            std::future::pending::<()>().await;
+        };
+        let performance_work = async {
+            let mut timer = tokio::time::interval(Duration::from_secs(2));
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut last_log = Instant::now();
+            let mut was_stalled = false;
+            loop {
+                timer.tick().await;
+                let now = Instant::now();
+                let local = counters.lock().unwrap().snapshot(now);
+                let (host, age) = remote.lock().unwrap().as_ref().map(|(snapshot, at)|
+                    (Some(snapshot.clone()), Some(now.saturating_duration_since(*at).as_millis().min(u64::MAX as u128) as u64)))
+                    .unwrap_or((None, None));
+                let path = match network.connection_path() {
+                    Some(pab_bridge::ConnectionPath::Direct) => Some("p2p"),
+                    Some(pab_bridge::ConnectionPath::Relay) => Some("relay"),
+                    _ => None,
+                };
+                let snapshot = ViewerPerformance { session_id: input_generation.session,
+                    generation: input_generation.generation, local, remote: host, remote_age_ms: age,
+                    network_rtt_ms: network.network_rtt().map(|rtt| rtt.as_secs_f64() * 1000.0),
+                    connection_path: path, visible: viewer_visible(window) };
+                let stalled = snapshot.visible && snapshot.local.oldest_pending_ms.is_some_and(|age| age >= 2000);
+                if stalled != was_stalled || last_log.elapsed() >= Duration::from_secs(30) {
+                    tracing::info!(window = window.label(), stalled,
+                        pipeline = %serde_json::to_string(&snapshot).unwrap_or_default(),
+                        "remote desktop pipeline progress");
+                    last_log = now; was_stalled = stalled;
+                }
+                owner.status.send_modify(|status| {
+                    status.connection_path = path;
+                    status.performance = Some(snapshot.clone());
+                });
+                let _ = window.emit_to(window.label(), "desktop-viewer-performance", snapshot);
+            }
+        };
         let quality_work = async {
             let mut timer = tokio::time::interval(Duration::from_secs(2));
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 timer.tick().await;
                 let snapshot = match quality.snapshot().await {
@@ -872,6 +942,8 @@ async fn stream(
                         .next_frame_when_changed()
                         .await
                         .map_err(StreamFailure::from)?;
+                    let received = Instant::now();
+                    counters.lock().unwrap().received(frame.header.frame_id, frame.bytes.len(), received);
                     recovery::submit_with_visible_budget(
                         viewer.submit(&frame),
                         || viewer_visible(window),
@@ -880,6 +952,7 @@ async fn stream(
                     .await
                     .ok_or_else(|| StreamFailure::renderer("native decoder submission timed out"))?
                     .map_err(StreamFailure::renderer)?;
+                    counters.lock().unwrap().submitted(frame.header.frame_id, received.elapsed());
                 }
                 #[allow(unreachable_code)]
                 Ok::<(), StreamFailure>(())
@@ -890,6 +963,7 @@ async fn stream(
                         .next()
                         .await
                         .map_err(StreamFailure::renderer)?;
+                    counters.lock().unwrap().presented(header.frame_id, Instant::now());
                     acknowledgements
                         .report_presented(&header)
                         .map_err(StreamFailure::from)?;
@@ -990,8 +1064,17 @@ async fn stream(
             result = interaction => result,
             result = cursor_work => result.map(|_| None),
             _ = quality_work => unreachable!("quality polling does not complete the viewer"),
+            _ = diagnostics_work => unreachable!("diagnostics polling does not complete the viewer"),
+            _ = performance_work => unreachable!("performance polling does not complete the viewer"),
             _ = clipboard_work => unreachable!("clipboard polling does not complete the viewer"),
         };
+        if let Err(error) = &outcome {
+            tracing::warn!(window = window.label(), error = %error.message,
+                session = %input_generation.session, generation = input_generation.generation,
+                local = %serde_json::to_string(&counters.lock().unwrap().snapshot(Instant::now())).unwrap_or_default(),
+                remote = ?remote.lock().unwrap().as_ref().map(|(snapshot, at)| (snapshot, at.elapsed().as_millis())),
+                "remote desktop pipeline ended");
+        }
         drop(viewer);
         let command = match outcome {
             Ok(command) => command,

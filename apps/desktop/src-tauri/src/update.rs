@@ -248,7 +248,7 @@ pub fn start_background_checks(app: AppHandle, state: UpdateState) {
         tokio::time::sleep(Duration::from_secs(15)).await;
         loop {
             if let Ok(info) = query(&state).await { let _ = app.emit("update-status-changed", info); }
-            tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
+            tokio::time::sleep(Duration::from_secs(2 * 3600)).await;
         }
     });
 }

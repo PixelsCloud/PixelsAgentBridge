@@ -25,6 +25,34 @@ pub struct RemoteDesktopQualityControl {
     ended: watch::Receiver<bool>,
 }
 impl RemoteDesktopQualityControl {
+    pub fn network_rtt(&self) -> Option<Duration> { self.connection.selected_path_rtt() }
+    pub fn connection_path(&self) -> Option<pab_transport::ConnectionPath> { self.connection.selected_path() }
+    /// Optional, generation-bound query on its own stream. Old media/quality
+    /// contracts remain unchanged and failure cannot cancel a video read.
+    pub async fn diagnostics(&mut self) -> Result<DesktopDiagnosticsSnapshot> {
+        if *self.ended.borrow() || self.ended.has_changed().is_err() { return Err(DesktopError::Closed); }
+        let timeout = Duration::from_secs(3);
+        let query = async {
+            let mut stream = stream(&self.connection, RemoteDesktopRequest::Diagnostics {
+                version: DESKTOP_DIAGNOSTICS_VERSION, session_id: self.config.session_id,
+                generation: self.config.generation,
+            }, timeout).await?;
+            let snapshot = match response(&mut stream, timeout).await? {
+                RemoteDesktopReply::Diagnostics { snapshot } => snapshot,
+                _ => return Err(DesktopError::Protocol("unexpected desktop diagnostics reply")),
+            };
+            snapshot.validate().map_err(DesktopError::Protocol)?;
+            if snapshot.session_id != self.config.session_id || snapshot.generation != self.config.generation {
+                return Err(DesktopError::Protocol("obsolete desktop diagnostics reply"));
+            }
+            Ok(snapshot)
+        };
+        tokio::select! {
+            biased;
+            _ = self.ended.changed() => Err(DesktopError::Closed),
+            result = query => result,
+        }
+    }
     pub async fn snapshot(&mut self) -> Result<DesktopQualitySnapshot> {
         if *self.ended.borrow() || self.ended.has_changed().is_err() { return Err(DesktopError::Closed); }
         let timeout = Duration::from_secs(3);
@@ -635,6 +663,19 @@ async fn control_worker(
         let fatal = result.as_ref().is_err_and(|error| {
             response.is_none() || !matches!(error, DesktopError::Rejected { .. })
         });
+        if fatal {
+            if let Err(error) = &result {
+                // Input values are deliberately excluded from diagnostics.
+                let action = match &request.command {
+                    DesktopControlCommand::Heartbeat => "heartbeat",
+                    DesktopControlCommand::Presented { .. } => "presentation_ack",
+                    DesktopControlCommand::SelectScreen { .. } => "select_screen",
+                    DesktopControlCommand::SetInput { .. } => "set_input",
+                    DesktopControlCommand::Input { .. } => "input",
+                };
+                tracing::warn!(sequence, action, %error, "remote desktop control channel failed");
+            }
+        }
         if let Some(response) = response {
             let _ = response.send(result);
         }

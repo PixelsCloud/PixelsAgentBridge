@@ -1,0 +1,44 @@
+# Copy to smoke/local/lab.toml; all paths are relative to the repository root.
+schema_version = 1
+
+[execution]
+# Sequential suites; nested native builds use one job. Account for other sessions.
+jobs = 2
+timeout_seconds = 1800
+
+[web]
+# Only an isolated loopback test service may be used by the automated UI suite.
+isolated = true
+url = "https://127.0.0.1:38623"
+fixture_config = "smoke/local/web-RUN_ID/pab-server.toml"
+browser = "chrome"
+
+[devices]
+# Descriptive inventory only: the runner never installs/restarts these implicitly.
+android_serial = "YOUR_TEST_DEVICE_SERIAL"
+windows = "test-windows"
+macos = "test-macos"
+linux = "test-linux"
+
+[relay]
+nodes = ["test-relay-a", "test-relay-b"]
+
+[native_executor]
+# Prepared native host only. Windows identity tests require a privileged service
+# and an interactive session; Unix requires a dedicated test UID. Docker must
+# already contain debian:bookworm-slim. Platform GUI/keychain prerequisites also apply.
+enabled = false
+worker = "target/debug/pab-executor.exe"
+process_fixture = "target/debug/examples/process_fixture.exe"
+user = "YOUR_TEST_SESSION_ID_OR_UID"
+
+[android]
+# Opt in only after preparing a test phone; connection is temporarily switched and restored.
+enabled = false
+serial = "YOUR_TEST_DEVICE_SERIAL"
+apk = "apps/android/app/build/outputs/apk/debug/app-debug.apk"
+mcp = "target/debug/pab-mcp.exe"
+fixture = "target/debug/examples/remote-fixture.exe"
+
+# Do not put passwords, tokens, private keys or production database URLs here.
+# Existing test-specific private configuration stays in smoke/local/.

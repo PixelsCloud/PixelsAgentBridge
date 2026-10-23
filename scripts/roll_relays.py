@@ -367,6 +367,15 @@ def bounded_wait(predicate, seconds, label):
         time.sleep(.5)
 
 
+def wait_activation(api, operation_id, timeout):
+    def confirmed():
+        operation = api.request('GET', '/api/admin/relay-operations/' + operation_id)
+        if operation.get('phase') == 'failed' or operation.get('error_code') == 'superseded':
+            raise RuntimeError('Relay activation was not confirmed: ' + str(operation.get('error_code')))
+        return operation.get('phase') == 'completed'
+    bounded_wait(confirmed, timeout, 'Relay activation acknowledgement expired')
+
+
 def run_rollout(config, base, api, journal, save):
     health_timeout = int(config.get('rollout', {}).get('health_timeout_seconds', 60))
     observe = int(config.get('rollout', {}).get('observation_seconds', 5))
@@ -428,12 +437,20 @@ def run_rollout(config, base, api, journal, save):
                     if entry['phase'] == 'verifying':
                         bounded_wait(lambda: (row if row and row.get('health') == 'healthy' else None)
                             if (row := api.nodes().get(node_id)) else None, health_timeout, 'New Relay did not become healthy')
-                        probe(config, base, api, node_id)
                         entry['phase'] = 'activating'
                         entry['activate_id'] = str(uuid.uuid4())
                         save()
                     if entry['phase'] == 'activating':
                         api.request('PATCH', f'/api/admin/relays/{node_id}/state', {'state': 'active', 'operation_id': entry['activate_id']})
+                        wait_activation(api, entry['activate_id'], health_timeout)
+                        entry['phase'] = 'probing'
+                        save()
+                    if entry['phase'] == 'probing':
+                        # Maintenance intentionally rejects new Relay connections.
+                        probe(config, base, api, node_id)
+                        entry['phase'] = 'observing'
+                        save()
+                    if entry['phase'] == 'observing':
                         deadline = time.monotonic() + observe
                         while time.monotonic() < deadline:
                             row = api.nodes().get(node_id)
@@ -493,11 +510,12 @@ def recover(config, base, api, journal, save):
                 raise RuntimeError('Rollback binary could not be verified; node remains in maintenance')
             bounded_wait(lambda: (api.nodes().get(node['node_id']) or {}).get('health') == 'healthy',
                 int(config.get('rollout', {}).get('health_timeout_seconds', 60)), 'Rolled back Relay did not become healthy')
-            # Conservative recovery: require a new forwarding probe before making it selectable.
-            probe(config, base, api, node['node_id'])
+            # A maintained node rejects the probe until activation is confirmed.
             activate = entry.setdefault('restore_activate_id', str(uuid.uuid4()))
             save()
             api.request('PATCH', f"/api/admin/relays/{node['node_id']}/state", {'state': 'active', 'operation_id': activate})
+            wait_activation(api, activate, int(config.get('rollout', {}).get('health_timeout_seconds', 60)))
+            probe(config, base, api, node['node_id'])
             entry['phase'] = 'rolled_back'
             save()
             raise RuntimeError('Previous version restored and verified; rollout stopped before the next node')

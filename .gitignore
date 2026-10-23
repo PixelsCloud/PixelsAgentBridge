@@ -59,7 +59,6 @@ AGENTS.md
 # Run evidence is local; deterministic fixtures and the test contract are source.
 /acceptance/*
 !/acceptance/fixtures/
-!/acceptance/tool-coverage.json
 /experiments/*
 !/experiments/remote-desktop/
 /experiments/remote-desktop/*

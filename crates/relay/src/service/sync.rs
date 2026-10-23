@@ -32,6 +32,7 @@ pub async fn connect_and_sync(
     if let Some(boot) = settings.boot_id {
         let (_, capacity) = client.cluster_hello(&settings.node_id, boot).await?;
         runtime.set_node_capacity(capacity);
+        client.sync_node_control(boot,runtime,settings.metrics.as_deref()).await?;
     }
     client.sync_policy(runtime).await?;
     // Report the version actually applied, so Server can distinguish offered/applied.
@@ -58,6 +59,10 @@ pub fn spawn_refresh_loop(
         loop {
             let on_demand = tokio::select! {
                 _ = budgets.tick(), if settings.boot_id.is_some()=>{
+                    if let Err(error)=client.sync_node_control(settings.boot_id.unwrap(),&runtime,settings.metrics.as_deref()).await {
+                        tracing::warn!(%error,"Relay node state could not be refreshed");
+                        client=reconnect(&settings,connector.clone(),&runtime).await;continue;
+                    }
                     if let Err(error)=client.sync_budgets(settings.boot_id.unwrap(),&runtime).await {
                         tracing::debug!(%error,"Relay budget not available yet");
                         if !matches!(error,RelayControlClientError::Server{..}){

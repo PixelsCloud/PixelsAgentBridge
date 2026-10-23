@@ -21,6 +21,7 @@ pub fn check_relay_config(config: &RelayServiceConfig) -> ServiceResult<()> {
 pub struct RunningRelayService {
     server: Server,
     refresh: tokio::task::JoinHandle<()>,
+    drain: tokio::task::JoinHandle<()>,
     usage: crate::usage::UsageWorker,
     retirement: Option<(PolicySyncSettings, tokio_tungstenite::Connector)>,
 }
@@ -41,6 +42,8 @@ impl RunningRelayService {
     pub async fn shutdown(self) -> ServiceResult<()> {
         self.refresh.abort();
         let _ = self.refresh.await;
+        self.drain.abort();
+        let _ = self.drain.await;
         self.server.shutdown().await?;
         retire(self.retirement).await;
         self.usage.shutdown().await;
@@ -106,6 +109,19 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     let retirement = sync_settings
         .boot_id
         .map(|_| (sync_settings.clone(), connector.clone()));
+    let clients = server.relay_service().expect("Relay service").clients().clone();
+    let drain_runtime = runtime.clone();
+    let drain = tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_millis(250));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tick.tick().await;
+            if !drain_runtime.node_flags().1 {
+                // Repeating also catches an admission that raced the state change.
+                clients.shutdown().await;
+            }
+        }
+    });
     let refresh = spawn_refresh_loop(client, sync_settings, connector, runtime);
     println!(
         "PAB Relay ready: https={https_addr} quic={quic_addr} captive_loopback={captive_addr}"
@@ -113,6 +129,7 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     Ok(RunningRelayService {
         server,
         refresh,
+        drain,
         usage,
         retirement,
     })
@@ -137,6 +154,8 @@ pub async fn run_relay_service_until(
     };
     running.refresh.abort();
     let _ = running.refresh.await;
+    running.drain.abort();
+    let _ = running.drain.await;
     match stop {
         Stop::Signal => {
             running.server.shutdown().await?;

@@ -158,24 +158,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", default="emulator-5554")
     parser.add_argument("--relay-only", action="store_true")
+    parser.add_argument("--output-root", type=Path, default=ROOT / ".build/android/remote")
+    parser.add_argument("--mcp-executable", type=Path)
+    parser.add_argument("--fixture-executable", type=Path)
+    parser.add_argument("--apk", type=Path, default=ROOT / "apps/android/app/build/outputs/apk/debug/app-debug.apk")
     parser.add_argument("--capture-consent-tap", nargs=2, type=int, metavar=("X", "Y"),
         help="Click the actual Android 9 system consent dialog at these emulator-specific coordinates")
     options = parser.parse_args()
     sdk = int(adb(options.serial, "shell", "getprop", "ro.build.version.sdk").strip())
-    apk = ROOT / "apps/android/app/build/outputs/apk/debug/app-debug.apk"
+    apk = options.apk.resolve()
     apk_hash = hashlib.sha256(apk.read_bytes()).hexdigest()
     assert installed_apk_sha256(options.serial) == apk_hash, "Installed APK differs from the test artifact"
     request = str(uuid.uuid4())
-    run = ROOT / ".build/android/remote" / request
+    run = options.output_root.resolve() / request
     run.mkdir(parents=True)
     extension = ".exe" if os.name == "nt" else ""
     binaries = run / "bin"
     binaries.mkdir()
     server_exe = binaries / ("remote-fixture" + extension)
     mcp_exe = binaries / ("pab-mcp" + extension)
-    shutil.copy2(ROOT / "target/debug/examples" / server_exe.name, server_exe)
+    shutil.copy2(options.fixture_executable or ROOT / "target/debug/examples" / server_exe.name, server_exe)
     staged = ROOT / ".build/android/tools" / mcp_exe.name
-    shutil.copy2(staged if staged.exists() else ROOT / "target/debug" / mcp_exe.name, mcp_exe)
+    shutil.copy2(options.mcp_executable or (staged if staged.exists() else ROOT / "target/debug" / mcp_exe.name), mcp_exe)
     server = subprocess.Popen([str(server_exe)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               text=True, encoding="utf-8")
     lines: queue.Queue[dict] = queue.Queue()
@@ -348,7 +352,9 @@ def main():
         assert launcher["operation"]["state"] == "completed"
         assert not any(node["name"] == "fixture_save" for node in launcher["operation"]["observation"]["elements"])
         summary = {"status": "passed", "request_id": request, "connection_path": launcher["connection_path"],
-            "provenance": {"serial": options.serial, "sdk": sdk, "apk_sha256": apk_hash},
+            "provenance": {"serial": options.serial, "sdk": sdk, "apk_sha256": apk_hash,
+                "mcp_sha256": hashlib.sha256(mcp_exe.read_bytes()).hexdigest(),
+                "fixture_sha256": hashlib.sha256(server_exe.read_bytes()).hexdigest()},
             "normal_device_pairing": True, "duplicate_submissions":20,
             "wrong_password_rejected": True, "android_identity": True, "unicode_input": True,
             "native_click": True, "click_count": 1, "request_deduplicated": True,

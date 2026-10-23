@@ -3,6 +3,7 @@ package com.pixels.agent.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Build
+import android.os.PersistableBundle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,11 +51,11 @@ internal fun HomePage(
 ) {
     val context = LocalContext.current
     var revealed by remember(device.password) { mutableStateOf(true) }
-    var copied by remember { mutableStateOf(false) }
+    var copied by remember(device.password) { mutableStateOf<Int?>(null) }
     LaunchedEffect(copied) {
-        if (copied) {
+        if (copied != null) {
             kotlinx.coroutines.delay(2000)
-            copied = false
+            copied = null
         }
     }
     Column(
@@ -102,7 +103,7 @@ internal fun HomePage(
                                         device.status.deviceCode,
                                     )
                                 )
-                            copied = true
+                            copied = R.string.product_code_copied
                         },
                     ) {
                         PixelsIcon(
@@ -129,6 +130,30 @@ internal fun HomePage(
                         modifier = Modifier.weight(1f).testTag("access_password"),
                     )
                     IconButton(
+                        enabled = !device.password.isNullOrEmpty(),
+                        onClick = {
+                            val password = device.password ?: return@IconButton
+                            val clip =
+                                ClipData.newPlainText(
+                                    context.getString(R.string.product_access_password),
+                                    password,
+                                )
+                            clip.description.extras =
+                                PersistableBundle().apply {
+                                    putBoolean("android.content.extra.IS_SENSITIVE", true)
+                                }
+                            context
+                                .getSystemService(ClipboardManager::class.java)
+                                .setPrimaryClip(clip)
+                            copied = R.string.product_password_copied
+                        },
+                    ) {
+                        PixelsIcon(
+                            Glyph.COPY,
+                            description = stringResource(R.string.product_copy_password),
+                        )
+                    }
+                    IconButton(
                         enabled = device.password != null,
                         onClick = { revealed = !revealed },
                     ) {
@@ -150,12 +175,13 @@ internal fun HomePage(
                         )
                     }
                 }
-                if (copied)
+                copied?.let { message ->
                     Text(
-                        stringResource(R.string.product_code_copied),
+                        stringResource(message),
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                }
             }
         }
         ProductCard {

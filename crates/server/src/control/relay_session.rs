@@ -93,6 +93,7 @@ async fn handle_message(
             );
         }
         let claimed = match &message {
+            RelayControlClientMessage::GetNodeControl { node_id, .. } => Some(node_id.as_str()),
             RelayControlClientMessage::Goodbye { node_id, .. } => Some(node_id.as_str()),
             RelayControlClientMessage::GetProbe { node_id, .. } => Some(node_id.as_str()),
             RelayControlClientMessage::Hello { node_id, .. }
@@ -119,6 +120,16 @@ async fn handle_message(
         );
     }
     match message {
+        RelayControlClientMessage::GetNodeControl {request_id,node_id,boot_id,connections,applied} => {
+            if identity!=Some(node_id.as_str()) || *boot!=Some(boot_id) {
+                return error(Some(request_id),RelayControlErrorCode::InvalidMessage,"Relay node control identity mismatch");
+            }
+            let Some(config)=state.control.relay_config() else { return error(Some(request_id),RelayControlErrorCode::InvalidMessage,"Relay directory unavailable"); };
+            match state.control.store().relay_node_control(&node_id,boot_id,state.server_instance,&config,applied.as_ref(),connections).await {
+                Ok(snapshot)=>RelayControlServerMessage::NodeControl {request_id,snapshot},
+                Err(_)=>error(Some(request_id),RelayControlErrorCode::InvalidMessage,"Relay node control unavailable"),
+            }
+        }
         RelayControlClientMessage::Goodbye {
             request_id,
             node_id,
@@ -304,6 +315,7 @@ async fn handle_message(
                         .map(|n| u64::from(n.capacity_mbps) * 1_000_000 / 8)
                         .unwrap_or(0);
                     RelayControlServerMessage::HelloAccepted {
+                        node_control_version: Some(pab_protocol::RELAY_NODE_CONTROL_VERSION),
                         diagnostics_version: Some(pab_protocol::RELAY_DIAGNOSTICS_VERSION),
                         request_id,
                         heartbeat_seconds: config.heartbeat_seconds,

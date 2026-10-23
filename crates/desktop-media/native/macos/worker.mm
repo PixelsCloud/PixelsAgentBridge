@@ -74,7 +74,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         const auto command = read_value<uint8_t>(check_layout);
         if (command == 0) return;
         if (command == 2) { const bool applied=encoder.budget(read_value<uint32_t>()); write_value(applied ? magic : magic+1); continue; }
-        if (command != 1) throw std::runtime_error("Invalid capture command");
+        if (command != 1 && command != 3) throw std::runtime_error("Invalid capture command");
+        const auto capture_started = Clock::now();
+        uint64_t encode_us = 0;
         auto sampled = Clock::now();
         const auto deadline = sampled + std::chrono::seconds(5);
         EncodedFrame packet;
@@ -83,7 +85,9 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
             OwnedCF<CVPixelBufferRef> image;
             if (source) image = source(sampled);
             else { sampled = Clock::now(); image = synthetic(display.width, display.height, index); }
+            const auto encode_started = Clock::now();
             packet = encoder.encode(image.get(), index);
+            encode_us += static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-encode_started).count());
             if (desktop && !display_current(display))
                 throw std::runtime_error("Screen changed during encoding; refresh generation");
             next = std::max(next + std::chrono::microseconds(1000000/fps), Clock::now());
@@ -96,7 +100,13 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         } } while (packet.dropped);
         write_value(static_cast<uint32_t>(packet.bytes.size())); write_value(index);
         write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(sampled-start).count()));
-        write_value(static_cast<uint32_t>(packet.key)); write_bytes(packet.bytes.data(), packet.bytes.size());
+        write_value(static_cast<uint32_t>(packet.key));
+        if (command == 3) {
+            const auto total_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-capture_started).count());
+            write_value(total_us >= encode_us ? total_us-encode_us : uint64_t(0));
+            write_value(encode_us);
+        }
+        write_bytes(packet.bytes.data(), packet.bytes.size());
         ++index;
     } }
 }

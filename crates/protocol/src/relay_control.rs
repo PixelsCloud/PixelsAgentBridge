@@ -18,6 +18,13 @@ pub struct RelayNodeTelemetry {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlClientMessage {
+    GetNodeControl {
+        request_id: RequestId,
+        node_id: String,
+        boot_id: uuid::Uuid,
+        connections: u64,
+        applied: Option<crate::RelayNodeControlAck>,
+    },
     Goodbye {
         request_id: RequestId,
         node_id: String,
@@ -73,6 +80,7 @@ pub enum RelayControlClientMessage {
 impl RelayControlClientMessage {
     pub const fn request_id(&self) -> RequestId {
         match self {
+            Self::GetNodeControl { request_id, .. } => *request_id,
             Self::Goodbye { request_id, .. } => *request_id,
             Self::GetProbe { request_id, .. } => *request_id,
             Self::Hello { request_id, .. }
@@ -88,6 +96,10 @@ impl RelayControlClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RelayControlServerMessage {
+    NodeControl {
+        request_id: RequestId,
+        snapshot: crate::RelayNodeControl,
+    },
     GoodbyeAccepted {
         request_id: RequestId,
     },
@@ -108,6 +120,8 @@ pub enum RelayControlServerMessage {
         capacity_bytes_per_second: u64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         diagnostics_version: Option<u16>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node_control_version: Option<u16>,
     },
     UsageAccepted {
         request_id: RequestId,

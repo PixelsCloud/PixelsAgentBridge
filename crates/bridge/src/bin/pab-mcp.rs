@@ -513,7 +513,15 @@ mod tests {
             serde_json::to_value(&catalog).unwrap()["cacheScope"],
             "private"
         );
-        assert_eq!(catalog.tools.len(), 122);
+        let contract: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../smoke/tool-coverage.json"
+        ))
+        .unwrap();
+        let expected = contract["tools"].as_object().unwrap();
+        assert_eq!(catalog.tools.len(), expected.len());
+        for tool in &catalog.tools {
+            assert!(expected.contains_key(tool.name.as_ref()));
+        }
         let names = catalog
             .tools
             .iter()

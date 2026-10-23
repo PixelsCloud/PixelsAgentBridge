@@ -37,7 +37,7 @@ impl PostgresStore {
     ) -> Result<RelayMaintenanceOperation, StoreError> {
         // Polling is sufficient to expire an abandoned operation. It never changes
         // the node's administrative state or claims that an upgrade has run.
-        sqlx::query("UPDATE relay_maintenance_operations SET phase=CASE WHEN deadline_at<clock_timestamp()-interval '5 minutes' THEN 'failed' ELSE 'ready' END,completed_at=CASE WHEN deadline_at<clock_timestamp()-interval '5 minutes' THEN clock_timestamp() END,error_code=CASE WHEN deadline_at<clock_timestamp()-interval '5 minutes' THEN 'operator_lease_expired' END WHERE id=$1 AND phase IN ('waiting','ready') AND ((phase='waiting' AND deadline_at<=clock_timestamp()) OR deadline_at<clock_timestamp()-interval '5 minutes')")
+        sqlx::query("UPDATE relay_maintenance_operations SET phase='failed',completed_at=clock_timestamp(),error_code=CASE WHEN deadline_at<clock_timestamp()-interval '5 minutes' THEN 'operator_lease_expired' ELSE 'node_confirmation_timeout' END WHERE id=$1 AND ((phase='ready' AND deadline_at<clock_timestamp()-interval '5 minutes') OR (phase='waiting' AND deadline_at<clock_timestamp()-((CASE WHEN action='maintenance' THEN COALESCE(offline_seconds,15)+5 ELSE 0 END)*interval '1 second')) )")
             .bind(id).execute(&self.pool).await?;
         let row=sqlx::query("SELECT o.*,u.username actor,clock_timestamp() sampled_at,CASE WHEN o.offline_seconds IS NOT NULL AND ($2::uuid IS NULL OR o.server_instance=$2) THEN (SELECT CASE WHEN bool_or(n.capacity_mbps=0) THEN NULL ELSE COALESCE(sum(n.capacity_mbps),0)::bigint END FROM relay_cluster_nodes n WHERE n.node_id<>o.node_id AND n.configured AND n.admin_state='active' AND n.health='healthy' AND ($2::uuid IS NULL OR n.server_instance=$2) AND n.last_seen_at>clock_timestamp()-(o.offline_seconds*interval '1 second')) END remaining_capacity_mbps, COALESCE(o.offline_seconds IS NOT NULL AND ($2::uuid IS NULL OR o.server_instance=$2) AND EXISTS(SELECT 1 FROM relay_cluster_nodes n WHERE n.node_id<>o.node_id AND n.configured AND n.admin_state='active' AND n.health='healthy' AND n.capacity_mbps=0 AND ($2::uuid IS NULL OR n.server_instance=$2) AND n.last_seen_at>clock_timestamp()-(o.offline_seconds*interval '1 second')),false) remaining_host_bandwidth FROM relay_maintenance_operations o JOIN users u ON u.id=o.actor_id WHERE o.id=$1")
             .bind(id).bind(server_instance).fetch_optional(&self.pool).await?.ok_or(StoreError::NotFound)?;
@@ -179,14 +179,13 @@ impl PostgresStore {
             ));
         }
         if desired == RelayAdminState::Maintenance {
-            let other:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM relay_maintenance_operations WHERE phase IN ('waiting','ready'))").fetch_one(&mut *tx).await?;
+            let other:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM relay_maintenance_operations WHERE action='maintenance' AND phase IN ('waiting','ready'))").fetch_one(&mut *tx).await?;
             if other {
                 return Err(StoreError::Conflict("another Relay is being maintained"));
             }
-        } else {
-            sqlx::query("UPDATE relay_maintenance_operations SET phase='completed',completed_at=clock_timestamp() WHERE node_id=$1 AND phase IN ('waiting','ready')")
-                .bind(node).execute(&mut *tx).await?;
         }
+        sqlx::query("UPDATE relay_maintenance_operations SET phase='completed',completed_at=clock_timestamp(),error_code='superseded' WHERE node_id=$1 AND phase IN ('waiting','ready')")
+            .bind(node).execute(&mut *tx).await?;
         let admin = match desired {
             RelayAdminState::Active => "active",
             RelayAdminState::Maintenance => "maintenance",
@@ -194,11 +193,9 @@ impl PostgresStore {
         };
         sqlx::query("UPDATE relay_cluster_nodes SET admin_state=$2,maintenance_started_at=CASE WHEN $2='maintenance' THEN clock_timestamp() ELSE NULL END,operation_id=$3 WHERE node_id=$1")
             .bind(node).bind(admin).bind(operation).execute(&mut *tx).await?;
-        let phase = if desired == RelayAdminState::Maintenance {
-            "waiting"
-        } else {
-            "completed"
-        };
+        // Desired state is committed now; completion requires the node's ack.
+        let phase = "waiting";
+        let wait_seconds = if desired == RelayAdminState::Maintenance { wait_seconds } else { wait_seconds.max(15) };
         sqlx::query("INSERT INTO relay_maintenance_operations(id,node_id,action,phase,allow_outage,deadline_at,actor_id,completed_at,offline_seconds,server_instance) VALUES($1,$2,$3,$4,$5,clock_timestamp()+($6::bigint*interval '1 second'),$7,CASE WHEN $4='completed' THEN clock_timestamp() ELSE NULL END,$8,$9)")
             .bind(operation).bind(node).bind(action).bind(phase).bind(allow_outage).bind(wait_seconds as i64).bind(actor).bind(offline_seconds as i64).bind(server_instance).execute(&mut *tx).await?;
         sqlx::query("UPDATE relay_cluster_state SET revision=revision+1 WHERE singleton")

@@ -3,6 +3,9 @@
 .env
 .env/
 .build/
+smoke/local/
+smoke/runs/
+smoke/tmp/
 docs/
 references/
 target/
@@ -41,7 +44,6 @@ AGENTS.md
 /MACOS.md
 /acceptance/*
 !/acceptance/fixtures/
-!/acceptance/tool-coverage.json
 /experiments/*
 !/experiments/remote-desktop/
 /experiments/remote-desktop/*

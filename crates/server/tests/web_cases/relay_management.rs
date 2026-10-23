@@ -389,7 +389,7 @@ async fn browser_operation_recovers_committed_request_with_same_id_and_failure_r
     sqlx::query("UPDATE relay_maintenance_operations SET deadline_at=clock_timestamp()-interval '1 second' WHERE id=$1").bind(id).execute(&pool).await.unwrap();
     assert_eq!(
         call(&app, "GET", &path, &cookie, Value::Null).await.2["phase"],
-        "ready"
+        "waiting"
     );
     sqlx::query("UPDATE relay_maintenance_operations SET deadline_at=clock_timestamp()-interval '6 minutes' WHERE id=$1").bind(id).execute(&pool).await.unwrap();
     let (status, _, failed) = call(&app, "GET", &path, &cookie, Value::Null).await;
@@ -405,7 +405,7 @@ async fn browser_operation_recovers_committed_request_with_same_id_and_failure_r
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn completed_resume_is_not_reverted_by_old_maintenance_reads_or_retries(pool: PgPool) {
+async fn pending_resume_is_not_reverted_by_old_maintenance_reads_or_retries(pool: PgPool) {
     let (app, _, cookie) = cluster(pool.clone()).await;
     sqlx::query("UPDATE relay_cluster_nodes SET health='healthy',last_seen_at=clock_timestamp()")
         .execute(&pool).await.unwrap();
@@ -427,7 +427,7 @@ async fn completed_resume_is_not_reverted_by_old_maintenance_reads_or_retries(po
     let (status, _, resumed) = call(&app, "PATCH", state_path, &cookie,
         json!({"state":"active","operation_id":resume_id,"allow_outage":false})).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(resumed["phase"], "completed");
+    assert_eq!(resumed["phase"], "waiting");
     assert_eq!(resumed["action"], "activate");
     assert_eq!(call(&app, "GET", &path, &cookie, Value::Null).await.2["phase"], "failed");
     assert_eq!(call(&app, "PATCH", state_path, &cookie, input).await.2["id"], maintenance_id.to_string());

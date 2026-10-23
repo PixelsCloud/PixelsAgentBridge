@@ -1,0 +1,1064 @@
+{
+  "schema_version": 2,
+  "description": "Maintained tool coverage definitions, never historical run results. Real tools/list must match exactly.",
+  "tools": {
+    "pab_archive_create": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_archive_extract": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_browser_attach": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_click": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_close": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_console_messages": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_downloads": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_drag": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_drop": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_extract": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_file_upload": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_fill": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_fill_form": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_find": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_get_session": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_handle_dialog": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_hover": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_navigate": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_network_requests": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_open": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_pdf_save": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_pointer": {
+      "group": "browseradvanced",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_press_key": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_request_handoff": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_resume": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_screenshot": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_scroll": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_select_option": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_set_checked": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_setup_info": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_snapshot": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_tabs": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_browser_wait": {
+      "group": "browser",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/browser.rs",
+        "crates/protocol/src/browser.rs",
+        "acceptance/fixtures/browser-extension-smoke/pixels-browser-tool-smoke.mjs"
+      ],
+      "live_suite": "BROWSER-01"
+    },
+    "pab_cancel_operation": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_capture_screenshot": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_connect": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "NET-01"
+    },
+    "pab_container_control": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "CTR-01"
+    },
+    "pab_container_logs": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "CTR-01"
+    },
+    "pab_desktop_assistance": {
+      "group": "desktop-assistance",
+      "existing_test_sources": [
+        "crates/bridge/src/desktop_assistance_tests.rs"
+      ],
+      "live_suite": "RD-01"
+    },
+    "pab_desktop_input": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_device_presence": {
+      "group": "core",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DEV-01"
+    },
+    "pab_disconnect": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "NET-01"
+    },
+    "pab_dismiss_notification": {
+      "group": "notifications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/notifications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_document_close": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_suite": "DOC-01"
+    },
+    "pab_document_open": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_suite": "DOC-01"
+    },
+    "pab_document_read": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_suite": "DOC-01"
+    },
+    "pab_document_render_page": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_suite": "DOC-01"
+    },
+    "pab_document_search": {
+      "group": "document",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/document.rs",
+        "crates/document/src/lib.rs",
+        "crates/protocol/src/document.rs"
+      ],
+      "live_suite": "DOC-01"
+    },
+    "pab_download_file": {
+      "group": "transfer",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/transfer_tests.rs"
+      ],
+      "live_suite": "FILE-02"
+    },
+    "pab_file_copy": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_delete": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_hash": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_move": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_patch": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_read": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_search": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_stat": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_file_write": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_focus_window": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_get_app_change": {
+      "group": "packages",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_get_container": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "CTR-01"
+    },
+    "pab_get_operation": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_get_process": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_get_service": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_get_task": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_git_checkout": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_commit": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_diff": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_fetch": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_log": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_pull": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_push": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_git_status": {
+      "group": "git",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/git_tests.rs"
+      ],
+      "live_suite": "GIT-01"
+    },
+    "pab_inspect_app_package": {
+      "group": "packages",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_install_app": {
+      "group": "packages",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_launch_app": {
+      "group": "desktop-applications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs",
+        "crates/bridge/src/connection/system_query.rs",
+        "crates/bridge/src/runtime/system_query.rs",
+        "crates/executor/src/local_ipc_application_tests.rs",
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_list_apps": {
+      "group": "desktop-applications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs",
+        "crates/bridge/src/connection/system_query.rs",
+        "crates/bridge/src/runtime/system_query.rs",
+        "crates/executor/src/local_ipc_application_tests.rs",
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_list_containers": {
+      "group": "container",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/container_tests.rs"
+      ],
+      "live_suite": "CTR-01"
+    },
+    "pab_list_devices": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "NET-01"
+    },
+    "pab_list_directory": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_list_disks": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_list_execution_contexts": {
+      "group": "core",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/task-runtime/src/execution.rs"
+      ],
+      "live_suite": "DEV-01"
+    },
+    "pab_list_history": {
+      "group": "core",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DEV-01"
+    },
+    "pab_list_monitors": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_list_network_connections": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_list_network_interfaces": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_list_notifications": {
+      "group": "notifications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/notifications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_list_operations": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_list_processes": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_list_saved_devices": {
+      "group": "core",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DEV-01"
+    },
+    "pab_list_services": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_list_sessions": {
+      "group": "connection",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/bridge/tests/mcp_endpoint_live.rs"
+      ],
+      "live_suite": "NET-01"
+    },
+    "pab_list_windows": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_mkdir": {
+      "group": "files",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/filesystem_tests.rs",
+        "crates/executor/src/task_service/filesystem_enhanced_tests.rs",
+        "crates/executor/src/task_service/filesystem_b2_tests.rs",
+        "crates/executor/src/task_service/filesystem_b3_tests.rs"
+      ],
+      "live_suite": "FILE-01"
+    },
+    "pab_mobile_control": {
+      "group": "android",
+      "existing_test_sources": [
+        "crates/bridge/src/connection/mobile_tests.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_notification_status": {
+      "group": "notifications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/notifications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_open_file": {
+      "group": "desktop-applications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs",
+        "crates/bridge/src/connection/system_query.rs",
+        "crates/bridge/src/runtime/system_query.rs",
+        "crates/executor/src/local_ipc_application_tests.rs",
+        "crates/bridge/tests/mcp_operations.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_open_notification": {
+      "group": "notifications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/notifications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_open_terminal": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "TERM-01"
+    },
+    "pab_port_forward_close": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_suite": "PORT-01"
+    },
+    "pab_port_forward_open": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_suite": "PORT-01"
+    },
+    "pab_port_forward_status": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/runtime/port_forward.rs",
+        "crates/executor/src/task_service/port_forward.rs",
+        "crates/protocol/src/task_session.rs"
+      ],
+      "live_suite": "PORT-01"
+    },
+    "pab_read_output": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_resolve_dns": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_resume_app_change": {
+      "group": "packages",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_run_command": {
+      "group": "operations",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "EXEC-01"
+    },
+    "pab_service_control": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_system_info": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_system_log_event_read": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_system_log_read": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_system_log_sources": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/system_query.rs",
+        "crates/executor/src/task_service/system_query_tests.rs",
+        "crates/system-log-store/src/lib.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_terminal_close": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "TERM-01"
+    },
+    "pab_terminal_input": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "TERM-01"
+    },
+    "pab_terminal_read": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "TERM-01"
+    },
+    "pab_terminal_resize": {
+      "group": "terminal",
+      "existing_test_sources": [
+        "crates/terminal/src/lib.rs",
+        "crates/executor/src/task_service/tests.rs"
+      ],
+      "live_suite": "TERM-01"
+    },
+    "pab_terminate_process": {
+      "group": "system",
+      "existing_test_sources": [
+        "crates/executor/src/task_service/system_query_tests.rs"
+      ],
+      "live_suite": "SYS-01"
+    },
+    "pab_type_text": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_ui_action": {
+      "group": "desktop-ui",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_ui_get": {
+      "group": "desktop-ui",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_ui_query": {
+      "group": "desktop-ui",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_ui_wait": {
+      "group": "desktop-ui",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/ui.rs",
+        "crates/desktop-control/src/ui_engine/tests.rs",
+        "crates/executor/src/local_ipc_ui_tests.rs"
+      ],
+      "live_suite": "DESK-01"
+    },
+    "pab_uninstall_app": {
+      "group": "packages",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/applications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_upload_file": {
+      "group": "transfer",
+      "existing_test_sources": [
+        "crates/bridge/tests/mcp_operations.rs",
+        "crates/executor/src/task_service/transfer_tests.rs"
+      ],
+      "live_suite": "FILE-02"
+    },
+    "pab_wait_notification": {
+      "group": "notifications",
+      "existing_test_sources": [
+        "crates/bridge/src/bin/pab_mcp/notifications.rs"
+      ],
+      "live_suite": "ANDROID-01"
+    },
+    "pab_window_control": {
+      "group": "desktop",
+      "existing_test_sources": [
+        "crates/desktop-control/src/lib.rs",
+        "crates/desktop-control/src/batch.rs",
+        "crates/desktop-control/src/windows_tests.rs",
+        "crates/protocol/src/screenshot.rs"
+      ],
+      "live_suite": "DESK-01"
+    }
+  }
+}

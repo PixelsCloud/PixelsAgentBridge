@@ -35,6 +35,7 @@ struct Provider {
     input: Mutex<Option<Arc<input::InputProvider>>>,
     cursor_supported: bool,
     encoding_budget_supported: bool,
+    timings_supported: bool,
     cursor: Mutex<Option<Arc<cursor::CursorProvider>>>,
     ended: tokio::sync::watch::Sender<bool>,
 }
@@ -61,6 +62,7 @@ enum Operation {
     Screens,
     Start { config: DesktopVideoConfig },
     Next,
+    NextTimed,
     EncodingBudget { bits_per_second: u32 },
 }
 #[derive(Serialize, Deserialize)]
@@ -75,6 +77,8 @@ enum Reply {
         bytes: usize,
         capture_time_us: u64,
         keyframe: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timings: Option<pab_protocol::DesktopCaptureTimings>,
     },
     Error {
         message: String,
@@ -84,7 +88,7 @@ enum Response {
     Screens(Vec<DesktopScreen>),
     Started,
     EncodingBudget(Option<u32>),
-    Frame(MediaFrame),
+    Frame(MediaFrame, Option<pab_protocol::DesktopCaptureTimings>),
 }
 struct Request {
     operation: Operation,
@@ -232,6 +236,7 @@ impl DesktopBackend for HelperMediaBackend {
                         .map_err(|_| unavailable("media provider state unavailable"))? =
                         Some(config);
                     Ok(Box::new(HelperSource {
+                        capture_timings: None,
                         provider,
                         _stop: stop,
                         encoding_budget,
@@ -246,6 +251,7 @@ struct HelperSource {
     provider: Arc<Provider>,
     _stop: oneshot::Sender<()>,
     encoding_budget: Option<u32>,
+    capture_timings: Option<pab_protocol::DesktopCaptureTimings>,
 }
 impl Drop for HelperSource {
     fn drop(&mut self) {
@@ -257,6 +263,7 @@ impl Drop for HelperSource {
     }
 }
 impl DesktopSource for HelperSource {
+    fn capture_timings(&self) -> Option<pab_protocol::DesktopCaptureTimings> { self.capture_timings.clone() }
     fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
     fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
         Box::pin(async move {
@@ -273,11 +280,12 @@ impl DesktopSource for HelperSource {
     }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
-            match request(&self.provider, Operation::Next, None)
+            let operation = if self.provider.timings_supported { Operation::NextTimed } else { Operation::Next };
+            match request(&self.provider, operation, None)
                 .await
                 .map_err(unavailable)?
             {
-                Response::Frame(frame) => Ok(frame),
+                Response::Frame(frame, timings) => { self.capture_timings = timings; Ok(frame) },
                 _ => Err(unavailable("invalid media frame reply")),
             }
         })
@@ -329,6 +337,7 @@ pub(super) async fn serve_registered(
                 == Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION.into()),
             encoding_budget_supported: frame["encoding_budget_version"].as_u64()
                 == Some(ENCODING_BUDGET_VERSION.into()),
+            timings_supported: frame["capture_timings_version"].as_u64() == Some(1),
             cursor: Mutex::new(None),
             ended: tokio::sync::watch::channel(false).0,
         }));
@@ -400,11 +409,12 @@ async fn exchange(
             if bits_per_second.is_none_or(|value| value == *requested) =>
             Ok(Response::EncodingBudget(bits_per_second)),
         (
-            Operation::Next,
+            Operation::Next | Operation::NextTimed,
             Reply::Frame {
                 bytes: size,
                 capture_time_us,
                 keyframe,
+                timings,
             },
         ) if size > 0 && size <= DESKTOP_MAX_FRAME_BYTES => {
             let mut bytes = Vec::with_capacity(size);
@@ -423,7 +433,7 @@ async fn exchange(
                 bytes,
                 capture_time_us,
                 keyframe,
-            }))
+            }, timings))
         }
         _ => Err(LocalIpcError::Protocol),
     }
@@ -471,6 +481,7 @@ async fn serve_helper_socket_with_role(
         &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised,
             "clipboard_version": backend.supports_clipboard().then_some(pab_protocol::DESKTOP_CLIPBOARD_VERSION),
             "encoding_budget_version": ENCODING_BUDGET_VERSION,
+            "capture_timings_version": 1,
             "cursor_schema_version": backend.supports_cursor().then_some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION)}),
     )
     .await?;
@@ -524,7 +535,7 @@ async fn serve_media_requests(
                     source = Some(backend.start(config).await.map_err(unavailable_local)?);
                     Ok((Reply::Started, None))
                 }
-                Operation::Next => {
+                Operation::Next | Operation::NextTimed => {
                     let frame = source
                         .as_mut()
                         .ok_or(LocalIpcError::Protocol)?
@@ -539,6 +550,9 @@ async fn serve_media_requests(
                             bytes: frame.bytes.len(),
                             capture_time_us: frame.capture_time_us,
                             keyframe: frame.keyframe,
+                            timings: if matches!(operation, Operation::NextTimed) {
+                                source.as_ref().and_then(|source| source.capture_timings())
+                            } else { None },
                         },
                         Some(frame.bytes),
                     ))
@@ -641,6 +655,9 @@ mod tests {
         }
     }
     impl DesktopSource for Source {
+        fn capture_timings(&self) -> Option<pab_protocol::DesktopCaptureTimings> {
+            Some(pab_protocol::DesktopCaptureTimings { wait_us: 1200, encode_us: 3400 })
+        }
         fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
             Box::pin(async {
                 if self.1 {
@@ -740,7 +757,10 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut socket = accept_async_with_config(stream, None).await.unwrap();
             let mut frame: Value = read_control(&mut socket).await.unwrap();
-            if !budget_hint { frame.as_object_mut().unwrap().remove("encoding_budget_version"); }
+            if !budget_hint {
+                frame.as_object_mut().unwrap().remove("encoding_budget_version");
+                frame.as_object_mut().unwrap().remove("capture_timings_version");
+            }
             // Exercise the real kernel PID/account challenge. HMAC handshake
             // is independently covered by existing local_ipc tests.
             let _ = serve_registered(socket, frame).await;

@@ -7,6 +7,9 @@ mod cursor_wire;
 pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};
 mod flow;
 mod quality;
+mod diagnostics;
+mod viewer_diagnostics;
+pub use viewer_diagnostics::{ViewerDiagnostics, ViewerDiagnosticsSnapshot};
 mod host;
 pub use host::{
     DesktopBackend, DesktopConnectionGuard, DesktopCursorSource, DesktopHost, DesktopInputSink,

@@ -17,7 +17,7 @@ test('real policy edits survive a process restart and restore the TOML default w
   try {
     expect((await admin.post('/api/web/register', { data: { username: adminName, password } })).ok()).toBeTruthy();
     expect((await user.post('/api/web/register', { data: { username, password } })).ok()).toBeTruthy();
-    execFileSync(path.join(path.dirname(config), 'pab-server.exe'), ['web-admin', adminName, '--config', config], { stdio: 'pipe', windowsHide: true });
+    execFileSync(isolatedFixture().executable, ['web-admin', adminName, '--config', config], { stdio: 'pipe', windowsHide: true });
     const initialDiagnostics = await (await admin.get('/api/web/devices/diagnostics?scope=all')).json();
     const initialRevision = (await (await admin.get('/api/web/service')).json()).registration.revision;
     const actor = (await (await admin.get('/api/web/session')).json()).id;

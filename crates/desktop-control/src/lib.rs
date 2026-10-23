@@ -6,6 +6,8 @@ mod batch;
 #[cfg(any(target_os = "macos", test))]
 mod macos_display;
 #[cfg(any(target_os = "macos", test))]
+mod macos_window_geometry;
+#[cfg(any(target_os = "macos", test))]
 mod macos_media_keycodes;
 mod monitor_input;
 mod ui_controller;
@@ -376,6 +378,12 @@ impl DesktopSession {
                     let reference = self.reference(id, pid);
                     info.window_ref = reference.as_ref().ok().cloned();
                     info.control_error = reference.err().map(|s| short(&s, 256));
+                    // xcap only recognizes full-display bounds on macOS. A
+                    // maximized AppKit window occupies the visible work area.
+                    #[cfg(target_os = "macos")]
+                    if info.window_ref.is_some() && !info.minimized {
+                        info.maximized |= native::maximized(id).unwrap_or(false);
+                    }
                     snapshot.windows.push(info);
                 }
             }

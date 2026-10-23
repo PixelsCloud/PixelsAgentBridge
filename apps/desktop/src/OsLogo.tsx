@@ -2,12 +2,15 @@ import { Monitor } from "lucide-react";
 import windowsLogo from "./assets/os/windows.svg";
 import macosLogo from "./assets/os/macos.svg";
 import linuxLogo from "./assets/os/linux.svg";
+import androidLogo from "./assets/os/android.svg";
 
 export function OsLogo({ family }: { family: string }) {
   const os = family.toLowerCase();
   let logo: string | undefined;
 
-  if (os.includes("windows")) {
+  if (os.includes("android")) {
+    logo = androidLogo;
+  } else if (os.includes("windows")) {
     logo = windowsLogo;
   } else if (os.includes("macos") || os.includes("darwin")) {
     logo = macosLogo;

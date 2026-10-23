@@ -25,7 +25,7 @@ test('real HTTPS password reset revokes old sessions and authenticates the new p
     expect(created.ok()).toBeTruthy(); const account = await created.json();
     const config = path.resolve(fixtureConfig!);
     expect(config).toBe(isolatedFixture().config);
-    execFileSync(path.join(path.dirname(config), 'pab-server.exe'), ['web-admin', adminName, '--config', config], { stdio: 'pipe' });
+    execFileSync(isolatedFixture().executable, ['web-admin', adminName, '--config', config], { stdio: 'pipe' });
     expect((await user.get('/api/web/accounts')).status()).toBe(403);
     await page.context().addCookies((await admin.storageState()).cookies);
     await page.addInitScript(() => localStorage.setItem('pab-web-language', 'en'));

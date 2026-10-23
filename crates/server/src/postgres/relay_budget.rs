@@ -26,8 +26,8 @@ impl PostgresStore {
                 "invalid Relay budget batch".into(),
             ));
         }
-        let active:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM relay_cluster_nodes WHERE node_id=$1 AND boot_id=$2 AND configured AND admin_state='active' AND health='healthy' AND last_seen_at>clock_timestamp()-($3::bigint*interval '1 second'))")
-            .bind(node).bind(boot).bind(config.offline_seconds as i64).fetch_one(&self.pool).await?;
+        let active:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM relay_cluster_nodes n WHERE node_id=$1 AND boot_id=$2 AND configured AND (n.admin_state='active' OR (n.admin_state='maintenance' AND COALESCE((SELECT deadline_at FROM relay_maintenance_operations WHERE id=n.operation_id),n.maintenance_started_at+($4::bigint*interval '1 second'))>clock_timestamp())) AND health='healthy' AND last_seen_at>clock_timestamp()-($3::bigint*interval '1 second'))")
+            .bind(node).bind(boot).bind(config.offline_seconds as i64).bind(config.maintenance_seconds as i64).fetch_one(&self.pool).await?;
         if !active {
             return Err(StoreError::PermissionDenied);
         }
@@ -78,8 +78,8 @@ impl PostgresStore {
                 .await?;
             sqlx::query("INSERT INTO relay_budget_leases(user_id,node_id,boot_id,bytes_per_second,burst_bytes,expires_at) VALUES($1,$2,$3,0,0,$4) ON CONFLICT(user_id,node_id,boot_id) DO UPDATE SET last_demand_at=clock_timestamp()")
                 .bind(user.as_uuid()).bind(node).bind(boot).bind(now).execute(&mut *tx).await?;
-            let rows=sqlx::query("SELECT l.node_id,l.boot_id,l.generation,l.bytes_per_second,l.burst_bytes,l.expires_at,CASE WHEN n.configured AND n.admin_state='active' AND n.health='healthy' AND n.boot_id=l.boot_id AND n.last_seen_at>$2-($3::bigint*interval '1 second') AND l.last_demand_at>$2-interval '20 seconds' THEN n.weight ELSE 0 END AS demand_weight FROM relay_budget_leases l JOIN relay_cluster_nodes n USING(node_id) WHERE l.user_id=$1 ORDER BY l.node_id")
-                .bind(user.as_uuid()).bind(now).bind(config.offline_seconds as i64).fetch_all(&mut *tx).await?;
+            let rows=sqlx::query("SELECT l.node_id,l.boot_id,l.generation,l.bytes_per_second,l.burst_bytes,l.expires_at,CASE WHEN n.configured AND (n.admin_state='active' OR (n.admin_state='maintenance' AND COALESCE((SELECT deadline_at FROM relay_maintenance_operations WHERE id=n.operation_id),n.maintenance_started_at+($4::bigint*interval '1 second'))>clock_timestamp())) AND n.health='healthy' AND n.boot_id=l.boot_id AND n.last_seen_at>$2-($3::bigint*interval '1 second') AND l.last_demand_at>$2-interval '20 seconds' THEN n.weight ELSE 0 END AS demand_weight FROM relay_budget_leases l JOIN relay_cluster_nodes n USING(node_id) WHERE l.user_id=$1 ORDER BY l.node_id")
+                .bind(user.as_uuid()).bind(now).bind(config.offline_seconds as i64).bind(config.maintenance_seconds as i64).fetch_all(&mut *tx).await?;
             let total = (mbps as u64) * 1_000_000 / 8;
             let burst = total / 10;
             let mut reserved = 0u64;

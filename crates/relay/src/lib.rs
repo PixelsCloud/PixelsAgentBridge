@@ -6,6 +6,7 @@ mod diagnostics;
 mod limiter;
 mod policy;
 mod probes;
+mod node_control;
 mod runtime;
 #[cfg(test)]
 mod runtime_tests;

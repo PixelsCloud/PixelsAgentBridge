@@ -27,6 +27,7 @@ const fixture = (window as any).fixture = {
   holdCompletion: [] as string[],
   deferredCompletion: {} as Record<string, { resolve: () => void; reject: (message: string) => void }>,
   decoder(value: string | null) { decoder = value; fixture.emit(status()); },
+  performance(value: unknown) { callbacks.get(listeners.get("desktop-viewer-performance")!)?.({ payload: value }); },
   clipboard(value: string) { clipboardState = value; fixture.emit(status()); },
   emit(value: unknown) { callbacks.get(listeners.get("desktop-viewer-status")!)?.({ event: "desktop-viewer-status", id: 1, payload: value }); },
   fail() { phase = "failed"; fixture.emit({ phase, error: "Capture helper unavailable" }); },

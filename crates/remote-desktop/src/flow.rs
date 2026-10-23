@@ -23,6 +23,7 @@ pub(crate) struct VideoFlow {
     last_capture: Option<Instant>,
     last_adjustment: Option<Instant>,
     quality: crate::quality::EncodingQuality,
+    presentation_ack_last_us: Option<u64>,
 }
 
 impl VideoFlow {
@@ -38,6 +39,7 @@ impl VideoFlow {
             last_capture: None,
             last_adjustment: None,
             quality: crate::quality::EncodingQuality::new(),
+            presentation_ack_last_us: None,
         }
     }
 
@@ -113,7 +115,10 @@ impl VideoFlow {
             return Ok(());
         }
         while self.flights.front().is_some_and(|frame| frame.id <= id) {
-            self.flights.pop_front();
+            let frame = self.flights.pop_front().unwrap();
+            // For a cumulative ACK use the newest acknowledged frame. The
+            // others may already have been presented before this ACK arrived.
+            self.presentation_ack_last_us = Some(now.saturating_duration_since(frame.started).as_micros().min(u64::MAX as u128) as u64);
         }
         let first_presentation = self.acknowledged == 0;
         self.acknowledged = id;
@@ -148,6 +153,10 @@ impl VideoFlow {
         self.flights
             .front()
             .map(|frame| frame.started + MAX_BACKLOG_AGE)
+    }
+    pub(crate) fn diagnostics(&self, now: Instant) -> (u64, u64, Option<u64>, Option<u64>) {
+        (self.sent, self.acknowledged, self.presentation_ack_last_us,
+            self.flights.front().map(|f| now.saturating_duration_since(f.started).as_millis().min(u64::MAX as u128) as u64))
     }
     pub(crate) fn encoding_budget(&self) -> u32 {
         self.quality.budget()

@@ -159,6 +159,7 @@ struct NativeSource {
     process: MediaChild,
     index: u64,
     encoding_budget: Option<u32>,
+    capture_timings: Option<DesktopCaptureTimings>,
     #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     capture: Arc<cursor::CaptureLease>,
 }
@@ -169,6 +170,7 @@ impl Drop for NativeSource {
     }
 }
 impl DesktopSource for NativeSource {
+    fn capture_timings(&self) -> Option<DesktopCaptureTimings> { self.capture_timings.clone() }
     fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
     fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
         Box::pin(async move {
@@ -191,7 +193,10 @@ impl DesktopSource for NativeSource {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
             let operation = async {
-                self.process.input.lock().await.write_u8(1).await?;
+                // Command 1 keeps the original worker framing for diagnostics
+                // and Linux. Timed frames are private to the bundled worker.
+                let timed = cfg!(any(windows, target_os = "macos"));
+                self.process.input.lock().await.write_u8(if timed { 3 } else { 1 }).await?;
                 let size = self.process.output.as_mut().unwrap().read_u32_le().await? as usize;
                 if size == 0 || size > DESKTOP_MAX_FRAME_BYTES {
                     return Err(std::io::Error::other("invalid media length"));
@@ -205,6 +210,12 @@ impl DesktopSource for NativeSource {
                 if key > 1 || (index == 0 && key == 0) {
                     return Err(std::io::Error::other("media keyframe mismatch"));
                 }
+                self.capture_timings = if timed {
+                    Some(DesktopCaptureTimings {
+                        wait_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                        encode_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                    })
+                } else { None };
                 let mut bytes = vec![0; size];
                 self.process
                     .output
@@ -390,6 +401,7 @@ impl DesktopBackend for NativeBackend {
                 lease
             };
             Ok(Box::new(NativeSource {
+                capture_timings: None,
                 process,
                 index: 0,
                 encoding_budget: Some(0),

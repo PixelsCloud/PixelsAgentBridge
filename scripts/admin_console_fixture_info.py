@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tomllib
 from urllib.parse import urlsplit
 
@@ -11,6 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def fixture_info(config):
     config = config.resolve()
+    if config.is_relative_to(ROOT / 'smoke/local'):
+        sys.path.insert(0, str(ROOT))
+        from smoke.web_fixture import fixture_info as smoke_fixture_info
+        return smoke_fixture_info(config)
     relative = config.relative_to(ROOT / '.build/admin-console')
     allowed = relative.parts[0] in {'20261020-b3', '20261020-b4', '20261020-b5', '20261020-b6'} and relative.parts[1:] == ('https', 'pab-server.toml')
     allowed |= relative.parts == ('20261020-b7-global', 'candidate', 'https', 'pab-server.toml')

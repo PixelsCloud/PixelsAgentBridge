@@ -1893,6 +1893,9 @@ mod tests {
 
     #[tokio::test]
     async fn authenticated_client_receives_status_and_rejects_wrong_token() {
+        if configured_status_fixture("authenticated_client_receives_status_and_rejects_wrong_token") {
+            return;
+        }
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         crate::device_access::save(
@@ -1937,6 +1940,9 @@ mod tests {
 
     #[tokio::test]
     async fn password_refresh_persists_invalidates_old_password_and_updates_status_without_restart() {
+        if configured_status_fixture("password_refresh_persists_invalidates_old_password_and_updates_status_without_restart") {
+            return;
+        }
         use crate::credential::DeviceCredential;
         use zeroize::Zeroizing;
 
@@ -1983,6 +1989,24 @@ mod tests {
         assert!(again.password_version > refreshed.password_version);
         assert!(!DeviceCredential::read(&path).await.unwrap().verify(Zeroizing::new(refreshed.temporary_password)).await.unwrap());
         server.abort();
+    }
+
+    // These tests exercise a configured service. Keep that process environment
+    // independent of installed/private defaults and of parallel Rust tests.
+    fn configured_status_fixture(name: &str) -> bool {
+        if std::env::var("PAB_IPC_STATUS_TEST").as_deref() == Ok(name) {
+            return false;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", &format!("local_ipc::tests::{name}"), "--nocapture"])
+            .env("PAB_IPC_STATUS_TEST", name)
+            .env("PAB_CONTROL_URL", "wss://127.0.0.1:9/control")
+            .env("PAB_RELAY_URLS", "https://127.0.0.1:9/")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "configured IPC fixture failed: {}{}",
+            String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        true
     }
 
     #[tokio::test]

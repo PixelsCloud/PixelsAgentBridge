@@ -77,6 +77,8 @@ impl PostgresStore {
         let changed = sqlx::query("UPDATE relay_cluster_nodes SET boot_id=$2,retired=false,agent_version=$3,health=$4,healthy_since=NULL,last_seen_at=clock_timestamp(),server_instance=$5 WHERE node_id=$1 AND (boot_id IS DISTINCT FROM $2 OR health='offline' OR health='incompatible' OR server_instance IS DISTINCT FROM $5 OR NOT $6)")
             .bind(node_id).bind(boot_id).bind(version).bind(health).bind(instance).bind(compatible).execute(&mut *tx).await?.rows_affected();
         if changed > 0 {
+            sqlx::query("UPDATE relay_cluster_nodes SET node_control_version=0,state_applied_boot_id=NULL,state_applied_operation_id=NULL,state_applied_admin_state=NULL,state_applied_at=NULL,state_drained=false WHERE node_id=$1")
+                .bind(node_id).execute(&mut *tx).await?;
             sqlx::query("UPDATE relay_cluster_state SET revision=revision+1 WHERE singleton")
                 .execute(&mut *tx)
                 .await?;
@@ -249,7 +251,7 @@ impl PostgresStore {
         // One SQL statement gives revision AND rows the same MVCC snapshot,
         // without a read transaction or row lock. LEFT JOIN preserves the
         // revision when the configured directory is empty.
-        let rows = sqlx::query("SELECT s.revision,n.node_id,n.public_url,n.region,n.weight,n.capacity_mbps,n.admin_state,n.health FROM relay_cluster_state s LEFT JOIN relay_cluster_nodes n ON n.configured WHERE s.singleton ORDER BY n.node_id")
+        let rows = sqlx::query("SELECT s.revision,n.node_id,n.public_url,n.region,n.weight,n.capacity_mbps,n.admin_state,n.health,n.node_control_version,COALESCE(n.state_applied_boot_id=n.boot_id AND n.state_applied_operation_id IS NOT DISTINCT FROM n.operation_id AND n.state_applied_admin_state=n.admin_state AND n.state_applied_at>clock_timestamp()-interval '15 seconds',false) state_applied FROM relay_cluster_state s LEFT JOIN relay_cluster_nodes n ON n.configured WHERE s.singleton ORDER BY n.node_id")
             .fetch_all(&self.pool).await?;
         let revision: i64 = rows
             .first()
@@ -265,13 +267,16 @@ impl PostgresStore {
                 "maintenance" => RelayAdminState::Maintenance,
                 _ => RelayAdminState::Disabled,
             };
-            let health = match row.try_get::<&str, _>("health")? {
+            let mut health = match row.try_get::<&str, _>("health")? {
                 "healthy" => RelayHealth::Healthy,
                 "suspect" => RelayHealth::Suspect,
                 "offline" => RelayHealth::Offline,
                 "incompatible" => RelayHealth::Incompatible,
                 _ => RelayHealth::Starting,
             };
+            if admin_state==RelayAdminState::Active && row.try_get::<i32,_>("node_control_version")?>=1 && !row.try_get::<bool,_>("state_applied")? {
+                health=RelayHealth::Starting;
+            }
             nodes.push(RelayDirectoryNode {
                 node_id: row.try_get("node_id")?,
                 url: row.try_get("public_url")?,

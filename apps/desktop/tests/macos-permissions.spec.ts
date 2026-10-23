@@ -142,7 +142,7 @@ test("the returning program is checked again and opening settings never claims a
   await expect(page.getByRole("status")).toContainText("enable: pab-executor");
   await expect(row).toContainText("Access restricted");
   await page.evaluate(() => { (window as any).fixture.disk.executor.state = "normal"; window.dispatchEvent(new Event("focus")); });
-  await expect(row).toContainText("Granted");
+  await expect(row).toContainText("Normal");
   await expect(app(page).getByRole("group", { name: "File access", exact: true })).toContainText("Access restricted");
 });
 
@@ -170,5 +170,5 @@ test("a pending file check leaves the page responsive and queues one recheck on 
   await expect(row).toContainText("Checking");
   await expect(page.getByRole("menuitem", { name: "Preferences", exact: true })).toBeEnabled();
   await page.evaluate(() => { const f = (window as any).fixture; f.disk.executor.state = "normal"; f.holdDisk = ""; f.resolveDisk(); });
-  await expect(row).toContainText("Granted");
+  await expect(row).toContainText("Normal");
 });

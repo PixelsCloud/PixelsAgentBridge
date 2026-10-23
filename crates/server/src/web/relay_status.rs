@@ -54,6 +54,8 @@ pub(super) async fn snapshot(state: &WebState, query: RelayQuery) -> Result<Valu
             WHEN n.health IN ('healthy','starting','suspect') AND (n.last_seen_at IS NULL OR n.server_instance IS DISTINCT FROM $1) THEN 'starting' ELSE n.health END health,
           n.health='healthy' AND COALESCE(n.server_instance=$1,false) AND COALESCE(n.last_seen_at>s.at-($2::bigint*interval '1 second'),false) online,
           COALESCE(n.server_instance=$1,false) sample_current_instance,
+          n.node_control_version,n.state_drained,
+          COALESCE(n.state_applied_boot_id=n.boot_id AND n.state_applied_operation_id IS NOT DISTINCT FROM n.operation_id AND n.state_applied_admin_state=n.admin_state AND n.state_applied_at>s.at-interval '15 seconds' AND n.server_instance=$1,false) state_applied,
           n.agent_version,n.boot_id,n.operation_id,(extract(epoch from n.last_seen_at)*1000)::bigint last_seen,
           (extract(epoch from n.last_seen_at)*1000)::bigint telemetry_sampled_at,
           n.server_instance=$1 AND n.last_seen_at>s.at-($2::bigint*interval '1 second') telemetry_current,
@@ -69,6 +71,7 @@ pub(super) async fn snapshot(state: &WebState, query: RelayQuery) -> Result<Valu
           CASE WHEN r.server_instance=$1 AND r.last_seen_at>s.at-($2::bigint*interval '1 second') THEN 'healthy' ELSE 'offline' END health,
           r.server_instance=$1 AND r.last_seen_at>s.at-($2::bigint*interval '1 second') online,
           r.server_instance=$1 sample_current_instance,
+          0::integer node_control_version,false state_drained,false state_applied,
           r.agent_version,r.telemetry_boot_id boot_id,NULL::uuid operation_id,(extract(epoch from r.last_seen_at)*1000)::bigint last_seen,
           (extract(epoch from r.telemetry_received_at)*1000)::bigint telemetry_sampled_at,
           t.fresh telemetry_current,
@@ -87,7 +90,7 @@ pub(super) async fn snapshot(state: &WebState, query: RelayQuery) -> Result<Valu
     };
     let sql = format!(
         r#"WITH sample AS (SELECT statement_timestamp() at), nodes AS ({nodes}),
-      classified AS (SELECT *,configured AND online AND COALESCE(admin_state='active',true) available,
+      classified AS (SELECT *,configured AND online AND COALESCE(admin_state='active',true) AND (node_control_version=0 OR state_applied) available,
         configured AND admin_state='maintenance' maintenance,configured AND admin_state='disabled' disabled,
         configured AND COALESCE(admin_state<>'disabled',true) AND health<>'healthy' abnormal,NOT configured history FROM nodes),
       filtered AS (SELECT * FROM classified WHERE position(lower($3) in lower(id))>0 AND

@@ -209,12 +209,11 @@ pub fn scan(
         let before = reader
             .stream_position()
             .map_err(|e| LogError::Native(e.to_string()))?;
-        let (raw, complete) = bounded_line(&mut reader)?;
+        let (mut raw, complete) = bounded_line(&mut reader)?;
         if !complete {
             page.exhausted = true;
             break;
         }
-        let after_offset = before.saturating_add(raw.len() as u64);
         let text = std::str::from_utf8(&raw)
             .map_err(|_| LogError::Unverified("Pixels log line is not UTF-8".into()))?;
         let timestamp = text
@@ -224,6 +223,36 @@ pub fn scan(
         let timestamp = DateTime::parse_from_rfc3339(timestamp)
             .map_err(|_| LogError::Unverified("Pixels log timestamp is invalid".into()))?
             .timestamp_millis();
+        let native_level = text.split_whitespace().nth(1).map(str::to_owned);
+        // Tracing messages and captured media stderr can contain continuation
+        // lines without a timestamp. Keep those bytes in their preceding record
+        // instead of aborting the scan and losing all later timestamped events.
+        // The cursor always lands at a record boundary, including after paging.
+        loop {
+            let next_start = reader
+                .stream_position()
+                .map_err(|e| LogError::Native(e.to_string()))?;
+            let (next, complete) = bounded_line(&mut reader)?;
+            let begins_record = std::str::from_utf8(&next)
+                .ok()
+                .and_then(|line| line.split_whitespace().next())
+                .is_some_and(|timestamp| DateTime::parse_from_rfc3339(timestamp).is_ok());
+            if !complete || begins_record {
+                reader
+                    .seek(SeekFrom::Start(next_start))
+                    .map_err(|e| LogError::Native(e.to_string()))?;
+                break;
+            }
+            if raw.len().saturating_add(next.len()) > MAX_LINE {
+                return Err(LogError::Unverified(
+                    "Pixels log record exceeds 16 MiB".into(),
+                ));
+            }
+            raw.extend_from_slice(&next);
+        }
+        let text = std::str::from_utf8(&raw)
+            .map_err(|_| LogError::Unverified("Pixels log record is not UTF-8".into()))?;
+        let after_offset = before.saturating_add(raw.len() as u64);
         if timestamp >= start_unix_ms && timestamp < end_unix_ms {
             if !page.events.is_empty()
                 && (page.events.len() >= max_records || bytes.saturating_add(raw.len()) > max_bytes)
@@ -241,7 +270,7 @@ pub fn scan(
                 source_locator: path.to_string_lossy().into_owned(),
                 native_position: native_position.clone(),
                 timestamp_unix_ms: timestamp,
-                native_level: text.split_whitespace().nth(1).map(str::to_owned),
+                native_level,
                 message: Some(text.to_owned()),
                 raw,
             });
@@ -266,6 +295,90 @@ pub fn scan(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn multiline_media_errors_preserve_raw_bytes_and_resume_at_next_record() {
+        let root = tempfile::tempdir().unwrap();
+        let first = "2026-10-23T03:00:00Z ERROR capture failed\nmedia: Screen capture stopped: 找不到显示器\n  caused by: unavailable window\n";
+        let second = "2026-10-23T04:00:00Z INFO new event\n";
+        fs::write(root.path().join("executor.log"), format!("{first}{second}")).unwrap();
+        let page = scan(
+            root.path(),
+            "pixels-file:executor.log",
+            None,
+            0,
+            i64::MAX,
+            1,
+            4096,
+        )
+        .unwrap();
+        assert_eq!(page.events.len(), 1);
+        assert_eq!(page.events[0].raw, first.as_bytes());
+        assert_eq!(page.events[0].native_level.as_deref(), Some("ERROR"));
+        let next = scan(
+            root.path(),
+            "pixels-file:executor.log",
+            page.next_native_position.as_deref(),
+            0,
+            i64::MAX,
+            1,
+            4096,
+        )
+        .unwrap();
+        assert_eq!(next.events.len(), 1);
+        assert_eq!(next.events[0].raw, second.as_bytes());
+        assert!(next.exhausted);
+        // Filtering out the old multiline event must still reach recent logs.
+        let recent = scan(
+            root.path(),
+            "pixels-file:executor.log",
+            None,
+            1792728000000,
+            i64::MAX,
+            1,
+            4096,
+        )
+        .unwrap();
+        assert_eq!(recent.events.len(), 1);
+        assert_eq!(recent.events[0].raw, second.as_bytes());
+    }
+
+    #[test]
+    fn standalone_unstructured_prefix_is_explicit_and_unfinished_tail_is_not_consumed() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("executor.log");
+        fs::write(
+            &path,
+            "media: no timestamp\n2026-10-23T04:00:00Z INFO later\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            scan(
+                root.path(),
+                "pixels-file:executor.log",
+                None,
+                0,
+                i64::MAX,
+                1,
+                4096
+            ),
+            Err(LogError::Unverified(_))
+        ));
+        let complete = "2026-10-23T04:00:00Z INFO ready\n";
+        fs::write(&path, format!("{complete}2026-10-23T04:01")).unwrap();
+        let page = scan(
+            root.path(),
+            "pixels-file:executor.log",
+            None,
+            0,
+            i64::MAX,
+            1,
+            4096,
+        )
+        .unwrap();
+        assert_eq!(page.events[0].raw, complete.as_bytes());
+        let position = parse_position(page.next_native_position.as_deref().unwrap()).unwrap();
+        assert_eq!(position.offset, complete.len() as u64);
+    }
     #[test]
     fn text_after_preview_boundary_remains_available_for_exact_filtering() {
         let root = tempfile::tempdir().unwrap();

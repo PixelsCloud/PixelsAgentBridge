@@ -1,0 +1,4 @@
+# Public test builds must not depend on a maintainer's private URLs or CA files.
+# Integration fixtures supply their own runtime TOML configuration.
+control_url = ""
+relay_urls = []

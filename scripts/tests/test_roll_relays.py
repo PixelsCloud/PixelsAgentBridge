@@ -58,7 +58,7 @@ class RecoveryTests(unittest.TestCase):
     def test_resume_unknown_update_outcome_reads_status_without_repeating_install(self):
         journal = {'nodes':{'a':{'phase':'deploying','stage':'stage','previous_sha256':'old','target_sha256':'new'}}}
         config = {'nodes':[{'node_id':'a','platform':'windows','artifact':'x'}]}
-        actions = []
+        actions = []; events = []
         class Target:
             def __init__(self, *args):pass
             def install(self, stage, action):
@@ -69,11 +69,20 @@ class RecoveryTests(unittest.TestCase):
         class Api:
             token = 'private'
             def nodes(self):return {'a':{'health':'healthy','admin_state':'active'}}
-            def request(self, *args):return {}
-        with patch.object(roll, 'Target', Target), patch.object(roll, 'unpack_relay', return_value='new'), patch.object(roll, 'probe'), patch.object(roll.time, 'sleep'):
+            def request(self, method, *args):
+                events.append('ack' if method == 'GET' else 'activate')
+                return {'phase':'completed'} if method=='GET' else {}
+        with patch.object(roll, 'Target', Target), patch.object(roll, 'unpack_relay', return_value='new'), patch.object(roll, 'probe', side_effect=lambda *args: events.append('probe')), patch.object(roll.time, 'sleep'):
             roll.run_rollout(config, Path('.'), Api(), journal, lambda:None)
         self.assertEqual(journal['nodes']['a']['phase'], 'done')
         self.assertEqual(actions, ['status'])
+        self.assertEqual(events, ['activate','ack','probe'])
+
+    def test_superseded_activation_is_not_a_confirmation(self):
+        class Api:
+            def request(self, *args):return {'phase':'completed','error_code':'superseded'}
+        with self.assertRaisesRegex(RuntimeError, 'not confirmed'):
+            roll.wait_activation(Api(), 'owned', 10)
 
     def test_rollback_does_not_override_another_operators_maintenance(self):
         journal = {'nodes':{'a':{'phase':'restoring','operation_id':'owned'}}}

@@ -31,6 +31,7 @@ pub struct RelayPolicyRuntime {
     clock: Arc<Mutex<Option<(i64, Instant)>>>,
     cluster_mode: Arc<std::sync::atomic::AtomicBool>,
     diagnostics: Arc<crate::diagnostics::Diagnostics>,
+    node_control: Arc<Mutex<Option<crate::node_control::NodeControl>>>,
 }
 
 impl RelayPolicyRuntime {
@@ -59,6 +60,7 @@ impl RelayPolicyRuntime {
             clock: Arc::default(),
             cluster_mode: Arc::default(),
             diagnostics: Arc::default(),
+            node_control: Arc::default(),
         }
     }
 
@@ -67,6 +69,7 @@ impl RelayPolicyRuntime {
     }
 
     pub(crate) fn enable_cluster(&self, node_id: String, boot_id: uuid::Uuid) {
+        *self.node_control.lock().expect("node control lock") = Some(crate::node_control::NodeControl::new(node_id.clone(), boot_id));
         self.cluster_mode
             .store(true, std::sync::atomic::Ordering::Relaxed);
         *self.probes.lock().expect("probe lock") =
@@ -80,6 +83,15 @@ impl RelayPolicyRuntime {
             .lock()
             .ok()
             .and_then(|p| p.as_ref().and_then(|p| p.applied()))
+    }
+    pub(crate) fn node_flags(&self) -> (bool, bool) {
+        self.node_control.lock().map(|control| control.as_ref().map_or((true,true), |control| control.flags(Instant::now()))).unwrap_or((false,false))
+    }
+    pub(crate) fn node_ack(&self) -> Option<pab_protocol::RelayNodeControlAck> {
+        self.node_control.lock().ok()?.as_ref()?.ack(Instant::now())
+    }
+    pub(crate) fn apply_node_control(&self, snapshot: pab_protocol::RelayNodeControl, started: Instant) -> Result<(), &'static str> {
+        self.node_control.lock().map_err(|_| "node control lock")?.as_mut().ok_or("node control is not enabled")?.apply(snapshot,started,Instant::now())
     }
     pub(crate) fn apply_probe(
         &self,
@@ -270,6 +282,7 @@ impl RelayPolicyRuntime {
 
 impl AccessControl for RelayPolicyRuntime {
     async fn on_connect(&self, request: &ClientRequest) -> Access {
+        if !self.node_flags().0 { return Access::Deny { reason:Some("Relay node is not accepting connections".into()) }; }
         let probe = self.probes.lock().ok().is_some_and(|p| {
             p.as_ref()
                 .is_some_and(|p| p.admits(endpoint_key(request.endpoint_id())))
@@ -292,7 +305,8 @@ impl AccessControl for RelayPolicyRuntime {
                 tokio::time::timeout(std::time::Duration::from_secs(3), completed.changed()).await;
         }
         match self.endpoint_owner(request.endpoint_id()) {
-            Ok(Some(_)) => { self.diagnostics.connected(request.endpoint_id(),request.connection_id(),false);Access::Allow },
+            Ok(Some(_)) if self.node_flags().0 => { self.diagnostics.connected(request.endpoint_id(),request.connection_id(),false);Access::Allow },
+            Ok(Some(_)) => Access::Deny { reason:Some("Relay node is not accepting connections".into()) },
             Ok(None) | Err(_) => Access::Deny {
                 reason: Some("endpoint is not admitted by a current policy".to_owned()),
             },
@@ -347,6 +361,7 @@ impl ForwardingControl for RelayPolicyRuntime {
         usage.entry(key).or_default().add(&value);
     }
     fn check(&self, src: EndpointId, dst: EndpointId, bytes: usize) -> ForwardingDecision {
+        if !self.node_flags().1 { return ForwardingDecision::Drop; }
         let Ok(now_unix_ms) = self.policy_now() else {
             return ForwardingDecision::Drop;
         };

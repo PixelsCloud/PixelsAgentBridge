@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import { designFixture } from './support/designFixture';
 
 async function fixture(page: Page, admin = true, total = 0) {
+  await designFixture(page, { language: 'en', ordinary: !admin });
   let limit = 10;
   const writes: unknown[] = [];
   const requests: URL[] = [];
@@ -21,7 +23,7 @@ async function fixture(page: Page, admin = true, total = 0) {
     } else if (path === '/accounts') data = { items: [{ ...viewer, status: 'active', revision: 1, relay_limit_mbps: limit }], total: 1, page: 1, page_size: 20 };
     else if (path === '/accounts/test-user/traffic') {
       const body = route.request().postDataJSON(); writes.push(body); limit = body.mbps; data = {};
-    } else throw new Error(`Unexpected fixture request: ${path}`);
+    } else return route.fallback();
     await route.fulfill({ json: data });
   });
   return { writes, requests };

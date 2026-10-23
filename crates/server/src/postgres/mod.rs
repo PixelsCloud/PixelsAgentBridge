@@ -27,6 +27,7 @@ mod migration;
 mod relay_budget;
 mod relay_cluster;
 mod relay_capacity;
+mod relay_node_control;
 mod relay_maintenance;
 pub use relay_maintenance::RelayMaintenanceOperation;
 mod guest_access;

@@ -18,15 +18,19 @@ from test_android_remote import ROOT, installed_apk_sha256
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
-    parser.add_argument('--operator-run-id', required=True, type=uuid.UUID)
+    parser.add_argument('--operator-run-id', type=uuid.UUID)
+    parser.add_argument('--operator-config', type=Path)
+    parser.add_argument('--output-root', type=Path, default=ROOT / '.build/android/port-forward')
     parser.add_argument('--device-code', required=True)
     parser.add_argument('--apk-sha256', required=True)
     parser.add_argument('--mcp-executable', required=True, type=Path)
     args = parser.parse_args()
     assert installed_apk_sha256(args.serial) == args.apk_sha256
-    directory = ROOT / '.build/android/port-forward' / str(uuid.uuid4())
+    if not args.operator_config and not args.operator_run_id:
+        parser.error('Provide --operator-config or --operator-run-id')
+    operator_config = args.operator_config or ROOT / '.build/android/public' / str(args.operator_run_id) / 'mcp.toml'
+    directory = args.output_root.resolve() / str(uuid.uuid4())
     directory.mkdir(parents=True)
-    operator = ROOT / '.build/android/public' / str(args.operator_run_id)
     remote = '/workspace/pixels-forward-' + directory.name
     result = {'status': 'failed', 'serial': args.serial, 'apk_sha256': args.apk_sha256,
         'mcp_sha256': hashlib.sha256(args.mcp_executable.read_bytes()).hexdigest(),
@@ -34,6 +38,7 @@ def main():
         'forced_relay': True, 'checks': [], 'remote_root': remote, 'cleanup_pending': False,
         'full_android_acceptance': False, 'physical_usb_unplug_tested': False, 'eight_hour_soak_tested': False}
     home = Home(args.serial)
+    before = normal_status(args.serial)
     client = None
     forwards, tasks, sockets = {}, set(), []
     generation = 0
@@ -52,7 +57,7 @@ def main():
         nonlocal client, generation
         if client is None:
             generation += 1
-            client = PublicMcp(operator / 'mcp.toml', args.device_code, True,
+            client = PublicMcp(operator_config, args.device_code, True,
                 directory / f'mcp-{generation}.log', args.mcp_executable)
         value, raw = client.connect()
         assert value.get('connected') and not raw.get('isError'), value
@@ -138,17 +143,11 @@ def main():
         return port
 
     try:
-        home.start(); home.set_paused(True); connect()
+        home.start(); connect()
         catalog = client.rpc('tools/list', {})
         (directory / 'catalog.json').write_text(json.dumps(catalog, indent=2, ensure_ascii=False), encoding='utf-8')
         assert {'pab_port_forward_open', 'pab_port_forward_status', 'pab_port_forward_close'} <= {t['name'] for t in catalog['tools']}
-        paused = open_forward(9)
-        with local(paused) as sock: closed(sock)
-        denied = wait_status(paused, lambda v: v['failed_connections'] == 1)
-        assert 'control_paused' in denied['last_error'], denied
-        close_forward(paused)
-        passed('existing_mcp_contract_and_pause_before_destination_connect')
-        home.set_paused(False)
+        passed('existing_mcp_port_forward_contract')
         file('pab_mkdir', {'path': remote, 'parents': False, 'exist_ok': False})
         result['cleanup_pending'] = True
         fixture = '''case "$1" in
@@ -217,14 +216,19 @@ esac
         assert again['state'] == 'closed' and again['active_connections'] == 0
         rebound = open_forward(echo_port, local_port=echo['local_port']); exchange(rebound, b'rebound'); close_forward(rebound)
         passed('close_cancels_sockets_is_idempotent_and_releases_local_port')
-        paused_live = open_forward(echo_port)
-        held = local(paused_live); held.sendall(b'pause'); assert receive_exact(held, 5) == b'pause'; sockets.append(held)
-        home.start(); home.set_paused(True); closed(held); sockets.clear()
-        wait_status(paused_live, lambda v: v['active_connections'] == 0)
-        with local(paused_live) as denied: closed(denied)
-        wait_status(paused_live, lambda v: 'control_paused' in (v.get('last_error') or '')); close_forward(paused_live)
-        passed('normal_pause_closes_active_sockets_and_denies_new_relays')
-        home.set_paused(False)
+        stopped_live = open_forward(echo_port)
+        held = local(stopped_live); held.sendall(b'stop'); assert receive_exact(held, 4) == b'stop'; sockets.append(held)
+        home.stop(); closed(held); sockets.clear()
+        wait_status(stopped_live, lambda v: v['active_connections'] == 0)
+        try:
+            denied = local(stopped_live)
+        except ConnectionRefusedError:
+            pass  # The listener may already have closed after the transport stopped.
+        else:
+            with denied: closed(denied)
+        close_forward(stopped_live)
+        passed('normal_device_disconnect_closes_active_sockets_and_denies_new_relays')
+        home.start(); connect()
         fresh_port = server('echo'); fresh = open_forward(fresh_port)
         held = local(fresh); held.sendall(b'disconnect'); assert receive_exact(held, 10) == b'disconnect'; sockets.append(held)
         call('pab_disconnect', device=True); closed(held); sockets.clear()
@@ -260,14 +264,17 @@ esac
                 except Exception as e: result.setdefault('cleanup_errors', []).append(type(e).__name__)
             if result['cleanup_pending']:
                 try:
-                    home.start(); home.set_paused(False); file('pab_file_delete', {'path': remote, 'recursive': True})
+                    home.start(); file('pab_file_delete', {'path': remote, 'recursive': True})
                     result['cleanup_pending'] = False
                 except Exception as e: result.setdefault('cleanup_errors', []).append(type(e).__name__)
             try: call('pab_disconnect', device=True)
             except Exception as e: result.setdefault('cleanup_errors', []).append(type(e).__name__)
             client.close()
         try:
-            home.start(); home.set_paused(True); state = normal_status(args.serial)
+            if before['connection_requested']: home.start()
+            else: home.stop()
+            state = normal_status(args.serial)
+            assert all(state.get(k) == before.get(k) for k in ('paused', 'connection_requested'))
             result['final_state'] = {k: state.get(k) for k in ('phase', 'remote_ready', 'paused', 'accessibility_ready')}
         except Exception as e: result.setdefault('cleanup_errors', []).append(type(e).__name__)
         if result.get('cleanup_errors') or result['cleanup_pending']: result['status'] = 'failed'

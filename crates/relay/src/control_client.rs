@@ -23,6 +23,17 @@ pub struct RelayControlClient {
 }
 
 impl RelayControlClient {
+    pub(crate) async fn sync_node_control(&mut self, boot_id: uuid::Uuid, runtime: &RelayPolicyRuntime, metrics: Option<&iroh_relay::server::Metrics>) -> Result<(), RelayControlClientError> {
+        let request_id = RequestId::new();
+        let started = std::time::Instant::now();
+        let connections = metrics.map_or(0, |metrics| metrics.accepts.get().saturating_sub(metrics.disconnects.get()));
+        let request = RelayControlClientMessage::GetNodeControl { request_id, node_id:self.node_id.clone(),boot_id,connections,applied:runtime.node_ack() };
+        match self.exchange(&request).await? {
+            RelayControlServerMessage::NodeControl { request_id:id,snapshot } if id==request_id => runtime.apply_node_control(snapshot,started).map_err(|_| RelayControlClientError::UnexpectedMessage),
+            RelayControlServerMessage::Error {code,message,..} => Err(RelayControlClientError::Server{code,message}),
+            _ => Err(RelayControlClientError::UnexpectedMessage),
+        }
+    }
     pub(crate) async fn retire(
         &mut self,
         boot_id: uuid::Uuid,
@@ -144,7 +155,9 @@ impl RelayControlClient {
                 heartbeat_seconds,
                 capacity_bytes_per_second,
                 diagnostics_version,
+                node_control_version,
             } if id == request_id && (1..=30).contains(&heartbeat_seconds) => {
+                if node_control_version != Some(pab_protocol::RELAY_NODE_CONTROL_VERSION) { return Err(RelayControlClientError::UnexpectedMessage); }
                 self.heartbeat_interval = Some(Duration::from_secs(heartbeat_seconds));
                 self.diagnostics_supported=diagnostics_version==Some(pab_protocol::RELAY_DIAGNOSTICS_VERSION);
                 Ok((

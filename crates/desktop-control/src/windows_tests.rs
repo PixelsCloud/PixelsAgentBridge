@@ -83,6 +83,15 @@ fn native_monitor_input_observes_pointer_and_fixture_click() {
         / i64::from(target.scale_percent)) as u32;
     let y = ((i64::from(rect.top) + 155 - i64::from(target.y)) * 100
         / i64::from(target.scale_percent)) as u32;
+    let (native_x, native_y) = target.native_point(x, y).unwrap();
+    // Native test execution shares a desktop with the test operator. Place only
+    // our disposable window above other windows and verify the hit target
+    // before dispatch, rather than accidentally clicking an occluding app.
+    assert_ne!(unsafe {
+        SetWindowPos(fixture.id as usize as HWND, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+    }, 0);
+    assert_eq!(unsafe { WindowFromPoint(POINT { x: native_x, y: native_y }) } as usize as u32, fixture.id);
     let input = MonitorInput {
         target,
         action: MonitorAction::Click {
@@ -129,6 +138,14 @@ struct Fixture {
 }
 impl Fixture {
     fn new(ignore_close: bool) -> Self {
+        // The input engine establishes per-monitor DPI awareness. Initialize it
+        // before creating/measuring windows so earlier tests cannot change this
+        // fixture's coordinate units halfway through a click.
+        let _ = enigo::Enigo::new(&enigo::Settings {
+            open_prompt_to_get_permissions: false,
+            ..enigo::Settings::default()
+        })
+        .unwrap();
         let (tx, rx) = mpsc::channel();
         let worker = thread::spawn(move || unsafe {
             let instance = GetModuleHandleW(std::ptr::null());
@@ -197,7 +214,10 @@ impl Fixture {
                 text.as_mut_ptr(),
                 text.len() as i32,
             );
-            String::from_utf16(&text[..n as usize]).unwrap()
+            // SendInput delivers emoji as two UTF-16 messages. A polling read
+            // may observe just the high surrogate; only the final exact text
+            // assertion proves complete delivery.
+            String::from_utf16_lossy(&text[..n as usize])
         }
     }
 }

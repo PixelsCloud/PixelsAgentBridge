@@ -131,3 +131,20 @@ portal stays on an automatically assigned loopback port.
 BuildKit retains Cargo caches. Use the [build entry point](../../BUILDING.md) for
 versioned incremental builds. See [Web deployment](../../docs/WEB_DEPLOYMENT.md) for
 proxy setup. Task history stays local; Server/Web neither receive nor display it.
+
+## Relay node state confirmation
+
+Upgrade the central Server before the Relay services. The new Relay requires the
+Server's node-control capability and fails closed when it is unavailable. The
+Web console marks disable/resume as pending until the current Relay process
+acknowledges the operation. Disable rejects new clients and forwarding, closes
+existing Relay sockets, and completes only after the node reports zero sockets.
+Maintenance rejects new clients immediately and disconnects remaining sockets at
+the configured deadline (30 seconds by default), then acknowledges readiness.
+A timer alone is not proof of disconnection. Healthy P2P connections remain open.
+
+Run forwarding probes after activation is confirmed; maintenance deliberately
+rejects new Relay connections. The rollout helper waits for confirmation before
+probing. Old Relay versions cannot acknowledge the new lifecycle: the initial
+upgrade must wait the full grace period and replace the old process explicitly,
+without treating that elapsed wait as a confirmed drain.

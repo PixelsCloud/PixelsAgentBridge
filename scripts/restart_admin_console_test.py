@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tomllib
 from urllib.parse import urlsplit
 import psutil
@@ -17,6 +18,11 @@ def main():
     parser.add_argument('--stop',action='store_true')
     args=parser.parse_args()
     config=args.config.resolve()
+    if config.is_relative_to(ROOT / 'smoke/local'):
+        sys.path.insert(0, str(ROOT))
+        from smoke.web_fixture import restart
+        print(json.dumps(restart(config, stop=args.stop)))
+        return
     fixture_info(config)
     relative=config.relative_to(ROOT / '.build/admin-console')
     settings=tomllib.loads(config.read_text(encoding='utf-8'))

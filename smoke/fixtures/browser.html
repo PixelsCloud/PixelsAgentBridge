@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><title>Pixels smoke fixture</title>
+<style>body{font:18px sans-serif;padding:24px}label,button{display:block;margin:16px 0}#drop{border:2px dashed #777;padding:30px}#bottom{margin-top:1100px}</style>
+<h1>Pixels smoke fixture</h1>
+<label>Name <input id="name" aria-label="Name"></label>
+<label><input id="check" type="checkbox"> Enabled</label>
+<label>Platform <select id="platform" aria-label="Platform"><option value="windows">Windows</option><option value="linux">Linux</option><option value="android">Android</option></select></label>
+<button id="save" onclick="out.textContent=nameInput.value+' / '+platform.value+' / '+check.checked">Save</button>
+<output id="out" aria-live="polite">Not saved</output>
+<button id="dialog" onclick="out.textContent=prompt('Smoke prompt','')??'cancelled'">Prompt</button>
+<div id="drag" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','Pixels drag')">Drag source</div>
+<div id="drop" ondragover="event.preventDefault()" ondrop="event.preventDefault();this.textContent=event.dataTransfer.getData('text/plain')">Drop target</div>
+<a id="download" download="pixels-smoke.txt" href="data:text/plain,Pixels%20smoke%20download">Download fixture</a>
+<label>Upload <input type="file" id="upload" onchange="out.textContent=this.files[0]?.name??'none'"></label>
+<table id="table"><tr><th>Platform</th><th>Count</th></tr><tr><td>Android</td><td>1</td></tr></table>
+<div id="bottom">Bottom marker</div>
+<script>const nameInput=document.getElementById('name');console.info('Pixels smoke fixture ready');</script>
+</html>

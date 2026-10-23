@@ -18,6 +18,8 @@
     <string name="product_name_failed">Could not update the device name. Try again.</string>
     <string name="product_copy_code">Copy device code</string>
     <string name="product_code_copied">Device code copied</string>
+    <string name="product_copy_password">Copy password</string>
+    <string name="product_password_copied">Password copied</string>
     <string name="product_online">Online</string>
     <string name="product_offline">Offline</string>
     <string name="product_control_paused">Remote control is paused</string>

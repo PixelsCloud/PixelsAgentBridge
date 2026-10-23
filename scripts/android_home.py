@@ -21,6 +21,8 @@ from test_android_remote import ROOT, PACKAGE, adb, installed_apk_sha256
 LABELS = {
     'tab_home':('首页', 'Home'),
     'tab_access':('访问', 'Access'),
+    'tab_settings':('设置', 'Settings'),
+    'connection_settings':('连接设置', 'Connection settings'),
     'permission_workspace':('仅使用工作目录', 'Use workspace only'),
     'permission_check':('检查应用权限', 'Check app permissions'),
     'permission_continue':('授权并继续', 'Authorize and continue'),
@@ -104,8 +106,30 @@ class Home:
                 time.sleep(.2)
         raise RuntimeError('The normal control pause toggle did not reach its persisted state')
 
+    def stop(self):
+        """Use the current product's connection switch and verify persisted stop."""
+        adb(self.serial, 'shell', 'am', 'start', '-f', '0x14000000', '-n',
+            f'{PACKAGE}/com.pixels.agent.MainActivity')
+        time.sleep(.5)
+        self.click('disconnect', already='connect')
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            status = normal_status(self.serial)
+            if not status['connection_requested'] and not status['remote_ready']:
+                intent = tomllib.loads(adb(self.serial, 'shell', 'run-as', PACKAGE,
+                    'cat', 'no_backup/control-intent.toml'))
+                if not intent['connection_requested']:
+                    return
+            time.sleep(.2)
+        raise RuntimeError('Normal disconnect did not stop the persisted connection')
+
     def click(self, key, *, already=None):
-        tab = ('tab_home' if key in ('connect', 'disconnect', 'pause', 'resume', 'show', 'hide', 'rotate')
+        if key in ('connect', 'disconnect'):
+            # Connection controls moved to Settings in the product navigation.
+            # Only navigate; never rewrite stored server settings to prepare a test.
+            self.click('tab_settings')
+            self.click('connection_settings', already=key)
+        tab = ('tab_home' if key in ('pause', 'resume', 'show', 'hide', 'rotate')
                else 'tab_access' if key in ('permission_check', 'install_settings') else None)
         if tab:
             tree = self.tree()

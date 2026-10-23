@@ -1,0 +1,3 @@
+# Full self-tests/release checks and isolated HTTPS fixtures; the runner is stdlib-only.
+cryptography>=44,<47
+psutil>=6,<8

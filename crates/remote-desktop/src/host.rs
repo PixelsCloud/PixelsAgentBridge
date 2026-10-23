@@ -31,6 +31,7 @@ pub struct MediaFrame {
 /// dropped, including cancellation while next_frame is pending. No archives.
 pub trait DesktopSource: Send {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame>;
+    fn capture_timings(&self) -> Option<DesktopCaptureTimings> { None }
     /// In-place budget changes must preserve reference frames and geometry.
     /// None opts out; zero restores the original encoder quality.
     fn encoding_budget(&self) -> Option<u32> { None }
@@ -122,6 +123,7 @@ struct Generation {
     frame_ready: AtomicBool,
     progress: Mutex<crate::flow::VideoFlow>,
     encoding_budget: Mutex<Option<u32>>,
+    diagnostics: Mutex<super::diagnostics::ProducerDiagnostics>,
     credit: Notify,
     backlog_changed: Notify,
 }
@@ -152,6 +154,7 @@ impl Generation {
             frame_ready: AtomicBool::new(false),
             progress: Mutex::new(flow),
             encoding_budget: Mutex::new(None),
+            diagnostics: Mutex::new(super::diagnostics::ProducerDiagnostics::new()),
             credit: Notify::new(),
             backlog_changed: Notify::new(),
         })
@@ -423,7 +426,11 @@ impl DesktopHost {
                 tokio::select! {
                     _ = cancelled(&entry.cancelled) => break,
                     _ = tokio::time::sleep_until(deadline) => {
-                        if Instant::now() >= *entry.last_seen.lock().unwrap() + Duration::from_millis(LEASE_MS.into()) { break; }
+                        if Instant::now() >= *entry.last_seen.lock().unwrap() + Duration::from_millis(LEASE_MS.into()) {
+                            tracing::warn!(session = %entry.id, lease_ms = LEASE_MS,
+                                "remote desktop control lease expired");
+                            break;
+                        }
                     }
                 }
             }
@@ -500,6 +507,23 @@ impl DesktopHost {
                     });
                 match result {
                     Ok(snapshot) => reply(&mut stream, RemoteDesktopReply::Quality { snapshot }, timeout).await?,
+                    Err(error) => rejected(&mut stream, error, timeout).await?,
+                }
+            }
+            RemoteDesktopRequest::Diagnostics { version, session_id, generation } => {
+                let result = self.entry(owner, account, session_id, false)
+                    .and_then(|entry| entry.video(generation))
+                    .and_then(|video| {
+                        if version != DESKTOP_DIAGNOSTICS_VERSION {
+                            return Err(DesktopError::reject(DesktopErrorCode::Unsupported,
+                                "unsupported desktop diagnostics version"));
+                        }
+                        // Lock order matches the writer: flow then diagnostics.
+                        let flow = video.progress.lock().unwrap();
+                        Ok(video.diagnostics.lock().unwrap().snapshot(&video.config, &flow, Instant::now()))
+                    });
+                match result {
+                    Ok(snapshot) => reply(&mut stream, RemoteDesktopReply::Diagnostics { snapshot }, timeout).await?,
                     Err(error) => rejected(&mut stream, error, timeout).await?,
                 }
             }
@@ -605,7 +629,14 @@ impl DesktopHost {
                     biased;
                     _ = cancelled(&entry.cancelled) => {},
                     _ = cancelled(&video.cancelled) => {},
-                    result = self.video(&video, stream, timeout) => result?,
+                    result = self.video(&video, stream, timeout) => {
+                        if let Err(error) = &result {
+                            let flow = video.progress.lock().unwrap();
+                            let snapshot = video.diagnostics.lock().unwrap().snapshot(&video.config, &flow, Instant::now());
+                            tracing::warn!(%error, pipeline = ?snapshot, "remote desktop producer failed");
+                        }
+                        result?;
+                    },
                 }
             }
             RemoteDesktopRequest::Cursor {
@@ -805,6 +836,7 @@ impl DesktopHost {
         tokio::pin!(peer_end);
         loop {
             let send = async {
+                video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Credit);
                 video.wait_to_capture().await;
                 let budget = video.progress.lock().unwrap().encoding_budget();
                 if source.encoding_budget().is_some_and(|current| current != budget) {
@@ -812,10 +844,14 @@ impl DesktopHost {
                         .await.map_err(|_| DesktopError::Timeout)??;
                     *video.encoding_budget.lock().unwrap() = source.encoding_budget();
                 }
+                video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Capture);
+                let source_start = Instant::now();
                 let media = source.next_frame().await?;
                 if media.bytes.is_empty() || media.bytes.len() > DESKTOP_MAX_FRAME_BYTES {
                     return Err(DesktopError::Protocol("media frame too large or empty"));
                 }
+                video.diagnostics.lock().unwrap().produced(source_start.elapsed(), media.bytes.len(), source.capture_timings());
+                video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Send);
                 let frame_id = video.begin_send()?;
                 let frame = VideoFrame {
                     header: DesktopFrameHeader {
@@ -829,7 +865,9 @@ impl DesktopHost {
                     },
                     bytes: media.bytes,
                 };
+                let send_start = Instant::now();
                 writer.send(&frame, timeout).await?;
+                video.diagnostics.lock().unwrap().sent(send_start.elapsed());
                 video.frame_ready.store(true, Ordering::Release);
                 Ok::<_, DesktopError>(())
             };

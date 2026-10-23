@@ -22,7 +22,9 @@ from test_android_remote import ROOT, PACKAGE, adb, installed_apk_sha256
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--serial', required=True)
-    parser.add_argument('--operator-run-id', required=True, type=uuid.UUID)
+    parser.add_argument('--operator-run-id', type=uuid.UUID)
+    parser.add_argument('--operator-config', type=Path)
+    parser.add_argument('--output-root', type=Path, default=ROOT / '.build/android/execution')
     parser.add_argument('--device-code', required=True)
     parser.add_argument('--apk-sha256', required=True)
     parser.add_argument('--mcp-executable', required=True, type=Path)
@@ -30,9 +32,11 @@ def main():
     args = parser.parse_args()
     if args.restart_app: assert args.serial.startswith('emulator-'), 'App-stop fault is limited to the disposable emulator'
     assert installed_apk_sha256(args.serial) == args.apk_sha256
-    directory = ROOT / '.build/android/execution' / str(uuid.uuid4())
+    if not args.operator_config and not args.operator_run_id:
+        parser.error('Provide --operator-config or --operator-run-id')
+    operator_config = args.operator_config or ROOT / '.build/android/public' / str(args.operator_run_id) / 'mcp.toml'
+    directory = args.output_root.resolve() / str(uuid.uuid4())
     directory.mkdir(parents=True)
-    operator = ROOT / '.build/android/public' / str(args.operator_run_id)
     remote = '/workspace/pixels-command-' + directory.name
     result = {'status': 'failed', 'serial': args.serial, 'apk_sha256': args.apk_sha256,
         'mcp_sha256': hashlib.sha256(args.mcp_executable.read_bytes()).hexdigest(),
@@ -40,18 +44,21 @@ def main():
         'cleanup_pending': False, 'path_probe': True, 'full_android_acceptance': False}
     client = None
     home = Home(args.serial)
+    before = normal_status(args.serial)
     terminals = set()
     tasks = set()
     reconnect_number = 0
 
-    def connect():
+    def connect(*, reuse=False):
         nonlocal client, reconnect_number
-        if client is not None:
+        if client is not None and not reuse:
             call('pab_disconnect')
             client.close()
-        reconnect_number += 1
-        client = PublicMcp(operator / 'mcp.toml', args.device_code, True,
-            directory / f'mcp-{reconnect_number}.log', args.mcp_executable)
+            client = None
+        if client is None:
+            reconnect_number += 1
+            client = PublicMcp(operator_config, args.device_code, True,
+                directory / f'mcp-{reconnect_number}.log', args.mcp_executable)
         value, raw = client.connect()
         assert value.get('connected') and not raw.get('isError'), value
         assert value['target']['execution']['os_family'] == 'android'
@@ -153,18 +160,19 @@ def main():
         return body.decode('utf-8', errors='replace')
 
     try:
-        home.start(); home.set_paused(True); connect()
+        home.start(); connect()
         catalog = client.rpc('tools/list', {})
         encoded = json.dumps(catalog, ensure_ascii=False, indent=2).encode('utf-8')
         (directory / 'catalog.json').write_bytes(encoded)
         result['catalog_sha256'] = hashlib.sha256(encoded).hexdigest()
         result['catalog_tools'] = len(catalog['tools'])
+        home.stop()
         for name, fields in [('pab_run_command', {'program': '/system/bin/sh', 'args': ['-c', 'id']}),
                              ('pab_open_terminal', {})]:
             denied, raw = call(name, fields, error=True)
-            assert raw.get('isError') and 'control_paused' in json.dumps(denied), denied
-        passed('normal_pause_pre_dispatch_gate')
-        home.set_paused(False)
+            assert raw.get('isError') and not (denied.get('task') or denied.get('snapshot')), denied
+        passed('normal_disconnect_pre_dispatch_gate')
+        home.start(); connect(reuse=True)
         file('pab_mkdir', {'path': remote, 'parents': False, 'exist_ok': False})
         result['cleanup_pending'] = True
 
@@ -330,14 +338,14 @@ def main():
 
         _, _, task = command('sleep 120; printf SHOULD_NOT_COMPLETE', wait=False)
         fourth = terminal_open()
-        home.start(); home.set_paused(True)
-        assert wait_task(task)['state'] == 'cancelled'
+        home.stop()
         denied, raw = call('pab_terminal_read', {'session_id': fourth}, error=True, device=False)
-        assert raw.get('isError'), denied
+        assert raw.get('isError') or denied.get('ended'), denied
         terminals.discard(fourth)
-        home.set_paused(False)
+        home.start(); connect(reuse=True)
+        assert wait_task(task)['state'] in ('cancelled', 'interrupted')
         run_ok("printf 'RECOVERED'")
-        passed('pause_stops_active_work_and_fresh_work_recovers')
+        passed('device_disconnect_stops_active_work_and_fresh_work_recovers')
         result['status'] = 'passed'
     finally:
         if client is not None:
@@ -355,7 +363,7 @@ def main():
                 except Exception as error: result.setdefault('cleanup_errors', []).append(type(error).__name__)
             if result['cleanup_pending']:
                 try:
-                    home.start(); home.set_paused(False)
+                    home.start()
                     file('pab_file_delete', {'path': remote, 'recursive': True})
                     result['cleanup_pending'] = False
                 except Exception as error: result.setdefault('cleanup_errors', []).append(type(error).__name__)
@@ -363,8 +371,10 @@ def main():
             except Exception as error: result.setdefault('cleanup_errors', []).append(type(error).__name__)
             client.close()
         try:
-            home.start(); home.set_paused(True)
+            if before['connection_requested']: home.start()
+            else: home.stop()
             state = normal_status(args.serial)
+            assert all(state.get(k) == before.get(k) for k in ('paused', 'connection_requested'))
             result['final_state'] = {key: state.get(key) for key in ('phase','remote_ready','paused','accessibility_ready')}
         except Exception as error:
             result.setdefault('cleanup_errors', []).append(type(error).__name__)

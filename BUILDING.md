@@ -128,12 +128,16 @@ Keep the combined Cargo, CMake, Gradle and nested build concurrency at or below
 - `apps/`: Desktop, Web, Android and agent integrations.
 - `packaging/` and `scripts/`: reproducible builds, deployment templates and checks.
 - `vendor/` and `patches/`: pinned third-party code, local patches and licenses.
-- `acceptance/fixtures/`: deterministic test inputs; `acceptance/tool-coverage.json`
+- `acceptance/fixtures/`: deterministic test inputs; `smoke/tool-coverage.json`
   is the MCP test contract. Keep these inputs in Git.
 - `experiments/remote-desktop/reliable_media.rs` and `media_child.rs`: source inputs
   of the registered `reliable-media` Cargo example; keep both in Git.
 
 ### Checks
+
+Release candidates use the maintained [smoke test entry point](smoke/README.md).
+Definitions and reusable orchestration live in `smoke/`; private environments and
+per-run evidence stay in its ignored `local/` and `runs/` directories.
 
 Run from the repository root, selecting the packages affected by a change:
 
