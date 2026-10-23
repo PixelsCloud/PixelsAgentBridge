@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr, sync::Arc};
+use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
 
 use iroh_relay::server::{CertConfig, QuicConfig, RelayConfig, Server, ServerConfig, TlsConfig};
 
@@ -7,9 +7,57 @@ use super::{
     sync::{PolicySyncSettings, connect_and_sync, spawn_refresh_loop},
     tls::{control_connector, load_server_config},
 };
-use crate::{RelayPolicyRuntime, RelayPolicyState};
+use crate::{RelayControlClientError, RelayPolicyRuntime, RelayPolicyState};
 
 type ServiceResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+
+fn retry_initial_sync(error: &RelayControlClientError) -> bool {
+    use pab_protocol::RelayControlErrorCode;
+    use tokio_tungstenite::tungstenite::Error as WebSocketError;
+    match error {
+        RelayControlClientError::Server {
+            code: RelayControlErrorCode::NodeBusy | RelayControlErrorCode::Internal,
+            ..
+        }
+        | RelayControlClientError::Timeout
+        | RelayControlClientError::Closed => true,
+        RelayControlClientError::WebSocket(WebSocketError::Io(error)) => matches!(
+            error.kind(),
+            std::io::ErrorKind::ConnectionRefused
+                | std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionAborted
+                | std::io::ErrorKind::NotConnected
+                | std::io::ErrorKind::TimedOut
+                | std::io::ErrorKind::Interrupted
+                | std::io::ErrorKind::UnexpectedEof
+        ),
+        RelayControlClientError::WebSocket(WebSocketError::Http(response)) => {
+            response.status().is_server_error()
+        }
+        _ => false,
+    }
+}
+
+async fn initial_sync(
+    settings: &PolicySyncSettings,
+    connector: tokio_tungstenite::Connector,
+    runtime: &RelayPolicyRuntime,
+) -> Result<crate::RelayControlClient, RelayControlClientError> {
+    tokio::time::timeout(Duration::from_secs(60), async {
+        loop {
+            match connect_and_sync(settings, connector.clone(), runtime).await {
+                Ok(client) => return Ok(client),
+                Err(error) if retry_initial_sync(&error) => {
+                    tracing::warn!(%error, "Relay control is not ready during startup; retrying");
+                    tokio::time::sleep(settings.reconnect_interval).await;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+    })
+    .await
+    .map_err(|_| RelayControlClientError::Timeout)?
+}
 
 pub fn check_relay_config(config: &RelayServiceConfig) -> ServiceResult<()> {
     config.validate()?;
@@ -70,7 +118,7 @@ pub async fn start_relay_service(config: RelayServiceConfig) -> ServiceResult<Ru
     if let Some(boot) = sync_settings.boot_id {
         runtime.enable_cluster(config.node_id.clone(), boot);
     }
-    let client = connect_and_sync(&sync_settings, connector.clone(), &runtime).await?;
+    let client = initial_sync(&sync_settings, connector.clone(), &runtime).await?;
 
     let mut relay = RelayConfig::new(config.captive_bind);
     relay.tls = Some(TlsConfig::new(
@@ -142,14 +190,18 @@ pub async fn run_relay_service_until(
     config: RelayServiceConfig,
     stop: impl std::future::Future<Output = ()>,
 ) -> ServiceResult<()> {
-    let mut running = start_relay_service(config).await?;
+    tokio::pin!(stop);
+    let mut running = tokio::select! {
+        running = start_relay_service(config) => running?,
+        _ = &mut stop => return Ok(()),
+    };
 
     enum Stop {
         Signal,
         Server(Result<Result<(), iroh_relay::server::SupervisorError>, tokio::task::JoinError>),
     }
     let stop = tokio::select! {
-        _ = stop => Stop::Signal,
+        _ = &mut stop => Stop::Signal,
         result = running.server.join() => Stop::Server(result),
     };
     running.refresh.abort();
@@ -184,5 +236,72 @@ async fn retire(retirement: Option<(PolicySyncSettings, tokio_tungstenite::Conne
         if !matches!(result, Ok(Ok(()))) {
             tracing::warn!("Relay retirement was not confirmed; previous budgets expire normally");
         }
+    }
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    use pab_protocol::RelayControlErrorCode;
+
+    #[test]
+    fn startup_retries_temporary_failures_and_rejects_identity_or_tls_errors() {
+        let server = |code| RelayControlClientError::Server {
+            code,
+            message: "test rejection".into(),
+        };
+        assert!(retry_initial_sync(&server(RelayControlErrorCode::NodeBusy)));
+        assert!(retry_initial_sync(&server(RelayControlErrorCode::Internal)));
+        assert!(!retry_initial_sync(&server(RelayControlErrorCode::InvalidMessage)));
+        assert!(!retry_initial_sync(&server(RelayControlErrorCode::InvalidPolicyVersion)));
+        for (kind, retry) in [
+            (std::io::ErrorKind::ConnectionRefused, true),
+            (std::io::ErrorKind::InvalidData, false),
+            (std::io::ErrorKind::PermissionDenied, false),
+        ] {
+            let error = RelayControlClientError::WebSocket(
+                tokio_tungstenite::tungstenite::Error::Io(std::io::Error::new(kind, "test")),
+            );
+            assert_eq!(retry_initial_sync(&error), retry);
+        }
+    }
+
+    #[tokio::test]
+    async fn stopping_during_initial_connection_does_not_wait_for_startup_timeout() {
+        let directory = tempfile::tempdir().unwrap();
+        let certified = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let cert = directory.path().join("cert.pem");
+        let key = directory.path().join("key.pem");
+        std::fs::write(&cert, certified.cert.pem()).unwrap();
+        std::fs::write(&key, certified.signing_key.serialize_pem()).unwrap();
+        let control = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = control.local_addr().unwrap().port();
+        drop(control);
+        let config = RelayServiceConfig {
+            cluster_enabled: true,
+            public_url: None,
+            node_id: "startup-test".into(),
+            usage_dir: directory.path().join("usage"),
+            control_url: format!("wss://localhost:{port}/relay-control"),
+            control_secret: "isolated startup test secret 0123456789".into(),
+            control_ca_cert: Some(cert.clone()),
+            tls_cert: cert,
+            tls_key: key,
+            https_bind: "127.0.0.1:0".parse().unwrap(),
+            captive_bind: "127.0.0.1:0".parse().unwrap(),
+            quic_bind: "127.0.0.1:0".parse().unwrap(),
+            policy_refresh_interval: Duration::from_secs(1),
+            reconnect_interval: Duration::from_millis(100),
+            limiter_burst: Duration::from_millis(100),
+        };
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            run_relay_service_until(config, async {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }),
+        )
+        .await
+        .expect("stop must cancel initial connection retries")
+        .unwrap();
     }
 }

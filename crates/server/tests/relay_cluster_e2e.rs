@@ -350,7 +350,19 @@ async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool
         limiter_burst: Duration::from_millis(100),
     };
     drop(reserved_a);
+    // A restored database can retain a fresh heartbeat from a crashed process.
+    // Startup must respect that lease and retry without admitting both boots.
+    let startup = std::time::Instant::now();
+    if diagnostics_only {
+        store
+            .register_relay_boot("a", uuid::Uuid::new_v4(), "crashed-test-process", true, &config, uuid::Uuid::new_v4())
+            .await
+            .unwrap();
+    }
     let relay_a = start_relay_service(relay_config(0)).await.unwrap();
+    if diagnostics_only {
+        assert!(startup.elapsed() >= Duration::from_secs(2));
+    }
     drop(reserved_b);
     let mut relay_b = Some(start_relay_service(relay_config(1)).await.unwrap());
     let relay_c = if three_nodes {

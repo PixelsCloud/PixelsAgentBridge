@@ -150,6 +150,7 @@ pub enum RelayControlServerMessage {
 pub enum RelayControlErrorCode {
     InvalidMessage,
     InvalidPolicyVersion,
+    NodeBusy,
     Internal,
 }
 

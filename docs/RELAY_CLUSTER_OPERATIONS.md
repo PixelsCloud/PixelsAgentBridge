@@ -1,6 +1,6 @@
 # Relay 多节点与滚动升级
 
-此文适用于启用了 `relay.cluster` 的 Server 和 `cluster_enabled=true` 的 Relay。中央 Server 仍是单活控制面；Relay 可以同时运行在原生 Windows、Linux 或容器中。Windows Server 直接运行 `pab-server.exe` 与 `pab-relay-server.exe`，不需要 WSL。PostgreSQL 可以部署在另一台机器。
+此文适用于通过 `relay.directory` 配置节点目录的管理服务和 Relay。中央 Server 仍是单活控制面；Relay 可以同时运行在原生 Windows、Linux 或容器中。Windows Server 直接运行 `pab-server.exe` 与 `pab-relay-server.exe`，不需要 WSL。PostgreSQL 可以部署在另一台机器。
 
 ## 配置与首次切换
 
@@ -14,9 +14,11 @@
 
 `RelayAdminState` 的管理意图与健康状态分开：`active / maintenance / disabled`；`starting / healthy / suspect / offline / incompatible`。只有 active 且 healthy 的节点参与新分配。默认心跳 5 秒、失联 15 秒、恢复观察 10 秒、维护等待 30 秒；均在 Server TOML 配置。降低剩余容量只影响可用带宽，不阻止有备用节点的维护。
 
+节点异常退出或数据库恢复后，目录可能暂时保留旧进程的有效心跳。新进程会按重连间隔等待旧心跳过期，并在启动阶段最多重试 60 秒；管理服务暂时不可达也使用这一有界等待。等待期间可正常停止服务。身份、协议或证书校验失败会立即报错。超过等待期限后，应检查重复节点 ID、管理服务和心跳配置，再重新启动。
+
 ## 原生安装与升级
 
-Server 包含三个程序、Web 资源、安装脚本和配置示例。只复制样例再填写私有配置，升级时不要用样例覆盖现有 TOML。脚本对服务路径和专属目录进行校验，不允许操作 `PixelsAgentBridgeExecutor`。
+管理服务包包含 `pab-server`、Web 资源及部署资料；Relay 包包含 `pab-relay-server`、真实转发探针及节点部署资料。两种包分别安装和升级。只复制样例再填写私有配置，升级时不要用样例覆盖现有 TOML。脚本对服务路径和专属目录进行校验，不允许操作 `PixelsAgentBridgeExecutor`。
 
 Windows 管理员 PowerShell：
 

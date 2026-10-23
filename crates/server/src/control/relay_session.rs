@@ -322,6 +322,11 @@ async fn handle_message(
                         capacity_bytes_per_second,
                     }
                 }
+                Err(crate::StoreError::Conflict(_)) if compatible => error(
+                    Some(request_id),
+                    RelayControlErrorCode::NodeBusy,
+                    "Relay node still has a current process; wait for its heartbeat to expire",
+                ),
                 _ => error(
                     Some(request_id),
                     RelayControlErrorCode::InvalidMessage,

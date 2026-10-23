@@ -99,11 +99,12 @@ def main():
                         program, argv = '/usr/bin/python3', ['-c', script]
                     accepted = client.call('pab_run_command', {'device_code': code, 'program': program,
                         'args': argv, 'wait_ms': 1000, 'timeout_ms': 15000})
+                    sample['command_operation_ref'] = accepted.get('operation_ref')
                     value = client.observe(accepted)
                     assert (value.get('snapshot') or value.get('task'))['state'] == 'succeeded'
-                    text = value.get('output', {}).get('stdout', {}).get('text')
-                    if text is None:
-                        text = client.call('pab_read_output', {'device_code': code, 'task_id': accepted['operation_ref']['task_id'], 'stream': 'stdout', 'max_bytes': 8192})['text']
+                    sample['command_complete'] = value.get('complete')
+                    sample['stdout_range'] = value.get('stdout')
+                    text = client.read_stdout(value, max_bytes=8192)
                     metrics = json.loads(text)
                     assert metrics.pop('marker') == marker
                     assert metrics['threads'] > 0 and metrics['handles'] > 0

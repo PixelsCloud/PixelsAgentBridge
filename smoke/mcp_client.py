@@ -101,7 +101,10 @@ class McpClient:
             # immutable unconfirmed result must be inspected, never replayed or
             # polled forever as if the helper were still doing useful work.
             terminal = result.get('state') in ('completed', 'failed', 'cancelled', 'unconfirmed')
-            terminal |= snapshot.get('state') in ('succeeded', 'failed', 'cancelled')
+            # A command can exit before its output streams finish draining.
+            # An explicit incomplete result must keep observing that same task.
+            terminal |= (snapshot.get('state') in ('succeeded', 'failed', 'cancelled')
+                         and value.get('complete') is not False)
             if terminal or value.get('complete') is True or value.get('error'):
                 return value
             query = {
@@ -111,6 +114,33 @@ class McpClient:
                 query['kind'] = operation['kind']
             value = self.call('pab_get_operation', query, allow_error=True)
         raise TimeoutError(f'Operation {operation["operation_id"]} remains unconfirmed')
+
+    def read_stdout(self, value, *, timeout=15, max_bytes=65536):
+        """Read the original task through EOF; previews and empty chunks are not EOF."""
+        operation = value.get('operation_ref', {})
+        if not operation.get('task_id') or not operation.get('device_code'):
+            raise ValueError('A resolved command task is required')
+        if type(max_bytes) is not int or not 1 <= max_bytes <= 16 * 1024 * 1024 or timeout <= 0:
+            raise ValueError('Invalid bounded output read')
+        deadline = time.monotonic() + timeout
+        offset, chunks = 0, []
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            chunk = self.call('pab_read_output', {
+                'device_code': operation['device_code'], 'task_id': operation['task_id'],
+                'stream': 'stdout', 'offset': offset, 'max_bytes': min(65536, max_bytes - offset + 1),
+                'wait_ms': max(1, min(1000, int(remaining * 1000)))}, timeout=min(45, remaining + 2))
+            next_offset = chunk['next_offset']
+            if (chunk.get('gap') or chunk['offset'] != offset or type(next_offset) is not int
+                    or next_offset < offset or chunk.get('decoding_replacements', 0)):
+                raise ValueError('Original task output is incomplete or invalid')
+            if next_offset > max_bytes:
+                raise ValueError('Original task output exceeds the configured bound')
+            chunks.append(chunk['text'])
+            offset = next_offset
+            if chunk['range']['complete'] and offset >= chunk['range']['available_to']:
+                return ''.join(chunks)
+        raise TimeoutError('Original task output did not reach EOF')
 
     def close(self):
         if self.closed:
