@@ -5,6 +5,12 @@
 
 ## 管理平台与 Relay 发布
 
+当前开发版本的 Windows/Linux 独立服务包及签名清单也提供
+[COS 下载索引](https://pixels-agent-bridge-1251612681.cos.ap-beijing.myqcloud.com/releases/services/2026-10-24.json)。
+索引记录准确版本、源码标签、SHA-256 和每个包的 `release.json` 地址；下载后仍须按下文
+使用另行信任的公钥验证签名。该批次按维护者指令进行开发阶段发布，完整人工冒烟仍未完成，
+实际状态保留在签名清单中。GitHub Release 尚未同步，源码标签已推送。
+
 原生包使用 `python scripts/build.py management --profile release --package` 或
 `python scripts/build.py relay --profile release --package` 构建。Docker 使用
 `docker-management` 或 `docker-relay` 目标，添加 `--package` 导出按镜像 ID 固定的 tar。
