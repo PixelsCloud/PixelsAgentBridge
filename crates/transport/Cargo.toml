@@ -7,7 +7,7 @@ rust-version.workspace = true
 
 [features]
 # Explicit test harness support; absent from shipped binaries.
-test-utils = []
+test-utils = ["iroh/smoke-test-utils"]
 
 [dependencies]
 pab-service-config = { path = "../service-config" }

@@ -282,6 +282,45 @@ test("registration validates confirmation and uses the native HTTP registration 
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((x: any) => x.command === "operator_login_account").length)).toBe(0);
 });
 
+for (const language of ["en", "zh-CN"]) test(`registration rejects invalid normalized account names before submitting (${language})`, async ({ page }) => {
+  await page.goto(`${url}?app=true&language=${language}`);
+  await page.locator(".sidebar-account").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: language === "en" ? "Create account" : "注册账号", exact: true }).click();
+  await dialog.locator("#account-login-password").fill("fixture password");
+  await dialog.locator("#account-confirm-password").fill("fixture password");
+  const username = dialog.locator("#account-login-username");
+  for (const invalid of ["90", "９０", "x".repeat(65), "pc 90", "pc/90", "pc\\90"]) {
+    await username.fill(invalid);
+    await expect(username).toHaveAttribute("aria-invalid", "true");
+    await expect(dialog.locator("#account-username-hint")).toContainText(language === "en" ? "3–64" : "3～64");
+    await expect(dialog.locator('button[type="submit"]')).toBeDisabled();
+    await dialog.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+  }
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((x: any) => x.command === "operator_register_account").length)).toBe(0);
+  await username.fill("pc90");
+  await expect(dialog.locator('button[type="submit"]')).toBeEnabled();
+  await dialog.locator('button[type="submit"]').click();
+  await expect(page.locator(".page-me")).toContainText("Pixels");
+});
+
+for (const [code, text] of [
+  ["account_username_taken", "该账号已存在，请更换账号或直接登录"],
+  ["account_registration_disabled", "当前服务已关闭新账号注册，请联系管理员"],
+  ["account_rate_limited", "操作过于频繁，请稍后重试"],
+]) test(`registration explains server rejection ${code}`, async ({ page }) => {
+  await page.goto(`${url}?app=true&language=zh-CN&accountError=${code}`);
+  await page.locator(".sidebar-account").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "注册账号", exact: true }).click();
+  await dialog.locator("#account-login-username").fill("pc90");
+  await dialog.locator("#account-login-password").fill("fixture password");
+  await dialog.locator("#account-confirm-password").fill("fixture password");
+  await dialog.locator('button[type="submit"]').click();
+  await expect(dialog.getByRole("alert").filter({ hasText: text })).toBeVisible();
+  await expect(dialog).not.toContainText("HTTP");
+});
+
 test("titlebar close uses the native close handler and tray language follows preferences", async ({ page }) => {
   await page.goto(`${url}?app=true&language=en`);
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.some((call: any) => call.command === "set_tray_language" && call.args.language === "en"))).toBe(true);

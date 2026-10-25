@@ -120,7 +120,7 @@ static void cursor_worker(const Display& display, const std::string& capture_tok
             requested = true;
         }
         // Bound native sampling without a busy loop on high-refresh desktops.
-        std::this_thread::sleep_until(next_poll);
+        media_wait::until(next_poll);
         next_poll = Clock::now() + std::chrono::milliseconds(8);
         if (coordination && coordination->active()) {
             if (!win32) {

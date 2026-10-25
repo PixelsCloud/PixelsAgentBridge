@@ -3,6 +3,8 @@
 mod connection;
 mod endpoint;
 mod traffic;
+mod statistics;
+pub use statistics::ConnectionStatistics;
 pub use traffic::DirectTraffic;
 
 pub use connection::{

@@ -56,6 +56,7 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
     return snapshot;
   }
   if (["operator_login_account", "operator_register_account"].includes(command)) {
+    if (params.has("accountError")) throw params.get("accountError");
     if (params.has("slowLogin")) await new Promise<void>(resolve => { fixture.release = resolve; });
     if (fixture.loginError) throw Error("Invalid credentials");
     activeScope = account;

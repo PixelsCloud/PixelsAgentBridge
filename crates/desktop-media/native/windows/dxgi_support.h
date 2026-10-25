@@ -59,6 +59,16 @@ inline bool same_display_layout(const Display& selected, const Display& current)
         selected.dpi_x == current.dpi_x && selected.dpi_y == current.dpi_y;
 }
 
+inline void validate_selected_display_layout(const Display& selected) {
+    Display current;
+    check(selected.output->GetDesc(&current.screen), "Capture output description");
+    if (!current.screen.AttachedToDesktop)
+        throw std::runtime_error("Capture output detached; refresh generation");
+    check(GetDpiForMonitor(current.screen.Monitor, MDT_EFFECTIVE_DPI, &current.dpi_x, &current.dpi_y), "Capture monitor DPI");
+    if (!same_display_layout(selected, current))
+        throw std::runtime_error("Screen changed; refresh generation");
+}
+
 inline std::vector<Display> displays() {
     ComPtr<IDXGIFactory1> factory;
     check(CreateDXGIFactory1(IID_PPV_ARGS(&factory)), "CreateDXGIFactory1");

@@ -13,6 +13,8 @@ pub struct DesktopCaptureTimings {
     pub wait_us: u64,
     /// The native encode call, including conversion/readback if required.
     pub encode_us: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<crate::DesktopCaptureBreakdown>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

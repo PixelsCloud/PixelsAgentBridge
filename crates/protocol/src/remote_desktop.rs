@@ -16,6 +16,9 @@ pub const DESKTOP_QUALITY_SCHEMA_VERSION: u16 = 1;
 #[path = "desktop_diagnostics.rs"]
 mod diagnostics;
 pub use diagnostics::*;
+#[path = "desktop_frame_trace.rs"]
+mod frame_trace;
+pub use frame_trace::*;
 
 /// Optional diagnostics on a separate stream; existing v2 media stays unchanged.
 /// Cadence/budget are sender targets, never measured FPS or delivered bitrate.
@@ -216,6 +219,12 @@ pub enum RemoteDesktopRequest {
         session_id: RequestId,
         generation: u64,
     },
+    Trace {
+        version: u16,
+        session_id: RequestId,
+        generation: u64,
+        after_frame_id: u64,
+    },
     Close {
         session_id: RequestId,
     },
@@ -252,6 +261,9 @@ pub enum RemoteDesktopReply {
     },
     Diagnostics {
         snapshot: DesktopDiagnosticsSnapshot,
+    },
+    Trace {
+        snapshot: DesktopTraceSnapshot,
     },
     Closed,
     Error {

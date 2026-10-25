@@ -1,6 +1,7 @@
 #pragma once
 #include "nvenc_encoder.h"
 #include "mf_decoder.h"
+#include "mf_encoder.h"
 #include <memory>
 #include <optional>
 
@@ -8,6 +9,7 @@
 
 class CaptureEncoder {
     std::unique_ptr<Encoder> hardware_;
+    std::unique_ptr<IntelHardwareEncoder> intel_;
     void* software_ = nullptr;
     ComPtr<ID3D11Device> device_;
     ComPtr<ID3D11DeviceContext> context_;
@@ -18,9 +20,11 @@ class CaptureEncoder {
     double readback_ms_ = 0, codec_ms_ = 0;
     uint64_t frames_ = 0;
     uint32_t budget_ = 0;
+    uint64_t readback_us_ = 0, conversion_us_ = 0, codec_us_ = 0;
     void initialize_software() {
         // Retire NVENC's retained surface/session before constructing fallback.
         hardware_.reset();
+        intel_.reset();
         padded_.Reset();
         D3D11_TEXTURE2D_DESC description{};
         description.Width = width_; description.Height = height_;
@@ -55,14 +59,29 @@ public:
             }
             catch (const std::exception&) {} // Native RAII retires partial GPU setup before fallback.
         }
-        if (fail_encoder_ && !hardware_) throw std::runtime_error("Fault test requires a working hardware encoder");
-        if (!hardware_) initialize_software();
+        if (!force_software && !hardware_) {
+            try { intel_ = std::make_unique<IntelHardwareEncoder>(device,width,height,fps); }
+            catch (const std::exception& error) {
+                std::cerr << "media encoder_unavailable=intel_mf_gpu reason=" << error.what() << '\n';
+            } // Unsupported/partial setup is retired before CPU fallback.
+        }
+        if (fail_encoder_ && !hardware_ && !intel_) throw std::runtime_error("Fault test requires a working hardware encoder");
+        if (!hardware_ && !intel_) initialize_software();
     }
     ~CaptureEncoder() { if (software_) pab_soft_encoder_drop(software_); }
     CaptureEncoder(const CaptureEncoder&) = delete;
     bool software() const { return software_ != nullptr; }
+    const char* name() const { return software_ ? "openh264_software" : intel_ ? "intel_mf_gpu" : "nvenc_gpu"; }
+    uint64_t readback_us() const { return readback_us_; }
+    uint64_t conversion_us() const { return conversion_us_; }
+    uint64_t codec_us() const { return codec_us_; }
     bool budget(uint32_t value) {
         if (value && (value < 150000 || value > 16000000)) throw std::runtime_error("Encoder budget outside bounds");
+        if (intel_) {
+            // Keep the qualified quality mode and surface path. Report optional
+            // rate control as unsupported rather than quietly restarting a live codec.
+            return value == 0;
+        }
         if (hardware_) {
             try { hardware_->budget(value); budget_ = value; return true; }
             catch (const std::exception&) {
@@ -82,9 +101,22 @@ public:
             << " mean_conversion_encode_ms=" << codec_ms_/frames_ << '\n';
     }
     void encode(ID3D11Texture2D* texture, uint64_t index, std::vector<uint8_t>& packet) {
+        readback_us_ = conversion_us_ = codec_us_ = 0;
         D3D11_TEXTURE2D_DESC description{}; texture->GetDesc(&description);
         if (description.Width != width_ || description.Height != height_ || description.Format != DXGI_FORMAT_B8G8R8A8_UNORM || description.ArraySize != 1 || description.SampleDesc.Count != 1)
             throw std::runtime_error("Capture texture changed");
+        if (intel_) {
+            try {
+                if (fail_encoder_ && index == 2) throw std::runtime_error("Injected encoder failure");
+                const auto started = Clock::now();
+                packet = intel_->encode(texture,index);
+                codec_us_ = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-started).count();
+                return;
+            } catch (const std::exception& error) {
+                initialize_software();
+                std::cerr << "media encoder fallback=openh264_software readback_per_frame=1 reason=" << error.what() << '\n';
+            }
+        }
         if (hardware_) {
             try {
                 if (fail_encoder_ && index == 2) throw std::runtime_error("Injected encoder failure");
@@ -106,7 +138,10 @@ public:
                         }
                     }
                 }
-                hardware_->encode(padded_ ? padded_.Get() : texture,index,nullptr,&packet); return;
+                const auto codec_start = Clock::now();
+                hardware_->encode(padded_ ? padded_.Get() : texture,index,nullptr,&packet);
+                codec_us_ = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-codec_start).count();
+                return;
             } catch (const std::exception&) {
                 initialize_software();
                 // Its first published output is a new SPS/PPS + IDR. No failed
@@ -122,9 +157,15 @@ public:
         check(context_->Map(readback_.Get(),0,D3D11_MAP_READ,0,&mapped), "Map software capture");
         const auto mapped_at = Clock::now();
         PabCodecBytes output{};
-        const bool ok = mapped.RowPitch >= width_*4 && pab_soft_encode(software_,static_cast<const uint8_t*>(mapped.pData),
-            size_t(mapped.RowPitch)*(height_-1)+size_t(width_)*4,mapped.RowPitch,&output);
+        const bool prepared = mapped.RowPitch >= width_*4 && pab_soft_prepare_bgra(software_,static_cast<const uint8_t*>(mapped.pData),
+            size_t(mapped.RowPitch)*(height_-1)+size_t(width_)*4,mapped.RowPitch);
+        const auto converted = Clock::now();
         context_->Unmap(readback_.Get(),0);
+        const auto codec_start = Clock::now();
+        const bool ok = prepared && pab_soft_encode_prepared(software_, &output);
+        readback_us_ = std::chrono::duration_cast<std::chrono::microseconds>(mapped_at-started).count();
+        conversion_us_ = std::chrono::duration_cast<std::chrono::microseconds>(converted-mapped_at).count();
+        codec_us_ = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-codec_start).count();
         readback_ms_ += std::chrono::duration<double,std::milli>(mapped_at-started).count();
         codec_ms_ += std::chrono::duration<double,std::milli>(Clock::now()-mapped_at).count();
         ++frames_;

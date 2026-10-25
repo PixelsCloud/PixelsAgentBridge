@@ -65,6 +65,7 @@ allowed_external_types = [
 ]
 
 [features]
+smoke-test-utils = []
 default = [
     "metrics",
     "fast-apple-datapath",

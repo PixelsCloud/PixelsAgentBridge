@@ -23,3 +23,7 @@ pkg-config = "0.3"
 [[bin]]
 name = "pab-media-worker"
 path = "src/main.rs"
+
+[[example]]
+name = "remote_desktop_color"
+path = "../../smoke/remote_desktop_color.rs"

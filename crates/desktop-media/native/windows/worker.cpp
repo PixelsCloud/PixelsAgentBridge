@@ -6,6 +6,7 @@
 #include "software_codec.h"
 #include "wgc_capture.h"
 #include "capture_events.h"
+#include "media_wait_fixture.h"
 #include <d3d11_1.h>
 #include <shellscalingapi.h>
 #include <algorithm>
@@ -22,7 +23,7 @@ static void read_bytes(void* data, uint32_t size, NativePresenter* viewer = null
         DWORD available = 0;
         if (!PeekNamedPipe(GetStdHandle(STD_INPUT_HANDLE), nullptr, 0, nullptr, &available, nullptr))
             throw std::runtime_error("Parent pipe ended");
-        if (!available) { if (idle) idle(); Sleep(2); continue; }
+        if (!available) { if (idle) idle(); media_wait::sleep(std::chrono::milliseconds(2)); continue; }
         DWORD read = 0;
         if (!ReadFile(GetStdHandle(STD_INPUT_HANDLE), cursor, (std::min)(size, static_cast<uint32_t>(available)), &read, nullptr) || !read)
             throw std::runtime_error("Parent pipe read failed");
@@ -116,9 +117,13 @@ static void validate_wgc_desktop(const Display& selected) {
     validate_display_layout(selected);
 }
 static void capture(const Display& display, unsigned fps, const std::string& mode, bool force_software, bool fail_encoder,
-    const std::string& capture_token = {}) {
+    const std::string& capture_token = {}, const std::string& proof_log = {}) {
     const bool synthetic = mode == "synthetic";
-    if (!synthetic && mode != "desktop" && mode != "animate") throw std::runtime_error("Unknown source mode");
+    const bool proof = mode == "desktop-proof";
+    if (!synthetic && mode != "desktop" && mode != "animate" && !proof) throw std::runtime_error("Unknown source mode");
+    if (proof != !proof_log.empty()) throw std::runtime_error("Explicit proof log required only for synthetic pattern checking");
+    std::ofstream proof_output;
+    if (proof) { proof_output.open(proof_log,std::ios::out|std::ios::trunc); if(!proof_output) throw std::runtime_error("Cannot open own proof log"); }
     std::unique_ptr<WgcRuntime> wgc_runtime; // Released after the shared device.
     std::unique_ptr<CaptureEvents> coordination;
     if (!capture_token.empty()) coordination = std::make_unique<CaptureEvents>(capture_token, true);
@@ -161,6 +166,8 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         check(device->CreateRenderTargetView(texture.Get(), nullptr, &target), "Synthetic target");
     }
     CaptureEncoder encoder(device.Get(), width, height, fps, force_software, fail_encoder);
+    std::unique_ptr<pattern_proof::GPU> proof_gpu;
+    if(proof) proof_gpu=std::make_unique<pattern_proof::GPU>(device.Get(),context.Get());
     const auto switch_wgc = [&] {
         if (wgc) return;
         if (synthetic) throw std::runtime_error("Synthetic capture cannot change backend");
@@ -191,7 +198,7 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
         }
         if (coordination && coordination->requested()) switch_wgc();
     };
-    std::cerr << "media encoder=" << (encoder.software() ? "openh264_software readback_per_frame=1" : "nvenc_gpu readback_per_frame=0") << '\n';
+    std::cerr << "media encoder=" << encoder.name() << " readback_per_frame=" << (encoder.software() ? 1 : 0) << '\n';
     write_value(magic); write_value(width); write_value(height);
     const auto start = Clock::now(); auto next = start;
     uint64_t index = 0;
@@ -205,13 +212,14 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
             write_value(applied ? magic : magic + 1);
             continue;
         }
-        if (command != 1 && command != 3) throw std::runtime_error("Invalid capture command");
+        if (command != 1 && command != 3 && command != 4) throw std::runtime_error("Invalid capture command");
         const auto capture_started = Clock::now();
-        std::this_thread::sleep_until(next);
+        media_wait::until(next);
         std::vector<uint8_t> packet;
         auto sampled = Clock::now();
         Clock::time_point encode_started;
         uint64_t encode_us = 0;
+        pattern_proof::Result proof_result;
         {
             FrameLease lease{nullptr};
             if (synthetic) {
@@ -254,25 +262,47 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
                 }
                 sampled = Clock::now();
             }
+            if(proof_gpu) {
+                const RECT visible{0,0,static_cast<LONG>(width),static_cast<LONG>(height)};
+                proof_result=proof_gpu->inspect_texture(texture.Get(),0,visible,"capture",0);
+            }
             encode_started = Clock::now();
             encoder.encode(texture.Get(), index, packet);
             encode_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-encode_started).count());
             // Keep backend switching outside the outstanding DXGI frame lease.
             // Here only reject a layout transition before publishing the frame.
-            if (!synthetic) validate_display_layout(display);
+            // The selected output/DPI still has a per-frame guard. Full adapter
+            // inventory remains in coordinate(), outside the frame hot path.
+            if (!synthetic) validate_selected_display_layout(display);
         }
         if (!synthetic) texture.Reset();
         if (packet.empty() || packet.size() > max_packet) throw std::runtime_error("Encoded frame outside bounds");
+        if(proof_gpu) {
+            proof_output << "{\"frame\":" << index+1 << ",\"pattern\":" << proof_result.pattern
+                << ",\"max_error\":" << proof_result.max_error << ",\"checks\":" << pattern_proof::samples
+                << ",\"encoder\":\"" << encoder.name() << "\""
+                << ",\"fingerprint\":\"" << std::hex << pattern_proof::fingerprint(packet) << std::dec << "\"}\n";
+            proof_output.flush();
+            if(!proof_output) throw std::runtime_error("Synthetic proof log write failed");
+        }
+        const auto native_total_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-capture_started).count());
         write_value(static_cast<uint32_t>(packet.size())); write_value(index);
         write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(sampled-start).count()));
         write_value(static_cast<uint32_t>(idr(packet)));
-        if (command == 3) {
+        if (command == 3 || command == 4) {
             write_value(static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(encode_started-capture_started).count()));
             write_value(encode_us);
         }
+        if (command == 4) {
+            write_value(native_total_us); write_value(encoder.readback_us());
+            write_value(encoder.conversion_us()); write_value(encoder.codec_us());
+        }
         write_bytes(packet.data(), static_cast<uint32_t>(packet.size()));
         ++index;
-        next = (std::max)(next + std::chrono::microseconds(1000000/fps), Clock::now());
+        // Anchor to the frame actually sampled, rather than a deadline from
+        // before a credit/static-screen pause. Otherwise that pause allows
+        // two immediate captures while the old schedule catches up.
+        next = sampled + std::chrono::microseconds(1000000/fps);
     }
 }
 static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, unsigned fps, bool interactive) {
@@ -281,14 +311,24 @@ static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, uns
     uint64_t expected = 0;
     uint64_t cursor_sequence = 0;
     std::deque<std::pair<LONGLONG, uint64_t>> pending;
+    std::deque<Clock::time_point> decode_started;
     auto last_output = Clock::now();
     const auto consume = [&](DecodedFrame& frame) {
         if (pending.empty() || pending.front().first != frame.timestamp)
             throw std::runtime_error("Decoder reordered or invented a timestamp");
         const auto index = pending.front().second;
+        const auto rendering = Clock::now();
+        const auto decode_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(rendering-decode_started.front()).count());
         presenter.render(frame, index);
+        const auto render_us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-rendering).count());
+        decode_started.pop_front();
         pending.pop_front(); last_output = Clock::now();
-        write_value(uint8_t(2)); write_value(index);
+        if(presenter.pattern_proof_enabled()) {
+            write_value(uint8_t(8)); write_value(index); write_value(uint32_t(presenter.proof_pattern));
+            write_value(uint32_t(presenter.proof_decoded_error)); write_value(uint32_t(presenter.proof_rendered_error));
+            write_value(uint32_t(pattern_proof::samples*2));
+        }
+        write_value(uint8_t(7)); write_value(index); write_value(decode_us); write_value(render_us);
     };
     const auto drain_ready = [&] {
         if (pending.empty()) return;
@@ -326,13 +366,15 @@ static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, uns
         std::vector<uint8_t> packet(size); read_bytes(packet.data(), size, &presenter, drain_ready);
         const LONGLONG timestamp = static_cast<LONGLONG>(index) * 10000000 / fps;
         const auto deadline = Clock::now() + std::chrono::seconds(2);
+        const auto decoding = Clock::now();
         while (!decoder.try_submit(packet, timestamp)) {
             drain_ready(); presenter.pump();
             if (Clock::now() >= deadline) throw std::runtime_error("Decoder backpressure timed out");
-            Sleep(1);
+            media_wait::sleep(std::chrono::milliseconds(1));
         }
         if (pending.empty()) last_output = Clock::now();
         pending.emplace_back(timestamp, index);
+        decode_started.push_back(decoding);
         // Acceptance permits another compressed packet, but gives no network
         // credit and never enables input. Only event 2 confirms rendered output.
         write_value(uint8_t(1)); write_value(index); ++expected;
@@ -340,7 +382,7 @@ static void render_stream(VideoDecoder& decoder, NativePresenter& presenter, uns
         if (pending.size() > 4) throw std::runtime_error("Decoder exceeds the four-frame latency budget");
     }
 }
-static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive, bool streaming, bool force_software) {
+static void render(const Display& display, unsigned width, unsigned height, unsigned fps, bool verify, HWND parent, unsigned rotation, bool interactive, bool streaming, bool force_software, bool proof = false) {
     MediaRuntime runtime;
     ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
     check(D3D11CreateDevice(display.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
@@ -350,6 +392,7 @@ static void render(const Display& display, unsigned width, unsigned height, unsi
     NativePresenter presenter;
     presenter.input_available(interactive);
     presenter.initialize(device.Get(), width, height, fps, display.screen.DesktopCoordinates, true, verify, parent, rotation);
+    if(proof) presenter.enable_pattern_proof();
     write_value(magic);
     if (streaming) {
         try { render_stream(decoder, presenter, fps, interactive); }
@@ -403,6 +446,17 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
     try {
         if (const auto result = user_capture::run(argc, argv)) return *result;
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (argc == 2 && std::string(argv[1]) == "media-timing-check") {
+            media_timing_check(); return 0;
+        }
+        if (argc == 2 && std::string(argv[1]) == "pattern-proof-check") {
+            pattern_proof::fixture(); std::cout << "{\"status\":\"passed\",\"negative_cases\":15,\"desktop_access\":false}\n"; return 0;
+        }
+        if (argc == 3 && std::string(argv[1]) == "media-priority-check" && std::string(argv[2]) == "inventory") {
+            if (GetPriorityClass(GetCurrentProcess()) != NORMAL_PRIORITY_CLASS)
+                throw std::runtime_error("Media worker inherited background priority");
+            std::cout << R"([{"id":"media-priority-fixture","name":"Synthetic priority fixture","x":0,"y":0,"desktop_width":64,"desktop_height":64,"pixel_width":64,"pixel_height":64,"scale_milli":1000,"rotation":"identity","primary":true}])" << '\n'; return 0;
+        }
         if (argc == 2 && std::string(argv[1]) == "viewer-chrome-check") {
             viewer_chrome_check(); return 0;
         }
@@ -422,6 +476,29 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             InputReleases releases(input_recovery_path()); recover_input(releases); return 0;
         }
         const auto found = displays();
+        if (argc == 2 && std::string(argv[1]) == "display-layout-check") {
+            if (found.empty()) throw std::runtime_error("No display for layout check");
+            unsigned rejected = 0;
+            for (const auto& current : found) {
+                validate_selected_display_layout(current);
+                for (unsigned mutation = 0; mutation < 5; ++mutation) {
+                    auto stale = current;
+                    switch (mutation) {
+                        case 0: ++stale.screen.DesktopCoordinates.right; break;
+                        case 1: stale.screen.Rotation = current.screen.Rotation == DXGI_MODE_ROTATION_IDENTITY
+                            ? DXGI_MODE_ROTATION_ROTATE90 : DXGI_MODE_ROTATION_IDENTITY; break;
+                        case 2: stale.screen.Monitor = nullptr; break;
+                        case 3: ++stale.dpi_x; break;
+                        case 4: ++stale.dpi_y; break;
+                    }
+                    try { validate_selected_display_layout(stale); }
+                    catch (const std::runtime_error&) { ++rejected; continue; }
+                    throw std::runtime_error("Stale capture layout accepted");
+                }
+            }
+            std::cout << "{\"displays\":" << found.size() << ",\"stale_layouts_rejected\":" << rejected << "}\n";
+            return 0;
+        }
         if (argc == 3 && std::string(argv[1]) == "input-fixture" && !found.empty()) {
             input_fixture(found.front(), number(argv[2], 120)); return 0;
         }
@@ -452,18 +529,18 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             const auto start = Clock::now();
             for (uint64_t frame = 0; frame < uint64_t(fps)*seconds; ++frame) {
                 window.draw(context.Get(), frame);
-                std::this_thread::sleep_until(start + std::chrono::microseconds((frame+1)*1000000/fps));
+                media_wait::until(start + std::chrono::microseconds((frame+1)*1000000/fps));
             }
             return 0;
         }
-        if ((argc == 5 || argc == 6) && std::string(argv[1]) == "capture") {
+        if ((argc == 5 || argc == 6 || argc == 7) && std::string(argv[1]) == "capture") {
             std::string mode(argv[4]);
             const bool fail_encoder = mode.size() > 13 && mode.compare(mode.size()-13,13,"-fail-encoder") == 0;
             if (fail_encoder) mode.resize(mode.size()-13);
             const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
             if (software) mode.resize(mode.size()-9);
             for (const auto& d : found) if (screen_id(d) == argv[2]) {
-                capture(d, number(argv[3],60),mode,software,fail_encoder,argc == 6 ? argv[5] : ""); return 0;
+                capture(d, number(argv[3],60),mode,software,fail_encoder,argc >= 6 ? argv[5] : "",argc == 7 ? argv[6] : ""); return 0;
             }
             throw std::runtime_error("Selected screen disappeared");
         }
@@ -471,7 +548,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
             std::string mode(argv[5]);
             const bool software = mode.size() > 9 && mode.compare(mode.size()-9,9,"-software") == 0;
             if (software) mode.resize(mode.size()-9);
-            const bool streaming = mode == "stream" || mode == "stream-verify" || mode == "stream-interactive";
+            const bool streaming = mode == "stream" || mode == "stream-verify" || mode == "stream-interactive" || mode == "stream-proof";
             if (!streaming && mode != "verify" && mode != "normal" && mode != "interactive") throw std::runtime_error("Invalid render mode");
             const auto width = number(argv[2],8192), height = number(argv[3],8192);
             if (uint64_t(width)*height > 33554432) throw std::runtime_error("Render dimensions too large");
@@ -490,7 +567,7 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
                 else if (angle != "0") throw std::runtime_error("Invalid rotation");
             }
             render(found.front(),width,height,number(argv[4],60),mode == "verify" || mode == "stream-verify", parent, rotation,
-                mode == "interactive" || mode == "stream-interactive", streaming, software); return 0;
+                mode == "interactive" || mode == "stream-interactive", streaming, software,mode == "stream-proof"); return 0;
         }
         throw std::runtime_error("usage: stream-media inventory | capture SCREEN_ID FPS synthetic|desktop|animate | render WIDTH HEIGHT FPS normal|verify");
     } catch (const std::exception& e) {

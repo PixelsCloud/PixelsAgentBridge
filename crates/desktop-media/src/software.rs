@@ -13,6 +13,11 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 // Keep fine chroma residuals after desktop transitions. QP 20 still left
 // persistent color errors with different multi-slice boundaries.
 const SOFTWARE_QP: u8 = 14;
+#[path = "software_bgra.rs"]
+mod bgra;
+#[cfg(test)]
+#[path = "../../../smoke/remote_desktop_conversion.rs"]
+mod conversion_tests;
 
 fn dimensions(width: usize, height: usize) -> Result<(usize, usize), Error> {
     if width == 0
@@ -59,6 +64,12 @@ impl Planar {
         }
         // Preserve the even-size hot path. Odd images replicate edge pixels
         // while converting, without allocating/copying an extra BGRA image.
+        if self.width == self.visible_width && self.height == self.visible_height
+            && bgra::convert(input, stride, self.width, self.height,
+                &mut self.y, &mut self.u, &mut self.v)
+        {
+            return Ok(());
+        }
         if self.width == self.visible_width && self.height == self.visible_height {
             self.convert::<false>(input, stride);
         } else {
@@ -217,9 +228,30 @@ impl SoftwareEncoder {
             return Err("software encoder budget outside bounds".into());
         }
         if self.encoding_budget != bits_per_second {
+            if self.initialized && self.encoding_budget != 0 && bits_per_second != 0 {
+                use openh264_sys2::{ENCODER_OPTION_BITRATE, SBitrateInfo, SPATIAL_LAYER_ALL};
+                let mut bitrate = SBitrateInfo { iLayer: SPATIAL_LAYER_ALL, iBitrate: bits_per_second as i32 };
+                // SAFETY: the live codec already uses RC_BITRATE_MODE; this
+                // option only updates its target and rate controller. Storage
+                // is correctly sized and lives for the synchronous API call.
+                let updated = unsafe {
+                    let api = self.encoder.raw_api();
+                    let ok = api.set_option(ENCODER_OPTION_BITRATE, (&mut bitrate as *mut SBitrateInfo).cast()) == 0;
+                    let mut actual = SBitrateInfo { iLayer: SPATIAL_LAYER_ALL, iBitrate: 0 };
+                    ok && api.get_option(ENCODER_OPTION_BITRATE, (&mut actual as *mut SBitrateInfo).cast()) == 0
+                        && actual.iBitrate == bits_per_second as i32
+                };
+                if updated {
+                    self.encoding_budget = bits_per_second;
+                    return Ok(());
+                }
+                // A rejected/partial native update retires this instance using
+                // the same independent SPS/PPS + IDR recovery as a mode switch.
+            }
             // OpenH264 can accept an RC-mode update without changing the
-            // running rate controller. Replace only the codec; retain owned
-            // conversion planes and publish SPS/PPS + IDR on the next frame.
+            // running rate controller. A mode switch still replaces the codec;
+            // bitrate-only updates above retain its reference frames. Retain
+            // conversion planes and publish SPS/PPS + IDR for replacements.
             let replacement = Self::encoder(self.fps, bits_per_second, self.bounded_slices)?;
             self.encoder = replacement;
             self.initialized = false;
@@ -437,6 +469,10 @@ impl SoftwareDecoder {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../smoke/remote_desktop_color_regression.rs"]
+mod color_regression;
 
 #[cfg(test)]
 mod tests {

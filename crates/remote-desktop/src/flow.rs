@@ -1,12 +1,12 @@
-//! Sender-clock feedback only: slow consumption delays returning capture
-//! credit. Decoder pipeline latency alone must not reduce capture cadence.
+//! Display credit is the rate limiter for a slow consumer. Keep the requested
+//! cadence when credit returns, without turning a past network pause into a
+//! second, persistent frame-rate penalty. Encoder budgets still adapt.
 use crate::{DesktopError, Result};
 use pab_protocol::{DESKTOP_MAX_IN_FLIGHT, DesktopErrorCode};
 use std::{collections::VecDeque, time::Duration};
 use tokio::time::Instant;
 
 pub(crate) const MAX_BACKLOG_AGE: Duration = Duration::from_secs(5);
-const RECOVERY_INTERVAL: Duration = Duration::from_secs(1);
 
 struct Flight {
     id: u64,
@@ -17,11 +17,9 @@ pub(crate) struct VideoFlow {
     sent: u64,
     acknowledged: u64,
     flights: VecDeque<Flight>,
-    nominal_period: Duration,
     period: Duration,
     credit_wait_since: Option<Instant>,
     last_capture: Option<Instant>,
-    last_adjustment: Option<Instant>,
     quality: crate::quality::EncodingQuality,
     presentation_ack_last_us: Option<u64>,
 }
@@ -33,11 +31,9 @@ impl VideoFlow {
             sent: 0,
             acknowledged: 0,
             flights: VecDeque::with_capacity(DESKTOP_MAX_IN_FLIGHT as usize),
-            nominal_period: period,
             period,
             credit_wait_since: None,
             last_capture: None,
-            last_adjustment: None,
             quality: crate::quality::EncodingQuality::new(),
             presentation_ack_last_us: None,
         }
@@ -48,8 +44,6 @@ impl VideoFlow {
     /// budget before the replacement encoder produces its first keyframe.
     pub(crate) fn restart(&self, fps: u16) -> Self {
         let mut fresh = Self::new(fps);
-        fresh.period = self.period.max(fresh.nominal_period);
-        fresh.last_adjustment = self.last_adjustment;
         fresh.quality = self.quality.clone();
         fresh
     }
@@ -69,15 +63,10 @@ impl VideoFlow {
             let waited = now.saturating_duration_since(since);
             if waited > self.period.max(Duration::from_millis(100)) {
                 self.quality.pressure(now);
-                // A cumulative ACK may return several credits together. Avoid
-                // attributing their whole wait to each individual next frame.
-                let returned = DESKTOP_MAX_IN_FLIGHT as u32 - self.flights.len() as u32;
-                let desired =
-                    (waited / returned).clamp(self.nominal_period, Duration::from_secs(1));
-                if desired > self.period {
-                    self.period = desired;
-                    self.last_adjustment = Some(now);
-                }
+                // The full flight window already stopped production during
+                // this wait. Returning credit permits the nominal cadence;
+                // do not divide a one-off pause by the number of ACKs and
+                // carry that delay into otherwise healthy future frames.
             }
         }
         Some(self.last_capture.map_or(now, |last| last + self.period))
@@ -137,15 +126,6 @@ impl VideoFlow {
         } else if !first_presentation {
             self.quality.consumed(now);
         }
-        if !under_pressure
-            && self.period > self.nominal_period
-            && self
-                .last_adjustment
-                .is_none_or(|last| now - last >= RECOVERY_INTERVAL)
-        {
-            self.period = (self.period * 7 / 8).max(self.nominal_period);
-            self.last_adjustment = Some(now);
-        }
         Ok(())
     }
 
@@ -175,20 +155,20 @@ mod tests {
     fn restarting_preserves_capacity_without_reusing_old_frame_credit() {
         let now = Instant::now();
         let mut old = VideoFlow::new(15);
-        old.period = Duration::from_millis(250);
         old.quality.pressure(now);
+        old.quality.pressure(now + Duration::from_millis(600));
         for _ in 0..DESKTOP_MAX_IN_FLIGHT { old.begin_send(now).unwrap(); }
         assert!(old.capture_at(now).is_none());
         let mut fresh = old.restart(30);
         assert_eq!(fresh.encoding_budget(), 3_000_000);
-        assert_eq!(fresh.capture_fps_milli(), 4_000);
+        assert_eq!(fresh.capture_fps_milli(), 30_000);
         assert_eq!(fresh.backlog_deadline(), None);
         assert_eq!(fresh.capture_at(now), Some(now));
         assert!(fresh.acknowledge(1, now).is_err());
         assert_eq!(fresh.begin_send(now).unwrap(), 1);
         fresh.acknowledge(1, now + Duration::from_millis(20)).unwrap();
         assert_eq!(fresh.encoding_budget(), 3_000_000);
-        assert!(fresh.period >= fresh.nominal_period);
+        assert_eq!(fresh.period, Duration::from_secs_f64(1.0 / 30.0));
         assert_eq!(old.flights.len(), DESKTOP_MAX_IN_FLIGHT as usize);
     }
 
@@ -220,59 +200,64 @@ mod tests {
     }
 
     #[test]
-    fn slow_consumption_reduces_capture_rate_then_recovers_gradually() {
+    fn a_network_pause_returns_to_requested_cadence_without_a_catchup_burst() {
         let start = Instant::now();
         let mut now = start;
         let mut flow = VideoFlow::new(30);
         flow.begin_capture(now);
         flow.begin_send(now).unwrap();
         flow.acknowledge(1, now + Duration::from_millis(10)).unwrap();
-        now += flow.nominal_period;
+        now += flow.period;
         for _ in 0..4 {
             flow.begin_capture(now);
             flow.begin_send(now).unwrap();
-            now += flow.nominal_period;
+            now += flow.period;
         }
         assert!(flow.capture_at(now).is_none());
         now += Duration::from_millis(900);
         flow.acknowledge(5, now).unwrap();
         assert!(flow.capture_at(now).is_some());
-        assert_eq!(flow.period, Duration::from_millis(225));
-        let slow_period = flow.period;
-        for _ in 0..30 {
-            now += Duration::from_secs(1);
-            let id = flow.begin_send(now).unwrap();
-            now += Duration::from_millis(10);
-            flow.acknowledge(id, now).unwrap();
-            assert!(flow.period <= slow_period && flow.period >= flow.nominal_period);
-        }
-        assert_eq!(flow.period, flow.nominal_period);
+        assert_eq!(flow.encoding_budget(), 0);
+        assert_eq!(flow.capture_fps_milli(), 30_000);
+        flow.begin_capture(now);
+        flow.begin_send(now).unwrap();
+        assert_eq!(flow.capture_at(now).unwrap(), now + flow.period);
     }
 
     #[test]
-    fn first_presentation_startup_does_not_throttle_but_subsequent_pressure_does() {
+    fn startup_is_excluded_and_subsequent_slow_consumption_keeps_bounded_credit() {
         let start = Instant::now();
         let mut flow = VideoFlow::new(15);
         for n in 0..DESKTOP_MAX_IN_FLIGHT {
-            let now = start + flow.nominal_period * n as u32;
+            let now = start + flow.period * n as u32;
             flow.begin_capture(now);
             flow.begin_send(now).unwrap();
         }
-        let full = start + flow.nominal_period * DESKTOP_MAX_IN_FLIGHT as u32;
+        let full = start + flow.period * DESKTOP_MAX_IN_FLIGHT as u32;
         assert!(flow.capture_at(full).is_none());
         assert!(flow.begin_send(full).is_err());
         let first = full + Duration::from_secs(2);
         flow.acknowledge(1, first).unwrap();
         assert!(flow.capture_at(first).unwrap() <= first);
-        assert_eq!(flow.period, flow.nominal_period);
+        assert_eq!(flow.capture_fps_milli(), 15_000);
         flow.begin_capture(first);
         flow.begin_send(first).unwrap();
         assert!(flow.capture_at(first).is_none());
         let second = first + Duration::from_secs(1);
         flow.acknowledge(2, second).unwrap();
         assert!(flow.capture_at(second).is_some());
-        assert!(flow.period > flow.nominal_period);
+        assert_eq!(flow.capture_fps_milli(), 15_000);
+        assert_eq!(flow.encoding_budget(), 0);
         assert!(flow.flights.len() < DESKTOP_MAX_IN_FLIGHT as usize);
+        // A slow consumer can refill only the returned single credit. No new
+        // source frame may be produced until another display ACK arrives.
+        flow.begin_send(second).unwrap();
+        assert!(flow.capture_at(second).is_none());
+        assert!(flow.begin_send(second).is_err());
+        let third = second + Duration::from_millis(600);
+        flow.acknowledge(3, third).unwrap();
+        assert!(flow.capture_at(third).is_some());
+        assert_eq!(flow.encoding_budget(), 3_000_000);
     }
 
     #[test]
@@ -286,12 +271,12 @@ mod tests {
         assert_eq!(flow.backlog_deadline(), Some(ready + MAX_BACKLOG_AGE));
         flow.acknowledge(id, ready + Duration::from_millis(10))
             .unwrap();
-        assert_eq!(flow.period, flow.nominal_period);
+        assert_eq!(flow.capture_fps_milli(), 15_000);
         assert_eq!(flow.backlog_deadline(), None);
         // One new request may start immediately after a long pending capture,
         // but cannot spend that idle time as credits for a burst of requests.
         assert!(flow.capture_at(ready).unwrap() <= ready);
         flow.begin_capture(ready);
-        assert_eq!(flow.capture_at(ready).unwrap(), ready + flow.nominal_period);
+        assert_eq!(flow.capture_at(ready).unwrap(), ready + flow.period);
     }
 }

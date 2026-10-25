@@ -1,14 +1,17 @@
 #pragma once
 #include "mf_decoder.h"
+#include "media_wait.h"
 #include <dxgi1_3.h>
 #include <array>
 #include <deque>
+#include <memory>
 #include <thread>
 #include "viewer_input.h"
 #include "../software_codec_ffi.h"
 #include "cursor_overlay.h"
 #include "presentation_history.h"
 #include "viewer_stats.h"
+#include "../../../../smoke/remote_desktop_pattern_proof.h"
 
 // RGB test quadrants change every frame; differing corners detect channel,
 // orientation, crop and stale-surface errors. Values avoid clipping extremes.
@@ -60,6 +63,7 @@ class NativePresenter {
     ComPtr<IDXGISwapChain2> swapchain_;
     ComPtr<ID3D11Query> finished_;
     ComPtr<ID3D11Texture2D> pixel_;
+    std::unique_ptr<pattern_proof::GPU> proof_decoded_, proof_rendered_;
     UINT width_ = 0, height_ = 0;
     UINT output_width_ = 960, output_height_ = 540;
     bool refresh_local_cursor() {
@@ -89,6 +93,13 @@ public:
     void input_available(bool available) { input_.available = available; }
     void input_enabled(bool enabled) { input_.enable(window_, enabled); refresh_local_cursor(); }
     uint64_t submitted = 0, displayed = 0, pixel_checks = 0;
+    unsigned proof_pattern = 0, proof_decoded_error = 0, proof_rendered_error = 0;
+    bool pattern_proof_enabled() const { return bool(proof_decoded_); }
+    void enable_pattern_proof() {
+        if (rotation_) throw std::runtime_error("Pattern proof requires identity rotation");
+        proof_decoded_ = std::make_unique<pattern_proof::GPU>(device_.Get(),context_.Get());
+        proof_rendered_ = std::make_unique<pattern_proof::GPU>(device_.Get(),context_.Get());
+    }
     unsigned max_color_error = 0;
     uint64_t stats_disjoint = 0;
 
@@ -127,7 +138,7 @@ public:
             // unconfirmed observation preserves honest counts and bounded
             // shutdown; it does not indicate a decode/render failure.
             if (Clock::now() > deadline) { pending_presents_.clear(); return; }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            media_wait::sleep(std::chrono::milliseconds(1));
         }
     }
     void pump() {
@@ -354,10 +365,19 @@ public:
             check(hr, "GPU render completion");
             if (hr == S_OK && done) break;
             if (Clock::now() > deadline) throw std::runtime_error("GPU rendering timed out");
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            media_wait::sleep(std::chrono::milliseconds(1));
         }
         // The decoded sample/array slice is still retained here. Only this
         // optional synthetic-only correctness mode reads pixels, four per frame.
+        if (proof_decoded_ && count) {
+            const RECT visible{0,0,static_cast<LONG>(width_),static_cast<LONG>(height_)};
+            const auto decoded = proof_decoded_->inspect_texture(frame.texture.Get(),frame.subresource,visible,"decoded",16);
+            const auto rendered = proof_rendered_->inspect_texture(backbuffer.Get(),0,viewport_,"rendered",16);
+            if(decoded.pattern!=rendered.pattern) throw std::runtime_error("Synthetic decoded/rendered frame mismatch");
+            proof_pattern=decoded.pattern; proof_decoded_error=decoded.max_error; proof_rendered_error=rendered.max_error;
+            pixel_checks += pattern_proof::samples*2;
+            max_color_error = (std::max)(max_color_error,(std::max)(decoded.max_error,rendered.max_error));
+        }
         if (pixel_) {
             for (unsigned quadrant = 0; quadrant < 4; ++quadrant) {
                 const UINT x = viewport_.left + (viewport_.right-viewport_.left) * (1 + 2 * (quadrant % 2)) / 4;

@@ -18,6 +18,8 @@ mod flow_recovery;
 mod clipboard_sessions;
 mod input_wire;
 mod quality_feedback;
+#[path = "../../../smoke/remote_desktop_network_recovery.rs"]
+mod network_recovery;
 
 fn screens() -> Vec<DesktopScreen> {
     vec![
@@ -264,7 +266,10 @@ impl Drop for Harness {
 }
 impl Harness {
     async fn new(global: &DesktopHost) -> Self {
-        let (a, b, client, peer) = pair().await;
+        Self::with_pair(global, pair().await).await
+    }
+    async fn with_pair(global: &DesktopHost, endpoints: (PabEndpoint, PabEndpoint, PabConnection, PabConnection)) -> Self {
+        let (a, b, client, peer) = endpoints;
         let server = peer.clone();
         let host = global.for_connection();
         let authority = host.clone();

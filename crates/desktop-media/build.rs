@@ -1,5 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=native");
+    println!("cargo:rerun-if-changed=../../smoke/remote_desktop_pattern_proof.h");
     // The source codec silently drops x86 SIMD when NASM is absent. Do not let
     // a release with unexpectedly slow fallback pass as a normal build.
     if matches!(

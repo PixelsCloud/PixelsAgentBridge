@@ -215,13 +215,16 @@ impl PabConnection {
         self.inner.paths().iter().find(|path| path.is_selected())
             .and_then(|path| self.inner.rtt(path.id()))
     }
+    pub fn statistics(&self) -> Option<crate::ConnectionStatistics> {
+        crate::statistics::snapshot(&self.inner)
+    }
 
     pub async fn open_bi(&self, timeout: Duration) -> Result<PabBiStream, PabConnectionError> {
         let (send, receive) = tokio::time::timeout(timeout, self.inner.open_bi())
             .await
             .map_err(|_| PabConnectionError::Timeout)?
             .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
-        Ok(PabBiStream { send, receive })
+        Ok(PabBiStream { send, receive, connection: self.inner.clone() })
     }
 
     pub async fn accept_bi(&self, timeout: Duration) -> Result<PabBiStream, PabConnectionError> {
@@ -229,7 +232,7 @@ impl PabConnection {
             .await
             .map_err(|_| PabConnectionError::Timeout)?
             .map_err(|error| PabConnectionError::Stream(error.to_string()))?;
-        Ok(PabBiStream { send, receive })
+        Ok(PabBiStream { send, receive, connection: self.inner.clone() })
     }
 
     pub async fn closed(&self) {
@@ -244,9 +247,13 @@ impl PabConnection {
 pub struct PabBiStream {
     send: SendStream,
     receive: RecvStream,
+    connection: Connection,
 }
 
 impl PabBiStream {
+    pub fn statistics(&self) -> Option<crate::ConnectionStatistics> {
+        crate::statistics::snapshot(&self.connection)
+    }
     /// Independent owned directions for additive streaming protocols. Readers
     /// must stay alive across idle periods: never cancel a partial frame read.
     pub fn into_framed(self) -> (PabFrameWriter, PabFrameReader) {

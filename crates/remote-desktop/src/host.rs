@@ -31,6 +31,10 @@ pub struct MediaFrame {
 /// dropped, including cancellation while next_frame is pending. No archives.
 pub trait DesktopSource: Send {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame>;
+    /// Trusted adapters may own the requested FPS clock. They must bound
+    /// cadence themselves, including after a pause, and never catch up in a
+    /// burst. Other adapters retain the host's clock as well as display credit.
+    fn frames_are_paced(&self) -> bool { false }
     fn capture_timings(&self) -> Option<DesktopCaptureTimings> { None }
     /// In-place budget changes must preserve reference frames and geometry.
     /// None opts out; zero restores the original encoder quality.
@@ -176,17 +180,18 @@ impl Generation {
             .lock()
             .unwrap()
             .acknowledge(id, Instant::now())?;
+        self.diagnostics.lock().unwrap().trace.acknowledge(id);
         self.credit.notify_one();
         self.backlog_changed.notify_one();
         Ok(())
     }
-    async fn wait_to_capture(&self) {
+    async fn wait_to_capture(&self, source_paced: bool) {
         loop {
             let available = self.credit.notified();
             let now = Instant::now();
             let at = self.progress.lock().unwrap().capture_at(now);
             match at {
-                Some(at) if at <= now => {
+                Some(at) if source_paced || at <= now => {
                     // Include capture/encoding work in the cadence; adding the
                     // full interval after encoding would throttle twice.
                     self.progress.lock().unwrap().begin_capture(now);
@@ -489,6 +494,22 @@ impl DesktopHost {
         timeout: Duration,
     ) -> Result<()> {
         match request {
+            RemoteDesktopRequest::Trace { version, session_id, generation, after_frame_id } => {
+                let result = self.entry(owner, account, session_id, false)
+                    .and_then(|entry| entry.video(generation))
+                    .and_then(|video| {
+                        if version != DESKTOP_TRACE_VERSION {
+                            return Err(DesktopError::reject(DesktopErrorCode::Unsupported, "unsupported desktop trace version"));
+                        }
+                        let snapshot = video.diagnostics.lock().unwrap().trace.snapshot(&video.config, after_frame_id, stream.statistics());
+                        if after_frame_id > snapshot.latest_frame_id { return Err(DesktopError::Protocol("invalid frame trace cursor")); }
+                        Ok(snapshot)
+                    });
+                match result {
+                    Ok(snapshot) => reply(&mut stream, RemoteDesktopReply::Trace { snapshot }, timeout).await?,
+                    Err(error) => rejected(&mut stream, error, timeout).await?,
+                }
+            }
             RemoteDesktopRequest::Clipboard { version, session_id, generation, request } => {
                 self.serve_clipboard(owner, account, version, session_id, generation, request, stream, timeout).await?;
             }
@@ -837,7 +858,10 @@ impl DesktopHost {
         loop {
             let send = async {
                 video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Credit);
-                video.wait_to_capture().await;
+                let credit_start = Instant::now();
+                video.wait_to_capture(source.frames_are_paced()).await;
+                let credit_us = credit_start.elapsed().as_micros().min(u64::MAX as u128) as u64;
+                let budget_start = Instant::now();
                 let budget = video.progress.lock().unwrap().encoding_budget();
                 if source.encoding_budget().is_some_and(|current| current != budget) {
                     tokio::time::timeout(MEDIA_TIMEOUT, source.set_encoding_budget(budget))
@@ -845,6 +869,7 @@ impl DesktopHost {
                     *video.encoding_budget.lock().unwrap() = source.encoding_budget();
                 }
                 video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Capture);
+                let budget_us = budget_start.elapsed().as_micros().min(u64::MAX as u128) as u64;
                 let source_start = Instant::now();
                 let media = source.next_frame().await?;
                 if media.bytes.is_empty() || media.bytes.len() > DESKTOP_MAX_FRAME_BYTES {
@@ -853,6 +878,11 @@ impl DesktopHost {
                 video.diagnostics.lock().unwrap().produced(source_start.elapsed(), media.bytes.len(), source.capture_timings());
                 video.diagnostics.lock().unwrap().stage(DesktopProducerStage::Send);
                 let frame_id = video.begin_send()?;
+                video.diagnostics.lock().unwrap().trace.begin(DesktopFrameTrace {
+                    frame_id, elapsed_us: 0, capture_time_us: media.capture_time_us, credit_us, budget_us,
+                    source_us: source_start.elapsed().as_micros().min(u64::MAX as u128) as u64,
+                    capture: source.capture_timings(), send_us: None, ack_us: None,
+                });
                 let frame = VideoFrame {
                     header: DesktopFrameHeader {
                         version: REMOTE_DESKTOP_SCHEMA_VERSION,
@@ -868,6 +898,7 @@ impl DesktopHost {
                 let send_start = Instant::now();
                 writer.send(&frame, timeout).await?;
                 video.diagnostics.lock().unwrap().sent(send_start.elapsed());
+                video.diagnostics.lock().unwrap().trace.sent(frame_id, send_start.elapsed());
                 video.frame_ready.store(true, Ordering::Release);
                 Ok::<_, DesktopError>(())
             };
@@ -1022,6 +1053,35 @@ mod tests {
     }
     fn owner() -> OperatorRef {
         OperatorRef::guest(EndpointKey::new([8; 32]))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn source_clock_replaces_only_the_host_timer_and_keeps_display_credit_bounded() {
+        let host = DesktopHost::new(Some(Arc::new(Backend { pending: false })));
+        let (opened, guard) = host.open(owner(), None, REMOTE_DESKTOP_SCHEMA_VERSION,
+            RequestId::new(), None, 30).await.unwrap();
+        let video = guard.entry.as_ref().unwrap().video(1).unwrap();
+        let start = Instant::now();
+        for _ in 0..DESKTOP_MAX_IN_FLIGHT {
+            video.wait_to_capture(true).await;
+            video.begin_send().unwrap();
+        }
+        assert_eq!(Instant::now(), start, "host added a second clock to a paced source");
+        assert!(tokio::time::timeout(Duration::from_millis(50), video.wait_to_capture(true)).await.is_err(),
+            "source pacing must never bypass the four-frame display window");
+        video.acknowledge(1).unwrap();
+        let resumed = Instant::now();
+        video.wait_to_capture(true).await;
+        assert_eq!(Instant::now(), resumed);
+        video.begin_send().unwrap();
+        assert!(video.progress.lock().unwrap().begin_send(Instant::now()).is_err());
+
+        // Sources without their own clock still get the requested rate cap.
+        let unpaced = Generation::new(opened.config);
+        unpaced.wait_to_capture(false).await;
+        let first = Instant::now();
+        unpaced.wait_to_capture(false).await;
+        assert!(first.elapsed() >= Duration::from_secs_f64(1.0 / 30.0));
     }
 
     struct PendingInput(Arc<AtomicBool>);

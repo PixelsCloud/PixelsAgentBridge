@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn delayed_consumption_paces_new_capture_instead_of_bursting_returned_credit() {
+async fn transient_consumer_pause_resumes_requested_cadence_without_bursting_credit() {
     let backend = Arc::new(Backend::default());
     let global = DesktopHost::new(Some(backend));
     let server = Harness::new(&global).await;
@@ -22,10 +22,19 @@ async fn delayed_consumption_paces_new_capture_instead_of_bursting_returned_cred
     let fifth = viewer.next_frame(WAIT).await.unwrap();
     let resumed = tokio::time::Instant::now();
     let sixth = viewer.next_frame(WAIT).await.unwrap();
-    assert!(
-        resumed.elapsed() >= Duration::from_millis(120),
-        "returned credits burst at the old fixed cadence"
-    );
+    assert!(resumed.elapsed() >= Duration::from_millis(45), "returned credit bypassed the 15 FPS capture limit");
+    let quality = viewer.quality_control().snapshot().await.unwrap();
+    assert_eq!(quality.capture_fps_milli, 15_000);
+    // A healthy consumer must not spend seconds recovering from a pause that
+    // has already ended. Consume enough frames to distinguish nominal pacing
+    // from the old ~175ms period inferred from this single stalled window.
+    viewer.report_presented(&sixth.header).unwrap();
+    let recovered = tokio::time::Instant::now();
+    for _ in 0..15 {
+        let frame = viewer.next_frame(WAIT).await.unwrap();
+        viewer.report_presented(&frame.header).unwrap();
+    }
+    assert!(recovered.elapsed() < Duration::from_millis(1600), "a completed pause imposed a second capture throttle");
     assert_eq!((fifth.header.frame_id, sixth.header.frame_id), (6, 7));
     server.legacy().await;
     viewer.close().await.unwrap();

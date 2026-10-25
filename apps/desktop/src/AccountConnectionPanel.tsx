@@ -96,10 +96,17 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const passwordMismatch = register && confirmPassword.length > 0 && password !== confirmPassword;
+  const normalizedUsername = username.trim().normalize("NFKC");
+  const usernameInvalid = register && (Array.from(normalizedUsername).length < 3
+    || Array.from(normalizedUsername).length > 64 || /[\p{White_Space}\p{Cc}/\\]/u.test(normalizedUsername));
 
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!username.trim() || !password || busy || (register && password !== confirmPassword)) return;
+    if (usernameInvalid) {
+      setError(`${t.accountRegisterFailed}: ${t.accountUsernameInvalid}`);
+      return;
+    }
     if (register && Array.from(password).length < 8) {
       setError(`${t.accountRegisterFailed}: ${t.accountPasswordTooShort}`);
       return;
@@ -112,7 +119,20 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
       setConfirmPassword("");
       onSignedIn(status);
     } catch (cause) {
-      setError(`${register ? t.accountRegisterFailed : t.accountConnectFailed}: ${String(cause)}`);
+      const reasons: Record<string, string> = {
+        account_username_invalid: t.accountUsernameInvalid,
+        account_password_too_short: t.accountPasswordTooShort,
+        account_password_too_long: t.accountPasswordTooLong,
+        account_registration_invalid: t.accountRegistrationInvalid,
+        account_registration_disabled: t.accountRegistrationDisabled,
+        account_username_taken: t.accountUsernameTaken,
+        account_invalid_credentials: t.accountInvalidCredentials,
+        account_access_denied: t.accountAccessDenied,
+        account_rate_limited: t.accountRateLimited,
+        account_service_unavailable: t.accountServiceUnavailable,
+        "account request failed; cached login was retained": t.accountServiceUnavailable,
+      };
+      setError(`${register ? t.accountRegisterFailed : t.accountConnectFailed}: ${reasons[String(cause)] ?? String(cause)}`);
     } finally {
       setBusy(false);
     }
@@ -121,7 +141,11 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
   return <form className="account-login-form" onSubmit={(event) => void connect(event)}>
     <label htmlFor="account-login-username">{t.accountName}</label>
     <Input id="account-login-username" autoComplete="username" autoFocus disabled={busy}
+      status={usernameInvalid && username.length > 0 ? "error" : undefined}
+      aria-invalid={(usernameInvalid && username.length > 0) || undefined}
+      aria-describedby={register ? "account-username-hint" : undefined}
       value={username} onChange={(event) => setUsername(event.target.value)} />
+    {register && <Typography.Text id="account-username-hint" type={usernameInvalid && username.length > 0 ? "danger" : "secondary"}>{t.accountUsernameInvalid}</Typography.Text>}
     <label htmlFor="account-login-password">{t.accountPassword}</label>
     <Input.Password id="account-login-password" autoComplete={register ? "new-password" : "current-password"} disabled={busy}
       status={passwordMismatch ? "error" : undefined} aria-invalid={passwordMismatch || undefined}
@@ -135,7 +159,7 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
         value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></>}
     {passwordMismatch && <Typography.Text id="account-password-error" type="danger" role="alert">{t.accountPasswordMismatch}</Typography.Text>}
     {error && <Alert type="error" showIcon title={error} />}
-    <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || !password || (register && password !== confirmPassword)} block>{register ? t.accountRegister : t.accountConnect}</Button>
+    <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || usernameInvalid || !password || (register && password !== confirmPassword)} block>{register ? t.accountRegister : t.accountConnect}</Button>
     <Button type="link" disabled={busy} onClick={() => { setRegister(!register); setError(""); setPassword(""); setConfirmPassword(""); }}>{register ? t.accountAlreadyRegistered : t.accountRegister}</Button>
     <GithubAccount language={language} disabled={busy} onBusy={setBusy} onSignedIn={onSignedIn}/>
   </form>;

@@ -16,6 +16,7 @@ struct BudgetSource {
     unsupported: bool,
 }
 impl DesktopSource for BudgetSource {
+    fn frames_are_paced(&self) -> bool { self.inner.frames_are_paced() }
     fn capture_timings(&self) -> Option<pab_protocol::DesktopCaptureTimings> { self.inner.capture_timings() }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         self.inner.next_frame()
@@ -83,7 +84,7 @@ async fn encoding_budget_crosses_verified_helper_and_restores_without_interrupti
         assert_eq!(source.encoding_budget(), Some(value));
         assert_eq!(backend.budget.load(Ordering::SeqCst), value);
         assert_eq!(source.next_frame().await.unwrap().bytes.len(), 200_013);
-        assert_eq!(source.capture_timings(), Some(pab_protocol::DesktopCaptureTimings { wait_us: 1200, encode_us: 3400 }));
+        assert_eq!(source.capture_timings(), Some(pab_protocol::DesktopCaptureTimings { wait_us: 1200, encode_us: 3400, detail: None }));
     }
     assert_eq!(backend.calls.load(Ordering::SeqCst), 3);
     drop(source);

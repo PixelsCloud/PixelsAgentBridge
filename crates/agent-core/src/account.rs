@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::{path::Path, time::Duration};
 use zeroize::Zeroizing;
 
-pub mod local_device;
 mod github;
-pub use github::{GithubStatus, GithubStart};
+pub mod local_device;
+pub use github::{GithubStart, GithubStatus};
 #[cfg(target_os = "macos")]
 mod macos_credentials;
 mod store;
@@ -61,6 +61,8 @@ pub enum AccountError {
     Network,
     #[error("account service returned HTTP {0}")]
     Http(u16),
+    #[error("{0}")]
+    Authentication(&'static str),
     #[error("{0}")]
     Github(&'static str),
     #[error("account service returned an invalid response")]
@@ -127,7 +129,7 @@ impl AccountClient {
             .send()
             .await
             .map_err(|_| AccountError::Network)?;
-        let response = checked(response)?;
+        let response = checked_credentials(response, register).await?;
         let session: AccountSession = response
             .json()
             .await
@@ -366,9 +368,107 @@ fn checked(response: reqwest::Response) -> Result<reqwest::Response, AccountErro
     }
 }
 
+async fn checked_credentials(
+    mut response: reqwest::Response,
+    register: bool,
+) -> Result<reqwest::Response, AccountError> {
+    if response.status().is_success() {
+        return Ok(response);
+    }
+    let status = response.status().as_u16();
+    // Never display an arbitrary response body, HTML, or echoed credentials.
+    let mut body = Vec::new();
+    while let Ok(Some(chunk)) = response.chunk().await {
+        if body.len() + chunk.len() > 4096 {
+            return Err(AccountError::Http(status));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    let json = serde_json::from_slice::<serde_json::Value>(&body).ok();
+    let code = json
+        .as_ref()
+        .and_then(|v| v.get("code"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let reason = match (status, code, register) {
+        (400, "invalid_username", true) => "account_username_invalid",
+        (400, "password_too_short", true) => "account_password_too_short",
+        (400, "password_too_long", true) => "account_password_too_long",
+        (400, _, true) => "account_registration_invalid",
+        (401, _, _) => "account_invalid_credentials",
+        (403, "registration_disabled", true) => "account_registration_disabled",
+        (403, _, _) => "account_access_denied",
+        (409, "conflict", true) => "account_username_taken",
+        (429, _, _) => "account_rate_limited",
+        (500..=599, _, _) => "account_service_unavailable",
+        _ => return Err(AccountError::Http(status)),
+    };
+    Err(AccountError::Authentication(reason))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn credentials_failures_are_bounded_translated_codes_without_echoing_server_bodies() {
+        for (status, body, register, expected) in [
+            (
+                400,
+                r#"{"code":"invalid_username"}"#,
+                true,
+                "account_username_invalid",
+            ),
+            (
+                400,
+                r#"{"code":"invalid_input"}"#,
+                true,
+                "account_registration_invalid",
+            ),
+            (
+                403,
+                r#"{"code":"registration_disabled"}"#,
+                true,
+                "account_registration_disabled",
+            ),
+            (
+                409,
+                r#"{"code":"conflict"}"#,
+                true,
+                "account_username_taken",
+            ),
+            (
+                401,
+                "do not echo this body",
+                false,
+                "account_invalid_credentials",
+            ),
+            (429, "", true, "account_rate_limited"),
+            (
+                503,
+                "do not echo this body",
+                false,
+                "account_service_unavailable",
+            ),
+        ] {
+            let response: reqwest::Response =
+                tokio_tungstenite::tungstenite::http::Response::builder()
+                    .status(status)
+                    .body(body)
+                    .unwrap()
+                    .into();
+            assert!(matches!(checked_credentials(response, register).await,
+                Err(AccountError::Authentication(reason)) if reason == expected));
+        }
+        let response: reqwest::Response = tokio_tungstenite::tungstenite::http::Response::builder()
+            .status(400)
+            .body(vec![b'x'; 4097])
+            .unwrap()
+            .into();
+        assert!(matches!(
+            checked_credentials(response, true).await,
+            Err(AccountError::Http(400))
+        ));
+    }
     #[test]
     fn origins_scope_credentials_and_reject_insecure_or_embedded_secrets() {
         assert_eq!(

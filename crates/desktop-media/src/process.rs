@@ -60,7 +60,11 @@ impl MediaChild {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
         #[cfg(windows)]
-        command.creation_flags(0x08000000); // No console; the render window is created explicitly.
+        // Scheduled session helpers may run BelowNormal. Live capture/decode
+        // must not inherit that background priority, or unrelated foreground
+        // work can starve the bounded media/ACK pipeline. Use normal priority,
+        // without boosting above the other applications on the machine.
+        command.creation_flags(0x08000000 | 0x00000020); // CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS
         let mut child = command.spawn()?;
         let stderr = child.stderr.take().unwrap();
         let (events, diagnostics) = if interactive {
@@ -170,6 +174,10 @@ impl Drop for NativeSource {
     }
 }
 impl DesktopSource for NativeSource {
+    // The Windows worker owns a high-resolution deadline and caps every frame,
+    // including recovery from exhausted credit. A second host timer adds its
+    // own scheduling/IPC delay to that cadence.
+    fn frames_are_paced(&self) -> bool { cfg!(windows) }
     fn capture_timings(&self) -> Option<DesktopCaptureTimings> { self.capture_timings.clone() }
     fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
     fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
@@ -193,10 +201,11 @@ impl DesktopSource for NativeSource {
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
             let operation = async {
+                let request_started = std::time::Instant::now();
                 // Command 1 keeps the original worker framing for diagnostics
                 // and Linux. Timed frames are private to the bundled worker.
                 let timed = cfg!(any(windows, target_os = "macos"));
-                self.process.input.lock().await.write_u8(if timed { 3 } else { 1 }).await?;
+                self.process.input.lock().await.write_u8(if cfg!(windows) { 4 } else if timed { 3 } else { 1 }).await?;
                 let size = self.process.output.as_mut().unwrap().read_u32_le().await? as usize;
                 if size == 0 || size > DESKTOP_MAX_FRAME_BYTES {
                     return Err(std::io::Error::other("invalid media length"));
@@ -214,6 +223,15 @@ impl DesktopSource for NativeSource {
                     Some(DesktopCaptureTimings {
                         wait_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
                         encode_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                        detail: if cfg!(windows) {
+                            Some(pab_protocol::DesktopCaptureBreakdown {
+                                native_total_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                                readback_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                                conversion_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                                codec_us: self.process.output.as_mut().unwrap().read_u64_le().await?,
+                                worker_roundtrip_us: 0, helper_roundtrip_us: 0,
+                            })
+                        } else { None },
                     })
                 } else { None };
                 let mut bytes = vec![0; size];
@@ -224,6 +242,9 @@ impl DesktopSource for NativeSource {
                     .read_exact(&mut bytes)
                     .await?;
                 self.index += 1;
+                if let Some(detail) = self.capture_timings.as_mut().and_then(|t| t.detail.as_mut()) {
+                    detail.worker_roundtrip_us = request_started.elapsed().as_micros().min(u64::MAX as u128) as u64;
+                }
                 Ok(MediaFrame {
                     bytes,
                     capture_time_us,

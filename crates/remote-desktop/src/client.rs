@@ -9,6 +9,14 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc, oneshot, watch};
+#[cfg(test)]
+#[path = "client_control_tests.rs"]
+mod control_tests;
+#[path = "client_control.rs"]
+mod control;
+#[path = "client_ack_trace.rs"]
+mod ack_trace;
+pub use ack_trace::DesktopAckTrace;
 #[path = "client_clipboard.rs"]
 mod clipboard;
 pub use clipboard::RemoteDesktopClipboardControl;
@@ -25,6 +33,29 @@ pub struct RemoteDesktopQualityControl {
     ended: watch::Receiver<bool>,
 }
 impl RemoteDesktopQualityControl {
+    pub fn network_statistics(&self) -> Option<pab_transport::ConnectionStatistics> { self.connection.statistics() }
+    pub async fn frame_trace(&mut self, after_frame_id: u64) -> Result<DesktopTraceSnapshot> {
+        if *self.ended.borrow() || self.ended.has_changed().is_err() { return Err(DesktopError::Closed); }
+        let timeout = Duration::from_secs(3);
+        let query = async {
+            let mut channel = stream(&self.connection, RemoteDesktopRequest::Trace {
+                version: DESKTOP_TRACE_VERSION, session_id: self.config.session_id,
+                generation: self.config.generation,
+                after_frame_id,
+            }, timeout).await?;
+            let snapshot = match response(&mut channel, timeout).await? {
+                RemoteDesktopReply::Trace { snapshot } => snapshot,
+                _ => return Err(DesktopError::Protocol("unexpected desktop frame trace reply")),
+            };
+            snapshot.validate().map_err(DesktopError::Protocol)?;
+            if snapshot.session_id != self.config.session_id || snapshot.generation != self.config.generation
+                || snapshot.latest_frame_id < after_frame_id {
+                return Err(DesktopError::Protocol("obsolete desktop frame trace reply"));
+            }
+            Ok(snapshot)
+        };
+        tokio::select! { biased; _ = self.ended.changed() => Err(DesktopError::Closed), result = query => result }
+    }
     pub fn network_rtt(&self) -> Option<Duration> { self.connection.selected_path_rtt() }
     pub fn connection_path(&self) -> Option<pab_transport::ConnectionPath> { self.connection.selected_path() }
     /// Optional, generation-bound query on its own stream. Old media/quality
@@ -90,6 +121,7 @@ pub struct RemoteDesktopSession {
     video: Option<DesktopVideoReader>,
     video_keepalive: Option<PabFrameWriter>,
     presentations: watch::Sender<Option<(u64, u64)>>,
+    ack_history: Arc<Mutex<ack_trace::AckHistory>>,
     last_received: Arc<AtomicU64>,
     presentation_valid: Arc<Mutex<bool>>,
     closed: bool,
@@ -160,8 +192,12 @@ pub struct RemoteDesktopPresentationControl {
     received: Arc<AtomicU64>,
     valid: Arc<Mutex<bool>>,
     presentations: watch::Sender<Option<(u64, u64)>>,
+    ack_history: Arc<Mutex<ack_trace::AckHistory>>,
 }
 impl RemoteDesktopPresentationControl {
+    pub fn trace(&self) -> Vec<DesktopAckTrace> {
+        self.ack_history.lock().unwrap().snapshot(self.generation)
+    }
     pub fn report_presented(&self, header: &DesktopFrameHeader) -> Result<()> {
         let valid = self.valid.lock().unwrap();
         if !*valid || self.presentations.is_closed() {
@@ -184,6 +220,7 @@ impl RemoteDesktopPresentationControl {
                     return false;
                 }
             }
+            self.ack_history.lock().unwrap().notified(header.generation, header.frame_id);
             *latest = Some((header.generation, header.frame_id));
             true
         });
@@ -359,10 +396,12 @@ impl RemoteDesktopSession {
         let (commands, requests) = mpsc::channel(8);
         let heartbeat = Duration::from_millis(opened.heartbeat_ms.into());
         let (presentations, presentation_updates) = watch::channel(None);
+        let ack_history = Arc::new(Mutex::new(ack_trace::AckHistory::default()));
         let worker = tokio::spawn(control_worker(
             control,
             requests,
             presentation_updates,
+            ack_history.clone(),
             heartbeat,
             timeout,
         ));
@@ -377,6 +416,7 @@ impl RemoteDesktopSession {
             video: None,
             video_keepalive: None,
             presentations,
+            ack_history,
             last_received: Arc::new(AtomicU64::new(0)),
             presentation_valid: Arc::new(Mutex::new(true)),
             closed: false,
@@ -464,6 +504,7 @@ impl RemoteDesktopSession {
             received: self.last_received.clone(),
             valid: self.presentation_valid.clone(),
             presentations: self.presentations.clone(),
+            ack_history: self.ack_history.clone(),
         }
     }
     /// Confirms enabling/retiring this generation's input route. It does not
@@ -611,76 +652,11 @@ impl Drop for RemoteDesktopSession {
 }
 async fn control_worker(
     stream: PabBiStream,
-    mut commands: mpsc::Receiver<Command>,
-    mut presentations: watch::Receiver<Option<(u64, u64)>>,
+    commands: mpsc::Receiver<Command>,
+    presentations: watch::Receiver<Option<(u64, u64)>>,
+    ack_history: Arc<Mutex<ack_trace::AckHistory>>,
     heartbeat: Duration,
     timeout: Duration,
 ) {
-    let (mut writer, mut reader) = stream.into_framed();
-    let mut ticks = tokio::time::interval(heartbeat);
-    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    let mut sequence = 0_u64;
-    loop {
-        let (command, response) = tokio::select! {
-            value = commands.recv() => match value {
-                Some(value) => (value.command, Some(value.result)), None => break,
-            },
-            changed = presentations.changed() => {
-                if changed.is_err() { break; }
-                let latest = *presentations.borrow_and_update();
-                let Some((generation, frame_id)) = latest else { continue };
-                (DesktopControlCommand::Presented { generation, frame_id }, None)
-            },
-            _ = ticks.tick() => (DesktopControlCommand::Heartbeat, None),
-        };
-        let Some(next) = sequence.checked_add(1) else {
-            break;
-        };
-        sequence = next;
-        let request = DesktopControl { sequence, command };
-        let operation = async {
-            writer
-                .write(&serde_json::to_vec(&request)?, DESKTOP_CONTROL_BYTES)
-                .await?;
-            let reply: DesktopControlReply =
-                serde_json::from_slice(&reader.read(DESKTOP_CONTROL_BYTES).await?)?;
-            if reply.sequence() != sequence {
-                return Err(DesktopError::Protocol(
-                    "desktop control reply sequence mismatch",
-                ));
-            }
-            match reply {
-                DesktopControlReply::Error { code, message, .. } => {
-                    Err(DesktopError::reject(code, message))
-                }
-                other => Ok(other),
-            }
-        };
-        let result = match tokio::time::timeout(timeout, operation).await {
-            Ok(result) => result,
-            Err(_) => Err(DesktopError::Timeout),
-        };
-        let fatal = result.as_ref().is_err_and(|error| {
-            response.is_none() || !matches!(error, DesktopError::Rejected { .. })
-        });
-        if fatal {
-            if let Err(error) = &result {
-                // Input values are deliberately excluded from diagnostics.
-                let action = match &request.command {
-                    DesktopControlCommand::Heartbeat => "heartbeat",
-                    DesktopControlCommand::Presented { .. } => "presentation_ack",
-                    DesktopControlCommand::SelectScreen { .. } => "select_screen",
-                    DesktopControlCommand::SetInput { .. } => "set_input",
-                    DesktopControlCommand::Input { .. } => "input",
-                };
-                tracing::warn!(sequence, action, %error, "remote desktop control channel failed");
-            }
-        }
-        if let Some(response) = response {
-            let _ = response.send(result);
-        }
-        if fatal {
-            break;
-        } // Never retry a partially read control message.
-    }
+    control::run(stream, commands, presentations, ack_history, heartbeat, timeout).await;
 }

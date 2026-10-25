@@ -1,4 +1,5 @@
 #include "wgc_capture.h"
+#include "media_wait.h"
 #include <d3d11_4.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
@@ -132,7 +133,7 @@ struct WgcCapture::Impl {
         const auto deadline = Clock::now() + std::chrono::milliseconds(timeout_ms);
         while (!(frame = pool.TryGetNextFrame())) {
             if (Clock::now() >= deadline) return {};
-            Sleep(2);
+            media_wait::sleep(std::chrono::milliseconds(2));
         }
         // Consume at most the two-slot pool; never grow a queue or spin while
         // the producer keeps running. Prefer the newest available image after
@@ -166,7 +167,7 @@ struct WgcCapture::Impl {
             check(hr, "Capture rotation completion");
             if (hr == S_OK && complete) break;
             if (Clock::now() >= gpu_deadline) throw std::runtime_error("GPU capture rotation timed out");
-            Sleep(1);
+            media_wait::sleep(std::chrono::milliseconds(1));
         }
         return rotated;
     }

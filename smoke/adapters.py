@@ -36,6 +36,8 @@ def command_for(adapter, directory, lab):
         return [sys.executable, str(ROOT / "smoke/unittest_adapter.py"), groups[adapter],
                 str(directory / "counts.json")], ROOT, env, "counts"
     if adapter.startswith("cargo-"):
+        if adapter == "cargo-media-timing" and os.name != "nt":
+            raise ValueError("Windows media timing requires a Windows host")
         from smoke.native_env import prepare
         env = prepare(env)
         env["PAB_CLIENT_DEFAULTS_FILE"] = str(ROOT / "smoke/fixtures/client-defaults.toml")
@@ -45,6 +47,9 @@ def command_for(adapter, directory, lab):
             "cargo-executor": ["-p", "pab-executor", "--lib"],
             "cargo-relay": ["-p", "pab-relay", "--lib"],
             "cargo-service": ["-p", "pab-server", "-p", "pab-relay", "--tests", "--no-fail-fast"],
+            "cargo-remote-desktop": ["-p", "pab-remote-desktop", "--lib", "--test", "reliable_sessions"],
+            "cargo-media-timing": ["-p", "pab-desktop-media", "--test", "windows_media_timing"],
+            "cargo-media-conversion": ["-p", "pab-desktop-media", "--lib", "software::conversion_tests"],
         }
         if adapter not in selections:
             raise ValueError("Unknown Cargo adapter")

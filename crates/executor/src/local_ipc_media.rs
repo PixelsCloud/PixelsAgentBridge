@@ -71,7 +71,7 @@ enum Reply {
     Screens {
         screens: Vec<DesktopScreen>,
     },
-    Started,
+    Started { #[serde(default)] frames_are_paced: bool },
     EncodingBudget { bits_per_second: Option<u32> },
     Frame {
         bytes: usize,
@@ -86,7 +86,7 @@ enum Reply {
 }
 enum Response {
     Screens(Vec<DesktopScreen>),
-    Started,
+    Started(bool),
     EncodingBudget(Option<u32>),
     Frame(MediaFrame, Option<pab_protocol::DesktopCaptureTimings>),
 }
@@ -220,7 +220,7 @@ impl DesktopBackend for HelperMediaBackend {
             .await
             .map_err(unavailable)?
             {
-                Response::Started => {
+                Response::Started(frames_are_paced) => {
                     // Old helpers keep the original start/next wire format.
                     // Only negotiate the extra operation after an explicit hint.
                     let encoding_budget = if provider.encoding_budget_supported {
@@ -236,6 +236,7 @@ impl DesktopBackend for HelperMediaBackend {
                         .map_err(|_| unavailable("media provider state unavailable"))? =
                         Some(config);
                     Ok(Box::new(HelperSource {
+                        frames_are_paced,
                         capture_timings: None,
                         provider,
                         _stop: stop,
@@ -248,6 +249,7 @@ impl DesktopBackend for HelperMediaBackend {
     }
 }
 struct HelperSource {
+    frames_are_paced: bool,
     provider: Arc<Provider>,
     _stop: oneshot::Sender<()>,
     encoding_budget: Option<u32>,
@@ -263,6 +265,7 @@ impl Drop for HelperSource {
     }
 }
 impl DesktopSource for HelperSource {
+    fn frames_are_paced(&self) -> bool { self.frames_are_paced }
     fn capture_timings(&self) -> Option<pab_protocol::DesktopCaptureTimings> { self.capture_timings.clone() }
     fn encoding_budget(&self) -> Option<u32> { self.encoding_budget }
     fn set_encoding_budget(&mut self, bits_per_second: u32) -> MediaFuture<'_, ()> {
@@ -280,12 +283,18 @@ impl DesktopSource for HelperSource {
     }
     fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
         Box::pin(async {
+            let request_started = std::time::Instant::now();
             let operation = if self.provider.timings_supported { Operation::NextTimed } else { Operation::Next };
             match request(&self.provider, operation, None)
                 .await
                 .map_err(unavailable)?
             {
-                Response::Frame(frame, timings) => { self.capture_timings = timings; Ok(frame) },
+                Response::Frame(frame, mut timings) => {
+                    if let Some(detail) = timings.as_mut().and_then(|t| t.detail.as_mut()) {
+                        detail.helper_roundtrip_us = request_started.elapsed().as_micros().min(u64::MAX as u128) as u64;
+                    }
+                    self.capture_timings = timings; Ok(frame)
+                },
                 _ => Err(unavailable("invalid media frame reply")),
             }
         })
@@ -403,7 +412,7 @@ async fn exchange(
             validate_desktop_screens(&screens).map_err(|_| LocalIpcError::Protocol)?;
             Ok(Response::Screens(screens))
         }
-        (Operation::Start { .. }, Reply::Started) => Ok(Response::Started),
+        (Operation::Start { .. }, Reply::Started { frames_are_paced }) => Ok(Response::Started(frames_are_paced)),
         (Operation::EncodingBudget { bits_per_second: requested },
             Reply::EncodingBudget { bits_per_second })
             if bits_per_second.is_none_or(|value| value == *requested) =>
@@ -533,7 +542,7 @@ async fn serve_media_requests(
                 Operation::Start { config } if source.is_none() => {
                     config.validate().map_err(|_| LocalIpcError::Protocol)?;
                     source = Some(backend.start(config).await.map_err(unavailable_local)?);
-                    Ok((Reply::Started, None))
+                    Ok((Reply::Started { frames_are_paced: source.as_ref().unwrap().frames_are_paced() }, None))
                 }
                 Operation::Next | Operation::NextTimed => {
                     let frame = source
@@ -649,14 +658,21 @@ mod tests {
         }
     }
     struct Source(Arc<AtomicUsize>, bool);
+    #[test]
+    fn a_missing_source_clock_hint_keeps_host_pacing_and_invalid_hints_are_rejected() {
+        assert!(matches!(serde_json::from_value::<Reply>(json!({"result":"started"})).unwrap(),
+            Reply::Started { frames_are_paced: false }));
+        assert!(serde_json::from_value::<Reply>(json!({"result":"started","frames_are_paced":1})).is_err());
+    }
     impl Drop for Source {
         fn drop(&mut self) {
             self.0.fetch_sub(1, Ordering::SeqCst);
         }
     }
     impl DesktopSource for Source {
+        fn frames_are_paced(&self) -> bool { true }
         fn capture_timings(&self) -> Option<pab_protocol::DesktopCaptureTimings> {
-            Some(pab_protocol::DesktopCaptureTimings { wait_us: 1200, encode_us: 3400 })
+            Some(pab_protocol::DesktopCaptureTimings { wait_us: 1200, encode_us: 3400, detail: None })
         }
         fn next_frame(&mut self) -> MediaFuture<'_, MediaFrame> {
             Box::pin(async {
@@ -791,6 +807,7 @@ mod tests {
         }).await.unwrap();
         assert_eq!(provider().await.unwrap().id, selected);
         let mut source = HelperMediaBackend.start(config()).await.unwrap();
+        assert!(source.frames_are_paced(), "helper source clock was lost at the IPC boundary");
         assert_eq!(source.next_frame().await.unwrap().bytes.len(), 200_013);
         count(&supervised, 1).await;
         count(&gui, 0).await;

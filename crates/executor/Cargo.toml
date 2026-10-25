@@ -48,12 +48,14 @@ zeroize = "1"
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [dev-dependencies]
+pab-desktop-media = { path = "../desktop-media" }
 axum = "0.8"
 bollard = { version = "=0.21.1", default-features = false, features = ["http"] }
 tempfile = "3"
 
-[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dev-dependencies]
-pab-desktop-media = { path = "../desktop-media" }
+[[example]]
+name = "remote_desktop_host"
+path = "../../smoke/remote_desktop_host.rs"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8"

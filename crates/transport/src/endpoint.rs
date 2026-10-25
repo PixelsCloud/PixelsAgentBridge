@@ -27,6 +27,8 @@ pub struct PabEndpointConfig {
     tls: CaTlsConfig,
     #[cfg(any(debug_assertions, feature = "test-utils"))]
     relay_only_for_testing: bool,
+    #[cfg(any(debug_assertions, feature = "test-utils"))]
+    counted_udp_proxy_for_testing: bool,
 }
 
 impl PabEndpointConfig {
@@ -44,6 +46,8 @@ impl PabEndpointConfig {
             tls: CaTlsConfig::embedded(),
             #[cfg(any(debug_assertions, feature = "test-utils"))]
             relay_only_for_testing: false,
+            #[cfg(any(debug_assertions, feature = "test-utils"))]
+            counted_udp_proxy_for_testing: false,
         };
         let private_ca = pab_service_config::client::DEFAULT_RELAY_CA_PEM.as_bytes();
         if private_ca.is_empty() {
@@ -74,6 +78,12 @@ impl PabEndpointConfig {
     #[cfg(any(debug_assertions, feature = "test-utils"))]
     pub fn relay_only_for_testing(mut self) -> Self {
         self.relay_only_for_testing = true;
+        self
+    }
+
+    #[cfg(any(debug_assertions, feature = "test-utils"))]
+    pub fn counted_udp_proxy_for_testing(mut self) -> Self {
+        self.counted_udp_proxy_for_testing = true;
         self
     }
 }
@@ -108,6 +118,11 @@ impl PabEndpoint {
         } else {
             builder
         };
+        #[cfg(any(debug_assertions, feature = "test-utils"))]
+        let builder = if config.counted_udp_proxy_for_testing {
+            builder.transport_config(iroh::endpoint::QuicTransportConfig::builder()
+                .without_nat_traversal_for_testing().build())
+        } else { builder };
         let inner = builder
             .bind()
             .await

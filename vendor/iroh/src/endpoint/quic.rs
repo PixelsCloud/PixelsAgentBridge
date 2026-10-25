@@ -546,6 +546,16 @@ impl QuicTransportConfigBuilder {
         self
     }
 
+    /// Prevent a counted impairment proxy from being bypassed by candidate
+    /// exchange. Test-only: ordinary endpoint configuration is unchanged.
+    #[cfg(any(debug_assertions, feature = "smoke-test-utils"))]
+    pub fn without_nat_traversal_for_testing(mut self) -> Self {
+        self.0.max_remote_nat_traversal_addresses(0);
+        self.0.send_observed_address_reports(false);
+        self.0.receive_observed_address_reports(false);
+        self
+    }
+
     /// Configures qlog capturing by setting a [`QlogFactory`].
     ///
     /// This assigns a [`QlogFactory`] that produces qlog capture configurations for

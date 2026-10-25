@@ -1,8 +1,11 @@
 use pab_protocol::*;
 use std::time::Duration;
 use tokio::time::Instant;
+#[path = "producer_trace.rs"]
+mod trace;
 
 pub(crate) struct ProducerDiagnostics {
+    pub(super) trace: trace::FrameHistory,
     stage: DesktopProducerStage,
     since: Instant,
     produced: u64,
@@ -14,6 +17,7 @@ pub(crate) struct ProducerDiagnostics {
 impl ProducerDiagnostics {
     pub(crate) fn new() -> Self {
         Self {
+            trace: trace::FrameHistory::new(),
             stage: DesktopProducerStage::Starting,
             since: Instant::now(),
             produced: 0,
@@ -61,7 +65,7 @@ impl ProducerDiagnostics {
             sent_frame_id: sent,
             presented_frame_id: presented,
             encoded_bytes: self.bytes,
-            capture: self.capture.clone(),
+            capture: self.capture.clone().map(|mut c| { c.detail = None; c }),
             source_last_us: self.source_us,
             send_last_us: self.send_us,
             presentation_ack_last_us: ack,

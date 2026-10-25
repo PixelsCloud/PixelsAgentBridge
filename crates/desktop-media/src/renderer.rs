@@ -20,6 +20,7 @@ struct Progress {
     consumed: u64,
     cursor_consumed: u64,
     presented: Option<DesktopFrameHeader>,
+    presentation_timings: Option<serde_json::Value>,
     summary: Option<serde_json::Value>,
     error: Option<String>,
 }
@@ -76,8 +77,10 @@ impl CursorAcknowledgements {
 pub struct NativePresentations {
     progress: watch::Receiver<Progress>,
     last: u64,
+    last_timings: Option<serde_json::Value>,
 }
 impl NativePresentations {
+    pub fn timings(&self) -> Option<&serde_json::Value> { self.last_timings.as_ref() }
     /// Actual native decoder reported for this generation, never the requested
     /// preference. Older/missing reports and failed renderers remain unknown.
     pub fn decoder(&self) -> Option<&'static str> {
@@ -97,6 +100,7 @@ impl NativePresentations {
             }
             if let Some(header) = value.presented.filter(|h| h.frame_id > self.last) {
                 self.last = header.frame_id;
+                self.last_timings = value.presentation_timings;
                 return Ok(header);
             }
             if value.summary.is_some() {
@@ -142,6 +146,7 @@ impl Renderer {
         NativePresentations {
             progress: self.progress.clone(),
             last: 0,
+            last_timings: None,
         }
     }
     pub(crate) async fn enqueue(&self, header: DesktopFrameHeader) -> Result<(), Error> {
@@ -212,6 +217,7 @@ async fn receive(
     sender: &watch::Sender<Progress>,
 ) -> Result<(), Error> {
     let mut state = Progress::default();
+    let mut pattern_proof: Option<(u64, serde_json::Value)> = None;
     loop {
         match output.read_u8().await? {
             1 => {
@@ -228,8 +234,16 @@ async fn receive(
                 }
                 state.consumed = frame_id;
             }
-            2 => {
+            kind @ (2 | 7) => {
                 let index = output.read_u64_le().await?;
+                let mut timings = if kind == 7 {
+                    Some(serde_json::json!({"frame_id":index.checked_add(1).ok_or("presentation sequence exhausted")?,
+                        "decode_us":output.read_u64_le().await?, "present_call_us":output.read_u64_le().await?}))
+                } else { None };
+                if let Some((proof_index, proof)) = pattern_proof.take() {
+                    if proof_index != index || kind != 7 { return Err("pattern proof belongs to a different frame".into()); }
+                    timings.as_mut().unwrap()["pattern_proof"] = proof;
+                }
                 let header = pending
                     .lock()
                     .unwrap()
@@ -240,12 +254,13 @@ async fn receive(
                     return Err("native decoder reordered or invented a frame".into());
                 }
                 state.presented = Some(header);
+                state.presentation_timings = timings;
             }
             3 => {
                 let displayed = output.read_u64_le().await?;
                 let pixel_checks = output.read_u64_le().await?;
                 let max_rgb_error = output.read_u32_le().await?;
-                if !pending.lock().unwrap().is_empty() || displayed > state.consumed {
+                if !pending.lock().unwrap().is_empty() || displayed > state.consumed || pattern_proof.is_some() {
                     return Err("native decoder did not drain submitted frames".into());
                 }
                 state.summary = Some(
@@ -283,6 +298,20 @@ async fn receive(
                 }
                 state.cursor_consumed = sequence;
             }
+            8 => {
+                let index = output.read_u64_le().await?;
+                let pattern = output.read_u32_le().await?;
+                let decoded_error = output.read_u32_le().await?;
+                let rendered_error = output.read_u32_le().await?;
+                let checks = output.read_u32_le().await?;
+                if pattern_proof.is_some() || index.checked_add(1).is_none_or(|id|id>state.consumed
+                    || pending.lock().unwrap().front().is_none_or(|h|h.frame_id!=id))
+                    || pattern > u16::MAX as u32 || decoded_error > 16 || rendered_error > 16 || checks != 1152 {
+                    return Err("invalid synthetic pattern proof event".into());
+                }
+                pattern_proof = Some((index,serde_json::json!({"pattern":pattern,"decoded_error":decoded_error,
+                    "rendered_error":rendered_error,"checks":checks})));
+            }
             _ => return Err("invalid native renderer event".into()),
         }
         sender.send_replace(state.clone());
@@ -298,6 +327,35 @@ mod tests {
         io::{AsyncWriteExt, DuplexStream},
         time::timeout,
     };
+
+    #[tokio::test]
+    async fn synthetic_pixel_proof_is_attached_only_to_its_presentation() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        renderer.enqueue(header(1)).await.unwrap();
+        event(&mut pipe, 1, 0).await;
+        event(&mut pipe, 8, 0).await;
+        for value in [123u32,2,3,1152] { pipe.write_u32_le(value).await.unwrap(); }
+        event(&mut pipe, 7, 0).await;
+        pipe.write_u64_le(10).await.unwrap();
+        pipe.write_u64_le(20).await.unwrap();
+        let mut presentations=renderer.presentations();
+        assert_eq!(presentations.next().await.unwrap().frame_id,1);
+        assert_eq!(presentations.timings().unwrap()["pattern_proof"]["pattern"],123);
+        assert_eq!(presentations.timings().unwrap()["present_call_us"],20);
+    }
+
+    #[tokio::test]
+    async fn proof_for_a_different_frame_is_rejected_before_display_ack() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        renderer.enqueue(header(1)).await.unwrap();
+        event(&mut pipe, 1, 0).await;
+        event(&mut pipe, 8, 1).await;
+        for value in [123u32,2,3,1152] { pipe.write_u32_le(value).await.unwrap(); }
+        let result=renderer.presentations().next().await;
+        assert!(result.unwrap_err().to_string().contains("invalid synthetic pattern proof event"));
+    }
 
     #[tokio::test]
     async fn cursor_consumption_never_grants_video_credit_or_displayed_frames() {
@@ -384,6 +442,29 @@ mod tests {
     async fn event(pipe: &mut DuplexStream, kind: u8, index: u64) {
         pipe.write_u8(kind).await.unwrap();
         pipe.write_u64_le(index).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn native_timings_belong_to_the_returned_frame_and_legacy_events_clear_them() {
+        let (mut pipe, output) = tokio::io::duplex(256);
+        let renderer = Renderer::start(output);
+        let mut presentations = renderer.presentations();
+        for frame in 1..=3 {
+            renderer.enqueue(header(frame)).await.unwrap();
+            event(&mut pipe, 1, frame - 1).await;
+            event(&mut pipe, 7, frame - 1).await;
+            pipe.write_u64_le(frame * 10).await.unwrap();
+            pipe.write_u64_le(frame * 20).await.unwrap();
+            assert_eq!(presentations.next().await.unwrap().frame_id, frame);
+            assert_eq!(presentations.timings().unwrap()["frame_id"], frame);
+            assert_eq!(presentations.timings().unwrap()["decode_us"], frame * 10);
+            assert_eq!(presentations.timings().unwrap()["present_call_us"], frame * 20);
+        }
+        renderer.enqueue(header(4)).await.unwrap();
+        event(&mut pipe, 1, 3).await;
+        event(&mut pipe, 2, 3).await;
+        assert_eq!(presentations.next().await.unwrap().frame_id, 4);
+        assert!(presentations.timings().is_none());
     }
 
     #[tokio::test]
