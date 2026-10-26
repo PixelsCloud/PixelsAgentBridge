@@ -2,6 +2,7 @@
 /references/
 /docs/*
 !/docs/USAGE_AND_SELF_HOSTING.md
+!/docs/FIRST_VERSION.md
 !/docs/CONFIGURATION.md
 !/docs/RELAY_CLUSTER_OPERATIONS.md
 !/docs/RELEASE.md

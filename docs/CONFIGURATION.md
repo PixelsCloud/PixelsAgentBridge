@@ -1,6 +1,6 @@
 # 程序配置格式
 
-项目自己定义的程序配置统一使用 TOML，适用于 Windows、macOS、Linux。第三方或操作系统强制要求的格式保持原样。这条
+项目自己定义的程序配置统一使用 TOML，适用于 Windows、macOS、Linux 和 Android。第三方或操作系统强制要求的格式保持原样。第一版的安装和使用流程见[功能与使用说明](FIRST_VERSION.md)。
 
 ## 配置清单
 
@@ -12,6 +12,7 @@
 | Linux 安装默认值 | `/etc/pixels-agent-bridge/config.toml` | 安装器读取 `/opt/pixels-agent-bridge/settings.env`，成功后将旧文件保留为 `.migrated` 备份 |
 | Desktop 用户服务器设置，MCP 共享 | 用户数据目录 `operator-server.toml` | 第一次使用时读取旧 `operator-server.json`，校验后原子写入 TOML；旧文件保留备份，不再参与读取 |
 | MCP 工具分组开关 | 用户数据目录 `mcp-tools.toml` | 第一次使用时迁移 `mcp-tools.json`，保留已有选择和版本升级规则 |
+| Desktop 自动接入 AI Agent | 用户数据目录 `agent-integrations.toml` | 文件不存在时默认自动接入；手动关闭或启用时保存对应客户端偏好 |
 | Server | 原有 `pab-server.toml` | 已使用 TOML |
 | Relay | 原有 `pab-relay-server.toml` | 已使用 TOML |
 | 官网服务 | 原有 `site.toml` | 已使用 TOML |
@@ -90,6 +91,25 @@ relayUrl = ""
 操作端设备密码库、设备列表、任务记录、队列及访客身份改为保存在用户数据目录的 `operators/<控制服务 URL 哈希>/` 下。Desktop 与 MCP 共用同一服务器的数据库，但各 MCP 进程仍有独立端点。新服务重新注册访客身份；切回旧服务可以读取该服务自己的历史记录，但设置页切换后需要重新登录账号。旧版本没有标记所属服务的根目录数据库与私钥保留原地，不自动导入任何新命名空间，以免把旧服务凭据提交给新服务。旧设备可在对应服务登录同步，或重新添加。
 
 语言、主题、MCP 工具开关、AI 集成设置、机器级 Executor 的身份和配置保持原有位置。
+
+## 自动接入 AI Agent
+
+Windows、macOS、Linux Desktop 在启动时检测当前用户已安装的 Codex、Kimi Code、Claude Code、DeepSeek Harness 和 OpenCode，验证本机 MCP 后合并 Pixels 配置。未检测到客户端不创建其配置，不安装客户端。已正确接入的不重复写入；同名第三方 MCP、损坏的文件或不兼容权限不会被覆盖。
+
+`agent-integrations.toml` 与 `operator-server.toml` 同级，不随服务切换清除。缺省自动接入；示例：
+
+```toml
+auto_connect = true
+
+[agents]
+codex = true
+kimi = true
+claude = false
+deepseek = true
+opencode = true
+```
+
+`auto_connect = false` 停止自动配置写入，保留已经存在的接入，仍可手动启用。各客户端未填写时默认为 `true`。设置页主动关闭的接入会保存为 `false`，下次启动不会重新打开；重新启用则恢复为 `true`。宿主需要新建会话或重启才能加载更新，Pixels 不结束现有 Agent 会话。Linux 无界面版不运行 Desktop 的自动扫描，需手动注册 `run-mcp.sh`。
 
 ## 保持原格式的内容
 

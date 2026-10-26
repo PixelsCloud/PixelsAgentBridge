@@ -136,7 +136,7 @@ Ubuntu 22.04 x86_64 GUI 使用独立入口，不改变已发布的 glibc 2.31 �
 python scripts/build_linux_desktop.py --version 1.0.0 --package --headless-package PATH_TO_VERIFIED_TAR --headless-sha256 VERIFIED_SHA256
 ```
 
-该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 8 + CMake 2，总编译并发最多 10，Docker CPU 限制为 10。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。
+该入口生成原生 Tauri GUI 和 deb，复用经过哈希验证的稳定后台、MCP、文档 Worker 与离线资源；不递增 `build-version.json`。GUI 构建记录绑定版本、架构和 ELF 哈希，缺失记录、篡改或错误版本拒绝打包。Cargo 与原生 Make 依赖共享作业池，默认最多 10 个作业及对应的 Docker CPU 限制；可通过 `CARGO_BUILD_JOBS` 调低以共享整机预算。具体方法见 [桌面包说明](packaging/desktop/linux-desktop/README.md)。使用 `python scripts/release.py linux-desktop --headless-package PATH --headless-sha256 SHA256 --notes-zh "说明" --notes-en "Notes"` 可自动预留版本、构建、核验、签名、上传和发布；私有凭据沿用已有发布环境变量。
 
 ## Development
 

@@ -8,11 +8,14 @@ tools for non-interactive builds. See [build prerequisites](../../BUILDING.md).
 
 ## macOS
 
-On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.9+, run
+On a Mac with Rust, Xcode Command Line Tools, Node/npm and Python 3.12+, run
 `bash packaging/desktop/build-macos.sh release` from the repository root
 (`debug` is also supported). The native-architecture archive in `.build/packages`
-contains the ad-hoc signed `Pixels Agent Bridge.app`, MCP, Executor, dedicated
+contains `Pixels Agent Bridge.app`, MCP, Executor, dedicated
 macOS scripts and launchd plists. It is not Developer-ID signed or notarized.
+The app and bundled executables use the build user's persistent self-signed
+identity; they are not left with Tauri's temporary ad-hoc signature. Initialize
+and preserve that identity as described in [builds and signing](../../BUILDING.md#打包与版本校验).
 The adjacent SHA-256 manifest records the complete archive checksum.
 The macOS wrapper uses the unified build entry to allocate one installer release version.
 Rust, npm, Tauri and the built app retain their internal versions. macOS tar/PKG
@@ -25,7 +28,8 @@ needed. Upgrading automatically stops the installed PAB processes; finish active
 tasks first. Agent hosts remain open and may need to reconnect Pixels MCP.
 Uninstallation preserves machine and user data. See the [usage and self-hosting guide](../../docs/USAGE_AND_SELF_HOSTING.md)
 for setup and permission requirements.
-Windows/Linux use their existing scripts unchanged.
+Linux offers separate desktop and headless packages; see the
+[first-version guide](../../docs/FIRST_VERSION.md#平台与边界).
 
 ### Double-click macOS installer
 

@@ -1,21 +1,28 @@
 # Pixels Agent Bridge
 
+> **注意：** 我们提供免费 Relay 服务，如果想获得更快的速度，请您自行部署 Relay 服务。
+
 **让 AI Agent 通过网络操作你的设备。**
 
 [English](README.md) · 简体中文
 
-Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用自然语言让 Agent 跨设备执行命令、管理文件、查询系统信息和操作桌面应用。
+Pixels Agent Bridge 通过 MCP 将 AI Agent 与计算机、Android 设备连接起来。用自然语言跨设备执行命令、管理文件、查询系统和操作应用；需要人工处理时，也可以直接打开远程桌面或终端接手。
 
 ## 能做什么
 
-- **命令与终端**：运行程序、使用交互式终端、查看任务输出。
+- **远程桌面**：独立窗口查看画面，支持切换屏幕、鼠标键盘、全屏和文字剪贴板同步。默认只查看，需要时再启用操作。
+- **命令与终端**：运行程序、使用独立交互式终端窗口、查看任务输出；Windows 在支持的环境下提供 System 终端。
 - **文件操作**：上传、下载、搜索、编辑、复制和压缩文件，支持后台传输和进度查询。
 - **桌面自动化**：在 Windows、macOS 上获取 JPEG 截图、查询窗口与 UI 控件、发送键鼠输入。
 - **系统与开发工具**：查询系统资源、进程和网络，执行平台支持的服务管理、Git 和 Docker 操作。
+- **文档与浏览器**：提取和搜索文档、渲染支持的格式、离线 OCR，以及操作 Pixels 启动的浏览器。Agent 遇到需要人工处理的环节时可以请求协助。
+- **Android 被控端**：在系统授权范围内提供无障碍界面操作、截图、文件、应用、通知、命令和网络工具。
 - **桌面管理**：管理设备、查看本地任务记录和各 Agent 的 MCP 连接。支持简体中文、英文及亮暗主题。
-- **账号与 Web 后台**：注册登录、查看设备和在线状态、管理用户、设置用户的 Relay 带宽。任务记录只保存在本地，不上传服务端。
+- **账号与 Web 后台**：登录、管理用户和设备，设置 Relay 节点容量、监控连接、维护节点及停用／恢复。任务记录只保存在本地，不上传服务端。
 
-已提供 **Codex、Kimi Code、Claude Code、DeepSeek Harness、OpenCode** 的一键接入。其他客户端可手动配置 stdio MCP。
+Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude Code、DeepSeek Harness、OpenCode**。未安装的直接跳过，保留已有配置，主动关闭的接入不会重新开启。其他客户端及无界面安装可手动配置 stdio MCP。
+
+完整流程与平台限制见[第一版功能与使用说明](docs/FIRST_VERSION.md)。本文描述当前源码，已安装软件提供的功能以对应发行包为准。
 
 ## 支持平台
 
@@ -23,15 +30,17 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用
 |---|---|
 | Windows | 桌面应用、后台设备服务、MCP |
 | macOS | 桌面应用、后台设备服务、MCP |
-| Linux | 无界面设备服务和 MCP，暂无桌面应用 |
+| Linux 桌面 | Ubuntu 22.04 x86_64 桌面应用、后台设备服务、MCP |
+| Linux 无界面 | x86_64 设备服务和 MCP，glibc 2.31+；基础工具无需图形会话 |
+| Android | Android 9+ 被控应用；操作端 Desktop／MCP 运行在计算机上 |
 
-具体能力取决于目标系统和权限。macOS 截图、键鼠控制需要相应的系统授权。配置步骤与平台要求见[使用指南](docs/USAGE_AND_SELF_HOSTING.md)。
+远程桌面的查看与控制由 Windows、macOS、Linux 桌面组件提供。锁屏／登录界面访问取决于辅助服务、系统、会话和权限，不绕过系统登录；macOS 需要屏幕录制与辅助功能授权。Android 不提供桌面查看窗口。详见[平台与边界](docs/FIRST_VERSION.md#平台与边界)。
 
 ## 快速开始
 
-1. **安装应用**：在操作端和目标设备安装对应平台的包，并使用同一个控制服务。参见[安装与打包说明](packaging/desktop/README.md)或 [Linux 无界面安装](packaging/desktop/unix/INSTALL-LINUX.txt)。
-2. **保存设备连接**：在目标设备的桌面应用中查看九位设备码和密码，在操作端输入并成功连接一次。之后 MCP 会使用保存的凭据。
-3. **接入 Agent**：打开「设置 → AI Agent」，启用需要的客户端，再重启客户端或新建会话。运行中的会话会显示在「MCP 连接」页。
+1. **安装并登录**：在操作端和目标设备安装对应平台的包，使用同一个控制服务，在操作端登录账号。从[项目官网](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest)下载，安装说明见[桌面安装包](packaging/desktop/README.md)、[Linux 桌面版](packaging/desktop/linux-desktop/README.md)和 [Linux 无界面版](packaging/desktop/unix/INSTALL-LINUX.txt)。
+2. **保存设备连接**：在目标应用查看九位设备码和密码；Linux 无界面版使用 `show-access`。在操作端输入并成功连接一次，之后 MCP 会使用保存的凭据。
+3. **使用 Agent**：Desktop 自动配置检测到的受支持客户端，新建 Agent 会话或重启客户端以加载 MCP。「设置 → AI Agent」可查看、修复或关闭接入；运行中的会话显示在「MCP 连接」页。Linux 无界面版需手动注册 MCP。
 4. **直接交代任务**：
 
    > 用 Pixels 连接设备 123456789，检查它的操作系统和磁盘剩余空间，并总结结果。
@@ -48,7 +57,7 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与你的计算机连接起来。用
 
 Agent 调用本地 MCP，由 MCP 连接目标设备的 Executor。控制服务负责设备发现和认证，操作数据优先通过 P2P 传输，无法直连时使用 Relay 中继。
 
-每个 MCP 独立维护连接，Desktop 汇总活动状态并展示本地任务记录。多个 Agent 可以操作同一设备，但同时修改同一文件或操作同一桌面时仍需协调。
+每个 MCP 独立维护连接，Desktop 汇总活动状态并展示本地任务记录。多个 Agent 可以操作同一设备，但同一被控设备同时只允许一个远程桌面查看者；同时修改同一文件或操作同一桌面时仍需协调。远程桌面沿用现有可靠传输和设备认证。
 
 ## 构建与自部署
 
@@ -63,16 +72,20 @@ python scripts/build.py desktop --profile release --package
 
 产物位于 `.build/packages/`。安装包版本自动递增，内部组件版本独立维护，构建会复用缓存。
 
-自部署请按 [Web 部署指南](docs/WEB_DEPLOYMENT.md)和 [Docker Compose 说明](packaging/docker/README.md)配置。Server、Relay 和客户端需要使用兼容版本；开发阶段清库重建后，设备需要重新注册。
+自部署请按 [Web 部署指南](docs/WEB_DEPLOYMENT.md)和 [Docker Compose 说明](packaging/docker/README.md)配置。管理平台、Relay 和客户端独立发布、分别计版本。客户端填写配套的控制与 Relay 地址后使用自建服务，覆盖编译默认值。自有程序配置统一使用 TOML；服务切换和 Relay CA 的规则见[配置参考](docs/CONFIGURATION.md)。
 
 ## 更多文档
 
+- [第一版功能与使用说明](docs/FIRST_VERSION.md)
 - [使用指南与自我部署](docs/USAGE_AND_SELF_HOSTING.md)（与官网文档同步维护）
 - [构建与版本规则](BUILDING.md)
 - [安装包发布与在线更新](docs/RELEASE.md)
 - [配置参考](docs/CONFIGURATION.md)
 - [Relay 集群运维](docs/RELAY_CLUSTER_OPERATIONS.md)
 - [文档解析与 OCR](docs/DOCUMENTS.md)
+- [浏览器自动化](docs/BROWSER_AUTOMATION.md)
+- [AI 远程桌面人工协助](docs/REMOTE_DESKTOP_ASSISTANCE.md)
+- [Android 被控端](apps/android/README.md)
 - [开发说明](BUILDING.md#development)
 
 ## 许可证

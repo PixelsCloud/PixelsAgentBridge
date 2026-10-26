@@ -24,6 +24,8 @@
 
 ## 开始之前
 
+> **注意：** 我们提供免费 Relay 服务，如果想获得更快的速度，请您自行部署 Relay 服务。
+
 Pixels Agent Bridge 由操作端、目标设备和 AI Agent 组成。操作端安装 Desktop 并登录账号；目标设备运行 Executor。AI Agent 通过本机 MCP 使用保存的设备连接。
 
 > 账号用于识别发起控制的人；设备码和设备密码用于验证目标设备。两者都需要，登录不能代替设备密码。
@@ -38,7 +40,7 @@ Pixels Agent Bridge 由操作端、目标设备和 AI Agent 组成。操作端�
 2. 完成安装并启动 Pixels Desktop；目标设备上的后台服务保持运行。
 3. macOS 首次使用桌面截图或键鼠功能时，按系统提示授予屏幕录制与辅助功能权限。
 
-[前往下载](https://agent.rgaa.vip/#downloads)
+[前往下载](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest)
 
 <a id="application-config"></a>
 

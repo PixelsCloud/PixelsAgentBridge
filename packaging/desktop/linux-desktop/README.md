@@ -15,8 +15,10 @@ python scripts/build_linux_desktop.py --version 1.0.0 --package \
   --headless-sha256 SHA256_FROM_THE_VERIFIED_RELEASE
 ```
 
-The GUI builds on an isolated Ubuntu 22.04 sysroot with Cargo 8 + CMake 2 and a
-10-CPU Docker limit. It uses its own target volume, so it does not change the
+The GUI builds on an Ubuntu 22.04 sysroot, mounting the main source checkout.
+Cargo and native Make dependencies share a jobserver, with at most 10 jobs and
+a matching Docker CPU limit. `CARGO_BUILD_JOBS` can lower that budget when other
+builds share the machine. It uses its own target volume, so it does not change the
 headless build cache or Windows installation. Frontend and native GUI use the
 same explicit desktop installer version; `build-version.json` is not modified.
 The verified headless archive supplies unchanged Executor, MCP, document Worker
