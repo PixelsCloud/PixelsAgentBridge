@@ -1,13 +1,20 @@
 name: Release candidates
+run-name: ${{ inputs.purpose || 'draft' }} / ${{ inputs.tag || github.ref_name }}
 on:
   push:
     tags: ['client-v*', 'management-v*', 'relay-v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing client-vX.Y.Z, management-vX.Y.Z or relay-vX.Y.Z tag
+        description: Product version identity; an existing Git tag is required only for draft
         required: true
         type: string
+      purpose:
+        description: Rehearse builds without creating tags or Releases, or build a tagged draft
+        required: true
+        default: rehearsal
+        type: choice
+        options: [rehearsal, draft]
 permissions:
   contents: read
 concurrency:
@@ -18,6 +25,7 @@ env:
   GIT_CONFIG_KEY_0: core.autocrlf
   GIT_CONFIG_VALUE_0: 'false'
   PYTHONUTF8: '1'
+  PAB_RELEASE_REHEARSAL: ${{ github.event_name == 'workflow_dispatch' && inputs.purpose == 'rehearsal' && 'true' || 'false' }}
 jobs:
   plan:
     runs-on: ubuntu-22.04
@@ -29,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.purpose == 'rehearsal' && github.sha || inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -79,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ needs.plan.outputs.tag }}
+          ref: ${{ inputs.purpose == 'rehearsal' && github.sha || needs.plan.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -124,18 +132,18 @@ jobs:
           path: .build/github-release/out/${{ matrix.id }}/*
           if-no-files-found: error
           retention-days: 14
-  draft:
+  bundle:
     needs: [plan, build]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
     env:
       TAG: ${{ needs.plan.outputs.tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ needs.plan.outputs.tag }}
+          ref: ${{ inputs.purpose == 'rehearsal' && github.sha || needs.plan.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -157,6 +165,36 @@ jobs:
           path: .build/github-release/bundle/*
           if-no-files-found: error
           retention-days: 14
+      - name: Report rehearsal result
+        if: env.PAB_RELEASE_REHEARSAL == 'true'
+        shell: python
+        run: |
+          import os
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('Rehearsal passed. Signed artifacts are available in release-bundle. No Git tag, GitHub Release, application update or deployment was created. Rehearsal artifacts cannot be promoted.\n')
+  draft:
+    if: github.event_name != 'workflow_dispatch' || inputs.purpose != 'rehearsal'
+    needs: [plan, bundle]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r smoke/requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-bundle
+          path: .build/github-release/bundle
       - run: python scripts/github_release.py draft --tag "$TAG" --directory .build/github-release/bundle --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}

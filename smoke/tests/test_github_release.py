@@ -29,7 +29,8 @@ class ReleaseTests(unittest.TestCase):
         self.stack.enter_context(patch.object(release, 'ROOT', self.root))
         self.stack.enter_context(patch.object(release, 'checked_source', return_value=self.source))
         self.stack.enter_context(patch.dict(os.environ, {
-            'PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64': base64.b64encode(bytes(range(32))).decode()
+            'PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64': base64.b64encode(bytes(range(32))).decode(),
+            'PAB_RELEASE_REHEARSAL': 'false'
         }))
         self.tag = 'relay-v1.2.3'
 
@@ -105,6 +106,26 @@ class ReleaseTests(unittest.TestCase):
         with patch.dict(os.environ, {'PAB_SERVICE_RELEASE_PUBLIC_KEY_BASE64': base64.b64encode(bytes(32)).decode()}):
             with self.assertRaisesRegex(ValueError, 'signature'):
                 release.read_bundle(self.tag, self.folder)
+
+    def test_signed_rehearsal_cannot_create_or_publish_a_release(self):
+        self.candidates()
+        for path in self.folder.glob('candidate-*.json'):
+            value=json.loads(path.read_text());value['rehearsal']=True;release.write_json(path,value)
+        with patch.dict(os.environ, {'PAB_RELEASE_REHEARSAL':'true'}):
+            value=release.assemble(self.tag,self.folder)
+        self.assertTrue(value['rehearsal'])
+        with patch.object(release,'gh') as github, patch.object(release,'remote_identity') as remote:
+            with self.assertRaisesRegex(ValueError,'Rehearsal'):
+                release.draft(self.tag,self.folder,'owner/repo')
+            with self.assertRaisesRegex(ValueError,'Rehearsal'):
+                release.publish(self.tag,self.folder,'owner/repo',self.root)
+            github.assert_not_called();remote.assert_not_called()
+
+    def test_rehearsal_and_release_platforms_cannot_be_combined(self):
+        self.candidates()
+        with patch.dict(os.environ, {'PAB_RELEASE_REHEARSAL':'true'}):
+            with self.assertRaisesRegex(ValueError,'mix rehearsal'):
+                release.assemble(self.tag,self.folder)
 
     def test_missing_platform_candidate_cannot_be_assembled(self):
         with self.assertRaisesRegex(ValueError, 'platform candidates'):
@@ -289,6 +310,22 @@ class AndroidAndContainerTests(unittest.TestCase):
         self.assertIn('--locked --release', command)
         self.assertIn('-j 4', command)
         self.assertIn('unset CMAKE_BUILD_PARALLEL_LEVEL', command)
+
+
+class SourceGuards(unittest.TestCase):
+    def test_rehearsal_requires_current_main_and_never_resolves_or_creates_a_tag(self):
+        source=dict(commit='a'*40,sha256='b'*64,dirty=False)
+        env=dict(GITHUB_ACTIONS='true',GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/main',
+                 GITHUB_SHA=source['commit'],PAB_RELEASE_REHEARSAL='true')
+        with patch.object(release,'source_state',return_value=source), patch.dict(os.environ,env,clear=True), \
+             patch.object(release.subprocess,'run') as run, patch.object(release.subprocess,'check_output') as resolve:
+            self.assertEqual(release.checked_source('relay-v1.2.3'),source)
+            self.assertEqual(run.call_args.args[0][:3],['git','merge-base','--is-ancestor'])
+            resolve.assert_not_called()
+        for bad in ({'GITHUB_EVENT_NAME':'pull_request'},{'GITHUB_REF':'refs/heads/other'},{'GITHUB_SHA':'c'*40}):
+            with patch.object(release,'source_state',return_value=source), patch.dict(os.environ,dict(env,**bad),clear=True), \
+                 patch.object(release.subprocess,'run'), self.assertRaisesRegex(ValueError,'current main'):
+                release.checked_source('relay-v1.2.3')
 
 
 if __name__ == '__main__':

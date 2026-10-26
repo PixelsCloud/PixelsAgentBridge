@@ -26,6 +26,10 @@ DOMAIN = b'PAB-GITHUB-RELEASE-V1\n'
 CONFIG = ROOT / 'packaging/github-release.toml'
 
 
+def is_rehearsal():
+    return os.environ.get('PAB_RELEASE_REHEARSAL') == 'true'
+
+
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -77,6 +81,12 @@ def checked_source(tag):
         # Both manually selected refs and pushed tags must belong to reviewed main history.
         subprocess.run(['git', 'merge-base', '--is-ancestor', value['commit'], 'origin/main'],
                        cwd=ROOT, check=True, capture_output=True)
+        if is_rehearsal():
+            if (os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch'
+                    or os.environ.get('GITHUB_REF') != 'refs/heads/main'
+                    or os.environ.get('GITHUB_SHA') != value['commit']):
+                raise ValueError('Rehearsals require an explicit manual run of the current main commit')
+            return value
         selected = subprocess.check_output(['git', 'rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}'],
                                            cwd=ROOT, text=True).strip()
         if selected != value['commit']:
@@ -186,7 +196,7 @@ def build(tag, target):
         if digest(output / metadata['name']) != metadata['sha256']:
             raise ValueError('Artifact changed during staging')
     write_json(output / f'candidate-{target}.json', dict(schema_version=1, target=target,
-               tag=tag, product=product, version=version, source=before, assets=[a for _, a in assets]))
+               tag=tag, product=product, version=version, source=before, rehearsal=is_rehearsal(), assets=[a for _, a in assets]))
     return output
 
 
@@ -224,6 +234,8 @@ def assemble(tag, directory):
         if (receipt.get('schema_version'), receipt['tag'], receipt['product'], receipt['version'], receipt['source']) != (
                 1, tag, value['product'], value['version'], source):
             raise ValueError('Platform candidates do not share the tagged source and version')
+        if receipt.get('rehearsal', False) != is_rehearsal():
+            raise ValueError('Cannot mix rehearsal and release candidates')
         if not receipt['assets']:
             raise ValueError('Empty platform candidate')
         for item in receipt['assets']:
@@ -242,7 +254,7 @@ def assemble(tag, directory):
     if {p.name for p in directory.iterdir()} != allowed:
         raise ValueError('Unexpected file in candidate bundle')
     release = dict(schema_version=1, tag=tag, product=value['product'], version=value['version'],
-                   source=source, assets=sorted(assets, key=lambda a: a['name']))
+                   source=source, rehearsal=is_rehearsal(), assets=sorted(assets, key=lambda a: a['name']))
     key = signing_key(value['product'])
     write_json(directory / 'release.json', {'domain': DOMAIN.decode().strip(), 'release': release,
                'signature': base64.b64encode(key.sign(canonical(release))).decode()})
@@ -314,6 +326,8 @@ def verify_remote(value, directory, repo, draft=None, allow_partial=False):
 
 def draft(tag, directory, repo):
     value = read_bundle(tag, directory)
+    if value.get('rehearsal') or is_rehearsal():
+        raise ValueError('Rehearsal artifacts cannot create a GitHub Release')
     remote_identity(tag, repo, value['source']['commit'])
     # Distinguish a missing release from authentication, networking and other API errors.
     from urllib.parse import quote
@@ -350,6 +364,8 @@ def validate_reports(value, directory, reports):
 
 def publish(tag, directory, repo, reports):
     value = read_bundle(tag, directory)
+    if value.get('rehearsal') or is_rehearsal():
+        raise ValueError('Rehearsal artifacts cannot publish a GitHub Release')
     # Full existing gate, before signing/publication/network writes; no CI shortcut.
     validate_reports(value, directory, reports)
     verify_remote(value, directory, repo)
