@@ -1,0 +1,20 @@
+# Copy to .env/github-release-lab.toml on dedicated release-test runners.
+# Complete smoke/run.py release/soak reports for the exact downloaded candidates.
+# Include one report for every attached artifact, including portable archives.
+# Only report.json and its validated JSON evidence are exported; no raw logs.
+schema_version = 1
+
+[targets.windows-x64]
+reports = []
+
+[targets.macos-arm64]
+reports = []
+
+[targets.macos-x64]
+reports = []
+
+[targets.linux-x64]
+reports = []
+
+[targets.android]
+reports = []

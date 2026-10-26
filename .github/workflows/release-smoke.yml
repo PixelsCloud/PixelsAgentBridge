@@ -1,0 +1,106 @@
+name: Release smoke qualification
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Candidate tag already tested on the dedicated machines
+        required: true
+        type: string
+      candidate_run:
+        description: Successful Release candidates Actions run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release-smoke-${{ inputs.tag }}
+  cancel-in-progress: false
+env:
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  PYTHONUTF8: '1'
+jobs:
+  plan:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - id: plan
+        env:
+          TAG: ${{ inputs.tag }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/github_release.py check-run --repo "$GITHUB_REPOSITORY" --run-id "$CANDIDATE_RUN" --workflow release.yml --tag "$TAG"
+          python scripts/github_release.py plan --tag "$TAG" --github-output "$GITHUB_OUTPUT"
+      - name: Record public qualification context
+        shell: python
+        env:
+          TAG: ${{ inputs.tag }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: |
+          import json, os, pathlib, subprocess
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          path = pathlib.Path('.build/github-release/context.json')
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(dict(tag=os.environ['TAG'], candidate_run=os.environ['CANDIDATE_RUN'], commit=commit)))
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-context
+          path: .build/github-release/context.json
+          if-no-files-found: error
+          retention-days: 7
+  qualify:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    # Never schedule PRs or public builds on these machines. Operators configure
+    # these labels only on dedicated lab runners with completed real smoke reports.
+    runs-on: [self-hosted, pab-release-smoke, '${{ matrix.id }}']
+    timeout-minutes: 30
+    concurrency:
+      group: release-lab-${{ matrix.id }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+          # Preserve the lab TOML, completed evidence and installed identities.
+          clean: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r smoke/requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-bundle
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+          path: .build/github-release/test-input/${{ inputs.candidate_run }}
+      - name: Qualify existing full smoke evidence against exact candidates
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ matrix.id }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: python scripts/github_release.py qualify --tag "$TAG" --target "$TARGET" --directory ".build/github-release/test-input/$CANDIDATE_RUN" --lab .env/github-release-lab.toml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qualification-${{ matrix.id }}
+          path: .build/github-release/qualification/${{ github.run_id }}/${{ matrix.id }}/
+          if-no-files-found: error
+          retention-days: 7

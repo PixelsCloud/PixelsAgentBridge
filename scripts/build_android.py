@@ -133,17 +133,55 @@ def prepare_document_runtime() -> None:
             temporary.unlink(missing_ok=True)
 
 
-def native(abi: str, env: dict[str, str], check: bool) -> None:
+def native(abi: str, env: dict[str, str], check: bool, profile: str = 'debug') -> None:
     target = TARGETS[abi][0]
     if check:
         run(["cargo", "check", "--locked", "-j", str(MAX_JOBS), "--target", target,
              "-p", "pab-agent-core", "-p", "pab-transport"], env)
         return
-    run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "--target", target,
+    run(["cargo", "build", "--locked", *(['--release'] if profile == 'release' else []), "-j", str(MAX_JOBS), "--target", target,
          "-p", "pab-android-agent"], env)
     destination = APP_ROOT / "transport" / "src" / "main" / "jniLibs" / abi
     destination.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / "target" / target / "debug" / "libpab_android_agent.so", destination)
+    shutil.copy2(ROOT / "target" / target / profile / "libpab_android_agent.so", destination)
+
+
+def release_version_code(version: str) -> int:
+    # Explicit numeric product version, monotonic across all supported versions.
+    if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)', version):
+        raise ValueError('Use a release version with minor/patch below 100')
+    major, minor, patch = map(int, version.split('.'))
+    code = major * 10000 + minor * 100 + patch
+    if not 1 <= code <= 2_100_000_000:
+        raise ValueError('Android release versionCode is out of range')
+    return code
+
+
+def build_release(version: str, env: dict[str, str]) -> Path:
+    code = release_version_code(version)
+    required = ('PAB_ANDROID_KEYSTORE_FILE', 'PAB_ANDROID_KEYSTORE_PASSWORD',
+                'PAB_ANDROID_KEY_ALIAS', 'PAB_ANDROID_KEY_PASSWORD', 'PAB_ANDROID_CERT_SHA256')
+    if any(not env.get(name) for name in required):
+        raise ValueError('Android release requires the existing keystore, credentials and pinned certificate SHA-256')
+    if not Path(env['PAB_ANDROID_KEYSTORE_FILE']).is_file():
+        raise ValueError('Android release keystore is missing')
+    for abi in TARGETS:
+        native(abi, env, False, profile='release')
+    prepare_verifier()
+    prepare_document_runtime()
+    wrapper = str(APP_ROOT / ('gradlew.bat' if os.name == 'nt' else 'gradlew'))
+    run([wrapper, '--no-daemon', f'--max-workers={min(2, MAX_JOBS)}',
+         f'-PpixelsVersionCode={code}', f'-PpixelsVersionName={version}',
+         'lintRelease', 'testReleaseUnitTest', ':app:assembleRelease'], env, APP_ROOT)
+    apk = APP_ROOT / 'app/build/outputs/apk/release/app-release.apk'
+    apksigner = Path(env['ANDROID_HOME']) / 'build-tools/36.0.0' / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
+    result = subprocess.run([str(apksigner), 'verify', '--verbose', '--print-certs', str(apk)],
+                            env=env, capture_output=True, text=True, check=True)
+    actual = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)$', result.stdout, re.M)
+    expected = env['PAB_ANDROID_CERT_SHA256'].replace(':', '').lower()
+    if not re.fullmatch('[0-9a-f]{64}', expected) or [a.lower() for a in actual] != [expected]:
+        raise ValueError('Android signing certificate does not match the pinned release identity')
+    return apk
 
 
 def install_updates(env: dict[str, str], include_tests: bool) -> None:
@@ -214,7 +252,7 @@ def stage_server_tools() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=[
-        "check-shared", "native", "assemble", "check", "format", "instrument",
+        "check-shared", "native", "assemble", "release", "check", "format", "instrument",
         "verify", "regression", "clippy", "clippy-android", "test-native", "test-execution", "test-execution-linux", "test-port-forward", "test-port-forward-linux", "test-file-enhancements", "test-file-enhancements-linux", "test-files", "test-system", "test-documents", "test-documents-linux", "control-fixture", "remote-tools", "mcp-tools", "shared-test", "check-integration", "check-web", "server-tools", "public-compat", "linux-tools",
     ])
     parser.add_argument("--abi", choices=list(TARGETS), default="x86_64")
@@ -222,7 +260,10 @@ def main() -> None:
                         help="Share the ten-job total budget with other active builds")
     parser.add_argument("--install-tests", action="store_true",
                         help="Also update the optional instrumentation APK on the configured phone")
+    parser.add_argument('--version', help='Explicit version for the signed release action; no device access')
     args = parser.parse_args()
+    if (args.action == 'release') != bool(args.version):
+        parser.error('--version is required exclusively for release')
     global MAX_JOBS
     MAX_JOBS = args.jobs
     limit_processors()
@@ -244,6 +285,9 @@ def main() -> None:
         else:
             import fcntl
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.action == 'release':
+            build_release(args.version, env)
+            return
         if args.action in APK_ACTIONS:
             # Kotlin/JNI must match every ABI shipped in the APK, including an
             # emulator ABI left by an earlier build. Never package stale natives.

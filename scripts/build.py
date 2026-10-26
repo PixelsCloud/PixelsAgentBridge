@@ -77,8 +77,14 @@ def main():
     parser.add_argument('--image', help='Override the image tag for one Docker target')
     parser.add_argument('--macos-arch', choices=['native', 'arm64', 'aarch64', 'x86_64', 'all'], default=None)
     parser.add_argument('--installer-version', help='Version reserved by the release service; does not change local build-version.json')
+    parser.add_argument('--release-version', help='Explicit CI product version; never increments local counters')
     parser.add_argument('--macos-installer-identity', help='Developer ID Installer identity for the macOS PKG')
     args = parser.parse_args()
+    if args.release_version:
+        parse_version(args.release_version)
+        products = {product_for_target(target) for target in args.targets}
+        if args.installer_version or len(products) != 1 or args.profile != 'release' or not args.package:
+            parser.error('--release-version requires one product, release profile and --package')
     if args.installer_version:
         parse_version(args.installer_version)
         if len(args.targets) != 1 or args.targets[0] not in ('desktop', 'macos', 'linux') or args.profile != 'release' or not args.package:
@@ -95,8 +101,6 @@ def main():
         architectures = macos_architectures(args.macos_arch or 'native')
     if 'desktop' in targets and os.name != 'nt':
         parser.error('desktop builds the Windows installer components; use linux for Linux Docker builds')
-    if 'linux' in targets and os.name != 'nt':
-        parser.error('linux currently uses the Windows-host Docker build script')
     docker_targets = [t for t in targets if t in ('docker', 'docker-management', 'docker-relay')]
     if args.image and len(docker_targets) != 1:
         parser.error('--image requires exactly one Docker target')
@@ -125,7 +129,7 @@ def main():
         for target in targets:
             product = product_for_target(target)
             if product not in versions:
-                versions[product] = args.installer_version or reserve_product_version(ROOT, product)
+                versions[product] = args.release_version or args.installer_version or reserve_product_version(ROOT, product)
         source_before = None
         if (ROOT / '.git').exists() and any(t in BINARIES or t in ('docker-management', 'docker-relay') for t in targets):
             sys.path.insert(0, str(ROOT))
@@ -205,7 +209,10 @@ def main():
                     from package_service_image import package_image
                     print(package_image(ROOT, product, version, image, source_before), flush=True)
             elif target == 'linux':
-                run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
+                if os.name == 'nt':
+                    run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'packaging/desktop/build-linux.ps1', '-Profile', args.profile, '-ComponentsOnly'])
+                else:
+                    run([sys.executable, 'scripts/build_linux_headless.py', '--profile', args.profile])
                 files = {name: ROOT / f'.build/guest-desktop-linux-{args.profile}' / name for name in ['pab-executor', 'pab-mcp', 'pab-document-worker']}
                 record_artifacts(ROOT, target, args.profile, version, files)
                 if args.package:

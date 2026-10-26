@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+from build_linux_headless import defaults_arguments as container_defaults
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = 'pab-linux-desktop-build-deps:jammy'
@@ -62,7 +63,8 @@ cp /target/release/pab-desktop /out/pab-desktop
          '--env', 'CARGO_TARGET_DIR=/target', '--env', f'CARGO_BUILD_JOBS={JOBS}',
          '--env', 'CARGO_PROFILE_RELEASE_LTO=false',
          '--env', 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16',
-         '--env', f'PAB_INSTALLER_VERSION={args.version}', IMAGE, 'bash', '-c', script])
+         '--env', f'PAB_INSTALLER_VERSION={args.version}',
+         *container_defaults(), IMAGE, 'bash', '-c', script])
     binary = output / 'pab-desktop'
     metadata = {'version': args.version, 'platform': 'linux-desktop', 'architecture': 'x86_64',
                 'sysroot': 'Ubuntu 22.04', 'cargo_jobs': JOBS, 'cmake_jobs': JOBS,

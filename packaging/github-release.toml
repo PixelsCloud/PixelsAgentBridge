@@ -1,0 +1,38 @@
+schema_version = 1
+
+[products.client]
+targets = ["windows-x64", "macos-arm64", "macos-x64", "linux-x64", "android"]
+latest = true
+
+[products.management]
+targets = ["windows-x64", "linux-x64"]
+latest = false
+
+[products.relay]
+targets = ["windows-x64", "linux-x64"]
+latest = false
+
+[targets.windows-x64]
+runner = "windows-2022"
+platform = "windows"
+architecture = "x86_64"
+
+[targets.macos-arm64]
+runner = "macos-15"
+platform = "macos"
+architecture = "aarch64"
+
+[targets.macos-x64]
+runner = "macos-15-intel"
+platform = "macos"
+architecture = "x86_64"
+
+[targets.linux-x64]
+runner = "ubuntu-22.04"
+platform = "linux"
+architecture = "x86_64"
+
+[targets.android]
+runner = "ubuntu-22.04"
+platform = "android"
+architecture = "aarch64"

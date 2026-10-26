@@ -15,7 +15,8 @@ import subprocess
 import sys
 import tempfile
 
-STATE = Path.home() / 'Library/Application Support/PixelsAgentBridgeBuildSigning'
+STATE = Path(os.environ.get('PAB_MACOS_SIGNING_STATE_DIR',
+                            Path.home() / 'Library/Application Support/PixelsAgentBridgeBuildSigning'))
 IDENTIFIERS = {'desktop': 'vip.rgaa.pab.desktop', 'executor': 'vip.rgaa.pab.executor',
                'mcp': 'vip.rgaa.pab.mcp', 'document': 'vip.rgaa.pab.document',
                'pdfium': 'vip.rgaa.pab.pdfium'}
@@ -91,6 +92,47 @@ def initialize(state=STATE):
     print(f'Created local signing certificate {load_identity(state)} (not notarized)')
 
 
+def import_ci_identity(state=STATE):
+    """Import the existing pinned identity into a fresh hosted runner, never generate one."""
+    import base64
+    from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
+    if sys.platform != 'darwin' or os.environ.get('GITHUB_ACTIONS') != 'true':
+        raise RuntimeError('CI identity import is only available on a macOS Actions runner')
+    if state.exists():
+        raise RuntimeError('Refusing to replace an existing signing state')
+    try:
+        encoded = base64.b64decode(os.environ['PAB_MACOS_SIGNING_P12_BASE64'], validate=True)
+        password = os.environ['PAB_MACOS_SIGNING_P12_PASSWORD']
+        key, certificate, _ = pkcs12.load_key_and_certificates(encoded, password.encode())
+        if key is None or certificate is None:
+            raise ValueError()
+        der = certificate.public_bytes(Encoding.DER)
+        fingerprint = hashlib.sha1(der).hexdigest().upper()
+        if fingerprint != os.environ['PAB_MACOS_CERT_SHA1'].replace(':', '').upper():
+            raise ValueError()
+    except (KeyError, ValueError, TypeError):
+        raise RuntimeError('Existing macOS signing material or pinned certificate is invalid') from None
+    state.mkdir(parents=True, mode=0o700)
+    keychain_password = secrets.token_urlsafe(48)
+    (state / 'keychain.password').write_text(keychain_password)
+    (state / 'keychain.password').chmod(0o600)
+    keychain = state / 'signing.keychain-db'
+    run(['/usr/bin/security', 'create-keychain', '-p', keychain_password, keychain])
+    keychain.chmod(0o600)
+    run(['/usr/bin/security', 'set-keychain-settings', '-lut', '21600', keychain])
+    with tempfile.TemporaryDirectory(prefix='import-', dir=state) as temporary:
+        p12 = Path(temporary) / 'identity.p12'
+        p12.write_bytes(encoded)
+        p12.chmod(0o600)
+        run(['/usr/bin/security', 'import', p12, '-k', keychain, '-P', password, '-T', '/usr/bin/codesign'])
+        run(['/usr/bin/security', 'set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:',
+             '-s', '-k', keychain_password, keychain])
+    (state / 'certificate.der').write_bytes(der)
+    (state / 'identity.json').write_text(json.dumps({'sha1': fingerprint, 'kind': 'imported'}) + '\n')
+    (state / 'identity.json').chmod(0o600)
+    load_identity(state)
+
+
 def sign(path, identifier, state=STATE):
     fingerprint = load_identity(state)
     keychain = state / 'signing.keychain-db'
@@ -130,9 +172,11 @@ def verify(path, identifier, fingerprint):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['init', 'check'])
+    parser.add_argument('action', choices=['init', 'check', 'import-ci'])
     args = parser.parse_args()
-    if args.action == 'init':
+    if args.action == 'import-ci':
+        import_ci_identity()
+    elif args.action == 'init':
         initialize()
     else:
         print(load_identity())

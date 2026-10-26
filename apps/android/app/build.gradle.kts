@@ -16,7 +16,24 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
-    buildTypes { debug { applicationIdSuffix = ".debug" } }
+    val releaseKeystore = providers.environmentVariable("PAB_ANDROID_KEYSTORE_FILE")
+    signingConfigs {
+        if (releaseKeystore.isPresent) {
+            create("officialRelease") {
+                storeFile = file(releaseKeystore.get())
+                storePassword = providers.environmentVariable("PAB_ANDROID_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("PAB_ANDROID_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("PAB_ANDROID_KEY_PASSWORD").get()
+            }
+        }
+    }
+    buildTypes {
+        debug { applicationIdSuffix = ".debug" }
+        release {
+            if (releaseKeystore.isPresent)
+                signingConfig = signingConfigs.getByName("officialRelease")
+        }
+    }
     buildFeatures { compose = true }
     sourceSets["main"]
         .assets

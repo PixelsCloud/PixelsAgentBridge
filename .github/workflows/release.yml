@@ -1,0 +1,164 @@
+name: Release candidates
+on:
+  push:
+    tags: ['client-v*', 'management-v*', 'relay-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing client-vX.Y.Z, management-vX.Y.Z or relay-vX.Y.Z tag
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+env:
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  PYTHONUTF8: '1'
+jobs:
+  plan:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      product: ${{ steps.plan.outputs.product }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - id: plan
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: python scripts/github_release.py plan --tag "$TAG" --github-output "$GITHUB_OUTPUT"
+      - run: python -m pip install -r smoke/requirements.txt
+      - name: Check release configuration before starting expensive builds
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          PAB_RELEASE_PRIVATE_KEY_BASE64: ${{ secrets.PAB_RELEASE_PRIVATE_KEY_BASE64 }}
+          PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64: ${{ secrets.PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64 }}
+          PAB_RELEASE_PUBLIC_KEY_BASE64: ${{ vars.PAB_RELEASE_PUBLIC_KEY_BASE64 }}
+          PAB_SERVICE_RELEASE_PUBLIC_KEY_BASE64: ${{ vars.PAB_SERVICE_RELEASE_PUBLIC_KEY_BASE64 }}
+          PAB_CI_CLIENT_DEFAULTS_TOML: ${{ vars.PAB_CI_CLIENT_DEFAULTS_TOML }}
+          PAB_CI_RELAY_CA_PEM: ${{ secrets.PAB_CI_RELAY_CA_PEM }}
+          PAB_MACOS_SIGNING_P12_BASE64: ${{ secrets.PAB_MACOS_SIGNING_P12_BASE64 }}
+          PAB_MACOS_SIGNING_P12_PASSWORD: ${{ secrets.PAB_MACOS_SIGNING_P12_PASSWORD }}
+          PAB_MACOS_CERT_SHA1: ${{ vars.PAB_MACOS_CERT_SHA1 }}
+          PAB_ANDROID_KEYSTORE_BASE64: ${{ secrets.PAB_ANDROID_KEYSTORE_BASE64 }}
+          PAB_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PAB_ANDROID_KEYSTORE_PASSWORD }}
+          PAB_ANDROID_KEY_ALIAS: ${{ secrets.PAB_ANDROID_KEY_ALIAS }}
+          PAB_ANDROID_KEY_PASSWORD: ${{ secrets.PAB_ANDROID_KEY_PASSWORD }}
+          PAB_ANDROID_CERT_SHA256: ${{ vars.PAB_ANDROID_CERT_SHA256 }}
+        run: python scripts/github_release.py preflight --tag "$TAG"
+      - run: python -m unittest discover -s smoke/tests
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      PRODUCT: ${{ needs.plan.outputs.product }}
+      TARGET: ${{ matrix.id }}
+      CARGO_BUILD_JOBS: '4'
+      CMAKE_BUILD_PARALLEL_LEVEL: '1'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.15.0'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        if: matrix.id == 'android'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python -m pip install -r smoke/requirements.txt
+      - run: python scripts/github_release_setup.py --target "$TARGET" --product "$PRODUCT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - if: needs.plan.outputs.product == 'client' && matrix.id != 'android'
+        run: npm ci --prefix apps/desktop
+      - if: needs.plan.outputs.product == 'management'
+        run: npm ci --prefix apps/web
+      - name: Build and verify exact release candidates
+        env:
+          PAB_CI_CLIENT_DEFAULTS_TOML: ${{ needs.plan.outputs.product == 'client' && vars.PAB_CI_CLIENT_DEFAULTS_TOML || '' }}
+          PAB_CI_RELAY_CA_PEM: ${{ needs.plan.outputs.product == 'client' && secrets.PAB_CI_RELAY_CA_PEM || '' }}
+          PAB_MACOS_SIGNING_P12_BASE64: ${{ matrix.platform == 'macos' && secrets.PAB_MACOS_SIGNING_P12_BASE64 || '' }}
+          PAB_MACOS_SIGNING_P12_PASSWORD: ${{ matrix.platform == 'macos' && secrets.PAB_MACOS_SIGNING_P12_PASSWORD || '' }}
+          PAB_MACOS_CERT_SHA1: ${{ vars.PAB_MACOS_CERT_SHA1 }}
+          PAB_ANDROID_KEYSTORE_BASE64: ${{ matrix.id == 'android' && secrets.PAB_ANDROID_KEYSTORE_BASE64 || '' }}
+          PAB_ANDROID_KEYSTORE_PASSWORD: ${{ matrix.id == 'android' && secrets.PAB_ANDROID_KEYSTORE_PASSWORD || '' }}
+          PAB_ANDROID_KEY_ALIAS: ${{ matrix.id == 'android' && secrets.PAB_ANDROID_KEY_ALIAS || '' }}
+          PAB_ANDROID_KEY_PASSWORD: ${{ matrix.id == 'android' && secrets.PAB_ANDROID_KEY_PASSWORD || '' }}
+          PAB_ANDROID_CERT_SHA256: ${{ vars.PAB_ANDROID_CERT_SHA256 }}
+        run: python scripts/github_release.py build --tag "$TAG" --target "$TARGET"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-${{ matrix.id }}
+          path: .build/github-release/out/${{ matrix.id }}/*
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: [plan, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r smoke/requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: candidate-*
+          merge-multiple: true
+          path: .build/github-release/bundle
+      - run: python scripts/github_release.py assemble --tag "$TAG" --directory .build/github-release/bundle
+        env:
+          PAB_RELEASE_PRIVATE_KEY_BASE64: ${{ needs.plan.outputs.product == 'client' && secrets.PAB_RELEASE_PRIVATE_KEY_BASE64 || '' }}
+          PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64: ${{ needs.plan.outputs.product != 'client' && secrets.PAB_SERVICE_RELEASE_PRIVATE_KEY_BASE64 || '' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-bundle
+          path: .build/github-release/bundle/*
+          if-no-files-found: error
+          retention-days: 14
+      - run: python scripts/github_release.py draft --tag "$TAG" --directory .build/github-release/bundle --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAB_RELEASE_PUBLIC_KEY_BASE64: ${{ vars.PAB_RELEASE_PUBLIC_KEY_BASE64 }}
+          PAB_SERVICE_RELEASE_PUBLIC_KEY_BASE64: ${{ vars.PAB_SERVICE_RELEASE_PUBLIC_KEY_BASE64 }}

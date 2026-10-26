@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 import json
 import os
+import shutil
 import subprocess
 import zipfile
 import sys
@@ -99,6 +100,8 @@ def main() -> None:
         raise ValueError('Windows version resources require major <= 65535')
 
     compiler = ROOT / "tools" / "nsis" / "makensis.exe"
+    if not compiler.is_file():
+        compiler = Path(shutil.which('makensis') or compiler)
     icon = ROOT / "apps" / "desktop" / "src-tauri" / "icons" / "icon.ico"
     script = ROOT / "packaging" / "desktop" / "windows" / "setup.nsi"
     if not compiler.is_file():

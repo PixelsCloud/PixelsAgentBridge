@@ -131,15 +131,20 @@ class Versions(TestCase):
         self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor', 'pab-document-worker'})
         self.assertEqual(read_state(self.root)['build_count'], 1)
 
-    def test_linux_windows_host_orchestrator_rejects_other_hosts_before_reserving(self):
+    def test_linux_orchestrator_accepts_posix_and_explicit_release_version_without_allocating(self):
         import build
         posix = SimpleNamespace(name='posix', environ=build.os.environ)
-        with patch.object(build, 'os', posix), patch.object(build, 'ROOT', self.root), patch.object(build, 'run') as run, patch.object(sys, 'argv', ['build.py', 'linux']):
-            with self.assertRaises(SystemExit) as error:
-                build.main()
-        self.assertEqual(error.exception.code, 2)
+        def fake_run(command, cwd=None):
+            folder = self.root / '.build/guest-desktop-linux-release'
+            folder.mkdir(parents=True, exist_ok=True)
+            for name in ('pab-mcp', 'pab-executor', 'pab-document-worker'):
+                (folder / name).write_bytes(b'fixture')
+        with patch.object(build, 'os', posix), patch.object(build, 'ROOT', self.root), patch.object(build, 'run', side_effect=fake_run) as run, patch.object(build.shutil, 'which', side_effect=lambda x: x), patch.object(sys, 'argv', ['build.py', 'linux', '--profile', 'release', '--package', '--release-version', '2.3.4']):
+            build.main()
         self.assertEqual(read_state(self.root)['build_count'], 0)
-        run.assert_not_called()
+        self.assertEqual(len(run.call_args_list), 3)
+        receipt = json.loads((self.root / '.build/builds/linux-release.json').read_text())
+        self.assertEqual(receipt['version'], '2.3.4')
 
     def test_macos_both_architectures_share_one_reserved_version(self):
         import build
