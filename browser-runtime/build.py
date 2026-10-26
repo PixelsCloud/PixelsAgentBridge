@@ -121,7 +121,10 @@ def main():
     installed_version = json.loads(installed_package.read_text(encoding='utf-8')).get('version') if installed_package.is_file() else None
     if installed_version != MCP_VERSION or not (SOURCE / 'node_modules' / '@playwright' / 'mcp' / 'cli.js').is_file():
         env = dict(os.environ, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD='1')
-        subprocess.run(['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'],
+        npm = shutil.which('npm.cmd' if os.name == 'nt' else 'npm')
+        if npm is None:
+            raise RuntimeError('npm is required to prepare the pinned browser runtime')
+        subprocess.run([npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'],
                        cwd=SOURCE, env=env, check=True)
     BUILD.mkdir(parents=True, exist_ok=True)
     stage = BUILD / args.platform
