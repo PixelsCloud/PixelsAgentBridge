@@ -52,7 +52,7 @@ unset CMAKE_BUILD_PARALLEL_LEVEL
 cargo build --locked --release --features tauri/custom-protocol --manifest-path apps/desktop/src-tauri/Cargo.toml -j {JOBS}
 cp /target/release/pab-desktop /out/pab-desktop
 '''
-    run(['docker', 'run', '--rm', '--cpus', '10',
+    run(['docker', 'run', '--rm', '--cpus', str(JOBS),
          # Keep the source path stable across releases; only outputs are versioned.
          '--mount', f'type=bind,source={source},target=/src',
          '--mount', f'type=bind,source={output},target=/out',

@@ -24,6 +24,7 @@ class DesktopBuildWorkspaceTests(unittest.TestCase):
                     (output / 'pab-desktop').write_bytes(b'built GUI fixture')
 
             with patch.object(build_linux_desktop, 'ROOT', root), \
+                 patch.object(build_linux_desktop, 'JOBS', 4), \
                  patch.object(build_linux_desktop, 'run', side_effect=run), \
                  patch.object(build_linux_desktop.shutil, 'which', return_value='npm'), \
                  patch.object(build_linux_desktop.subprocess, 'check_output', return_value=b'fixture-commit\n'), \
@@ -36,10 +37,11 @@ class DesktopBuildWorkspaceTests(unittest.TestCase):
             self.assertFalse((output / 'source').exists())
             self.assertNotIn('CMAKE_BUILD_PARALLEL_LEVEL=1', docker)
             self.assertIn('unset CMAKE_BUILD_PARALLEL_LEVEL', docker[-1])
-            self.assertIn(f'CARGO_BUILD_JOBS={build_linux_desktop.JOBS}', docker)
+            self.assertEqual(docker[docker.index('--cpus') + 1], '4')
+            self.assertIn('CARGO_BUILD_JOBS=4', docker)
             receipt = json.loads((output / 'build.json').read_text())
             self.assertEqual(receipt['source_commit'], 'fixture-commit')
-            self.assertLessEqual(receipt['cargo_jobs'], 10)
+            self.assertEqual(receipt['cargo_jobs'], 4)
             self.assertEqual(receipt['cmake_jobs'], receipt['cargo_jobs'])
             self.assertTrue(receipt['native_jobs_shared_with_cargo'])
 
