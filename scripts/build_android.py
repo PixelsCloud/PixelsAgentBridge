@@ -172,7 +172,7 @@ def build_release(version: str, env: dict[str, str]) -> Path:
     wrapper = str(APP_ROOT / ('gradlew.bat' if os.name == 'nt' else 'gradlew'))
     run([wrapper, '--no-daemon', f'--max-workers={min(2, MAX_JOBS)}',
          f'-PpixelsVersionCode={code}', f'-PpixelsVersionName={version}',
-         'lintRelease', 'testReleaseUnitTest', ':app:assembleRelease'], env, APP_ROOT)
+         'lintRelease', ':core:test', 'testDebugUnitTest', ':app:assembleRelease'], env, APP_ROOT)
     apk = APP_ROOT / 'app/build/outputs/apk/release/app-release.apk'
     apksigner = Path(env['ANDROID_HOME']) / 'build-tools/36.0.0' / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
     result = subprocess.run([str(apksigner), 'verify', '--verbose', '--print-certs', str(apk)],

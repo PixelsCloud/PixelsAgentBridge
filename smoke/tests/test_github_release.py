@@ -297,6 +297,9 @@ class AndroidAndContainerTests(unittest.TestCase):
                 self.assertEqual(native.call_count, 2)
                 self.assertTrue(all(c.kwargs['profile']=='release' for c in native.call_args_list))
                 self.assertIn(':app:assembleRelease', run.call_args.args[0])
+                self.assertIn(':core:test', run.call_args.args[0])
+                self.assertIn('testDebugUnitTest', run.call_args.args[0])
+                self.assertNotIn('testReleaseUnitTest', run.call_args.args[0])
                 self.assertIn('-PpixelsVersionCode=10203', run.call_args.args[0])
                 install.assert_not_called()
 

@@ -11,6 +11,8 @@ import os
 import plistlib
 import re
 import secrets
+import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -96,7 +98,8 @@ def import_ci_identity(state=STATE):
     """Import the existing pinned identity into a fresh hosted runner, never generate one."""
     import base64
     from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
-    if sys.platform != 'darwin' or os.environ.get('GITHUB_ACTIONS') != 'true':
+    if (sys.platform != 'darwin' or os.environ.get('GITHUB_ACTIONS') != 'true'
+            or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted'):
         raise RuntimeError('CI identity import is only available on a macOS Actions runner')
     if state.exists():
         raise RuntimeError('Refusing to replace an existing signing state')
@@ -120,6 +123,7 @@ def import_ci_identity(state=STATE):
     run(['/usr/bin/security', 'create-keychain', '-p', keychain_password, keychain])
     keychain.chmod(0o600)
     run(['/usr/bin/security', 'set-keychain-settings', '-lut', '21600', keychain])
+    run(['/usr/bin/security', 'unlock-keychain', '-p', keychain_password, keychain])
     with tempfile.TemporaryDirectory(prefix='import-', dir=state) as temporary:
         p12 = Path(temporary) / 'identity.p12'
         p12.write_bytes(encoded)
@@ -127,10 +131,22 @@ def import_ci_identity(state=STATE):
         run(['/usr/bin/security', 'import', p12, '-k', keychain, '-P', password, '-T', '/usr/bin/codesign'])
         run(['/usr/bin/security', 'set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:',
              '-s', '-k', keychain_password, keychain])
+    # codesign's private-key lookup also uses the user search list. Preserve the
+    # runner's existing keychains rather than replacing the list with this one.
+    search = shlex.split(run(['/usr/bin/security', 'list-keychains', '-d', 'user']).decode())
+    if str(keychain) not in search:
+        run(['/usr/bin/security', 'list-keychains', '-d', 'user', '-s', *search, keychain])
     (state / 'certificate.der').write_bytes(der)
     (state / 'identity.json').write_text(json.dumps({'sha1': fingerprint, 'kind': 'imported'}) + '\n')
     (state / 'identity.json').chmod(0o600)
     load_identity(state)
+    # Detect unusable imports before spending time on a complete native build.
+    with tempfile.TemporaryDirectory(prefix='signing-probe-', dir=state) as temporary:
+        probe = Path(temporary) / 'probe'
+        shutil.copyfile('/usr/bin/true', probe)
+        probe.chmod(0o755)
+        sign(probe, IDENTIFIERS['executor'], state)
+    print(f'Imported existing identity {fingerprint}; signing and verification passed')
 
 
 def sign(path, identifier, state=STATE):

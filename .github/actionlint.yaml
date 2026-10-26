@@ -1,5 +1,7 @@
 self-hosted-runner:
   labels:
+    # This hosted label was introduced after the pinned actionlint release.
+    - macos-15-intel
     - pab-release-smoke
     - windows-x64
     - macos-arm64
