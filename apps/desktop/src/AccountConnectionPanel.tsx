@@ -130,6 +130,14 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
         account_access_denied: t.accountAccessDenied,
         account_rate_limited: t.accountRateLimited,
         account_service_unavailable: t.accountServiceUnavailable,
+        account_network_timeout: t.accountNetworkTimeout,
+        account_dns_failed: t.accountDnsFailed,
+        account_tls_failed: t.accountTlsFailed,
+        account_proxy_failed: t.accountProxyFailed,
+        account_proxy_authentication_required: t.accountProxyAuthentication,
+        account_ca_invalid: t.accountCaInvalid,
+        account_network_configuration_invalid: t.accountNetworkConfigurationInvalid,
+        account_connection_failed: t.accountConnectionFailed,
         "account request failed; cached login was retained": t.accountServiceUnavailable,
       };
       setError(`${register ? t.accountRegisterFailed : t.accountConnectFailed}: ${reasons[String(cause)] ?? String(cause)}`);

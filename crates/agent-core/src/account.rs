@@ -1,6 +1,6 @@
 //! HTTP user sessions are independent of endpoint/device authentication.
 use serde::{Deserialize, Serialize};
-use std::{path::Path, time::Duration};
+use std::path::Path;
 use zeroize::Zeroizing;
 
 mod github;
@@ -59,6 +59,8 @@ pub enum AccountError {
     InvalidUrl,
     #[error("account request failed; cached login was retained")]
     Network,
+    #[error("{}", .0.account_code())]
+    Transport(crate::http_client::Failure),
     #[error("account service returned HTTP {0}")]
     Http(u16),
     #[error("{0}")]
@@ -88,18 +90,16 @@ pub fn account_origin(control_url: &str) -> Result<String, AccountError> {
 
 impl AccountClient {
     pub fn new(control_url: &str, ca_pem: Option<&[u8]>) -> Result<Self, AccountError> {
-        let mut builder = reqwest::Client::builder()
-            .timeout(Duration::from_secs(15))
-            .redirect(reqwest::redirect::Policy::none());
-        if let Some(pem) = ca_pem {
-            builder = builder.add_root_certificate(
-                reqwest::Certificate::from_pem(pem).map_err(|_| AccountError::InvalidResponse)?,
-            );
-        }
+        let origin = account_origin(control_url)?;
         Ok(Self {
-            client: builder.build().map_err(|_| AccountError::Network)?,
-            origin: account_origin(control_url)?,
+            client: crate::http_client::client(crate::http_client::ACCOUNT_TIMEOUT, ca_pem)
+                .map_err(AccountError::Transport)?,
+            origin,
         })
+    }
+
+    fn network_error(&self, operation: &'static str, error: reqwest::Error) -> AccountError {
+        AccountError::Transport(crate::http_client::failure(operation, &error))
     }
 
     pub fn from_env() -> Result<Self, AccountError> {
@@ -107,7 +107,7 @@ impl AccountClient {
         let ca = std::env::var_os("PAB_CONTROL_CA_CERT")
             .map(|path| std::fs::read(Path::new(&path)))
             .transpose()
-            .map_err(|_| AccountError::Storage)?;
+            .map_err(|error| AccountError::Transport(crate::http_client::Failure::unreadable_ca(&error)))?;
         Self::new(&url, ca.as_deref())
     }
 
@@ -128,7 +128,7 @@ impl AccountClient {
             .json(&serde_json::json!({"username":username,"password":password.as_str()}))
             .send()
             .await
-            .map_err(|_| AccountError::Network)?;
+            .map_err(|error| self.network_error(if register { "account.register" } else { "account.login" }, error))?;
         let response = checked_credentials(response, register).await?;
         let session: AccountSession = response
             .json()
@@ -149,7 +149,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?
         .json()
         .await
@@ -172,7 +172,7 @@ impl AccountClient {
                 .json(input)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?
         .json()
         .await
@@ -193,7 +193,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?
         .json()
         .await
@@ -212,7 +212,7 @@ impl AccountClient {
                 .json(input)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?
         .json()
         .await
@@ -234,7 +234,7 @@ impl AccountClient {
                 .json(input)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?;
         Ok(())
     }
@@ -251,7 +251,7 @@ impl AccountClient {
                 .json(batch)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?;
         Ok(())
     }
@@ -272,7 +272,7 @@ impl AccountClient {
                 .json(proof)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?
         .json()
         .await
@@ -303,7 +303,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.request", error))?,
         )?;
         Ok(())
     }
@@ -339,7 +339,7 @@ impl AccountClient {
         if let Some(token) = token {
             request = request.bearer_auth(token);
         }
-        checked(request.send().await.map_err(|_| AccountError::Network)?)?
+        checked(request.send().await.map_err(|error| self.network_error("account.request", error))?)?
             .json()
             .await
             .map_err(|_| AccountError::InvalidResponse)
@@ -376,6 +376,17 @@ async fn checked_credentials(
         return Ok(response);
     }
     let status = response.status().as_u16();
+    tracing::warn!(
+        operation = if register { "account.register" } else { "account.login" },
+        origin = %response.url().origin().ascii_serialization(), status,
+        "Account service rejected the request"
+    );
+    if status == 407 {
+        return Err(AccountError::Transport(crate::http_client::Failure {
+            kind: crate::http_client::FailureKind::ProxyAuthentication,
+            detail: "proxy_authentication_required",
+        }));
+    }
     // Never display an arbitrary response body, HTML, or echoed credentials.
     let mut body = Vec::new();
     while let Ok(Some(chunk)) = response.chunk().await {

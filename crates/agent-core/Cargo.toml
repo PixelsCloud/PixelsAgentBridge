@@ -11,7 +11,9 @@ hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Retain proxy discovery, SOCKS environments and OS-trusted interception CAs with Rustls.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "rustls-tls-native-roots", "system-proxy", "socks"] }
+tracing.workspace = true
 serde.workspace = true
 url = "2"
 futures-util = "0.3"
@@ -33,5 +35,10 @@ zeroize = "1"
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6", features = ["windows-native"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+system-configuration = "0.7"
+
 [dev-dependencies]
+rcgen = "0.14"
 tempfile = "3"
+tracing-subscriber.workspace = true

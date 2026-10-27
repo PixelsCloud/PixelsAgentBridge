@@ -131,7 +131,7 @@ test("global refresh recovers MCP status and refreshes visible AI integration st
   const refresh = page.getByRole("button", { name: "Refresh all information", exact: true });
   await expect(refresh).toBeEnabled();
   await page.evaluate(() => { (window as any).fixture.mcpError = true; });
-  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "MCP connections", exact: true }).click();
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name: "MCP", exact: true }).click();
   await expect(page.locator(".mcp-reporting-panel").getByRole("alert")).toBeVisible();
   await page.evaluate(() => { (window as any).fixture.mcpError = false; });
   await refresh.click();
@@ -304,6 +304,29 @@ for (const language of ["en", "zh-CN"]) test(`registration rejects invalid norma
   await expect(page.locator(".page-me")).toContainText("Pixels");
 });
 
+for (const language of ["en", "zh-CN"]) for (const [code, english, chinese] of [
+  ["account_network_timeout", "request timed out", "账号请求超时"],
+  ["account_dns_failed", "resolve the server or proxy hostname", "无法解析服务器或代理的域名"],
+  ["account_tls_failed", "TLS verification or handshake failed", "TLS 验证或连接失败"],
+  ["account_proxy_failed", "connect through the proxy", "代理连接失败"],
+  ["account_proxy_authentication_required", "proxy requires authentication", "代理要求身份验证"],
+  ["account_ca_invalid", "CA certificate file is unreadable", "CA 证书文件无法读取"],
+  ["account_network_configuration_invalid", "prepare HTTPS", "无法初始化 HTTPS 连接"],
+  ["account_connection_failed", "establish the account connection", "无法建立账号连接"],
+]) test(`registration explains transport failure ${code} (${language})`, async ({ page }) => {
+  await page.goto(`${url}?app=true&language=${language}&accountError=${code}`);
+  await page.locator(".sidebar-account").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: language === "en" ? "Create account" : "注册账号", exact: true }).click();
+  await dialog.locator("#account-login-username").fill("proxy-fixture");
+  await dialog.locator("#account-login-password").fill("fixture password");
+  await dialog.locator("#account-confirm-password").fill("fixture password");
+  await dialog.locator('button[type="submit"]').click();
+  await expect(dialog.getByRole("alert")).toContainText(language === "en" ? english : chinese);
+  await expect(dialog.locator('button[type="submit"]')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "operator_register_account").length)).toBe(1);
+});
+
 for (const [code, text] of [
   ["account_username_taken", "该账号已存在，请更换账号或直接登录"],
   ["account_registration_disabled", "当前服务已关闭新账号注册，请联系管理员"],
@@ -334,18 +357,20 @@ test("titlebar close uses the native close handler and tray language follows pre
 });
 
 for (const [language, devices, mcp, settings] of [
-  ["en", "Device list", "MCP connections", "Settings"],
+  ["en", "Device list", "MCP", "Settings"],
   ["zh-CN", "设备列表", "MCP 连接", "设置"],
 ]) for (const theme of ["light", "dark"]) {
   test(`MCP has a dedicated sidebar page in ${language}/${theme}`, async ({ page }) => {
     await page.setViewportSize({ width: 1100, height: 700 });
     await page.goto(`${url}?app=true&language=${language}&theme=${theme}`);
     const menu = page.locator(".sidebar-menu");
+    await expect(menu).toHaveCSS("border-inline-end-width", "0px");
+    await expect(page.locator(".sidebar")).toHaveCSS("border-right-width", "0px");
     const labels = await menu.getByRole("menuitem").allTextContents();
     expect(labels[labels.indexOf(devices) + 1]).toBe(mcp);
     await menu.getByRole("menuitem", { name: mcp, exact: true }).click();
     await expect(menu.getByRole("menuitem", { name: mcp, exact: true })).toHaveClass(/ant-menu-item-selected/);
-    await expect(page.getByRole("heading", { name: mcp, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: language === "en" ? "MCP connections" : mcp, exact: true })).toBeVisible();
     await expect(page.locator(".page-mcp .ant-collapse-header")).toHaveCount(9);
     await page.locator(".page-mcp .ant-collapse-header").filter({ hasText: "DeepSeek Harness" }).click();
     await expect(page.getByText("dsh-mcp-client · client-version", { exact: true })).toBeVisible();
@@ -369,6 +394,11 @@ for (const [language, devices, mcp, settings] of [
     await expect(menu.getByRole("menuitem", { name: mcp, exact: true })).toHaveClass(/ant-menu-item-selected/);
     await expect(page.locator(".page-mcp .ant-collapse-header")).toHaveCount(9);
     await page.screenshot({ path: test.info().outputPath(`mcp-page-${language}-${theme}.png`), fullPage: true });
+    await page.setViewportSize({ width: 1000, height: 700 });
+    for (const label of await menu.locator(".ant-menu-title-content").all()) {
+      expect(await label.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
+    await page.screenshot({ path: test.info().outputPath(`mcp-sidebar-compact-${language}-${theme}.png`), fullPage: true });
   });
 }
 

@@ -67,9 +67,8 @@ pub async fn probe(
 }
 
 async fn check(kind: ServerKind, url: url::Url, ca: Option<&[u8]>) -> Result<(), ProbeError> {
-    let mut builder = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(8));
+    let mut builder = crate::http_client::builder(Duration::from_secs(8))
+        .map_err(|_| ProbeError::Unreachable)?;
     if let Some(pem) = ca {
         let certificates =
             reqwest::Certificate::from_pem_bundle(pem).map_err(|_| ProbeError::Tls)?;

@@ -1,6 +1,6 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use pab_agent_core::{DataPaths, DataScope, ensure_data_dir};
+use pab_agent_core::{DataPaths, DataScope, ensure_data_dir, http_client};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{fs::{File, OpenOptions}, io::{Read, Write}, path::PathBuf, sync::Arc, time::Duration};
@@ -93,9 +93,8 @@ fn validate(info: &UpdateInfo) -> Result<(), String> {
     key.verify(canonical(info).as_bytes(), &signature).map_err(|_| "Update signature verification failed".into())
 }
 
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(900)).build().map_err(|_| "Could not prepare update connection".into())
+fn client(timeout: Duration) -> Result<reqwest::Client, String> {
+    http_client::client(timeout, None).map_err(|error| error.to_string())
 }
 
 async fn query(state: &UpdateState) -> Result<Option<UpdateInfo>, String> {
@@ -103,16 +102,16 @@ async fn query(state: &UpdateState) -> Result<Option<UpdateInfo>, String> {
     let base = std::env::var("PAB_UPDATE_SITE_URL").unwrap_or_else(|_| DEFAULT_SITE.into());
     let endpoint = format!("{}/api/updates/check", base.trim_end_matches('/'));
     if !endpoint.starts_with("https://") { return Err("Update service must use HTTPS".into()); }
-    let response = client()?.get(endpoint).query(&[
+    let response = client(http_client::UPDATE_CHECK_TIMEOUT)?.get(endpoint).query(&[
         ("platform", platform), ("architecture", architecture), ("channel", "stable"), ("current", INSTALLER_VERSION)
-    ]).send().await.map_err(|_| "Could not reach update service")?;
+    ]).send().await.map_err(|error| http_client::failure("update.check", &error).to_string())?;
     if response.status() == reqwest::StatusCode::NO_CONTENT {
         let mut inner = state.0.write().await;
         inner.available = None;
         inner.verified_path = None;
         return Ok(None);
     }
-    if !response.status().is_success() { return Err("Update service returned an error".into()); }
+    if !response.status().is_success() { return Err(format!("Update service returned HTTP {}", response.status().as_u16())); }
     let info: UpdateInfo = response.json().await.map_err(|_| "Invalid update service response")?;
     validate(&info)?;
     let mut inner = state.0.write().await;
@@ -178,9 +177,9 @@ pub async fn download_update(app: AppHandle, state: State<'_, UpdateState>) -> R
         std::fs::remove_file(&partial).map_err(|_| "Could not reset damaged update download")?;
         offset = 0;
     }
-    let mut request = client()?.get(&info.download_url);
+    let mut request = client(http_client::UPDATE_DOWNLOAD_TIMEOUT)?.get(&info.download_url);
     if offset > 0 { request = request.header(reqwest::header::RANGE, format!("bytes={offset}-")); }
-    let mut response = request.send().await.map_err(|_| "Update download failed")?;
+    let mut response = request.send().await.map_err(|error| http_client::failure("update.download", &error).to_string())?;
     if offset > 0 && response.status() == reqwest::StatusCode::OK { offset = 0; }
     if offset > 0 {
         let expected = format!("bytes {offset}-");
@@ -194,7 +193,7 @@ pub async fn download_update(app: AppHandle, state: State<'_, UpdateState>) -> R
     let mut file = OpenOptions::new().create(true).write(true).append(offset > 0).truncate(offset == 0)
         .open(&partial).map_err(|_| "Could not open update cache")?;
     let mut received = offset;
-    while let Some(chunk) = response.chunk().await.map_err(|_| "Update download interrupted")? {
+    while let Some(chunk) = response.chunk().await.map_err(|error| http_client::failure("update.download_body", &error).to_string())? {
         received += chunk.len() as u64;
         if received > info.size { return Err("Downloaded installer is larger than expected".into()); }
         file.write_all(&chunk).map_err(|_| "Could not write update cache")?;

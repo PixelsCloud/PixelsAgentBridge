@@ -19,7 +19,7 @@ impl AccountClient {
                 .get(format!("{}/api/account/config", self.origin))
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.github", error))?,
         )
         .await?
         .json()
@@ -39,7 +39,7 @@ impl AccountClient {
             request = request.bearer_auth(token)
         }
         let result: GithubStart =
-            github_checked(request.send().await.map_err(|_| AccountError::Network)?)
+            github_checked(request.send().await.map_err(|error| self.network_error("account.github", error))?)
                 .await?
                 .json()
                 .await
@@ -66,7 +66,7 @@ impl AccountClient {
                 .json(&serde_json::json!({"code":code,"verifier":verifier}))
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.github", error))?,
         )
         .await?
         .json()
@@ -86,7 +86,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.github", error))?,
         )
         .await?
         .json()
@@ -100,7 +100,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.github", error))?,
         )
         .await?;
         Ok(())
@@ -112,7 +112,7 @@ impl AccountClient {
                 .bearer_auth(token)
                 .send()
                 .await
-                .map_err(|_| AccountError::Network)?,
+                .map_err(|error| self.network_error("account.github", error))?,
         )
         .await?;
         Ok(())
