@@ -198,15 +198,20 @@ test("decoder and capture target details use reported values without inventing m
 
 test("controls keep stable screen IDs and the user can leave input stopped across screen changes", async ({ page }) => {
   await page.goto(viewer);
+  await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
   await page.getByRole("button", { name: "Stop control" }).click();
   await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
-  await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("30");
+  await page.getByRole("combobox", { name: "FPS" }).selectOption("60");
+  await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("60");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("combobox", { name: "FPS" }).selectOption("15");
+  await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("15");
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_viewer_control").map((c: any) => c.args));
-  expect(calls).toEqual([{ inputEnabled: false }, { screen: "adapter:left" }, { fps: 30 }]);
+  expect(calls).toEqual([{ inputEnabled: false }, { screen: "adapter:left" }, { fps: 60 }, { fps: 15 }]);
 });
 
 test("input remains gated by the first presented frame and unsupported peers", async ({ page }) => {

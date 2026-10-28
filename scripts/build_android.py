@@ -159,6 +159,7 @@ def release_version_code(version: str) -> int:
 
 def build_release(version: str, env: dict[str, str]) -> Path:
     code = release_version_code(version)
+    env = dict(env, PAB_INSTALLER_VERSION=version)
     required = ('PAB_ANDROID_KEYSTORE_FILE', 'PAB_ANDROID_KEYSTORE_PASSWORD',
                 'PAB_ANDROID_KEY_ALIAS', 'PAB_ANDROID_KEY_PASSWORD', 'PAB_ANDROID_CERT_SHA256')
     if any(not env.get(name) for name in required):

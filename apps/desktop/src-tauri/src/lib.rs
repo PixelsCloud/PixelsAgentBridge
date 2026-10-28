@@ -33,6 +33,7 @@ mod mcp_tool_settings;
 mod operator;
 mod screenshot_session;
 mod server_settings;
+mod project_links;
 mod session_helper;
 mod tray;
 mod update;
@@ -410,6 +411,7 @@ pub fn run() {
         .manage(operator::OperatorState::new())
         .manage(operator::desktop_terminal::DesktopTerminalState::default())
         .manage(operator::remote_desktop::RemoteDesktopState::default())
+        .manage(operator::file_manager::FileManagerState::default())
         .manage(github_login::GithubLoginState::default())
         .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
@@ -459,6 +461,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| {
+            if invoke.message.webview().label().starts_with("file-manager-")
+                && !invoke.message.command().starts_with("file_manager_") {
+                invoke.resolver.reject("command is unavailable in a file transfer window");
+                return true;
+            }
             if invoke.message.webview().label().starts_with("desktop-viewer-")
                 && !invoke.message.command().starts_with("desktop_viewer_") {
                 invoke.resolver.reject("command is unavailable in a remote desktop window");
@@ -533,6 +540,7 @@ pub fn run() {
                 mcp_tool_settings::save_mcp_tool_settings,
                 server_settings::get_operator_server_settings,
                 server_settings::open_account_console,
+                project_links::open_project_repository,
                 server_settings::validate_operator_server,
                 server_settings::save_operator_server_settings,
                 server_settings::restart_desktop,
@@ -547,6 +555,7 @@ pub fn run() {
                 operator::operator_presence,
                 operator::history::operator_bootstrap,
                 operator::history::operator_history_page,
+                operator::history::operator_clear_history,
                 operator::history::operator_device_history_page,
                 operator::history::operator_operations,
                 operator::history::operator_rename_device,
@@ -557,6 +566,25 @@ pub fn run() {
                 operator::transfer::operator_cancel_transfer,
                 operator::transfer::operator_transfer_result,
                 operator::directory::operator_list_directory,
+                operator::file_manager::file_manager_window,
+                operator::file_manager::file_manager_tabs,
+                operator::file_manager::file_manager_close_tab,
+                operator::file_manager::file_manager_contexts,
+                operator::file_manager::file_manager_path,
+                operator::file_manager::file_manager_request,
+                operator::file_manager::file_manager_status,
+                operator::file_manager::file_manager_cancel,
+                operator::file_manager::file_manager_start_batch,
+                operator::file_manager::file_manager_batches,
+                operator::file_manager::file_manager_clear_completed,
+                operator::file_manager::file_manager_batch_intent,
+                operator::file_manager::file_manager_retry_failed,
+                operator::file_manager::file_manager_local_identity,
+                operator::file_manager::file_manager_reveal_local,
+                operator::file_manager::file_manager_link_status,
+                operator::file_manager::file_manager_start_drop,
+                operator::file_manager::file_manager_batch_items,
+                operator::file_manager::file_manager_resolve_conflict,
                 operator::windows::operator_list_windows,
                 operator::windows::operator_desktop_input,
                 operator::screenshot::operator_capture_screenshot,
@@ -585,7 +613,7 @@ pub fn run() {
         .expect("could not start Pixels Agent Bridge desktop application")
         .run(|handle, event| match event {
             tauri::RunEvent::ExitRequested { code, api, .. }
-                if tray::prevent_exit(handle, code) =>
+                if tray::prevent_exit(handle, code) || operator::file_manager::FileManagerState::intercept_exit(handle,code) =>
             {
                 api.prevent_exit()
             }

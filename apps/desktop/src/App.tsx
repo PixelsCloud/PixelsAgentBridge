@@ -10,6 +10,7 @@ import { AppRefreshContext, useAppRefreshRegistry } from "./appRefresh";
 import { initialLanguage, messages, type Language } from "./i18n";
 import { OperatorPanel } from "./OperatorPanel";
 import { SettingsPanel, type SettingsSection } from "./SettingsPanel";
+import { ProjectRepositoryButton } from "./ProjectRepositoryButton";
 import { UpdateNotice } from "./UpdateNotice";
 import { BrowserHandoffNotice } from "./BrowserHandoffNotice";
 import { DesktopAssistanceNotice } from "./DesktopAssistanceNotice";
@@ -271,6 +272,7 @@ function App() {
           <span>Pixels Agent Bridge (V{__PAB_RELEASE_VERSION__})</span>
         </div>
         <div className="window-controls">
+          <ProjectRepositoryButton language={language} titlebar />
           <button type="button" className={`titlebar-refresh${refreshing ? " is-refreshing" : ""}`}
             aria-label={t.refreshAll} title={refreshing ? t.refreshAllBusy : t.refreshAll}
             aria-busy={refreshing} disabled={refreshing || accountLoading} onClick={() => void refreshAll()}>

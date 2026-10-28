@@ -8,9 +8,10 @@ import { api, ApiError, type Viewer } from './api';
 import { PageHeading } from './PageHeading';
 import { useText } from './i18n';
 import { RelayNodes } from './RelayNodes';
+import { AccountDevicesModal } from './AccountDevicesModal';
 import { usePage } from './usePagedResource';
 
-interface Account { id: string; username: string; status: string; server_admin: boolean; revision: number; relay_limit_mbps: number | null }
+interface Account { id: string; username: string; status: string; server_admin: boolean; revision: number; relay_limit_mbps: number | null; device_count: number; saved_device_count: number }
 
 
 function DataPage<T extends { id: string }>({ title, resource, columns, extra, hint }: { title: string; resource: ReturnType<typeof usePage<T>>; columns: TableColumnsType<T>; extra?: React.ReactNode; hint?: string }) {
@@ -28,6 +29,8 @@ export function AccountsPage({ liveRevision }: { liveRevision: number }) {
   const navigate = useNavigate();
   const t = useText(); const { message } = App.useApp(); const resource = usePage<Account>('/accounts', liveRevision);
   const [editing, setEditing] = useState<Account>(); const [assigning, setAssigning] = useState<Account>(); const [busy, setBusy] = useState(false);
+  const [devicesAccount, setDevicesAccount] = useState<Account>();
+  const [addedAccount, setAddedAccount] = useState<Account>();
   const [form] = Form.useForm(); const [assignment] = Form.useForm();
   async function submit(values: { status: string; server_admin: boolean }) {
     if (!editing) return; setBusy(true);
@@ -42,9 +45,13 @@ export function AccountsPage({ liveRevision }: { liveRevision: number }) {
   return <><DataPage title={t('accounts')} resource={resource} columns={[
     { title: t('username'), render: (_, item) => <Button type="link" onClick={() => navigate(`/accounts/${item.id}`)}>{item.username}</Button> }, { title: t('role'), render: (_, item) => <Tag>{t(item.server_admin ? 'admin' : 'user')}</Tag> },
     { title: t('accountStatus'), render: (_, item) => <Tag color={item.status === 'active' ? 'success' : 'default'}>{t(item.status === 'active' ? 'enabled' : 'disabled')}</Tag> },
+    { title: t('associatedDevices'), render: (_, item) => <Button type="link" className="table-inline-link" aria-label={`${t('associatedDevices')} · ${item.username}`} onClick={() => setDevicesAccount(item)}>{item.device_count ?? '—'}</Button> },
+    { title: t('addedDevices'), render: (_, item) => <Button type="link" className="table-inline-link" aria-label={`${t('addedDevices')} · ${item.username}`} onClick={() => setAddedAccount(item)}>{item.saved_device_count ?? '—'}</Button> },
     { title: t('userBandwidth'), render: (_, item) => `${item.relay_limit_mbps ?? 10} Mbps` },
     { title: t('actions'), render: (_, item) => <Space><Button onClick={() => { form.setFieldsValue(item); setEditing(item); }}>{t('edit')}</Button><Button onClick={() => { assignment.setFieldsValue({ mbps: item.relay_limit_mbps ?? 10 }); setAssigning(item); }}>{t('limits')}</Button></Space> },
   ]}/>
+    {addedAccount && <AccountDevicesModal key={`added:${addedAccount.id}`} account={addedAccount} kind="added" liveRevision={liveRevision} onClose={() => setAddedAccount(undefined)}/>}
+    {devicesAccount && <AccountDevicesModal key={devicesAccount.id} account={devicesAccount} liveRevision={liveRevision} onClose={() => setDevicesAccount(undefined)}/>}
     <Modal title={editing?.username} open={!!editing} maskClosable={false} keyboard={false} onCancel={() => !busy && setEditing(undefined)} onOk={() => form.submit()} confirmLoading={busy} okText={t('save')} cancelText={t('cancel')}><Alert type="info" title={t('accountUpdateHint')} style={{ marginBottom: 20 }}/><Form form={form} layout="vertical" onFinish={submit}>
       <Form.Item name="status" label={t('accountStatus')}><ConsoleSelect disabled={busy} options={[{ value: 'active', label: t('enabled') }, { value: 'disabled', label: t('disabled') }]}/></Form.Item><Form.Item name="server_admin" label={t('admin')} valuePropName="checked"><Switch/></Form.Item>
     </Form></Modal>

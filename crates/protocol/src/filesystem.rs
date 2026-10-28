@@ -56,6 +56,11 @@ impl FileSearchOptions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum FileSystemAction {
+    Managed {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expected_execution: Option<crate::FileExecutionIdentity>,
+        operation: crate::FileManagerOperation,
+    },
     ListDirectory {
         after: Option<String>,
         limit: u16,
@@ -127,6 +132,7 @@ pub enum FileSystemAction {
 impl FileSystemAction {
     pub const fn kind(&self) -> &'static str {
         match self {
+            Self::Managed { .. } => "file_manager",
             Self::ListDirectory { .. } => "directory",
             Self::Copy { .. } => "file_copy",
             Self::Move { .. } => "file_move",
@@ -163,7 +169,13 @@ impl FileSystemAction {
         )
     }
     pub const fn asynchronous(&self) -> bool {
-        matches!(self, Self::Hash) || self.is_bulk()
+        matches!(
+            self,
+            Self::Hash
+                | Self::Managed {
+                    operation: crate::FileManagerOperation::OpenDirectory { .. }, ..
+                }
+        ) || self.is_bulk()
     }
 
     pub const fn has_payload(&self) -> bool {
@@ -172,6 +184,11 @@ impl FileSystemAction {
 
     pub fn schema_version(&self) -> u16 {
         match self {
+            Self::Managed {operation:crate::FileManagerOperation::PrepareDirectory {..},..}=>11,
+            Self::Managed { operation: crate::FileManagerOperation::InspectPathIdentity { .. }, .. } => 10,
+            Self::Managed { operation: crate::FileManagerOperation::InspectDirectoryObject { .. } | crate::FileManagerOperation::SetDirectoryMetadata { .. }, .. } => 9,
+            Self::Managed { expected_execution: Some(_), .. } => 8,
+            Self::Managed { .. } => 7,
             Self::ListDirectory { .. } => 6,
             Self::Read {
                 range: TextReadRange::Stream { .. },
@@ -191,6 +208,16 @@ impl FileSystemAction {
 
     pub const fn mutates(&self) -> bool {
         self.is_bulk()
+            || matches!(
+                self,
+                Self::Managed {
+                    operation: crate::FileManagerOperation::CreateDirectory { .. }
+                        | crate::FileManagerOperation::PrepareDirectory { .. }
+                        | crate::FileManagerOperation::SetDirectoryMetadata { .. }
+                        | crate::FileManagerOperation::Rename { .. }
+                        | crate::FileManagerOperation::Delete { .. }, ..
+                }
+            )
             || matches!(
                 self,
                 Self::Write { .. } | Self::Patch { dry_run: false, .. } | Self::Mkdir { .. }
@@ -248,6 +275,14 @@ impl FileSystemRequest {
             return Err("destination requires 1..4096 bytes without NUL");
         }
         match &self.operation {
+            FileSystemAction::Managed { operation, expected_execution } => crate::FileManagerRequest {
+                expected_execution: expected_execution.clone(),
+                schema_version: crate::FILE_MANAGER_SCHEMA_VERSION,
+                request_id: self.request_id,
+                execution: self.execution,
+                operation: operation.clone(),
+            }
+            .validate()?,
             FileSystemAction::ListDirectory { after, limit }
                 if *limit == 0
                     || *limit > crate::MAX_DIRECTORY_PAGE_ENTRIES
@@ -439,6 +474,8 @@ pub struct FileSystemError {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSystemReply {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_manager: Option<crate::FileManagerReply>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cancellable: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub directory: Option<crate::DirectoryPage>,
@@ -476,7 +513,14 @@ impl FileSystemReply {
     }
     pub fn pending(request: &FileSystemRequest) -> Self {
         Self {
-            cancellable: None,
+            file_manager: None,
+            cancellable: matches!(
+                request.operation,
+                FileSystemAction::Managed {
+                    operation: crate::FileManagerOperation::OpenDirectory { .. }, ..
+                }
+            )
+            .then_some(true),
             directory: None,
             execution_context: None,
             log: None,

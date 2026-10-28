@@ -12,6 +12,16 @@ pub struct FileSystemResult {
 }
 
 impl AuthenticatedDeviceConnection {
+    pub async fn file_manager(
+        &self,
+        request: &pab_protocol::FileManagerRequest,
+    ) -> Result<FileSystemResult, BridgeError> {
+        request
+            .validate()
+            .map_err(|error| BridgeError::UnexpectedTaskResponse(error.into()))?;
+        self.filesystem(&request.filesystem_request(), &[]).await
+    }
+
     pub async fn filesystem(
         &self,
         request: &FileSystemRequest,
@@ -83,6 +93,29 @@ impl AuthenticatedDeviceConnection {
         {
             return Err(BridgeError::UnexpectedTaskResponse(
                 "filesystem reply does not match request".to_owned(),
+            ));
+        }
+        if let pab_protocol::FileSystemAction::Managed { operation, expected_execution } = &request.operation {
+            let managed = pab_protocol::FileManagerRequest {
+                expected_execution: expected_execution.clone(),
+                schema_version: pab_protocol::FILE_MANAGER_SCHEMA_VERSION,
+                request_id: request.request_id,
+                execution: request.execution,
+                operation: operation.clone(),
+            };
+            if (reply.state == "completed" && reply.file_manager.is_none())
+                || reply.file_manager.as_ref().is_some_and(|body| {
+                    body.validate_for(&managed).is_err()
+                        || body.execution_context != reply.execution_context
+                })
+            {
+                return Err(BridgeError::UnexpectedTaskResponse(
+                    "file-manager result does not match selected execution request".into(),
+                ));
+            }
+        } else if reply.file_manager.is_some() {
+            return Err(BridgeError::UnexpectedTaskResponse(
+                "unexpected file-manager result".into(),
             ));
         }
         let mut data = Vec::with_capacity(reply.data_size as usize);
@@ -217,7 +250,12 @@ impl AuthenticatedDeviceConnection {
 }
 
 fn valid_reply(reply: &FileSystemReply, id: RequestId) -> bool {
-    serde_json::to_vec(reply).is_ok_and(|bytes| bytes.len() <= 32 * 1024)
+    let limit = if reply.file_manager.is_some() {
+        60 * 1024
+    } else {
+        32 * 1024
+    };
+    serde_json::to_vec(reply).is_ok_and(|bytes| bytes.len() <= limit)
         && reply.request_id == id
         && reply.path.len() <= 4096
         && reply.destination.as_ref().is_none_or(|p| p.len() <= 4096)

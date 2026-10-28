@@ -2,6 +2,31 @@ use super::{AuthenticatedDeviceConnection, BridgeError, unexpected_task_response
 use pab_protocol::*;
 
 impl AuthenticatedDeviceConnection {
+    /// References belong to one authenticated connection. Re-discover a frozen
+    /// native identity after reconnect; never substitute another account/mode.
+    pub async fn resolve_file_execution(&self, expected:&FileExecutionIdentity)->Result<ExecutionSelection,BridgeError> {
+        expected.validate().map_err(|message|BridgeError::FileTransfer(message.into()))?;
+        if expected.identity.mode==ExecutionMode::Service {return Ok(ExecutionSelection::Service {});}
+        let mut cache=self.file_execution_selections.lock().await;
+        if let Some((_,selection))=cache.iter().find(|(identity,_)|identity==expected){return Ok(*selection);}
+        let id=RequestId::new();
+        let query=SystemQuery::ExecutionContexts {user:Some(expected.identity.account_name.clone()),include_system:false,limit:1000};
+        let mut reply=match self.system_query(id,query).await {
+            Ok(reply)=>reply,
+            Err(original)=>self.get_system_query(id).await.map_err(|_|original)?,
+        };
+        let deadline=tokio::time::Instant::now()+std::time::Duration::from_secs(30);
+        while matches!(reply.state.as_str(),"running"|"queued") && tokio::time::Instant::now()<deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            reply=self.get_system_query(id).await?;
+        }
+        let Some(SystemQueryData::ExecutionContexts {entries,..})=reply.data.filter(|_|reply.state=="completed") else {
+            return Err(BridgeError::FileTransfer("Pinned file account discovery did not complete; the original query remains observable".into()));
+        };
+        let selection=select_file_execution(expected,&entries)?;
+        if cache.len()==32 {cache.remove(0);}
+        cache.push((expected.clone(),selection));Ok(selection)
+    }
     pub async fn system_query(
         &self,
         id: RequestId,
@@ -76,6 +101,12 @@ impl AuthenticatedDeviceConnection {
             response => Err(unexpected_task_response(response)),
         }
     }
+}
+fn select_file_execution(expected:&FileExecutionIdentity,entries:&[ExecutionContextEntry])->Result<ExecutionSelection,BridgeError> {
+    let mut matches=entries.iter().filter(|entry|entry.validate().is_ok() && entry.identity.as_ref()==Some(&expected.identity) && entry.unavailable_reason.is_none()).filter_map(|entry|entry.selection.filter(|selection|selection.mode()==expected.identity.mode));
+    let first=matches.next().ok_or_else(||BridgeError::FileTransfer("The original file account/session is unavailable; service fallback is forbidden".into()))?;
+    if matches.next().is_some(){return Err(BridgeError::FileTransfer("Pinned file account discovery returned ambiguous identities".into()));}
+    Ok(first)
 }
 fn require_capability(version: Option<u16>, query: &SystemQuery) -> Result<(), BridgeError> {
     if version.is_none_or(|v| v < query.required_version()) {
@@ -380,6 +411,21 @@ fn valid_application(reply: &SystemQueryReply) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn file_user_resolution_requires_the_same_account_session_and_one_native_reference() {
+        let identity=ExecutionIdentity {mode:ExecutionMode::User,account_id:"S-1-5-21-123-456-789-1001".into(),account_name:"fixture\\user".into(),home:"C:\\Users\\fixture".into(),primary_group:None,session_id:Some("1".into()),logon_id:Some("login-1".into()),environment_source:ExecutionEnvironmentSource::NativeAccount};
+        let expected=FileExecutionIdentity {os_family:OsFamily::Windows,path_style:PathStyle::Windows,identity:identity.clone()};
+        let selection=ExecutionSelection::User {context_ref:ExecutionContextRef::new()};
+        let entry=ExecutionContextEntry {mode:ExecutionMode::User,account_name:identity.account_name.clone(),account_id:Some(identity.account_id.clone()),session_id:identity.session_id.clone(),identity:Some(identity),selection:Some(selection),unavailable_reason:None};
+        assert_eq!(select_file_execution(&expected,&[entry.clone()]).unwrap(),selection);
+        assert!(select_file_execution(&expected,&[]).is_err());
+        let mut changed=entry.clone();changed.identity.as_mut().unwrap().logon_id=Some("login-2".into());
+        assert!(select_file_execution(&expected,&[changed]).is_err());
+        let mut unavailable=entry.clone();unavailable.selection=None;unavailable.unavailable_reason=Some("session closed".into());
+        assert!(select_file_execution(&expected,&[unavailable]).is_err());
+        let mut duplicate=entry.clone();duplicate.selection=Some(ExecutionSelection::User {context_ref:ExecutionContextRef::new()});
+        assert!(select_file_execution(&expected,&[entry,duplicate]).is_err());
+    }
     #[test]
     fn notification_replies_accept_all_five_kinds_and_require_matching_bounded_data() {
         let mut reply = SystemQueryReply::pending(

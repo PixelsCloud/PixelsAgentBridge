@@ -26,7 +26,7 @@ impl RuntimeStore {
         actor: &str,
         owner: &str,
     ) -> Result<bool, RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let existing=sqlx::query("SELECT o.device_ref_json,o.initiated_by,o.owner_session_id,q.query_json FROM runtime_operations o LEFT JOIN runtime_system_results q ON q.id=o.id WHERE o.id=?").bind(id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(row) = existing {
             if row.try_get::<Option<String>, _>("query_json")?.is_none() {

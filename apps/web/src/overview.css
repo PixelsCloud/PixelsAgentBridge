@@ -11,7 +11,7 @@
 .admin-overview .segments { display: flex; gap: 3px; padding: 3px; background: #e6ede8; border: 1px solid var(--border); border-radius: 7px; }
 .admin-overview .segments button { padding: 6px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 14px; }
 .admin-overview .segments button[aria-pressed=true] { background: var(--surface); color: var(--teal); box-shadow: 0 1px 4px #12382309; font-weight: 600; }
-.admin-overview .fleet-overview { display: grid; grid-template-columns: 1.1fr 1fr 1fr; margin-bottom: 17px; padding: 15px 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.admin-overview .fleet-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 17px; padding: 15px 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .admin-overview .fleet-card { display: flex; align-items: center; gap: 12px; padding: 0 21px; min-width: 0; }
 .admin-overview .fleet-card + .fleet-card { border-left: 1px solid var(--border); }
 .admin-overview .fleet-icon { display: grid; place-items: center; width: 32px; height: 34px; border: 1px solid var(--border); background: var(--subtle); border-radius: 7px; color: #6a9180; flex-shrink: 0; }
@@ -398,4 +398,14 @@
   .admin-overview .chart-tabs { gap: 12px; }
   .admin-overview .ranking-panel .console-select { max-width: 180px; }
   .admin-overview .table-paging { gap: 7px; }
+}
+
+@media (max-width: 1200px) {
+  .admin-overview .fleet-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+  .admin-overview .fleet-card { padding: 14px 12px; }
+  .admin-overview .fleet-card:nth-child(2n + 1) { border-left: 0; }
+  .admin-overview .fleet-card:nth-child(n + 3) { border-top: 1px solid var(--border); }
+  .admin-overview .fleet-card:nth-child(3) { grid-column: auto; margin-top: 0; }
+  .admin-overview .fleet-card:nth-child(3) .fleet-main { display: block; width: auto; }
+  .admin-overview .fleet-card:nth-child(3) .fleet-details { margin-top: 9px; }
 }

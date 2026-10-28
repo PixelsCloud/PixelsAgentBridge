@@ -23,6 +23,8 @@ pub(super) struct DeviceSession {
     manually_disconnected: AtomicBool,
     connection_mode: AtomicU8,
     runtime: Arc<RuntimeInner>,
+    file_profile: bool,
+    usage_session: String,
 }
 
 impl DeviceSession {
@@ -36,7 +38,7 @@ impl DeviceSession {
             .runtime
             .store
             .sample_connection_traffic(
-                &self.runtime.session_id,
+                &self.usage_session,
                 self.device_ref.device_id,
                 id,
                 scope,
@@ -54,7 +56,7 @@ impl DeviceSession {
         if let Some(connection) = self.connection.write().await.take() {
             self.finish_usage(&connection).await;
             connection.as_ref().clone().close();
-            self.runtime.publish(RuntimeEventKind::DeviceConnection {
+            self.publish(RuntimeEventKind::DeviceConnection {
                 device_ref: self.device_ref,
                 phase: DeviceConnectionPhase::Disconnected,
                 retry_in_ms: None,
@@ -69,6 +71,8 @@ impl DeviceSession {
 
     pub(super) fn new(device_ref: DeviceRef, runtime: Arc<RuntimeInner>) -> Self {
         Self {
+            usage_session: runtime.session_id.clone(),
+            file_profile: false,
             device_ref,
             connection: RwLock::new(None),
             connect_lock: Mutex::new(()),
@@ -76,6 +80,18 @@ impl DeviceSession {
             connection_mode: AtomicU8::new(0),
             runtime,
         }
+    }
+
+    pub(super) fn new_file(device: DeviceRef, runtime: Arc<RuntimeInner>, relay: bool) -> Self {
+        let mut session = Self::new(device,runtime);
+        session.file_profile = true;
+        session.usage_session = format!("{}:files:{}",session.runtime.session_id,u8::from(relay));
+        session.connection_mode.store(u8::from(relay),Ordering::Release);
+        session
+    }
+    fn publish(&self, event: RuntimeEventKind) {
+        // A file profile cannot overwrite the shared desktop/terminal status.
+        if !self.file_profile {self.runtime.publish(event);}
     }
 
     pub(super) fn resume(&self) {
@@ -118,13 +134,13 @@ impl DeviceSession {
             .runtime
             .store
             .sample_connection(
-                &self.runtime.session_id,
+                &self.usage_session,
                 self.device_ref.device_id,
                 None,
                 None,
             )
             .await;
-        self.runtime.publish(RuntimeEventKind::DeviceConnection {
+        self.publish(RuntimeEventKind::DeviceConnection {
             device_ref: self.device_ref,
             phase: DeviceConnectionPhase::Disconnected,
             retry_in_ms: None,
@@ -174,7 +190,7 @@ impl DeviceSession {
             self.ensure_enabled()?;
             match availability.borrow().clone() {
                 BridgeAvailability::Connecting => {
-                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                    self.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::WaitingForBridge,
                         retry_in_ms: None,
@@ -199,7 +215,7 @@ impl DeviceSession {
         };
         loop {
             self.ensure_enabled()?;
-            self.runtime.publish(RuntimeEventKind::DeviceConnection {
+            self.publish(RuntimeEventKind::DeviceConnection {
                 device_ref: self.device_ref,
                 phase: DeviceConnectionPhase::Connecting,
                 retry_in_ms: None,
@@ -208,7 +224,7 @@ impl DeviceSession {
             let password = match self.runtime.passwords.load_password(self.device_ref).await {
                 Ok(password) => password,
                 Err(error) => {
-                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                    self.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Disconnected,
                         retry_in_ms: None,
@@ -251,7 +267,7 @@ impl DeviceSession {
                             })
                     };
                     self.sample_usage(scope.as_deref()).await;
-                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                    self.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Connected,
                         retry_in_ms: None,
@@ -261,7 +277,7 @@ impl DeviceSession {
                 }
                 Err(error) if error.is_recoverable_connection() => {
                     tracing::warn!(device_id = %self.device_ref.device_id, %error, "device connection attempt failed, retrying");
-                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                    self.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Retrying,
                         retry_in_ms: Some(duration_millis(self.runtime.retry_interval)),
@@ -272,7 +288,7 @@ impl DeviceSession {
                         .await?;
                 }
                 Err(error) => {
-                    self.runtime.publish(RuntimeEventKind::DeviceConnection {
+                    self.publish(RuntimeEventKind::DeviceConnection {
                         device_ref: self.device_ref,
                         phase: DeviceConnectionPhase::Disconnected,
                         retry_in_ms: None,
@@ -302,7 +318,7 @@ impl DeviceSession {
             failed.as_ref().clone().close();
         }
         drop(connection);
-        self.runtime.publish(RuntimeEventKind::DeviceConnection {
+        self.publish(RuntimeEventKind::DeviceConnection {
             device_ref: self.device_ref,
             phase: DeviceConnectionPhase::Retrying,
             retry_in_ms: Some(duration_millis(self.runtime.retry_interval)),
@@ -326,9 +342,40 @@ mod mode_tests {
     use super::*;
 
     #[tokio::test]
+    async fn file_relay_profiles_never_replace_the_shared_desktop_connection() {
+        let dir = tempfile::tempdir().unwrap();
+        let (runtime,_credentials) = crate::runtime::test_support::runtime(dir.path()).await;
+        let (_a,_b,client,peer) = crate::connection::test_connection_pair().await;
+        let reference = client.device_ref();
+        assert!(runtime.file_profile_observation(reference,false).await.is_none());
+        assert!(runtime.inner.file_devices.lock().await.is_empty(),"status must not open a file profile");
+        let common = runtime.inner.device(reference).await;
+        common.set_test_connection(client).await;
+        assert!(runtime.file_profile_observation(reference,false).await.is_none(),"status must not borrow the desktop transport");
+        let auto = runtime.inner.file_device(reference,false).await.unwrap();
+        let relay = runtime.inner.file_device(reference,true).await.unwrap();
+        assert!(!Arc::ptr_eq(&common,&auto));
+        assert!(!Arc::ptr_eq(&auto,&relay));
+        assert!(Arc::ptr_eq(&relay,&runtime.inner.file_device(reference,true).await.unwrap()));
+        assert_ne!(common.usage_session,auto.usage_session);
+        assert_ne!(auto.usage_session,relay.usage_session);
+        assert_eq!(relay.connection_mode(),crate::ConnectionMode::Relay);
+        assert_eq!(common.connection_mode(),crate::ConnectionMode::Auto);
+        relay.close_for_account_change().await;
+        assert!(common.cached_connection().await.is_some());
+        assert!(common.cached_connection().await.unwrap().connection().selected_path().is_some());
+        assert_eq!(runtime.inner.all_devices().await.len(),3);
+        peer.close(b"test done");
+        runtime.inner.file_devices.lock().await.clear();
+        runtime.inner.devices.lock().await.clear();
+        drop((common,auto,relay));
+        Arc::try_unwrap(runtime).ok().unwrap().shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn changing_mode_closes_the_cached_connection_and_keeps_other_device_choices() {
         let dir = tempfile::tempdir().unwrap();
-        let runtime = crate::runtime::test_support::runtime(dir.path()).await;
+        let (runtime,_credentials) = crate::runtime::test_support::runtime(dir.path()).await;
         let (_a, _b, client, peer) = crate::connection::test_connection_pair().await;
         let device_ref = client.device_ref();
         let device = runtime.inner.device(device_ref).await;

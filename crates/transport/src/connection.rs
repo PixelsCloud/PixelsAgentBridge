@@ -208,6 +208,7 @@ impl PabConnection {
                 .unwrap_or(ConnectionPath::Unknown),
         )
     }
+    pub fn is_closed(&self)->bool {self.inner.close_reason().is_some()}
     /// QUIC's estimate for the currently selected path. This is round trip,
     /// independent of video PTS and includes Relay transit when relayed.
     pub fn selected_path_rtt(&self) -> Option<Duration> {

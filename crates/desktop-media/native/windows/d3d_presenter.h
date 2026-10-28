@@ -9,6 +9,7 @@
 #include "viewer_input.h"
 #include "../software_codec_ffi.h"
 #include "cursor_overlay.h"
+#include "local_cursor.h"
 #include "presentation_history.h"
 #include "viewer_stats.h"
 #include "../../../../smoke/remote_desktop_pattern_proof.h"
@@ -25,6 +26,9 @@ class NativePresenter {
     ViewerStats stats_;
     CursorOverlay cursor_;
     bool cursor_tracking_ = false;
+    bool local_pointer_ = false;
+    pab_cursor::Image local_image_;
+    LocalCursor local_cursor_;
     bool fullscreen_ = false;
     ViewerInput input_;
     static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -70,12 +74,19 @@ class NativePresenter {
         POINT point{};
         if (!GetCursorPos(&point) || WindowFromPoint(point) != window_) return false;
         ScreenToClient(window_, &point);
-        const bool remote = cursor_tracking_ && input_.enabled() && PtInRect(&viewport_,point);
-        SetCursor(remote ? nullptr : LoadCursorW(nullptr,IDC_ARROW));
+        const bool inside = input_.enabled() && PtInRect(&viewport_,point);
+        const bool remote = !local_pointer_ && cursor_tracking_ && inside;
+        SetCursor(local_pointer_ && inside ? local_cursor_.get() : remote ? nullptr : LoadCursorW(nullptr,IDC_ARROW));
         return true;
     }
 public:
     void cursor_update(const std::vector<uint8_t>& packet) {
+        if (!packet.empty() && packet.front() == 4) {
+            if (packet.size() != 1) throw std::runtime_error("Invalid local pointer mode");
+            local_pointer_ = true; cursor_tracking_ = false; cursor_.hide(); refresh_local_cursor();
+            if (retained_.sample) render(retained_,retained_index_,false);
+            return;
+        }
         if (!packet.empty() && packet.front() == 3) {
             if (packet.size() != 2 || packet[1] > 1) throw std::runtime_error("Invalid viewer layout");
             fullscreen_ = packet[1] != 0; input_.fullscreen(fullscreen_); pump(); return;
@@ -83,6 +94,11 @@ public:
         if (!packet.empty() && packet.front() == 2) {
             stats_.update(window_,packet.data()+1,packet.size()-1,[this] { input_.release(window_); });
             return;
+        }
+        if (local_pointer_) {
+            if (local_image_.update(packet.data(),packet.size())) local_cursor_.replace(local_image_);
+            refresh_local_cursor();
+            return; // Shape updates never repaint video; position stays local.
         }
         cursor_.update(device_.Get(), packet);
         cursor_tracking_ = !packet.empty() && packet.front() == 1;

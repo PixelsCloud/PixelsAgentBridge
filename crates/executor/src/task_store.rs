@@ -17,10 +17,13 @@ const MAX_RETAINED_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
 mod directory;
 mod filesystem;
+mod filesystem_creation;
 mod operation;
 mod system_query;
 mod terminal;
 mod transfer_execution;
+mod transfer_metadata;
+mod transfer_stop;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskChangeKind {
@@ -49,6 +52,11 @@ pub(crate) struct TaskStore {
 }
 
 impl TaskStore {
+    #[cfg(test)]
+    pub(crate) async fn close_for_test(&self){self.pool.close().await;}
+    async fn write_transaction(&self)->Result<Transaction<'static,sqlx::Sqlite>,sqlx::Error> {
+        pab_file_manager::begin_write_transaction(&self.pool,"UPDATE read_operations SET request_id=request_id WHERE 0").await
+    }
     pub(crate) fn with_initiating_user(
         mut self,
         user: Option<pab_protocol::UserAttribution>,
@@ -147,8 +155,12 @@ impl TaskStore {
             sqlx::query(statement).execute(&mut *tx).await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS filesystem_results (request_id TEXT PRIMARY KEY REFERENCES read_operations(request_id), fingerprint TEXT NOT NULL, reply_json TEXT)").execute(&mut *tx).await?;
+        sqlx::query("CREATE TABLE IF NOT EXISTS filesystem_execution (request_id TEXT PRIMARY KEY REFERENCES filesystem_results(request_id) ON DELETE CASCADE,request_json TEXT NOT NULL,context_json TEXT,creation_receipt_pending INTEGER NOT NULL DEFAULT 0 CHECK(creation_receipt_pending IN (0,1)))").execute(&mut *tx).await?;
         sqlx::query("CREATE TABLE IF NOT EXISTS terminal_execution (session_id TEXT PRIMARY KEY REFERENCES terminal_sessions(id), connection_id TEXT NOT NULL, selection_json TEXT NOT NULL, identity_json TEXT, cols INTEGER NOT NULL, rows INTEGER NOT NULL)").execute(&mut *tx).await?;
         sqlx::query("CREATE TABLE IF NOT EXISTS transfer_execution (request_id TEXT PRIMARY KEY REFERENCES transfer_operations(request_id), fingerprint TEXT NOT NULL, request_json TEXT NOT NULL, context_json TEXT NOT NULL)").execute(&mut *tx).await?;
+        sqlx::query("CREATE TABLE IF NOT EXISTS transfer_publications (request_id TEXT PRIMARY KEY REFERENCES transfer_operations(request_id) ON DELETE CASCADE, committed_at_unix_ms INTEGER NOT NULL)").execute(&mut *tx).await?;
+        sqlx::query("CREATE TABLE IF NOT EXISTS transfer_metadata_results (request_id TEXT PRIMARY KEY REFERENCES transfer_publications(request_id) ON DELETE CASCADE, result_json TEXT NOT NULL)").execute(&mut *tx).await?;
+        sqlx::query("CREATE TABLE IF NOT EXISTS transfer_stop_requests (request_id TEXT PRIMARY KEY REFERENCES transfer_operations(request_id),intent TEXT NOT NULL CHECK(intent IN ('pause','cancel')),requested INTEGER NOT NULL)").execute(&mut *tx).await?;
         // Older builds persisted log previews and raw event chunks in the
         // general task history. Keep only the operation metadata there;
         // bounded log payloads live in the dedicated log store.

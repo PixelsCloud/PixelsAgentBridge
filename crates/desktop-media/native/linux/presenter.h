@@ -43,6 +43,8 @@ class Presenter {
     }
     std::unique_ptr<ViewInput> input_;
     CursorOverlay cursor_;
+    bool local_pointer_=false;
+    pab_cursor::Image local_image_;
     GdkFrameClock* clock_ = nullptr;
     gulong painted_signal_ = 0;
     GThread* thread_ = g_thread_self();
@@ -124,7 +126,7 @@ class Presenter {
             glUniform1i(glGetUniformLocation(program_, i ? "plane_uv" : "plane_y"), i);
         }
         const int drawable_height=gtk_widget_get_allocated_height(area_)*scale;
-        const auto parameters=cursor_.parameters(v,drawable_height,rotation_%2 ? height_ : width_,rotation_%2 ? width_ : height_);
+        const auto parameters=local_pointer_ ? CursorOverlay::Parameters{} : cursor_.parameters(v,drawable_height,rotation_%2 ? height_ : width_,rotation_%2 ? width_ : height_);
         cursor_.bind(program_,parameters,drawable_height);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         if (pending_ || verify_redraw_) verify_pixels(v);
@@ -264,6 +266,12 @@ public:
         while (pending_) { parent_alive(); poll_events(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
     }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0]==4) {
+            poll_events(false);
+            if (size!=1) throw std::runtime_error("Invalid local pointer mode");
+            local_pointer_=true; input_->local_pointer();
+            gtk_gl_area_queue_render(GTK_GL_AREA(area_)); return;
+        }
         if (size && bytes[0]==3) {
             poll_events(false);
             if (size!=2 || bytes[1]>1) throw std::runtime_error("Invalid viewer layout");
@@ -271,7 +279,12 @@ public:
             input_->fullscreen(bytes[1]!=0); gtk_gl_area_queue_render(GTK_GL_AREA(area_)); return;
         }
         if (size && bytes[0]==2) { poll_events(false); statistics(bytes+1,size-1); return; }
-        poll_events(false); cursor_.update(bytes,size);
+        poll_events(false);
+        if (local_pointer_) {
+            if (local_image_.update(bytes,size)) input_->local_cursor(local_image_);
+            return;
+        }
+        cursor_.update(bytes,size);
         input_->cursor_tracking(cursor_.tracking());
         // Cursor-only redraws keep the last uploaded NV12 textures and do not
         // set pending_ or generate a new video presentation acknowledgement.

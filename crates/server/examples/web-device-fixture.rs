@@ -62,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             device_id,
         },
         agent_version: "web-e2e".into(),
+        client_version: None,
         observed_at_unix_ms: (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000)
             as i64,
         execution_context: pab_platform::detect_native_execution_context()?,

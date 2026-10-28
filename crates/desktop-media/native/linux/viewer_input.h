@@ -1,6 +1,7 @@
 #pragma once
 #include "geometry.h"
 #include "keycodes.h"
+#include "../local_cursor_image.h"
 #include <gtk/gtk.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
@@ -44,6 +45,8 @@ class ViewInput {
     bool enabled_=false;
     bool fullscreen_=false, escape_held_=false;
     bool cursor_tracking_=false;
+    bool local_pointer_=false;
+    GdkCursor* shape_cursor_=nullptr;
     GdkWindow* cursor_window_=nullptr;
     GdkCursor* blank_cursor_=nullptr;
     GdkCursor* previous_cursor_=nullptr;
@@ -56,10 +59,10 @@ class ViewInput {
     void pointer_hidden(bool hidden) noexcept {
         if (!cursor_window_ || gdk_window_is_destroyed(cursor_window_)) return;
         if (hidden==cursor_hidden_) return;
-        if (hidden && !blank_cursor_)
+        if (hidden && !local_pointer_ && !blank_cursor_)
             blank_cursor_=gdk_cursor_new_for_display(gtk_widget_get_display(area_),GDK_BLANK_CURSOR);
-        if (hidden && !blank_cursor_) return;
-        gdk_window_set_cursor(cursor_window_,hidden ? blank_cursor_ : previous_cursor_);
+        if (hidden && !local_pointer_ && !blank_cursor_) return;
+        gdk_window_set_cursor(cursor_window_,hidden ? (local_pointer_ ? shape_cursor_ : blank_cursor_) : previous_cursor_);
         cursor_hidden_=hidden;
     }
     void pointer_at(double px,double py) noexcept {
@@ -214,7 +217,7 @@ public:
         g_signal_connect(window_,"notify::is-active",G_CALLBACK(active),this);
     }
     ViewInput(const ViewInput&)=delete;
-    ~ViewInput() { release(); release_pointer_window(); g_signal_handlers_disconnect_by_data(area_,this); g_signal_handlers_disconnect_by_data(window_,this); }
+    ~ViewInput() { release(); release_pointer_window(); if (shape_cursor_) g_object_unref(shape_cursor_); g_signal_handlers_disconnect_by_data(area_,this); g_signal_handlers_disconnect_by_data(window_,this); }
     void release() noexcept {
         if (enabled_) emit(5);
         buttons_=0; keys_.fill(false); wheel_=0;
@@ -224,6 +227,23 @@ public:
         if (value) gtk_widget_grab_focus(area_);
     }
     void cursor_tracking(bool value) { cursor_tracking_=value; refresh_pointer(); }
+    void local_pointer() { pointer_hidden(false); local_pointer_=true; cursor_tracking_=true; refresh_pointer(); }
+    void local_cursor(const pab_cursor::Image& image) {
+        GdkCursor* next=nullptr;
+        if (image.format) {
+            auto* bitmap=gdk_pixbuf_new(GDK_COLORSPACE_RGB,TRUE,8,image.width,image.height);
+            if (bitmap) {
+                const auto rgba=image.rgba();
+                auto* pixels=gdk_pixbuf_get_pixels(bitmap); const auto stride=gdk_pixbuf_get_rowstride(bitmap);
+                for (uint32_t y=0;y<image.height;++y) std::memcpy(pixels+y*stride,rgba.data()+size_t(y)*image.width*4,image.width*4);
+                next=gdk_cursor_new_from_pixbuf(gtk_widget_get_display(area_),bitmap,image.hotspot_x,image.hotspot_y);
+                g_object_unref(bitmap);
+            }
+        }
+        pointer_hidden(false);
+        if (shape_cursor_) g_object_unref(shape_cursor_);
+        shape_cursor_=next; refresh_pointer();
+    }
     void sink(std::function<bool(const InputPacket&)> sink) { release(); enabled_=false; sink_=std::move(sink); refresh_pointer(); }
     void enable(bool value) {
         release(); enabled_=value && bool(sink_);

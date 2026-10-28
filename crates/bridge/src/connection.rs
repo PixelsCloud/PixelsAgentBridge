@@ -32,16 +32,23 @@ pub use desktop_terminal::DesktopTerminalSession;
 pub use pab_remote_desktop::RemoteDesktopSession;
 mod document;
 mod file_transfer;
+mod upload_pipeline;
 mod filesystem;
 mod screenshot;
 mod mobile;
 mod system_query;
 mod terminal;
 mod transfer_control;
+#[cfg(test)]
+mod transfer_test_hooks;
+#[cfg(test)]
+pub(crate) use transfer_test_hooks::PublicationBarrier;
 mod windows;
 
 #[cfg(test)]
 pub(crate) use file_transfer::tests::pair as test_connection_pair;
+pub(crate) use file_transfer::restore_download_checkpoint_owned;
+pub(crate) use file_transfer::{verify_download_publication,recover_download_metadata};
 
 pub use filesystem::FileSystemResult;
 pub use screenshot::Screenshot;
@@ -230,7 +237,7 @@ impl BridgeConnector {
                 && authenticated_at_unix_ms > 0 =>
             {
                 Ok(AuthenticatedDeviceConnection {
-                    connection,
+                    file_execution_selections:Default::default(),connection,
                     device_ref,
                     operator,
                     password_version,
@@ -252,6 +259,7 @@ impl BridgeConnector {
 
 #[derive(Clone)]
 pub struct AuthenticatedDeviceConnection {
+    file_execution_selections: std::sync::Arc<tokio::sync::Mutex<Vec<(pab_protocol::FileExecutionIdentity,pab_protocol::ExecutionSelection)>>>,
     connection: PabConnection,
     device_ref: DeviceRef,
     operator: OperatorRef,
@@ -262,8 +270,13 @@ pub struct AuthenticatedDeviceConnection {
 
 impl AuthenticatedDeviceConnection {
     #[cfg(test)]
+    pub(crate) fn file_lab_fixture(connection:PabConnection,device_ref:DeviceRef,operator:OperatorRef)->Self {
+        Self {file_execution_selections:Default::default(),connection,device_ref,operator,password_version:1,authenticated_at_unix_ms:1,operation_timeout:std::time::Duration::from_secs(30)}
+    }
+    #[cfg(test)]
     pub(crate) fn test_new(connection: PabConnection, device_ref: DeviceRef) -> Self {
         Self {
+            file_execution_selections:Default::default(),
             connection,
             device_ref,
             operator: OperatorRef::guest(pab_protocol::EndpointKey::new([7; 32])),
@@ -476,7 +489,7 @@ impl AuthenticatedDeviceConnection {
                     && matches!(snapshot.direction.as_str(), "receive" | "send")
                     && matches!(
                         snapshot.state.as_str(),
-                        "running" | "completed" | "failed" | "interrupted"
+                        "running" | "committing" | "stopping" | "completed" | "failed" | "interrupted" | "paused" | "cancelled"
                     ) =>
             {
                 Ok(snapshot)

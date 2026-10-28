@@ -691,6 +691,7 @@ async fn tls_account_flow(pool: PgPool) {
             environment_revision: "windows-test-env-1".to_owned(),
         },
         agent_version: "0.1.0-test".to_owned(),
+        client_version: Some("7.8.9".to_owned()),
         observed_at_unix_ms: 1_795_000_000_000,
     };
     let mut device_connection =
@@ -713,6 +714,11 @@ async fn tls_account_flow(pool: PgPool) {
     .await
     .unwrap();
     assert_eq!(stored_revision, "windows-test-env-1");
+    let stored_version: Option<String> = sqlx::query_scalar(
+        "SELECT client_version FROM device_runtime WHERE tenant_id=$1 AND device_id=$2",
+    ).bind(personal_tenant_id.as_uuid()).bind(device_id.as_uuid())
+        .fetch_one(inspection_control.store().pool()).await.unwrap();
+    assert_eq!(stored_version.as_deref(), Some("7.8.9"));
     let endpoint_key = EndpointKey::new(*device_secret.public().as_bytes());
     let endpoint_instance_id = EndpointInstanceId::new();
     let device_network = DeviceNetworkUpdate {

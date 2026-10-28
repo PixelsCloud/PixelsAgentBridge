@@ -217,6 +217,10 @@ pub struct LinuxCursorRenderer {
     acknowledgements: crate::renderer::CursorAcknowledgements,
 }
 impl LinuxCursorRenderer {
+    /// Use GDK's local pointer with the remote shape and hotspot.
+    pub async fn local_pointer(&mut self) -> Result<(), Error> {
+        self.send(vec![4]).await
+    }
     /// Local chrome command; does not affect the media generation or remote input lease.
     pub async fn fullscreen(&mut self, enabled: bool) -> Result<(), Error> {
         self.send(vec![3, u8::from(enabled)]).await

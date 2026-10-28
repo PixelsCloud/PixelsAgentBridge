@@ -12,6 +12,7 @@ use tokio::sync::{Mutex, Semaphore};
 use crate::{ControlApiState, ControlPlane};
 
 mod account_support;
+mod account_saved_devices;
 mod audit;
 mod audit_context;
 mod device_accounts;
@@ -96,6 +97,7 @@ pub fn router(control: ControlApiState) -> Router {
         .route("/api/web/overview", get(devices::overview))
         .route("/api/web/events", get(events::subscribe))
         .route("/api/web/accounts", get(management::accounts))
+        .route("/api/web/accounts/{id}/saved-devices", get(account_saved_devices::list))
         .route(
             "/api/web/accounts/{id}",
             get(account_support::detail).patch(management::update_account),

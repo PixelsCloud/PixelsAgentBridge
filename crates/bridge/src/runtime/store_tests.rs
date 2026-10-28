@@ -805,6 +805,47 @@ async fn history_count_includes_all_pages_and_filters_by_device() {
 }
 
 #[tokio::test]
+async fn clearing_history_covers_all_pages_persists_and_keeps_execution_state() {
+    let directory = tempdir().unwrap(); let path = directory.path().join("history.sqlite3");
+    let store = RuntimeStore::open(&path).await.unwrap();
+    let second = DeviceRef { device_id: DeviceId::from_u128(99), ..device_ref() };
+    for value in 1..=45 {
+        let device = if value % 2 == 0 { second } else { device_ref() };
+        let id = RequestId::from_u128(value);
+        store.record_pending(device, id, &command()).await.unwrap();
+        let mut accepted = snapshot(device, id); accepted.task_ref.task_id = TaskId::from_u128(value);
+        store.bind_snapshot(&accepted).await.unwrap();
+        store.start_operation(RequestId::from_u128(value+100), device, None, "guest", "upload", "source", "destination", false, None).await.unwrap();
+    }
+    let local = BridgeLocalStore::open(&path).await.unwrap();
+    assert_eq!(local.history_count(None).await.unwrap(), 90);
+    local.clear_history().await.unwrap(); local.clear_history().await.unwrap();
+    let reopened = BridgeLocalStore::open(&path).await.unwrap();
+    assert_eq!(reopened.history_count(None).await.unwrap(), 0);
+    assert!(reopened.tasks_page(None, 40).await.unwrap().is_empty());
+    assert!(reopened.operations_page(None, 40).await.unwrap().is_empty());
+    assert!(reopened.operations_refresh().await.unwrap().is_empty());
+    for device in [device_ref(), second] {
+        assert_eq!(reopened.history_count(Some(device)).await.unwrap(), 0);
+        assert!(reopened.tasks_page_for_device(device, None, 40).await.unwrap().is_empty());
+        assert!(reopened.operations_page_for_device(device, None, 40).await.unwrap().is_empty());
+    }
+    // Clear the history view without breaking a running task's observation/recovery.
+    let old = store.get_by_task_id(TaskId::from_u128(1)).await.unwrap();
+    store.bind_snapshot(old.snapshot.as_ref().unwrap()).await.unwrap();
+    assert_eq!(store.operations().await.unwrap().len(), 45);
+    assert_eq!(reopened.history_count(None).await.unwrap(), 0);
+    let id = RequestId::from_u128(999);
+    store.record_pending(device_ref(), id, &command()).await.unwrap();
+    let mut accepted = snapshot(device_ref(), id); accepted.task_ref.task_id = TaskId::from_u128(999);
+    store.bind_snapshot(&accepted).await.unwrap();
+    store.start_operation(RequestId::from_u128(1000), device_ref(), None, "guest", "upload", "new", "destination", false, None).await.unwrap();
+    assert_eq!(reopened.history_count(None).await.unwrap(), 2);
+    assert_eq!(reopened.tasks_page(None, 40).await.unwrap()[0].request_id, id);
+    assert_eq!(reopened.operations_refresh().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn device_history_pages_exclude_other_devices() {
     let directory = tempdir().unwrap();
     let store = RuntimeStore::open(&directory.path().join("bridge.sqlite3"))

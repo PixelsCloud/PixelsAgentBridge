@@ -51,8 +51,8 @@ async fn run(args: Vec<String>) -> Result<(), Error> {
     }
     let code = args[0].parse()?;
     let fps: u16 = args[1].parse()?;
-    if !matches!(fps, 15 | 30) {
-        return Err("FPS must be 15 or 30".into());
+    if !matches!(fps, 15 | 30 | 60) {
+        return Err("FPS must be 15, 30 or 60".into());
     }
     let temp = tempfile::tempdir()?;
     let config = BridgeConfig::register_guest_with_secret(temp.path().join("operator.key")).await?;

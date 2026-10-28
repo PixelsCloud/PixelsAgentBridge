@@ -15,6 +15,7 @@ pab-agent-core = { path = "../agent-core" }
 pab-service-config = { path = "../service-config" }
 pab-logging = { path = "../logging" }
 pab-protocol = { path = "../protocol" }
+pab-file-manager = { path = "../file-manager" }
 pab-remote-desktop = { path = "../remote-desktop" }
 pab-screenshot = { path = "../screenshot" }
 pab-transport = { path = "../transport" }
@@ -33,6 +34,8 @@ zeroize = "1"
 tempfile = "3"
 
 [dev-dependencies]
+pab-executor = { path = "../executor", features = ["test-support"] }
+pab-platform = { path = "../platform" }
 pab-desktop-media = { path = "../desktop-media" }
 rmcp = { version = "=3.5.0", default-features = false, features = ["client", "transport-io"] }
 

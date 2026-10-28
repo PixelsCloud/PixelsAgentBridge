@@ -1,5 +1,6 @@
 #pragma once
 #include "dma_cursor_frame.h"
+#include "drm_compat.h"
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <optional>
@@ -90,7 +91,7 @@ class Exporter {
         for (int i = 0; i < resources->count_connectors; ++i) {
             Connector c(drmModeGetConnector(fd, resources->connectors[i]));
             if (!c) throw std::runtime_error("DRM connector changed");
-            const char* type = drmModeGetConnectorTypeName(c->connector_type);
+            const char* type = connector_type_name(c->connector_type);
             if (!type || std::string(type) + "-" + std::to_string(c->connector_type_id) != connector_) continue;
             if (result) throw std::runtime_error("Ambiguous DRM connector");
             result = std::move(c);

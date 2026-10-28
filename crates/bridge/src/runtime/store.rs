@@ -48,6 +48,9 @@ pub(super) struct OutputGap {
 }
 
 impl RuntimeStore {
+    pub(super) async fn write_transaction(&self)->Result<Transaction<'static,sqlx::Sqlite>,sqlx::Error> {
+        pab_file_manager::begin_write_transaction(&self.pool,"UPDATE runtime_operations SET id=id WHERE 0").await
+    }
     pub async fn open(path: &Path) -> Result<Self, RuntimeStoreError> {
         let mut attempt = 0;
         loop {
@@ -75,12 +78,17 @@ impl RuntimeStore {
             .max_connections(1)
             .connect_with(options)
             .await?;
-        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+        // The first migration is DDL, so it takes the writer before any reads.
+        // Own the RAII transaction before that await can be cancelled.
+        let mut tx = pool.begin().await?;
         for statement in [
+            "CREATE TABLE IF NOT EXISTS runtime_cleared_history(kind TEXT NOT NULL,id TEXT NOT NULL,PRIMARY KEY(kind,id))",
             "CREATE TABLE IF NOT EXISTS runtime_session_servers(session_id TEXT PRIMARY KEY,origin TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS client_usage_accumulators(scope TEXT NOT NULL,hour INTEGER NOT NULL,counters TEXT NOT NULL,PRIMARY KEY(scope,hour))",
             "CREATE TABLE IF NOT EXISTS client_usage_outbox(id TEXT PRIMARY KEY,scope TEXT NOT NULL,payload TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS connection_usage(session_id TEXT NOT NULL,device_id TEXT NOT NULL,connection_id INTEGER NOT NULL,scope TEXT,last_ms INTEGER NOT NULL,PRIMARY KEY(session_id,device_id))",
+            "CREATE TABLE IF NOT EXISTS runtime_connection_profiles(profile TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES runtime_sessions(id) ON DELETE CASCADE)",
+            "CREATE TABLE IF NOT EXISTS runtime_managed_file_attempts(id TEXT PRIMARY KEY,scope TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS account_catalog(scope TEXT NOT NULL,device_id TEXT NOT NULL,code TEXT NOT NULL,item_json TEXT NOT NULL,revision INTEGER NOT NULL,dirty INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(scope,device_id),UNIQUE(scope,code))",
             "CREATE TABLE IF NOT EXISTS catalog_sync(scope TEXT PRIMARY KEY,cursor INTEGER NOT NULL DEFAULT 0,lease TEXT,lease_until INTEGER NOT NULL DEFAULT 0,error TEXT,failures INTEGER NOT NULL DEFAULT 0)",
             "CREATE TABLE IF NOT EXISTS catalog_outbox(scope TEXT NOT NULL,device_id TEXT NOT NULL,mutation_json TEXT NOT NULL,PRIMARY KEY(scope,device_id))",
@@ -232,7 +240,7 @@ impl RuntimeStore {
         // Reserve the writer before reading. A deferred WAL transaction can
         // fail its read-to-write upgrade immediately when another MCP commits,
         // even with busy_timeout configured. Use IMMEDIATE for write transactions.
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         if let Some(row) = sqlx::query("SELECT * FROM runtime_tasks WHERE request_id = ?")
             .bind(request_id.to_string())
             .fetch_optional(&mut *tx)
@@ -261,7 +269,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<LocalTaskRecord, RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = sqlx::query("SELECT * FROM runtime_tasks WHERE request_id = ?")
             .bind(snapshot.request_id.to_string())
             .fetch_optional(&mut *tx)
@@ -328,7 +336,7 @@ impl RuntimeStore {
     }
 
     pub async fn record_event(&self, event: &TaskEvent) -> Result<bool, RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = row_by_task(&mut tx, event.task_ref).await?;
         let record = decode_record(&row)?;
         if event.seq <= record.last_event_seq {
@@ -366,7 +374,7 @@ impl RuntimeStore {
         chunk: &OutputChunk,
         range: &OutputRange,
     ) -> Result<bool, RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = row_by_task(&mut tx, chunk.task_ref).await?;
         let record = decode_record(&row)?;
         let local = match chunk.stream {
@@ -424,7 +432,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<LocalTaskRecord, RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = row_by_task(&mut tx, snapshot.task_ref).await?;
         let record = decode_record(&row)?;
         if record.request_id != snapshot.request_id {
@@ -451,7 +459,7 @@ impl RuntimeStore {
         &self,
         snapshot: &TaskSnapshot,
     ) -> Result<(LocalTaskRecord, Vec<OutputGap>), RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = row_by_task(&mut tx, snapshot.task_ref).await?;
         let record = decode_record(&row)?;
         if record.request_id != snapshot.request_id {
@@ -563,7 +571,7 @@ impl RuntimeStore {
         limit: u32,
     ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
         let rows = sqlx::query(
-            "SELECT * FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
+            "SELECT * FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='task' AND h.id=runtime_tasks.request_id) AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
         )
         .bind(before.map(|value| value.to_string()))
         .bind(before.map(|value| value.to_string()))
@@ -580,7 +588,7 @@ impl RuntimeStore {
         limit: u32,
     ) -> Result<Vec<LocalTaskRecord>, RuntimeStoreError> {
         let rows = sqlx::query(
-            "SELECT * FROM runtime_tasks WHERE device_ref_json = ? AND snapshot_json IS NOT NULL AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
+            "SELECT * FROM runtime_tasks WHERE device_ref_json = ? AND snapshot_json IS NOT NULL AND NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='task' AND h.id=runtime_tasks.request_id) AND (? IS NULL OR rowid < (SELECT rowid FROM runtime_tasks WHERE request_id = ?)) ORDER BY rowid DESC LIMIT ?",
         )
         .bind(serde_json::to_string(&device_ref)?)
         .bind(before.map(|value| value.to_string()))

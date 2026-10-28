@@ -37,7 +37,7 @@ export function AdminOverview({ liveRevision }: { liveRevision: number }) {
   return <div className="admin-overview">
     <header className="page-heading"><div><div className="eyebrow">OPERATIONS / OVERVIEW</div><h2>{text('title')}<span>.</span></h2><p>{text('description')}</p></div><div className="heading-controls"><span className="capture"><span className="capture-dot"/>{text('updated')} <time>{summary?.relay_status?.sampled_at ? date(summary.relay_status.sampled_at) : '—'}</time></span><div className="segments period-tabs" role="group" aria-label={common('usagePeriod')}>{(['today', '7', 'month', 'lifetime'] as const).map(value => <button key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>{text(value === '7' ? 'week' : value)}</button>)}</div><Button className="overview-refresh" size="small" aria-label={common('refresh')} icon={<RefreshCw size={14}/>} onClick={resources.refresh}/></div></header>
     {errors.map(error => <Alert key={error} type="error" title={common(error)} style={{ marginBottom: 12 }}/>) }
-    <OverviewFleet data={summary} diagnostics={diagnostics}/>
+    <OverviewFleet data={summary} diagnostics={diagnostics} nodes={resources.nodes.error ? undefined : resources.nodes.data}/>
     <div className="dashboard-main">
       <section className="panel trend-panel usage-workspace"><div className="panel-heading"><h2><Activity/>{text('usage')}</h2><span className="range-caption" title={range}>{data ? range : '—'}</span></div>
         <section className="metrics" aria-label={text('usage')} aria-busy={resources.usage.loading}>

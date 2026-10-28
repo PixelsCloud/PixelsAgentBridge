@@ -170,8 +170,8 @@ export default function RemoteDesktopWindow() {
           {!opened && <option value="">{text.screen}</option>}
           {opened?.screens.map(screen => <option key={screen.id} value={screen.id}>{screen.name} · {screen.desktop_width} × {screen.desktop_height}</option>)}
         </select>
-        <select aria-label="FPS" value={opened?.config.fps || 15} disabled={busy || status.phase !== "viewing"} onChange={event => void control({ fps: Number(event.target.value) })}>
-          <option value={15}>15 FPS</option><option value={30}>30 FPS</option>
+        <select aria-label="FPS" value={opened?.config.fps || 30} disabled={busy || status.phase !== "viewing"} onChange={event => void control({ fps: Number(event.target.value) })}>
+          <option value={15}>15 FPS</option><option value={30}>30 FPS</option><option value={60}>60 FPS</option>
         </select>
         <button className="remote-desktop-control-toggle" aria-label={status.input_enabled ? inputText.disable : inputText.enable} title={status.input_enabled ? inputText.disable : inputText.enable} aria-pressed={Boolean(status.input_enabled)} disabled={busy || status.phase !== "viewing" || !status.input_ready || !opened?.input_supported} onClick={() => void control({ inputEnabled: !status.input_enabled })}><MousePointer2 size={14} /><span>{status.input_enabled ? inputText.disable : inputText.enable}</span></button>
         <button className="remote-desktop-icon-button" aria-label={clipboardEnabled ? clipboardText.disable : clipboardText.enable}

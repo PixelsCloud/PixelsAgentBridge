@@ -21,9 +21,11 @@ type Props = {
   embedded?: boolean;
   deviceOptions?: { code: string; label: string }[];
   onDeviceChange?: (code: string) => void;
+  onClear?: () => void;
+  clearing?: boolean;
 };
 
-export function DeviceHistoryPanel({ code, language, embedded = true, deviceOptions, onDeviceChange }: Props) {
+export function DeviceHistoryPanel({ code, language, embedded = true, deviceOptions, onDeviceChange, onClear, clearing }: Props) {
   const t = messages[language];
   const [history, setHistory] = useState<HistoryPage>(emptyHistory);
   const [selectedId, setSelectedId] = useState("");
@@ -192,6 +194,8 @@ export function DeviceHistoryPanel({ code, language, embedded = true, deviceOpti
       deviceOptions={deviceOptions}
       deviceCode={code}
       onDeviceChange={onDeviceChange}
+      onClear={onClear}
+      clearing={clearing}
       onRefresh={() => void refresh(true)}
       onRefreshTask={(id) => void refreshTask(id)}
     />

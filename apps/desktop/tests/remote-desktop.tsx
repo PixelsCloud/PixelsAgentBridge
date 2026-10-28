@@ -9,7 +9,7 @@ const screens = [
   { id: "adapter:primary", name: "Main", desktop_width: 1920, desktop_height: 1080, primary: true },
   { id: "adapter:left", name: "Portrait", desktop_width: 1080, desktop_height: 1920, primary: false },
 ];
-let opened = { config: { session_id: "viewer-session-fixture", screen: screens[0], fps: 15, generation: 1 }, screens, input_supported: true };
+let opened = { config: { session_id: "viewer-session-fixture", screen: screens[0], fps: 30, generation: 1 }, screens, input_supported: true };
 let phase = "viewing";
 const params = new URLSearchParams(location.search);
 let inputReady = params.get("ready") !== "0", inputEnabled = inputReady, inputRequested = true;

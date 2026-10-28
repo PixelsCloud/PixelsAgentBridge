@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type SetStateAction } from
 import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ArrowUpRight, Copy, Monitor, Pencil, Trash2, Unplug, Terminal as TerminalIcon } from "lucide-react";
+import { ArrowUpRight, Copy, Files, Monitor, Pencil, Trash2, Unplug, Terminal as TerminalIcon } from "lucide-react";
 import { messages, type Language } from "./i18n";
 import type { View } from "./App";
 import type { ConnectedDevice, HistoryPage, OperatorBootstrap, OperationEntry, TaskEntry, TaskUpdate, TransferUpdate } from "./operatorTypes";
@@ -77,6 +77,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   const deviceRefreshRef = useRef<Promise<boolean> | null>(null);
   const presenceRequestRef = useRef(0);
   const historyRefreshRef = useRef<Promise<void> | null>(null);
+  const historyEpoch = useRef(0), clearHistoryGate = useRef(false);
+  const [clearingHistory, setClearingHistory] = useState(false);
   const refreshingRef = useRef(new Set<string>());
   const refreshAgainRef = useRef(new Set<string>());
   const selected = devices.find((device) => device.deviceCode === selectedCode);
@@ -241,6 +243,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     return {
       items: [
         { key: "desktop-viewer", icon: <Monitor size={16} />, label: language === "en" ? "Remote desktop" : "远程桌面" },
+        { key: "file-manager", icon: <Files size={16} />, label: language === "en" ? "File transfer" : "文件传输" },
         { key: "desktop-terminal", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal" : "远程终端" },
         { key: "desktop-terminal-system", icon: <TerminalIcon size={16} />, label: language === "en" ? "Remote terminal (System)" : "远程终端（System）" },
         { key: "connect", icon: <ArrowUpRight size={16} />, label: t.connect },
@@ -252,6 +255,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       ],
       onClick: ({ key }) => {
         if (key === "desktop-viewer") void connectSaved(device, undefined, "desktop");
+        if (key === "file-manager") void connectSaved(device, undefined, "files");
         if (key === "desktop-terminal") void connectSaved(device, undefined, "terminal-console");
         if (key === "desktop-terminal-system") void connectSaved(device, undefined, "terminal-system");
         if (key === "connect") void connectSaved(device);
@@ -315,6 +319,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       if (action !== "connect") {
         setSavedConnection((current) => current?.attempt === attempt ? { ...current, phase: "checking", step: 2 } : current);
         if (action === "desktop") await invoke("desktop_viewer_window", { code: device.deviceCode });
+        else if (action === "files") await invoke("file_manager_window", { code: device.deviceCode });
         else await invoke("desktop_terminal_window", { code: device.deviceCode, mode: action === "terminal-system" ? "system" : "console" });
         if (savedConnectionAttemptRef.current === attempt) setSavedConnection(null);
         return;
@@ -381,7 +386,9 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
 
 
   async function refreshOperations() {
+    const epoch = historyEpoch.current;
     const saved = await invoke<OperationEntry[]>("operator_operations");
+    if (epoch !== historyEpoch.current || clearHistoryGate.current) return;
     setTransfer((current) => {
       if (!current) return current;
       const record = saved.find((item) => item.id === current.id);
@@ -401,6 +408,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   }
 
   function refreshActivity(): Promise<void> {
+    if (clearHistoryGate.current) return Promise.resolve();
+    const epoch = historyEpoch.current;
     if (historyRefreshRef.current) return historyRefreshRef.current;
     const refresh = invoke<HistoryPage>("operator_history_page", {
       taskBefore: null,
@@ -409,6 +418,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
       loadTasks: true,
       loadOperations: true,
     }).then((page) => {
+      if (epoch !== historyEpoch.current) return;
       setHistoryTotalCount(page.totalCount);
       setTasks((current) => {
         const previous = new Map(current.map((task) => [task.id, task]));
@@ -444,6 +454,20 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     return refresh;
   }
 
+  async function clearHistory() {
+    if (clearHistoryGate.current) return;
+    clearHistoryGate.current = true; setClearingHistory(true); historyEpoch.current++;
+    try {
+      await invoke("operator_clear_history");
+      historyEpoch.current++;
+      tasksRef.current = []; setTasks([]); setOperations([]); setHistoryTotalCount(0);
+      setTaskBefore(null); setOperationBeforeStartedAtUnixMs(null); setOperationBeforeId(null);
+      setHasMoreTasks(false); setHasMoreOperations(false); setSelectedActivityId("");
+      setHistoryDeviceCode(""); setHistoryError("");
+    } catch (cause) { setHistoryError(`${t.clearHistoryFailed}: ${String(cause)}`); }
+    finally { clearHistoryGate.current = false; setClearingHistory(false); }
+  }
+
   async function refreshActivityManually() {
     setRefreshingHistory(true);
     try {
@@ -456,6 +480,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
   }
 
   async function loadMoreHistory() {
+    if (clearHistoryGate.current) return false;
+    const epoch = historyEpoch.current;
     if (loadingHistory || (!hasMoreTasks && !hasMoreOperations)) return false;
     setLoadingHistory(true);
     try {
@@ -466,6 +492,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         loadTasks: hasMoreTasks,
         loadOperations: hasMoreOperations,
       });
+      if (epoch !== historyEpoch.current) return false;
       setTasks((current) => {
         const known = new Set(current.map((item) => item.id));
         const next = [...current, ...page.tasks.filter((item) => !known.has(item.id))];
@@ -548,9 +575,10 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
     let stopTransfer: (() => void) | undefined;
     let bootstrapRetry: number | undefined;
     const loadBootstrap = async () => {
+      const epoch = historyEpoch.current;
       try {
         const saved = await invoke<OperatorBootstrap>("operator_bootstrap");
-        if (closed) return;
+        if (closed || epoch !== historyEpoch.current) return;
         setDevices((current) => {
           const known = new Set(current.map((device) => device.deviceId));
           return [...current, ...saved.devices.filter((device) => !known.has(device.deviceId))];
@@ -936,10 +964,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
                     </span>
                     <span className={`home-recent-presence ${status}`} aria-label={statusLabel} />
                     <span className={`home-recent-connection ${availability === true ? "connected" : "disconnected"}`}>
-                      {device.connected ? t.connected : statusLabel}
-                      {device.connected && device.connectionPath && (
-                        <> · {device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.connectionPathUnknown}</>
-                      )}
+                      {device.connected ? device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.connectionPathUnknown : statusLabel}
                     </span>
                   </button>
                   </Dropdown>
@@ -1019,6 +1044,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
             code={historyDeviceCode}
             language={language}
             embedded={false}
+            onClear={() => void clearHistory()}
+            clearing={clearingHistory}
             deviceOptions={devices.map((device) => ({ code: device.deviceCode, label: `${device.alias || devicePresence[device.deviceCode]?.name || formatDeviceCode(device.deviceCode)} · ${formatDeviceCode(device.deviceCode)}` }))}
             onDeviceChange={setHistoryDeviceCode}
           /> : <ActivityPanel
@@ -1038,6 +1065,8 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
             deviceOptions={devices.map((device) => ({ code: device.deviceCode, label: `${device.alias || devicePresence[device.deviceCode]?.name || formatDeviceCode(device.deviceCode)} · ${formatDeviceCode(device.deviceCode)}` }))}
             deviceCode=""
             onDeviceChange={setHistoryDeviceCode}
+            onClear={() => void clearHistory()}
+            clearing={clearingHistory}
             onRefresh={() => void refreshActivityManually()}
             onRefreshTask={(id) => void refreshTask(id)}
           />}

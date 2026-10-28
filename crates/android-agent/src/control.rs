@@ -179,6 +179,7 @@ impl ControlAgent {
                         device_ref: device,
                         execution_context: execution.clone(),
                         agent_version: env!("CARGO_PKG_VERSION").into(),
+                        client_version: option_env!("PAB_INSTALLER_VERSION").map(str::to_owned),
                         observed_at_unix_ms: crate::peer::now_ms(),
                     })
                     .map_err(|_| "invalid_hello")?

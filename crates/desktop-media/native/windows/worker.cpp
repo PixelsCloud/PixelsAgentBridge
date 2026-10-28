@@ -89,6 +89,7 @@ static void validate_wgc_desktop(const Display& selected);
 #include "cursor_worker.h"
 #include "cursor_fixture.h"
 #include "win32_cursor_fixture.h"
+#include "local_cursor_fixture.h"
 #include "cursor_overlay_fixture.h"
 #include "viewer_chrome_fixture.h"
 static bool idr(const std::vector<uint8_t>& bytes) {
@@ -465,6 +466,9 @@ extern "C" int pab_media_main(int argc, const char* const* argv) {
         }
         if (argc == 2 && std::string(argv[1]) == "cursor-shape-check") {
             cursor_shape_check(); return 0;
+        }
+        if (argc == 2 && std::string(argv[1]) == "local-cursor-check") {
+            local_cursor_check(); return 0;
         }
         if (argc == 2 && std::string(argv[1]) == "cursor-overlay-check") {
             cursor_overlay_check(); return 0;

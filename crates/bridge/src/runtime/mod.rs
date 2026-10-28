@@ -8,6 +8,18 @@ mod directory;
 mod document;
 mod event;
 mod filesystem;
+mod file_manager;
+pub use file_manager::RemoteFileBrowser;
+mod file_batch_runner;
+mod file_batch_clock;
+pub use file_batch_runner::ManagedBatchJob;
+#[cfg(test)]
+mod file_batch_tests;
+#[cfg(test)]
+mod file_batch_network_fixture;
+#[cfg(test)]
+#[path="../../../../smoke/file_manager_fixture.rs"]
+mod file_fixture_cleanup;
 mod mobile;
 mod operation;
 mod port_forward;
@@ -199,6 +211,15 @@ impl BridgeLocalStore {
             .await
     }
 
+    /// Remove the history view, while retaining execution/recovery state for active work.
+    pub async fn clear_history(&self) -> Result<(), RuntimeStoreError> {
+        let mut tx = self.store.pool.begin().await?;
+        sqlx::query("INSERT OR IGNORE INTO runtime_cleared_history(kind,id) SELECT 'task',request_id FROM runtime_tasks").execute(&mut *tx).await?;
+        sqlx::query("INSERT OR IGNORE INTO runtime_cleared_history(kind,id) SELECT 'operation',id FROM runtime_operations").execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn history_count(
         &self,
         device_ref: Option<DeviceRef>,
@@ -207,13 +228,13 @@ impl BridgeLocalStore {
             Some(device_ref) => {
                 let encoded = serde_json::to_string(&device_ref)?;
                 let tasks = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND device_ref_json = ?",
+                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='task' AND h.id=runtime_tasks.request_id) AND device_ref_json = ?",
                 )
                 .bind(&encoded)
                 .fetch_one(&self.store.pool)
                 .await?;
                 let operations = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM runtime_operations WHERE device_ref_json = ?",
+                    "SELECT COUNT(*) FROM runtime_operations WHERE NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='operation' AND h.id=runtime_operations.id) AND device_ref_json = ?",
                 )
                 .bind(&encoded)
                 .fetch_one(&self.store.pool)
@@ -222,11 +243,11 @@ impl BridgeLocalStore {
             }
             None => {
                 let tasks = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL",
+                    "SELECT COUNT(*) FROM runtime_tasks WHERE snapshot_json IS NOT NULL AND NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='task' AND h.id=runtime_tasks.request_id)",
                 )
                 .fetch_one(&self.store.pool)
                 .await?;
-                let operations = sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations")
+                let operations = sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations WHERE NOT EXISTS(SELECT 1 FROM runtime_cleared_history h WHERE h.kind='operation' AND h.id=runtime_operations.id)")
                     .fetch_one(&self.store.pool)
                     .await?;
                 (tasks, operations)
@@ -462,6 +483,7 @@ impl BridgeRuntime {
             availability,
             shutdown: shutdown_receiver,
             devices: Mutex::new(HashMap::new()),
+            file_devices: Mutex::new(HashMap::new()),
             device_codes: Mutex::new(HashMap::new()),
             initiated_by,
             operations: Mutex::new(HashMap::new()),
@@ -1045,6 +1067,7 @@ struct RuntimeInner {
     availability: watch::Receiver<BridgeAvailability>,
     shutdown: watch::Receiver<bool>,
     devices: Mutex<HashMap<DeviceRef, Arc<DeviceSession>>>,
+    file_devices: Mutex<HashMap<(DeviceRef, bool), Arc<DeviceSession>>>,
     device_codes: Mutex<HashMap<DeviceRef, DeviceCode>>,
     initiated_by: String,
     operations: Mutex<HashMap<RequestId, AbortHandle>>,
@@ -1054,6 +1077,21 @@ struct RuntimeInner {
 }
 
 impl RuntimeInner {
+    async fn all_devices(&self) -> Vec<Arc<DeviceSession>> {
+        let mut devices = self.devices.lock().await.values().cloned().collect::<Vec<_>>();
+        devices.extend(self.file_devices.lock().await.values().cloned());
+        devices
+    }
+    async fn file_device(self: &Arc<Self>, device: DeviceRef, relay: bool) -> Result<Arc<DeviceSession>, RuntimeError> {
+        let mut devices = self.file_devices.lock().await;
+        if let Some(session) = devices.get(&(device,relay)) {return Ok(session.clone());}
+        if devices.len() >= 64 {return Err(crate::BridgeError::FileTransfer("file connection profile limit reached".into()).into());}
+        let profile=format!("{}:files:{}",self.session_id,u8::from(relay));
+        sqlx::query("INSERT INTO runtime_connection_profiles(profile,session_id) VALUES(?,?) ON CONFLICT(profile) DO NOTHING").bind(profile).bind(&self.session_id).execute(&self.store.pool).await.map_err(RuntimeStoreError::from)?;
+        let session = Arc::new(DeviceSession::new_file(device,self.clone(),relay));
+        devices.insert((device,relay),session.clone());
+        Ok(session)
+    }
     async fn device(self: &Arc<Self>, device_ref: DeviceRef) -> Arc<DeviceSession> {
         let mut devices = self.devices.lock().await;
         Arc::clone(

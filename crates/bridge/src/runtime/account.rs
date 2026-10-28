@@ -142,13 +142,7 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
             }),
         });
     }
-    let devices = inner
-        .devices
-        .lock()
-        .await
-        .values()
-        .cloned()
-        .collect::<Vec<_>>();
+    let devices = inner.all_devices().await;
     let mut checks = tokio::task::JoinSet::new();
     for device in devices {
         let scope = context
@@ -189,13 +183,7 @@ async fn synchronize(config: &BridgeConfig, inner: &Arc<RuntimeInner>) -> Result
 }
 
 async fn close_device_connections(inner: &RuntimeInner) {
-    let devices = inner
-        .devices
-        .lock()
-        .await
-        .values()
-        .cloned()
-        .collect::<Vec<_>>();
+    let devices = inner.all_devices().await;
     for device in devices {
         device.close_for_account_change().await;
     }

@@ -7,12 +7,13 @@ import { byteText } from './usageModel';
 import { compactDuration, type Diagnostics, type Nodes, type OverviewData } from './overviewModel';
 import { useOverviewText } from './overviewText';
 
-export function OverviewFleet({ data, diagnostics }: { data?: OverviewData; diagnostics?: Diagnostics }) {
+export function OverviewFleet({ data, diagnostics, nodes }: { data?: OverviewData; diagnostics?: Diagnostics; nodes?: Nodes }) {
   const text = useOverviewText(); const navigate = useNavigate();
   return <section className="fleet-overview overview-stats" aria-label={text('registered')}>
     <article className="fleet-card"><span className="fleet-icon"><Users/></span><div className="fleet-main"><div className="fleet-value"><span>{text('registered')}</span><button className="overview-count" onClick={() => navigate('/accounts')}>{data?.accounts ?? '—'}</button><small>{text('administrators')} {data?.account_summary?.administrators ?? '—'}</small></div><div className="fleet-details"><span>{text('enabled')} <b>{data?.account_summary?.enabled ?? '—'}</b></span><span>{text('disabled')} <b>{data?.account_summary?.disabled ?? '—'}</b></span></div></div></article>
     <article className="fleet-card"><span className="fleet-icon"><Monitor/></span><div className="fleet-main"><div className="fleet-value"><span>{text('devices')}</span><button className="metric-value" aria-label={text('devices')} onClick={() => navigate('/devices')}>{data?.total ?? '—'}</button></div><div className="fleet-details"><span>{text('reported')} <b>{diagnostics?.reported ?? '—'}</b></span><span>{text('unreported')} <b>{diagnostics?.not_reported ?? '—'}</b></span></div></div></article>
     <article className="fleet-card"><span className="fleet-icon"><Activity/></span><div className="fleet-main"><div className="fleet-value connection-values"><span><i className="status-dot"/>{text('online')} <button className="overview-count" aria-label={text('online')} onClick={() => navigate('/devices?status=online')}>{data?.online ?? '—'}</button></span><span><i className="status-dot gray"/>{text('offline')} <button className="overview-count" aria-label={text('offline')} onClick={() => navigate('/devices?status=offline')}>{data?.offline ?? '—'}</button></span></div><div className="fleet-details">{text('control')}</div></div></article>
+    <article className="fleet-card"><span className="fleet-icon"><Network/></span><div className="fleet-main"><div className="fleet-value"><span>{text('relayNodes')}</span><button className="overview-count" aria-label={text('relayNodes')} onClick={() => navigate('/relay')}>{nodes?.summary.configured ?? '—'}</button></div><div className="fleet-details"><span>{text('relayAvailable')} <b>{nodes?.summary.available ?? '—'}</b></span><span>{text('maintenance')} <b>{nodes?.summary.maintenance ?? '—'}</b></span><span>{text('abnormal')} <b>{nodes?.summary.abnormal ?? '—'}</b></span></div></div></article>
   </section>;
 }
 

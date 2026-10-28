@@ -18,10 +18,11 @@ impl PostgresStore {
                 execution_context,
                 environment_revision,
                 agent_version,
+                client_version,
                 observed_at_unix_ms,
                 accepted_at
             )
-            SELECT $2, $3, $4::jsonb, $5, $6, $7, clock_timestamp()
+            SELECT $2, $3, $4::jsonb, $5, $6, $8, $7, clock_timestamp()
             FROM endpoints endpoint
             JOIN devices device
               ON device.tenant_id = endpoint.tenant_id
@@ -38,6 +39,7 @@ impl PostgresStore {
                 execution_context = EXCLUDED.execution_context,
                 environment_revision = EXCLUDED.environment_revision,
                 agent_version = EXCLUDED.agent_version,
+                client_version = EXCLUDED.client_version,
                 observed_at_unix_ms = EXCLUDED.observed_at_unix_ms,
                 accepted_at = clock_timestamp()
             RETURNING accepted_at
@@ -50,6 +52,7 @@ impl PostgresStore {
         .bind(&hello.execution_context.environment_revision)
         .bind(&hello.agent_version)
         .bind(hello.observed_at_unix_ms)
+        .bind(&hello.client_version)
         .fetch_optional(&self.pool)
         .await?
         .ok_or(StoreError::NotFound)?;

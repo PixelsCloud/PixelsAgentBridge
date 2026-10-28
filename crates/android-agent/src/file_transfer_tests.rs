@@ -1,6 +1,46 @@
 use super::*;
 
 #[tokio::test]
+async fn unsupported_attributes_and_source_constraints_are_rejected_before_acceptance() {
+    let root=tempfile::tempdir().unwrap();let staging=root.path().join("staging");std::fs::create_dir(&staging).unwrap();let service=FileService::open(&root.path().join("attributes.sqlite3"),&staging,[9;32]).await.unwrap();let actor=OperatorRef::guest(EndpointKey::new([7;32]));
+    for attributes in [false,true] {
+        let mut request=upload();request.native_path=Some(pab_protocol::NativeFilePath::Utf8(request.operation.path().into()));
+        if attributes {request.metadata=Some(pab_protocol::FileTransferMetadata {modified_at_unix_ms:Some(1_700_000_000_123),unix_mode:Some(0o644)});}else{request.source_constraint=Some(pab_protocol::FileTransferSourceConstraint {size:pab_protocol::FileByteCount(100),modified_at_unix_ms:Some(1_700_000_000_123)});}
+        request.validate().unwrap();
+        let error=service.accept_transfer("unsupported",actor,None,context(),&request).await.err().expect("unimplemented attributes must not be silently accepted");assert!(error.to_string().contains("updated Android storage adapter"));
+        assert!(service.transfer_snapshot("unsupported",request.request_id).await.unwrap().is_none());assert_eq!(std::fs::read_dir(&service.staging).unwrap().count(),0);
+    }
+}
+
+#[tokio::test]
+async fn native_transfer_storage_rejects_non_utf8_identity_before_acceptance() {
+    let root = tempfile::tempdir().unwrap();
+    let service = FileService::open(&root.path().join("native.sqlite3"), root.path(), [9; 32])
+        .await
+        .unwrap();
+    let actor = OperatorRef::guest(EndpointKey::new([7; 32]));
+    let mut request = upload();
+    let native = pab_protocol::NativeFilePath::UnixBytes(b"/workspace/\xff.bin".to_vec());
+    request.native_path = Some(native.clone());
+    if let FileTransferOperation::Upload { path, .. } = &mut request.operation {
+        *path = native.display_label();
+    }
+    assert!(
+        service
+            .accept_transfer("native", actor, None, context(), &request)
+            .await
+            .is_err()
+    );
+    assert!(
+        service
+            .transfer_snapshot("native", request.request_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[tokio::test]
 async fn completed_sender_allows_an_explicit_verified_download_resume_but_never_upload_replay() {
     let directory = tempfile::tempdir().unwrap();
     let service = FileService::open(
@@ -11,7 +51,8 @@ async fn completed_sender_allows_an_explicit_verified_download_resume_but_never_
     .await
     .unwrap();
     let operator = OperatorRef::guest(EndpointKey::new([7; 32]));
-    let original = FileTransferRequest {
+    let original = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+        native_path: None,
         request_id: RequestId::new(),
         execution: ExecutionSelection::default(),
         resume_from: None,
@@ -31,7 +72,8 @@ async fn completed_sender_allows_an_explicit_verified_download_resume_but_never_
     snapshot.sha256 = Some("a".repeat(64));
     service.save_transfer("first", &snapshot).await.unwrap();
     drop(lease);
-    let mut resume = FileTransferRequest {
+    let mut resume = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+        native_path: None,
         request_id: RequestId::new(),
         execution: ExecutionSelection::default(),
         resume_from: Some(original.request_id),
@@ -120,7 +162,8 @@ fn context() -> ExecutionContext {
 }
 
 fn upload() -> FileTransferRequest {
-    FileTransferRequest {
+    FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+        native_path: None,
         request_id: RequestId::new(),
         execution: ExecutionSelection::default(),
         resume_from: None,

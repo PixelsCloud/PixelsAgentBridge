@@ -114,6 +114,7 @@ pub fn prevent_exit(app: &tauri::AppHandle, code: Option<i32>) -> bool {
     code != Some(tauri::RESTART_EXIT_CODE)
         && !app.state::<TrayState>().exiting.load(Ordering::SeqCst)
 }
+pub(crate) fn cancel_exit(app:&tauri::AppHandle){app.state::<TrayState>().exiting.store(false,Ordering::SeqCst);}
 
 #[tauri::command]
 pub fn set_tray_language(app: tauri::AppHandle, language: &str) -> Result<(), String> {
@@ -123,6 +124,7 @@ pub fn set_tray_language(app: tauri::AppHandle, language: &str) -> Result<(), St
         _ => return Err("Unsupported tray language".into()),
     };
     let state = app.state::<TrayState>();
+    app.state::<crate::operator::file_manager::FileManagerState>().set_english(language=="en");
     state
         .show
         .set_text(show)

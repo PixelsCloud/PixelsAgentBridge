@@ -148,6 +148,11 @@ pub async fn operator_bootstrap(
 }
 
 #[tauri::command]
+pub async fn operator_clear_history(state: State<'_, OperatorState>) -> Result<(), String> {
+    state.local_store().await?.clear_history().await.map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub async fn operator_history_page(
     state: State<'_, OperatorState>,
     task_before: Option<String>,

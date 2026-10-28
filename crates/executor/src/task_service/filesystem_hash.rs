@@ -101,7 +101,7 @@ impl TaskService {
         id: RequestId,
     ) -> Result<FileSystemReply, TaskServiceError> {
         let mut reply = self.store.get_filesystem(actor, id).await?;
-        if pab_protocol::cancellable_filesystem_kind(&reply.kind) && reply.kind != "file_hash" {
+        if reply.supports_cancel() && reply.kind != "file_hash" {
             return self.cancel_bulk(actor, id).await;
         }
         if reply.kind != "file_hash" {

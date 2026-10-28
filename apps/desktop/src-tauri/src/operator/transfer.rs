@@ -147,7 +147,7 @@ pub async fn operator_start_transfer(
         source,
         destination,
         overwrite,
-        options: FileTransferOptions {
+        options: FileTransferOptions { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
             execution: execution.unwrap_or_default(),
             resume_from: None,
         },

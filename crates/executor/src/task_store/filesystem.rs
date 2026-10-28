@@ -18,7 +18,7 @@ impl TaskStore {
         &self,
         reply: &FileSystemReply,
     ) -> Result<(), TaskStoreError> {
-        sqlx::query("UPDATE read_operations SET state = 'cancel_requested' WHERE request_id = ? AND state = 'running' AND kind IN ('file_hash', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract')")
+        sqlx::query("UPDATE read_operations SET state = 'cancel_requested' WHERE request_id = ? AND state = 'running' AND kind IN ('file_hash', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'file_manager')")
             .bind(reply.request_id.to_string()).execute(&self.pool).await?;
         Ok(())
     }
@@ -64,7 +64,7 @@ impl TaskStore {
         fingerprint: &str,
         context: Option<&pab_protocol::ExecutionContext>,
     ) -> Result<Option<FileSystemReply>, TaskStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let existing = sqlx::query("SELECT o.initiated_by_json, o.state, f.fingerprint, f.reply_json FROM read_operations o LEFT JOIN filesystem_results f ON f.request_id = o.request_id WHERE o.request_id = ?")
             .bind(request.request_id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(row) = existing {
@@ -103,6 +103,9 @@ impl TaskStore {
         .bind(serde_json::to_string(&pending)?)
         .execute(&mut *tx)
         .await?;
+        let creation=cfg!(unix) && matches!(&request.operation,pab_protocol::FileSystemAction::Managed {operation:pab_protocol::FileManagerOperation::PrepareDirectory {existing_object:None,..},..});
+        sqlx::query("INSERT INTO filesystem_execution(request_id,request_json,context_json,creation_receipt_pending) VALUES(?,?,?,?)")
+            .bind(request.request_id.to_string()).bind(serde_json::to_string(request)?).bind(context.map(serde_json::to_string).transpose()?).bind(i64::from(creation)).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(None)
     }
@@ -121,6 +124,7 @@ impl TaskStore {
             serde_json::from_str::<FileSystemReply>(&json)?
         } else {
             FileSystemReply {
+                file_manager:None,
                 cancellable: None,
                 directory: None,
                 execution_context: None,

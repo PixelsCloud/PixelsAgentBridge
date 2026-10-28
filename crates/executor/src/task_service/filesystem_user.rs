@@ -14,7 +14,13 @@ impl TaskService {
         cancel: watch::Receiver<bool>,
     ) -> Result<(FileSystemReply, Vec<u8>), TaskServiceError> {
         let id = request.request_id;
-        let result = crate::user_worker::filesystem::execute(
+        let manager_scope = matches!(
+            request.operation,
+            pab_protocol::FileSystemAction::Managed { .. }
+        )
+        .then(|| self.file_manager_scope(actor))
+        .transpose()?;
+        let result = crate::user_worker::filesystem::execute_scoped(
             &self.user_worker_executable()?,
             user,
             request,
@@ -22,6 +28,7 @@ impl TaskService {
             context,
             self.file_coordinator(),
             cancel,
+            manager_scope,
         )
         .await;
         match result {
@@ -30,6 +37,9 @@ impl TaskService {
                 // Preserve the last durable publication/progress evidence. A
                 // broken IPC channel does not establish that no effect happened.
                 let mut reply = self.store.get_filesystem(actor, id).await?;
+                // A worker may disappear after its final attribute receipt was
+                // durably acknowledged. Preserve that known terminal outcome.
+                if reply.state == "completed" { return Ok((reply,Vec::new())); }
                 reply.state = "unconfirmed".into();
                 reply.error = Some(FileError::new("worker_unavailable", "observe", format!("user file worker outcome unconfirmed: {error}; query the original request")).0);
                 Ok((reply, Vec::new()))

@@ -179,6 +179,12 @@ impl FileService {
         request: &FileTransferRequest,
     ) -> Result<(TransferSnapshot, Uuid, Option<TransferLease>), Error> {
         request.validate()?;
+        if request.expected_execution.is_some() || request.source_constraint.is_some() || request.metadata.is_some() {
+            return Err("Native file execution preconditions require an updated Android storage adapter".into());
+        }
+        if request.native_path.as_ref().is_some_and(|path| !matches!(path, pab_protocol::NativeFilePath::Utf8(value) if value == request.operation.path())) {
+            return Err("Android storage supports UTF-8 native paths only".into());
+        }
         if !request.execution.is_service() {
             return Err(
                 "Android files execute as the app UID; alternate user execution is unsupported"
@@ -283,31 +289,32 @@ impl FileService {
                     "Cannot resume a running/unconfirmed transfer or a completed upload".into(),
                 );
             }
-            let compatible = match (&old_request.operation, &request.operation) {
-                (
-                    FileTransferOperation::Upload {
-                        path: a,
-                        size: b,
-                        sha256: c,
-                        overwrite: d,
-                    },
-                    FileTransferOperation::Upload {
-                        path: w,
-                        size: x,
-                        sha256: y,
-                        overwrite: z,
-                    },
-                ) => a == w && b == x && c == y && d == z,
-                (
-                    FileTransferOperation::Download { path: a, .. },
-                    FileTransferOperation::Download {
-                        path: b,
-                        expected_sha256: Some(expected),
-                        ..
-                    },
-                ) => a == b && old.sha256.as_ref() == Some(expected),
-                _ => false,
-            };
+            let compatible = old_request.native_path == request.native_path
+                && match (&old_request.operation, &request.operation) {
+                    (
+                        FileTransferOperation::Upload {
+                            path: a,
+                            size: b,
+                            sha256: c,
+                            overwrite: d,
+                        },
+                        FileTransferOperation::Upload {
+                            path: w,
+                            size: x,
+                            sha256: y,
+                            overwrite: z,
+                        },
+                    ) => a == w && b == x && c == y && d == z,
+                    (
+                        FileTransferOperation::Download { path: a, .. },
+                        FileTransferOperation::Download {
+                            path: b,
+                            expected_sha256: Some(expected),
+                            ..
+                        },
+                    ) => a == b && old.sha256.as_ref() == Some(expected),
+                    _ => false,
+                };
             if !compatible {
                 return Err("Resume source path, size or hash differs".into());
             }
@@ -319,6 +326,7 @@ impl FileService {
             }
         }
         let snapshot = TransferSnapshot {
+            metadata_result:None,
             initiating_user: user,
             execution_context: Some(context),
             request_id: request.request_id,

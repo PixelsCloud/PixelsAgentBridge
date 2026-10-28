@@ -27,6 +27,10 @@ mod document;
 mod execution;
 mod file_transfer;
 mod filesystem;
+#[cfg(test)]
+mod filesystem_manager_tests;
+pub(crate) mod file_manager;
+pub(crate) mod file_manager_recovery;
 mod filesystem_archive;
 mod filesystem_bulk;
 mod filesystem_bulk_io;
@@ -53,6 +57,8 @@ pub(crate) mod transfer_engine;
 mod transfer_user;
 #[cfg(test)]
 mod transfer_user_tests;
+#[cfg(test)]
+mod transfer_native_tests;
 mod ui;
 mod upload_lock;
 
@@ -85,6 +91,12 @@ pub(crate) struct TaskService {
     remote_desktop: pab_remote_desktop::DesktopHost,
     upload_locks: upload_lock::UploadPathLocks,
     filesystem_slots: Arc<tokio::sync::Semaphore>,
+    file_manager_cache:std::path::PathBuf,
+    file_manager_index:Arc<tokio::sync::OnceCell<pab_file_manager::DirectoryIndex>>,
+    #[cfg(any(unix,test))]
+    directory_recovery_gates:file_manager_recovery::RecoveryGates,
+    #[cfg(feature="test-support")]
+    pub(crate) transfer_barrier:Option<crate::transfer_test_hooks::UploadBarrier>,
     documents: document::DocumentCache,
     #[cfg(test)]
     hash_test_gate: Arc<Mutex<Option<Arc<filesystem_hash::HashTestGate>>>>,
@@ -138,6 +150,14 @@ impl Drop for UiConnection {
 }
 
 impl TaskService {
+    #[cfg(test)]
+    pub(crate) async fn close_for_test(&self){
+        self.store.close_for_test().await;
+        self.log_store.clone().shutdown().await;
+        if let Some(index)=self.file_manager_index.get(){index.clone().shutdown().await;}
+    }
+    #[cfg(feature="test-support")]
+    pub(crate) async fn fixture_stop_pending(&self,id:pab_protocol::RequestId)->Result<bool,String> {self.store.transfer_stop_pending(id).await.map_err(|error|error.to_string())}
     pub(crate) fn with_remote_desktop_backend(
         mut self,
         backend: Arc<dyn pab_remote_desktop::DesktopBackend>,
@@ -231,6 +251,12 @@ impl TaskService {
             remote_desktop: pab_remote_desktop::DesktopHost::default(),
             upload_locks: upload_lock::UploadPathLocks::default(),
             filesystem_slots: Arc::new(tokio::sync::Semaphore::new(8)),
+            file_manager_cache:database_file.with_file_name("file-manager-cache.sqlite3"),
+            file_manager_index:Arc::new(tokio::sync::OnceCell::new()),
+            #[cfg(any(unix,test))]
+            directory_recovery_gates:Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(feature="test-support")]
+            transfer_barrier:None,
             documents: document::DocumentCache::default(),
             #[cfg(test)]
             hash_test_gate: Arc::new(Mutex::new(None)),
@@ -323,14 +349,12 @@ impl TaskService {
                 .await;
         }
         if let DeviceTaskRequest::TransferFile { request, .. } = request {
-            let result = self
-                .transfer_stream(
+            let result = Box::pin(self.transfer_stream(
                     initiated_by,
                     &request,
                     &mut stream,
                     timeout.max(Duration::from_secs(60)),
-                )
-                .await;
+                )).await;
             if let Err(error) = &result {
                 let _ = stream.send_json(&error_response(error), timeout).await;
             }
@@ -632,8 +656,8 @@ impl TaskService {
                 desktop_terminal_schema_version: Some(
                     pab_protocol::DESKTOP_TERMINAL_SCHEMA_VERSION,
                 ),
-                filesystem_schema_version: Some(6),
-                transfer_schema_version: Some(pab_protocol::FILE_TRANSFER_SCHEMA_VERSION),
+                filesystem_schema_version: Some(11),
+                transfer_schema_version: Some(pab_protocol::FILE_TRANSFER_PARENT_SCHEMA_VERSION),
                 system_query_schema_version: Some(pab_protocol::SYSTEM_QUERY_SCHEMA_VERSION),
                 screenshot_schema_version: Some(pab_protocol::SCREENSHOT_SCHEMA_VERSION),
                 document_schema_version: Some(pab_protocol::DOCUMENT_SCHEMA_VERSION),
@@ -672,6 +696,10 @@ impl TaskService {
             DeviceTaskRequest::GetTransfer { request_id, .. } => {
                 let snapshot = self.lookup_transfer(initiated_by, request_id).await?;
                 Ok(DeviceTaskResponse::Transfer { snapshot })
+            }
+            DeviceTaskRequest::StopTransfer {request_id,intent,..} => {
+                let snapshot=self.store.request_transfer_stop(initiated_by,request_id,intent).await?;
+                Ok(DeviceTaskResponse::Transfer {snapshot})
             }
             DeviceTaskRequest::ListDirectory {
                 request_id,

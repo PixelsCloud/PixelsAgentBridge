@@ -16,6 +16,7 @@ use zeroize::Zeroizing;
 pub(crate) mod desktop_terminal;
 pub(crate) mod remote_desktop;
 pub(crate) mod directory;
+pub(crate) mod file_manager;
 pub(crate) mod execution;
 pub(crate) mod history;
 pub(crate) mod screenshot;

@@ -16,17 +16,20 @@ pub(super) struct Request {
     identity: ExecutionIdentity,
     context: pab_protocol::ExecutionContext,
     initial_cancel: bool,
+    manager_scope: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Operation {
     Execute { request: FileSystemRequest },
     Reconcile { original: FileSystemReply },
+    ReconcileDirectory {request:FileSystemRequest,original:FileSystemReply},
 }
 impl Operation {
     fn validate(&self) -> io::Result<()> {
         match self {
             Self::Execute { request } => request.validate().map_err(io::Error::other),
+            Self::ReconcileDirectory {request,original}=>crate::task_service::file_manager_recovery::validate_request(request,original),
             Self::Reconcile { original }
                 if original.state == "unconfirmed"
                     && matches!(original.kind.as_str(), "file_write" | "file_patch") =>
@@ -46,14 +49,14 @@ impl Operation {
         self.validate()?;
         match self {
             Self::Execute { request } => validate_payload(request, bytes),
-            Self::Reconcile { .. } if bytes.is_empty() => Ok(()),
+            Self::Reconcile { .. }|Self::ReconcileDirectory {..} if bytes.is_empty() => Ok(()),
             _ => Err(io::Error::other("unexpected reconcile payload")),
         }
     }
     fn validate_reply(&self, reply: &FileSystemReply) -> io::Result<()> {
         let expected = match self {
             Self::Execute { request } => FileSystemReply::pending(request),
-            Self::Reconcile { original } => original.clone(),
+            Self::Reconcile { original }|Self::ReconcileDirectory {original,..} => original.clone(),
         };
         if reply.request_id != expected.request_id
             || reply.path != expected.path
@@ -79,6 +82,10 @@ pub(super) enum Reply {
         publication: bool,
         snapshot: FileSystemReply,
     },
+    DirectoryMetadata {
+        snapshot: FileSystemReply,
+    },
+    DirectoryReceipt {snapshot:FileSystemReply,released:bool},
     Finished {
         snapshot: FileSystemReply,
     },
@@ -109,6 +116,16 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
     {
         return Err(io::Error::other("file execution identity mismatch"));
     }
+    let operation=match &request.operation {Operation::Execute {request}|Operation::ReconcileDirectory {request,..}=>Some(request),_=>None};
+    if let Some(operation)=operation
+        && let pab_protocol::FileSystemAction::Managed { expected_execution: Some(expected), .. } = &operation.operation {
+        if !expected.matches_context(&request.context) {
+            return Err(io::Error::other("file-manager account or session differs from the pinned identity"));
+        }
+    }
+    if let Operation::ReconcileDirectory {original,..}=&request.operation {
+        if original.execution_context.as_ref()!=Some(&request.context){return Err(io::Error::other("directory recovery execution identity mismatch"));}
+    }
     let payload = tokio::time::timeout(Duration::from_secs(30), async {
         let mut payload = Vec::with_capacity(request.operation.payload_size());
         while payload.len() < request.operation.payload_size() {
@@ -130,7 +147,20 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
     .await
     .map_err(io::Error::other)??;
     let (send, mut events) = mpsc::channel(8);
-    let engine = FileEngine::worker(send);
+    let mut engine = FileEngine::worker(send);
+    if let Some(scope) = &request.manager_scope {
+        if scope.len() != 64 || !scope.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(io::Error::other("invalid file manager scope"));
+        }
+        engine.file_manager = Some(crate::task_service::file_manager::ManagedContext {
+            owner: scope.clone(),
+            cache: std::path::PathBuf::from(&request.identity.home)
+                .join(".pixels-agent-bridge")
+                .join("cache")
+                .join("file-manager.sqlite3"),
+            index: std::sync::Arc::new(tokio::sync::OnceCell::new()),
+        });
+    }
     let (cancel, receive) = watch::channel(request.initial_cancel);
     let mut work = AbortOnDrop(tokio::spawn(async move {
         match request.operation {
@@ -140,6 +170,11 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
                     .await
             }
             Operation::Reconcile { original } => (engine.reconcile(original).await, Vec::new()),
+            Operation::ReconcileDirectory {request:operation,original}=>{
+                let fallback=original.clone();
+                let result=engine.reconcile_directory(&operation,original).await.unwrap_or_else(|error|{tracing::warn!(%error,"native directory publication recovery remains pending");fallback});
+                (result,Vec::new())
+            },
         }
     }));
     let result = async {
@@ -165,6 +200,18 @@ pub(super) async fn serve(mut peer: Peer, request: Request) -> io::Result<()> {
                                     if accepted { Ok(()) } else { Err(io::Error::other("file record not accepted")) }
                                 });
                                 let _ = answer.send(result);
+                            },
+                            FileCoordination::DirectoryMetadata { reply, answer } => {
+                                peer.control(Control::FileSystemReply {reply:Reply::DirectoryMetadata {snapshot:reply}}).await?;
+                                let result = ack(&mut peer,&cancel).await?.and_then(|accepted| {
+                                    if accepted { Ok(()) } else { Err(io::Error::other("directory outcome not accepted")) }
+                                });
+                                let _ = answer.send(result);
+                            },
+                            FileCoordination::DirectoryReceipt {reply,released,answer}=>{
+                                peer.control(Control::FileSystemReply {reply:Reply::DirectoryReceipt {snapshot:reply,released}}).await?;
+                                let result=ack(&mut peer,&cancel).await?.and_then(|accepted|if accepted {Ok(())}else{Err(io::Error::other("directory receipt not accepted"))});
+                                let _=answer.send(result);
                             },
                             FileCoordination::Unlock { .. } => unreachable!(),
                         }
@@ -216,6 +263,7 @@ struct OwnedWorker {
     child: pab_os_control::execution::UserProcess,
     coordinator: FileCoordinator,
 }
+#[cfg(test)]
 pub(crate) async fn execute(
     executable: &Path,
     prepared: PreparedUser,
@@ -225,6 +273,28 @@ pub(crate) async fn execute(
     coordinator: FileCoordinator,
     cancel: watch::Receiver<bool>,
 ) -> io::Result<(FileSystemReply, Vec<u8>)> {
+    execute_scoped(
+        executable,
+        prepared,
+        request,
+        payload,
+        context,
+        coordinator,
+        cancel,
+        None,
+    )
+    .await
+}
+pub(crate) async fn execute_scoped(
+    executable: &Path,
+    prepared: PreparedUser,
+    request: FileSystemRequest,
+    payload: Vec<u8>,
+    context: pab_protocol::ExecutionContext,
+    coordinator: FileCoordinator,
+    cancel: watch::Receiver<bool>,
+    manager_scope: Option<String>,
+) -> io::Result<(FileSystemReply, Vec<u8>)> {
     operate(
         executable,
         prepared,
@@ -233,6 +303,7 @@ pub(crate) async fn execute(
         context,
         coordinator,
         cancel,
+        manager_scope,
     )
     .await
 }
@@ -255,9 +326,16 @@ pub(crate) async fn reconcile(
         context,
         coordinator,
         cancel,
+        None,
     )
     .await
     .map(|(reply, _)| reply)
+}
+#[cfg(unix)]
+pub(crate) async fn reconcile_directory(executable:&Path,prepared:PreparedUser,request:FileSystemRequest,original:FileSystemReply,coordinator:FileCoordinator,manager_scope:String)->io::Result<FileSystemReply> {
+    let context=original.execution_context.clone().ok_or_else(||io::Error::other("missing original directory identity"))?;
+    let (_send,cancel)=watch::channel(false);
+    operate(executable,prepared,Operation::ReconcileDirectory {request,original},Vec::new(),context,coordinator,cancel,Some(manager_scope)).await.map(|(reply,_)|reply)
 }
 async fn operate(
     executable: &Path,
@@ -267,6 +345,7 @@ async fn operate(
     context: pab_protocol::ExecutionContext,
     coordinator: FileCoordinator,
     mut cancel: watch::Receiver<bool>,
+    manager_scope: Option<String>,
 ) -> io::Result<(FileSystemReply, Vec<u8>)> {
     request.validate_payload(&payload)?;
     let identity = prepared.identity().observation(
@@ -275,14 +354,14 @@ async fn operate(
     )?;
     let (mut peer, child) = launch(executable, prepared).await?;
     let mut owned = OwnedWorker { child, coordinator };
-    let timeout = if matches!(request, Operation::Reconcile { .. }) {
+    let timeout = if matches!(request, Operation::Reconcile { .. }|Operation::ReconcileDirectory {..}) {
         Duration::from_secs(15)
     } else {
         Duration::from_secs(30 * 60 + 30)
     };
     let result = tokio::time::timeout(timeout, async {
         let initial_cancel = *cancel.borrow();
-        peer.control(Control::FileSystem { request: Request { operation: request.clone(), identity, context: context.clone(), initial_cancel } }).await?;
+        peer.control(Control::FileSystem { request: Request { operation: request.clone(), identity, context: context.clone(), initial_cancel,manager_scope } }).await?;
         for chunk in payload.chunks(64 * 1024) { peer.send(5, chunk).await?; }
         peer.control(Control::FileSystemEnd).await?;
         let mut cancel_at = None;
@@ -313,12 +392,37 @@ async fn operate(
                 },
                 Reply::Unlock { id } => owned.coordinator.unlock(id)?,
                 Reply::Record { publication, snapshot } => {
-                    if matches!(request, Operation::Reconcile { .. }) { return Err(io::Error::other("unexpected reconcile write record")); }
+                    if !matches!(request, Operation::Execute { .. }) { return Err(io::Error::other("unexpected reconcile write record")); }
                     request.validate_reply(&snapshot)?;
                     if snapshot.execution_context.as_ref() != Some(&context) { return Err(io::Error::other("file progress execution identity mismatch")); }
                     if snapshot.state != "running" { return Err(io::Error::other("invalid file progress state")); }
                     owned.coordinator.record(publication, &snapshot).await?;
                     peer.control(Control::FileSystemAck { accepted: true, error: None }).await?;
+                },
+                Reply::DirectoryMetadata { snapshot } => {
+                    let Operation::Execute { request:original } = &request else {return Err(io::Error::other("unexpected directory outcome during reconciliation"));};
+                    let pab_protocol::FileSystemAction::Managed {operation:operation @ (pab_protocol::FileManagerOperation::SetDirectoryMetadata {..}|pab_protocol::FileManagerOperation::PrepareDirectory {..}),expected_execution} = &original.operation else {return Err(io::Error::other("unexpected directory outcome"));};
+                    request.validate_reply(&snapshot)?;
+                    if snapshot.execution_context.as_ref()!=Some(&context) || snapshot.state!="completed" || snapshot.error.is_some() || snapshot.data_size!=0 || snapshot.data_sha256.is_some() {
+                        return Err(io::Error::other("invalid directory outcome context or state"));
+                    }
+                    let managed = snapshot.file_manager.as_ref().ok_or_else(||io::Error::other("missing directory metadata result"))?;
+                    if managed.execution_context!=snapshot.execution_context {return Err(io::Error::other("directory outcome identity mismatch"));}
+                    managed.validate_for(&pab_protocol::FileManagerRequest {schema_version:pab_protocol::FILE_MANAGER_SCHEMA_VERSION,request_id:original.request_id,execution:original.execution,expected_execution:expected_execution.clone(),operation:operation.clone()}).map_err(io::Error::other)?;
+                    if !matches!(managed.result,pab_protocol::FileManagerResult::DirectoryMetadata {..}|pab_protocol::FileManagerResult::DirectoryPrepared {..}) {return Err(io::Error::other("missing directory facts"));}
+                    owned.coordinator.directory_metadata(&snapshot).await?;
+                    peer.control(Control::FileSystemAck {accepted:true,error:None}).await?;
+                },
+                Reply::DirectoryReceipt {snapshot,released}=>{
+                    let original=match &request {Operation::Execute {request} if released=>request,Operation::ReconcileDirectory {request,..}=>request,_=>return Err(io::Error::other("unexpected directory receipt acknowledgement"))};
+                    let pab_protocol::FileSystemAction::Managed {operation:operation @ pab_protocol::FileManagerOperation::PrepareDirectory {existing_object:None,..},expected_execution}=&original.operation else{return Err(io::Error::other("unexpected directory receipt operation"));};
+                    request.validate_reply(&snapshot)?;
+                    if snapshot.execution_context.as_ref()!=Some(&context) || snapshot.state!="completed" || snapshot.error.is_some() || snapshot.data_size!=0 || snapshot.data_sha256.is_some(){return Err(io::Error::other("invalid directory receipt context or state"));}
+                    let managed=snapshot.file_manager.as_ref().ok_or_else(||io::Error::other("missing directory receipt"))?;
+                    if managed.execution_context!=snapshot.execution_context || !matches!(managed.result,pab_protocol::FileManagerResult::DirectoryPrepared {created:true,..}){return Err(io::Error::other("invalid directory publication fact"));}
+                    managed.validate_for(&pab_protocol::FileManagerRequest {schema_version:pab_protocol::FILE_MANAGER_SCHEMA_VERSION,request_id:original.request_id,execution:original.execution,expected_execution:expected_execution.clone(),operation:operation.clone()}).map_err(io::Error::other)?;
+                    owned.coordinator.directory_receipt(&snapshot,released).await?;
+                    peer.control(Control::FileSystemAck {accepted:true,error:None}).await?;
                 },
                 Reply::Finished { snapshot } => {
                     request.validate_reply(&snapshot)?;

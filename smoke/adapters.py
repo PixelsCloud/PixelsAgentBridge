@@ -18,6 +18,13 @@ def command_for(adapter, directory, lab):
     env.update(CARGO_BUILD_JOBS=str(jobs), CMAKE_BUILD_PARALLEL_LEVEL="1",
                CMAKE_BUILD_PARALLEL="1", RAYON_NUM_THREADS="1", UV_THREADPOOL_SIZE="1")
     env["PAB_TEST_CATALOG_PATH"] = str(directory / "mcp-catalog.json")
+    if adapter == "linux-media-compat":
+        if not sys.platform.startswith("linux"):
+            raise ValueError("Linux media compatibility requires a Linux host")
+        if not shutil.which("g++") or not shutil.which("pkg-config"):
+            raise ValueError("Linux media compatibility requires g++ and pkg-config/libdrm headers")
+        return [sys.executable, str(ROOT / "smoke/linux_media_compat.py"),
+                "--output", str(directory)], ROOT, env, "counts"
     if adapter == "android-relay":
         android = lab.get("android", {})
         if android.get("enabled") is not True or not android.get("serial"):
@@ -50,6 +57,12 @@ def command_for(adapter, directory, lab):
             "cargo-remote-desktop": ["-p", "pab-remote-desktop", "--lib", "--test", "reliable_sessions"],
             "cargo-media-timing": ["-p", "pab-desktop-media", "--test", "windows_media_timing"],
             "cargo-media-conversion": ["-p", "pab-desktop-media", "--lib", "software::conversion_tests"],
+            "cargo-file-manager": ["-p", "pab-file-manager", "-p", "pab-protocol", "--lib"],
+            "cargo-file-manager-executor": ["-p", "pab-executor", "--lib", "filesystem_manager_tests"],
+            "cargo-upload-pipeline": ["-p", "pab-bridge", "--lib", "upload_pipeline::tests"],
+            "cargo-file-transfer-wire": ["-p", "pab-bridge", "--lib", "file_transfer::tests"],
+            "cargo-native-file-transfer": ["-p", "pab-executor", "--lib", "transfer_native_tests"],
+            "cargo-file-batches": ["-p", "pab-bridge", "--lib", "runtime::file_batch_tests::"],
         }
         if adapter not in selections:
             raise ValueError("Unknown Cargo adapter")
@@ -81,6 +94,16 @@ def command_for(adapter, directory, lab):
             env["DATABASE_URL"] = tomllib.loads(fixture.read_text(encoding="utf-8"))["database"]["url"]
         # A single Cargo job also bounds native build scripts that inherit NUM_JOBS.
         return ["cargo", "test", "--locked", "-j", "1", *selections[adapter], "--", "--test-threads=1"], ROOT, env, "libtest"
+    if adapter == "file-transfer-lab":
+        settings = lab.get("file_transfer_lab", {})
+        if settings.get("enabled") is not True:
+            raise ValueError("The isolated two-host file transfer lab must be explicitly enabled")
+        paths = {key: (ROOT / settings[key]).resolve(strict=True) for key in ("lab", "mcp")}
+        command = [sys.executable, str(ROOT / "smoke/file_transfer.py"), "--lab", str(paths["lab"]),
+                   "--mcp", str(paths["mcp"]), "--output", str(directory)]
+        if settings.get("config"):
+            command += ["--config", str((ROOT / settings["config"]).resolve(strict=True))]
+        return command, ROOT, env, "counts"
     node = shutil.which("node")
     if not node:
         raise ValueError("Node.js is unavailable")

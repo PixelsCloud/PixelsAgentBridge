@@ -20,3 +20,7 @@ pub use config::{ExecutorConfig, ExecutorConfigError};
 pub use device_status::{DeviceStatus, DeviceStatusError, read_local_device_status};
 pub use runtime::{ExecutorError, run_executor};
 pub use session::{DeviceSessionAcceptor, DeviceSessionError};
+#[cfg(feature = "test-support")]
+pub mod test_support;
+#[cfg(feature = "test-support")]
+mod transfer_test_hooks;

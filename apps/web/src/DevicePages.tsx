@@ -11,7 +11,7 @@ import { DeviceDiagnostics } from './DeviceDiagnostics';
 import { DeviceFilters } from './DeviceFilters';
 import { deviceQuery, deviceFilter } from './deviceDiagnosticsModel';
 
-export interface Device { id: string; code: string; name: string; revision: number; status: string; system: string | null; os_name: string | null; os_version: string | null; architecture: string | null; agent_version: string | null; created_at: number; last_online_at: number | null; online: boolean; association_revision?: number; associated_with_me?: boolean; associated_user_id?: string | null; associated_username?: string | null; diagnostics?: { runtime_reported: boolean; reported_at: number | null; permissions: string; compatibility: string } }
+export interface Device { id: string; code: string; name: string; revision: number; status: string; system: string | null; os_name: string | null; os_version: string | null; architecture: string | null; agent_version: string | null; client_version?: string | null; created_at: number; last_online_at: number | null; online: boolean; association_revision?: number; associated_with_me?: boolean; associated_user_id?: string | null; associated_username?: string | null; diagnostics?: { runtime_reported: boolean; reported_at: number | null; permissions: string; compatibility: string } }
 interface DeviceList { items: Device[]; total: number; page: number; page_size: number }
 export const formatCode = (code: string) => code.replace(/(\d{3})(?=\d)/g, '$1 ');
 
@@ -37,13 +37,14 @@ export function DeviceListPage({ me, liveRevision }: { me: Viewer; liveRevision:
     <DeviceDiagnostics admin={me.server_admin} liveRevision={liveRevision + diagnosticsRevision}/>
     <Card className="data-table-card"><DeviceFilters params={params} admin={me.server_admin} liveRevision={liveRevision + diagnosticsRevision} onApply={setParams} onRemove={key => update(key)}/>
       {resource.error && <Alert type="error" title={t(resource.error)} showIcon style={{ marginBottom: 16 }}/>}
-      <Table<Device> rowKey="id" loading={resource.loading} dataSource={resource.data?.items ?? []} scroll={{ x: 850 }} locale={{ emptyText: t('noData') }}
+      <Table<Device> rowKey="id" loading={resource.loading} dataSource={resource.data?.items ?? []} scroll={{ x: 1050 }} locale={{ emptyText: t('noData') }}
         pagination={{ components: paginationComponents, current: resource.data?.page ?? Number(params.get('page') || 1), pageSize: resource.data?.page_size ?? 20, total: resource.data?.total ?? 0, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showTotal: total => `${t('total')} ${total}`, onChange: (page, size) => { const next = new URLSearchParams(params); next.set('page', String(page)); next.set('page_size', String(size)); setParams(next); } }}
         columns={[
           { title: t('deviceCode'), key: 'device', render: (_, item) => <Button type="link" className="device-link" onClick={() => navigate(`/devices/${item.id}`)}><Monitor size={22}/><div><strong>{formatCode(item.code)}</strong><span>{item.name}</span></div></Button> },
+          { title: t('diagnosticsAccount'), key: 'account', render: (_, item) => item.associated_user_id ? <Button type="link" className="device-account-link" onClick={() => navigate(me.server_admin ? `/accounts/${item.associated_user_id}` : '/account')}>{item.associated_username ?? item.associated_user_id}</Button> : t('deviceUnassociated') },
           { title: t('online'), key: 'online', render: (_, item) => <Badge status={item.online ? 'success' : 'default'} text={t(item.online ? 'online' : 'offline')}/> },
           { title: t('system'), key: 'system', render: (_, item) => item.os_name ?? item.system ?? t('unknown') },
-          { title: t('agentVersion'), key: 'version', render: (_, item) => item.agent_version || t('unknown') },
+          { title: t('agentVersion'), key: 'version', render: (_, item) => item.client_version || t('clientVersionUnreported') },
           { title: t('lastOnline'), key: 'last', render: (_, item) => item.online ? t('online') : item.last_online_at ? date(item.last_online_at) : '—' },
           { title: t('actions'), key: 'actions', width: 72, render: (_, item) => <Dropdown menu={{ items: [{ key: 'details', label: t('details') }, { key: 'copy', label: t('copy'), icon: <Copy size={14}/> }], onClick: ({ key }) => key === 'copy' ? void copy(item) : navigate(`/devices/${item.id}`) }} trigger={['click']}><Button aria-label={t('actions')} icon={<Ellipsis size={18}/>}/></Dropdown> },
         ]}/>
@@ -69,13 +70,11 @@ export function DeviceDetail({ liveRevision, me }: { liveRevision: number; me: V
       {item && <Descriptions column={{ xs: 1, sm: 2 }} items={[
         { key: 'name', label: t('name'), children: item.name }, { key: 'state', label: t('online'), children: <Badge status={item.online ? 'success' : 'default'} text={t(item.online ? 'online' : 'offline')}/> },
         { key: 'system', label: t('system'), children: [item.os_name, item.os_version].filter(Boolean).join(' ') || t('unknown') },
-        { key: 'arch', label: t('architecture'), children: item.architecture ?? t('unknown') }, { key: 'agent', label: t('agentVersion'), children: item.agent_version ?? t('unknown') },
+        { key: 'arch', label: t('architecture'), children: item.architecture ?? t('unknown') }, { key: 'agent', label: t('agentVersion'), children: item.client_version || t('clientVersionUnreported') },
         { key: 'created', label: t('created'), children: date(item.created_at) }, { key: 'seen', label: t('lastOnline'), children: item.online ? t('online') : item.last_online_at ? date(item.last_online_at) : '—' },
-        { key: 'owner', label: t('diagnosticsAccount'), children: item.associated_user_id ? <Button type="link" style={{ whiteSpace: 'normal', height: 'auto' }} onClick={() => navigate(me.server_admin ? `/accounts/${item.associated_user_id}` : '/account')}>{item.associated_username ?? item.associated_user_id}</Button> : t('unknown') },
+        { key: 'owner', label: t('diagnosticsAccount'), children: item.associated_user_id ? <Button type="link" style={{ whiteSpace: 'normal', height: 'auto' }} onClick={() => navigate(me.server_admin ? `/accounts/${item.associated_user_id}` : '/account')}>{item.associated_username ?? item.associated_user_id}</Button> : t('deviceUnassociated') },
         { key: 'report', label: t('diagnosticsReport'), children: t(item.diagnostics?.runtime_reported ? 'diagnosticsReported' : 'diagnosticsUnreported') },
         { key: 'accepted', label: t('diagnosticsSampled'), children: item.diagnostics?.reported_at ? date(item.diagnostics.reported_at) : t('unknown') },
-        { key: 'permissions', label: t('diagnosticsPermissions'), children: t('diagnosticsPermissionUnknown') },
-        { key: 'compatibility', label: t('diagnosticsCompatibility'), children: t('diagnosticsCompatibilityUnknown') },
       ]}/>}
     </Card>}
     {item?.associated_with_me && <Button danger onClick={() => setUnlinking(item)}>{t('unlinkDevice')}</Button>}

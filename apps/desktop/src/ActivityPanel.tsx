@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, FileText, List, Monitor, RotateCw, Terminal } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, List, Monitor, RotateCw, Terminal, Trash2 } from "lucide-react";
 import { Button, Pagination, Select, Tag } from "antd";
 import { HistoryScreenshot } from "./HistoryScreenshot";
 import { HistoryTerminal } from "./HistoryTerminal";
@@ -31,6 +31,8 @@ type Props = {
   deviceOptions?: { code: string; label: string }[];
   deviceCode?: string;
   onDeviceChange?: (code: string) => void;
+  onClear?: () => void;
+  clearing?: boolean;
   onRefresh: () => void;
   onRefreshTask: (id: string) => void;
 };
@@ -38,7 +40,7 @@ type Props = {
 export function ActivityPanel({
   embedded = false, language, tasks, operations, totalCount, selectedId, onSelect, hasMore,
   hasMoreTasks, hasMoreOperations, loadingMore, refreshing, refreshError, onLoadMore,
-  deviceOptions, deviceCode = "", onDeviceChange, onRefresh,
+  deviceOptions, deviceCode = "", onDeviceChange, onRefresh, onClear, clearing = false,
 }: Props) {
   const t = messages[language];
   const [page, setPage] = useState(1);
@@ -103,7 +105,8 @@ export function ActivityPanel({
             options={[{ value: "", label: t.historyAllDevices }, ...(deviceOptions ?? []).map((device) => ({ value: device.code, label: device.label }))]}
             onChange={(value) => { setPage(1); onDeviceChange(value); }} />}
           <Tag className="count-badge">{totalCount}</Tag>
-          <Button type="text" className="activity-refresh" disabled={refreshing} onClick={() => { setPage(1); onRefresh(); }}>
+          {onClear && <Button type="text" className="activity-refresh" disabled={clearing || totalCount === 0 && activity.length === 0} onClick={() => { setPage(1); onClear(); }}><Trash2 size={14}/>{clearing ? t.clearingHistory : t.clearHistory}</Button>}
+          <Button type="text" className="activity-refresh" disabled={refreshing || clearing} onClick={() => { setPage(1); onRefresh(); }}>
             <RotateCw size={14} />
             {refreshing ? t.refreshingActivity : t.refreshActivity}
           </Button>

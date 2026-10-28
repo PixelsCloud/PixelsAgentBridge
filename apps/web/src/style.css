@@ -96,6 +96,7 @@ h1, h2, h3, h4 { margin-top: 0 !important; }
 .console-content .ant-table { font-size: 12px; }
 .console-content .ant-table-thead>tr>th { font-size: 11px; font-weight: 500; letter-spacing: .2px; }
 .console-content .ant-table-tbody>tr>td { border-bottom-color: var(--line); }
+.device-account-link.ant-btn, .table-inline-link.ant-btn { max-width: 100%; height: auto; margin: 0; padding: 0; border: 0; font: inherit; text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; vertical-align: baseline; }
 .console-content .ant-pagination { padding-top: 8px; }
 .console-content .ant-tag { border-radius: 5px; font-size: 10px; line-height: 20px; padding-inline: 8px; }
 .console-content .ant-alert { border-radius: 10px; font-size: 12px; }
@@ -430,3 +431,8 @@ h1, h2, h3, h4 { margin-top: 0 !important; }
 .relay-runtime .ant-table { font-size: 13px; }
 .relay-runtime .ant-table-thead>tr>th { font-size: 13px; }
 @media (max-width: 600px) { .relay-runtime-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+.relay-machine-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; min-width: 220px; }
+.relay-machine-status>div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.relay-machine-status span, .relay-machine-status small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.relay-machine-status strong { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }

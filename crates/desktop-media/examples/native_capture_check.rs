@@ -1,6 +1,6 @@
 //! Opt-in native encoder interoperability check using generated quadrants.
 //! This measures encode/decode throughput, not actual desktop or display FPS.
-//! No frame bytes are written to disk. Run: native_capture_check WORKER 15|30 [MODE].
+//! No frame bytes are written to disk. Run: native_capture_check WORKER 15|30|60 [MODE].
 use pab_desktop_media::{NativeBackend, software::SoftwareDecoder};
 use pab_protocol::DESKTOP_MAX_FRAME_BYTES;
 use pab_remote_desktop::DesktopBackend;
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !(2..=3).contains(&args.len()) {
-        return Err("usage: native_capture_check WORKER 15|30 [synthetic mode]".into());
+        return Err("usage: native_capture_check WORKER 15|30|60 [synthetic mode]".into());
     }
     let mode = args.get(2).map(String::as_str).unwrap_or("synthetic");
     if !matches!(
@@ -35,8 +35,8 @@ async fn run() -> Result<(), Error> {
         return Err("only generated diagnostic sources are allowed".into());
     }
     let fps: u16 = args[1].parse()?;
-    if !matches!(fps, 15 | 30) {
-        return Err("expected 15 or 30 FPS".into());
+    if !matches!(fps, 15 | 30 | 60) {
+        return Err("expected 15, 30 or 60 FPS".into());
     }
     let executable = PathBuf::from(&args[0]);
     let screen = NativeBackend::new(executable.clone(), vec![])

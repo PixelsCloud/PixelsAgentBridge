@@ -10,6 +10,9 @@ pub struct DeviceHello {
     pub device_ref: DeviceRef,
     pub execution_context: ExecutionContext,
     pub agent_version: String,
+    /// Installed product version; absent on older clients and development builds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_version: Option<String>,
     pub observed_at_unix_ms: i64,
 }
 

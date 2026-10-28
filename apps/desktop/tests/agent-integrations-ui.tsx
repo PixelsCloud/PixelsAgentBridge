@@ -48,6 +48,7 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
   if (command === "plugin:event|unlisten") { listeners.delete(args.eventId); return; }
   if (command.startsWith("plugin:window|")) return;
   if (command === "set_tray_language") return;
+  if (command === "open_project_repository") return;
   if (command === "macos_permissions") return null;
   if (command === "operator_current_traffic_scope") {
     const snapshot = activeScope;
@@ -78,8 +79,16 @@ const fixture = (window as any).fixture = { calls, states, release: null as null
   if (command === "operator_saved_device_presence") return fixture.devices.map(device => ({ deviceCode: device.deviceCode, name: device.alias, online: fixture.presence }));
   if (command === "operator_connection_paths") return fixture.devices.map(device => ({ deviceCode: device.deviceCode, path: device.connected ? "p2p" : null }));
   if (command === "operator_operations") return [];
-  if (command === "operator_history_page") return { tasks: fixture.historyTasks, operations: [], totalCount: fixture.historyTasks.length,
-    taskBefore: null, operationBeforeStartedAtUnixMs: null, operationBeforeId: null, hasMoreTasks: false, hasMoreOperations: false };
+  if (command === "operator_task") return {state:"Succeeded",complete:true,stdout:"Clear marker",stderr:"",stdoutOffset:12,stderrOffset:0,decodingReplacements:false,outputGap:false};
+  if (command === "operator_clear_history") {
+    if ((fixture as any).failClearHistory) throw Error("Fixture clear failed");
+    fixture.historyTasks=[];return null;
+  }
+  if (command === "operator_history_page") {
+    const result=structuredClone({tasks:fixture.historyTasks,operations:[],totalCount:fixture.historyTasks.length,taskBefore:null,operationBeforeStartedAtUnixMs:null,operationBeforeId:null,hasMoreTasks:false,hasMoreOperations:false});
+    if ((fixture as any).holdHistory) await new Promise<void>(resolve=>(fixture as any).releaseHistory=resolve);
+    return result;
+  }
   if (command === "mcp_reporting_status" && fixture.mcpError) throw Error("Reporting unavailable");
   if (command === "mcp_reporting_status") return { revision: fixture.mcpRevision, running: true, count: 9, error: null,
     clients: ["kimi-code", "kimi-code", "claude-code", "codex_cli_rs", "dsh-mcp-client", "cursor-agent", "opencode", "Custom Agent", null].map((clientName, index) => ({

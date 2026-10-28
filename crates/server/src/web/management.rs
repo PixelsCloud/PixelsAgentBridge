@@ -90,7 +90,7 @@ pub(crate) async fn accounts(
     Query(query): Query<PageQuery>,
 ) -> Result<Json<Value>, WebError> {
     let me = administrator(&state, &headers).await?;
-    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',u.id,'username',u.username,'status',u.status,'server_admin',u.server_admin,'revision',u.auth_revision,'relay_limit_mbps',u.relay_limit_mbps,'created_at',(extract(epoch from u.created_at)*1000)::bigint)::text payload
+    paged(&state,&me,query,r#"SELECT jsonb_build_object('id',u.id,'username',u.username,'status',u.status,'server_admin',u.server_admin,'revision',u.auth_revision,'device_count',(SELECT count(*) FROM device_accounts da WHERE da.user_id=u.id),'saved_device_count',(SELECT count(*) FROM user_saved_devices s WHERE s.user_id=u.id),'relay_limit_mbps',u.relay_limit_mbps,'created_at',(extract(epoch from u.created_at)*1000)::bigint)::text payload
       FROM users u
       WHERE $1 AND $2::uuid IS NOT NULL AND position(lower($3) in lower(u.username))>0 ORDER BY lower(u.username),u.id"#).await
 }

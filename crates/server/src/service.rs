@@ -454,6 +454,14 @@ impl ControlPlane {
         {
             return Err(ServiceError::InvalidAgentVersion);
         }
+        if hello.client_version.as_ref().is_some_and(|version| {
+            version.is_empty()
+                || version.trim() != version
+                || version.chars().count() > 64
+                || version.chars().any(char::is_control)
+        }) {
+            return Err(ServiceError::InvalidAgentVersion);
+        }
         if hello.observed_at_unix_ms <= 0 {
             return Err(ServiceError::InvalidObservedTime);
         }

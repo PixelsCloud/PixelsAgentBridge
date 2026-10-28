@@ -63,6 +63,8 @@ pub struct NewScan<'a> {
 }
 
 impl LogStore {
+    /// Close this store and wait for SQLite connections to release their files.
+    pub async fn shutdown(self) {self.pool.close().await;}
     pub async fn open(path: &Path) -> Result<Self, StoreError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)

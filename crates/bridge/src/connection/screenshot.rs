@@ -234,7 +234,7 @@ mod tests {
             .unwrap();
         let server = accept.await.unwrap();
         let authenticated = AuthenticatedDeviceConnection {
-            connection: client,
+            file_execution_selections:Default::default(),connection: client,
             device_ref: DeviceRef {
                 tenant_id: TenantId::from_u128(2),
                 device_id: DeviceId::from_u128(3),

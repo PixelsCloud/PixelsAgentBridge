@@ -43,6 +43,7 @@ struct TestStream {
     output: Vec<u8>,
     responses: Vec<DeviceTaskResponse>,
     resume_from: Option<RequestId>,
+    stop_after_progress: Option<FileTransferIntent>,
 }
 impl TransferStream for TestStream {
     async fn response(
@@ -111,7 +112,8 @@ async fn execute_inner(
                 identity.clone(),
             )
             .unwrap();
-        let request = FileTransferRequest {
+        let mut request = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+            native_path: None,
             request_id: id,
             execution: ExecutionSelection::User { context_ref },
             resume_from: stream.resume_from,
@@ -139,6 +141,9 @@ async fn execute_inner(
                 Operation::Reconcile { .. } => panic!("separate reconciliation"),
             },
         };
+        request.native_path=Some(pab_file_manager::encode_path(std::path::Path::new(request.operation.path())));
+        let mut expected=svc.execution_context.clone();expected.identity=Some(identity.clone());
+        request.expected_execution=Some(FileExecutionIdentity::from_context(&expected).unwrap());
         let result = dispatch(svc, &request, stream).await;
         if let Ok(snapshot) = svc.store.get_transfer(actor(), id).await {
             assert_eq!(
@@ -210,6 +215,7 @@ async fn dispatch(
 ) -> io::Result<()> {
     let (a, b, client, server) = super::transfer_tests::pair().await;
     let service = svc.clone();
+    let control_server=server.clone();
     let timeout = Duration::from_secs(15);
     let work = tokio::spawn(async move {
         service
@@ -272,6 +278,15 @@ async fn dispatch(
                     let FileTransferOperation::Upload { size, .. } = &request.operation else {
                         panic!("download progress frame")
                     };
+                    if let Some(intent)=fixture.stop_after_progress.take() {
+                        let service=svc.clone();let remote=control_server.clone();
+                        let stopping=tokio::spawn(async move {service.handle_stream(actor(),remote.accept_bi(timeout).await.unwrap(),timeout).await});
+                        let mut control=client.open_bi(timeout).await.unwrap();
+                        control.send_json(&DeviceTaskRequest::StopTransfer {schema_version:DEVICE_TASK_SCHEMA_VERSION,request_id:request.request_id,intent},timeout).await.unwrap();
+                        let DeviceTaskResponse::Transfer {snapshot}=control.receive_json::<DeviceTaskResponse>(timeout).await.unwrap() else {panic!("missing native stop acknowledgement")};
+                        assert!(matches!(snapshot.state.as_str(),"running"|"stopping"|"paused"|"cancelled"));
+                        stopping.await.unwrap().unwrap();continue;
+                    }
                     if offset < *size {
                         let bytes = fixture
                             .input
@@ -316,13 +331,22 @@ fn input(bytes: &[u8]) -> TestStream {
 #[tokio::test]
 #[ignore = "requires privileged native service and PAB_EXECUTION_TEST_WORKER/PAB_EXECUTION_TEST_USER"]
 async fn native_user_transfer_worker_acceptance() {
+    Box::pin(native_user_transfer_case()).await;
+}
+pub(super) async fn native_user_transfer_case() {
     let user = std::env::var("PAB_EXECUTION_TEST_USER")
         .unwrap()
         .parse()
         .unwrap();
     let identity = prepared(user).identity().clone();
-    let database = tempfile::tempdir().unwrap();
-    let mut svc = service(database.path()).await;
+    if let Ok(expected)=std::env::var("PAB_EXECUTION_TEST_ACCOUNT_ID") {assert_eq!(identity.account_id,expected,"the explicitly selected native session changed before acceptance");}
+    let database=match std::env::var_os("PAB_FILE_TRANSFER_FIXTURE_ROOT") {
+        Some(path)=>tempfile::Builder::new().prefix("pab-native-user-").tempdir_in(path).unwrap(),
+        None=>tempfile::tempdir().unwrap(),
+    };
+    eprintln!("PAB_FILE_TRANSFER_FIXTURE_ROOT={}",database.path().canonicalize().unwrap().display());
+    eprintln!("PAB_NATIVE_USER_ID={}",identity.account_id);
+    let mut svc = Box::pin(service(database.path())).await;
     svc.worker_executable = Some(
         std::env::var_os("PAB_EXECUTION_TEST_WORKER")
             .unwrap()
@@ -334,6 +358,7 @@ async fn native_user_transfer_worker_acceptance() {
             .join(format!("pab-transfer-acceptance-{}", RequestId::new())),
         home: identity.home.clone(),
     };
+    eprintln!("PAB_NATIVE_USER_WORKSPACE={}",serde_json::to_string(&pab_file_manager::encode_path(&root.path)).unwrap());
     let request = FileSystemRequest {
         execution: Default::default(),
         request_id: RequestId::new(),
@@ -367,6 +392,30 @@ async fn native_user_transfer_worker_acceptance() {
     .await
     .unwrap();
     assert_eq!(created.0.state, "completed", "{:?}", created.0);
+    eprintln!("NATIVE_FILE_PHASE basic_user_directory_completed");
+    // Exercise the public acceptance path and its pinned native identity, not
+    // merely a direct helper call. All paths stay inside this owned fixture.
+    let observed=identity.observation(ExecutionMode::User,ExecutionEnvironmentSource::NativeAccount).unwrap();
+    let caller=pab_task_runtime::ExecutionCaller {device:svc.device_ref,actor:actor(),connection:svc.ui_connection.id};
+    let context_ref=svc.ui_connection.execution_contexts.lock().await.register(caller,observed.clone()).unwrap();
+    let mut pinned=svc.execution_context.clone();pinned.identity=Some(observed);
+    let expected=FileExecutionIdentity::from_context(&pinned).unwrap();
+    let mut manager=FileSystemRequest {
+        request_id:RequestId::new(),execution:ExecutionSelection::User {context_ref},path:"file-manager".into(),
+        operation:FileSystemAction::Managed {expected_execution:Some(expected),operation:FileManagerOperation::CreateDirectory {parent:pab_file_manager::encode_path(&root.path),name:pab_file_manager::encode_path(std::path::Path::new("managed-native-user"))}},payload_size:0,payload_sha256:None,
+    };
+    eprintln!("NATIVE_FILE_PHASE managed_user_directory_start");
+    let result=Box::pin(svc.execute_filesystem(actor(),&manager,&[])).await.unwrap().0;
+    eprintln!("NATIVE_FILE_PHASE managed_user_directory_completed");
+    assert_eq!(result.state,"completed","{result:?}");
+    assert_eq!(result.execution_context.as_ref().and_then(|context|context.identity.as_ref()),pinned.identity.as_ref());
+    Box::pin(native_user_directory_attributes_case(&svc,&manager,&root.path)).await;
+    manager.request_id=RequestId::new();
+    let FileSystemAction::Managed {expected_execution:Some(expected),operation:FileManagerOperation::CreateDirectory {name,..}}=&mut manager.operation else {unreachable!()};
+    expected.identity.home.push_str("-wrong-account");*name=pab_file_manager::encode_path(std::path::Path::new("forbidden"));
+    assert!(matches!(Box::pin(svc.execute_filesystem(actor(),&manager,&[])).await,Err(TaskServiceError::ExecutionContext(_))));
+    assert!(!root.path.join("forbidden").exists());
+    eprintln!("NATIVE_FILE_PHASE pinned_identity_rejected_without_effects");
     let path = root.path.join("中文 payload.bin");
     let bytes: Vec<u8> = (0..196607).map(|n| (n % 251) as u8).collect();
     let mut interrupted = TestStream {
@@ -446,6 +495,7 @@ async fn native_user_transfer_worker_acceptance() {
         svc.store.get_transfer(actor(), id).await.unwrap().published,
         Some(true)
     );
+    Box::pin(native_user_attributes_case(&svc,user,&root.path,&transfer_context)).await;
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -461,6 +511,9 @@ async fn native_user_transfer_worker_acceptance() {
             "{owner}"
         );
         assert_ne!(owner, "S-1-5-18");
+    }
+    for intent in [FileTransferIntent::Pause,FileTransferIntent::Cancel] {
+        Box::pin(native_user_stop_case(&svc,user,&root.path,&bytes,intent)).await;
     }
     let mut downloaded = TestStream::default();
     let (id, result) = execute(
@@ -630,7 +683,8 @@ async fn native_user_transfer_worker_acceptance() {
             "committing",
         ),
     ] {
-        let req = FileTransferRequest {
+        let req = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+            native_path: None,
             request_id: RequestId::new(),
             execution: ExecutionSelection::User {
                 context_ref: ExecutionContextRef::new(),
@@ -674,11 +728,101 @@ async fn native_user_transfer_worker_acceptance() {
     assert!(svc.upload_locks.try_acquire(&path).await.unwrap().is_some());
 }
 
+// Public QUIC API, including native identity preparation and the worker IPC.
+async fn native_user_directory_attributes_case(svc:&TaskService,template:&FileSystemRequest,root:&std::path::Path) {
+    let path=root.join("managed-native-user");
+    let native=pab_file_manager::encode_path(&path);
+    let mut inspect=template.clone();inspect.request_id=RequestId::new();
+    let FileSystemAction::Managed {operation,..}=&mut inspect.operation else {unreachable!()};
+    *operation=FileManagerOperation::InspectDirectoryObject {path:native.clone()};
+    let observed=Box::pin(svc.execute_filesystem(actor(),&inspect,&[])).await.unwrap().0;
+    assert_eq!(observed.state,"completed","{observed:?}");
+    let FileManagerResult::DirectoryObject {identity,..}=observed.file_manager.unwrap().result else {panic!("missing native directory identity");};
+    // Child writes precede final attributes. This exercises the native adapter;
+    // batch postorder scheduling has its own separate acceptance tests.
+    std::fs::write(path.join("child.txt"),b"retained child").unwrap();
+    let mut set=template.clone();set.request_id=RequestId::new();
+    let FileSystemAction::Managed {operation,..}=&mut set.operation else {unreachable!()};
+    *operation=FileManagerOperation::SetDirectoryMetadata {path:native,expected_object:identity,
+        metadata:FileTransferMetadata {modified_at_unix_ms:Some(1_700_000_000_123),unix_mode:None}};
+    let reply=Box::pin(svc.execute_filesystem(actor(),&set,&[])).await.unwrap().0;
+    assert_eq!(reply.state,"completed","{reply:?}");
+    assert!(matches!(&reply.file_manager.as_ref().unwrap().result,FileManagerResult::DirectoryMetadata {metadata,..} if metadata.warnings.is_empty() && metadata.actual.modified_at_unix_ms==Some(1_700_000_000_123)));
+    assert_eq!(reply.execution_context.as_ref().unwrap().identity.as_ref().unwrap().mode,ExecutionMode::User);
+    assert_eq!(svc.lookup_filesystem(actor(),set.request_id).await.unwrap(),reply);
+    std::fs::rename(&path,root.join("managed-native-original")).unwrap();std::fs::create_dir(&path).unwrap();
+    let before=pab_file_manager::modified_at_unix_ms(&std::fs::metadata(&path).unwrap());
+    assert_eq!(Box::pin(svc.execute_filesystem(actor(),&set,&[])).await.unwrap().0,reply);
+    let mut stale=set;stale.request_id=RequestId::new();
+    let rejected=Box::pin(svc.execute_filesystem(actor(),&stale,&[])).await.unwrap().0;
+    assert_eq!(rejected.state,"failed","{rejected:?}");
+    assert_eq!(pab_file_manager::modified_at_unix_ms(&std::fs::metadata(&path).unwrap()),before);
+    assert_eq!(std::fs::read(root.join("managed-native-original/child.txt")).unwrap(),b"retained child");
+    eprintln!("NATIVE_FILE_PHASE directory_attributes_identity_and_durable_receipt_completed");
+}
+
+async fn native_user_attributes_case(svc:&TaskService,_user:u32,root:&std::path::Path,context:&ExecutionContext) {
+    let path=root.join("native-attributes.bin");let native=pab_file_manager::encode_path(&path);let bytes=b"native user attributes";
+    let metadata=FileTransferMetadata {modified_at_unix_ms:Some(1_700_000_000_123),unix_mode:Some(0o640)};
+    let context_ref=svc.ui_connection.execution_contexts.lock().await.register(pab_task_runtime::ExecutionCaller {device:svc.device_ref,actor:actor(),connection:svc.ui_connection.id},context.identity.clone().unwrap()).unwrap();
+    let request=FileTransferRequest { destination_parent:None,request_id:RequestId::new(),native_path:Some(native.clone()),execution:ExecutionSelection::User {context_ref},expected_execution:Some(FileExecutionIdentity::from_context(context).unwrap()),resume_from:None,source_constraint:None,metadata:Some(metadata.clone()),operation:FileTransferOperation::Upload {path:native.display_label(),size:bytes.len()as u64,sha256:digest(bytes),overwrite:false}};
+    let mut stream=input(bytes);dispatch(svc,&request,&mut stream).await.unwrap();
+    let receipt=svc.store.get_transfer(actor(),request.request_id).await.unwrap();assert_eq!(receipt.state,"completed");assert_eq!(receipt.published,Some(true));assert_eq!(receipt.execution_context.as_ref(),Some(context));
+    let outcome=receipt.metadata_result.unwrap();outcome.validate_for(&metadata).unwrap();assert_eq!(outcome.actual.modified_at_unix_ms,metadata.modified_at_unix_ms);
+    #[cfg(unix)] {assert_eq!(outcome.actual.unix_mode,Some(0o640));assert!(outcome.warnings.is_empty());}
+    #[cfg(windows)] {assert_eq!(outcome.actual.unix_mode,None);assert_eq!(outcome.warnings.len(),1);assert_eq!(outcome.warnings[0].code,"unsupported");}
+    assert_eq!(std::fs::read(&path).unwrap(),bytes);
+    for stale in [false,true] {
+        let constraint=FileTransferSourceConstraint {size:FileByteCount(bytes.len()as u64),modified_at_unix_ms:metadata.modified_at_unix_ms.map(|time|time+if stale {1000}else{0})};
+        let mut download=request.clone();download.request_id=RequestId::new();download.metadata=None;download.source_constraint=Some(constraint);download.operation=FileTransferOperation::Download {path:native.display_label(),offset:0,expected_sha256:Some(digest(bytes))};
+        let mut stream=TestStream::default();let result=dispatch(svc,&download,&mut stream).await;
+        assert_eq!(result.is_ok(),!stale);
+        if stale {assert!(stream.output.is_empty());assert!(!stream.responses.iter().any(|reply|matches!(reply,DeviceTaskResponse::FileComplete {..})));assert_eq!(svc.store.get_transfer(actor(),download.request_id).await.unwrap().state,"failed");}
+        else {assert_eq!(stream.output,bytes);assert_eq!(svc.store.get_transfer(actor(),download.request_id).await.unwrap().state,"completed");}
+    }
+    eprintln!("NATIVE_FILE_PHASE public_native_attributes_and_source_constraints_completed");
+    // Simulate a receive operation whose publication/attribute acknowledgments
+    // were lost. Queries must probe using the original native user, and must
+    // not retry attribute writes or bypass an in-flight writer's file lock.
+    let mut lost=request.clone();lost.request_id=RequestId::new();
+    svc.store.accept_transfer(actor(),&lost,context).await.unwrap();svc.store.transfer_progress(lost.request_id,bytes.len()as u64,bytes.len()as u64).await.unwrap();svc.store.begin_transfer_publication(lost.request_id).await.unwrap();
+    let file=std::fs::OpenOptions::new().read(true).write(true).open(&path).unwrap();file.try_lock().unwrap();
+    let pending=Box::pin(svc.lookup_transfer(actor(),lost.request_id)).await.unwrap();assert_eq!(pending.state,"committing");assert!(pending.metadata_result.is_none());drop(file);
+    std::fs::write(&path,vec![0;bytes.len()]).unwrap();assert_eq!(Box::pin(svc.lookup_transfer(actor(),lost.request_id)).await.unwrap(),pending);
+    std::fs::write(&path,bytes).unwrap();let changed=std::time::UNIX_EPOCH+Duration::from_secs(10);
+    std::fs::OpenOptions::new().write(true).open(&path).unwrap().set_times(std::fs::FileTimes::new().set_modified(changed)).unwrap();
+    let recovered=Box::pin(svc.lookup_transfer(actor(),lost.request_id)).await.unwrap();assert_eq!(recovered.state,"completed");assert_eq!(recovered.execution_context.as_ref(),Some(context));assert_eq!(recovered.published,Some(true));
+    let result=recovered.metadata_result.as_ref().unwrap();result.validate_for(&metadata).unwrap();assert!(result.warnings.iter().any(|warning|warning.attribute==FileTransferAttribute::ModifiedTime));
+    assert_eq!(std::fs::read(&path).unwrap(),bytes);assert_eq!(std::fs::metadata(&path).unwrap().modified().unwrap(),changed);assert_eq!(Box::pin(svc.lookup_transfer(actor(),lost.request_id)).await.unwrap(),recovered);
+    eprintln!("NATIVE_FILE_PHASE public_native_attribute_recovery_completed");
+}
+
+async fn native_user_stop_case(svc:&TaskService,user:u32,root:&Path,bytes:&[u8],intent:FileTransferIntent) {
+    let path=root.join(if intent==FileTransferIntent::Pause {"native-pause.bin"}else{"native-cancel.bin"});
+    std::fs::write(&path,b"preserve original native target").unwrap();
+    let mut stopped_stream=TestStream {input:[bytes[..65536].to_vec()].into(),stop_after_progress:Some(intent),..Default::default()};
+    let (id,result)=execute(svc,user,upload(&path,bytes,true),&mut stopped_stream,false).await;
+    assert!(result.is_err(),"a confirmed stop ends file bytes with EOF");
+    let original=svc.store.get_transfer(actor(),id).await.unwrap();
+    assert_eq!(original.state,if intent==FileTransferIntent::Pause {"paused"}else{"cancelled"});
+    assert_eq!(original.offset,65536);assert_eq!(original.published,Some(false));assert!(original.finished_at_unix_ms.is_some());
+    assert_eq!(std::fs::read(&path).unwrap(),b"preserve original native target");
+    if intent==FileTransferIntent::Pause {
+        let mut resumed=input(&bytes[65536..]);resumed.resume_from=Some(id);
+        execute(svc,user,upload(&path,bytes,true),&mut resumed,false).await.1.unwrap();
+        assert!(resumed.responses.iter().any(|reply|matches!(reply,DeviceTaskResponse::FileReady {offset:65536,..})));
+        assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        assert_eq!(svc.store.get_transfer(actor(),id).await.unwrap(),original,"resuming cannot rewrite the original stop fact");
+    }
+    eprintln!("NATIVE_FILE_PHASE confirmed_{intent:?}_checkpoint_and_cleanup");
+}
+
 #[tokio::test]
 async fn invalid_transfer_identity_rejects_before_acceptance() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path()).await;
-    let request = FileTransferRequest {
+    let request = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+        native_path: None,
         request_id: RequestId::new(),
         execution: ExecutionSelection::User {
             context_ref: ExecutionContextRef::new(),
@@ -708,7 +852,8 @@ async fn service_transfer_retains_observed_native_identity_and_reconciles_locall
         svc.execution_context.identity.as_ref().unwrap().mode,
         ExecutionMode::Service
     );
-    let request = FileTransferRequest {
+    let request = FileTransferRequest { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
+        native_path: None,
         request_id: RequestId::new(),
         execution: Default::default(),
         resume_from: None,

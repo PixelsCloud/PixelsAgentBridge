@@ -5,6 +5,9 @@ version = "1.2.48"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+test-support = []
+
 [dependencies]
 bollard = { version = "=0.21.1", default-features = false, features = ["pipe"] }
 argon2 = "0.5"
@@ -20,6 +23,7 @@ pab-agent-core = { path = "../agent-core" }
 pab-command-runtime = { path = "../command-runtime" }
 pab-device-session = { path = "../device-session" }
 pab-file-codec = { path = "../file-codec" }
+pab-file-manager = { path = "../file-manager" }
 pab-service-config = { path = "../service-config" }
 pab-document = { path = "../document" }
 pab-logging = { path = "../logging" }

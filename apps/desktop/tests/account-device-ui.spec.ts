@@ -44,13 +44,13 @@ for (const entry of connectionEntries) {
 
   test(`${entry.en} rechecks a stale connected card before opening`,async({page})=>{
     await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=online&connected&connection-error=the%20device%20is%20offline');
-    await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+    await expect(page.locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
     await page.getByText('Original',{exact:true}).first().click({button:'right'});
     await page.getByRole('menuitem',{name:entry.en,exact:true}).click();
     await expect(page.getByRole('dialog').locator('.saved-connect-error')).toContainText('Device is offline');
     expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='operator_connect_saved').length)).toBe(1);
     expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_viewer_window'||c.command==='desktop_terminal_window'))).toEqual([]);
-    await expect(page.locator('.home-recent-connection')).not.toContainText('Connected');
+    await expect(page.locator('.home-recent-connection')).not.toHaveText(/^(P2P|Relay|Detecting)$/);
   });
 }
 
@@ -60,7 +60,7 @@ test('a window startup failure stays visible and retry preserves the terminal mo
   await page.getByText('Original',{exact:true}).first().click({button:'right'});
   await page.getByRole('menuitem',{name:'Remote terminal (System)',exact:true}).click();
   const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText('Could not create the native window');
-  await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+  await expect(page.locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
   await page.evaluate(()=>{(window as any).fixture.launchError=null;});
   await dialog.getByRole('button',{name:'Retry',exact:true}).click();await expect(dialog).toBeHidden();
   expect(await page.evaluate(()=>(window as any).fixture.calls.filter((c:any)=>c.command==='desktop_terminal_window').map((c:any)=>c.args.mode))).toEqual(['system','system']);
@@ -101,7 +101,7 @@ for(const [error,message,needsPassword] of [
 
 test('manual refresh reloads saved devices and presence without resetting a live connection', async ({page}) => {
   await page.goto('http://127.0.0.1:1429/tests/account-device-ui.html?presence=offline&connected');
-  await expect(page.locator('.home-recent-connection')).toContainText('Connected');
+  await expect(page.locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
   await page.evaluate(() => {
     const fixture = (window as any).fixture;
     fixture.presence = true;
@@ -122,7 +122,7 @@ test('manual refresh reloads saved devices and presence without resetting a live
   await expect(refresh).toBeEnabled();
   await expect(page.locator('.device-list .home-recent-device')).toHaveCount(2);
   await expect(page.locator('.count-badge')).toHaveText('2');
-  await expect(page.locator('.home-recent-device').filter({hasText:'123 456 789'}).locator('.home-recent-connection')).toContainText('Connected');
+  await expect(page.locator('.home-recent-device').filter({hasText:'123 456 789'}).locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((call:any)=>call.command==='operator_saved_device_presence').length)).toBeGreaterThan(1);
   await expect(page.getByText('New device',{exact:true})).toBeVisible();
 });
@@ -187,12 +187,12 @@ for (const presence of ['offline', 'unknown', 'error']) {
     await expect(page.getByRole('dialog')).toContainText('Device connected');
     await page.getByRole('dialog').locator('.ant-modal-footer').getByRole('button',{name:'Close',exact:true}).click();
     await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
-    await expect(card.locator('.home-recent-connection')).toContainText('Connected');
+    await expect(card.locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
     await expect(card.locator('.home-recent-connection')).toContainText('P2P');
     await page.evaluate(()=>(window as any).fixture.setView('remote'));
     await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label','Online');
     await expect(page.locator('.device-basic-grid > div').nth(1).locator('strong')).toHaveText('Online');
-    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Detecting');
     await page.evaluate(()=>(window as any).fixture.setView('home'));
     await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
   });
@@ -221,7 +221,7 @@ test('an in-flight disconnected path snapshot cannot overwrite a successful conn
   await page.evaluate(()=>(window as any).fixture.pendingPaths[0].resolve([{deviceCode:'123456789',path:null}]));
   // The next refresh stays pending so it cannot conceal a stale-state regression.
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.pendingPaths.length)).toBeGreaterThan(1);
-  await expect(card.locator('.home-recent-connection')).toHaveText('Connected');
+  await expect(card.locator('.home-recent-connection')).toHaveText('Detecting');
   await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
 });
 
@@ -257,7 +257,7 @@ for (const error of ['device password has not been entered', 'the device rejecte
     await dialog.getByRole('button', {name:'Retry', exact:true}).click();
     await expect(dialog).toContainText('Device connected');
     await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label', 'Online');
-    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Detecting');
   });
 
   test(`saved connection allows password correction: ${error}`, async ({page}) => {

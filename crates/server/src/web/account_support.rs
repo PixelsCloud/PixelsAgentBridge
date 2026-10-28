@@ -43,19 +43,26 @@ pub(crate) async fn detail(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, WebError> {
     administrator(&state, &headers).await?;
-    let payload: String = sqlx::query_scalar(r#"WITH bounds AS (SELECT (floor(extract(epoch from statement_timestamp())/3600)*3600000+3600000)::bigint until_ms),
+    let sql = format!(
+        r#"WITH bounds AS (SELECT (floor(extract(epoch from statement_timestamp())/3600)*3600000+3600000)::bigint until_ms),
       recent AS (SELECT h.* FROM usage_hourly h CROSS JOIN bounds b WHERE h.subject=($1::uuid)::text AND h.hour_unix_ms>=b.until_ms-604800000 AND h.hour_unix_ms<b.until_ms),
-      sums AS (SELECT key,sum(value::numeric)::text total FROM recent CROSS JOIN LATERAL jsonb_each_text(counters) WHERE key<>'incomplete' GROUP BY key)
+      sums AS (SELECT key,sum(value::numeric)::text total FROM recent CROSS JOIN LATERAL jsonb_each_text(counters) WHERE key IN ({metrics}) GROUP BY key)
       SELECT jsonb_build_object('id',u.id,'username',u.username,'status',u.status,'server_admin',u.server_admin,'revision',u.auth_revision,
         'created_at',(extract(epoch from u.created_at)*1000)::bigint,'relay_limit_mbps',u.relay_limit_mbps,
         'password_enabled',u.password_hash IS NOT NULL,'github_enabled',EXISTS(SELECT 1 FROM external_identities e WHERE e.user_id=u.id AND e.provider='github'),
         'device_count',(SELECT count(*) FROM device_accounts d WHERE d.user_id=u.id),
         'usage',jsonb_build_object('from',b.until_ms-604800000,'until',b.until_ms,'interval','hour',
-          'counters',COALESCE((SELECT jsonb_object_agg(key,total) FROM sums),'{}'::jsonb),
+          'counters',COALESCE((SELECT jsonb_object_agg(key,total) FROM sums),'{{}}'::jsonb),
           'incomplete',COALESCE((SELECT bool_or(COALESCE((counters->>'incomplete')::boolean,false)) FROM recent),false)
             OR EXISTS(SELECT 1 FROM usage_hourly h WHERE h.source_kind='relay' AND h.subject='guest' AND h.hour_unix_ms>=b.until_ms-604800000 AND h.hour_unix_ms<b.until_ms AND COALESCE((h.counters->>'incomplete')::boolean,false)),
           'updated_at',(SELECT (extract(epoch from max(updated_at))*1000)::bigint FROM recent)))::text
-      FROM users u CROSS JOIN bounds b WHERE u.id=$1"#).bind(id).fetch_one(state.control.store().pool()).await?;
+      FROM users u CROSS JOIN bounds b WHERE u.id=$1"#,
+        metrics = super::usage::counter_metric_list()
+    );
+    let payload: String = sqlx::query_scalar(&sql)
+        .bind(id)
+        .fetch_one(state.control.store().pool())
+        .await?;
     Ok(Json(serde_json::from_str(&payload).map_err(|_| {
         WebError::new(StatusCode::INTERNAL_SERVER_ERROR, "server_error")
     })?))

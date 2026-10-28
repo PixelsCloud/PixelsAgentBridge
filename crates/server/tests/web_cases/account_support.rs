@@ -121,6 +121,9 @@ async fn account_detail_devices_and_exact_usage_agree_without_control_grants(poo
         .unwrap();
     let hour = (time::OffsetDateTime::now_utc().unix_timestamp() / 3600) * 3600000;
     let counters = pab_protocol::UsageCounters {
+        p2p_reported: true,
+        p2p_upload_bytes: 1234,
+        p2p_download_bytes: 5678,
         uploaded_bytes: 9007199254740993,
         connections: 7,
         incomplete: true,
@@ -143,6 +146,9 @@ async fn account_detail_devices_and_exact_usage_agree_without_control_grants(poo
     );
     assert_eq!(detail["usage"]["counters"]["connections"], "7");
     assert_eq!(detail["usage"]["incomplete"], true);
+    assert_eq!(detail["usage"]["counters"]["p2p_upload_bytes"], "1234");
+    assert_eq!(detail["usage"]["counters"]["p2p_download_bytes"], "5678");
+    assert!(detail["usage"]["counters"].get("p2p_reported").is_none());
     let (status, _, devices) = call(
         &f.app,
         "GET",
@@ -174,6 +180,104 @@ async fn account_detail_devices_and_exact_usage_agree_without_control_grants(poo
             .await
             .unwrap();
     assert!(tenant.is_none());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn admin_added_devices_include_removed_and_expired_entries_with_account_isolation(
+    pool: PgPool,
+) {
+    let f = fixture(pool.clone()).await;
+    let endpoint = unclaimed_fixture(&pool).await;
+    sqlx::query("INSERT INTO devices(id,tenant_id,code,name) SELECT gen_random_uuid(),$1,720000000+i,'Added '||i FROM generate_series(1,25) i")
+        .bind(endpoint.tenant_id.as_uuid()).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO user_saved_devices(user_id,device_id,revision,saved_name,saved_system,alias,deleted,verified_until) SELECT $1,id,code-720000000,name,'windows','Personal note',code%2=0,to_timestamp(0) FROM devices WHERE code BETWEEN 720000001 AND 720000025")
+        .bind(f.user_id).execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO user_saved_devices(user_id,device_id,revision,saved_name,alias,verified_until) SELECT $1,id,1,'Only admin saved name','only-admin-alias',to_timestamp(0) FROM devices WHERE code=720000001")
+        .bind(f.admin_id).execute(&pool).await.unwrap();
+    let accounts = call(&f.app, "GET", "/api/web/accounts", &f.admin, Value::Null)
+        .await
+        .2;
+    let user = accounts["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"] == f.user_id.to_string())
+        .unwrap();
+    assert_eq!(user["saved_device_count"], 25);
+    assert_eq!(user["device_count"], 0);
+    let path = format!("/api/web/accounts/{}/saved-devices", f.user_id);
+    let mut seen = std::collections::HashSet::new();
+    let mut removed = 0;
+    for (page, size) in [(1, 20), (2, 5)] {
+        let result = call(
+            &f.app,
+            "GET",
+            &format!("{path}?page={page}&page_size=20"),
+            &f.admin,
+            Value::Null,
+        )
+        .await;
+        assert_eq!(result.0, StatusCode::OK, "{}", result.2);
+        assert_eq!(result.2["total"], 25);
+        let items = result.2["items"].as_array().unwrap();
+        assert_eq!(items.len(), size);
+        for item in items {
+            assert!(seen.insert(item["id"].as_str().unwrap().to_owned()));
+            assert_eq!(item["alias"], "Personal note");
+            assert!(item["created_at"].is_number());
+            removed += usize::from(item["deleted"] == true);
+        }
+        assert!(!result.2.to_string().contains("only-admin-alias"));
+        assert!(!result.2.to_string().contains("verified_until"));
+    }
+    assert_eq!(seen.len(), 25);
+    assert_eq!(removed, 12);
+    assert_eq!(
+        call(
+            &f.app,
+            "GET",
+            &format!("{path}?q=only-admin-alias"),
+            &f.admin,
+            Value::Null
+        )
+        .await
+        .2["total"],
+        0
+    );
+    for cookie in [&f.user, ""] {
+        assert_eq!(
+            call(&f.app, "GET", &path, cookie, Value::Null).await.0,
+            if cookie.is_empty() {
+                StatusCode::UNAUTHORIZED
+            } else {
+                StatusCode::FORBIDDEN
+            }
+        );
+    }
+    assert_eq!(
+        call(
+            &f.app,
+            "GET",
+            &format!("/api/web/accounts/{}/saved-devices", Uuid::new_v4()),
+            &f.admin,
+            Value::Null
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(
+            &f.app,
+            "GET",
+            &format!("{path}?page_size=101"),
+            &f.admin,
+            Value::Null
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]

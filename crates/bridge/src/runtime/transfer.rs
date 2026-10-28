@@ -291,6 +291,8 @@ impl BridgeRuntime {
     }
 
     pub async fn cancel_transfer_record(&self, id: RequestId) -> Result<bool, RuntimeError> {
+        let managed:i64=sqlx::query_scalar("SELECT COUNT(*) FROM runtime_managed_file_attempts WHERE id=?").bind(id.to_string()).fetch_one(&self.inner.store.pool).await.map_err(super::RuntimeStoreError::from)?;
+        if managed!=0{return Err(RuntimeError::TaskOperation("Control this transfer from its independent file batch".into()));}
         let recorded = self
             .inner
             .store

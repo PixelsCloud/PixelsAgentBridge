@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             environment_revision: "android:metadata-compatibility-probe".into(),
         },
         agent_version: env!("CARGO_PKG_VERSION").into(),
+        client_version: None,
         observed_at_unix_ms: now_ms(),
     };
     let hello_result = if network.is_ok() {

@@ -16,6 +16,10 @@ pub(crate) use export::export;
 use query::{METRICS, Selection, exact_counters, legacy_counters};
 pub(crate) use ranking::ranking;
 
+pub(super) fn counter_metric_list() -> String {
+    query::metric_list()
+}
+
 pub(crate) async fn report(
     State(state): State<WebState>,
     headers: HeaderMap,

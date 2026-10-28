@@ -60,7 +60,7 @@ impl RuntimeStore {
         owner: &str,
     ) -> Result<bool, RuntimeStoreError> {
         let fingerprint = format!("{:x}", Sha256::digest(serde_json::to_vec(request)?));
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let existing = sqlx::query("SELECT o.device_ref_json, o.initiated_by, f.fingerprint FROM runtime_operations o LEFT JOIN runtime_filesystem_results f ON f.id = o.id WHERE o.id = ?").bind(request.request_id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(row) = existing {
             if serde_json::from_str::<DeviceRef>(row.try_get("device_ref_json")?)? != device
@@ -113,7 +113,7 @@ impl RuntimeStore {
             reply.state.as_str(),
             "completed" | "failed" | "interrupted" | "cancelled"
         );
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let prior = sqlx::query("SELECT o.state, f.reply_json FROM runtime_operations o JOIN runtime_filesystem_results f ON f.id = o.id WHERE o.id = ?")
             .bind(reply.request_id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(row) = prior {
@@ -156,12 +156,40 @@ impl RuntimeStore {
 }
 
 impl BridgeRuntime {
+    /// File windows use an independent transport so forcing Relay never closes
+    /// a desktop or terminal attached to the ordinary device session.
+    pub async fn file_connection(&self, device:DeviceRef, force_relay:bool) -> Result<std::sync::Arc<crate::AuthenticatedDeviceConnection>,RuntimeError> {
+        let session=self.inner.file_device(device,force_relay).await?;
+        if let Some(connection)=session.cached_connection().await && connection.connection().is_closed() {
+            session.recover(&connection,&crate::BridgeError::FileTransfer("file transport closed".into())).await?;
+        }
+        session.connection().await
+    }
+    pub async fn file_manager_profile(&self,device:DeviceRef,request:&pab_protocol::FileManagerRequest,force_relay:bool)->Result<FileSystemResult,RuntimeError> {
+        request.validate().map_err(|error|crate::BridgeError::UnexpectedTaskResponse(error.into()))?;
+        self.filesystem_profile(device,&request.filesystem_request(),&[],Some(force_relay)).await
+    }
+    pub async fn file_manager(
+        &self,
+        device: DeviceRef,
+        request: &pab_protocol::FileManagerRequest,
+    ) -> Result<FileSystemResult, RuntimeError> {
+        request
+            .validate()
+            .map_err(|error| crate::BridgeError::UnexpectedTaskResponse(error.into()))?;
+        self.filesystem(device, &request.filesystem_request(), &[])
+            .await
+    }
+
     pub async fn filesystem(
         &self,
         device: DeviceRef,
         request: &FileSystemRequest,
         payload: &[u8],
     ) -> Result<FileSystemResult, RuntimeError> {
+        self.filesystem_profile(device,request,payload,None).await
+    }
+    async fn filesystem_profile(&self,device:DeviceRef,request:&FileSystemRequest,payload:&[u8],file_profile:Option<bool>)->Result<FileSystemResult,RuntimeError> {
         request
             .validate()
             .map_err(|error| crate::BridgeError::UnexpectedTaskResponse(error.to_owned()))?;
@@ -196,13 +224,15 @@ impl BridgeRuntime {
             ) {
                 return Err(RuntimeStoreError::RequestConflict.into());
             }
-            let reply = self.get_filesystem(device, request.request_id).await?;
+            let reply = self.get_filesystem_profile(device, request.request_id,file_profile).await?;
             return Ok(FileSystemResult {
                 reply,
                 data: Vec::new(),
             });
         }
-        let connection = match self.inner.device(device).await.connection().await {
+        let session = match file_profile {Some(relay)=>self.inner.file_device(device,relay).await?,None=>self.inner.device(device).await};
+        let connect=async {match file_profile {Some(relay)=>self.file_connection(device,relay).await,None=>session.connection().await}};
+        let connection = match connect.await {
             Ok(connection) => connection,
             Err(error) => {
                 let mut reply = FileSystemReply::pending(request);
@@ -252,6 +282,7 @@ impl BridgeRuntime {
                     }
                 );
                 reply.state = if (request.operation.mutates()
+                    || request.operation.asynchronous()
                     || matches!(
                         request.operation,
                         pab_protocol::FileSystemAction::Hash
@@ -340,6 +371,9 @@ impl BridgeRuntime {
         device: DeviceRef,
         id: RequestId,
     ) -> Result<FileSystemReply, RuntimeError> {
+        self.cancel_filesystem_profile(device,id,None).await
+    }
+    pub async fn cancel_filesystem_profile(&self,device:DeviceRef,id:RequestId,file_profile:Option<bool>)->Result<FileSystemReply,RuntimeError> {
         let (stored, cached) = self
             .inner
             .store
@@ -361,7 +395,8 @@ impl BridgeRuntime {
         ) {
             return Ok(cached);
         }
-        let connection = self.inner.device(device).await.connection().await?;
+        let session = match file_profile {Some(relay)=>self.inner.file_device(device,relay).await?,None=>self.inner.device(device).await};
+        let connection=match file_profile {Some(relay)=>self.file_connection(device,relay).await?,None=>session.connection().await?};
         let reply = connection.cancel_filesystem(id).await?;
         if reply.path != cached.path
             || reply.kind != cached.kind
@@ -383,6 +418,9 @@ impl BridgeRuntime {
         device: DeviceRef,
         id: RequestId,
     ) -> Result<FileSystemReply, RuntimeError> {
+        self.get_filesystem_profile(device,id,None).await
+    }
+    pub async fn get_filesystem_profile(&self,device:DeviceRef,id:RequestId,file_profile:Option<bool>)->Result<FileSystemReply,RuntimeError> {
         let (stored_device, cached) = self
             .inner
             .store
@@ -398,11 +436,9 @@ impl BridgeRuntime {
             return Ok(cached);
         }
         let query = async {
-            self.inner
-                .device(device)
-                .await
-                .connection()
-                .await?
+            let session = match file_profile {Some(relay)=>self.inner.file_device(device,relay).await?,None=>self.inner.device(device).await};
+            let connection=match file_profile {Some(relay)=>self.file_connection(device,relay).await?,None=>session.connection().await?};
+            connection
                 .get_filesystem(id)
                 .await
                 .map_err(RuntimeError::from)

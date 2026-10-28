@@ -102,7 +102,7 @@ inline void export_session(unsigned pid, int process, int socket) {
         if (node.rfind("/dev/dri/card", 0) != 0) continue;
         // pidfd_getfd pins the original process even if the numeric PID is
         // reused while procfs is enumerated. A dead original cannot export.
-        Fd candidate(int(syscall(SYS_pidfd_getfd, process, number(name.c_str(), 1048576), 0)));
+        Fd candidate(duplicate_process_fd(process, number(name.c_str(), 1048576)));
         if (candidate.get() < 0) throw std::runtime_error("Cannot duplicate compositor DRM descriptor");
         struct stat actual{}, expected{};
         if (fstat(candidate.get(), &actual) || stat(node.c_str(), &expected) ||
@@ -121,7 +121,7 @@ inline void export_session(unsigned pid, int process, int socket) {
         for (int i = 0; i < resources->count_connectors; ++i) {
             Connector output(drmModeGetConnector(observer.get(), resources->connectors[i]));
             if (!output) continue;
-            const char* type = drmModeGetConnectorTypeName(output->connector_type);
+            const char* type = connector_type_name(output->connector_type);
             if (type && std::string(type) + "-" + std::to_string(output->connector_type_id) == connector &&
                 output->connection == DRM_MODE_CONNECTED && output->encoder_id) found = true;
         }

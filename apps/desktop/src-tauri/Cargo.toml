@@ -23,6 +23,8 @@ pab-agent-core = { path = "../../../crates/agent-core" }
 pab-service-config = { path = "../../../crates/service-config" }
 pab-logging = { path = "../../../crates/logging" }
 pab-protocol = { path = "../../../crates/protocol" }
+pab-file-manager = { path = "../../../crates/file-manager" }
+pab-os-control = { path = "../../../crates/os-control" }
 pab-desktop-control = { path = "../../../crates/desktop-control" }
 pab-desktop-media = { path = "../../../crates/desktop-media" }
 pab-remote-desktop = { path = "../../../crates/remote-desktop" }
@@ -58,7 +60,6 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 libc = "0.2"
 gtk = "0.18"
 enigo = { version = "=0.5.0", default-features = false, features = ["x11rb"] }
-pab-os-control = { path = "../../../crates/os-control" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"

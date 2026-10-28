@@ -6,9 +6,9 @@ for (const [language, theme, label, themeLabel] of [
 ]) test(`global refresh sits before theme control (${language}, ${theme})`, async ({ page }, testInfo) => {
   await page.goto(`http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn&language=${language}&theme=${theme}`);
   const controls = page.locator(".window-controls button");
-  await expect(controls.nth(0)).toHaveAccessibleName(label);
-  await expect(controls.nth(1)).toHaveAccessibleName(themeLabel);
-  await expect(controls.nth(0)).toBeEnabled();
+  await expect(controls.nth(1)).toHaveAccessibleName(label);
+  await expect(controls.nth(2)).toHaveAccessibleName(themeLabel);
+  await expect(controls.nth(1)).toBeEnabled();
   await page.locator(".titlebar").screenshot({ path: testInfo.outputPath(`global-refresh-${language}-${theme}.png`) });
 });
 
@@ -534,4 +534,36 @@ test("sidebar account restores existing identity, handles read and logout errors
   await page.evaluate(() => { (window as any).fixture.logoutError = false; });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(entry).toContainText("Not signed in");
+});
+
+
+test("clear history removes all records and rejects a pre-clear refresh reply", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/agent-integrations-ui.html?app&signedIn");
+  await page.locator(".sidebar-menu").getByRole("menuitem", { name:"Activity",exact:true }).click();
+  const panel=page.locator('.page-activity');
+  const clear=panel.getByRole('button',{name:'Clear history',exact:true});
+  const refresh=panel.getByRole('button',{name:'Refresh',exact:true});
+  await expect(clear).toBeDisabled();
+  await page.evaluate(()=>{
+    const f=(window as any).fixture;
+    f.historyTasks=[{id:'clear-me',deviceCode:'987654321',initiatedBy:'fixture',program:'echo',args:['Clear marker'],cwd:null,startedAtUnixMs:Date.now(),state:'succeeded',complete:true,stdout:'Clear marker',stderr:'',stdoutOffset:12,stderrOffset:0}];
+  });
+  await refresh.click();
+  await expect(panel.locator('.task-row')).toHaveCount(1);
+  await page.evaluate(()=>(window as any).fixture.failClearHistory=true);
+  await clear.click();
+  await expect(panel.getByRole('alert').filter({hasText:'Could not clear history'})).toBeVisible();
+  await expect(panel.locator('.task-row')).toHaveCount(1);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.failClearHistory=false;f.holdHistory=true;});
+  await refresh.click();
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).fixture.releaseHistory)).toBe('function');
+  await clear.click();
+  await expect(panel.locator('.task-row')).toHaveCount(0);
+  await page.evaluate(()=>{const f=(window as any).fixture;f.holdHistory=false;f.releaseHistory();});
+  await expect(refresh).toBeEnabled();
+  await refresh.click();
+  await expect(refresh).toBeEnabled();
+  await expect(panel.locator('.task-row')).toHaveCount(0);
+  await expect(panel.locator('.count-badge')).toHaveText('0');
+  await expect(clear).toBeDisabled();
 });

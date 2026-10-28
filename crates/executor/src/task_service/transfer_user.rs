@@ -4,6 +4,7 @@ use crate::user_worker::transfer::Operation;
 use pab_os_control::execution::PreparedUser;
 use pab_protocol::{FileTransferOperation, FileTransferRequest, TransferSnapshot};
 use std::io;
+use std::path::PathBuf;
 
 impl TaskService {
     pub(super) async fn transfer_stream(
@@ -16,7 +17,13 @@ impl TaskService {
         request
             .validate()
             .map_err(TaskServiceError::InvalidRequest)?;
-        if !Path::new(request.operation.path()).is_absolute() {
+        let operational_path = match &request.native_path {
+            Some(path) => pab_file_manager::decode_path(path).map_err(|_| {
+                TaskServiceError::InvalidRequest("native transfer path is invalid on this platform")
+            })?,
+            None => PathBuf::from(request.operation.path()),
+        };
+        if !operational_path.is_absolute() {
             return Err(TaskServiceError::InvalidRequest(
                 "transfer path must be absolute",
             ));
@@ -47,6 +54,9 @@ impl TaskService {
                 Sha256::digest(serde_json::to_vec(identity).map_err(TaskStoreError::from)?)
             );
             context.identity = Some(identity.clone());
+        }
+        if request.expected_execution.as_ref().is_some_and(|expected|!expected.matches_context(&context)) {
+            return Err(TaskServiceError::ExecutionContext("file transfer execution identity changed before acceptance".into()));
         }
         // Resolve the worker before accepting work; a missing executable must
         // not leave a durable running operation with nothing to settle it.
@@ -79,7 +89,7 @@ impl TaskService {
                         && d == z
                         && matches!(
                             original.state.as_str(),
-                            "failed" | "interrupted" | "cancelled"
+                            "failed" | "interrupted" | "cancelled" | "paused"
                         )
                 }
                 (
@@ -96,7 +106,7 @@ impl TaskService {
                         && expected_sha256 == &original.sha256
                         && matches!(
                             original.state.as_str(),
-                            "failed" | "interrupted" | "cancelled" | "completed"
+                            "failed" | "interrupted" | "cancelled" | "paused" | "completed"
                         )
                 }
                 _ => false,
@@ -106,7 +116,13 @@ impl TaskService {
                     "original transfer has no recorded execution identity".into(),
                 ));
             };
-            if !same || previous.identity != context.identity {
+            if !same
+                || original_request.native_path != request.native_path
+                || original_request.metadata != request.metadata
+                || original_request.destination_parent != request.destination_parent
+                || original_request.source_constraint != request.source_constraint
+                || previous.identity != context.identity
+            {
                 return Err(TaskStoreError::RequestConflict.into());
             }
             context = previous;
@@ -120,6 +136,7 @@ impl TaskService {
         }
         // Publish the frozen identity before the first binary frame. Failure to
         // deliver this receipt is settled by the same durable transfer record.
+        let worker_required=user.is_some();
         let result = async {
             stream
                 .send_frame_json(
@@ -153,12 +170,14 @@ impl TaskService {
                     },
                 };
                 let (_send, cancel) = watch::channel(false);
-                crate::user_worker::transfer::execute(
+                Box::pin(crate::user_worker::transfer::execute_native(
                     worker
                         .as_ref()
                         .expect("user worker resolved before acceptance"),
                     prepared,
                     operation,
+                    request.native_path.clone(),
+                    crate::user_worker::transfer::Attributes {destination_parent:request.destination_parent.clone(),metadata:request.metadata.clone(),source_constraint:request.source_constraint.clone()},
                     LocalRecorder {
                         store: self.store.clone(),
                         request_id: request.request_id,
@@ -166,36 +185,54 @@ impl TaskService {
                     self.file_coordinator(),
                     stream,
                     cancel,
-                )
+                ))
                 .await
                 .map_err(TaskServiceError::from)
             } else {
                 let engine =
-                    TransferEngine::local(&self.store, request.request_id, &self.upload_locks);
+                    TransferEngine::local(&self.store, request.request_id, &self.upload_locks).with_parent(request.destination_parent.clone()).with_metadata(request.metadata.clone()).with_source_constraint(request.source_constraint.clone());
+                #[cfg(feature="test-support")]
+                let engine=engine.with_barrier(self.transfer_barrier.clone());
                 match &request.operation {
                     FileTransferOperation::Upload {
-                        path,
+                        path: _,
                         size,
                         sha256,
                         overwrite,
                     } => {
                         engine
-                            .upload(stream, timeout, path, *size, sha256, *overwrite)
+                            .upload(
+                                stream,
+                                timeout,
+                                &operational_path,
+                                *size,
+                                sha256,
+                                *overwrite,
+                            )
                             .await
                     }
                     FileTransferOperation::Download {
-                        path,
+                        path: _,
                         offset,
                         expected_sha256,
                     } => {
                         engine
-                            .download(stream, timeout, path, *offset, expected_sha256.as_deref())
+                            .download(
+                                stream,
+                                timeout,
+                                &operational_path,
+                                *offset,
+                                expected_sha256.as_deref(),
+                            )
                             .await
                     }
                 }
             }
         }
         .await;
+        if !worker_required && result.is_ok() && self.store.get_transfer(actor,request.request_id).await?.state=="stopping" {
+            self.store.finalize_transfer_stopped(request.request_id).await?;
+        }
         self.finish_transfer(request.request_id, &result).await?;
         result
     }
@@ -209,6 +246,10 @@ impl TaskService {
         if snapshot.state != "committing" || snapshot.direction != "receive" {
             return Ok(snapshot);
         }
+        // Status polling must share the normal file IO/worker budget rather
+        // than start an unbounded set of checksum probes or native processes.
+        let Ok(_slot)=self.filesystem_slots.try_acquire() else {return Ok(snapshot);};
+        let request=self.store.transfer_request(actor,id).await?;
         let Some(identity) = snapshot
             .execution_context
             .as_ref()
@@ -217,12 +258,24 @@ impl TaskService {
         else {
             return Ok(snapshot);
         };
-        if identity.mode == pab_protocol::ExecutionMode::Service {
-            return Ok(snapshot);
-        }
         let Some(hash) = snapshot.sha256.clone() else {
             return Ok(snapshot);
         };
+        if identity.mode == pab_protocol::ExecutionMode::Service {
+            // Never probe files under a different service identity after an
+            // upgrade/reconfiguration, even if that identity is privileged.
+            let same=snapshot.execution_context.as_ref().and_then(|context|pab_protocol::FileExecutionIdentity::from_context(context).ok())
+                .is_some_and(|expected|expected.matches_context(&self.execution_context));
+            if request.metadata.is_some() && same {
+                let path=match &request.native_path {Some(path)=>pab_file_manager::decode_path(path).map_err(|_|TaskServiceError::InvalidRequest("invalid stored native transfer path"))?,None=>PathBuf::from(&snapshot.path)};
+                let engine=TransferEngine::local(&self.store,id,&self.upload_locks).with_parent(request.destination_parent).with_metadata(request.metadata);
+                if matches!(Box::pin(engine.verify_publication(path,snapshot.size,&hash)).await,Ok(true)) {
+                    self.store.finish_transfer(id,"completed",None).await?;
+                    snapshot=self.store.get_transfer(actor,id).await?;
+                }
+            }
+            return Ok(snapshot);
+        }
         let prepared =
             tokio::task::spawn_blocking(move || PreparedUser::from_observation(&identity)).await?;
         let Ok(prepared) = prepared else {
@@ -230,7 +283,8 @@ impl TaskService {
         };
         let mut evidence = EvidenceStream(false);
         let (_send, cancel) = watch::channel(false);
-        let result = crate::user_worker::transfer::execute(
+        let native_path = request.native_path;
+        let result = Box::pin(crate::user_worker::transfer::execute_native(
             &self.user_worker_executable()?,
             prepared,
             Operation::Reconcile {
@@ -238,6 +292,8 @@ impl TaskService {
                 size: snapshot.size,
                 sha256: hash,
             },
+            native_path,
+            crate::user_worker::transfer::Attributes {destination_parent:request.destination_parent,metadata:request.metadata,source_constraint:None},
             LocalRecorder {
                 store: self.store.clone(),
                 request_id: id,
@@ -245,7 +301,7 @@ impl TaskService {
             self.file_coordinator(),
             &mut evidence,
             cancel,
-        )
+        ))
         .await;
         if result.is_ok() && evidence.0 {
             self.store.finish_transfer(id, "completed", None).await?;

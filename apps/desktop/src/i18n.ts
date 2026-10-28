@@ -2,6 +2,8 @@ export type Language = "zh-CN" | "en";
 
 export const messages = {
   "zh-CN": {
+    openProjectRepository: "打开 GitHub 仓库",
+    openProjectRepositoryFailed: "无法打开 GitHub 仓库，请检查默认浏览器设置后重试。",
     refreshAll: "刷新全部信息",
     refreshAllBusy: "正在刷新…",
     refreshAllFailed: "部分信息刷新失败，请检查服务连接后重试。",
@@ -158,6 +160,9 @@ export const messages = {
     historyPreviousPage: "上一页",
     historyNextPage: "下一页",
     refreshActivity: "刷新记录",
+    clearHistory: "清理记录",
+    clearingHistory: "正在清理…",
+    clearHistoryFailed: "清理记录失败",
     refreshingActivity: "刷新中…",
     screenshot: "截图",
     commandDirection: "本机 → 远端（命令）",
@@ -421,6 +426,8 @@ export const messages = {
     phaseDisconnected: "已断开",
   },
   en: {
+    openProjectRepository: "Open GitHub repository",
+    openProjectRepositoryFailed: "Could not open the GitHub repository. Check the default browser settings and try again.",
     refreshAll: "Refresh all information",
     refreshAllBusy: "Refreshing…",
     refreshAllFailed: "Some information could not be refreshed. Check the service connection and try again.",
@@ -577,6 +584,9 @@ export const messages = {
     historyPreviousPage: "Previous",
     historyNextPage: "Next",
     refreshActivity: "Refresh",
+    clearHistory: "Clear history",
+    clearingHistory: "Clearing…",
+    clearHistoryFailed: "Could not clear history",
     refreshingActivity: "Refreshing…",
     screenshot: "Screenshot",
     commandDirection: "Local → Remote (command)",

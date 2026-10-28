@@ -1,8 +1,9 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
 use pab_protocol::{RequestId, TransferSnapshot};
+#[cfg(test)]
 use sha2::{Digest, Sha256};
-use tokio::{fs::File, io::AsyncReadExt, sync::watch};
+use tokio::sync::watch;
 
 use super::{RuntimeError, RuntimeInner, operation::OperationRecord};
 
@@ -251,27 +252,7 @@ fn remote_target_matches(record: &OperationRecord, snapshot: &TransferSnapshot) 
 }
 
 pub(super) async fn published_file_matches(path: &Path, size: u64, digest: &str) -> bool {
-    let Ok(metadata) = tokio::fs::symlink_metadata(path).await else {
-        return false;
-    };
-    if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() != size {
-        return false;
-    }
-    let Ok(mut file) = File::open(path).await else {
-        return false;
-    };
-    let mut hash = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let Ok(read) = file.read(&mut buffer).await else {
-            return false;
-        };
-        if read == 0 {
-            break;
-        }
-        hash.update(&buffer[..read]);
-    }
-    format!("{:x}", hash.finalize()) == digest
+    crate::connection::verify_download_publication(path,size,digest,None).await.unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -325,6 +306,7 @@ mod tests {
             filesystem_mutation: None,
         };
         let mut snapshot = TransferSnapshot {
+            metadata_result:None,
             initiating_user: None,
             execution_context: None,
             request_id,

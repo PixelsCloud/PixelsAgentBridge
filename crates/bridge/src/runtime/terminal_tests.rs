@@ -9,7 +9,7 @@ async fn close_archives_large_tail_serializes_polling_and_records_missing_output
     const TIMEOUT: Duration = Duration::from_secs(5);
     for missing in [false, true] {
         let dir = tempfile::tempdir().unwrap();
-        let runtime = runtime(dir.path()).await;
+        let (runtime,_credentials) = runtime(dir.path()).await;
         let (_a, _b, client, server) = crate::connection::test_connection_pair().await;
         let device = client.device_ref();
         runtime
@@ -149,7 +149,7 @@ fn clear_account(runtime: &BridgeRuntime) {
 #[tokio::test]
 async fn account_readiness_requires_current_confirmed_login() {
     let dir = tempfile::tempdir().unwrap();
-    let runtime = runtime(dir.path()).await;
+    let (runtime,_credentials) = runtime(dir.path()).await;
     assert!(runtime.inner.wait_account_ready().await.is_ok());
     let status = runtime.inner.presence.lock().unwrap().account.take();
     assert!(

@@ -27,9 +27,15 @@ pub(crate) enum FileCoordination {
         reply: FileSystemReply,
         answer: oneshot::Sender<io::Result<()>>,
     },
+    DirectoryMetadata {
+        reply: FileSystemReply,
+        answer: oneshot::Sender<io::Result<()>>,
+    },
+    DirectoryReceipt {reply:FileSystemReply,released:bool,answer:oneshot::Sender<io::Result<()>>},
 }
 #[derive(Clone)]
 pub(crate) struct FileEngine {
+    pub(crate) file_manager: Option<super::file_manager::ManagedContext>,
     pub(super) store: FileRecords,
     pub(super) upload_locks: FileLocks,
     #[cfg(test)]
@@ -68,6 +74,13 @@ impl FileEngine {
         use super::filesystem::FileError;
         let mut reply = FileSystemReply::pending(&request);
         reply.execution_context = context;
+        if let FileSystemAction::Managed { expected_execution: Some(expected), .. } = &request.operation {
+            if reply.execution_context.as_ref().is_none_or(|actual|!expected.matches_context(actual)) {
+                reply.state="failed".into();
+                reply.error=Some(FileError::new("execution_identity_changed","accept","file-manager account/session differs from the pinned identity").0);
+                return (reply,Vec::new());
+            }
+        }
         if request.operation.is_bulk() {
             use std::sync::{
                 Arc,
@@ -129,6 +142,9 @@ impl FileEngine {
                 ))
             })
             .map(|_| Vec::new())
+        } else if let FileSystemAction::Managed { operation, .. } = &request.operation {
+            self.manage_files_controlled(&request, operation, &mut reply, cancel.clone())
+                .await
         } else {
             self.prepare_filesystem(&request, &payload, &mut reply)
                 .await
@@ -139,7 +155,9 @@ impl FileEngine {
                 (reply, bytes)
             }
             Err(error) => {
-                reply.state = if error.0.code == "cancelled" {
+                reply.state = if error.0.code == "outcome_unconfirmed" {
+                    "unconfirmed"
+                } else if error.0.code == "cancelled" {
                     "cancelled"
                 } else {
                     "failed"
@@ -153,6 +171,7 @@ impl FileEngine {
 
     pub(crate) fn worker(send: mpsc::Sender<FileCoordination>) -> Self {
         Self {
+            file_manager: None,
             store: FileRecords::Worker(send.clone()),
             upload_locks: FileLocks::Worker(send),
             #[cfg(test)]
@@ -179,6 +198,16 @@ pub(crate) struct FileCoordinator {
     held: std::collections::HashMap<RequestId, UploadPathGuard>,
 }
 impl FileCoordinator {
+    pub(crate) async fn directory_receipt(&self,reply:&FileSystemReply,released:bool)->io::Result<()> {
+        self.store.directory_creation_receipt(reply,released).await.map_err(io::Error::other)
+    }
+    pub(crate) async fn directory_metadata(&self, reply:&FileSystemReply) -> io::Result<()> {
+        if self.held.is_empty() || reply.state != "completed" || reply.kind != "file_manager"
+            || !matches!(reply.file_manager.as_ref().map(|value|&value.result),Some(pab_protocol::FileManagerResult::DirectoryMetadata {..}|pab_protocol::FileManagerResult::DirectoryPrepared {..})) {
+            return Err(io::Error::other("invalid directory metadata outcome"));
+        }
+        self.store.finish_directory_metadata(reply).await.map_err(io::Error::other)
+    }
     pub(crate) fn lock(&mut self, id: RequestId, key: PathBuf) -> io::Result<bool> {
         if self.held.contains_key(&id) || self.held.len() >= 128 || key.as_os_str().len() > 32768 {
             return Err(io::Error::other("invalid file lock request"));
@@ -203,7 +232,12 @@ impl FileCoordinator {
         reply: &FileSystemReply,
     ) -> io::Result<()> {
         if publication {
-            if self.held.is_empty() || !matches!(reply.kind.as_str(), "file_write" | "file_patch") {
+            if self.held.is_empty()
+                || !matches!(
+                    reply.kind.as_str(),
+                    "file_write" | "file_patch" | "file_manager"
+                )
+            {
                 return Err(io::Error::other("invalid file publication phase"));
             }
             self.store.begin_file_publication(reply).await
@@ -223,6 +257,7 @@ impl TaskService {
     }
     pub(super) fn file_engine(&self) -> FileEngine {
         FileEngine {
+            file_manager: None,
             store: FileRecords::Store(self.store.clone()),
             upload_locks: FileLocks::Store(self.upload_locks.clone()),
             #[cfg(test)]
@@ -239,6 +274,26 @@ pub(super) enum FileRecords {
     Worker(mpsc::Sender<FileCoordination>),
 }
 impl FileRecords {
+    pub(super) async fn directory_receipt(&self,reply:&FileSystemReply,released:bool)->Result<(),TaskStoreError> {
+        match self {
+            Self::Store(store)=>store.directory_creation_receipt(reply,released).await,
+            Self::Worker(send)=>{
+                let (answer,result)=oneshot::channel();
+                send.send(FileCoordination::DirectoryReceipt {reply:reply.clone(),released,answer}).await.map_err(|_|unavailable())?;
+                result.await.map_err(|_|unavailable())?.map_err(TaskStoreError::Io)
+            }
+        }
+    }
+    pub(super) async fn finish_directory_metadata(&self, reply:&FileSystemReply) -> Result<(),TaskStoreError> {
+        match self {
+            Self::Store(store) => store.finish_directory_metadata(reply).await,
+            Self::Worker(send) => {
+                let (answer,result) = oneshot::channel();
+                send.send(FileCoordination::DirectoryMetadata {reply:reply.clone(),answer}).await.map_err(|_|unavailable())?;
+                result.await.map_err(|_|unavailable())?.map_err(TaskStoreError::Io)
+            }
+        }
+    }
     pub(super) async fn update_filesystem_progress(
         &self,
         reply: &FileSystemReply,
@@ -340,6 +395,58 @@ mod tests {
     use pab_protocol::{FileSystemAction, FileSystemRequest, TextEncoding};
 
     #[tokio::test]
+    async fn directory_outcome_is_persisted_with_the_object_retained_even_if_acknowledgement_is_lost() {
+        for kind in 0..3 {
+        for lose_ack in [false,true] {
+            let temp=tempfile::tempdir().unwrap();let root=temp.path().canonicalize().unwrap();
+            let directory=root.join("target");std::fs::create_dir(&directory).unwrap();
+            let path=pab_file_manager::encode_path(&directory);
+            let identity=pab_file_manager::DirectoryObject::open(&path,false).unwrap().identity().to_owned();
+            let operation=if kind==0 {pab_protocol::FileManagerOperation::SetDirectoryMetadata {path,expected_object:identity,metadata:pab_protocol::FileTransferMetadata {modified_at_unix_ms:Some(1_700_000_000_123),unix_mode:None}}}else {
+                let expected_parent=pab_file_manager::DirectoryObject::open(&pab_file_manager::encode_path(&root),false).unwrap().identity().to_owned();
+                if kind==1 {std::fs::remove_dir(&directory).unwrap();}
+                pab_protocol::FileManagerOperation::PrepareDirectory {path,expected_parent,existing_object:(kind==2).then_some(identity)}
+            };
+            let request=FileSystemRequest {request_id:RequestId::new(),execution:Default::default(),path:"file-manager".into(),operation:FileSystemAction::Managed {expected_execution:None,operation},payload_size:0,payload_sha256:None};
+            let store=TaskStore::open(&root.join("tasks.sqlite3")).await.unwrap();
+            let context=pab_platform::detect_native_execution_context().unwrap();
+            store.accept_filesystem_with_context(actor(),&request,&digest(&serde_json::to_vec(&request).unwrap()),Some(&context)).await.unwrap();
+            let (send,mut events)=mpsc::channel(8);let mut engine=FileEngine::worker(send);
+            engine.file_manager=Some(super::super::file_manager::ManagedContext {owner:"fixture".into(),cache:root.join("index.sqlite3"),index:Default::default()});
+            let (_cancel,receive)=watch::channel(false);let original=request.clone();
+            let work=tokio::spawn(engine.execute(original,Vec::new(),Some(context),receive));
+            let mut coordinator=FileCoordinator {store:store.clone(),locks:Default::default(),held:Default::default()};
+            let mut recorded=None;
+            while let Some(event)=events.recv().await {
+                match event {
+                    FileCoordination::Lock {id,key,answer}=>{answer.send(coordinator.lock(id,key)).unwrap();},
+                    FileCoordination::Unlock {id}=>coordinator.unlock(id).unwrap(),
+                    FileCoordination::Record {publication,reply,answer}=>{assert!(publication);coordinator.record(publication,&reply).await.unwrap();answer.send(Ok(())).unwrap();},
+                    FileCoordination::DirectoryMetadata {reply,answer}=>{
+                        assert!(coordinator.locks.try_acquire(&directory).await.unwrap().is_none());
+                        #[cfg(windows)] assert!(std::fs::rename(&directory,root.join("must-not-move")).is_err(),"directory must stay retained through recording");
+                        coordinator.directory_metadata(&reply).await.unwrap();
+                        assert_eq!(store.get_filesystem(actor(),request.request_id).await.unwrap(),reply);
+                        recorded=Some(reply);
+                        if lose_ack {drop(answer);} else {answer.send(Ok(())).unwrap();}
+                    },
+                    FileCoordination::DirectoryReceipt {reply,released,answer}=>{assert!(released);coordinator.directory_receipt(&reply,released).await.unwrap();answer.send(Ok(())).unwrap();},
+                }
+            }
+            let (outcome,_)=work.await.unwrap();
+            assert_eq!(outcome.state,if lose_ack {"unconfirmed"}else{"completed"});
+            assert!(coordinator.held.is_empty());
+            let recorded=recorded.unwrap();assert_eq!(store.get_filesystem(actor(),request.request_id).await.unwrap(),recorded);
+            // A late worker error must not overwrite the committed receipt.
+            store.finish_filesystem(&outcome).await.unwrap();
+            let reopened=TaskStore::open(&root.join("tasks.sqlite3")).await.unwrap();
+            assert_eq!(reopened.get_filesystem(actor(),request.request_id).await.unwrap(),recorded);
+            std::fs::rename(&directory,root.join("released")).unwrap();
+        }
+        }
+    }
+
+    #[tokio::test]
     async fn publication_waits_for_parent_persistence_and_peer_loss_keeps_original_file() {
         for disconnect in [false, true] {
             let root = tempfile::tempdir().unwrap();
@@ -413,6 +520,7 @@ mod tests {
                     FileCoordination::Unlock { id } => {
                         assert!(held.remove(&id).is_some());
                     }
+                    FileCoordination::DirectoryMetadata { .. }|FileCoordination::DirectoryReceipt {..} => panic!("unexpected directory receipt for file publication"),
                 }
             }
             let (result, reply) = worker.await.unwrap();

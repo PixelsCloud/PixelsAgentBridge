@@ -21,7 +21,7 @@ impl RuntimeStore {
         let Some(identity) = identity else { return Ok(()); };
         identity.validate().map_err(|_| RuntimeStoreError::SnapshotIdentityMismatch)?;
         let encoded = serde_json::to_string(identity)?;
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let existing: Option<String> = sqlx::query_scalar("SELECT identity_json FROM runtime_terminal_identity WHERE id=?")
             .bind(id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(existing) = existing {

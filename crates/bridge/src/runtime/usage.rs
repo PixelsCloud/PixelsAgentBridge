@@ -15,13 +15,7 @@ pub(super) async fn run_sampler(
             _ = shutdown.changed() => break,
             _ = tick.tick() => {}
         }
-        let devices = inner
-            .devices
-            .lock()
-            .await
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+        let devices = inner.all_devices().await;
         for device in devices {
             // Preserve the last server-confirmed owner in the SQLite
             // transaction. A pending local login must not reattribute traffic
@@ -29,13 +23,7 @@ pub(super) async fn run_sampler(
             device.sample_usage(None).await;
         }
     }
-    let devices = inner
-        .devices
-        .lock()
-        .await
-        .values()
-        .cloned()
-        .collect::<Vec<_>>();
+    let devices = inner.all_devices().await;
     for device in devices {
         device.close_for_account_change().await;
     }
@@ -102,8 +90,8 @@ pub(super) async fn finished_transfer(
 
 impl RuntimeStore {
     async fn recover_usage_windows(&self) -> Result<(), RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        let stale=sqlx::query("SELECT c.session_id,c.device_id,c.scope FROM connection_usage c LEFT JOIN runtime_sessions s ON s.id=c.session_id WHERE s.id IS NULL OR s.stopped_at_unix_ms IS NOT NULL OR s.heartbeat_at_unix_ms<?")
+        let mut tx = self.write_transaction().await?;
+        let stale=sqlx::query("SELECT c.session_id,c.device_id,c.scope FROM connection_usage c LEFT JOIN runtime_connection_profiles p ON p.profile=c.session_id LEFT JOIN runtime_sessions s ON s.id=COALESCE(p.session_id,c.session_id) WHERE s.id IS NULL OR s.stopped_at_unix_ms IS NOT NULL OR s.heartbeat_at_unix_ms<?")
             .bind(super::unix_millis()-30_000).fetch_all(&mut *tx).await?;
         for row in stale {
             if let Some(scope) = row.try_get::<Option<String>, _>("scope")? {
@@ -147,7 +135,7 @@ impl RuntimeStore {
         traffic: Option<pab_transport::DirectTraffic>,
     ) -> Result<(), RuntimeStoreError> {
         let now = super::unix_millis();
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let previous =
             sqlx::query("SELECT * FROM connection_usage WHERE session_id=? AND device_id=?")
                 .bind(session)
@@ -295,9 +283,7 @@ impl RuntimeStore {
             .token(state.active_slot.as_deref().ok_or(AccountError::Storage)?)?
             .ok_or(AccountError::Storage)?;
         let scope = format!("{}\n{}", client.origin(), user.id);
-        let mut tx = self
-            .pool
-            .begin_with("BEGIN IMMEDIATE")
+        let mut tx = self.write_transaction()
             .await
             .map_err(|_| AccountError::Storage)?;
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM client_usage_outbox")
@@ -353,9 +339,7 @@ impl RuntimeStore {
             if batch.valid_at(super::unix_millis()) {
                 client.report_usage(&token, &batch).await?;
             } else {
-                let mut tx = self
-                    .pool
-                    .begin_with("BEGIN IMMEDIATE")
+                let mut tx = self.write_transaction()
                     .await
                     .map_err(|_| AccountError::Storage)?;
                 add(
@@ -385,6 +369,22 @@ impl RuntimeStore {
 mod tests {
     use super::*;
     use pab_protocol::{DeviceId, DeviceRef, TenantId, UserAttribution, UserId};
+    #[tokio::test]
+    async fn file_profile_usage_follows_its_parent_session_liveness() {
+        let dir=tempfile::tempdir().unwrap();let store=RuntimeStore::open(&dir.path().join("profiles.db")).await.unwrap();store.start_session("parent").await.unwrap();
+        for profile in ["parent:files:0","parent:files:1"] {
+            sqlx::query("INSERT INTO runtime_connection_profiles(profile,session_id) VALUES(?,'parent')").bind(profile).execute(&store.pool).await.unwrap();
+            store.sample_connection(profile,DeviceId::new(),Some(1),Some(profile)).await.unwrap();
+        }
+        store.recover_usage_windows().await.unwrap();
+        assert_eq!(sqlx::query_scalar::<_,i64>("SELECT COUNT(*) FROM connection_usage").fetch_one(&store.pool).await.unwrap(),2);
+        assert!(!total(&store,"parent:files:0").await.incomplete);assert!(!total(&store,"parent:files:1").await.incomplete);
+        sqlx::query("UPDATE runtime_sessions SET heartbeat_at_unix_ms=0 WHERE id='parent'").execute(&store.pool).await.unwrap();store.recover_usage_windows().await.unwrap();
+        assert_eq!(sqlx::query_scalar::<_,i64>("SELECT COUNT(*) FROM connection_usage").fetch_one(&store.pool).await.unwrap(),0);
+        for profile in ["parent:files:0","parent:files:1"] {let usage=total(&store,profile).await;assert!(usage.incomplete);assert_eq!(usage.connections,1);}
+        store.close().await;
+    }
+
     #[tokio::test]
     async fn direct_bytes_are_durable_incremental_and_keep_the_interval_owner() {
         let dir = tempfile::tempdir().unwrap();

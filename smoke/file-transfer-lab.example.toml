@@ -1,0 +1,27 @@
+# Synthetic pinned-peer network fixture, not a production Relay bypass.
+# Use a shared LAN (auto), or a dedicated TLS test Relay that admits the lab
+# endpoints (relay). Normal product authentication/Relay acceptance is a
+# separate candidate-client test. Never relax a production Relay's policy.
+[file_transfer]
+isolated_network = true
+mode = "auto"
+relay_urls = ["https://relay.example.test"]
+
+# cargo test --locked -j 1 -p pab-bridge --lib --no-run
+# Copy the reported native libtest binary for each OS to the publishing host
+# using Pixels; record/verify SHA-256. Do not copy the source tree or keys.
+[[file_transfer.device]]
+role = "client"
+code = "111111111"
+os = "windows"
+parent = 'D:\PixelsSmoke'
+binary = 'smoke/local/file-transfer/client-lab.exe'
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[[file_transfer.device]]
+role = "server"
+code = "222222222"
+os = "linux"
+parent = "/var/tmp/pixels-smoke"
+binary = "smoke/local/file-transfer/server-lab"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"

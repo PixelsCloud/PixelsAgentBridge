@@ -68,6 +68,7 @@ async fn queued_transfer_keeps_submitting_user_without_an_initialized_runtime() 
 
 fn remote(spec: &TransferRequest, state: &str, published: Option<bool>) -> TransferSnapshot {
     TransferSnapshot {
+        metadata_result:None,
         initiating_user: None,
         execution_context: None,
         request_id: spec.request_id,

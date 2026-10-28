@@ -166,7 +166,7 @@ impl RuntimeStore {
         expected: Option<u64>,
     ) -> Result<usize, RuntimeStoreError> {
         let scope = scope_at(self, expected)?.ok_or(RuntimeStoreError::AccountStorage)?;
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let rows = sqlx::query("SELECT * FROM remembered_devices")
             .fetch_all(&mut *tx)
             .await?;
@@ -211,7 +211,7 @@ impl RuntimeStore {
         expected: Option<u64>,
     ) -> Result<(), RuntimeStoreError> {
         let scope = scope_at(self, expected)?.ok_or(RuntimeStoreError::AccountStorage)?;
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let conflict: String = sqlx::query_scalar(
             "SELECT desired_json FROM catalog_conflicts WHERE scope=? AND device_id=?",
         )
@@ -300,7 +300,7 @@ impl RuntimeStore {
         scope: &str,
         device: &RememberedDevice,
     ) -> Result<(), RuntimeStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let old: Option<String> = sqlx::query_scalar(
             "SELECT item_json FROM account_catalog WHERE scope=? AND device_id=?",
         )
@@ -368,7 +368,7 @@ impl RuntimeStore {
         if alias.is_some_and(|v| v.chars().count() > 128 || v.chars().any(char::is_control)) {
             return Err(RuntimeStoreError::InvalidStoredIdentifier);
         }
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = sqlx::query("SELECT item_json FROM account_catalog WHERE scope=? AND code=?")
             .bind(scope)
             .bind(code.to_string())
@@ -516,9 +516,7 @@ impl RuntimeStore {
                 return Ok(());
             }
             let changes = client.saved_devices(token, cursor).await?;
-            let mut tx = self
-                .pool
-                .begin_with("BEGIN IMMEDIATE")
+            let mut tx = self.write_transaction()
                 .await
                 .map_err(|_| AccountError::Storage)?;
             for remote in &changes.items {
@@ -564,9 +562,7 @@ impl RuntimeStore {
                 break;
             }
         }
-        let mut tx = self
-            .pool
-            .begin_with("BEGIN IMMEDIATE")
+        let mut tx = self.write_transaction()
             .await
             .map_err(|_| AccountError::Storage)?;
         let rows:Vec<String>=sqlx::query_scalar("SELECT item_json FROM account_catalog WHERE scope=? AND dirty=1 AND revision>0 AND NOT EXISTS(SELECT 1 FROM catalog_outbox o WHERE o.scope=account_catalog.scope AND o.device_id=account_catalog.device_id) LIMIT 20")
@@ -608,9 +604,7 @@ impl RuntimeStore {
                 Err(AccountError::Http(409)) => None,
                 Err(error) => return Err(error),
             };
-            let mut tx = self
-                .pool
-                .begin_with("BEGIN IMMEDIATE")
+            let mut tx = self.write_transaction()
                 .await
                 .map_err(|_| AccountError::Storage)?;
             if let Some(revision) = revision {

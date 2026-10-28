@@ -160,6 +160,7 @@ async fn read_frame(reader: &mut (impl AsyncRead + Unpin)) -> io::Result<Frame> 
     let limit = match tag {
         0 => CONTROL_LIMIT,
         1..=8 => BINARY_LIMIT,
+        9 => 0, // explicit interrupted-read marker, with no binary payload
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -185,9 +186,10 @@ async fn write_frame(
     let limit = match tag {
         0 => CONTROL_LIMIT,
         1..=8 => BINARY_LIMIT,
+        9 => 1,
         _ => 0,
     };
-    if limit == 0 || bytes.len() > limit {
+    if limit == 0 || bytes.len() > limit || tag==9 && !bytes.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "invalid worker output frame",

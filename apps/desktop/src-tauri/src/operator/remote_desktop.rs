@@ -456,7 +456,7 @@ pub async fn desktop_viewer_control(
             pab_protocol::validate_desktop_screen_id(&screen).map_err(str::to_owned)?;
             Command::Screen(screen)
         }
-        (None, Some(fps @ (15 | 30)), None, None, None) => Command::Fps(fps),
+        (None, Some(fps @ (15 | 30 | 60)), None, None, None) => Command::Fps(fps),
         (None, None, Some(true), None, None) => Command::Retry,
         (None, None, None, Some(enabled), None) => Command::Input(enabled, input_generation()?),
         (None, None, None, None, Some(true))
@@ -544,7 +544,7 @@ async fn run(
         }
     };
     let work = async {
-        let mut fps = 15;
+        let mut fps = 30;
         let mut screen = owner.initial_screen.clone();
         let mut failures = 0u32;
         let mut first_failure = None;
@@ -768,6 +768,11 @@ async fn stream(
         let cursor_work = async move {
             let mut source = cursor_source;
             let mut renderer = cursor_renderer;
+            // The OS owns pointer motion. Only remote shapes affect the local
+            // cursor; remote positions must never move or paint our pointer.
+            tokio::time::timeout(Duration::from_secs(5), renderer.local_pointer()).await
+                .map_err(|_| StreamFailure::renderer("local pointer setup timed out"))?
+                .map_err(StreamFailure::renderer)?;
             let mut overlay = owner.overlay.subscribe();
             let mut fullscreen = owner.fullscreen.subscribe();
             overlay.mark_changed();

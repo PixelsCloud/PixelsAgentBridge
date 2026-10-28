@@ -57,6 +57,7 @@ export async function designFixture(page: Page, options: {
     ], url);
     else if (path.startsWith('/accounts/')) data = { ...accounts[0], device_count: 4, password_enabled: true, github_enabled: true, usage: { ...usage, counters } };
     else if (path === '/traffic') data = { user_mbps: 10 };
+    else if (/^\/relays\/[^/]+\/runtime$/.test(path)) data = { supported: false, fresh: false, items: [], total: 0, page: 1, page_size: 1 };
     else if (path === '/relays') data = { ...snapshot, ...paged(['ap-east-primary', 'ap-east-secondary', 'eu-west-backup'].map((id, index) => ({
       id, region: index === 2 ? 'Frankfurt' : 'Hong Kong', url: `https://${id}.example.invalid`, online: true, health: 'healthy', configured: true, admin_state: index === 2 ? 'maintenance' : 'active', agent_version: '1.2.74', applied_policy_version: 14324, offered_policy_version: 14324, capacity_mbps: 1000, last_seen: now - 2000, sample_current_instance: true, connections_exact: String(18 + index * 6), boot_id: 'preview-boot', heartbeat_age_ms: 2000,
     })), url) };

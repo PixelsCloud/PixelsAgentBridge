@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::sync::{LazyLock, Mutex};
 
 pub mod execution;
+pub mod filesystem;
 
 #[cfg(target_os = "linux")]
 mod linux;

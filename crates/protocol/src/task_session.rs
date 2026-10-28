@@ -151,6 +151,8 @@ impl CommandOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferSnapshot {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub metadata_result:Option<crate::FileTransferMetadataResult>,
     pub initiating_user: Option<crate::UserAttribution>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_context: Option<crate::ExecutionContext>,
@@ -255,6 +257,11 @@ pub enum DeviceTaskRequest {
     GetTransfer {
         schema_version: u16,
         request_id: RequestId,
+    },
+    StopTransfer {
+        schema_version: u16,
+        request_id: RequestId,
+        intent: crate::FileTransferIntent,
     },
     ListDirectory {
         schema_version: u16,
@@ -399,6 +406,7 @@ impl DeviceTaskRequest {
             | Self::SubmitCommand { schema_version, .. }
             | Self::GetTask { schema_version, .. }
             | Self::GetTransfer { schema_version, .. }
+            | Self::StopTransfer { schema_version, .. }
             | Self::ListDirectory { schema_version, .. }
             | Self::ListWindows { schema_version, .. }
             | Self::CaptureScreenshot { schema_version, .. }
@@ -760,6 +768,7 @@ mod tests {
         );
         let response = DeviceTaskResponse::Transfer {
             snapshot: TransferSnapshot {
+                metadata_result:None,
                 initiating_user: None,
                 execution_context: None,
                 request_id,

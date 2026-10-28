@@ -20,7 +20,7 @@ pub use runtime::{
     BridgeLocalStore, BridgeRuntime, BridgeRuntimeConfig, CatalogStatus, DeviceConnectionPhase,
     DevicePasswordProvider, DirectoryDevicePasswordProvider, FileDevicePasswordProvider,
     LocalTaskRecord, MemoryDevicePasswordProvider, OperationRecord, PortForwardStatus,
-    QueuedTransfer, RememberedDevice, RuntimeCredentialError, RuntimeError, RuntimeEvent,
+    ManagedBatchJob, QueuedTransfer, RememberedDevice, RemoteFileBrowser, RuntimeCredentialError, RuntimeError, RuntimeEvent,
     RuntimeEventKind, RuntimePresenceSource, RuntimeStoreError, SqliteDevicePasswordProvider,
     TerminalAuditEvent, TransferQueue, TransferRequest,
 };

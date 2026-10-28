@@ -365,7 +365,7 @@ impl OperationManager {
             })?;
         let upload = name == "pab_upload_file";
         let spec = TransferRequest {
-            options: pab_protocol::FileTransferOptions {
+            options: pab_protocol::FileTransferOptions { destination_parent:None, source_constraint:None,metadata:None,expected_execution:None,
                 execution: args.execution,
                 resume_from: args.resume_from,
             },

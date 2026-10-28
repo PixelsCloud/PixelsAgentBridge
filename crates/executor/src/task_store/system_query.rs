@@ -75,7 +75,7 @@ impl TaskStore {
         query: &SystemQuery,
         context: Option<&pab_protocol::ExecutionContext>,
     ) -> Result<bool, TaskStoreError> {
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let prior=sqlx::query("SELECT o.initiated_by_json, q.query_json FROM read_operations o LEFT JOIN system_query_results q ON q.request_id=o.request_id WHERE o.request_id=?").bind(id.to_string()).fetch_optional(&mut *tx).await?;
         if let Some(row) = prior {
             if serde_json::from_str::<OperatorRef>(row.try_get("initiated_by_json")?)? != actor {

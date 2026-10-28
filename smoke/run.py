@@ -63,7 +63,7 @@ def catalog():
     cases = data["case"]
     ids = set()
     for case in cases:
-        if not re.fullmatch(r"[A-Z]+-[0-9]{2}", case["id"]) or case["id"] in ids:
+        if not re.fullmatch(r"[A-Z]+-[0-9]{2,3}", case["id"]) or case["id"] in ids:
             raise ValueError("Invalid or duplicate case ID")
         ids.add(case["id"])
         if (case["level"] not in ("quick", "release", "soak")

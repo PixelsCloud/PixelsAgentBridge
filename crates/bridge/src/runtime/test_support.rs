@@ -3,7 +3,14 @@ use pab_protocol::RequestId;
 use std::{path::Path, sync::atomic::AtomicU64};
 use tokio::sync::{Notify, broadcast};
 
-pub(super) async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
+pub(super) struct FixtureCredentials(pab_agent_core::account::AccountStore);
+impl Drop for FixtureCredentials {
+    fn drop(&mut self) {
+        if self.0.read().is_ok_and(|state|state.active_slot.is_none() && state.pending_logouts.is_empty()){return;}
+        if let Err(error)=self.0.clear_local_session(){tracing::warn!(%error,"synthetic fixture credential cleanup failed");}
+    }
+}
+pub(super) async fn runtime(path: &Path) -> (Arc<BridgeRuntime>,FixtureCredentials) {
     let store = RuntimeStore::open(&path.join("runtime.sqlite3"))
         .await
         .unwrap();
@@ -25,7 +32,8 @@ pub(super) async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
             access_token: "fixture-token".into(),
         })
         .unwrap();
-    Arc::new(BridgeRuntime {
+    let credentials=FixtureCredentials(account_store.clone());
+    (Arc::new(BridgeRuntime {
         account_task: tokio::spawn(async {}),
         usage_task: tokio::spawn(async {}),
         inner: Arc::new(RuntimeInner {
@@ -53,6 +61,7 @@ pub(super) async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
             availability: watch::channel(BridgeAvailability::Connecting).1,
             shutdown: receiver,
             devices: Mutex::new(HashMap::new()),
+            file_devices: Mutex::new(HashMap::new()),
             device_codes: Mutex::new(HashMap::new()),
             initiated_by: "fixture".into(),
             operations: Mutex::new(HashMap::new()),
@@ -64,5 +73,5 @@ pub(super) async fn runtime(path: &Path) -> Arc<BridgeRuntime> {
         bridge_task: tokio::spawn(async {}),
         heartbeat_task: tokio::spawn(async {}),
         reconciliation_task: tokio::spawn(async {}),
-    })
+    }),credentials)
 }

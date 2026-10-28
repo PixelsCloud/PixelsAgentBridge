@@ -199,7 +199,7 @@ impl TransferQueue {
     }
 
     pub async fn active_for_device(&self, code: DeviceCode) -> Result<i64, RuntimeStoreError> {
-        Ok(sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations WHERE owner_session_id = ? AND device_code = ? AND kind IN ('file_transfer', 'directory', 'file_stat', 'file_read', 'file_write', 'file_patch', 'file_search', 'file_hash', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'system_info', 'disks', 'processes', 'process', 'network_interfaces', 'network_connections', 'dns', 'os_sessions', 'execution_contexts', 'app_list', 'app_launch', 'app_open_file', 'app_package_inspect', 'app_install', 'app_uninstall', 'app_change_status', 'app_change_resume', 'process_terminate', 'services', 'service', 'service_control', 'monitors', 'desktop_windows', 'window_focus', 'window_control', 'type_text', 'desktop_batch', 'monitor_input', 'containers', 'container', 'container_logs', 'container_control', 'git_status', 'git_diff', 'git_log', 'git_commit', 'git_checkout', 'git_fetch', 'git_pull', 'git_push') AND finished_at_unix_ms IS NULL")
+        Ok(sqlx::query_scalar("SELECT COUNT(*) FROM runtime_operations WHERE owner_session_id = ? AND device_code = ? AND kind IN ('file_transfer', 'directory', 'file_manager', 'file_stat', 'file_read', 'file_write', 'file_patch', 'file_search', 'file_hash', 'mkdir', 'file_copy', 'file_move', 'file_delete', 'archive_create', 'archive_extract', 'system_info', 'disks', 'processes', 'process', 'network_interfaces', 'network_connections', 'dns', 'os_sessions', 'execution_contexts', 'app_list', 'app_launch', 'app_open_file', 'app_package_inspect', 'app_install', 'app_uninstall', 'app_change_status', 'app_change_resume', 'process_terminate', 'services', 'service', 'service_control', 'monitors', 'desktop_windows', 'window_focus', 'window_control', 'type_text', 'desktop_batch', 'monitor_input', 'containers', 'container', 'container_logs', 'container_control', 'git_status', 'git_diff', 'git_log', 'git_commit', 'git_checkout', 'git_fetch', 'git_pull', 'git_push') AND finished_at_unix_ms IS NULL")
             .bind(&self.session_id).bind(code.to_string()).fetch_one(&self.store.pool).await?)
     }
 
@@ -247,7 +247,7 @@ impl TransferQueue {
             return Err(RuntimeStoreError::RequestConflict);
         }
         let options = serde_json::to_string(&spec.options)?;
-        let mut tx = self.store.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.store.write_transaction().await?;
         let previous = sqlx::query("SELECT * FROM runtime_operations WHERE id = ?")
             .bind(spec.request_id.to_string())
             .fetch_optional(&mut *tx)

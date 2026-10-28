@@ -781,7 +781,7 @@ async fn overload_rejects_before_acceptance_and_old_environment_payload_still_de
     assert!(matches!(
         &response,
         DeviceTaskResponse::Environment {
-            filesystem_schema_version: Some(6),
+            filesystem_schema_version: Some(7),
             ..
         }
     ));

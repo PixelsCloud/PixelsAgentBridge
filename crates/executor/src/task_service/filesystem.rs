@@ -51,7 +51,9 @@ impl TaskService {
             request
                 .validate()
                 .map_err(|message| FileError::new("invalid_request", "validate", message))?;
-            validate_path(Path::new(&request.path))?;
+            if !matches!(request.operation, FileSystemAction::Managed { .. }) {
+                validate_path(Path::new(&request.path))?;
+            }
             Ok::<_, FileError>(())
         }
         .await;
@@ -125,7 +127,7 @@ impl TaskService {
         } else {
             self.bulk_jobs.lock().await.contains_key(&id)
         };
-        if pab_protocol::cancellable_filesystem_kind(&reply.kind)
+        if reply.supports_cancel()
             && matches!(reply.state.as_str(), "running" | "cancel_requested")
             && !registered
         {
@@ -141,6 +143,10 @@ impl TaskService {
         let Ok(_permit) = self.filesystem_slots.try_acquire() else {
             return Ok(reply);
         };
+        #[cfg(unix)]
+        if reply.kind=="file_manager" && matches!(reply.state.as_str(),"unconfirmed"|"completed") {
+            return self.reconcile_directory_query(actor,reply).await;
+        }
         if matches!(reply.kind.as_str(), "file_write" | "file_patch")
             && reply.state == "unconfirmed"
             && let Some(meta) = &reply.metadata
@@ -220,6 +226,11 @@ impl TaskService {
             );
             context.identity = Some(identity.clone());
         }
+        if let FileSystemAction::Managed { expected_execution: Some(expected), .. } = &request.operation {
+            if !expected.matches_context(&context) {
+                return Err(TaskServiceError::ExecutionContext("file-manager account or session differs from the pinned identity".into()));
+            }
+        }
         if let Some(existing) = self
             .store
             .accept_filesystem_with_context(actor, request, &fingerprint, Some(&context))
@@ -228,7 +239,7 @@ impl TaskService {
             return self.filesystem_history(actor, existing).await;
         }
         if let Some((prepared, _)) = user {
-            if pab_protocol::cancellable_filesystem_kind(request.operation.kind()) {
+            if request.operation.asynchronous() {
                 return Ok((
                     self.start_user_filesystem(actor, request.clone(), prepared, context)
                         .await?,
@@ -255,10 +266,22 @@ impl TaskService {
         if request.operation.is_bulk() {
             return Ok((self.start_bulk(request, context).await?, Vec::new()));
         }
+        if matches!(
+            request.operation,
+            FileSystemAction::Managed {
+                operation: pab_protocol::FileManagerOperation::OpenDirectory { .. }, ..
+            }
+        ) {
+            return Ok((
+                self.start_manager_scan(actor, request.clone(), context)
+                    .await?,
+                Vec::new(),
+            ));
+        }
         let mut reply = FileSystemReply::pending(request);
         reply.execution_context = Some(context);
         let result = self
-            .file_engine()
+            .managed_engine(actor)?
             .prepare_filesystem(request, payload, &mut reply)
             .await;
         let bytes = match result {
@@ -267,7 +290,7 @@ impl TaskService {
                 bytes
             }
             Err(error) => {
-                reply.state = "failed".to_owned();
+                reply.state = if error.0.code == "outcome_unconfirmed" { "unconfirmed" } else { "failed" }.to_owned();
                 reply.error = Some(error.0);
                 Vec::new()
             }
@@ -291,7 +314,7 @@ impl TaskService {
                 .0,
             );
         } else if existing.state == "unconfirmed"
-            || (pab_protocol::cancellable_filesystem_kind(&existing.kind)
+            || (existing.supports_cancel()
                 && matches!(existing.state.as_str(), "running" | "cancel_requested"))
         {
             existing = self.lookup_filesystem(actor, existing.request_id).await?;
@@ -309,6 +332,9 @@ impl super::filesystem_engine::FileEngine {
     ) -> Result<Vec<u8>, FileError> {
         let path = Path::new(&request.path);
         match &request.operation {
+            FileSystemAction::Managed { operation, .. } => {
+                self.manage_files(request, operation, reply).await
+            }
             FileSystemAction::ListDirectory { after, limit } => {
                 let mut page = super::directory::list(
                     request.request_id,

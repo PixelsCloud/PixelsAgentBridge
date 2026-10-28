@@ -4,7 +4,7 @@ import { RotateCw } from "lucide-react";
 import { formatDeviceCode } from "./deviceCode";
 import { messages, type Language } from "./i18n";
 
-export type SavedConnectionAction = "connect" | "desktop" | "terminal-console" | "terminal-system";
+export type SavedConnectionAction = "connect" | "desktop" | "terminal-console" | "terminal-system" | "files";
 
 export type SavedConnection = {
   mode: "manual" | "saved";

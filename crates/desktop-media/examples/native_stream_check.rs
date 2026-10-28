@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
 async fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !(3..=6).contains(&args.len()) || !matches!(args[1].as_str(), "synthetic" | "animate") {
-        return Err("usage: native_stream_check WORKER synthetic|animate 15|30 [auto|software-encode|software-decode|software|encoder-failure] [--embedded|--standalone] [--budget-cycle]".into());
+        return Err("usage: native_stream_check WORKER synthetic|animate 15|30|60 [auto|software-encode|software-decode|software|encoder-failure] [--embedded|--standalone] [--budget-cycle]".into());
     }
     let prefix = match args.get(4).map(String::as_str) {
         None => vec![],
@@ -53,8 +53,8 @@ async fn run() -> Result<(), Error> {
     };
     let executable = PathBuf::from(&args[0]);
     let fps: u16 = args[2].parse()?;
-    if !matches!(fps, 15 | 30) {
-        return Err("FPS must be 15 or 30".into());
+    if !matches!(fps, 15 | 30 | 60) {
+        return Err("FPS must be 15, 30 or 60".into());
     }
     let screen = NativeBackend::new(executable.clone(), prefix.clone())
         .screens()

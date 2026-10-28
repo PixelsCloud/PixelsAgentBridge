@@ -53,13 +53,12 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
         device_ref,
         EndpointKey::new(*secret.public().as_bytes()),
     )?;
-    let hello = DeviceHello {
-        schema_version: DEVICE_SESSION_SCHEMA_VERSION,
-        device_ref,
-        execution_context: execution_context.clone(),
-        agent_version: env!("CARGO_PKG_VERSION").to_owned(),
-        observed_at_unix_ms: unix_millis(SystemTime::now())?,
-    };
+    let hello = native_device_hello(device_ref, execution_context.clone())?;
+    tracing::info!(
+        client_version = hello.client_version.as_deref().unwrap_or("development"),
+        agent_version = %hello.agent_version,
+        "publishing client system information"
+    );
     let control = EndpointControlConfig {
         url: config.control_url,
         tenant_id: config.tenant_id,
@@ -201,6 +200,20 @@ fn report_status(status: &pab_agent_core::ControlConnectionStatus) {
     }
 }
 
+fn native_device_hello(
+    device_ref: DeviceRef,
+    execution_context: pab_protocol::ExecutionContext,
+) -> Result<DeviceHello, ExecutorError> {
+    Ok(DeviceHello {
+        schema_version: DEVICE_SESSION_SCHEMA_VERSION,
+        device_ref,
+        execution_context,
+        agent_version: env!("CARGO_PKG_VERSION").to_owned(),
+        client_version: option_env!("PAB_INSTALLER_VERSION").map(str::to_owned),
+        observed_at_unix_ms: unix_millis(SystemTime::now())?,
+    })
+}
+
 fn unix_millis(now: SystemTime) -> Result<i64, ExecutorError> {
     let value = now
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -254,16 +267,23 @@ mod tests {
     #[test]
     fn builds_a_valid_native_device_hello_payload() {
         let context = detect_native_execution_context().unwrap();
-        let hello = DeviceHello {
-            schema_version: DEVICE_SESSION_SCHEMA_VERSION,
-            device_ref: DeviceRef {
+        let hello = native_device_hello(
+            DeviceRef {
                 tenant_id: pab_protocol::TenantId::from_u128(2),
                 device_id: pab_protocol::DeviceId::from_u128(3),
             },
-            execution_context: context,
-            agent_version: env!("CARGO_PKG_VERSION").to_owned(),
-            observed_at_unix_ms: unix_millis(SystemTime::now()).unwrap(),
-        };
+            context.clone(),
+        )
+        .unwrap();
+        let wire = serde_json::to_value(&hello).unwrap();
+        assert_eq!(
+            wire["execution_context"],
+            serde_json::to_value(&context).unwrap()
+        );
+        match option_env!("PAB_INSTALLER_VERSION") {
+            Some(product_version) => assert_eq!(wire["client_version"], product_version),
+            None => assert!(wire.get("client_version").is_none()),
+        }
 
         assert_eq!(hello.schema_version, DEVICE_SESSION_SCHEMA_VERSION);
         assert!(hello.observed_at_unix_ms > 0);

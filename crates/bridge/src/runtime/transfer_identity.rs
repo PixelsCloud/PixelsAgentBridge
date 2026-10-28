@@ -46,7 +46,7 @@ impl RuntimeStore {
         {
             return Err(RuntimeStoreError::RequestConflict);
         }
-        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
+        let mut tx = self.write_transaction().await?;
         let row = sqlx::query(
             "SELECT options_json,context_json FROM runtime_transfer_context WHERE id=?",
         )

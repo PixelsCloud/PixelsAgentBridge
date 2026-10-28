@@ -4,6 +4,7 @@ members = [
     "crates/command-runtime",
     "crates/device-session",
     "crates/file-codec",
+    "crates/file-manager",
     "crates/agent-core",
     "crates/bridge",
     "crates/executor",

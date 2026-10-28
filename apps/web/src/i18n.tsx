@@ -1,6 +1,9 @@
 import { createContext, useContext } from 'react';
 
 const zh = {
+  relayMachineLoad: '机器负载 / Relay 流量', relayMachineLoadHint: 'CPU、内存来自节点系统采样；流量为 Relay 转发流量。每 5 秒刷新，过期数据不显示为实时状态。', relayMemoryShort: '内存', relayInboundShort: 'Relay 入站', relayOutboundShort: 'Relay 出站',
+  addedDevices: '添加的设备', addedDevicesHint: '显示该账号添加过的所有远程设备，包括已移除的记录。', addedDeviceStatus: '添加状态', addedDeviceSaved: '已添加', addedDeviceRemoved: '已移除', deviceAddedAt: '添加时间',
+  close: '关闭', clientVersionUnreported: '未上报', deviceUnassociated: '未关联',
   relayConnectionStatus:'状态',
   relayRecordId:'记录 ID',relayFirstForwarded:'首次转发',relayDataFrames:'数据帧',
   'relayIdentity.probe':'转发探针',
@@ -220,6 +223,9 @@ const zh = {
 } as const;
 type Key = keyof typeof zh;
 const en: Record<Key,string> = {
+  relayMachineLoad: 'Machine load / Relay traffic', relayMachineLoadHint: 'System CPU and memory sampled by the node; traffic covers Relay forwarding. Refreshes every 5 seconds; stale samples are hidden.', relayMemoryShort: 'Memory', relayInboundShort: 'Relay inbound', relayOutboundShort: 'Relay outbound',
+  addedDevices: 'Added devices', addedDevicesHint: 'All remote devices added by this account, including removed entries.', addedDeviceStatus: 'Save status', addedDeviceSaved: 'Saved', addedDeviceRemoved: 'Removed', deviceAddedAt: 'Added at',
+  close: 'Close', clientVersionUnreported: 'Not reported', deviceUnassociated: 'Unassociated',
   relayConnectionStatus:'Status',
   relayRecordId:'Record ID',relayFirstForwarded:'First forwarded',relayDataFrames:'data frames',
   'relayIdentity.probe':'Forwarding probe',
@@ -414,7 +420,7 @@ const en: Record<Key,string> = {
   overview:'Overview',devices:'Device list',onlineDevices:'Online devices',accounts:'Accounts',relay:'Relay nodes',events:'Management changes',settings:'Settings',account:'My account',
   language:'Language',appearance:'Appearance',light:'Light',dark:'Dark',about:'About',version:'Version',retry:'Retry',save:'Save',cancel:'Cancel',confirm:'Confirm',back:'Back',loading:'Loading',
   sessionExpired:'Your session expired. Please sign in again.',server_error:'The service is unavailable. Please try again.',networkError:'Cannot reach the server. Check your connection.',unauthorized:'Invalid credentials or account unavailable.',invalid_input:'Check the entered values.',conflict:'Data changed or the name is taken. Refresh and try again.',forbidden:'You do not have permission.',not_found:'This resource is unavailable.',rate_limited:'Too many requests. Please try again later.',origin_rejected:'Open this page from the server’s trusted address.',registration_disabled:'Registration is disabled.',
-  required:'Required',passwordMin:'Use at least 8 characters.',passwordMismatch:'Passwords do not match.',usernameHint:'3–64 characters, without spaces or slashes',alreadyAccount:'Already registered? Sign in',createAccount:'Create an account',passwordChanged:'Password updated.',changePassword:'Change password',admin:'Server administrator',user:'User',noData:'No data',refresh:'Refresh',totalDevices:'Total devices',online:'Online',offline:'Offline',unknown:'Unknown',deviceCode:'Device code',name:'Name',system:'System',lastOnline:'Last online',search:'Search name or device code',all:'All',details:'Details',rename:'Rename',copy:'Copy information',copied:'Device information copied',actions:'Actions',total:'Total',disconnected:'Live updates interrupted. Reconnecting…',connected:'Live updates connected',deviceOnlineHint:'Online means the device is connected to the server.',architecture:'Architecture',agentVersion:'Agent version',created:'Registered',renamed:'Name updated',nameHint:'This is the server device name. Desktop local aliases are unchanged.',
+  required:'Required',passwordMin:'Use at least 8 characters.',passwordMismatch:'Passwords do not match.',usernameHint:'3–64 characters, without spaces or slashes',alreadyAccount:'Already registered? Sign in',createAccount:'Create an account',passwordChanged:'Password updated.',changePassword:'Change password',admin:'Server administrator',user:'User',noData:'No data',refresh:'Refresh',totalDevices:'Total devices',online:'Online',offline:'Offline',unknown:'Unknown',deviceCode:'Device code',name:'Name',system:'System',lastOnline:'Last online',search:'Search name or device code',all:'All',details:'Details',rename:'Rename',copy:'Copy information',copied:'Device information copied',actions:'Actions',total:'Total',disconnected:'Live updates interrupted. Reconnecting…',connected:'Live updates connected',deviceOnlineHint:'Online means the device is connected to the server.',architecture:'Architecture',agentVersion:'Client version',created:'Registered',renamed:'Name updated',nameHint:'This is the server device name. Desktop local aliases are unchanged.',
 };
 export type Language = 'zh-CN' | 'en';
 export const dictionaries = { 'zh-CN': zh, en };

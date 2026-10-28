@@ -1,0 +1,30 @@
+[package]
+name = "pab-file-manager"
+version = "1.2.48"
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+dirs = "6"
+pab-protocol = { path = "../protocol" }
+pab-os-control = { path = "../os-control" }
+serde_json.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite"] }
+thiserror.workspace = true
+blake3 = "1"
+cap-std = "=4.0.3"
+cap-fs-ext = "=4.0.3"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[example]]
+name = "directory_index_probe"
+path = "../../smoke/file_manager_directory.rs"
+
+[[example]]
+name = "file_manager_operations_probe"
+path = "../../smoke/file_manager_operations.rs"

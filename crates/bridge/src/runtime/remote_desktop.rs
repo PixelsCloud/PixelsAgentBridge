@@ -35,7 +35,7 @@ mod tests {
     async fn desktop_open_evicts_closed_transport_but_preserves_live_legacy_connection() {
         for closed in [false, true] {
             let dir = tempfile::tempdir().unwrap();
-            let runtime = super::super::test_support::runtime(dir.path()).await;
+            let (runtime,_credentials) = super::super::test_support::runtime(dir.path()).await;
             let (_a, _b, client, server) = crate::connection::test_connection_pair().await;
             let device_ref = client.device_ref();
             let transport = client.connection().clone();

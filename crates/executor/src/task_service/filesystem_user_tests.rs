@@ -317,6 +317,89 @@ async fn invalid_user_file_context_is_rejected_before_acceptance() {
 }
 
 #[tokio::test]
+#[cfg(unix)]
+#[ignore = "requires an explicitly prepared native user and matching PAB_EXECUTION_TEST_WORKER; owns only a generated home fixture"]
+async fn native_user_directory_publication_recovery_acceptance() {
+    // Keep the composed acceptance workflow off the default libtest stack.
+    Box::pin(native_user_directory_publication_recovery_case()).await;
+}
+
+#[cfg(unix)]
+async fn native_user_directory_publication_recovery_case() {
+    use std::os::unix::fs::MetadataExt;
+    let user: u32 = std::env::var("PAB_EXECUTION_TEST_USER").unwrap().parse().unwrap();
+    let identity = prepared(user).identity().clone();
+    let worker = PathBuf::from(std::env::var_os("PAB_EXECUTION_TEST_WORKER").unwrap());
+    assert!(worker.is_file(), "a matching, runnable Executor worker is required");
+    for fault in ["none", "result-commit", "release-notification"] {
+        let database = tempfile::tempdir().unwrap();
+        let database_root = database.path().to_owned();
+        let mut svc = Box::pin(service(&database_root)).await.for_ui_connection();
+        svc.worker_executable = Some(worker.clone());
+        let root = Workspace {
+            path: identity.home.join(format!("pab-file-acceptance-{}", RequestId::new())),
+            home: identity.home.clone(),
+        };
+        eprintln!("PAB_FILE_TRANSFER_FIXTURE_ROOT={}", root.path.display());
+        eprintln!("PAB_NATIVE_DIRECTORY_DATABASE_ROOT={}", database_root.display());
+        success(&svc, user, &root.path, FileSystemAction::Mkdir {parents:false,exist_ok:false}, vec![]).await;
+        assert_eq!(std::fs::metadata(&root.path).unwrap().uid(), user);
+        let child=root.path.join("child");let native=pab_file_manager::encode_path(&child);
+        let parent=pab_file_manager::DirectoryObject::open(&pab_file_manager::encode_path(&root.path),false).unwrap().identity().to_owned();
+        let observed=prepared(user).identity().observation(ExecutionMode::User,ExecutionEnvironmentSource::NativeAccount).unwrap();
+        let context_ref=svc.ui_connection.execution_contexts.lock().await.register(
+            pab_task_runtime::ExecutionCaller {device:svc.device_ref,actor:actor(),connection:svc.ui_connection.id},observed.clone()).unwrap();
+        let mut expected_context=svc.execution_context.clone();expected_context.identity=Some(observed.clone());
+        let request=FileSystemRequest {request_id:RequestId::new(),execution:ExecutionSelection::User {context_ref},path:"file-manager".into(),operation:FileSystemAction::Managed {expected_execution:Some(FileExecutionIdentity::from_context(&expected_context).unwrap()),operation:FileManagerOperation::PrepareDirectory {path:native.clone(),expected_parent:parent,existing_object:None}},payload_size:0,payload_sha256:None};
+        let pool=sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(database_root.join("executor.sqlite3"))).await.unwrap();
+        let id=request.request_id.to_string();
+        if fault=="result-commit" {
+            // The real child must publish before the parent's final transaction
+            // fails. Progress/admission remain available for original-ID lookup.
+            sqlx::query(&format!("CREATE TRIGGER reject_native_directory_result BEFORE UPDATE OF reply_json ON filesystem_results WHEN NEW.request_id='{id}' AND json_extract(NEW.reply_json,'$.state')='completed' BEGIN SELECT RAISE(ABORT,'injected native directory commit failure'); END")).execute(&pool).await.unwrap();
+        }else if fault=="release-notification" {
+            sqlx::query(&format!("CREATE TRIGGER reject_native_directory_release BEFORE UPDATE OF creation_receipt_pending ON filesystem_execution WHEN NEW.request_id='{id}' AND NEW.creation_receipt_pending=0 BEGIN SELECT RAISE(ABORT,'injected native release notification failure'); END")).execute(&pool).await.unwrap();
+        }
+        let first=tokio::time::timeout(Duration::from_secs(45),Box::pin(svc.execute_filesystem(actor(),&request,&[]))).await.expect("native directory operation did not settle").unwrap().0;
+        assert_eq!(first.state,if fault=="result-commit" {"unconfirmed"}else{"completed"},"{first:?}");
+        assert_eq!(first.execution_context.as_ref().unwrap().identity.as_ref(),Some(&observed));
+        assert_eq!(std::fs::metadata(&child).unwrap().uid(),user,"directory must be created by the selected native user");
+        let original_identity=pab_file_manager::DirectoryObject::open(&native,false).unwrap().identity().to_owned();
+        let admitted=svc.store.filesystem_execution(actor(),request.request_id).await.unwrap().unwrap();
+        assert_eq!(admitted.request,request);assert_eq!(admitted.context,first.execution_context);
+        assert_eq!(admitted.creation_receipt_pending,fault!="none");
+        sqlx::query("DROP TRIGGER IF EXISTS reject_native_directory_result").execute(&pool).await.unwrap();
+        sqlx::query("DROP TRIGGER IF EXISTS reject_native_directory_release").execute(&pool).await.unwrap();
+        std::fs::rename(&child,root.path.join("original")).unwrap();std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("sentinel"),b"replacement must remain unchanged").unwrap();
+        let fresh=svc.for_ui_connection();
+        let final_reply=tokio::time::timeout(Duration::from_secs(30),Box::pin(fresh.lookup_filesystem(actor(),request.request_id))).await.expect("native directory recovery did not settle").unwrap();
+        assert_eq!(final_reply.state,"completed","{final_reply:?}");assert!(final_reply.error.is_none());
+        assert_eq!(final_reply.execution_context,first.execution_context);
+        assert_eq!(final_reply.file_manager.as_ref().unwrap().result,FileManagerResult::DirectoryPrepared {path:native,identity:original_identity,created:true});
+        assert!(!fresh.store.filesystem_execution(actor(),request.request_id).await.unwrap().unwrap().creation_receipt_pending);
+        assert_eq!(Box::pin(fresh.execute_filesystem(actor(),&request,&[])).await.unwrap().0,final_reply,"replay must use the original identity despite the connection-bound user selection expiring");
+        let mut changed=request.clone();changed.execution=ExecutionSelection::Service {};
+        let rejected=Box::pin(fresh.execute_filesystem(actor(),&changed,&[])).await;
+        assert!(matches!(rejected,Err(TaskServiceError::InvalidRequest("file-manager execution mode differs from the pinned identity"))),"{rejected:?}");
+        // A syntactically valid service request must also be refused for the
+        // original user-owned request ID, before any service mutation occurs.
+        let FileSystemAction::Managed {expected_execution,..}=&mut changed.operation else {unreachable!()};
+        *expected_execution=Some(FileExecutionIdentity::from_context(&fresh.execution_context).unwrap());
+        changed.validate().unwrap();
+        let rejected=Box::pin(fresh.execute_filesystem(actor(),&changed,&[])).await;
+        assert!(matches!(rejected,Err(TaskServiceError::Store(TaskStoreError::RequestConflict))),"{rejected:?}");
+        assert_eq!(fresh.store.filesystem_execution(actor(),request.request_id).await.unwrap().unwrap().request,request);
+        assert_eq!(std::fs::read(child.join("sentinel")).unwrap(),b"replacement must remain unchanged");
+        assert_eq!(std::fs::read_dir(root.path.join("original")).unwrap().count(),0);
+        pool.close().await;svc.close_for_test().await;drop((fresh,svc));
+        let home_root=root.path.clone();drop(root);assert!(!home_root.exists(),"owned native-user fixture cleanup failed");
+        database.close().unwrap();assert!(!database_root.exists(),"owned task database fixture cleanup failed");
+        eprintln!("native_user_directory_recovery phase={fault} uid={user} original_id={id} fixture_cleanup_verified=true");
+    }
+}
+
+#[tokio::test]
 #[ignore = "requires native user and PAB_EXECUTION_TEST_WORKER; owns only a generated home fixture"]
 async fn native_user_filesystem_worker_acceptance() {
     let user: u32 = std::env::var("PAB_EXECUTION_TEST_USER")

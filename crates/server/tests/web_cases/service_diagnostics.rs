@@ -367,9 +367,154 @@ async fn seed_device(pool: &PgPool, index: i32, context: Option<Value>, version:
         .await
         .unwrap();
     if let Some(context) = context {
-        sqlx::query("INSERT INTO device_runtime(tenant_id,device_id,execution_context,environment_revision,agent_version,observed_at_unix_ms) VALUES($1,$2,$3,'fixture', $4,1)").bind(tenant).bind(id).bind(context).bind(version).execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO device_runtime(tenant_id,device_id,execution_context,environment_revision,agent_version,client_version,observed_at_unix_ms) VALUES($1,$2,$3,'fixture', '1.2.48',$4,1)").bind(tenant).bind(id).bind(context).bind(version).execute(pool).await.unwrap();
     }
     id
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn installed_client_version_is_explicit_and_legacy_hellos_remain_unknown(pool: PgPool) {
+    let f = fixture(&pool).await;
+    let endpoint = unclaimed_fixture(&pool).await;
+    let mut hello: pab_protocol::DeviceHello = serde_json::from_value(json!({
+        "schema_version": 1,
+        "device_ref": {"tenant_id": endpoint.tenant_id, "device_id": match endpoint.principal {
+            pab_protocol::EndpointProofPrincipal::Device { device_id } => device_id,
+            _ => unreachable!(),
+        }},
+        "execution_context": {
+            "os_family": "windows", "os_name": "Windows", "os_version": "11",
+            "architecture": "x86_64", "execution_scope": "native", "path_style": "windows",
+            "interpreter": null, "cwd": null, "environment_revision": "inventory-test",
+        },
+        "agent_version": "1.2.48", "observed_at_unix_ms": 1795000000000_i64,
+    }))
+    .unwrap();
+    assert!(hello.client_version.is_none());
+    f.control
+        .publish_device_hello(&endpoint, &hello)
+        .await
+        .unwrap();
+    let id = hello.device_ref.device_id;
+    let detail = |app: Router, cookie: String| async move {
+        call(
+            &app,
+            "GET",
+            &format!("/api/web/devices/{id}"),
+            &cookie,
+            Value::Null,
+        )
+        .await
+        .2
+    };
+    assert!(detail(f.app.clone(), f.admin.clone()).await["client_version"].is_null());
+    hello.client_version = Some("1.3.27".into());
+    f.control
+        .publish_device_hello(&endpoint, &hello)
+        .await
+        .unwrap();
+    let value = detail(f.app.clone(), f.admin.clone()).await;
+    assert_eq!(value["client_version"], "1.3.27");
+    assert_eq!(value["agent_version"], "1.2.48");
+    let stats = call(
+        &f.app,
+        "GET",
+        "/api/web/devices/diagnostics?scope=all&version=1.3.27",
+        &f.admin,
+        Value::Null,
+    )
+    .await
+    .2;
+    assert_eq!(stats["total"], 1);
+    assert_eq!(stats["versions"], json!([{"value":"1.3.27","count":1}]));
+    for invalid in ["", " 1.3.27", "1.3.27\n", &"a".repeat(65)] {
+        hello.client_version = Some(invalid.into());
+        assert!(
+            f.control
+                .publish_device_hello(&endpoint, &hello)
+                .await
+                .is_err()
+        );
+    }
+    // An older installation reconnecting must not retain a previous product version.
+    hello.client_version = None;
+    f.control
+        .publish_device_hello(&endpoint, &hello)
+        .await
+        .unwrap();
+    assert!(detail(f.app.clone(), f.admin.clone()).await["client_version"].is_null());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn account_device_counts_match_paginated_current_associations(pool: PgPool) {
+    let f = fixture(&pool).await;
+    for index in 1..=25 {
+        let id = seed_device(&pool, index, None, "").await;
+        sqlx::query("INSERT INTO device_accounts(device_id,user_id,revision) VALUES($1,$2,1)")
+            .bind(id)
+            .bind(f.user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    seed_device(&pool, 26, None, "").await;
+    let accounts = call(&f.app, "GET", "/api/web/accounts", &f.admin, Value::Null)
+        .await
+        .2;
+    let items = accounts["items"].as_array().unwrap();
+    assert_eq!(
+        items
+            .iter()
+            .find(|a| a["id"] == f.user_id.to_string())
+            .unwrap()["device_count"],
+        25
+    );
+    assert_eq!(
+        items
+            .iter()
+            .find(|a| a["username"] == "policy-admin")
+            .unwrap()["device_count"],
+        0
+    );
+    for (page, length) in [(1, 20), (2, 5)] {
+        let result = call(
+            &f.app,
+            "GET",
+            &format!(
+                "/api/web/devices?scope=all&user={}&page={page}&page_size=20",
+                f.user_id
+            ),
+            &f.admin,
+            Value::Null,
+        )
+        .await;
+        assert_eq!(result.0, StatusCode::OK);
+        assert_eq!(result.2["total"], 25);
+        let rows = result.2["items"].as_array().unwrap();
+        assert_eq!(rows.len(), length);
+        assert!(
+            rows.iter()
+                .all(|d| d["associated_user_id"] == f.user_id.to_string())
+        );
+    }
+    assert_eq!(
+        call(&f.app, "GET", "/api/web/accounts", &f.user, Value::Null)
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &f.app,
+            "GET",
+            &format!("/api/web/devices?scope=all&user={}", f.user_id),
+            &f.user,
+            Value::Null
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -456,6 +601,8 @@ async fn device_diagnostics_are_scoped_filtered_and_do_not_infer_permissions(poo
     .2;
     assert_eq!(device["associated_user_id"], f.user_id.to_string());
     assert_eq!(device["associated_username"], "policy-user");
+    assert_eq!(device["agent_version"], "1.2.48");
+    assert_eq!(device["client_version"], "1.2.3");
     assert_eq!(device["diagnostics"]["permissions"], "not_reported");
     assert_eq!(device["diagnostics"]["compatibility"], "not_reported");
     assert!(device["diagnostics"]["reported_at"].is_number());

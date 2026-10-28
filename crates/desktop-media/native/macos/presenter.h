@@ -3,6 +3,7 @@
 #include "viewer_input.h"
 #include "viewer_stats.h"
 #include "cursor_overlay.h"
+#include "../local_cursor_image.h"
 #include "video_shader.h"
 #include "../software_codec_ffi.h"
 #import <Metal/Metal.h>
@@ -15,12 +16,14 @@
 @interface PABMetalView : PABInputView
 @property(nonatomic) BOOL needsMediaRedraw;
 @property(nonatomic) BOOL tracksRemoteCursor;
+@property(nonatomic) BOOL usesLocalPointer;
+@property(nonatomic, strong) NSCursor* localPointer;
 @property(nonatomic, strong) PABViewerStats* statisticsOverlay;
 @end
 @implementation PABMetalView
 - (void)resetCursorRects {
     [super resetCursorRects];
-    if (!self.tracksRemoteCursor || !mediaInput.enabled) return;
+    if ((!self.tracksRemoteCursor && !self.usesLocalPointer) || !mediaInput.enabled) return;
     const double w = mediaInput.rotation%2 ? mediaInput.height : mediaInput.width;
     const double h = mediaInput.rotation%2 ? mediaInput.width : mediaInput.height;
     if (w <= 0 || h <= 0) return;
@@ -36,7 +39,8 @@
         [image addRepresentation:bitmap];
         return [[NSCursor alloc] initWithImage:image hotSpot:NSZeroPoint];
     }();
-    [self addCursorRect:NSMakeRect(NSMidX(bounds)-w*scale/2,NSMidY(bounds)-h*scale/2,w*scale,h*scale) cursor:transparent];
+    NSCursor* cursor = self.usesLocalPointer ? (self.localPointer ?: NSCursor.arrowCursor) : transparent;
+    [self addCursorRect:NSMakeRect(NSMidX(bounds)-w*scale/2,NSMidY(bounds)-h*scale/2,w*scale,h*scale) cursor:cursor];
 }
 - (void)setMediaInputEnabled:(BOOL)enabled {
     [super setMediaInputEnabled:enabled];
@@ -71,6 +75,19 @@
 @end
 
 namespace pab_mac {
+inline NSCursor* local_cursor(const pab_cursor::Image& shape, double scale) {
+    if (!shape.format) return nil;
+    auto bitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:nullptr pixelsWide:shape.width pixelsHigh:shape.height
+        bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace
+        bitmapFormat:NSBitmapFormatAlphaNonpremultiplied bytesPerRow:shape.width*4 bitsPerPixel:32];
+    if (!bitmap) return nil;
+    const auto rgba = shape.rgba(); std::memcpy(bitmap.bitmapData,rgba.data(),rgba.size());
+    scale = std::max(1.0,scale);
+    const auto size = NSMakeSize(shape.width/scale,shape.height/scale);
+    bitmap.size = size;
+    auto image = [[NSImage alloc] initWithSize:size]; [image addRepresentation:bitmap];
+    return [[NSCursor alloc] initWithImage:image hotSpot:NSMakePoint(shape.hotspot_x/scale,shape.hotspot_y/scale)];
+}
 inline std::array<unsigned, 3> test_rgb(uint64_t frame, unsigned quadrant) {
     return {unsigned(24 + (frame * 3 + quadrant * 43) % 208), unsigned(24 + (frame * 7 + quadrant * 67) % 208),
         unsigned(24 + (frame * 11 + quadrant * 97) % 208)};
@@ -103,6 +120,7 @@ class NativePresenter {
     unsigned width_, height_, rotation_;
     PabVideoGeometry geometry_;
     CursorOverlay cursor_;
+    pab_cursor::Image local_image_;
     bool verify_, owns_window_ = false, last_verified_ = false;
     Clock::time_point next_redraw_{};
     std::shared_ptr<DisplayStats> stats_ = std::make_shared<DisplayStats>();
@@ -153,7 +171,7 @@ class NativePresenter {
         [render setVertexBytes:visible_fraction length:sizeof(visible_fraction) atIndex:1];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->y.get()) atIndex:0];
         [render setFragmentTexture:CVMetalTextureGetTexture(lease->uv.get()) atIndex:1];
-        const auto cursor = cursor_.parameters(viewport,rotated_w,rotated_h);
+        const auto cursor = view_.usesLocalPointer ? CursorOverlay::Parameters{} : cursor_.parameters(viewport,rotated_w,rotated_h);
         [render setFragmentTexture:cursor_.image(device_) atIndex:2];
         [render setFragmentBytes:&cursor length:sizeof(cursor) atIndex:0];
         [render drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -328,6 +346,12 @@ public:
     }
     void input_sink(std::function<bool(const InputPacket&)> sink) { require_main(); view_->mediaInput.sink = std::move(sink); }
     void cursor(const uint8_t* bytes, size_t size) {
+        if (size && bytes[0] == 4) {
+            require_main();
+            if (size != 1) throw std::runtime_error("Invalid local pointer mode");
+            view_.usesLocalPointer = YES; view_.tracksRemoteCursor = NO;
+            [view_.window invalidateCursorRectsForView:view_]; view_.needsMediaRedraw = YES; return;
+        }
         if (size && bytes[0] == 3) {
             require_main();
             if (size != 2 || bytes[1] > 1) throw std::runtime_error("Invalid viewer layout");
@@ -352,7 +376,15 @@ public:
             [view_.statisticsOverlay placeInViewer]; view_.statisticsOverlay.needsDisplay = YES;
             return;
         }
-        require_main(); cursor_.update(device_,bytes,size);
+        require_main();
+        if (view_.usesLocalPointer) {
+            if (local_image_.update(bytes,size)) {
+                view_.localPointer = local_cursor(local_image_,view_.window.backingScaleFactor ?: 1.0);
+                [view_.window invalidateCursorRectsForView:view_];
+            }
+            return;
+        }
+        cursor_.update(device_,bytes,size);
         if (view_.tracksRemoteCursor != cursor_.tracking()) {
             view_.tracksRemoteCursor = cursor_.tracking();
             [view_.window invalidateCursorRectsForView:view_];

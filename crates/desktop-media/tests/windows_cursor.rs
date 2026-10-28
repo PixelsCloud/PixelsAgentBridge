@@ -47,6 +47,19 @@ fn generated_dxgi_shapes_preserve_masks_alpha_padding_and_hotspots() {
 }
 
 #[test]
+fn local_os_cursor_keeps_remote_shapes_without_position_echo() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_pab-media-worker"))
+        .arg("local-cursor-check")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["status"], "passed");
+    assert_eq!(report["desktop_access"], false);
+    assert!(report["local_cursor_checks"].as_u64().unwrap() >= 20);
+}
+
+#[test]
 fn generated_win32_shapes_match_os_compositing_and_capture_events_expire() {
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_pab-media-worker"))
         .arg("cursor-win32-check")

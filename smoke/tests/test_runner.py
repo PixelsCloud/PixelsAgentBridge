@@ -49,6 +49,36 @@ class ResultTests(unittest.TestCase):
                 self.assertTrue((run.ROOT / source).is_file(), source)
             self.assertNotIn("live_status", definition)
 
+    def test_file_transfer_acceptance_has_all_independent_cases_without_implied_passes(self):
+        cases = {case["id"]: case for case in run.catalog() if case["id"].startswith("FT-")}
+        expected = {f"FT-{number:03}" for numbers in (range(1, 27), range(101, 122), range(201, 212)) for number in numbers}
+        self.assertEqual(set(cases), expected)
+        for case in cases.values():
+            self.assertNotIn("adapter", case, "A core/unit adapter must not imply full acceptance")
+            self.assertNotIn("status", case)
+            self.assertGreaterEqual(len(case["steps"]), 2)
+        self.assertEqual(cases["FT-208"]["level"], "soak")
+        self.assertNotIn("android", cases["FT-001"]["targets"], "Android is a receiving endpoint, not the desktop window")
+        self.assertIn("android", cases["FT-115"]["targets"])
+        self.assertIn("relay", cases["FT-103"]["targets"])
+
+    def test_catalog_rejects_duplicate_three_digit_case_ids(self):
+        with TemporaryDirectory() as temp:
+            path = Path(temp)
+            fixture = '''[[case]]
+id = "FT-001"
+title = "Fixture"
+targets = ["windows"]
+level = "release"
+prerequisite = "owned fixture"
+steps = ["act"]
+expected = ["verify"]
+cleanup = "remove owned fixture"
+'''
+            (path / "cases.toml").write_text(fixture * 2, encoding="utf-8")
+            with patch.object(run, "HOME", path), self.assertRaisesRegex(ValueError, "duplicate"):
+                run.catalog()
+
     def test_production_url_rejected_before_browser_starts(self):
         with patch("smoke.adapters.shutil.which", return_value="node"):
             with self.assertRaisesRegex(ValueError, "loopback"):
@@ -57,6 +87,22 @@ class ResultTests(unittest.TestCase):
     def test_excess_build_jobs_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "jobs"):
             command_for("python", Path("."), {"execution": {"jobs": 11}})
+
+    def test_linux_native_compatibility_uses_distributed_driver_and_real_counts(self):
+        with patch("smoke.adapters.sys.platform", "linux"), patch("smoke.adapters.shutil.which", return_value="/usr/bin/g++"):
+            command, cwd, env, parser = command_for("linux-media-compat", Path("smoke/tmp/fixture"), {})
+        self.assertEqual(parser, "counts")
+        self.assertTrue(Path(command[1]).is_file())
+        self.assertEqual(Path(command[1]).name, "linux_media_compat.py")
+        self.assertIn("--output", command)
+        self.assertEqual(env["CMAKE_BUILD_PARALLEL_LEVEL"], "1")
+
+    def test_linux_native_compatibility_rejects_missing_tools_or_other_hosts(self):
+        with patch("smoke.adapters.sys.platform", "win32"), self.assertRaisesRegex(ValueError, "Linux host"):
+            command_for("linux-media-compat", Path("."), {})
+        with patch("smoke.adapters.sys.platform", "linux"), patch("smoke.adapters.shutil.which", return_value=None):
+            with self.assertRaisesRegex(ValueError, r"g\+\+"):
+                command_for("linux-media-compat", Path("."), {})
 
     def test_redaction(self):
         value = run.redact('password="super-secret" Authorization: Bearer abc123\nhttps://user:pass@example.com')

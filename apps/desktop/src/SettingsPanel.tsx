@@ -9,6 +9,7 @@ import { macosPermissionText } from "./macosPermissionText";
 import { AgentIntegrationsPanel } from "./AgentIntegrationsPanel";
 import { UpdatePanel } from "./UpdatePanel";
 import { ServerAddressField } from "./ServerAddressField";
+import { ProjectRepositoryButton } from "./ProjectRepositoryButton";
 
 type ServerSettings = {
   controlUrl: string;
@@ -128,6 +129,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
         <div className="settings-about-product">
           <h2>Pixels Agent Bridge</h2>
           <span className="settings-about-version">V{__PAB_RELEASE_VERSION__}</span>
+          <ProjectRepositoryButton language={language} />
         </div>
         <p className="settings-about-intro">{t.settingsAboutIntro}</p>
         <UpdatePanel language={language} />

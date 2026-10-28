@@ -82,12 +82,12 @@ const BASE: &str = r#"FROM devices d
  AND ($6::text IS NULL OR CASE WHEN r.execution_context->>'os_family' IN ('windows','linux','macos','android') THEN r.execution_context->>'os_family' ELSE 'unknown' END=$6)
  AND ($7::uuid IS NULL OR p.user_id=$7)
  AND ($8::text IS NULL OR CASE WHEN r.execution_context->>'architecture' IN ('x86_64','aarch64') THEN r.execution_context->>'architecture' ELSE 'unknown' END=$8)
- AND ($9::text IS NULL OR r.agent_version=$9)
- AND ($10::text IS NULL OR ($10='reported')=(NULLIF(btrim(r.agent_version),'') IS NOT NULL))"#;
+ AND ($9::text IS NULL OR r.client_version=$9)
+ AND ($10::text IS NULL OR ($10='reported')=(NULLIF(btrim(r.client_version),'') IS NOT NULL))"#;
 const FIELDS: &str = r#"d.id,d.code,d.name,d.revision,d.status,p.revision AS association_revision,COALESCE(p.user_id=$2,false) AS associated_with_me,
  r.execution_context->>'os_family' AS system,r.execution_context->>'os_name' AS os_name,
  r.execution_context->>'os_version' AS os_version,r.execution_context->>'architecture' AS architecture,
- r.agent_version,p.user_id AS associated_user_id,owner.username AS associated_username,
+ r.agent_version,r.client_version,p.user_id AS associated_user_id,owner.username AS associated_username,
  r.device_id IS NOT NULL AS runtime_reported,(extract(epoch from r.accepted_at)*1000)::bigint AS runtime_accepted_at,
  (extract(epoch from d.created_at)*1000)::bigint AS created_at,
  (extract(epoch from d.last_online_at)*1000)::bigint AS last_online_at,
@@ -100,6 +100,7 @@ fn device(row: sqlx::postgres::PgRow) -> Result<Value, sqlx::Error> {
       "status":row.try_get::<String,_>("status")?,"system":row.try_get::<Option<String>,_>("system")?,
       "os_name":row.try_get::<Option<String>,_>("os_name")?,"os_version":row.try_get::<Option<String>,_>("os_version")?,
       "architecture":row.try_get::<Option<String>,_>("architecture")?,"agent_version":row.try_get::<Option<String>,_>("agent_version")?,
+      "client_version":row.try_get::<Option<String>,_>("client_version")?,
       "associated_user_id":row.try_get::<Option<Uuid>,_>("associated_user_id")?,"associated_username":row.try_get::<Option<String>,_>("associated_username")?,
       "diagnostics":{"runtime_reported":row.try_get::<bool,_>("runtime_reported")?,"reported_at":row.try_get::<Option<i64>,_>("runtime_accepted_at")?,"permissions":"not_reported","compatibility":"not_reported"},
       "created_at":row.try_get::<i64,_>("created_at")?,"last_online_at":row.try_get::<Option<i64>,_>("last_online_at")?,
@@ -208,7 +209,7 @@ pub(crate) async fn diagnostics(
         r#"WITH visible AS (SELECT
         CASE WHEN r.execution_context->>'os_family' IN ('windows','linux','macos','android') THEN r.execution_context->>'os_family' END system,
         CASE WHEN r.execution_context->>'architecture' IN ('x86_64','aarch64') THEN r.execution_context->>'architecture' END architecture,
-        NULLIF(btrim(r.agent_version),'') version,r.device_id IS NOT NULL reported,
+        NULLIF(btrim(r.client_version),'') version,r.device_id IS NOT NULL reported,
         EXISTS(SELECT 1 FROM endpoints e WHERE e.device_id=d.id AND e.status='active' AND e.endpoint_key=ANY($5::bytea[])) online {BASE})
         SELECT jsonb_build_object('total',count(*),'online',count(*) FILTER(WHERE online),'offline',count(*) FILTER(WHERE NOT online),
         'reported',count(*) FILTER(WHERE reported),'not_reported',count(*) FILTER(WHERE NOT reported),
