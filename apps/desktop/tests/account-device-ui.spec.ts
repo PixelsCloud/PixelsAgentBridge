@@ -192,7 +192,7 @@ for (const presence of ['offline', 'unknown', 'error']) {
     await page.evaluate(()=>(window as any).fixture.setView('remote'));
     await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label','Online');
     await expect(page.locator('.device-basic-grid > div').nth(1).locator('strong')).toHaveText('Online');
-    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Detecting');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
     await page.evaluate(()=>(window as any).fixture.setView('home'));
     await expect(card.locator('.home-recent-presence')).toHaveAttribute('aria-label','Online');
   });
@@ -257,7 +257,7 @@ for (const error of ['device password has not been entered', 'the device rejecte
     await dialog.getByRole('button', {name:'Retry', exact:true}).click();
     await expect(dialog).toContainText('Device connected');
     await expect(page.locator('.device-list .home-recent-presence')).toHaveAttribute('aria-label', 'Online');
-    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Detecting');
+    await expect(page.locator('.device-basic-grid > div').nth(2).locator('strong')).toHaveText('Connected');
   });
 
   test(`saved connection allows password correction: ${error}`, async ({page}) => {

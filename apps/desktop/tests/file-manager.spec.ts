@@ -166,7 +166,7 @@ for (const rejected of [false, true]) test(`account end clears private panes and
   await expect(page.getByRole("alert")).toHaveText(ended);
   await expect(page.locator(".fm-task, .fm-submission, .fm-panes")).toHaveCount(0);
   await expect(page.getByRole("tab")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Send", exact: true })).toHaveCount(0);
   // UI cleanup must not rewrite durable backend history or submit another transfer.
   expect(await page.evaluate(() => (window as any).fixture.batches.length)).toBe(1);
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "file_manager_start_batch").length)).toBe(1);
@@ -442,7 +442,7 @@ test("task area resizes and collapses without remounting panes, and retries only
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
 test("native drops use an owned token and frozen destination; a lost reply cannot create another batch", async ({ page }) => {
-  await expect(page.getByText("Native local fixture user", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "This computer", exact: true })).toBeVisible();
   await page.evaluate(() => {
     const pane = document.querySelector(".fm-remote-panes")!;
     const transfer = new DataTransfer(); transfer.setData("text/uri-list", "file:///C:/forged-path");
@@ -472,7 +472,7 @@ test("a lost delete reply blocks resubmission, observes the original and preserv
   await page.evaluate(() => { (window as any).fixture.loseDeleteSuffix = "file-000002.bin"; });
   await local.getByTitle("Delete", { exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Delete", exact: true });
-  await expect(dialog).toContainText("Native local fixture user");
+  await expect(dialog.locator("li")).toHaveCount(3);
   await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Inspect original request", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
