@@ -14,41 +14,44 @@ Click any screenshot to view it at full size.
 
 [![Pixels Agent Bridge main interface](assets/images/en/main-en.jpg)](assets/images/en/main-en.jpg)
 
-### MCP connections
-
-See each agent's connections, tool calls, and tasks.
-
-[![MCP connections and agent session details](assets/images/en/mcp-en.jpg)](assets/images/en/mcp-en.jpg)
-
-### Activity history
-
-Review commands and file transfers in local task history.
-
-[![Local activity history with command execution details](assets/images/en/activity-en.jpg)](assets/images/en/activity-en.jpg)
-
-### Remote desktop
-
-View a remote screen and take control when needed.
-
-[![Remote desktop viewer with screen selection and control toolbar](assets/images/en/remote-en.jpg)](assets/images/en/remote-en.jpg)
-
-### File transfer
-
-Browse local and remote files side by side and track transfers.
-
-[![Two-pane file manager with transfer progress](assets/images/en/ft-en.jpg)](assets/images/en/ft-en.jpg)
-
-### Remote terminal
-
-Run commands interactively in a dedicated terminal window.
-
-[![Remote terminal running an interactive PowerShell session](assets/images/en/terminal-en.jpg)](assets/images/en/terminal-en.jpg)
-
-### Web console
-
-Monitor users, devices, traffic, and Relay nodes in one place.
-
-[![Web console overview of devices, traffic, and Relay status](assets/images/en/pab-en.jpg)](assets/images/en/pab-en.jpg)
+<table>
+  <tr>
+    <th width="50%">MCP connections</th>
+    <th width="50%">Activity history</th>
+  </tr>
+  <tr>
+    <td align="center">Agent sessions and tools</td>
+    <td align="center">Local task history</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><a href="assets/images/en/mcp-en.jpg"><img src="assets/images/en/mcp-en.jpg" alt="MCP connections and agent session details" width="100%"></a></td>
+    <td width="50%" valign="top"><a href="assets/images/en/activity-en.jpg"><img src="assets/images/en/activity-en.jpg" alt="Local activity history with command execution details" width="100%"></a></td>
+  </tr>
+  <tr>
+    <th width="50%">Remote desktop</th>
+    <th width="50%">File transfer</th>
+  </tr>
+  <tr>
+    <td align="center">View and control devices</td>
+    <td align="center">Browse and transfer files</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><a href="assets/images/en/remote-en.jpg"><img src="assets/images/en/remote-en.jpg" alt="Remote desktop viewer with screen selection and control toolbar" width="100%"></a></td>
+    <td width="50%" valign="top"><a href="assets/images/en/ft-en.jpg"><img src="assets/images/en/ft-en.jpg" alt="Two-pane file manager with transfer progress" width="100%"></a></td>
+  </tr>
+  <tr>
+    <th width="50%">Remote terminal</th>
+    <th width="50%">Web console</th>
+  </tr>
+  <tr>
+    <td align="center">Interactive commands</td>
+    <td align="center">Devices, traffic and Relay</td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><a href="assets/images/en/terminal-en.jpg"><img src="assets/images/en/terminal-en.jpg" alt="Remote terminal running an interactive PowerShell session" width="100%"></a></td>
+    <td width="50%" valign="top"><a href="assets/images/en/pab-en.jpg"><img src="assets/images/en/pab-en.jpg" alt="Web console overview of devices, traffic, and Relay status" width="100%"></a></td>
+  </tr>
+</table>
 
 ## What it can do
 
