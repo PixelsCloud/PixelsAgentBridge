@@ -68,7 +68,8 @@ def main():
         try:
             for device in lab['device']:
                 code, family = device['code'], device['os']
-                root = (r'C:\Windows\Temp\pab-git-' if family == 'windows' else '/tmp/pab-git-') + str(uuid.uuid4())
+                temp = r'C:\Windows\Temp' if family == 'windows' else '/private/tmp' if family == 'macos' else '/tmp'
+                root = temp + ('\\pab-git-' if family == 'windows' else '/pab-git-') + str(uuid.uuid4())
                 repo, peer, bare = root + '/repo', root + '/peer', root + '/remote.git'
                 created = False
                 try:
@@ -124,7 +125,7 @@ def main():
                     if created:
                         cls = PureWindowsPath if family == 'windows' else PurePosixPath
                         target = cls(root)
-                        assert target.parent == cls(r'C:\Windows\Temp' if family == 'windows' else '/tmp')
+                        assert target.parent == cls(temp)
                         uuid.UUID(target.name.removeprefix('pab-git-'))
                         result = call('pab_file_delete', {'device_code': code, 'path': root, 'recursive': True, 'max_entries': 1000, 'max_bytes': 10 * 1024 * 1024})
                         report['cleanup'].append({'device': code, 'confirmed': result['result']['state'] == 'completed'})
