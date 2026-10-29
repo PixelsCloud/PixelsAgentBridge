@@ -46,3 +46,7 @@ path = "../../smoke/remote_desktop_stability.rs"
 [[example]]
 name = "android_desktop_protocol"
 path = "../../smoke/android_desktop_protocol.rs"
+
+[[example]]
+name = "image_clipboard_network"
+path = "../../smoke/image_clipboard_network.rs"

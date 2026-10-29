@@ -132,7 +132,14 @@ impl VideoFlow {
     pub(crate) fn backlog_deadline(&self) -> Option<Instant> {
         self.flights
             .front()
-            .map(|frame| frame.started + MAX_BACKLOG_AGE)
+            .map(|frame| frame.started + self.backlog_budget())
+    }
+    pub(crate) fn backlog_budget(&self) -> Duration {
+        // Successful presentation RTT includes network and display latency.
+        // Give a slow but progressing connection bounded grace, never extend
+        // a frame's deadline merely because heartbeats/duplicate ACKs arrive.
+        Duration::from_micros(self.presentation_ack_last_us.unwrap_or(0).saturating_mul(4))
+            .clamp(MAX_BACKLOG_AGE, Duration::from_secs(12))
     }
     pub(crate) fn diagnostics(&self, now: Instant) -> (u64, u64, Option<u64>, Option<u64>) {
         (self.sent, self.acknowledged, self.presentation_ack_last_us,
@@ -150,6 +157,22 @@ impl VideoFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn delayed_acks_get_bounded_grace_but_duplicates_do_not_extend_it() {
+        let start = Instant::now();
+        let mut flow = VideoFlow::new(30);
+        flow.begin_send(start).unwrap();
+        assert_eq!(flow.backlog_deadline(), Some(start + Duration::from_secs(5)));
+        flow.acknowledge(1, start + Duration::from_secs(2)).unwrap();
+        let next = start + Duration::from_secs(3);
+        flow.begin_send(next).unwrap();
+        assert_eq!(flow.backlog_deadline(), Some(next + Duration::from_secs(8)));
+        flow.acknowledge(1, next + Duration::from_secs(7)).unwrap();
+        assert_eq!(flow.backlog_deadline(), Some(next + Duration::from_secs(8)));
+        flow.acknowledge(2, next + Duration::from_secs(10)).unwrap();
+        flow.begin_send(next + Duration::from_secs(11)).unwrap();
+        assert_eq!(flow.backlog_budget(), Duration::from_secs(12));
+    }
 
     #[test]
     fn restarting_preserves_capacity_without_reusing_old_frame_credit() {

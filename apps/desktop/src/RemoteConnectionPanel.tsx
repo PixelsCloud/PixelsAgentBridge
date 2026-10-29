@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { OsLogo } from "./OsLogo";
@@ -48,7 +49,7 @@ export function RemoteConnectionPanel({
       </div>
       <Input className="device-search" aria-label={t.searchDevices} placeholder={t.searchDevices}
         prefix={<Search size={15} />} allowClear value={search} onChange={(event) => setSearch(event.target.value)} />
-      {error && <div className="inline-error" role="alert">{error}</div>}
+      {error && <div className="inline-error" role="alert">{userFacingError(error, language)}</div>}
       {sortedDevices.length === 0 ? <div className="empty-list">{devices.length === 0 ? t.noConnectedDevices : t.noMatchingDevices}</div> : (
         <div className="device-list">
           {sortedDevices.map((device) => {

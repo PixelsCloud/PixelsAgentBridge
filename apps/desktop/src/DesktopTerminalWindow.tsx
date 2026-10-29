@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -11,6 +12,7 @@ import "@xterm/xterm/css/xterm.css";
 import "./windowChrome.css";
 import "./desktopTerminal.css";
 import { desktopTerminalText } from "./desktopTerminalText";
+import { initialLanguage } from "./i18n";
 import type { ExecutionEntry, ExecutionReply, ExecutionSelection } from "./executionQueries";
 import type { ExecutionIdentity } from "./operatorTypes";
 
@@ -22,7 +24,7 @@ function terminalError(cause: unknown): string {
   return message;
 }
 type LaunchMode = "console" | "system" | null;
-const language = localStorage.getItem("pab.language");
+const language = initialLanguage();
 const text = desktopTerminalText[language === "en" ? "en" : "zh-CN"];
 const dark = localStorage.getItem("pab.theme") === "dark";
 
@@ -249,7 +251,7 @@ function TerminalContent() {
         if (typeof event.reason !== "string" || (event.exit_code !== null && !Number.isInteger(event.exit_code))) { fail("invalid terminal ending fields"); return; }
         live.current = false; setPhase("ended");
         if (event.exit_code !== null) mustEnd.current = false;
-        setReason(`${event.reason}${event.exit_code === null ? "" : ` · ${event.exit_code}`}`);
+        setReason(`${userFacingError(event.reason, language)}${event.exit_code === null ? "" : ` · ${event.exit_code}`}`);
       } else fail("invalid terminal IPC frame kind");
       };
       if (acceptance?.paused && new Uint8Array(buffer)[0] === 0) {
@@ -287,7 +289,7 @@ function TerminalContent() {
     const timer = window.setInterval(() => void poll(), 2000);
     return () => {active = false; window.clearInterval(timer);};
   }, [phase, opened?.session_id]);
-  const options = [{ value: "service", label: text.service }, ...accounts.filter((entry) => entry.mode === "user").map((entry, index) => ({ value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${index}`, label: `${entry.account_name}${entry.session_id ? ` · ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${entry.unavailable_reason}` : ""}`, disabled: !entry.selection }))];
+  const options = [{ value: "service", label: text.service }, ...accounts.filter((entry) => entry.mode === "user").map((entry, index) => ({ value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${index}`, label: `${entry.account_name}${entry.session_id ? ` · ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${userFacingError(entry.unavailable_reason)}` : ""}`, disabled: !entry.selection }))];
   return <div className={`desktop-terminal ${dark ? "desktop-terminal-dark" : ""}`}>
     <header className="titlebar desktop-terminal-header"
       onMouseDown={(event) => {
@@ -316,7 +318,7 @@ function TerminalContent() {
     {!launchMode && (phase === "ready" || phase === "ended" || phase === "preparing") && <div className="desktop-terminal-setup"><Select aria-label={text.account} style={{ minWidth: 250, maxWidth: 520, flex: 1 }} placeholder={text.choose} value={selected || undefined} options={options} onChange={setSelected} showSearch optionFilterProp="label" loading={loadingAccounts} />
       <Button icon={<RefreshCw size={14} />} onClick={() => void refreshAccounts()} loading={loadingAccounts}>{text.refresh}</Button><Button type="primary" disabled={!selected || loadingAccounts} onClick={() => void start()}>{opened ? text.reopen : text.open}</Button></div>}
     {launchMode && phase === "ended" && <div className="desktop-terminal-setup"><Button type="primary" onClick={() => void automaticStart()}>{text.reopen}</Button></div>}
-    {error && <Alert className="desktop-terminal-alert" type="error" showIcon title={text.error} description={error} closable onClose={() => setError("")} />}
+    {error && <Alert className="desktop-terminal-alert" type="error" showIcon title={text.error} description={userFacingError(error)} closable onClose={() => setError("")} />}
     {reason && <Alert className="desktop-terminal-alert" type="info" title={`${text.endedReason}: ${reason}`} />}
     {opened?.os_family === "macos" && phase === "running" && !privacyHintDismissed && <Alert className="desktop-terminal-alert" type="info" showIcon title={text.macosFilesTitle} description={text.macosFilesBody} closable onClose={() => setPrivacyHintDismissed(true)} />}
     <div className="desktop-terminal-screen"><div className="desktop-terminal-host" ref={host} /></div>

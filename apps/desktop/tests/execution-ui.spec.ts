@@ -57,7 +57,7 @@ test("application mutations inspect the same ID without replay", async ({ page }
   await page.getByRole("table").getByRole("radio").check();
   await page.evaluate(() => { (window as any).fixture.rejectNext = true; });
   await page.getByRole("button", { name: "Launch application" }).click();
-  await expect(page.getByText("fixture request rejected before submission")).toBeVisible();
+  await expect(page.getByText("The operation did not complete. Check its current state; diagnostic logs can help investigate.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Launch application" })).toBeEnabled();
   await page.getByRole("button", { name: "Launch application" }).click();
   await expect(page.getByRole("button", { name: "Launch application" })).toBeDisabled();

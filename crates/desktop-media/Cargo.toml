@@ -14,7 +14,11 @@ openh264 = "=0.9.8"
 openh264-sys2 = "=0.9.9"
 
 [target.'cfg(any(windows, target_os = "macos", target_os = "linux"))'.dependencies]
-arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
+arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control", "image-data"] }
+image = { version = "=0.25.10", default-features = false, features = ["png", "bmp"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Ole", "Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
 cc = "1"
@@ -27,3 +31,7 @@ path = "src/main.rs"
 [[example]]
 name = "remote_desktop_color"
 path = "../../smoke/remote_desktop_color.rs"
+
+[[example]]
+name = "image_clipboard_check"
+path = "../../smoke/image_clipboard_check.rs"

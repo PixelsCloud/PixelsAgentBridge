@@ -31,7 +31,7 @@ test('download automatically starts installation only after verification complet
 test('a failed download or verification never launches the installer', async ({ page }) => {
   await page.goto('http://127.0.0.1:1429/tests/update-notice.html?panel=update&downloadError');
   await page.getByRole('button', { name: '下载并安装', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('checksum does not match');
+  await expect(page.getByRole('alert')).toContainText('更新包校验失败，已停止安装');
   expect(await page.evaluate(() => (window as any).fixture.calls.includes('install_update'))).toBe(false);
   await expect(page.getByRole('button', { name: '检查更新' })).toBeEnabled();
 });
@@ -39,7 +39,7 @@ test('a failed download or verification never launches the installer', async ({ 
 test('installer launch failure allows retry with revalidation and no confirmation dialog', async ({ page }) => {
   await page.goto('http://127.0.0.1:1429/tests/update-notice.html?panel=update&installError');
   await page.getByRole('button', { name: '下载并安装', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Could not start the installer');
+  await expect(page.getByRole('alert')).toContainText('无法启动安装程序');
   await page.getByRole('button', { name: '重试安装', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: string) => c.endsWith('_update')))).toEqual(['download_update', 'install_update', 'download_update', 'install_update']);
   await expect(page.getByRole('alert')).toHaveCount(0);

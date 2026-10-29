@@ -69,9 +69,9 @@ test("settings errors survive permission polling and never fall back to Finder",
   await page.goto(url);
   await page.evaluate(() => { (window as any).fixture.fail = "open_macos_permission_settings"; });
   await service(page).getByRole("button", { name: "Set permissions" }).click();
-  await expect(page.getByRole("alert")).toContainText("Native action failed");
+  await expect(page.getByRole("alert")).toContainText("Could not open permission settings.");
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "macos_permissions").length)).toBeGreaterThan(3);
-  await expect(page.getByRole("alert")).toContainText("Native action failed");
+  await expect(page.getByRole("alert")).toContainText("Could not open permission settings.");
   expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "reveal_macos_permission_target"))).toBe(false);
 });
 

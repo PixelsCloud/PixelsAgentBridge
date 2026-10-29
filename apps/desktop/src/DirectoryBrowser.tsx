@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { File, Folder, Link2 } from "lucide-react";
@@ -85,7 +86,7 @@ export function DirectoryBrowser({ code, osFamily, connected, language, onAuditC
       }} />
       <Button loading={loading} disabled={!connected || !path.trim() || !execution} onClick={() => void browse(path, null, "first")}>{loading ? t.loadingHistory : t.directoryBrowse}</Button>
     </div>
-    {error && <div className="inline-error" role="alert">{error}</div>}
+    {error && <div className="inline-error" role="alert">{userFacingError(error, language)}</div>}
     {page && <>
       <div className="directory-entries">
         {page.entries.length === 0 ? <small>{t.directoryEmpty}</small> : page.entries.map((entry) => (

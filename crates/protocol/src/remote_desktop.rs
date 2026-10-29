@@ -184,6 +184,11 @@ impl DesktopOpened {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopRequest {
+    /// Authenticated, read-only confirmation token for the currently occupied slot.
+    Occupancy,
+    /// Retire only the session the user confirmed, never a replacement session.
+    Takeover { session_id: RequestId },
+    SessionStatus { session_id: RequestId },
     Clipboard {
         version: u16,
         session_id: RequestId,
@@ -198,6 +203,9 @@ pub enum RemoteDesktopRequest {
     },
     Control {
         session_id: RequestId,
+        /// ACK replies may overtake slow input replies; mutations remain ordered.
+        #[serde(default)]
+        independent_ack: bool,
     },
     Video {
         session_id: RequestId,
@@ -235,6 +243,7 @@ pub enum DesktopErrorCode {
     Unsupported,
     InvalidRequest,
     Busy,
+    TakenOver,
     NotFound,
     WrongOwner,
     StaleGeneration,
@@ -243,11 +252,14 @@ pub enum DesktopErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopReply {
+    Occupancy { session_id: Option<RequestId> },
     Clipboard {
         version: u16,
         revision: u64,
         changed: bool,
         bytes: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        image: Option<crate::DesktopClipboardImage>,
     },
     Opened {
         opened: DesktopOpened,

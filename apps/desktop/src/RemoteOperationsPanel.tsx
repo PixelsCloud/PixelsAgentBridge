@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 import { Button, Checkbox, Input, Menu, Progress, Segmented } from "antd";
@@ -130,7 +131,7 @@ export function RemoteOperationsPanel({
                     <Progress percent={transfer.size ? Math.round(transfer.offset / transfer.size * 100) : 0} size="small" showInfo={false} />
                     {["cancel_requested", "unconfirmed"].includes(transfer.state) && <><small>{t.transferCancelUnconfirmed}</small><Button onClick={onInspectTransfer}>{t.appsInspect}</Button></>}
                     {transfer.executionIdentity && <ExecutionIdentityView identity={transfer.executionIdentity} language={language} />}
-                    {transfer.message && <small>{transfer.message}</small>}
+                    {transfer.message && <small>{userFacingError(transfer.message, language)}</small>}
                     {transfer.state === "running" && <Button type="text" onClick={() => onCancelTransfer()}>{t.cancelTransfer}</Button>}
                   </div>
                 )}

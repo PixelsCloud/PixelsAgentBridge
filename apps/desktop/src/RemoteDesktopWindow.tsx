@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -13,7 +14,7 @@ import { pipelineRows, type PipelinePerformance } from "./remoteDesktopDiagnosti
 type Screen = { id: string; name: string; desktop_width: number; desktop_height: number; primary: boolean };
 type Quality = { session_id: string; generation: number; capture_fps_milli: number; encoder_target_bps: number | null };
 type Status = {
-  phase: string; error?: string; input_ready?: boolean; input_enabled?: boolean; frame_ready?: boolean;
+  phase: string; takeover_session?: string | null; error?: string; input_ready?: boolean; input_enabled?: boolean; frame_ready?: boolean;
   decoder?: string | null; quality?: Quality | null; remote_os?: string | null; connection_path?: string | null;
   performance?: PipelinePerformance | null;
   clipboard_enabled?: boolean; clipboard_state?: string;
@@ -27,8 +28,8 @@ const inputText = english
   ? { enable: "Enable control", disable: "Stop control", active: "Control enabled" }
   : { enable: "启用操作", disable: "停止操作", active: "可操作" };
 const clipboardText = english
-  ? { enable: "Enable text clipboard sync", disable: "Disable text clipboard sync", waiting: "Text clipboard: waiting for control", active: "Text clipboard: syncing", disabled: "Text clipboard: off", unsupported: "Text clipboard: update the remote app to enable", unavailable: "Text clipboard is temporarily unavailable; retrying", paste_failed: "Clipboard sync failed. Paste was not sent; please try again." }
-  : { enable: "开启文字剪贴板同步", disable: "关闭文字剪贴板同步", waiting: "文字剪贴板：等待启用操作", active: "文字剪贴板：同步中", disabled: "文字剪贴板：已关闭", unsupported: "文字剪贴板：请升级远端程序", unavailable: "文字剪贴板暂不可用，正在重试", paste_failed: "剪贴板同步失败，未发送粘贴，请重试。" };
+  ? { enable: "Enable clipboard (text and images) sync", disable: "Disable clipboard (text and images) sync", syncing: "Clipboard: transferring", too_large: "Image too large (PNG up to 32 MiB; decoded pixels up to 64 MiB)", waiting: "Clipboard: waiting for control", active: "Clipboard: syncing", disabled: "Clipboard: off", unsupported: "Clipboard: update the remote app to enable", unavailable: "Clipboard is temporarily unavailable; retrying", paste_failed: "Clipboard sync failed. Paste was not sent; please try again." }
+  : { enable: "开启剪贴板（文字、图片）同步", disable: "关闭剪贴板（文字、图片）同步", syncing: "剪贴板：正在传输", too_large: "图片过大（PNG 上限 32 MiB，解码像素上限 64 MiB）", waiting: "剪贴板（文字、图片）：等待启用操作", active: "剪贴板（文字、图片）：同步中", disabled: "剪贴板（文字、图片）：已关闭", unsupported: "剪贴板（文字、图片）：请升级远端程序", unavailable: "剪贴板（文字、图片）暂不可用，正在重试", paste_failed: "剪贴板同步失败，未发送粘贴，请重试。" };
 
 export default function RemoteDesktopWindow() {
   const [status, setStatus] = useState<Status>({ phase: "ready" });
@@ -40,8 +41,23 @@ export default function RemoteDesktopWindow() {
   const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
   const clipboardEnabled = status.clipboard_enabled !== false;
   const clipboardState = status.clipboard_state || "waiting";
-  const clipboardHint = clipboardText[clipboardState as keyof typeof clipboardText] || clipboardText.waiting;
+  const clipboardHint = clipboardState === "unsupported" && status.remote_os === "android"
+    ? (english ? "Clipboard sync is not supported on Android yet" : "Android 暂无剪贴板同步功能")
+    : clipboardText[clipboardState as keyof typeof clipboardText] || clipboardText.waiting;
   const closePending = useRef(false);
+  const takeoverPrompted = useRef<string | null>(null);
+  async function requestTakeover() {
+    setBusy(true); setError("");
+    try { await invoke("desktop_viewer_takeover", { english }); }
+    catch (cause) { setError(String(cause)); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => {
+    if (status.phase === "occupied" && status.takeover_session && takeoverPrompted.current !== status.takeover_session) {
+      takeoverPrompted.current = status.takeover_session;
+      void requestTakeover();
+    }
+  }, [status.phase, status.takeover_session]);
   const { appWindow, fullscreen, toggleFullscreen } = useViewerFullscreen(setError);
   async function requestClose() {
     if (closePending.current) return;
@@ -110,7 +126,7 @@ export default function RemoteDesktopWindow() {
   const opened = status.opened;
   const quality = status.phase === "viewing" ? status.quality : null;
   const connectionPath = status.connection_path === "p2p" ? "P2P" : status.connection_path === "relay" ? "Relay" : null;
-  const phase = (text[status.phase as keyof typeof text] || status.phase) + (status.phase === "viewing" && connectionPath ? (english ? ` (${connectionPath})` : `（${connectionPath}）`) : "");
+  const phase = (status.phase === "occupied" ? (english ? "Device in use" : "设备正在被控制") : status.phase === "taken_over" ? (english ? "Session taken over" : "会话已被接管") : text[status.phase as keyof typeof text] || (english ? "Unknown status" : "状态未知")) + (status.phase === "viewing" && connectionPath ? (english ? ` (${connectionPath})` : `（${connectionPath}）`) : "");
   const unknown = english ? "Not reported" : "未上报";
   const decoder = status.decoder === "openh264_software"
     ? (english ? "Software decoding" : "软件解码")
@@ -132,7 +148,7 @@ export default function RemoteDesktopWindow() {
     ...(status.phase === "viewing" && status.performance ? pipelineRows(status.performance, english) : []),
     [english ? "First frame / input ready" : "首帧／输入就绪", `${status.frame_ready ? "✓" : "—"} / ${status.input_ready ? "✓" : "—"}`],
     [english ? "Input supported" : "远端输入支持", opened ? (opened.input_supported ? "✓" : "—") : unknown],
-    [english ? "Text clipboard" : "文字剪贴板", clipboardHint],
+    [english ? "Clipboard" : "剪贴板（文字、图片）", clipboardHint],
     [english ? "Generation" : "会话代次", opened ? String(opened.config.generation) : unknown],
     [english ? "Session" : "会话标识", opened?.config.session_id || unknown],
   ];
@@ -161,7 +177,7 @@ export default function RemoteDesktopWindow() {
       }}>
       <div className="titlebar-identity remote-desktop-title" title={title}><img className="brand-mark" src={brand} alt="" /><strong>{title}</strong></div>
       <span className="remote-desktop-phase" role="status">{phase}</span>
-      {error && <span className="remote-desktop-control-error" role="alert" title={error}>{error}</span>}
+      {error && <span className="remote-desktop-control-error" role="alert" title={userFacingError(error)}>{userFacingError(error)}</span>}
       {status.clipboard_state === "paste_failed" && <span className="remote-desktop-control-error" role="alert" title={clipboardText.paste_failed}>{english ? "Paste not sent" : "未发送粘贴"}</span>}
       {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
         request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
@@ -181,7 +197,7 @@ export default function RemoteDesktopWindow() {
         {status.remote_os === "windows" && <button className="remote-desktop-sas" disabled={busy || status.phase !== "viewing" || !status.input_enabled} onClick={() => void control({ secureAttention: true })}>Ctrl + Alt + Delete</button>}
         <button className="remote-desktop-icon-button" aria-label={statisticsTitle} title={statisticsTitle} aria-expanded={statisticsExpanded} aria-pressed={statisticsExpanded} onClick={() => setStatisticsExpanded(value => !value)}><Bug size={16} /></button>
         <button className="remote-desktop-icon-button" aria-label={fullscreen ? text.exitFull : text.full} title={fullscreen ? text.exitFull : text.full} aria-pressed={fullscreen} onClick={() => void toggleFullscreen()}>{fullscreen ? <Shrink size={15} /> : <Expand size={15} />}</button>
-        {status.phase === "failed" && <button disabled={busy} onClick={() => void control({ retry: true })}>{text.retry}</button>}
+        {["failed", "occupied", "taken_over"].includes(status.phase) && <button disabled={busy} onClick={() => void control({ retry: true })}>{text.retry}</button>}
       </div>
       <div className="window-controls">
         <button className="remote-desktop-theme" aria-label={english ? "Switch theme" : "切换主题"} title={english ? "Switch theme" : "切换主题"} onClick={() => { const next = !dark; localStorage.setItem("pab.theme", next ? "dark" : "light"); setDark(next); }}>{dark ? <Sun /> : <Moon />}</button>
@@ -191,7 +207,14 @@ export default function RemoteDesktopWindow() {
       </div>
     </header>
     <section className="remote-desktop-placeholder">
-      {(error || status.error) ? <p role="alert">{error || status.error}</p> : <p>{status.phase === "ended" ? text.ended : text.waiting}</p>}
+      {status.phase === "occupied" ? <>
+        <p role="alert">{english ? "This device is being controlled by another session." : "这台设备正在被其他会话控制。"}</p>
+        {(error || status.error) && <p role="alert">{userFacingError(error || status.error)}</p>}
+        {status.takeover_session ? <button disabled={busy} onClick={() => void requestTakeover()}>{english ? "Take over" : "强制接管"}</button>
+          : <p>{english ? "Close the existing session, or update the remote app to enable takeover." : "请关闭原会话，或更新被控端以启用强制接管。"}</p>}
+      </> : status.phase === "taken_over" ? <p role="alert">{english ? "This session was taken over by another controller. Your input has been released." : "当前会话已被其他控制端接管，键盘和鼠标控制已释放。"}</p>
+      : (error || status.error) ? <p role="alert">{userFacingError(error || status.error)}</p>
+      : <p>{status.phase === "ended" ? text.ended : text.waiting}</p>}
     </section>
     <aside className="remote-desktop-statistics" aria-label={statisticsTitle} hidden={!statisticsExpanded}>
       <strong>{statisticsTitle}</strong><dl>{diagnostics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd
@@ -217,7 +240,7 @@ function AssistanceCompletion({ request, count, viewing, onComplete }: {
     finally { setFinishing(false); }
   }
   return <>
-    {error && <span role="alert" title={error}>{error}</span>}
+    {error && <span role="alert" title={userFacingError(error)}>{userFacingError(error)}</span>}
     <button className="remote-desktop-assistance" disabled={finishing || !viewing}
       title={request.request.expected_action} onClick={() => void complete()}>
       {english ? "Complete assistance" : "完成协助"}{count > 1 ? ` (${count})` : ""}: {request.request.expected_action}

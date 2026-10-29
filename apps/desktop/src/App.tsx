@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -324,7 +325,7 @@ function App() {
         </aside>
 
         <main className="workspace">
-          {error && <div className="toast error" role="status">{error}</div>}
+          {error && <div className="toast error" role="status">{userFacingError(error, language)}</div>}
 
           <div className={`page-content page-${view}`}>
             {view === "home" && (

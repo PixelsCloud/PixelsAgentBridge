@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Camera, X } from "lucide-react";
@@ -139,7 +140,7 @@ export function ScreenshotBrowser({ code, connected, language, onAuditChange }: 
     {live && <Button disabled={!connected} onClick={() => {
       void sendInput({ type: "secure_attention" }).finally(onAuditChange);
     }}>{t.sendSecureAttention}</Button>}
-    {error && <div className="inline-error" role="alert">{error}</div>}
+    {error && <div className="inline-error" role="alert">{userFacingError(error, language)}</div>}
     {live && <p className="form-hint">{t.remoteControlHint}</p>}
     {(live ? liveImage : image) && <>
       <div className="screenshot-meta">{(live ? liveImage : image)!.width} × {(live ? liveImage : image)!.height} · {(live ? liveImage : image)!.format.toUpperCase()}</div>

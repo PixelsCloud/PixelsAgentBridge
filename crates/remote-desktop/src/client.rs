@@ -19,6 +19,8 @@ mod ack_trace;
 pub use ack_trace::DesktopAckTrace;
 #[path = "client_clipboard.rs"]
 mod clipboard;
+#[path = "client_takeover.rs"]
+mod takeover;
 pub use clipboard::RemoteDesktopClipboardControl;
 
 struct Command {
@@ -386,7 +388,7 @@ impl RemoteDesktopSession {
         }
         let mut control = stream(
             &connection,
-            RemoteDesktopRequest::Control { session_id: id },
+            RemoteDesktopRequest::Control { session_id: id, independent_ack: true },
             timeout,
         )
         .await?;

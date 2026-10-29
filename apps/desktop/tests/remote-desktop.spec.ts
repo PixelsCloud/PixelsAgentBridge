@@ -1,5 +1,30 @@
 import { test, expect } from "@playwright/test";
 
+test("busy prompts once, cancellation preserves the session, and confirmation reconnects", async ({ page }) => {
+  await page.goto(viewer + "?language=zh-CN");
+  await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
+  await page.evaluate(() => (window as any).fixture.emit({ phase: "occupied", takeover_session: "existing-session" }));
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.takeoverDialogs)).toBe(1);
+  await expect(page.getByRole("alert")).toContainText("正在被其他会话控制");
+  await page.evaluate(() => (window as any).fixture.emit({ phase: "occupied", takeover_session: "existing-session" }));
+  expect(await page.evaluate(() => (window as any).fixture.takeoverDialogs)).toBe(1);
+  await page.evaluate(() => (window as any).fixture.takeoverAnswers.push(true));
+  await page.getByRole("button", { name: "强制接管", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.takeoverDialogs)).toBe(2);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("old hosts and displaced viewers show actionable messages without automatic takeover", async ({ page }) => {
+  await page.goto(viewer + "?language=zh-CN");
+  await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
+  await page.evaluate(() => (window as any).fixture.emit({ phase: "occupied" }));
+  await expect(page.getByText("请关闭原会话，或更新被控端以启用强制接管。")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).fixture.takeoverDialogs)).toBe(0);
+  await page.evaluate(() => (window as any).fixture.emit({ phase: "taken_over" }));
+  await expect(page.getByRole("alert")).toContainText("会话已被其他控制端接管");
+  await expect(page.getByRole("button", { name: "重新连接", exact: true })).toBeVisible();
+});
+
 const viewer = "http://127.0.0.1:1429/tests/remote-desktop.html";
 
 for (const language of ["en", "zh-CN"]) test(`pipeline measurements update without restarting video and reject obsolete generations (${language})`, async ({ page }) => {
@@ -41,30 +66,41 @@ for (const language of ["en", "zh-CN"]) test(`pipeline measurements update witho
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "desktop_viewer_overlay").length)).toBe(overlayCount);
 });
 
-test("text clipboard sync toggles independently without restarting video or input", async ({ page }) => {
+test("clipboard (text and images) sync toggles independently without restarting video or input", async ({ page }) => {
   await page.goto(viewer);
-  const toggle = page.getByRole("button", { name: "Disable text clipboard sync", exact: true });
+  const toggle = page.getByRole("button", { name: "Disable clipboard (text and images) sync", exact: true });
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await toggle.click();
-  await expect(page.getByRole("button", { name: "Enable text clipboard sync", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Enable clipboard (text and images) sync", exact: true })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("button", { name: "Stop control", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Enable text clipboard sync", exact: true }).click();
+  await page.getByRole("button", { name: "Enable clipboard (text and images) sync", exact: true }).click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "desktop_viewer_control"));
   expect(calls.map((call: any) => call.args)).toEqual([{ clipboardEnabled: false }, { clipboardEnabled: true }]);
 });
 
+test("Android clipboard reports an unavailable feature instead of an upgrade requirement", async ({ page }) => {
+  await page.goto(viewer + "?language=zh-CN&os=android");
+  await page.evaluate(() => (window as any).fixture.clipboard("unsupported"));
+  await expect(page.getByRole("button", { name: "关闭剪贴板（文字、图片）同步", exact: true })).toHaveAttribute("title", "Android 暂无剪贴板同步功能");
+});
+
 test("clipboard failures and old peers remain visible without failing the desktop", async ({ page }) => {
   await page.goto(viewer + "?language=zh-CN");
-  const toggle = page.getByRole("button", { name: "关闭文字剪贴板同步", exact: true });
+  const toggle = page.getByRole("button", { name: "关闭剪贴板（文字、图片）同步", exact: true });
   await page.evaluate(() => (window as any).fixture.clipboard("unsupported"));
-  await expect(toggle).toHaveAttribute("title", "文字剪贴板：请升级远端程序");
+  await expect(toggle).toHaveAttribute("title", "剪贴板（文字、图片）：请升级远端程序");
+  await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
+  await page.evaluate(() => (window as any).fixture.clipboard("syncing"));
+  await expect(toggle).toHaveAttribute("title", "剪贴板：正在传输");
+  await page.evaluate(() => (window as any).fixture.clipboard("too_large"));
+  await expect(toggle).toHaveAttribute("title", /32 MiB/);
   await expect(page.getByRole("button", { name: "停止操作", exact: true })).toBeEnabled();
   await page.evaluate(() => (window as any).fixture.clipboard("paste_failed"));
   await expect(page.locator("header").getByRole("alert")).toContainText("未发送粘贴");
   await page.evaluate(() => (window as any).fixture.clipboard("active"));
   await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
-  await expect(toggle).toHaveAttribute("title", "文字剪贴板：同步中");
+  await expect(toggle).toHaveAttribute("title", "剪贴板（文字、图片）：同步中");
 });
 
 for (const language of ["en", "zh-CN"]) test(`viewer close asks natively, cancellation keeps control and confirmation closes (${language})`, async ({ page }) => {
@@ -91,7 +127,7 @@ test("native close and repeated clicks share one pending confirmation and can re
   await page.evaluate(() => (window as any).fixture.nativeClose());
   expect(await page.evaluate(() => (window as any).fixture.closeDialogs)).toBe(1);
   await page.evaluate(() => { const f = (window as any).fixture; f.rejectClose = true; f.holdClose = false; f.releaseClose(); });
-  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not show close confirmation");
+  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not open the confirmation dialog. Please try again.");
   await page.evaluate(() => { const f = (window as any).fixture; f.rejectClose = false; f.closeAnswers = [true]; f.nativeClose(); });
   await expect.poll(() => page.evaluate(() => (window as any).fixture.closed)).toBe(true);
   await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
@@ -155,7 +191,7 @@ test("native-focus Escape and fullscreen failure synchronize the same local stat
   await page.evaluate(() => { (window as any).fixture.rejectFullscreen = true; });
   await page.getByRole("button", { name: "Fullscreen", exact: true }).click();
   await expect(page.locator("header")).toBeVisible();
-  await expect(page.locator("header").getByRole("alert")).toContainText("Fullscreen unavailable");
+  await expect(page.locator("header").getByRole("alert")).toContainText("Could not switch fullscreen mode.");
 });
 
 for (const native of [false, true]) test(`Esc wins over a delayed fullscreen reply (native focus: ${native})`, async ({ page }) => {
@@ -227,9 +263,9 @@ test("input remains gated by the first presented frame and unsupported peers", a
 test("control errors remain above native surface and capture failure can reconnect", async ({ page }) => {
   await page.goto(viewer); await page.evaluate(() => { (window as any).fixture.reject = true; });
   await page.getByRole("combobox", { name: "FPS" }).selectOption("30");
-  await expect(page.locator("header").getByRole("alert")).toContainText("Renderer is busy");
+  await expect(page.locator("header").getByRole("alert")).toContainText("The device is handling another operation.");
   await page.evaluate(() => { (window as any).fixture.reject = false; (window as any).fixture.fail(); });
-  await expect(page.getByRole("alert")).toContainText("Capture helper unavailable");
+  await expect(page.getByRole("alert")).toContainText("The remote display is temporarily unavailable.");
   await page.getByRole("button", { name: "Reconnect" }).click();
   await expect(page.getByRole("button", { name: "Stop control" })).toBeEnabled();
 });
@@ -306,7 +342,7 @@ test("current completion failure stays visible above the native surface and can 
   await complete.click();
   await expect(complete).toBeDisabled();
   await page.evaluate(() => (window as any).fixture.deferredCompletion.current.reject("Could not complete current request"));
-  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not complete current request");
+  await expect(page.locator("header").getByRole("alert")).toHaveText("Could not update the assistance request. Check its status before trying again.");
   await expect(complete).toBeEnabled();
   await page.evaluate(() => { (window as any).fixture.holdCompletion = []; });
   await complete.click();

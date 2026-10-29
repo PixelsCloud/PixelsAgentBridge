@@ -16,6 +16,10 @@ use tokio::time::Instant;
 mod cursor;
 #[path = "host_clipboard.rs"]
 mod clipboard;
+#[path = "host_takeover.rs"]
+mod takeover;
+#[path = "host_control.rs"]
+mod control;
 
 const HEARTBEAT_MS: u32 = 5000;
 const LEASE_MS: u32 = 15000;
@@ -97,6 +101,7 @@ struct Shared {
 }
 struct Connection {
     id: RequestId,
+    taken_over: Arc<Mutex<Option<RequestId>>>,
     closed: AtomicBool,
 }
 #[derive(Clone)]
@@ -113,6 +118,8 @@ struct Entry {
     cancelled: watch::Sender<bool>,
     last_seen: Mutex<Instant>,
     control_attached: AtomicBool,
+    control_stopped: watch::Sender<bool>,
+    taken_over: Arc<Mutex<Option<RequestId>>>,
 }
 struct Ready {
     video: Arc<Generation>,
@@ -130,6 +137,7 @@ struct Generation {
     diagnostics: Mutex<super::diagnostics::ProducerDiagnostics>,
     credit: Notify,
     backlog_changed: Notify,
+    failure: Mutex<Option<(DesktopErrorCode, String)>>,
 }
 fn signal() -> watch::Sender<bool> {
     watch::channel(false).0
@@ -161,7 +169,17 @@ impl Generation {
             diagnostics: Mutex::new(super::diagnostics::ProducerDiagnostics::new()),
             credit: Notify::new(),
             backlog_changed: Notify::new(),
+            failure: Mutex::new(None),
         })
+    }
+    fn ensure_live(&self) -> Result<()> {
+        if *self.cancelled.borrow() {
+            return Err(match self.failure.lock().unwrap().as_ref() {
+                Some((code, message)) => DesktopError::reject(*code, message.clone()),
+                None => DesktopError::reject(DesktopErrorCode::StaleGeneration, "desktop video generation ended"),
+            });
+        }
+        Ok(())
     }
     fn stop(&self) {
         self.cancelled.send_replace(true);
@@ -258,6 +276,7 @@ impl DesktopHost {
             }),
             connection: Arc::new(Connection {
                 id: RequestId::new(),
+                taken_over: Arc::new(Mutex::new(None)),
                 closed: AtomicBool::new(false),
             }),
         }
@@ -267,6 +286,7 @@ impl DesktopHost {
             shared: self.shared.clone(),
             connection: Arc::new(Connection {
                 id: RequestId::new(),
+                taken_over: Arc::new(Mutex::new(None)),
                 closed: AtomicBool::new(false),
             }),
         }
@@ -307,7 +327,7 @@ impl DesktopHost {
         entry.stop();
         // Occupancy is retained until the video task has dropped its native
         // source. A new viewer must not race the previous capture worker's exit.
-        if entry.state.lock().unwrap().as_ref().is_some_and(|ready| {
+        if (entry.control_attached.load(Ordering::SeqCst) && !*entry.control_stopped.borrow()) || entry.state.lock().unwrap().as_ref().is_some_and(|ready| {
             (ready.video.claimed.load(Ordering::SeqCst) && !*ready.video.stopped.borrow())
                 || (ready.video.cursor_claimed.load(Ordering::SeqCst)
                     && !*ready.video.cursor_stopped.borrow())
@@ -386,6 +406,8 @@ impl DesktopHost {
             cancelled: signal(),
             last_seen: Mutex::new(Instant::now()),
             control_attached: AtomicBool::new(false),
+            control_stopped: signal(),
+            taken_over: self.connection.taken_over.clone(),
         });
         {
             let mut slot = self.shared.slot.lock().unwrap();
@@ -494,6 +516,9 @@ impl DesktopHost {
         timeout: Duration,
     ) -> Result<()> {
         match request {
+            RemoteDesktopRequest::Occupancy | RemoteDesktopRequest::Takeover { .. } | RemoteDesktopRequest::SessionStatus { .. } => {
+                self.serve_takeover(account, request, stream, timeout).await?;
+            }
             RemoteDesktopRequest::Trace { version, session_id, generation, after_frame_id } => {
                 let result = self.entry(owner, account, session_id, false)
                     .and_then(|entry| entry.video(generation))
@@ -591,7 +616,7 @@ impl DesktopHost {
                     Err(error) => rejected(&mut stream, error, timeout).await?,
                 }
             }
-            RemoteDesktopRequest::Control { session_id } => {
+            RemoteDesktopRequest::Control { session_id, independent_ack } => {
                 let entry = match self.entry(owner, account, session_id, false) {
                     Ok(entry) => entry,
                     Err(error) => return rejected(&mut stream, error, timeout).await,
@@ -607,15 +632,15 @@ impl DesktopHost {
                     )
                     .await;
                 }
-                let _guard = ReleaseGuard {
-                    host: self.clone(),
-                    entry: Some(entry.clone()),
-                };
+                let _guard = takeover::ControlGuard { host: self.clone(), entry: entry.clone() };
                 reply(&mut stream, RemoteDesktopReply::Ready, timeout).await?;
                 tokio::select! {
                     biased;
                     _ = cancelled(&entry.cancelled) => {},
-                    result = self.control(&entry, stream, timeout) => result?,
+                    result = async {
+                        if independent_ack { self.control_independent(&entry, stream, timeout).await }
+                        else { self.control(&entry, stream, timeout).await }
+                    } => result?,
                 }
             }
             RemoteDesktopRequest::Video {
@@ -652,9 +677,11 @@ impl DesktopHost {
                     _ = cancelled(&video.cancelled) => {},
                     result = self.video(&video, stream, timeout) => {
                         if let Err(error) = &result {
+                            *video.failure.lock().unwrap() = Some((error.code(), error.to_string()));
                             let flow = video.progress.lock().unwrap();
                             let snapshot = video.diagnostics.lock().unwrap().snapshot(&video.config, &flow, Instant::now());
-                            tracing::warn!(%error, pipeline = ?snapshot, "remote desktop producer failed");
+                            tracing::warn!(%error, backlog_budget_ms = flow.backlog_budget().as_millis() as u64,
+                                pipeline = ?snapshot, "remote desktop producer failed");
                         }
                         result?;
                     },
@@ -771,6 +798,7 @@ impl DesktopHost {
             *lease = None;
             return Ok(());
         }
+        video.ensure_live()?;
         if *video.cancelled.borrow() || !video.frame_ready.load(Ordering::Acquire) {
             return Err(DesktopError::reject(
                 DesktopErrorCode::MediaUnavailable,
@@ -805,6 +833,9 @@ impl DesktopHost {
     ) -> Result<()> {
         event.validate().map_err(DesktopError::Protocol)?;
         let video = entry.video(generation)?;
+        // Retiring video also retires its input lease. Report the original
+        // lifecycle failure, not a misleading non-recoverable view-only error.
+        video.ensure_live()?;
         let active = lease
             .as_mut()
             .filter(|l| Arc::ptr_eq(&l.generation, &video))
@@ -1161,7 +1192,7 @@ mod tests {
         assert!(matches!(
             host.set_input(entry, &mut lease, 1, true).await,
             Err(DesktopError::Rejected {
-                code: DesktopErrorCode::MediaUnavailable,
+                code: DesktopErrorCode::StaleGeneration,
                 ..
             })
         ));

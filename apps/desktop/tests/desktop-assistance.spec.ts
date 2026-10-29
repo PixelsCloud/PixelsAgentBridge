@@ -71,7 +71,7 @@ for (const oldCommand of ["desktop_assistance_open", "desktop_assistance_cancel"
     await expect(page.getByRole("alert")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Decline" })).toBeDisabled();
     await page.evaluate(() => (window as any).fixture.deferred["desktop_assistance_open:new"].reject("New request failed"));
-    await expect(page.getByRole("alert")).toHaveText("New request failed");
+    await expect(page.getByRole("alert")).toHaveText("The operation did not complete. Check its current state; diagnostic logs can help investigate.");
     await expect(page.getByRole("button", { name: "Decline" })).toBeEnabled();
   });
 }

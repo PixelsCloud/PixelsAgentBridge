@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><title>Pixels Image Clipboard Acceptance</title>
+<style>body{font:24px system-ui;background:#eee;color:#123}#target{border:4px solid teal;height:80vh;overflow:auto}img{max-width:90%}</style>
+<h1>Pixels image paste test</h1><div id="target" tabindex="0" contenteditable="true">Click here, then paste the synthetic image.</div>
+<script>
+window.pastes=[];window.resetPaste=()=>{pastes=[];document.getElementById('target').textContent='Ready';document.getElementById('target').focus();return true};
+document.addEventListener('paste',async e=>{e.preventDefault();const file=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'))?.getAsFile();if(!file){pastes.push({kind:'text',length:e.clipboardData.getData('text/plain').length});return;}const b=await createImageBitmap(file);const canvas=document.createElement('canvas');canvas.width=b.width;canvas.height=b.height;const ctx=canvas.getContext('2d');ctx.drawImage(b,0,0);const rgba=ctx.getImageData(0,0,b.width,b.height).data;const hash=await crypto.subtle.digest('SHA-256',rgba);const hex=[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join('');pastes.push({kind:'image',width:b.width,height:b.height,rgba:hex});document.getElementById('target').replaceChildren(canvas);b.close();});
+window.pattern=(w,h,v)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),im=x.createImageData(w,h);for(let y=0;y<h;y++)for(let a=0;a<w;a++){const i=(y*w+a)*4;im.data.set([(a+v)%256,(y+v)%256,(a+y+v)%256,a<w/2?255:128],i)}x.putImageData(im,0,0);return c};
+window.expected=async(w,h,v)=>{const c=pattern(w,h,v);const bytes=c.getContext('2d').getImageData(0,0,w,h).data;return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('')};
+window.copyImage=async(w,h,v)=>{const c=pattern(w,h,v);const png=await new Promise(r=>c.toBlob(r,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);return {width:w,height:h,copied:true}};
+document.getElementById('target').focus();
+</script>

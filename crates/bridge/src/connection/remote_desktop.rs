@@ -1,6 +1,13 @@
 use super::*;
 
 impl AuthenticatedDeviceConnection {
+    pub async fn desktop_occupancy(&self)->Result<Option<pab_protocol::RequestId>,BridgeError>{
+        Ok(RemoteDesktopSession::occupancy(&self.connection,self.operation_timeout()).await?)
+    }
+    pub async fn take_over_desktop(&self,session:pab_protocol::RequestId)->Result<(),BridgeError>{
+        Ok(RemoteDesktopSession::takeover(&self.connection,session,self.operation_timeout()).await?)
+    }
+
     pub async fn open_remote_desktop(
         &self,
         screen_id: Option<String>,

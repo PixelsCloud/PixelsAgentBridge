@@ -996,6 +996,9 @@ async fn handle_connection(
                     Some("register_media_input_helper") if registration.0.is_none() => {
                         return media::input::serve_registered(socket, frame).await;
                     }
+                    Some("register_media_clipboard_helper") if registration.0.is_none() => {
+                        return media::clipboard::serve_registered(socket, frame).await;
+                    }
                     Some("register_media_cursor_helper") if registration.0.is_none() => {
                         return media::cursor::serve_registered(socket, frame).await;
                     }

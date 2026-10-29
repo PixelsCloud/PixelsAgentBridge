@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, AppWindow } from "lucide-react";
@@ -48,7 +49,7 @@ export function WindowBrowser({ code, connected, language, onAuditChange }: {
     <Button type="primary" loading={loading} disabled={!connected} onClick={() => void refresh()}>
       {loading ? t.loadingHistory : t.refreshWindows}<RefreshCw size={16} />
     </Button>
-    {error && <div className="inline-error" role="alert">{error}</div>}
+    {error && <div className="inline-error" role="alert">{userFacingError(error, language)}</div>}
     {entries.length === 0 && !error && !loading && <div className="empty-list">{t.noWindows}</div>}
     {visible.length > 0 && <>
       <div className="directory-entries">

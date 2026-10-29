@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Checkbox, Input, Segmented, Space, Table } from "antd";
 import { messages, type Language } from "./i18n";
@@ -84,11 +85,11 @@ export function ApplicationBrowser({ code, connected, language, contexts, osFami
     <Input value={file} onChange={(event) => setFile(event.target.value)} placeholder={t.appsFilePath} />
     <Checkbox checked={withSelected} disabled={!target} onChange={(event) => setWithSelected(event.target.checked)}>{t.appsUseSelected}</Checkbox>
     <Button disabled={unavailable || !file.trim() || (withSelected && !target)} onClick={() => void run({ action: "execute", request: { operation: "open_file", path: file.trim(), application: withSelected ? target : null } })}>{t.appsOpenFile}</Button>
-    {error && <Alert type="error" title={error} showIcon />}
-    {reply?.error && <Alert type="error" title={reply.error} showIcon />}
+    {error && <Alert type="error" title={userFacingError(error, language)} showIcon />}
+    {reply?.error && <Alert type="error" title={userFacingError(reply.error, language)} showIcon />}
     {snapshot?.type === "action" && reply?.state === "completed" && <Alert type="success" title={t.appsAccepted} description={t.appsWindowNotConfirmed} showIcon />}
     {snapshot?.type === "list" && snapshot.snapshot.truncated && <Alert type="info" title={t.appsTruncated} />}
-    {snapshot?.type === "list" && snapshot.snapshot.warnings.map((warning) => <Alert key={warning} type="warning" title={warning} />)}
+    {snapshot?.type === "list" && snapshot.snapshot.warnings.map((warning) => <Alert key={warning} type="warning" title={userFacingError(warning, language)} />)}
     {unresolved && <Alert type={busy ? "info" : "warning"} title={busy ? t.appsWorking : t.appsUnconfirmed} description={<Button loading={busy} onClick={() => void inspect()}>{t.appsInspect}</Button>} />}
     {identity && <ExecutionIdentityView identity={identity} language={language} />}
   </div>;

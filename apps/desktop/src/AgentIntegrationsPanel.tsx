@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, Button, Space, Tag } from "antd";
@@ -71,7 +72,7 @@ function AgentRow({ id, name, language }: { id: AgentId; name: string; language:
           icon={<RotateCw size={15} />} onClick={() => void refresh()} />
       </Space>
     </div>
-    {failure && <Alert role="alert" type="error" showIcon title={failure} />}
+    {failure && <Alert role="alert" type="error" showIcon title={userFacingError(failure, language)} />}
   </div>;
 }
 

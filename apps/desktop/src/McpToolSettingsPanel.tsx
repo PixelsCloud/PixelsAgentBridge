@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, App, Button, Spin, Switch, Tag } from "antd";
@@ -46,7 +47,7 @@ export function McpToolSettingsPanel({ language }: { language: Language }) {
     <h2>{t.settingsTools}</h2>
     <p>{t.settingsToolsHint}</p>
     {loading && <Spin />}
-    {error && <Alert type="error" showIcon title={error} action={!view && <Button size="small" onClick={() => void load()}>{t.settingsToolsRetry}</Button>} />}
+    {error && <Alert type="error" showIcon title={userFacingError(error, language)} action={!view && <Button size="small" onClick={() => void load()}>{t.settingsToolsRetry}</Button>} />}
     {view && <>
       <div className="settings-tool-groups">
         {view.groups.map(({ group, toolCount, required }) => <div className="settings-tool-group" key={group}>

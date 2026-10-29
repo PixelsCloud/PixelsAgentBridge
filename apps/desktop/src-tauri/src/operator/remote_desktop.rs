@@ -13,7 +13,13 @@ mod chrome;
 mod close;
 mod recovery;
 mod clipboard;
+mod takeover;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[tauri::command]
+pub async fn desktop_viewer_takeover(window:WebviewWindow,state:State<'_,RemoteDesktopState>,english:bool)->Result<bool,String>{
+    takeover::confirm(&window,&state,english).await
+}
 
 #[tauri::command]
 pub async fn desktop_viewer_close(
@@ -38,6 +44,7 @@ pub async fn desktop_viewer_fullscreen(
 #[derive(Clone, Default, Serialize)]
 pub struct ViewerStatus {
     phase: String,
+    takeover_session: Option<RequestId>,
     error: Option<String>,
     opened: Option<DesktopOpened>,
     input_ready: bool,
@@ -83,6 +90,7 @@ impl From<&DesktopOpened> for InputGeneration {
     }
 }
 struct StreamFailure {
+    occupied: bool,
     message: String,
     recoverable: bool,
     device_not_found: bool,
@@ -91,6 +99,7 @@ struct StreamFailure {
 impl StreamFailure {
     fn renderer(error: impl std::fmt::Display) -> Self {
         Self {
+            occupied: false,
             message: error.to_string(),
             recoverable: false,
             device_not_found: false,
@@ -101,6 +110,7 @@ impl StreamFailure {
 impl From<String> for StreamFailure {
     fn from(message: String) -> Self {
         Self {
+            occupied: false,
             message,
             recoverable: false,
             device_not_found: false,
@@ -116,6 +126,7 @@ impl From<&str> for StreamFailure {
 impl From<pab_bridge::RemoteDesktopError> for StreamFailure {
     fn from(error: pab_bridge::RemoteDesktopError) -> Self {
         Self {
+            occupied: matches!(&error,pab_bridge::RemoteDesktopError::Rejected{code:pab_protocol::DesktopErrorCode::Busy,..}),
             recoverable: error.is_recoverable_media(),
             device_not_found: false,
             message: error.to_string(),
@@ -138,6 +149,7 @@ impl From<pab_bridge::RuntimeError> for StreamFailure {
             _ => false,
         };
         Self {
+            occupied: matches!(&error,pab_bridge::RuntimeError::Bridge(pab_bridge::BridgeError::RemoteDesktop(pab_bridge::RemoteDesktopError::Rejected{code:pab_protocol::DesktopErrorCode::Busy,..}))),
             recoverable,
             device_not_found,
             message: error.to_string(),
@@ -497,6 +509,7 @@ fn publish(
     }
     let status = ViewerStatus {
         phase: phase.into(),
+        takeover_session: None,
         opened,
         error,
         input_ready: false,
@@ -638,7 +651,11 @@ async fn run(
                         tokio::time::sleep(delay).await;
                         continue;
                     }
-                    publish(&window, &owner, "failed", None, Some(error.message));
+                    if error.occupied {
+                        takeover::publish_occupied(&window,&owner).await;
+                    } else if error.message == "desktop_taken_over" {
+                        publish(&window,&owner,"taken_over",None,None);
+                    } else { publish(&window, &owner, "failed", None, Some(error.message)); }
                     loop {
                         match commands.recv().await {
                             Some(Command::Retry) => {
@@ -895,9 +912,11 @@ async fn stream(
                     generation: input_generation.generation, local, remote: host, remote_age_ms: age,
                     network_rtt_ms: network.network_rtt().map(|rtt| rtt.as_secs_f64() * 1000.0),
                     connection_path: path, visible: viewer_visible(window) };
-                let stalled = snapshot.visible && snapshot.local.oldest_pending_ms.is_some_and(|age| age >= 2000);
+                let stalled = snapshot.visible && (snapshot.local.oldest_pending_ms.is_some_and(|age| age >= 2000)
+                    || snapshot.remote.as_ref().is_some_and(|host| host.oldest_unpresented_ms.is_some_and(|age| age >= 2000)));
                 if stalled != was_stalled || last_log.elapsed() >= Duration::from_secs(30) {
                     tracing::info!(window = window.label(), stalled,
+                        acknowledgements = ?acknowledgements.trace(),
                         pipeline = %serde_json::to_string(&snapshot).unwrap_or_default(),
                         "remote desktop pipeline progress");
                     last_log = now; was_stalled = stalled;
@@ -991,12 +1010,15 @@ async fn stream(
         let interaction = async {
             let mut enabled = false;
             let mut clipboard_shortcuts = clipboard::Shortcuts::default();
+            let mut paste_work: Option<std::pin::Pin<Box<dyn std::future::Future<Output=bool> + Send + '_>>> = None;
+            let mut paste_chord = None;
             loop {
                 tokio::select! {
                     biased;
                     command = commands.recv() => match command {
                         Some(Command::Input(value, target)) if target == input_generation => {
                             clipboard_shortcuts = clipboard::Shortcuts::default();
+                            paste_work=None; paste_chord=None;
                             owner.input_requested.store(value, Ordering::Relaxed);
                             if value && (!supported || !*ready_rx.borrow_and_update()) {
                                 publish_input(window, owner, supported && *ready_rx.borrow(), false);
@@ -1015,6 +1037,7 @@ async fn stream(
                         }
                         Some(Command::SecureAttention(target)) if target == input_generation => {
                             clipboard_shortcuts = clipboard::Shortcuts::default();
+                            paste_work=None; paste_chord=None;
                             if !enabled { continue; }
                             // Stop local collection and retire held remote keys
                             // before the system changes desktops. SAS is sent
@@ -1050,20 +1073,37 @@ async fn stream(
                                 if enabled {
                                     if !matches!(event, pab_protocol::RemoteDesktopInput::ReleaseAll) { clipboard.activate(); }
                                     let (paste, copied) = clipboard_shortcuts.observe(&event);
-                                    if paste && !clipboard.before_paste().await { continue; }
+                                    if clipboard_shortcuts.swallow(&event) { continue; }
+                                    if paste {
+                                        paste_chord=Some(clipboard_shortcuts.begin(&event));
+                                        paste_work=Some(Box::pin(clipboard.before_paste()));
+                                        continue;
+                                    }
+                                    if clipboard::Shortcuts::cancels_paste(&event) {paste_work=None;paste_chord=None;}
+                                    if matches!(event,pab_protocol::RemoteDesktopInput::ReleaseAll){clipboard.deactivate();}
                                     control.send(event).await.map_err(StreamFailure::from)?;
                                     if copied { clipboard.copied(); }
                                 }
                             }
                             pab_desktop_media::NativeViewerEvent::ExitFullscreen => {
+                                paste_work=None;paste_chord=None;
                                 // Native focus must consume Esc locally, including its key-up.
                                 chrome::set_fullscreen(window, owner, false).map_err(StreamFailure::renderer)?;
                             }
                             pab_desktop_media::NativeViewerEvent::Focus { enabled: collecting, focused, foreground, requests, failures } => {
+                                if !collecting || !focused || !foreground {paste_work=None;paste_chord=None;clipboard.deactivate();}
                                 tracing::info!(window = window.label(), session = %input_generation.session,
                                     generation = input_generation.generation, collecting, focused, foreground,
                                     focus_requests = requests, focus_failures = failures,
                                     "remote desktop keyboard collection focus");
+                            }
+                        }
+                    }
+                    synced = async { match paste_work.as_mut() {Some(work)=>work.await,None=>std::future::pending().await} } => {
+                        paste_work=None;
+                        if let Some(chord)=paste_chord.take() {
+                            if synced && enabled && clipboard.paste_allowed() {
+                                for event in clipboard_shortcuts.replay(chord) {control.send(event).await.map_err(StreamFailure::from)?;}
                             }
                         }
                     }
@@ -1081,6 +1121,7 @@ async fn stream(
         };
         if let Err(error) = &outcome {
             tracing::warn!(window = window.label(), error = %error.message,
+                acknowledgements = ?acknowledgements.trace(),
                 session = %input_generation.session, generation = input_generation.generation,
                 local = %serde_json::to_string(&counters.lock().unwrap().snapshot(Instant::now())).unwrap_or_default(),
                 remote = ?remote.lock().unwrap().as_ref().map(|(snapshot, at)| (snapshot, at.elapsed().as_millis())),
@@ -1090,10 +1131,11 @@ async fn stream(
         let command = match outcome {
             Ok(command) => command,
             Err(error) => {
+                let taken_over=session.was_taken_over().await;
                 // Retire this owner's remote slot before reopening. Dropping
                 // alone schedules cleanup asynchronously and can race Busy.
                 let _ = tokio::time::timeout(Duration::from_secs(2), session.close()).await;
-                return Err(error);
+                return Err(if taken_over { "desktop_taken_over".into() } else { error });
             }
         };
         match command {

@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Select } from "antd";
@@ -82,7 +83,7 @@ export function CommandOutput({ task, language }: { task: TaskEntry; language: L
     </div>
     {output.decodingReplacements && <p className="inline-error">{t.outputEncodingInvalid}</p>}
     {output.outputGap && <p className="inline-error">{t.outputRetainedGap}</p>}
-    {error && <p className="inline-error" role="alert">{error}</p>}
+    {error && <p className="inline-error" role="alert">{userFacingError(error, language)}</p>}
     <pre>{output.stdout || (!output.stderr && t.waitingOutput)}</pre>
     {output.stderr && <pre className="stderr-output">{output.stderr}</pre>}
     {(!output.complete || error) && <Button type="text" loading={busy}

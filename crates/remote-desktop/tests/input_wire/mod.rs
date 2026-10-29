@@ -93,7 +93,7 @@ async fn open_raw(
     else {
         panic!("raw session did not open");
     };
-    let control = attach(server, RemoteDesktopRequest::Control { session_id }).await;
+    let control = attach(server, RemoteDesktopRequest::Control { session_id, independent_ack: false }).await;
     let video = attach(
         server,
         RemoteDesktopRequest::Video {
@@ -278,7 +278,7 @@ async fn unsupported_desktop_version_cannot_reserve_the_viewer_or_enable_input()
         ));
         assert!(matches!(
             server
-                .request(RemoteDesktopRequest::Control { session_id })
+                .request(RemoteDesktopRequest::Control { session_id, independent_ack: false })
                 .await,
             RemoteDesktopReply::Error {
                 code: DesktopErrorCode::NotFound,

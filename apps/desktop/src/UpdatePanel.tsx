@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -101,6 +102,6 @@ export function UpdatePanel({ language }: { language: Language }) {
         </div>
       </> : <div className="settings-update-current"><CheckCircle2 size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("没有待安装的更新。", "No update is available.")}</span></div>}
     </div>
-    {error && <p className="settings-error" role="alert">{error}</p>}
+    {error && <p className="settings-error" role="alert">{userFacingError(error, language, "update")}</p>}
   </div>;
 }

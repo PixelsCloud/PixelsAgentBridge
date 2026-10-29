@@ -18,6 +18,7 @@ mod flow_recovery;
 mod clipboard_sessions;
 mod input_wire;
 mod quality_feedback;
+mod input_progress;
 #[path = "../../../smoke/remote_desktop_network_recovery.rs"]
 mod network_recovery;
 
@@ -72,6 +73,7 @@ struct Backend {
     input_held: Arc<AtomicUsize>,
     input_applied: Arc<AtomicUsize>,
     fail_input: Option<Arc<AtomicUsize>>,
+    input_block: Option<Arc<tokio::sync::Notify>>,
     wake: Option<Arc<tokio::sync::Notify>>,
     fail_after: Option<u64>,
     encode_delay: Option<Duration>,
@@ -81,6 +83,7 @@ struct InputSink {
     held: Arc<AtomicUsize>,
     applied: Arc<AtomicUsize>,
     wake: Option<Arc<tokio::sync::Notify>>,
+    block: Option<Arc<tokio::sync::Notify>>,
 }
 impl Drop for InputSink {
     fn drop(&mut self) {
@@ -99,6 +102,7 @@ impl DesktopInputSink for InputSink {
                 RemoteDesktopInput::ReleaseAll => self.held.store(0, Ordering::SeqCst),
                 _ => {}
             }
+            if let Some(block) = &self.block { block.notified().await; }
             if let Some(wake) = &self.wake {
                 wake.notify_one();
             }
@@ -173,6 +177,7 @@ impl DesktopBackend for Backend {
                 held: self.input_held.clone(),
                 applied: self.input_applied.clone(),
                 wake: self.wake.clone(),
+                block: self.input_block.clone(),
             }) as Box<dyn DesktopInputSink>)
         })
     }
@@ -269,6 +274,9 @@ impl Harness {
         Self::with_pair(global, pair().await).await
     }
     async fn with_pair(global: &DesktopHost, endpoints: (PabEndpoint, PabEndpoint, PabConnection, PabConnection)) -> Self {
+        Self::with_account(global,endpoints,None).await
+    }
+    async fn with_account(global:&DesktopHost,endpoints:(PabEndpoint,PabEndpoint,PabConnection,PabConnection),account:Option<UserId>)->Self {
         let (a, b, client, peer) = endpoints;
         let server = peer.clone();
         let host = global.for_connection();
@@ -292,7 +300,7 @@ impl Harness {
                             request,
                             schema_version: DEVICE_TASK_SCHEMA_VERSION,
                         } => {
-                            let _ = host.serve(actor(), None, request, stream, WAIT).await;
+                            let _ = host.serve(actor(), account, request, stream, WAIT).await;
                         }
                         DeviceTaskRequest::GetPresence { .. } => {
                             stream
@@ -844,3 +852,6 @@ async fn reopening_after_media_failure_does_not_replay_input_or_retain_ownership
     );
     replacement.close().await.unwrap();
 }
+
+#[path="takeover_sessions/mod.rs"]
+mod takeover_sessions;

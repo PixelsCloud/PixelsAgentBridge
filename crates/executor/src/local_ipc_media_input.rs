@@ -3,7 +3,7 @@
 //! an advertised provider ID alone never grants access. Static capture cannot
 //! block input. No input is routed through the legacy window request queue.
 use super::*;
-use pab_protocol::{RemoteDesktopInput, DesktopClipboardOperation, DesktopClipboardSnapshot, DESKTOP_CLIPBOARD_JSON_BYTES};
+use pab_protocol::RemoteDesktopInput;
 use pab_remote_desktop::DesktopInputSink;
 
 const INPUT_VERSION: u16 = 1;
@@ -12,16 +12,14 @@ const INPUT_VERSION: u16 = 1;
 enum InputOperation {
     Start { config: DesktopVideoConfig },
     Event { event: RemoteDesktopInput },
-    Clipboard { request: DesktopClipboardOperation },
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 enum InputReply {
     Applied,
     Failed,
-    Clipboard { snapshot: Option<DesktopClipboardSnapshot> },
 }
-enum InputResponse { Applied, Clipboard(Option<DesktopClipboardSnapshot>) }
+enum InputResponse { Applied }
 struct InputRequest {
     operation: InputOperation,
     stop: Option<oneshot::Receiver<()>>,
@@ -31,6 +29,7 @@ pub(super) struct InputProvider {
     sender: mpsc::Sender<InputRequest>,
     claimed: AtomicBool,
 }
+impl InputProvider { pub(super) fn active(&self) -> bool { self.claimed.load(Ordering::Acquire) && !self.sender.is_closed() } }
 struct Registration {
     capture: Arc<Provider>,
     input: Arc<InputProvider>,
@@ -62,7 +61,7 @@ impl DesktopInputSink for InputSink {
             }
             request(&self.input, InputOperation::Event { event }, None)
                 .await
-                .map_err(unavailable).and_then(|reply| match reply { InputResponse::Applied => Ok(()), _ => Err(unavailable("invalid input reply")) })
+                .map_err(unavailable).map(|InputResponse::Applied| ())
         })
     }
 }
@@ -143,28 +142,13 @@ pub(super) async fn open(
     Ok(Box::new(sink))
 }
 
-pub(super) async fn clipboard(config: DesktopVideoConfig, operation: DesktopClipboardOperation) -> Result<DesktopClipboardSnapshot, DesktopError> {
-    operation.validate().map_err(unavailable)?;
-    let capture = providers().lock().map_err(|_| unavailable("media provider unavailable"))?.iter()
-        .find(|provider| !provider.retired.load(Ordering::Acquire) && provider.active_config.lock().ok().is_some_and(|active| active.as_ref() == Some(&config)))
-        .cloned().ok_or(DesktopError::Closed)?;
-    if !capture.clipboard_supported { return Err(DesktopError::Rejected { code: pab_protocol::DesktopErrorCode::Unsupported, message: "remote text clipboard requires an updated desktop helper".into() }); }
-    let input = capture.input.lock().map_err(|_| unavailable("input provider unavailable"))?.as_ref()
-        .filter(|input| input.claimed.load(Ordering::Acquire) && !input.sender.is_closed()).cloned()
-        .ok_or_else(|| unavailable("enable remote desktop control before clipboard synchronization"))?;
-    match request(&input, InputOperation::Clipboard { request: operation }, None).await.map_err(unavailable)? {
-        InputResponse::Clipboard(Some(snapshot)) => { snapshot.validate().map_err(unavailable)?; Ok(snapshot) }
-        _ => Err(unavailable("remote text clipboard is temporarily unavailable")),
-    }
-}
-
 async fn read_input_control<S: AsyncRead + AsyncWrite + Unpin, T: serde::de::DeserializeOwned>(socket: &mut WebSocketStream<S>) -> Result<T, LocalIpcError> {
     match receive_frame(socket).await? {
-        Message::Text(text) if text.len() <= DESKTOP_CLIPBOARD_JSON_BYTES => Ok(serde_json::from_str(&text)?),
+        Message::Text(text) if text.len() <= DESKTOP_CONTROL_BYTES => Ok(serde_json::from_str(&text)?),
         _ => Err(LocalIpcError::Protocol),
     }
 }
-async fn capture_ended(capture: &Provider) {
+pub(super) async fn capture_ended(capture: &Provider) {
     let mut ended = capture.ended.subscribe();
     loop {
         if *ended.borrow_and_update() {
@@ -261,7 +245,6 @@ pub(in crate::local_ipc) async fn serve_registered(
             send_json(&mut socket, &serde_json::to_value(operation)?).await?;
             match read_input_control::<_, InputReply>(&mut socket).await? {
                 InputReply::Applied => Ok(InputResponse::Applied),
-                InputReply::Clipboard { snapshot } => Ok(InputResponse::Clipboard(snapshot)),
                 InputReply::Failed => {
                     Err(LocalIpcError::Remote("remote desktop input failed".into()))
                 }
@@ -319,25 +302,18 @@ pub(super) async fn serve_helper_socket(
     .await
     .map_err(|_| LocalIpcError::Timeout)??;
     let mut sink: Option<Box<dyn DesktopInputSink>> = None;
-    let mut current_config = None;
     loop {
         let operation: InputOperation = read_input_control(&mut socket).await?;
         let work = async {
             match operation {
                 InputOperation::Start { config } if sink.is_none() => {
                     config.validate().map_err(unavailable)?;
-                    current_config = Some(config.clone());
                     sink = Some(backend.input(config).await?);
                     Ok(InputReply::Applied)
                 }
                 InputOperation::Event { event } if sink.is_some() => {
                     event.validate().map_err(unavailable)?;
                     sink.as_mut().unwrap().apply(event).await.map(|_| InputReply::Applied)
-                }
-                InputOperation::Clipboard { request } if sink.is_some() => {
-                    request.validate().map_err(unavailable)?;
-                    let snapshot = backend.clipboard(current_config.clone().ok_or(DesktopError::Closed)?, request).await.ok();
-                    Ok(InputReply::Clipboard { snapshot })
                 }
                 _ => Err(DesktopError::Closed),
             }

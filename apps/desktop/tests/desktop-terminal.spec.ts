@@ -41,12 +41,12 @@ test("unconfirmed input is never replayed and close failure remains visible", as
   await open(page);
   await page.evaluate(() => { (window as any).fixture.failInput = true; });
   await page.locator(".xterm-helper-textarea").focus(); await page.keyboard.type("x");
-  await expect(page.getByText("input result unconfirmed; not replayed", { exact: true })).toBeVisible();
+  await expect(page.getByText("The operation result is not confirmed. Check the original operation before repeating it.", { exact: true })).toBeVisible();
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_input").length)).toBe(1);
   await page.evaluate(() => { (window as any).fixture.failClose = true; (window as any).fixture.closeWindow(); });
   await page.getByRole("dialog").getByRole("button", { name: "End session", exact: true }).click();
-  await expect(page.getByText("worker termination not confirmed", { exact: true })).toBeVisible();
+  await expect(page.getByText("The operation result is not confirmed. Check the original operation before repeating it.", { exact: true })).toBeVisible();
 });
 test("multi-line paste requires confirmation and oversized paste is refused", async ({ page }) => {
   await open(page);
@@ -74,7 +74,7 @@ test("an output gap latches failure and closes the owned Shell without accepting
   await open(page);
   const before = await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_end").length);
   await page.evaluate(() => { const f = (window as any).fixture; f.raw([0,0,0,0,0,0,0,0,4,88]); f.output("later"); });
-  await expect(page.getByText("terminal output gap or duplicate detected; no data was silently skipped", { exact: true })).toBeVisible();
+  await expect(page.getByText("Terminal output is incomplete and input has been stopped. Check the remote process before reopening the terminal.", { exact: true })).toBeVisible();
   await page.locator(".xterm-helper-textarea").focus(); await page.keyboard.type("never");
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_input").length)).toBe(0);
   expect(await page.evaluate(() => (window as any).fixture.calls.filter((c: any) => c.command === "desktop_terminal_end").length)).toBe(before + 1);
@@ -164,7 +164,7 @@ for (const mode of ["console", "system"]) {
 
 test("an unavailable console does not start a service Shell; retry obtains a fresh context", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/desktop-terminal.html?launch=console&no-console");
-  await expect(page.getByText("no active local console login was found", { exact: true })).toBeVisible();
+  await expect(page.getByText("No signed-in desktop user is available. Sign in and unlock the remote desktop.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).fixture.calls.some((c: any) => c.command === "desktop_terminal_start"))).toBe(false);
   await expect(page.getByRole("combobox", { name: "Execution account" })).toHaveCount(0);
   await page.evaluate(() => { (window as any).fixture.failSelection = false; });

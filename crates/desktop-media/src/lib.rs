@@ -2,6 +2,10 @@
 //! no native FFI. Compressed video and bounded cursor snapshots cross private pipes.
 mod input;
 pub mod clipboard;
+#[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+mod clipboard_image;
+#[cfg(windows)]
+mod clipboard_windows;
 #[cfg(target_os = "linux")]
 mod linux_view;
 #[cfg(target_os = "linux")]

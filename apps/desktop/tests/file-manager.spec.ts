@@ -327,7 +327,7 @@ test("unchanged rejected references do not cause repeated discovery or directory
   await page.evaluate(() => { const f = (window as any).fixture; f.rejectNativeReads = true; f.calls = []; });
   await remote.getByTitle("Refresh", { exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "file_manager_contexts").length)).toBe(1);
-  await expect(remote.locator('.fm-error')).toContainText("EnvironmentChanged");
+  await expect(remote.locator('.fm-error')).toContainText("The selected user session is no longer available.");
   await page.waitForTimeout(2500);
   const calls = await page.evaluate(() => (window as any).fixture.calls);
   expect(calls.filter((call: any) => call.command === "file_manager_contexts")).toHaveLength(1);
@@ -458,7 +458,7 @@ test("native drops use an owned token and frozen destination; a lost reply canno
   await expect(dialog).toContainText("90");
   await page.evaluate(() => (window as any).fixture.emit("file-manager-open-tab", { code: "947158375", name: "XRServer", os_family: "windows" }));
   await dialog.getByRole("button", { name: "Send files", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Acceptance reply lost");
+  await expect(dialog.getByRole("alert")).toContainText("The operation result is not confirmed.");
   await dialog.getByRole("button", { name: "Send files", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   const calls = await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "file_manager_start_drop").map((call: any) => call.args));
@@ -536,7 +536,7 @@ test("a missing transfer submission reply retains its ID and frozen source, targ
 test("a confirmed pre-admission rejection releases the submission gate",async ({page}) => {
   const local=page.getByRole("region", {name:"This computer",exact:true});await local.getByRole("checkbox", {name:"Select file-000001.bin",exact:true}).check();
   await page.evaluate(() => {(window as any).fixture.rejectNextBatch=true;});await page.getByRole("button", {name:"Send (1)",exact:true}).click();
-  await expect(page.getByRole("alert")).toContainText("Destination denied");await expect(page.getByRole("button", {name:"Retry original submission",exact:true})).not.toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Permission was denied.");await expect(page.getByRole("button", {name:"Retry original submission",exact:true})).not.toBeVisible();
   await expect(page.getByRole("button", {name:"Send (1)",exact:true})).toBeEnabled();expect(await page.evaluate(() => (window as any).fixture.batches.length)).toBe(0);
 });
 
@@ -578,7 +578,7 @@ test("control and bidirectional filename characters are visible labels and renam
   const operations=await page.evaluate(()=>(window as any).fixture.calls.filter((call:any)=>call.args.operation?.action==="rename").map((call:any)=>call.args.operation));
   expect(operations).toEqual([{action:"rename",path:{encoding:"utf8",value:`C:\\Fixtures\\${original}`},name:{encoding:"utf8",value:"renamed.txt"}}]);
   await page.evaluate(name=>{const fixture=(window as any).fixture;fixture.batches.push({spec:{id:"control-details",code:"428358431",direction:"upload"},phase:"failed",intent:"run",revision:"1",total:"1",completed:"0",skipped:"0",failed:"1",cancelled:"0",size:"12",confirmed:"0",scan_complete:true,message:null});fixture.items.push({spec:{id:"control-item",relative_name:name,source:{encoding:"utf8",value:`C:\\Fixtures\\${name}`},destination:{encoding:"utf8",value:"D:\\destination\\file"},size:"12"},state:"failed",confirmed:"0",message:`Cannot copy ${name}`,attempt:"control-attempt"});},original);
-  await page.getByTitle("Transfer details",{exact:true}).click();const details=page.getByRole("dialog",{name:"Transfer details",exact:true});await expect(details.locator(".fm-batch-item strong")).toHaveText(label);await expect(details.getByText(`Cannot copy ${label}`,{exact:true})).toBeVisible();await expect(details.getByText(`C:\\Fixtures\\${label}`,{exact:true})).toBeVisible();
+  await page.getByTitle("Transfer details",{exact:true}).click();const details=page.getByRole("dialog",{name:"Transfer details",exact:true});await expect(details.locator(".fm-batch-item strong")).toHaveText(label);await expect(details.getByText("Could not copy this file. Check access to the source file and destination folder.",{exact:true})).toBeVisible();await expect(details.getByText(`C:\\Fixtures\\${label}`,{exact:true})).toBeVisible();
 });
 
 test("compact navigation uses console identity, breadcrumbs, shortcuts and pane transfer actions", async ({ page }) => {
@@ -726,7 +726,7 @@ test("conflict dialog stays open for remaining conflicts and failed choices", as
   });
   const dialog=page.getByRole('dialog',{name:'Transfer details',exact:true});
   await dialog.getByRole('button',{name:'Skip',exact:true}).first().click();
-  await expect(dialog.getByRole('alert')).toContainText('Could not resolve conflict');
+  await expect(dialog.getByRole('alert')).toContainText('Could not resolve the file conflict');
   await expect(dialog.locator('.fm-batch-item')).toHaveCount(2);
   await page.evaluate(()=>(window as any).fixture.failResolveConflict=false);
   await dialog.getByRole('button',{name:'Skip',exact:true}).first().click();
@@ -783,6 +783,6 @@ test("Android file pane uses the advertised app UID without a console user", asy
 
 test("an unsupported Android file pane stops loading and displays its error", async ({ page }) => {
   await page.goto("http://127.0.0.1:1429/tests/file-manager.html?android=1&unsupported=1");
-  await expect(page.locator(".fm-remote-tab:not([hidden])").getByText("This Android feature is not available", {exact:false})).toBeVisible();
+  await expect(page.locator(".fm-remote-tab:not([hidden])").getByText("This feature is not available on this Android device.", {exact:false})).toBeVisible();
   await expect(page.locator(".fm-remote-tab:not([hidden]) .fm-pane-status")).toContainText("Folder unavailable");
 });

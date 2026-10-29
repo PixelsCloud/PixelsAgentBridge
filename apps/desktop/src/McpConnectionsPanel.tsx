@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { Alert, Badge, Collapse, Descriptions, Empty, Space, Table, Tabs, Tag, Typography } from "antd";
 import { messages, type Language } from "./i18n";
 import { formatDeviceCode } from "./deviceCode";
@@ -18,7 +19,7 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
       failed: t.mcpFailed, cancelled: t.mcpCancelled, interrupted: t.mcpInterrupted,
       unconfirmed: t.transferUnconfirmedShort, not_initialized: t.mcpNotStarted,
     };
-    return states[state] ?? state;
+    return states[state] ?? t.unknown;
   };
   const stateTag = (state: string) => <Tag color={
     ["connected", "authenticated", "succeeded", "completed"].includes(state) ? "success"
@@ -83,14 +84,14 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
         { key: "remoteAccountSync", label: t.accountRemoteSync, children: !runtime?.devices.some(device => device.phase === "connected") ? "—" : runtime.account && runtime.account.remoteRevision === runtime.account.localRevision ? t.mcpSucceeded : t.mcpPending },
         { key: "relaySync", label: t.accountRelaySync, children: runtime?.account?.relayNodes.length ? runtime.account.relayNodes.map(node => `${node.node_id}: ${node.online && node.applied_policy_version != null && runtime.account?.policyVersion != null && node.applied_policy_version >= runtime.account.policyVersion ? t.mcpSucceeded : t.mcpPending}`).join(" · ") : t.mcpPending },
       ]} />
-      {runtime?.account?.error && <Alert type="warning" showIcon title={runtime.account.error} />}
-      {runtime?.lastError && <Alert type="error" showIcon title={runtime.lastError} />}
+      {runtime?.account?.error && <Alert type="warning" showIcon title={userFacingError(runtime.account.error, language)} />}
+      {runtime?.lastError && <Alert type="error" showIcon title={userFacingError(runtime.lastError, language)} />}
       <Tabs size="small" items={[
         { key: "devices", label: `${t.mcpDevices} (${runtime?.devices.length ?? 0})`, children: runtime?.devices.length ? <div className="mcp-device-list">{runtime.devices.map(device => <div className="mcp-device-row" key={`${device.deviceRef.tenant_id}/${device.deviceRef.device_id}`}>
           <div><strong>{device.deviceCode ? formatDeviceCode(device.deviceCode) : device.deviceRef.device_id}</strong>
             {(device.alias || device.name) && <div>{device.alias || device.name}</div>}
             {device.environment && <Typography.Text type="secondary">{[device.environment.os_name, device.environment.os_version, device.environment.architecture].filter(Boolean).join(" · ")}</Typography.Text>}
-            {device.lastError && <div className="settings-error">{device.lastError}</div>}
+            {device.lastError && <div className="settings-error">{userFacingError(device.lastError, language)}</div>}
           </div>
           <Space size={4}>{stateTag(device.phase)}{device.connectionPath && <Tag>{device.connectionPath === "p2p" ? "P2P" : device.connectionPath === "relay" ? "Relay" : t.unknown}</Tag>}</Space>
         </div>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t.mcpNoDevices} /> },
@@ -109,7 +110,7 @@ export function McpConnectionsPanel({ language }: { language: Language }) {
 
   return <div className="mcp-reporting-panel">
     <div className="mcp-reporting-heading"><h2>{t.mcpConnections}</h2><Badge count={status?.count ?? 0} showZero overflowCount={Number.MAX_SAFE_INTEGER} /></div>
-    {(error || status?.error) && <Alert type="error" showIcon title={t.mcpServiceFailed} description={error || status?.error} />}
+    {(error || status?.error) && <Alert type="error" showIcon title={t.mcpServiceFailed} description={userFacingError(error || status?.error, language)} />}
     {!status && !error ? <p>{t.loading}</p> : status?.running && <>
       {status.clients.length ? <Collapse size="small" items={status.clients.map(client => ({
         key: client.report.sessionId,

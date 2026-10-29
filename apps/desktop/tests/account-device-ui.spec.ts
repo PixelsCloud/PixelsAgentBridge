@@ -59,7 +59,7 @@ test('a window startup failure stays visible and retry preserves the terminal mo
   await page.evaluate(()=>{(window as any).fixture.launchError='Could not create the native window';});
   await page.getByText('Original',{exact:true}).first().click({button:'right'});
   await page.getByRole('menuitem',{name:'Remote terminal (System)',exact:true}).click();
-  const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText('Could not create the native window');
+  const dialog=page.getByRole('dialog');await expect(dialog.locator('.saved-connect-error')).toContainText('Could not open the window.');
   await expect(page.locator('.home-recent-connection')).toHaveText(/^(P2P|Relay|Detecting)$/);
   await page.evaluate(()=>{(window as any).fixture.launchError=null;});
   await dialog.getByRole('button',{name:'Retry',exact:true}).click();await expect(dialog).toBeHidden();

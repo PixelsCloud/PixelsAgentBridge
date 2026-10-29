@@ -1,5 +1,14 @@
 use super::*;
 impl BridgeRuntime {
+    pub async fn desktop_occupancy(&self,device:DeviceRef)->Result<Option<pab_protocol::RequestId>,RuntimeError>{
+        self.inner.wait_account_ready().await?;
+        Ok(self.inner.device(device).await.connection().await?.desktop_occupancy().await?)
+    }
+    pub async fn take_over_desktop(&self,device:DeviceRef,session:pab_protocol::RequestId)->Result<(),RuntimeError>{
+        self.inner.wait_account_ready().await?;
+        Ok(self.inner.device(device).await.connection().await?.take_over_desktop(session).await?)
+    }
+
     /// Reuse the current account's authenticated device connection. A media
     /// error does not invalidate unrelated task/terminal/file streams.
     pub async fn open_remote_desktop(

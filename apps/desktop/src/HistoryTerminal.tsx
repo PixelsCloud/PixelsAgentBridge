@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Terminal } from "@xterm/xterm";
@@ -51,15 +52,15 @@ export function HistoryTerminal({ id, offset, language }: {
     return () => terminal.dispose();
   }, [history]);
 
-  if (error) return <div className="inline-error" role="alert">{error}</div>;
+  if (error) return <div className="inline-error" role="alert">{userFacingError(error, language)}</div>;
   if (!history) return <p className="form-hint">{t.terminalHistoryUnavailable}</p>;
   return <div className="terminal-history">
     <div className="terminal-history-canvas" ref={host} />
     <div className="terminal-event-list">
       {history.events.map((event) => <div key={event.sequence}>
         <time>{new Date(event.atUnixMs).toLocaleString(language)}</time>
-        <strong>{event.kind}</strong>
-        <span>{event.state}</span>
+        <strong>{t.terminalEvents[event.kind as keyof typeof t.terminalEvents] ?? t.unknown}</strong>
+        <span>{t.taskStates[event.state.toLowerCase() as keyof typeof t.taskStates] ?? t.unknown}</span>
         {event.kind === "input" && <code>{new TextDecoder().decode(Uint8Array.from(atob(event.data), (char) => char.charCodeAt(0)))}</code>}
       </div>)}
     </div>

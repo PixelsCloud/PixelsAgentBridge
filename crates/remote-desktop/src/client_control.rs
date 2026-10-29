@@ -92,7 +92,7 @@ pub(super) async fn run(
             let deadline = pending.front().map(|p| p.deadline);
             let event = tokio::select! {
                 biased;
-                // Drain ordered replies before spending more control credit.
+                // Drain replies before spending more control credit.
                 reply = incoming.recv() => Event::Reply(reply),
                 _ = async {
                     match deadline {
@@ -106,9 +106,18 @@ pub(super) async fn run(
             };
             match event {
                 Event::Reply(reply) => {
-                    let Some(mut sent) = pending.pop_front() else {
+                    // A fast presentation ACK may overtake a slow input reply.
+                    // Match an outstanding sequence exactly; never accept a
+                    // duplicate/unknown reply or let it complete another caller.
+                    let index = match &reply {
+                        Some(Ok(reply)) => pending.iter().position(|p| p.sequence == reply.sequence()),
+                        _ => (!pending.is_empty()).then_some(0),
+                    };
+                    let Some(index) = index else {
+                        tracing::warn!("remote desktop control reply has no pending sequence");
                         break;
                     };
+                    let mut sent = pending.remove(index).unwrap();
                     let result = match reply {
                         Some(Ok(reply)) if reply.sequence() != sent.sequence => Err(
                             DesktopError::Protocol("desktop control reply sequence mismatch"),

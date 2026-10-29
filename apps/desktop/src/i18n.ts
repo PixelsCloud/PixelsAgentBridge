@@ -2,6 +2,8 @@ export type Language = "zh-CN" | "en";
 
 export const messages = {
   "zh-CN": {
+    taskStates: { queued: "排队中", accepted: "已接收", running: "执行中", completed: "已完成", succeeded: "已完成", failed: "失败", cancel_requested: "取消中", cancelled: "已取消", interrupted: "已中断", unconfirmed: "结果待确认", closed: "已关闭", exited: "已退出" },
+    terminalEvents: { open: "打开终端", opened: "终端已打开", input: "输入", output: "输出", resize: "调整窗口", close: "关闭终端", closed: "终端已关闭", exit: "进程退出", state: "状态变化", signal: "控制信号" },
     openProjectRepository: "打开 GitHub 仓库",
     openProjectRepositoryFailed: "无法打开 GitHub 仓库，请检查默认浏览器设置后重试。",
     refreshAll: "刷新全部信息",
@@ -426,6 +428,8 @@ export const messages = {
     phaseDisconnected: "已断开",
   },
   en: {
+    taskStates: { queued: "Queued", accepted: "Accepted", running: "Running", completed: "Completed", succeeded: "Completed", failed: "Failed", cancel_requested: "Cancelling", cancelled: "Cancelled", interrupted: "Interrupted", unconfirmed: "Unconfirmed", closed: "Closed", exited: "Exited" },
+    terminalEvents: { open: "Open terminal", opened: "Terminal opened", input: "Input", output: "Output", resize: "Resize window", close: "Close terminal", closed: "Terminal closed", exit: "Process exited", state: "State changed", signal: "Control signal" },
     openProjectRepository: "Open GitHub repository",
     openProjectRepositoryFailed: "Could not open the GitHub repository. Check the default browser settings and try again.",
     refreshAll: "Refresh all information",

@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, FileText, List, Monitor, RotateCw, Terminal, Trash2 } from "lucide-react";
 import { Button, Pagination, Select, Tag } from "antd";
@@ -81,19 +82,19 @@ export function ActivityPanel({
   const operationStateLabel = (item: OperationEntry) => item.ui && item.state !== "running" && item.state !== "cancel_requested"
     ? t.uiControl.outcomes[item.ui.outcome]
     : item.kind === "terminal"
-    ? t.terminalStates[item.state as keyof typeof t.terminalStates] ?? item.state
+    ? t.terminalStates[item.state as keyof typeof t.terminalStates] ?? t.unknown
     : item.state === "cancel_requested"
     ? t.transferStates.cancel_requested
     : item.executionObservation === "unconfirmed"
     ? t.transferUnconfirmedShort
     : item.kind === "file_transfer" && item.state === "running" && item.phase
     ? t.transferPhases[item.phase as keyof typeof t.transferPhases] ?? t.transferStates.running
-    : t.transferStates[item.state as keyof typeof t.transferStates] ?? item.state;
+    : t.transferStates[item.state as keyof typeof t.transferStates] ?? t.unknown;
   const operationMessage = (item: OperationEntry) => {
     const code = item.ui?.errorCode;
-    if (!code) return item.message;
+    if (!code) return item.message && (["failed", "unconfirmed", "interrupted"].includes(item.state) ? userFacingError(item.message, language) : item.message);
     if (code.startsWith("ui_worker_") || code.startsWith("stale_element:")) return t.uiControl.errors.worker_reset;
-    return t.uiControl.errors[code as keyof typeof t.uiControl.errors] ?? item.message;
+    return t.uiControl.errors[code as keyof typeof t.uiControl.errors] ?? (item.message ? userFacingError(item.message, language) : t.unknown);
   };
 
   return (
@@ -112,7 +113,7 @@ export function ActivityPanel({
           </Button>
         </div>
       </div>
-      {refreshError && <p className="inline-error" role="alert">{refreshError}</p>}
+      {refreshError && <p className="inline-error" role="alert">{userFacingError(refreshError, language)}</p>}
       {activity.length === 0 ? <div className="empty-panel"><span><List /></span><strong>{t.noTasks}</strong><p>{t.noTasksHint}</p></div> : (
         <div className="task-layout">
           <div className="task-list">
@@ -120,13 +121,13 @@ export function ActivityPanel({
               <button className={`task-row ${selected?.item.id === item.id ? "active" : ""}`} key={item.id} onClick={() => onSelect(item.id)}>
                 <span className="task-icon">{kind === "command" ? <Terminal size={18} /> : isSystemOperation(item.kind) ? <Monitor size={18} /> : isFileOperation(item.kind) ? <FileText size={18} /> : item.kind === "directory" || item.kind === "windows" || item.kind === "screenshot" || item.kind === "desktop_input" ? <Monitor size={18} /> : item.direction === "upload" ? <ArrowUp size={18} /> : <ArrowDown size={18} />}</span>
                 <span><strong>{kind === "command" ? item.program : operationLabel(item)}</strong><small>{formatDeviceCode(item.deviceCode)} · {formatTime(item.startedAtUnixMs)}</small></span>
-                <em>{kind === "command" ? item.state : operationStateLabel(item)}</em>
+                <em>{kind === "command" ? t.taskStates[item.state.toLowerCase() as keyof typeof t.taskStates] ?? t.unknown : operationStateLabel(item)}</em>
               </button>
             ))}
           </div>
           <div className="task-output" tabIndex={0}>
             {selectedTask && <>
-              <div className="output-heading"><strong>{selectedTask.program}</strong><span>{selectedTask.state}</span></div>
+              <div className="output-heading"><strong>{selectedTask.program}</strong><span>{t.taskStates[selectedTask.state.toLowerCase() as keyof typeof t.taskStates] ?? t.unknown}</span></div>
               <div className="output-meta">{formatDeviceCode(selectedTask.deviceCode)} · {t.commandDirection} · {formatTime(selectedTask.startedAtUnixMs)}</div>
               <div className="command-audit"><span>{t.initiatedBy}</span><code>{formatActor(selectedTask.initiatedBy)}</code></div>
               <ExecutionIdentityView identity={selectedTask.executionIdentity} language={language} />

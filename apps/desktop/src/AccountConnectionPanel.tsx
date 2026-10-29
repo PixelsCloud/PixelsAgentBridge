@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState, type FormEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, Avatar, Button, Input, Modal, Typography } from "antd";
@@ -61,7 +62,7 @@ export function AccountConnectionPanel({ language, activeScope, onSignOut }: {
         <GithubAccount key={activeScope.userId} language={language} signedIn compact disabled={busy} onBusy={setBusy}/>
         <Button className="home-account-disconnect" icon={<LogOut size={14} />} danger loading={busy} onClick={() => void disconnect()}>{t.accountDisconnect}</Button>
       </footer>
-      {error && <Alert className="account-error" type="error" showIcon title={error} />}
+      {error && <Alert className="account-error" type="error" showIcon title={userFacingError(error, language)} />}
     </section>
   );
 }
@@ -166,7 +167,7 @@ function AccountLoginForm({ language, busy, setBusy, register, setRegister, onSi
         aria-describedby={passwordMismatch ? "account-password-error" : undefined}
         value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></>}
     {passwordMismatch && <Typography.Text id="account-password-error" type="danger" role="alert">{t.accountPasswordMismatch}</Typography.Text>}
-    {error && <Alert type="error" showIcon title={error} />}
+    {error && <Alert type="error" showIcon title={userFacingError(error, language)} />}
     <Button type="primary" htmlType="submit" loading={busy} disabled={!username.trim() || usernameInvalid || !password || (register && password !== confirmPassword)} block>{register ? t.accountRegister : t.accountConnect}</Button>
     <Button type="link" disabled={busy} onClick={() => { setRegister(!register); setError(""); setPassword(""); setConfirmPassword(""); }}>{register ? t.accountAlreadyRegistered : t.accountRegister}</Button>
     <GithubAccount language={language} disabled={busy} onBusy={setBusy} onSignedIn={onSignedIn}/>

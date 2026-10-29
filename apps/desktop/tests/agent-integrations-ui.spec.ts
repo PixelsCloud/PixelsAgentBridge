@@ -426,7 +426,7 @@ test("each client enables and disables independently", async ({ page }) => {
 test("a broken client does not block others and refresh recovers it", async ({ page }) => {
   await page.goto(`${url}?error=true`);
   const claude = page.getByTestId("agent-claude");
-  await expect(claude.getByRole("alert")).toContainText("Invalid JSON");
+  await expect(claude.getByRole("alert")).toContainText("Settings could not be read or saved.");
   await expect(page.getByTestId("agent-kimi").getByRole("button", { name: "Enable", exact: true })).toBeEnabled();
   await page.evaluate(() => { (window as any).fixture.states.claude.error = null; });
   await claude.getByRole("button", { name: "Refresh Claude Code" }).click();
@@ -446,7 +446,7 @@ test("failed writes do not show configured and stale entries can be repaired", a
   await page.goto(`${url}?fail=true&repair=true`);
   const codex = page.getByTestId("agent-codex");
   await codex.getByRole("button", { name: "Update configuration" }).click();
-  await expect(codex.getByRole("alert")).toContainText("config changed");
+  await expect(codex.getByRole("alert")).toContainText("Settings changed during this operation.");
   await expect(codex.getByText("Configured", { exact: true })).toHaveCount(0);
   await expect(codex.getByRole("button", { name: "Disable", exact: true })).toBeEnabled();
 });
@@ -502,7 +502,7 @@ test("sidebar account login failure, busy state, cancel and retry", async ({ pag
   await expect(dialog.locator(".ant-modal-close")).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.release)).toBe("function");
   await page.evaluate(() => (window as any).fixture.release());
-  await expect(dialog.getByRole("alert")).toContainText("Invalid credentials");
+  await expect(dialog.getByRole("alert")).toContainText("The account or password is incorrect.");
   await expect(page.locator(".sidebar-account")).toContainText("Not signed in");
   await dialog.locator(".ant-modal-close").click();
   await expect(dialog).not.toBeVisible();
@@ -529,7 +529,7 @@ test("sidebar account restores existing identity, handles read and logout errors
   await expect(page.locator(".page-me")).toContainText("Pixels-very-long-account-name-for-layout");
   expect(await entry.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.locator(".page-me [role='alert'].account-error")).toContainText("Sign out failed");
+  await expect(page.locator(".page-me [role='alert'].account-error")).toContainText("Could not sign out.");
   await expect(entry).toContainText("Pixels-very-long-account-name-for-layout");
   await page.evaluate(() => { (window as any).fixture.logoutError = false; });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();

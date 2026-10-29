@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Select, Space } from "antd";
 import { RefreshCw } from "lucide-react";
@@ -46,7 +47,7 @@ export function ExecutionPicker({ language, contexts, mode, value, onChange, con
   const entries = contexts.entries.filter((entry) => entry.mode === mode);
   const options = entries.map((entry, i) => ({
     value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${i}`,
-    label: `${entry.account_name}${entry.session_id ? ` · ${t.executionSession} ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${entry.unavailable_reason}` : ""}`,
+    label: `${entry.account_name}${entry.session_id ? ` · ${t.executionSession} ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${userFacingError(entry.unavailable_reason, language)}` : ""}`,
     disabled: !entry.selection,
   }));
   if (mode === "user") options.unshift({ value: "service", label: t.executionService, disabled: false });
@@ -61,7 +62,7 @@ export function ExecutionPicker({ language, contexts, mode, value, onChange, con
       <Button aria-label={t.executionRefresh} title={t.executionRefresh} disabled={!connected} loading={contexts.loading}
         icon={<RefreshCw size={15} />} onClick={contexts.refresh} />
     </Space.Compact>
-    {contexts.error && <Alert type="warning" title={contexts.error} showIcon />}
+    {contexts.error && <Alert type="warning" title={userFacingError(contexts.error, language)} showIcon />}
     {stale && <small>{t.executionExpired}</small>}
     {contexts.truncated && <small>{t.executionTruncated}</small>}
     {mode === "desktop_user" && !contexts.loading && !entries.some((entry) => entry.selection) && <small>{t.executionNoDesktop}</small>}

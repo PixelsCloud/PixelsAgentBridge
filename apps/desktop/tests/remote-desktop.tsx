@@ -21,6 +21,7 @@ const status = () => ({ phase, opened, input_ready: inputReady, input_enabled: i
 const fixture = (window as any).fixture = {
   calls: [] as any[], reject: false, rejectFullscreen: false,
   holdFullscreen: false, releaseFullscreen: undefined as (() => void) | undefined,
+  takeoverAnswers: [] as boolean[], takeoverDialogs: 0,
   closeAnswers: [] as boolean[], closeDialogs: 0, closed: false, rejectClose: false,
   holdClose: false, releaseClose: undefined as (() => void) | undefined,
   assistance: [] as any[],
@@ -54,6 +55,12 @@ const fixture = (window as any).fixture = {
       const reply = fullscreen;
       if (fixture.holdFullscreen) await new Promise<void>(resolve => { fixture.releaseFullscreen = resolve; });
       return reply;
+    }
+    if (command === "desktop_viewer_takeover") {
+      fixture.takeoverDialogs++;
+      const confirmed = fixture.takeoverAnswers.shift() ?? false;
+      if (confirmed) { phase = "connecting"; fixture.emit({ phase }); }
+      return confirmed;
     }
     if (command === "desktop_viewer_start") return status();
     if (command === "desktop_viewer_close") {

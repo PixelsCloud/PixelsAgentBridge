@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X } from "lucide-react";
@@ -39,7 +40,7 @@ export function HistoryScreenshot({ id, language }: { id: string; language: Lang
   }, [expanded]);
 
   if (loading) return <p className="history-screenshot-note">{t.loadingHistory}</p>;
-  if (error) return <p className="history-screenshot-note">{error}</p>;
+  if (error) return <p className="history-screenshot-note">{userFacingError(error, language)}</p>;
   if (!image) return <p className="history-screenshot-note">{t.screenshotUnavailable}</p>;
 
   return <>

@@ -6,7 +6,7 @@ test("completion arriving during a byte read drains the final stdout and stderr"
   await page.goto(`${url}?language=en&streaming=true`);
   await expect.poll(() => page.evaluate(() => typeof (window as any).fixture.releaseInitial)).toBe("function");
   await page.evaluate(() => (window as any).fixture.finishTask());
-  await expect(page.locator(".task-row em")).toHaveText("Succeeded");
+  await expect(page.locator(".task-row em")).toHaveText("Completed");
   await page.evaluate(() => (window as any).fixture.releaseInitial());
   await expect(page.locator(".task-output pre").first()).toHaveText("first\nlast\n");
   await expect(page.locator(".task-output pre.stderr-output")).toHaveText("done\n");
@@ -30,7 +30,7 @@ for (const [language, label] of [["en", "English"], ["zh-CN", "简体中文"],])
       for (const embedded of [false, true]) {
         await page.goto(`${url}?language=${language}&theme=${theme}&embedded=${embedded}`);
         const row = page.locator(".task-row");
-        await expect(row.locator("em")).toHaveText("Succeeded");
+        await expect(row.locator("em")).toHaveText(language === "en" ? "Completed" : "已完成");
         const bounds = await row.evaluate(e => {
           const list = e.parentElement!;
           const state = e.querySelector("em")!.getBoundingClientRect();
@@ -98,7 +98,7 @@ for (const language of ["zh-CN", "en"]) {
 
 test("server settings cannot overwrite an unreadable configuration", async ({ page }) => {
   await page.goto(`${url}?panel=settings&section=server&settingsError=true`);
-  await expect(page.getByRole("alert")).toContainText("settings unavailable");
+  await expect(page.getByRole("alert")).toContainText("Settings could not be read or saved.");
   await expect(page.locator(".settings-actions button").first()).toBeDisabled();
 });
 

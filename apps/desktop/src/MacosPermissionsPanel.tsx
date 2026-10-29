@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Alert, Button, Dropdown, Modal, Space, Tag, Tooltip, theme } from "antd";
@@ -146,12 +147,12 @@ export function MacosPermissionsPanel({ language }: { language: Language }) {
       </div>
     </div>;
   }
-  const errors = (error || queryError) && <Alert type="error" showIcon title={error || queryError} />;
+  const errors = (error || queryError) && <Alert type="error" showIcon title={userFacingError(error || queryError, language)} />;
   function diskRow(target: Target) {
     const status = disk[target];
     const state = status.report?.state;
     const label = status.checking ? text.checking : status.error || state === "failed" ? text.failed : state === "normal" ? text.normal : state === "restricted" ? text.restricted : text.notChecked;
-    const detail = status.error || status.report?.folders.map(f => `${f.folder}: ${f.state === "normal" ? text.normal : f.state === "restricted" ? text.restricted : f.reason === "timeout" ? text.timedOut : text.failed}`).join(" · ") || text.fileNote;
+    const detail = (status.error ? userFacingError(status.error, language) : "") || status.report?.folders.map(f => `${f.folder}: ${f.state === "normal" ? text.normal : f.state === "restricted" ? text.restricted : f.reason === "timeout" ? text.timedOut : text.failed}`).join(" · ") || text.fileNote;
     return <div className="macos-permission-row" role="group" aria-label={text.fileAccess}>
       <span>{text.fileAccess}</span><div className="macos-permission-row-status">
         <Tooltip title={detail}><Tag color={!status.checking && state === "normal" ? "green" : !status.checking && state === "restricted" ? "orange" : undefined}>{label}</Tag></Tooltip>

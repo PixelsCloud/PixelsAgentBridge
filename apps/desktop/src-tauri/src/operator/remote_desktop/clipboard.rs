@@ -1,6 +1,6 @@
 use super::*;
 use pab_desktop_media::clipboard::NativeClipboard;
-use pab_protocol::{DesktopClipboardOperation as Operation, RemoteDesktopInput};
+use pab_protocol::{DesktopClipboardOperation as Operation, DesktopClipboardSnapshot as Snapshot};
 use pab_remote_desktop::RemoteDesktopClipboardControl;
 use std::sync::Mutex as StdMutex;
 
@@ -30,6 +30,16 @@ impl<'a> Bridge<'a> {
             progress: Mutex::new(Progress { remote, local_revision: None, remote_revision: None }), notify: tokio::sync::Notify::new(), supported })
     }
     pub(super) fn activate(&self) { if let Ok(mut active) = ACTIVE.lock() { *active = Some(self.token.clone()); } }
+    pub(super) fn deactivate(&self) {
+        if let Ok(mut active)=ACTIVE.lock(){if active.as_ref()==Some(&self.token){*active=None;}}
+    }
+    pub(super) fn paste_allowed(&self)->bool { self.enabled() && self.owns_clipboard() }
+    async fn guarded<T>(&self, work:impl std::future::Future<Output=Result<T,String>>)->Result<T,String> {
+        tokio::select! {
+            result=work=>result,
+            _=async {while self.paste_allowed(){tokio::time::sleep(Duration::from_millis(30)).await;}}=>Err("clipboard_cancelled".into()),
+        }
+    }
     fn owns_clipboard(&self) -> bool { ACTIVE.lock().is_ok_and(|active| active.as_ref() == Some(&self.token)) }
     fn enabled(&self) -> bool {
         let status = self.owner.status.borrow();
@@ -69,81 +79,95 @@ impl<'a> Bridge<'a> {
             }
             if self.window.is_focused().unwrap_or(false) { self.activate(); }
             if !self.owns_clipboard() || Instant::now() < retry_after { continue; }
-            if self.tick().await.is_err() {
-                self.publish("unavailable"); retry_after = Instant::now() + Duration::from_secs(3);
-            } else { self.publish("active"); }
+            match self.guarded(self.tick()).await {
+                Ok(())=>self.publish("active"),
+                Err(error)=>{self.publish(if error.contains("too_large"){"too_large"}else{"unavailable"}); retry_after=Instant::now()+Duration::from_secs(3);}
+            }
         }
     }
-    async fn tick(&self) -> Result<(), ()> {
-        let mut progress = self.progress.lock().await;
-        let local = self.local.exchange(Operation::Read { after: progress.local_revision }).await.map_err(|_| ())?;
-        if progress.remote_revision.is_none() {
-            let remote = progress.remote.exchange(Operation::Read { after: None }).await.map_err(|_| ())?;
-            // Starting a viewer never replaces either side's existing clipboard.
-            progress.local_revision = Some(local.revision); progress.remote_revision = Some(remote.revision);
-            return Ok(());
+    async fn tick(&self) -> Result<(), String> {
+        let mut progress=self.progress.lock().await;
+        let local=self.local.exchange(Operation::Read{after:progress.local_revision}).await.map_err(|e|e.to_string())?;
+        if progress.remote_revision.is_none(){
+            let remote=progress.remote.exchange(Operation::Read{after:None}).await.map_err(|e|e.to_string())?;
+            progress.local_revision=Some(local.revision);progress.remote_revision=Some(remote.revision);return Ok(());
         }
-        if !self.enabled() || !self.owns_clipboard() { return Ok(()); }
+        if !self.paste_allowed(){return Ok(());}
         if local.changed {
-            if let Some(text) = local.text {
-                let remote = progress.remote.exchange(Operation::Write { text }).await.map_err(|_| ())?;
-                progress.remote_revision = Some(remote.revision);
-            } else {
-                // A newly copied image/file stays local; do not replace it with old text.
-                let after = progress.remote_revision;
-                let remote = progress.remote.exchange(Operation::Read { after }).await.map_err(|_| ())?;
-                progress.remote_revision = Some(remote.revision);
+            if let Some(operation)=write_operation(&local, progress.remote_revision){
+                self.publish("syncing");
+                let remote=match transfer(&mut progress.remote,operation).await {
+                    Ok(remote)=>remote,
+                    Err(error)=>{
+                        if error.to_string().contains("clipboard_changed") {progress.local_revision=None;progress.remote_revision=None;}
+                        return Err(error.to_string());
+                    }
+                };
+                progress.remote_revision=Some(remote.revision);
+            }else{
+                let after=progress.remote_revision;
+                let remote=progress.remote.exchange(Operation::Read{after}).await.map_err(|e|e.to_string())?;
+                progress.remote_revision=Some(remote.revision);
             }
-            progress.local_revision = Some(local.revision);
-            return Ok(());
+            progress.local_revision=Some(local.revision);return Ok(());
         }
-        let after = progress.remote_revision;
-        let remote = progress.remote.exchange(Operation::Read { after }).await.map_err(|_| ())?;
-        if let Some(text) = remote.text {
-            let current = self.local.exchange(Operation::Read { after: progress.local_revision }).await.map_err(|_| ())?;
-            // A copy made locally during the network read wins over the older reply.
-            if current.changed || !self.enabled() || !self.owns_clipboard() { return Ok(()); }
-            let applied = self.local.exchange(Operation::Write { text }).await.map_err(|_| ())?;
-            progress.local_revision = Some(applied.revision);
+        let after=progress.remote_revision;
+        let remote=progress.remote.exchange(Operation::Read{after}).await.map_err(|e|e.to_string())?;
+        if let Some(operation)=write_operation(&remote,progress.local_revision){
+            let current=self.local.exchange(Operation::Read{after:progress.local_revision}).await.map_err(|e|e.to_string())?;
+            if current.changed || !self.paste_allowed(){return Ok(());}
+            self.publish("syncing");
+            let applied=self.local.exchange(operation).await.map_err(|e|e.to_string())?;
+            progress.local_revision=Some(applied.revision);
         }
-        progress.remote_revision = Some(remote.revision);
-        Ok(())
+        progress.remote_revision=Some(remote.revision);Ok(())
     }
     pub(super) async fn before_paste(&self) -> bool {
-        if !self.owner.clipboard_requested.load(Ordering::Acquire) { return true; }
-        if !self.supported { return true; } // An old peer keeps its existing remote-only paste behavior.
-        self.activate();
-        let result = async {
-            let mut progress = self.progress.lock().await;
-            let local = self.local.exchange(Operation::Read { after: None }).await.map_err(|_| ())?;
-            if !self.enabled() { return Err(()); }
-            if let Some(text) = local.text {
-                let remote = progress.remote.exchange(Operation::Write { text }).await.map_err(|_| ())?;
-                progress.remote_revision = Some(remote.revision);
-            }
-            progress.local_revision = Some(local.revision);
-            Ok::<_, ()>(())
-        }.await;
-        self.publish(if result.is_ok() { "active" } else { "paste_failed" });
+        if !self.owner.clipboard_requested.load(Ordering::Acquire) || !self.supported{return true;}
+        self.publish("syncing");
+        let result=self.guarded(async {
+            // Capture what was copied before waiting for an in-flight poll. A
+            // background remote update must not silently replace this paste.
+            let local=self.local.exchange(Operation::Read{after:None}).await.map_err(|e|e.to_string())?;
+            let mut progress=self.progress.lock().await;
+            let current=self.local.exchange(Operation::Read{after:Some(local.revision)}).await.map_err(|e|e.to_string())?;
+            if current.changed || !self.paste_allowed(){return Err("clipboard_cancelled".into());}
+            // Explicit paste intentionally replaces the remote clipboard. Background
+            // propagation uses expected_revision to preserve a newer remote copy.
+            if let Some(operation)=write_operation(&local,None){
+                let already_synced=if progress.local_revision==Some(local.revision) && progress.remote_revision.is_some(){
+                    let after=progress.remote_revision;
+                    !progress.remote.exchange(Operation::Read{after}).await.map_err(|e|e.to_string())?.changed
+                }else{false};
+                if !already_synced{
+                    let remote=transfer(&mut progress.remote,operation).await?;
+                    progress.remote_revision=Some(remote.revision);
+                }
+                let current=self.local.exchange(Operation::Read{after:Some(local.revision)}).await.map_err(|e|e.to_string())?;
+                if current.changed{return Err("clipboard_changed".into());}
+            }else{return Err("clipboard_content_unavailable".into());}
+            progress.local_revision=Some(local.revision);Ok(())
+        }).await;
+        self.publish(match &result{Ok(())=>"active",Err(e) if e.contains("too_large")=>"too_large",Err(_)=>"paste_failed"});
         result.is_ok()
     }
+
 }
 
-#[derive(Default)]
-pub(super) struct Shortcuts { held: std::collections::HashSet<u16> }
-impl Shortcuts {
-    pub(super) fn observe(&mut self, event: &RemoteDesktopInput) -> (bool, bool) {
-        match event {
-            RemoteDesktopInput::ReleaseAll => { self.held.clear(); (false, false) }
-            RemoteDesktopInput::Key { virtual_key, down } => {
-                let shortcut = [0x11, 0xa2, 0xa3, 0x5b, 0x5c].iter().any(|key| self.held.contains(key));
-                let shift = [0x10, 0xa0, 0xa1].iter().any(|key| self.held.contains(key));
-                let paste = *down && ((*virtual_key == 0x56 && shortcut) || (*virtual_key == 0x2d && shift));
-                let copy = !*down && shortcut && matches!(*virtual_key, 0x43 | 0x58);
-                if *down { self.held.insert(*virtual_key); } else { self.held.remove(virtual_key); }
-                (paste, copy)
-            }
-            _ => (false, false),
-        }
+async fn transfer(remote:&mut RemoteDesktopClipboardControl,operation:Operation)->Result<Snapshot,String>{
+    let image=operation.image().map(|i|(i.width,i.height,i.bytes));
+    let started=Instant::now();
+    let result=remote.exchange(operation).await.map_err(|e|e.to_string());
+    if let Some((width,height,bytes))=image{
+        tracing::info!(width,height,bytes,elapsed_ms=started.elapsed().as_millis() as u64,success=result.is_ok(),
+            error=result.as_ref().err().map(String::as_str),"remote desktop image clipboard write");
     }
+    result
 }
+fn write_operation(snapshot:&Snapshot,expected_revision:Option<u64>)->Option<Operation>{
+    if let Some(image)=&snapshot.image{Some(Operation::WriteImage{image:image.clone(),expected_revision})}
+    else{snapshot.text.clone().map(|text|Operation::Write{text})}
+}
+#[path = "clipboard_shortcuts.rs"]
+mod shortcuts;
+pub(super) use shortcuts::Shortcuts;

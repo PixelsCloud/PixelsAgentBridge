@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Terminal } from "@xterm/xterm";
@@ -191,7 +192,7 @@ export function TerminalBrowser({ code, connected, language, visible, onAuditCha
       {opened && <span>{[opened.shell, ...(opened.startup?.arguments ?? [])].join(" ")}</span>}
     </div>
     {opened && <ExecutionIdentityView identity={opened.executionIdentity} language={language} />}
-    {error && <div className="inline-error" role="alert">{error}</div>}
+    {error && <div className="inline-error" role="alert">{userFacingError(error, language)}</div>}
     <div className="terminal-canvas" ref={host} />
   </div>;
 }

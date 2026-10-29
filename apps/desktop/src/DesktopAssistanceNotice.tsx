@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Modal } from "antd";
@@ -76,6 +77,6 @@ function AssistancePrompt({ current, language }: { current: Assistance; language
     <p>{formatDeviceCode(current.request.device_code)}</p>
     <p><strong>{t.reason}</strong></p><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{current.request.reason}</p>
     <p><strong>{t.action}</strong></p><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{current.request.expected_action}</p>
-    <p>{t.hint}</p>{(error || deliveryFailed) && <p role="alert">{error || t.failed}</p>}
+    <p>{t.hint}</p>{(error || deliveryFailed) && <p role="alert">{error ? userFacingError(error, language) : t.failed}</p>}
   </Modal>;
 }

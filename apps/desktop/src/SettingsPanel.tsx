@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Menu, Select } from "antd";
@@ -117,7 +118,7 @@ export function SettingsPanel({ language, onLanguageChange, section, onSectionCh
             onChange={value => { setSettings(current => ({ ...current, relayUrl: value })); setSaved(false); }} />
         </div>
         <p className="settings-scope-note">{t.settingsScopeNote}</p>
-        {error && <p className="settings-error" role="alert">{error}</p>}
+        {error && <p className="settings-error" role="alert">{userFacingError(error, language)}</p>}
         <div className="settings-actions">
           <Button type="primary" disabled={!loaded} loading={busy} icon={<ArrowRight size={16} />} iconPlacement="end" onClick={() => void save()}>{t.settingsSave}</Button>
           {saved && <Button type="link" icon={<RotateCw size={15} />} onClick={() => void invoke("restart_desktop")}>{t.settingsRestart}</Button>}

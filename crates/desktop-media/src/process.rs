@@ -263,7 +263,7 @@ impl DesktopBackend for NativeBackend {
     fn clipboard(&self, config: DesktopVideoConfig, operation: DesktopClipboardOperation) -> MediaFuture<'_, DesktopClipboardSnapshot> {
         Box::pin(async move {
             config.validate().map_err(media_error)?;
-            self.clipboard.exchange(operation).await.map_err(|_| media_error("system text clipboard is temporarily unavailable"))
+            self.clipboard.exchange(operation).await.map_err(|error| media_error(error.to_string()))
         })
     }
     fn supports_cursor(&self) -> bool {

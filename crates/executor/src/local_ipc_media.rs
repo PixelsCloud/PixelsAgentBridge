@@ -15,6 +15,8 @@ use tokio::sync::Notify;
 pub(super) mod input;
 #[path = "local_ipc_media_cursor.rs"]
 pub(super) mod cursor;
+#[path = "local_ipc_media_clipboard.rs"]
+pub(super) mod clipboard;
 
 const VERSION: u16 = 1;
 const ENCODING_BUDGET_VERSION: u16 = 1;
@@ -32,6 +34,7 @@ struct Provider {
     active_config: Mutex<Option<DesktopVideoConfig>>,
     input_supported: bool,
     clipboard_supported: bool,
+    clipboard: Mutex<Option<Arc<clipboard::ClipboardProvider>>>,
     input: Mutex<Option<Arc<input::InputProvider>>>,
     cursor_supported: bool,
     encoding_budget_supported: bool,
@@ -159,7 +162,7 @@ impl DesktopBackend for HelperMediaBackend {
             .map(|provider| provider.clipboard_supported)).unwrap_or(false)
     }
     fn clipboard(&self, config: DesktopVideoConfig, operation: pab_protocol::DesktopClipboardOperation) -> MediaFuture<'_, pab_protocol::DesktopClipboardSnapshot> {
-        Box::pin(input::clipboard(config, operation))
+        Box::pin(clipboard::exchange(config, operation))
     }
     fn supports_cursor(&self) -> bool {
         // Keep an active capture's capability when another helper registers.
@@ -342,6 +345,7 @@ pub(super) async fn serve_registered(
             input_supported: frame["input_supported"].as_bool().unwrap_or(false),
             clipboard_supported: frame["clipboard_version"].as_u64() == Some(pab_protocol::DESKTOP_CLIPBOARD_VERSION.into()),
             input: Mutex::new(None),
+            clipboard: Mutex::new(None),
             cursor_supported: frame["cursor_schema_version"].as_u64()
                 == Some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION.into()),
             encoding_budget_supported: frame["encoding_budget_version"].as_u64()
@@ -521,6 +525,10 @@ async fn serve_helper_socket_with_role(
             if connect_auxiliary { cursor::serve_helper(backend, provider_id).await }
             else { std::future::pending().await }
         } => result,
+        result = async {
+            if connect_auxiliary { clipboard::serve_helper(backend, provider_id).await }
+            else { std::future::pending().await }
+        } => result,
     }
 }
 async fn serve_media_requests(
@@ -632,7 +640,10 @@ mod tests {
         held: Arc<AtomicBool>,
         clipboard_enabled: bool,
         clipboard_failed: Arc<AtomicBool>,
+        clipboard_stalled: Arc<AtomicBool>,
+        clipboard_entered: Arc<AtomicBool>,
         clipboard_text: Arc<Mutex<Option<String>>>,
+        clipboard_image: Arc<Mutex<Option<pab_protocol::DesktopClipboardImage>>>,
     }
     struct TestInput(Arc<AtomicUsize>, Arc<AtomicBool>);
     impl Drop for TestInput {
@@ -713,11 +724,14 @@ mod tests {
         fn supports_clipboard(&self) -> bool { self.clipboard_enabled }
         fn clipboard(&self, _: DesktopVideoConfig, operation: pab_protocol::DesktopClipboardOperation) -> MediaFuture<'_, pab_protocol::DesktopClipboardSnapshot> {
             Box::pin(async move {
+                self.clipboard_entered.store(true,Ordering::SeqCst);
+                while self.clipboard_stalled.load(Ordering::SeqCst){tokio::time::sleep(Duration::from_millis(10)).await;}
                 if self.clipboard_failed.load(Ordering::SeqCst) { return Err(unavailable("clipboard occupied")); }
                 let mut text = self.clipboard_text.lock().unwrap();
                 Ok(match operation {
-                    pab_protocol::DesktopClipboardOperation::Read { after } => pab_protocol::DesktopClipboardSnapshot { revision: 1, changed: after != Some(1), text: if after != Some(1) { text.clone() } else { None } },
-                    pab_protocol::DesktopClipboardOperation::Write { text: value } => { *text = Some(value); pab_protocol::DesktopClipboardSnapshot { revision: 1, changed: false, text: None } }
+                    pab_protocol::DesktopClipboardOperation::Read { after } => pab_protocol::DesktopClipboardSnapshot { revision: 1, changed: after != Some(1), text: if after != Some(1) { text.clone() } else { None }, image: if after!=Some(1){self.clipboard_image.lock().unwrap().clone()}else{None} },
+                    pab_protocol::DesktopClipboardOperation::WriteImage {image,..}=>{*text=None;*self.clipboard_image.lock().unwrap()=Some(image);pab_protocol::DesktopClipboardSnapshot{revision:1,changed:false,text:None,image:None}},
+                    pab_protocol::DesktopClipboardOperation::Write { text: value } => { *text = Some(value); *self.clipboard_image.lock().unwrap()=None; pab_protocol::DesktopClipboardSnapshot { revision: 1, changed: false, text: None, image:None } }
                 })
             })
         }
@@ -1155,6 +1169,22 @@ mod tests {
         Pair { server, helper }
     }
 
+    async fn clipboard_pair(backend: Arc<dyn DesktopBackend>, provider_id: u64) -> Pair {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async_with_config(stream, None).await.unwrap();
+            let frame: Value = read_control(&mut socket).await.unwrap();
+            let _ = clipboard::serve_registered(socket, frame).await;
+        });
+        let helper = tokio::spawn(async move {
+            let (socket, _) = connect_async(format!("ws://{address}")).await.unwrap();
+            let _ = clipboard::serve_helper_socket(socket, backend.as_ref(), provider_id).await;
+        });
+        Pair { server, helper }
+    }
+
     #[tokio::test]
     #[cfg_attr(target_os = "linux", ignore = "requires an active local graphical user")]
     async fn paired_clipboard_failure_preserves_input_and_static_capture() {
@@ -1167,20 +1197,38 @@ mod tests {
         let input_channel = input_pair(backend.clone(), id).await;
         assert!(HelperMediaBackend.clipboard(config.clone(), pab_protocol::DesktopClipboardOperation::Read { after: None }).await.is_err());
         let mut input = HelperMediaBackend.input(config.clone()).await.unwrap();
+        let clipboard_channel = clipboard_pair(backend.clone(), id).await;
         let text = "中文\nclipboard 🖥️".repeat(5000);
         HelperMediaBackend.clipboard(config.clone(), pab_protocol::DesktopClipboardOperation::Write { text: text.clone() }).await.unwrap();
         let read = HelperMediaBackend.clipboard(config.clone(), pab_protocol::DesktopClipboardOperation::Read { after: None }).await.unwrap();
         assert_eq!(read.text.as_ref(), Some(&text));
+        // Binary payloads use their own paired socket, not the input queue.
+        let mut data=vec![37u8;128*1024];
+        data[..16].copy_from_slice(&[137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82]);
+        data[16..20].copy_from_slice(&2u32.to_be_bytes());data[20..24].copy_from_slice(&2u32.to_be_bytes());
+        let image=pab_protocol::DesktopClipboardImage{width:2,height:2,bytes:data.len() as u32,data};
+        HelperMediaBackend.clipboard(config.clone(),pab_protocol::DesktopClipboardOperation::WriteImage{image:image.clone(),expected_revision:None}).await.unwrap();
+        let read=HelperMediaBackend.clipboard(config.clone(),pab_protocol::DesktopClipboardOperation::Read{after:None}).await.unwrap();
+        assert_eq!(read.image,Some(image));
         backend.clipboard_failed.store(true, Ordering::SeqCst);
         assert!(HelperMediaBackend.clipboard(config.clone(), pab_protocol::DesktopClipboardOperation::Read { after: None }).await.is_err());
         input.apply(pab_protocol::RemoteDesktopInput::Key { virtual_key: 65, down: true }).await.unwrap();
         assert!(backend.held.load(Ordering::SeqCst));
         assert_eq!(backend.input_active.load(Ordering::SeqCst), 1);
         backend.clipboard_failed.store(false, Ordering::SeqCst);
+        let read_config=config.clone();
         assert!(HelperMediaBackend.clipboard(config, pab_protocol::DesktopClipboardOperation::Read { after: None }).await.is_ok());
         input.apply(pab_protocol::RemoteDesktopInput::ReleaseAll).await.unwrap();
         assert!(!backend.held.load(Ordering::SeqCst));
-        drop(input); drop(source); drop(input_channel); drop(capture);
+        backend.clipboard_stalled.store(true,Ordering::SeqCst);backend.clipboard_entered.store(false,Ordering::SeqCst);
+        let pending_config=read_config;
+        let pending=tokio::spawn(async move{HelperMediaBackend.clipboard(pending_config,pab_protocol::DesktopClipboardOperation::Read{after:None}).await});
+        tokio::time::timeout(WAIT,async{while !backend.clipboard_entered.load(Ordering::SeqCst){tokio::task::yield_now().await;}}).await.unwrap();
+        tokio::time::timeout(Duration::from_millis(500),input.apply(pab_protocol::RemoteDesktopInput::Key{virtual_key:66,down:true})).await.unwrap().unwrap();
+        assert!(backend.held.load(Ordering::SeqCst));
+        drop(input);drop(source);
+        assert!(tokio::time::timeout(WAIT,pending).await.unwrap().unwrap().is_err());
+        drop(clipboard_channel); drop(input_channel); drop(capture);
     }
 
     #[tokio::test]

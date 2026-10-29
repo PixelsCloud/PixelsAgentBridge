@@ -492,6 +492,7 @@ pub fn run() {
                 operator::remote_desktop::desktop_viewer_overlay,
                 operator::remote_desktop::desktop_viewer_fullscreen,
                 operator::remote_desktop::desktop_viewer_close,
+                operator::remote_desktop::desktop_viewer_takeover,
                 desktop_assistance::desktop_assistance_pending,
                 desktop_assistance::desktop_assistance_displayed,
                 desktop_assistance::desktop_assistance_open,

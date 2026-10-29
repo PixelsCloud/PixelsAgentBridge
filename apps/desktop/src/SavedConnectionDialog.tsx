@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Input, Modal, Spin, Steps } from "antd";
 import { RotateCw } from "lucide-react";
@@ -99,5 +100,5 @@ function connectionErrorMessage(message: string, language: Language): string {
   if (text.includes("notfound") || text.includes("saved device was not found")) return t.connectDeviceNotFound;
   if (/timed out|timeout/.test(text)) return t.connectTimedOut;
   if (/endpoint control supervisor is unavailable|endpoint control connection closed/.test(text)) return t.connectServiceUnavailable;
-  return message;
+  return userFacingError(message, language);
 }

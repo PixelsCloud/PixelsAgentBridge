@@ -330,7 +330,7 @@ async fn mismatched_ack_reply_retires_the_stream_without_replaying_queued_input(
         mutation.command,
         DesktopControlCommand::SetInput { .. }
     ));
-    h.reply(request.sequence + 1).await;
+    h.reply(request.sequence + 100).await;
     tokio::time::timeout(WAIT, &mut h.worker)
         .await
         .unwrap()

@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -61,15 +62,15 @@ export function FileBatchDialog({ id, initialConflict, disabled, onClose, onChan
     <header><strong>{en ? "Transfer details" : "传输详情"}</strong><button title={en ? "Close details" : "关闭详情"} onClick={onClose}><X size={18} /></button></header>
     <div className="fm-batch-filter"><label>{en ? "Status" : "状态"}<select aria-label={en ? "Item status" : "项目状态"} value={filter} onChange={event => { setItems([]); setAfter(0); setFilter(event.target.value); }}><option value="">{en ? "All" : "全部"}</option>{Object.entries(states).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><span aria-live="polite">{loading ? en ? "Updating…" : "正在更新…" : ""}</span></div>
     {items.some(item => item.state === "waiting_conflict") && <label className="fm-conflict-remaining"><input type="checkbox" disabled={disabled || pending !== null} checked={applyRemaining} onChange={event => setApplyRemaining(event.target.checked)}/>{en ? "Apply this choice to all remaining conflicts in this transfer" : "对本次传输后续所有冲突应用此选择"}</label>}
-    {(error || readError) && <div role="alert" className="fm-error">{error || readError}</div>}
+    {(error || readError) && <div role="alert" className="fm-error">{userFacingError(error || readError)}</div>}
     <div className="fm-batch-items" tabIndex={0}>{items.length === 0 ? <p className="fm-empty">{en ? "No items in this view" : "当前没有匹配的项目"}</p> : items.map(item => <article key={item.spec.id} className="fm-batch-item">
-      <div><strong>{displayFileText(item.spec.relative_name)}</strong><span>{item.state === "completed" && !!item.metadata_result?.warnings.length ? en ? "Completed with attribute warnings" : "已完成，部分属性未保留" : states[item.state] || item.state}</span></div>
+      <div><strong>{displayFileText(item.spec.relative_name)}</strong><span>{item.state === "completed" && !!item.metadata_result?.warnings.length ? en ? "Completed with attribute warnings" : "已完成，部分属性未保留" : states[item.state] || (en ? "Unknown status" : "状态未知")}</span></div>
       <small>{fileSize(item.confirmed)} / {fileSize(item.spec.size)}</small>
       <dl><dt>{en ? "Source" : "源路径"}</dt><dd>{pathLabel(item.spec.source)}</dd><dt>{en ? "Destination" : "目标路径"}</dt><dd>{pathLabel(item.effective_destination || item.spec.destination)}</dd>{item.attempt && <><dt>{en ? "Request" : "请求 ID"}</dt><dd>{item.attempt}</dd></>}</dl>
-      {item.message && <p className={item.state === "failed" ? "fm-item-error" : ""}>{displayFileText(item.message)}</p>}
+      {item.message && <p className={item.state === "failed" ? "fm-item-error" : ""}>{userFacingError(item.message)}</p>}
       {!!item.metadata_result?.warnings.length && <div className="fm-attribute-warnings" role="note">{item.metadata_result.warnings.map(warning => <p key={warning.attribute}>
         <strong>{warning.attribute === "modified_time" ? en ? "Modified time" : "修改时间" : en ? "Permissions" : "文件权限"}：</strong>
-        {warning.code === "unsupported" ? en ? "Not supported by the destination filesystem; file contents were saved." : "目标文件系统不支持此属性；文件内容已保存。" : displayFileText(warning.message)}
+        {warning.code === "unsupported" ? en ? "Not supported by the destination filesystem; file contents were saved." : "目标文件系统不支持此属性；文件内容已保存。" : userFacingError({code: warning.code, message: warning.message})}
       </p>)}</div>}
       {item.state === "waiting_conflict" && <div className="fm-conflict-actions">{([ ["replace", en ? "Replace" : "替换"], ["skip", en ? "Skip" : "跳过"], ["keep_both", en ? "Keep both" : "保留两者"] ]).map(([choice, label]) => <button key={choice} disabled={disabled || pending !== null} onClick={() => void resolve(item, choice)}>{pending === item.spec.id ? "…" : label}</button>)}</div>}
     </article>)}</div>

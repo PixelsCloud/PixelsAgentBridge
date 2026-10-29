@@ -145,6 +145,11 @@ async fn unconsumed_backlog_retires_only_video_and_releases_input_before_new_gen
     })
     .await;
     server.legacy().await;
+    // The retired video clears input first. Input racing that retirement must
+    // retain the media lifecycle cause, so product recovery is still enabled.
+    let retired = old_input.send(RemoteDesktopInput::Key { virtual_key: 65, down: true }).await.unwrap_err();
+    assert!(retired.is_recoverable_media(), "retired video masked as view-only: {retired}");
+    assert!(retired.to_string().contains("presentation backlog expired"));
     assert!(matches!(
         RemoteDesktopSession::open(other.client.clone(), None, 15, WAIT).await,
         Err(DesktopError::Rejected {

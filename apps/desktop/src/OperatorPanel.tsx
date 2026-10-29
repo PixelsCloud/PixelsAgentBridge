@@ -1,3 +1,4 @@
+import { userFacingError } from "./userFacingError";
 import { lazy, Suspense, useEffect, useRef, useState, type SetStateAction } from "react";
 import { App as AntdApp, Dropdown, Input, Modal, type MenuProps } from "antd";
 import { invoke } from "@tauri-apps/api/core";
@@ -1082,7 +1083,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
           <label className="rename-device-label" htmlFor="rename-device-input">{t.deviceAlias}</label>
           <Input id="rename-device-input" maxLength={64} value={renameDraft}
             onChange={(event) => setRenameDraft(event.target.value)} onPressEnter={() => void renameSavedDevice()} />
-          {renameError && <p className="device-dialog-error" role="alert">{renameError}</p>}
+          {renameError && <p className="device-dialog-error" role="alert">{userFacingError(renameError, language)}</p>}
         </>}
       </Modal>
 
@@ -1092,7 +1093,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         {deleteTarget && <>
           <strong>{deleteTarget.alias || formatDeviceCode(deleteTarget.deviceCode)}</strong>
           <p>{t.deleteDeviceHint}</p>
-          {deleteError && <p className="device-dialog-error" role="alert">{deleteError}</p>}
+          {deleteError && <p className="device-dialog-error" role="alert">{userFacingError(deleteError, language)}</p>}
         </>}
       </Modal>
 
@@ -1102,7 +1103,7 @@ export function OperatorPanel({ language, view, onOpenRemote, signedIn, onSignIn
         {disconnectTarget && <>
           <strong>{disconnectTarget.alias || formatDeviceCode(disconnectTarget.deviceCode)}</strong>
           <p>{t.disconnectDeviceHint}</p>
-          {disconnectError && <p className="device-dialog-error" role="alert">{disconnectError}</p>}
+          {disconnectError && <p className="device-dialog-error" role="alert">{userFacingError(disconnectError, language)}</p>}
         </>}
       </Modal>
 
