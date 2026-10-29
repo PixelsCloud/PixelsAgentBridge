@@ -49,6 +49,9 @@ pub(crate) struct FileService {
     slots: Arc<Semaphore>,
     requests: Arc<Semaphore>,
     active_transfers: Arc<std::sync::Mutex<HashSet<(String, RequestId)>>>,
+    transfer_stops: Arc<std::sync::Mutex<HashMap<(String, RequestId), tokio::sync::watch::Sender<FileTransferIntent>>>>,
+    native_context: std::sync::OnceLock<ExecutionContext>,
+    managed_directories: Mutex<HashMap<RequestId, managed::Directory>>,
 }
 
 pub(crate) struct StagedFile(pub PathBuf);
@@ -102,6 +105,9 @@ impl FileService {
             slots: Arc::new(Semaphore::new(16)),
             requests: Arc::new(Semaphore::new(16)),
             active_transfers: Default::default(),
+            transfer_stops: Default::default(),
+            native_context: Default::default(),
+            managed_directories: Default::default(),
         }))
     }
 
@@ -155,11 +161,11 @@ impl FileService {
         if let Err(error) = request.validate() {
             return failed(reply, "invalid_request", error);
         }
-        if request.schema_version() > 4 {
+        if request.schema_version() > 11 || !request.execution.is_service() {
             return failed(
                 reply,
                 "unsupported",
-                "This Android build supports filesystem v4 as the app UID",
+                "Android storage executes only as the application UID",
             );
         }
         if payload.len() != request.payload_size as usize
@@ -429,6 +435,11 @@ impl FileService {
                 );
                 return reply;
             }
+            if let Some(body)=&reply.file_manager {
+                if let Err(error)=self.authorize_managed_reply(body).await {
+                    reply.file_manager=None;reply.state="failed".into();reply.error=Some(error.0);return reply;
+                }
+            }
             if let Some(search) = self
                 .searches
                 .lock()
@@ -647,6 +658,10 @@ impl FileService {
     ) -> Result<Vec<u8>, FileError> {
         cancelled(cancel)?;
         match &request.operation {
+            FileSystemAction::Managed { operation, expected_execution } => {
+                self.managed(owner,request,operation,expected_execution.as_ref(),reply,cancel).await?;
+                Ok(Vec::new())
+            }
             operation if operation.is_bulk() => self.bulk(owner, request, reply, cancel).await,
             FileSystemAction::Search { .. } => {
                 reply.search = Some(self.search(owner, request, cancel).await?);
@@ -973,3 +988,6 @@ mod bulk;
 
 #[path = "file_archive.rs"]
 mod archive;
+
+#[path = "file_managed.rs"]
+mod managed;

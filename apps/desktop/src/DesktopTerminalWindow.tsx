@@ -14,7 +14,13 @@ import { desktopTerminalText } from "./desktopTerminalText";
 import type { ExecutionEntry, ExecutionReply, ExecutionSelection } from "./executionQueries";
 import type { ExecutionIdentity } from "./operatorTypes";
 
-type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string; os_family?: "windows" | "linux" | "macos" };
+type Opened = { session_id: string; shell: string; arguments: string[]; cwd: string; identity: ExecutionIdentity; cols: number; rows: number; connection_path: string; os_family?: "windows" | "linux" | "macos" | "android" };
+function terminalError(cause: unknown): string {
+  const message = String(cause);
+  if (/Android does not provide a System\/root terminal|android_system_action_unavailable|android_pty_start_failed|android_terminal_requires_app_uid/.test(message))
+    return language === "en" ? "This feature is not available on this Android device." : "此 Android 设备暂无此功能。";
+  return message;
+}
 type LaunchMode = "console" | "system" | null;
 const language = localStorage.getItem("pab.language");
 const text = desktopTerminalText[language === "en" ? "en" : "zh-CN"];
@@ -69,7 +75,7 @@ function TerminalContent() {
       if (previous === "service") setSelected("service");
       else if (account?.selection && "context_ref" in account.selection) setSelected(account.selection.context_ref);
       setPhase("ready");
-    } catch (cause) { setError(String(cause)); setPhase("ready"); }
+    } catch (cause) { setError(terminalError(cause)); setPhase("ready"); }
     finally { setLoadingAccounts(false); }
   }
   async function consume() {
@@ -84,7 +90,7 @@ function TerminalContent() {
         if (gen !== generation.current) break;
         acked.current = offset;
       }
-    } catch (cause) { if (live.current && gen === generation.current) { setError(String(cause)); live.current = false; setPhase("ended"); } }
+    } catch (cause) { if (live.current && gen === generation.current) { setError(terminalError(cause)); live.current = false; setPhase("ended"); } }
     finally { ackBusy.current = false; if (live.current && pendingAck.current > acked.current && gen !== generation.current) void consume(); }
   }
   async function drainInput() {
@@ -99,7 +105,7 @@ function TerminalContent() {
         await invoke("desktop_terminal_input", { sessionId: id, bytes: Array.from(bytes) });
       }
     } catch (cause) {
-      if (gen === generation.current) { setError(String(cause)); live.current = false; setPhase("ended"); queue.current = []; queuedBytes.current = 0; }
+      if (gen === generation.current) { setError(terminalError(cause)); live.current = false; setPhase("ended"); queue.current = []; queuedBytes.current = 0; }
     } finally { draining.current = false; if (live.current && queue.current.length && gen !== generation.current) void drainInput(); }
   }
   function input(data: string) {
@@ -140,7 +146,7 @@ function TerminalContent() {
         const size = pendingResize.current; pendingResize.current = null;
         await invoke("desktop_terminal_resize", { sessionId: sessionId.current, ...size });
       }
-    } catch (cause) { if (live.current) setError(String(cause)); }
+    } catch (cause) { if (live.current) setError(terminalError(cause)); }
     finally { resizeBusy.current = false; }
   }
   async function endSession() {
@@ -161,13 +167,13 @@ function TerminalContent() {
       }
       await endSession();
       if (closeWindow) await invoke("desktop_terminal_destroy");
-    } catch (cause) { setError(String(cause)); }
+    } catch (cause) { setError(terminalError(cause)); }
     finally { closeBusy.current = false; }
   }
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     let disposed = false;
-    void invoke<{ code: string; launch_mode: LaunchMode }>("desktop_terminal_info").then((value) => { if (!disposed) { setCode(value.code); setLaunchMode(value.launch_mode); } }).catch((cause) => { if (!disposed) setError(String(cause)); });
+    void invoke<{ code: string; launch_mode: LaunchMode }>("desktop_terminal_info").then((value) => { if (!disposed) { setCode(value.code); setLaunchMode(value.launch_mode); } }).catch((cause) => { if (!disposed) setError(terminalError(cause)); });
     const term = new Terminal({ scrollback: 10000, fontSize: 14, fontFamily: '"Cascadia Mono", "SFMono-Regular", Consolas, monospace', cursorBlink: true, theme: { background: "#142334", foreground: "#e7f3f1", cursor: "#8cd6c9", selectionBackground: "#21857470" } });
     const addon = new FitAddon(); term.loadAddon(addon); term.open(host.current!); terminal.current = term; fit.current = addon;
     const data = term.onData(input);
@@ -196,7 +202,7 @@ function TerminalContent() {
       const selection = await invoke<ExecutionSelection>("desktop_terminal_selection");
       if (generation.current !== gen) return;
       await start(selection);
-    } catch (cause) { if (generation.current === gen) { setError(String(cause)); setPhase("ended"); } }
+    } catch (cause) { if (generation.current === gen) { setError(terminalError(cause)); setPhase("ended"); } }
     finally { automaticBusy.current = false; }
   }
   async function start(requestedSelection?: ExecutionSelection) {
@@ -266,31 +272,44 @@ function TerminalContent() {
       await invoke("desktop_terminal_watch", { sessionId: value.session_id });
       terminal.current.focus();
       localStorage.setItem(`pab.desktopTerminal.account.${code}`, selection.mode === "service" ? "service" : value.identity.account_id);
-    } catch (cause) { setError(String(cause)); live.current = false; setPhase("ended"); }
+    } catch (cause) { setError(terminalError(cause)); live.current = false; setPhase("ended"); }
   }
+  useEffect(() => {
+    if (phase !== "running" || !opened) return;
+    let active = true, pending = false;
+    const sessionId = opened.session_id;
+    const poll = async () => {
+      if (pending) return; pending = true;
+      try { const path = await invoke<string | null>("desktop_terminal_connection_path", {sessionId}); if (active) setOpened(current => current?.session_id === sessionId ? {...current, connection_path: path || "Unknown"} : current); }
+      catch { if (active) setOpened(current => current?.session_id === sessionId ? {...current, connection_path:"Unknown"} : current); }
+      finally { pending = false; }
+    };
+    const timer = window.setInterval(() => void poll(), 2000);
+    return () => {active = false; window.clearInterval(timer);};
+  }, [phase, opened?.session_id]);
   const options = [{ value: "service", label: text.service }, ...accounts.filter((entry) => entry.mode === "user").map((entry, index) => ({ value: entry.selection && "context_ref" in entry.selection ? entry.selection.context_ref : `unavailable-${index}`, label: `${entry.account_name}${entry.session_id ? ` · ${entry.session_id}` : ""}${entry.unavailable_reason ? ` · ${entry.unavailable_reason}` : ""}`, disabled: !entry.selection }))];
   return <div className={`desktop-terminal ${dark ? "desktop-terminal-dark" : ""}`}>
     <header className="titlebar desktop-terminal-header"
       onMouseDown={(event) => {
         if (event.button !== 0 || event.detail !== 1 || (event.target as HTMLElement).closest("button, .desktop-terminal-actions, .window-controls")) return;
         event.preventDefault();
-        void appWindow.startDragging().catch((cause) => setError(String(cause)));
+        void appWindow.startDragging().catch((cause) => setError(terminalError(cause)));
       }}
       onDoubleClick={(event) => {
         if ((event.target as HTMLElement).closest("button, .desktop-terminal-actions, .window-controls")) return;
-        void appWindow.toggleMaximize().catch((cause) => setError(String(cause)));
+        void appWindow.toggleMaximize().catch((cause) => setError(terminalError(cause)));
       }}>
-      <div className="titlebar-identity desktop-terminal-title"><img className="brand-mark" src={brand} alt="" /><strong>{text.title}</strong><span>{code.replace(/(\d{3})(?=\d)/g, "$1 ")}</span><Tag color={phase === "running" ? "green" : "default"}>{phase === "preparing" ? text.preparing : phase === "starting" ? text.starting : phase === "running" ? text.running : phase === "ended" ? text.ended : text.choose}</Tag>
+      <div className="titlebar-identity desktop-terminal-title"><img className="brand-mark" src={brand} alt="" /><strong>{text.title}</strong><span>{code.replace(/(\d{3})(?=\d)/g, "$1 ")}</span><Tag color={phase === "running" ? "green" : "default"}>{phase === "preparing" ? text.preparing : phase === "starting" ? text.starting : phase === "running" ? text.running + (opened && ["P2P", "Relay"].includes(opened.connection_path) ? (language === "en" ? ` (${opened.connection_path})` : `（${opened.connection_path}）`) : "") : phase === "ended" ? text.ended : text.choose}</Tag>
         {launchMode === "system" && <span className="desktop-terminal-path">System</span>}
-        {opened && <span className="desktop-terminal-path" title={text.path}>{opened.connection_path}</span>}
+
       </div>
-      <Space className="desktop-terminal-actions" size={6}><Button size="small" aria-label={text.copy} title={text.copy} icon={<Copy size={14} />} onClick={() => void navigator.clipboard.writeText(terminal.current?.getSelection() || "").catch((cause) => setError(String(cause)))} />
-        <Button size="small" aria-label={text.paste} title={text.paste} disabled={phase !== "running"} icon={<Clipboard size={14} />} onClick={() => void navigator.clipboard.readText().then(paste).catch((cause) => setError(String(cause)))} />
+      <Space className="desktop-terminal-actions" size={6}><Button size="small" aria-label={text.copy} title={text.copy} icon={<Copy size={14} />} onClick={() => void navigator.clipboard.writeText(terminal.current?.getSelection() || "").catch((cause) => setError(terminalError(cause)))} />
+        <Button size="small" aria-label={text.paste} title={text.paste} disabled={phase !== "running"} icon={<Clipboard size={14} />} onClick={() => void navigator.clipboard.readText().then(paste).catch((cause) => setError(terminalError(cause)))} />
         <Button size="small" aria-label={text.clear} title={text.localClear} icon={<Eraser size={14} />} onClick={() => terminal.current?.clear()}><span className="desktop-terminal-action-label">{text.clear}</span></Button>
         <Button size="small" aria-label={text.close} title={text.close} danger disabled={phase !== "running"} icon={<Square size={13} />} onClick={() => void requestClose(false)}><span className="desktop-terminal-action-label">{text.close}</span></Button></Space>
       <div className="window-controls">
-        <button aria-label={text.minimize} title={text.minimize} onClick={() => void appWindow.minimize().catch((cause) => setError(String(cause)))}><Minus /></button>
-        <button aria-label={text.maximize} title={text.maximize} onClick={() => void appWindow.toggleMaximize().catch((cause) => setError(String(cause)))}><Maximize2 /></button>
+        <button aria-label={text.minimize} title={text.minimize} onClick={() => void appWindow.minimize().catch((cause) => setError(terminalError(cause)))}><Minus /></button>
+        <button aria-label={text.maximize} title={text.maximize} onClick={() => void appWindow.toggleMaximize().catch((cause) => setError(terminalError(cause)))}><Maximize2 /></button>
         <button className="close" aria-label={text.closeWindow} title={text.closeWindow} onClick={() => void requestClose(true)}><X /></button>
       </div>
     </header>

@@ -323,6 +323,10 @@ async fn session(
                         let _permit=permit;
                         let request:DeviceTaskRequest=stream.receive_json(timeout).await?;
                         if request.schema_version()==DEVICE_TASK_SCHEMA_VERSION
+                            && let (Some(service),Some(scope),DeviceTaskRequest::DesktopTerminal {request,..})=(&commands,&command_scope,&request) {
+                            return service.serve_desktop_terminal(&owner,scope,request.clone(),stream).await;
+                        }
+                        if request.schema_version()==DEVICE_TASK_SCHEMA_VERSION
                             && let (Some(service),DeviceTaskRequest::PortForwardConnect {port_forward_schema_version,host,port,..})=(&forwards,&request) {
                             return service.serve(stream,forward_slots,*port_forward_schema_version,host,*port,timeout).await;
                         }
@@ -337,7 +341,7 @@ async fn session(
                         let response=if request.schema_version()!=DEVICE_TASK_SCHEMA_VERSION {unsupported()} else { match request {
                             DeviceTaskRequest::GetEnvironment {..}=>DeviceTaskResponse::Environment {
                                 context:Box::new(TargetContext {device_ref:device,execution,source:TargetContextSource::ExecutorVerified,observed_at_unix_ms:now_ms(),freshness:ContextFreshness::Current}),
-                                command_schema_version:commands.as_ref().map(|_|2),terminal_schema_version:commands.as_ref().map(|_|1),desktop_terminal_schema_version:None,remote_desktop_schema_version:None,remote_desktop_cursor_schema_version:None,remote_desktop_clipboard_schema_version:None,filesystem_schema_version:files.as_ref().map(|_|4),transfer_schema_version:files.as_ref().map(|_|FILE_TRANSFER_NATIVE_SCHEMA_VERSION),system_query_schema_version:system.as_ref().map(|_|SYSTEM_QUERY_SCHEMA_VERSION),screenshot_schema_version:Some(SCREENSHOT_SCHEMA_VERSION),document_schema_version:documents.as_ref().map(|_|DOCUMENT_SCHEMA_VERSION),port_forward_schema_version:forwards.as_ref().map(|_|PORT_FORWARD_SCHEMA_VERSION),mobile_schema_version:Some(MOBILE_SCHEMA_VERSION),
+                                command_schema_version:commands.as_ref().map(|_|2),terminal_schema_version:commands.as_ref().map(|_|1),desktop_terminal_schema_version:commands.as_ref().map(|_|DESKTOP_TERMINAL_SCHEMA_VERSION),remote_desktop_schema_version:None,remote_desktop_cursor_schema_version:None,remote_desktop_clipboard_schema_version:None,filesystem_schema_version:files.as_ref().map(|_|11),transfer_schema_version:files.as_ref().map(|_|FILE_TRANSFER_PARENT_SCHEMA_VERSION),system_query_schema_version:system.as_ref().map(|_|SYSTEM_QUERY_SCHEMA_VERSION),screenshot_schema_version:Some(SCREENSHOT_SCHEMA_VERSION),document_schema_version:documents.as_ref().map(|_|DOCUMENT_SCHEMA_VERSION),port_forward_schema_version:forwards.as_ref().map(|_|PORT_FORWARD_SCHEMA_VERSION),mobile_schema_version:Some(MOBILE_SCHEMA_VERSION),
                             },
                             DeviceTaskRequest::Document {request,..} if documents.is_some()=>DeviceTaskResponse::Document {reply:Box::new(documents.as_ref().expect("document capability").request(&owner,request).await)},
                             DeviceTaskRequest::GetDocument {request_id,..} if documents.is_some()=>DeviceTaskResponse::Document {reply:Box::new(documents.as_ref().expect("document capability").authorized_lookup(&owner,request_id).await)},

@@ -5,6 +5,9 @@ import java.io.InputStream
 
 fun interface AtomicFilePublisher {
     fun publish(source: File, destination: File, replace: Boolean)
+    fun publishBound(source: File, destination: File, replace: Boolean, parentIdentity: String) {
+        throw StorageFailure("bound_publication_unavailable")
+    }
 }
 
 /** A granted document or workspace entry. Implementations never expose credentials as a root. */
@@ -33,6 +36,14 @@ interface StorageEntry {
     fun mkdir(parents: Boolean, existOk: Boolean, checkpoint: () -> Unit = {})
 
     fun delete(checkpoint: () -> Unit = {})
+
+    fun bindParent(identity: String): StorageEntry {
+        throw StorageFailure("bound_publication_unavailable")
+    }
+
+    fun rename(name: String, checkpoint: () -> Unit = {}) {
+        throw StorageFailure("rename_unavailable")
+    }
 }
 
 data class StorageMetadata(

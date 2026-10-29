@@ -53,5 +53,7 @@ class NativeBridge(context: Context) {
 
     external fun stop(): String
 
+    external fun publishFileBound(source: String, destination: String, replace: Boolean, parentIdentity: String): String
+
     external fun publishFile(source: String, destination: String, replace: Boolean): String
 }

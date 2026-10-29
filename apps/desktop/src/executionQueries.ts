@@ -21,7 +21,7 @@ export type ExecutionReply = {
   error: string | null;
   truncated: boolean;
   execution_context?: { identity?: ExecutionIdentity | null };
-  data: { type: "execution_contexts"; entries: ExecutionEntry[] } | { type: "applications"; snapshot: AppSnapshot } | null;
+  data: { type: "execution_contexts"; backend?: string; entries: ExecutionEntry[] } | { type: "applications"; snapshot: AppSnapshot } | null;
 };
 export const isPending = (reply: ExecutionReply) => ["running", "queued", "unconfirmed"].includes(reply.state);
 export function executionErrorMessage(cause: unknown): string {

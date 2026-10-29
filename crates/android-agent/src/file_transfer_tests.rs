@@ -1,15 +1,29 @@
 use super::*;
 
 #[tokio::test]
-async fn unsupported_attributes_and_source_constraints_are_rejected_before_acceptance() {
-    let root=tempfile::tempdir().unwrap();let staging=root.path().join("staging");std::fs::create_dir(&staging).unwrap();let service=FileService::open(&root.path().join("attributes.sqlite3"),&staging,[9;32]).await.unwrap();let actor=OperatorRef::guest(EndpointKey::new([7;32]));
-    for attributes in [false,true] {
-        let mut request=upload();request.native_path=Some(pab_protocol::NativeFilePath::Utf8(request.operation.path().into()));
-        if attributes {request.metadata=Some(pab_protocol::FileTransferMetadata {modified_at_unix_ms:Some(1_700_000_000_123),unix_mode:Some(0o644)});}else{request.source_constraint=Some(pab_protocol::FileTransferSourceConstraint {size:pab_protocol::FileByteCount(100),modified_at_unix_ms:Some(1_700_000_000_123)});}
-        request.validate().unwrap();
-        let error=service.accept_transfer("unsupported",actor,None,context(),&request).await.err().expect("unimplemented attributes must not be silently accepted");assert!(error.to_string().contains("updated Android storage adapter"));
-        assert!(service.transfer_snapshot("unsupported",request.request_id).await.unwrap().is_none());assert_eq!(std::fs::read_dir(&service.staging).unwrap().count(),0);
-    }
+async fn managed_attributes_are_journaled_and_resume_cannot_change_them() {
+    let root=tempfile::tempdir().unwrap();let service=FileService::open(&root.path().join("attributes.sqlite3"),root.path(),[9;32]).await.unwrap();let actor=OperatorRef::guest(EndpointKey::new([7;32]));
+    let mut request=upload();request.native_path=Some(NativeFilePath::Utf8(request.operation.path().into()));
+    request.metadata=Some(FileTransferMetadata {modified_at_unix_ms:Some(123),unix_mode:Some(0o644)});
+    request.destination_parent=Some(FileTransferParentConstraint {identity:"android:123".into()});
+    let (mut snapshot,_,lease)=service.accept_transfer("managed",actor,None,context(),&request).await.unwrap();
+    snapshot.state="paused".into();service.save_transfer("managed",&snapshot).await.unwrap();drop(lease);
+    let mut resume=request.clone();resume.request_id=RequestId::new();resume.resume_from=Some(request.request_id);resume.metadata.as_mut().unwrap().unix_mode=None;
+    assert!(service.accept_transfer("managed",actor,None,context(),&resume).await.is_err());
+    resume.metadata=request.metadata.clone();assert!(service.accept_transfer("managed",actor,None,context(),&resume).await.is_ok());
+}
+
+#[tokio::test]
+async fn stop_is_owner_scoped_and_requires_worker_acknowledgement() {
+    let root=tempfile::tempdir().unwrap();let service=FileService::open(&root.path().join("stop.sqlite3"),root.path(),[9;32]).await.unwrap();let actor=OperatorRef::guest(EndpointKey::new([7;32]));
+    let request=upload();let (mut snapshot,_,lease)=service.accept_transfer("owner",actor,None,context(),&request).await.unwrap();
+    assert!(service.stop_transfer("other",request.request_id,FileTransferIntent::Cancel).await.unwrap().is_none());
+    let worker=service.clone();let id=request.request_id;
+    let stop=tokio::spawn(async move {worker.stop_transfer("owner",id,FileTransferIntent::Pause).await.unwrap().unwrap()});
+    tokio::time::timeout(Duration::from_secs(3),async {while service.stop_intent("owner",id)==FileTransferIntent::Run {tokio::time::sleep(Duration::from_millis(10)).await;}}).await.unwrap();
+    assert_eq!(service.transfer_snapshot("owner",id).await.unwrap().unwrap().state,"running");
+    snapshot.state="paused".into();service.save_transfer("owner",&snapshot).await.unwrap();drop(lease);
+    assert_eq!(stop.await.unwrap().state,"paused");
 }
 
 #[tokio::test]

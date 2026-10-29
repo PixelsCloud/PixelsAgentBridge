@@ -10,11 +10,13 @@ const MAX_FILE: u64 = 1024 * 1024 * 1024;
 struct TransferLease {
     active: Arc<std::sync::Mutex<HashSet<(String, RequestId)>>>,
     key: (String, RequestId),
+    stops: Arc<std::sync::Mutex<HashMap<(String, RequestId), tokio::sync::watch::Sender<FileTransferIntent>>>>,
     _slot: tokio::sync::OwnedSemaphorePermit,
 }
 impl Drop for TransferLease {
     fn drop(&mut self) {
         self.active.lock().unwrap().remove(&self.key);
+        self.stops.lock().unwrap().remove(&self.key);
     }
 }
 
@@ -34,12 +36,35 @@ pub(super) async fn initialize(pool: &SqlitePool) -> Result<(), &'static str> {
             .await
             .map_err(|_| "file_journal_unavailable")?;
     }
-    sqlx::query("UPDATE file_transfers SET snapshot=json_set(snapshot,'$.state',CASE WHEN json_extract(snapshot,'$.state')='publishing' THEN 'unconfirmed' ELSE 'interrupted' END,'$.message','Android process stopped; query before explicitly resuming') WHERE json_extract(snapshot,'$.state') IN ('running','publishing')")
+    if !columns.iter().any(|row|row.get::<String,_>("name")=="stop_intent") {
+        sqlx::query("ALTER TABLE file_transfers ADD COLUMN stop_intent TEXT").execute(pool).await.map_err(|_|"file_journal_unavailable")?;
+    }
+    sqlx::query("UPDATE file_transfers SET snapshot=json_set(snapshot,'$.state',CASE WHEN json_extract(snapshot,'$.state')='publishing' THEN 'unconfirmed' WHEN stop_intent='pause' THEN 'paused' WHEN stop_intent='cancel' THEN 'cancelled' ELSE 'interrupted' END,'$.message','Android process stopped; query before explicitly resuming') WHERE json_extract(snapshot,'$.state') IN ('running','publishing')")
         .execute(pool).await.map_err(|_| "file_journal_unavailable")?;
     Ok(())
 }
 
 impl FileService {
+    fn stop_intent(&self,owner:&str,id:RequestId)->FileTransferIntent {
+        self.transfer_stops.lock().unwrap().get(&(owner.into(),id)).map(|v|*v.borrow()).unwrap_or(FileTransferIntent::Run)
+    }
+    pub async fn stop_transfer(&self,owner:&str,id:RequestId,intent:FileTransferIntent)->Result<Option<TransferSnapshot>, &'static str> {
+        if intent==FileTransferIntent::Run {return Err("Stopping requires pause or cancel");}
+        {
+            let _guard=self.acceptance.lock().await;
+            let Some(snapshot)=self.transfer_snapshot(owner,id).await? else{return Ok(None)};
+            if snapshot.state!="running" {return Ok(Some(snapshot));}
+            sqlx::query("UPDATE file_transfers SET stop_intent=? WHERE owner=? AND id=?")
+                .bind(if intent==FileTransferIntent::Cancel {"cancel"} else {"pause"}).bind(owner).bind(id.to_string()).execute(&self.pool).await.map_err(|_|"Stop intent could not be recorded")?;
+            if let Some(signal)=self.transfer_stops.lock().unwrap().get(&(owner.into(),id)) {signal.send_replace(intent);}
+        }
+        let deadline=tokio::time::Instant::now()+Duration::from_secs(5);
+        loop {
+            let snapshot=self.transfer_snapshot(owner,id).await?;
+            if snapshot.as_ref().is_none_or(|v|v.state!="running") || tokio::time::Instant::now()>=deadline {return Ok(snapshot);}
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+    }
     pub async fn transfer_snapshot(
         &self,
         owner: &str,
@@ -127,7 +152,7 @@ impl FileService {
                         path, overwrite, ..
                     } = &request.operation
                     {
-                        self.io(json!({"action":"check_upload","path":path,"overwrite":overwrite}))
+                        self.io(json!({"action":"check_upload","path":path,"overwrite":overwrite,"destination_parent":request.destination_parent}))
                             .await?;
                     }
                     stream
@@ -138,7 +163,6 @@ impl FileService {
                             timeout,
                         )
                         .await?;
-                    let _guard = self.execution.lock().await;
                     self.transfer_bytes(owner, &request, &mut snapshot, stage_id, stream)
                         .await
                 }
@@ -147,6 +171,10 @@ impl FileService {
                     if snapshot.state != "completed" {
                         snapshot.state = if snapshot.state == "publishing" {
                             "unconfirmed"
+                        } else if self.stop_intent(owner,snapshot.request_id)==FileTransferIntent::Pause {
+                            "paused"
+                        } else if self.stop_intent(owner,snapshot.request_id)==FileTransferIntent::Cancel {
+                            "cancelled"
                         } else {
                             "interrupted"
                         }
@@ -179,8 +207,8 @@ impl FileService {
         request: &FileTransferRequest,
     ) -> Result<(TransferSnapshot, Uuid, Option<TransferLease>), Error> {
         request.validate()?;
-        if request.expected_execution.is_some() || request.source_constraint.is_some() || request.metadata.is_some() {
-            return Err("Native file execution preconditions require an updated Android storage adapter".into());
+        if request.expected_execution.as_ref().is_some_and(|expected|!expected.matches_context(&context)) {
+            return Err("Android application execution identity changed".into());
         }
         if request.native_path.as_ref().is_some_and(|path| !matches!(path, pab_protocol::NativeFilePath::Utf8(value) if value == request.operation.path())) {
             return Err("Android storage supports UTF-8 native paths only".into());
@@ -243,6 +271,7 @@ impl FileService {
             .map_err(|_| "File service is busy")?;
         let lease = TransferLease {
             active: self.active_transfers.clone(),
+            stops: self.transfer_stops.clone(),
             key: (owner.into(), request.request_id),
             _slot: slot,
         };
@@ -250,6 +279,7 @@ impl FileService {
             .lock()
             .unwrap()
             .insert(lease.key.clone());
+        self.transfer_stops.lock().unwrap().insert(lease.key.clone(),tokio::sync::watch::channel(FileTransferIntent::Run).0);
         let (size, hash) = match &request.operation {
             FileTransferOperation::Upload { size, sha256, .. } => (*size, Some(sha256.clone())),
             FileTransferOperation::Download { .. } => (0, None),
@@ -281,7 +311,7 @@ impl FileService {
                     FileTransferOperation::Download { .. }
                 )
                 && matches!(request.operation, FileTransferOperation::Download { .. });
-            if !(matches!(old.state.as_str(), "interrupted" | "failed" | "cancelled")
+            if !(matches!(old.state.as_str(), "interrupted" | "failed" | "cancelled" | "paused")
                 || completed_download)
                 || old.published == Some(true)
             {
@@ -289,7 +319,11 @@ impl FileService {
                     "Cannot resume a running/unconfirmed transfer or a completed upload".into(),
                 );
             }
-            let compatible = old_request.native_path == request.native_path
+            let compatible = old_request.expected_execution == request.expected_execution
+                && old_request.destination_parent == request.destination_parent
+                && old_request.metadata == request.metadata
+                && old_request.source_constraint == request.source_constraint
+                && old_request.native_path == request.native_path
                 && match (&old_request.operation, &request.operation) {
                     (
                         FileTransferOperation::Upload {
@@ -365,6 +399,8 @@ impl FileService {
         stream: &mut PabBiStream,
     ) -> Result<(), Error> {
         let timeout = Duration::from_secs(60);
+        let mut stop=self.transfer_stops.lock().unwrap().get(&(owner.into(),request.request_id)).ok_or("Transfer control unavailable")?.subscribe();
+        if *stop.borrow()!=FileTransferIntent::Run {return Err("Transfer stopped before IO".into());}
         match &request.operation {
             FileTransferOperation::Upload {
                 path,
@@ -403,7 +439,7 @@ impl FileService {
                     )
                     .await?;
                 while offset < *size {
-                    let bytes = stream.receive_binary_frame(timeout).await?;
+                    let bytes = tokio::select! { value=stream.receive_binary_frame(timeout)=>value?,_=stop.wait_for(|v|*v!=FileTransferIntent::Run)=>return Err("Transfer stopped".into()) };
                     if bytes.is_empty()
                         || bytes.len() > 65536
                         || offset + bytes.len() as u64 > *size
@@ -426,14 +462,21 @@ impl FileService {
                 if hash_file(&stage).await? != *sha256 {
                     return Err("Upload SHA-256 mismatch; file was not published".into());
                 }
+                let publication_guard=self.acceptance.lock().await;
+                if *stop.borrow()!=FileTransferIntent::Run {return Err("Transfer stopped before publication".into());}
                 snapshot.state = "publishing".into();
                 snapshot.published = None;
                 self.save_transfer(owner, snapshot).await?;
-                self.io(json!({"action":"publish","path":path,"staging_id":stage_id,"overwrite":overwrite})).await?;
+                let value=self.io(json!({"action":"publish","path":path,"staging_id":stage_id,"overwrite":overwrite,"destination_parent":request.destination_parent,"transfer_metadata":request.metadata})).await?;
+                if let Some(metadata)=&request.metadata {
+                    let result:FileTransferMetadataResult=serde_json::from_value(value["metadata_result"].clone())?;
+                    result.validate_for(metadata)?;snapshot.metadata_result=Some(result);
+                }
                 snapshot.state = "completed".into();
                 snapshot.published = Some(true);
                 snapshot.finished_at_unix_ms = Some(crate::peer::now_ms());
                 self.save_transfer(owner, snapshot).await?;
+                drop(publication_guard);
                 let _ = tokio::fs::remove_file(stage).await;
                 stream
                     .send_json(
@@ -450,7 +493,8 @@ impl FileService {
                 offset,
                 expected_sha256,
             } => {
-                let (stage, value) = self.snapshot(path, MAX_FILE).await?;
+                let stage_id=Uuid::new_v4();let stage=self.stage(stage_id);
+                let value=self.io(json!({"action":"snapshot","path":path,"staging_id":stage_id,"maximum_bytes":MAX_FILE,"source_constraint":request.source_constraint})).await?;
                 let size = value["size"].as_u64().ok_or("Missing snapshot size")?;
                 let hash = value["sha256"].as_str().ok_or("Missing snapshot hash")?;
                 if !valid_file_hash(hash)
@@ -487,10 +531,12 @@ impl FileService {
                     if count == 0 {
                         return Err("Download snapshot became shorter".into());
                     }
-                    stream.send_binary_frame(&buffer[..count], timeout).await?;
+                    tokio::select! {value=stream.send_binary_frame(&buffer[..count],timeout)=>value?,_=stop.wait_for(|v|*v!=FileTransferIntent::Run)=>return Err("Transfer stopped".into())};
                     snapshot.offset += count as u64;
                     self.save_transfer(owner, snapshot).await?;
                 }
+                let _completion=self.acceptance.lock().await;
+                if *stop.borrow()!=FileTransferIntent::Run {return Err("Transfer stopped".into());}
                 snapshot.state = "completed".into();
                 snapshot.finished_at_unix_ms = Some(crate::peer::now_ms());
                 self.save_transfer(owner, snapshot).await?;

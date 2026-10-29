@@ -8,7 +8,7 @@ use std::sync::{
 
 pub(crate) struct ConnectionScope {
     pub id: String,
-    closed: AtomicBool,
+    pub(super) closed: AtomicBool,
 }
 pub(crate) struct ConnectionLease {
     pub scope: Arc<ConnectionScope>,
@@ -189,6 +189,7 @@ impl ExecutionService {
     }
 
     pub(super) async fn close_terminals(&self, scope: Option<&str>) {
+        self.close_desktop_terminals(scope).await;
         let entries: Vec<_> = self
             .terminals
             .lock()

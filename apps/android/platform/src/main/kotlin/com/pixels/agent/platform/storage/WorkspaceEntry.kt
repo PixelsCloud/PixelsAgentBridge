@@ -18,6 +18,7 @@ internal class WorkspaceEntry(
     private val root: File,
     private val file: File = root,
     private val publisher: AtomicFilePublisher,
+    private val parentIdentity: String? = null,
 ) : StorageEntry {
     override val name: String
         get() = file.name
@@ -41,13 +42,7 @@ internal class WorkspaceEntry(
             target.takeIf { it.isFile }?.length(),
             target.lastModified().takeIf { it > 0 },
             !target.canWrite(),
-            Files.readAttributes(
-                    target.toPath(),
-                    BasicFileAttributes::class.java,
-                    LinkOption.NOFOLLOW_LINKS,
-                )
-                .fileKey()
-                ?.toString(),
+            android.system.Os.lstat(target.absolutePath).let { "${it.st_dev}:${it.st_ino}" },
         )
     }
 
@@ -98,7 +93,8 @@ internal class WorkspaceEntry(
                 throw StorageFailure("hash_conflict")
             }
             checkpoint()
-            publisher.publish(stage, target, overwrite)
+            if (parentIdentity == null) publisher.publish(stage, target, overwrite)
+            else publisher.publishBound(stage, target, overwrite, parentIdentity)
         } finally {
             stage.delete()
         }
@@ -121,6 +117,19 @@ internal class WorkspaceEntry(
         if (!target.exists()) throw StorageFailure("not_found")
         checkpoint()
         if (!target.delete()) throw StorageFailure("delete_failed")
+    }
+
+    override fun bindParent(identity: String): StorageEntry = WorkspaceEntry(root, file, publisher, identity)
+
+    override fun rename(name: String, checkpoint: () -> Unit) {
+        if (!StorageMounts.validName(name)) throw StorageFailure("invalid_path")
+        val source = checked()
+        if (source == root) throw StorageFailure("mount_root_protected")
+        if (!source.exists()) throw StorageFailure("not_found")
+        val target = File(source.parentFile, name)
+        if (target.exists()) throw StorageFailure("already_exists")
+        checkpoint()
+        publisher.publish(source, target, false)
     }
 
     private fun digest(target: File): String =

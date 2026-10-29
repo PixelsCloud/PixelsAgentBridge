@@ -28,9 +28,11 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
     private val currentGrants = MutableStateFlow<List<StorageGrant>>(emptyList())
     val grants = currentGrants.asStateFlow()
     private val mounts = StorageMounts(::roots)
+    private val managed = ManagedStorage(mounts)
 
     /** Check persisted authorization without calling a possibly blocked document provider. */
     fun checkMountAccess(path: String) {
+        if (path == "/") return // Control authorization is checked by RemoteFileAdapter.
         val parts = path.removePrefix("/").split('/')
         if (
             !path.startsWith('/') ||
@@ -204,6 +206,13 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
     fun execute(input: JSONObject, checkpoint: () -> Unit = {}): JSONObject {
         checkpoint()
         val path = input.getString("path")
+        if (input.getString("action") == "managed_context") return JSONObject().put("identity", JSONObject()
+            .put("mode", "service").put("account_id", "uid:${android.os.Process.myUid()}").put("account_name", application.packageName)
+            .put("home", "/workspace").put("primary_group", android.system.Os.getgid()).put("session_id", JSONObject.NULL)
+            .put("logon_id", JSONObject.NULL).put("environment_source", "service_process"))
+        if (input.getString("action") == "managed")
+            return managed.execute(input.getJSONObject("operation"), input.getString("filesystem_scope"), checkpoint)
+        if (input.getString("action") == "managed_list") return managed.listing(path)
         if (input.getString("action") == "check_staging") {
             checkStaging(input.getLong("additional_bytes"))
             return JSONObject()
@@ -227,7 +236,7 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
                 )
                 .put("has_more", names.size > limit)
         }
-        val entry = mounts.resolve(path)
+        val entry = input.optJSONObject("destination_parent")?.let { managed.boundTarget(path, it.getString("identity")) } ?: mounts.resolve(path)
         return when (input.getString("action")) {
             "check_upload" -> {
                 val existing =
@@ -268,6 +277,7 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
                 val maximum = input.getLong("maximum_bytes")
                 if (maximum !in 0..MAXIMUM_FILE_BYTES) throw StorageFailure("file_size_limit")
                 val before = entry.metadata()
+                input.optJSONObject("source_constraint")?.let { managed.source(path, it, before) }
                 if (before.directory) throw StorageFailure("not_a_file")
                 if (before.size?.let { it > maximum } == true)
                     throw StorageFailure("file_size_limit")
@@ -322,7 +332,10 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
                     checkpoint,
                 )
                 try {
-                    JSONObject().put("metadata", metadataJson(entry.metadata()))
+                    val actual = entry.metadata()
+                    JSONObject().put("metadata", metadataJson(actual)).also { result ->
+                        input.optJSONObject("transfer_metadata")?.let { result.put("metadata_result", managed.metadataResult(it, actual)) }
+                    }
                 } catch (_: Exception) {
                     throw StorageFailure("publication_unconfirmed")
                 }

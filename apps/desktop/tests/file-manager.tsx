@@ -41,6 +41,10 @@ function makeEntry(index: number, parent: NativePath, names = fixture.entryNameO
     if (command === "file_manager_local_identity") return "Native local fixture user";
     if (command === "file_manager_reveal_local") return null;
     if (command === "file_manager_link_status") return { connected: true, path: args.forceRelay ? "relay" : "p2p", rtt_ms: 12 };
+    if (command === "file_manager_contexts" && new URLSearchParams(location.search).has("android")) {
+      if (new URLSearchParams(location.search).has("unsupported")) throw new Error("This Android feature is not available");
+      return { state: "completed", data: { type: "execution_contexts", backend: "android_app_uid", entries: [{mode:"service",account_name:"com.pixels.agent",account_id:"uid:10234",session_id:null,selection:{mode:"service"},unavailable_reason:null,identity:{mode:"service",account_name:"com.pixels.agent",account_id:"uid:10234",home:"/workspace",primary_group:10234,session_id:null,logon_id:null,environment_source:"service_process"}}] } };
+    }
     if (command === "file_manager_contexts") return { state: "completed", data: { type: "execution_contexts", entries: args.forceRelay && (fixture as any).hideRelayUser ? [] : [{ mode: "user", account_name: "Test user", account_id: "uid:1001", session_id: "1", identity: { mode: "user", account_id: "uid:1001", account_name: "Test user", home: "C:\\Users\\fixture", primary_group:null, session_id:"1",logon_id:(fixture as any).nativeLogon || "fixture-login",environment_source:"native_account" }, selection: { mode: "user", context_ref: `user-${args.forceRelay ? "relay" : "auto"}${(fixture as any).nativeGeneration ? `-${(fixture as any).nativeGeneration}` : ""}` },unavailable_reason:null }] } };
     if (command === "file_manager_clear_completed") {
       if ((fixture as any).failClearCompleted) throw new Error("Could not clear completed transfers");

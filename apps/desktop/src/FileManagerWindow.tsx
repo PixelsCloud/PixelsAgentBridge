@@ -24,12 +24,13 @@ const words: Record<string, string> = en ? { running: "Transferring", scanning: 
 Object.assign(words, en ? { pause_requested: "Pausing…", cancel_requested: "Cancelling…", completed_with_skips: "Completed with skips", partial_failed: "Partially failed", verifying: "Verifying", publishing: "Publishing" } : { pause_requested: "暂停中…", cancel_requested: "取消中…", completed_with_skips: "完成（有跳过）", partial_failed: "部分失败", verifying: "校验中", publishing: "发布中" });
 const terminal = (batch: Batch) => ["completed", "completed_with_skips", "partial_failed", "failed", "cancelled"].includes(batch.phase);
 
-function nativeUserKey(entry:ExecutionEntry):string|null {
+function nativeUserKey(entry:ExecutionEntry, android = false):string|null {
   const identity=entry.identity as (NonNullable<ExecutionEntry["identity"]> & {primary_group?:number|null;environment_source?:string})|null;
-  return identity?.mode==="user" && identity.account_id && identity.home ? JSON.stringify([identity.mode,identity.account_id,identity.account_name,identity.home,identity.primary_group??null,identity.session_id,identity.logon_id,identity.environment_source??"native_account"]):null;
+  const allowed = identity?.mode === "user" || android && entry.selection?.mode === "service" && identity?.mode === "service" && /^uid:[1-9][0-9]*$/.test(identity.account_id) && identity.home === "/workspace";
+  return allowed && identity && identity.account_id && identity.home ? JSON.stringify([identity.mode,identity.account_id,identity.account_name,identity.home,identity.primary_group??null,identity.session_id,identity.logon_id,identity.environment_source??"native_account"]):null;
 }
 function RemotePane({ tab, active, ended, forceRelay, batchUpdates, onSelection, onExecution, onDragSelection, transferAction, relayControl }: { relayControl: ReactNode; transferAction: ReactNode; tab: Tab; active: boolean; ended: boolean; forceRelay: boolean; batchUpdates: readonly DirectoryTransfer[]; onSelection: (selection: PaneSelection) => void; onExecution: (code: string, value: ExecutionSelection|null) => void; onDragSelection: (selection: PaneSelection | null, token: string | null) => void }) {
-  const [contexts, setContexts] = useState<{ relay:boolean;entries: ExecutionEntry[]; loading: boolean; error: string }>({ relay:forceRelay,entries: [], loading: false, error: "" });
+  const [contexts, setContexts] = useState<{ relay:boolean;android?:boolean;entries: ExecutionEntry[]; loading: boolean; error: string }>({ relay:forceRelay,entries: [], loading: false, error: "" });
   const [selectedUser, setSelectedUser] = useState<{key:string;label:string}|null>(null);
   const [contextRevision, setContextRevision] = useState(0);
   const refreshedReferences = useRef(new Set<string>()), lastDiscovery = useRef(0);
@@ -58,9 +59,10 @@ function RemotePane({ tab, active, ended, forceRelay, batchUpdates, onSelection,
       void invoke<ExecutionReply>("file_manager_contexts", { code: tab.code, forceRelay }).then(reply => {
         if (!alive) return;
         if (reply.state !== "completed" || reply.data?.type !== "execution_contexts") throw new Error(reply.error || reply.state);
-        const users = reply.data.entries.filter(entry => entry.selection?.mode === "user" && nativeUserKey(entry));
-        setSelectedUser(current => current || (users.length === 1 ? { key: nativeUserKey(users[0])!, label: users[0].account_name } : null));
-        setContexts({ relay:forceRelay,entries: users, loading: false, error: users.length === 1 ? "" : (en ? "Console user is unavailable" : "Console 用户不可用") });
+        const android = reply.data.backend === "android_app_uid";
+        const users = reply.data.entries.filter(entry => !entry.unavailable_reason && nativeUserKey(entry, android));
+        setSelectedUser(current => current || (users.length === 1 ? { key: nativeUserKey(users[0], android)!, label: users[0].account_name } : null));
+        setContexts({ relay:forceRelay,android,entries: users, loading: false, error: users.length === 1 ? "" : (en ? "Console user is unavailable" : "Console 用户不可用") });
       }).catch(cause => { if (alive) setContexts(current => ({ relay:forceRelay,entries: recovering ? current.entries : [], loading: false, error: String(cause) })); });
     };
     const timer = recovering ? setTimeout(discover, Math.max(0, 2000 - (performance.now() - lastDiscovery.current))) : undefined;
@@ -68,7 +70,7 @@ function RemotePane({ tab, active, ended, forceRelay, batchUpdates, onSelection,
     return () => { alive = false; if (timer !== undefined) clearTimeout(timer); };
   }, [tab.code, forceRelay, ended, contextRevision]);
   const entries=contexts.relay===forceRelay && !contexts.loading ? contexts.entries:[];
-  const selectedEntry=selectedUser ? entries.find(entry=>entry.selection?.mode==="user" && nativeUserKey(entry)===selectedUser.key):null;
+  const selectedEntry=selectedUser ? entries.find(entry=>nativeUserKey(entry, contexts.android)===selectedUser.key):null;
   const execution=selectedEntry?.selection;
   useEffect(() => {
     onSelection({ endpoint: tab.code, execution: execution || { mode: "service" }, path: null, entries: [], pathStyle: tab.os_family === "windows" ? "windows" : "posix" });

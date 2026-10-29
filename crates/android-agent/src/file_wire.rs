@@ -12,6 +12,19 @@ impl FileService {
         stream: &mut PabBiStream,
     ) -> Result<bool, PabConnectionError> {
         let timeout = Duration::from_secs(8);
+        // The SDK reports the app UID/package. Never accept an identity supplied
+        // by a remote request or pretend Android has a Windows console account.
+        if self.native_context.get().is_none() && matches!(request,DeviceTaskRequest::FileSystem {..}|DeviceTaskRequest::TransferFile {..}) {
+            let value=self.io(json!({"action":"managed_context","path":"/"})).await;
+            let identity=value.ok().and_then(|v|serde_json::from_value::<ExecutionIdentity>(v["identity"].clone()).ok())
+                .filter(|i|i.validate().is_ok() && i.mode==ExecutionMode::Service && i.account_id.starts_with("uid:") && i.account_id!="uid:0" && i.home=="/workspace");
+            let Some(identity)=identity else {
+                stream.send_json(&DeviceTaskResponse::Error {code:DeviceTaskErrorCode::AccessDenied,message:"Android application storage identity unavailable".into()},timeout).await?;
+                return Ok(true);
+            };
+            let mut context=execution.clone();context.identity=Some(identity);let _=self.native_context.set(context);
+        }
+        let execution=self.native_context.get().unwrap_or(execution);
         let response = match request {
             DeviceTaskRequest::FileSystem { request, .. } => {
                 if request.validate().is_err() {
@@ -105,6 +118,13 @@ impl FileService {
                 )
                 .await?;
                 return Ok(true);
+            }
+            DeviceTaskRequest::StopTransfer {request_id,intent,..} => {
+                match self.stop_transfer(owner,*request_id,*intent).await {
+                    Ok(Some(snapshot))=>DeviceTaskResponse::Transfer {snapshot},
+                    Ok(None)=>DeviceTaskResponse::Error {code:DeviceTaskErrorCode::NotFound,message:"Transfer was not found for this caller".into()},
+                    Err(message)=>DeviceTaskResponse::Error {code:DeviceTaskErrorCode::InvalidRequest,message:message.into()},
+                }
             }
             DeviceTaskRequest::GetTransfer { request_id, .. } => {
                 match self.transfer_snapshot(owner, *request_id).await {

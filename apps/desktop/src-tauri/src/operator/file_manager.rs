@@ -275,6 +275,7 @@ pub async fn file_manager_contexts(window:WebviewWindow,state:State<'_,FileManag
     let tab = owner.devices.lock().await.get(&code).cloned().ok_or("Device does not belong to this window")?;
     let _permit = owner.slots.clone().try_acquire_owned().map_err(|_|"File window is busy")?;
     let connection = owner.runtime.file_connection(tab.device,force_relay).await.map_err(|e|e.to_string())?;
+    connection.require_managed_transfer().await.map_err(|e|e.to_string())?;
     let id = RequestId::new();
     let query = pab_protocol::SystemQuery::ExecutionContexts {user:None,include_system:false,limit:1000};
     let mut reply = match connection.system_query(id,query).await {Ok(reply)=>reply,Err(original)=>connection.get_system_query(id).await.map_err(|_|format!("{original} · {id}"))?};
@@ -283,6 +284,13 @@ pub async fn file_manager_contexts(window:WebviewWindow,state:State<'_,FileManag
         if owner.closed.load(Ordering::Acquire) || account().ok().as_ref()!=Some(&owner.account) {return Err("File window account ended".into());}
         tokio::time::sleep(Duration::from_millis(250)).await;
         reply = connection.get_system_query(id).await.map_err(|e|format!("{e} · {id}"))?;
+    }
+    if let Some(pab_protocol::SystemQueryData::ExecutionContexts { backend, entries, .. }) = &mut reply.data {
+        if backend == "android_app_uid" {
+            super::desktop_terminal::android_app_selection(entries)?;
+            entries.retain(|entry| entry.mode == pab_protocol::ExecutionMode::Service && entry.unavailable_reason.is_none());
+            return Ok(reply);
+        }
     }
     // Select the logged-in local console session explicitly; never pick an RDP
     // user or fall back to the service account when discovery is unavailable.

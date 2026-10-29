@@ -4976,6 +4976,7 @@ dependencies = [
  "pab-device-session",
  "pab-document",
  "pab-file-codec",
+ "pab-interactive-terminal",
  "pab-protocol",
  "pab-screenshot",
  "pab-service-config",

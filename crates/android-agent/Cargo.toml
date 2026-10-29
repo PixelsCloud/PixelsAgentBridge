@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 pab-agent-core = { path = "../agent-core" }
 pab-command-runtime = { path = "../command-runtime" }
 pab-terminal = { path = "../terminal" }
+pab-interactive-terminal = { path = "../interactive-terminal" }
 pab-device-session = { path = "../device-session" }
 pab-document = { path = "../document", default-features = false }
 pab-file-codec = { path = "../file-codec" }

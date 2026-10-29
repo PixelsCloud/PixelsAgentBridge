@@ -56,7 +56,7 @@ export default function RemoteDesktopWindow() {
     const subscription = listen("desktop-viewer-close-requested", () => { if (active) void requestClose(); });
     return () => { active = false; void subscription.then(unlisten => unlisten()); };
   }, []);
-  useEffect(() => { void appWindow.title().then(value => { if (value) setTitle(value); }).catch(() => {}); }, [appWindow]);
+  useEffect(() => { void appWindow.title().then(value => { if (value) setTitle(value.replace(/^Pixels\s*·\s*/, "")); }).catch(() => {}); }, [appWindow]);
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
   useEffect(() => {
     let active = true; let pending = false;
@@ -109,7 +109,8 @@ export default function RemoteDesktopWindow() {
   }, []);
   const opened = status.opened;
   const quality = status.phase === "viewing" ? status.quality : null;
-  const phase = text[status.phase as keyof typeof text] || status.phase;
+  const connectionPath = status.connection_path === "p2p" ? "P2P" : status.connection_path === "relay" ? "Relay" : null;
+  const phase = (text[status.phase as keyof typeof text] || status.phase) + (status.phase === "viewing" && connectionPath ? (english ? ` (${connectionPath})` : `（${connectionPath}）`) : "");
   const unknown = english ? "Not reported" : "未上报";
   const decoder = status.decoder === "openh264_software"
     ? (english ? "Software decoding" : "软件解码")

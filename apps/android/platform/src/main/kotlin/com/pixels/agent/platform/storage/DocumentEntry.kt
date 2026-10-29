@@ -256,6 +256,28 @@ internal class DocumentEntry(
         }
     }
 
+    override fun bindParent(identity: String): StorageEntry {
+        if (parent?.metadata()?.identity != identity) throw StorageFailure("destination_parent_changed")
+        // Keep this resolved parent document URI through staging and publication.
+        parent.actual()
+        return this
+    }
+
+    override fun rename(name: String, checkpoint: () -> Unit) {
+        if (!StorageMounts.validName(name)) throw StorageFailure("invalid_path")
+        val container = parent ?: throw StorageFailure("mount_root_protected")
+        if (!writeGranted()) throw StorageFailure("access_denied")
+        if (container.find(name) != null) throw StorageFailure("already_exists")
+        val uri = actual()
+        checkpoint()
+        try {
+            val result = DocumentsContract.renameDocument(resolver, uri, name)
+                ?: throw StorageFailure("publication_unconfirmed")
+            if (DocumentEntry(resolver, tree, result).metadata().name != name)
+                throw StorageFailure("publication_name_conflict")
+        } catch (_: Exception) { throw StorageFailure("publication_unconfirmed") }
+    }
+
     override fun delete(checkpoint: () -> Unit) {
         if (parent == null) throw StorageFailure("mount_root_protected")
         if (resolver.persistedUriPermissions.none { it.uri == tree && it.isWritePermission })

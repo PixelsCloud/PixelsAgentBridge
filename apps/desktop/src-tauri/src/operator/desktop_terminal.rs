@@ -402,9 +402,17 @@ pub async fn desktop_terminal_selection(
         )
         .await?,
     )?;
-    let SystemQueryData::ExecutionContexts { entries, .. } = contexts else {
+    let SystemQueryData::ExecutionContexts { entries, backend } = contexts else {
         return Err("unexpected remote account reply".into());
     };
+    // Android has one application UID, not a desktop console login or a root
+    // service. Only the normal console launch maps to that advertised identity.
+    if backend == "android_app_uid" {
+        if matches!(mode, TerminalLaunchMode::System) {
+            return Err("Android does not provide a System/root terminal".into());
+        }
+        return android_app_selection(&entries);
+    }
     if matches!(mode, TerminalLaunchMode::System) {
         return system_selection(&entries);
     }
@@ -439,6 +447,13 @@ pub async fn desktop_terminal_selection(
         return Err("unexpected remote session reply".into());
     };
     console_selection(&entries, &backend, &sessions)
+}
+pub(super) fn android_app_selection(entries:&[ExecutionContextEntry])->Result<ExecutionSelection,String> {
+    let entries:Vec<_>=entries.iter().filter(|e|e.mode==ExecutionMode::Service && e.unavailable_reason.is_none()
+        && e.identity.as_ref().is_some_and(|i|i.mode==ExecutionMode::Service && i.account_id.starts_with("uid:") && i.account_id!="uid:0" && i.home=="/workspace")
+        && matches!(e.selection,Some(ExecutionSelection::Service {..}))).collect();
+    if entries.len()!=1 {return Err("Android application execution context is unavailable".into());}
+    Ok(entries[0].selection.expect("validated service selection"))
 }
 #[tauri::command]
 pub async fn desktop_terminal_start(
@@ -591,6 +606,11 @@ pub async fn desktop_terminal_watch(
     }
     ready.take().unwrap().1.add_permits(1);
     Ok(())
+}
+#[tauri::command]
+pub async fn desktop_terminal_connection_path(window:WebviewWindow,state:State<'_,DesktopTerminalState>,session_id:RequestId)->Result<Option<&'static str>,String> {
+    let session=session(&state,&window,session_id).await?;
+    Ok(match session.connection_path(){Some(pab_bridge::ConnectionPath::Direct)=>Some("P2P"),Some(pab_bridge::ConnectionPath::Relay)=>Some("Relay"),_=>None})
 }
 #[tauri::command]
 pub async fn desktop_terminal_input(

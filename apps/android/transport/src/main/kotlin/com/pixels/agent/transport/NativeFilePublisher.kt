@@ -7,6 +7,10 @@ import org.json.JSONObject
 
 /** Android app policy may forbid hard links; renameat2 supplies atomic no-clobber publication. */
 class NativeFilePublisher(private val native: NativeBridge) : AtomicFilePublisher {
+    override fun publishBound(source: File, destination: File, replace: Boolean, parentIdentity: String) {
+        val result = JSONObject(native.publishFileBound(source.absolutePath, destination.absolutePath, replace, parentIdentity))
+        if (!result.optBoolean("ok")) throw StorageFailure(result.optString("error", "publication_unconfirmed"))
+    }
     override fun publish(source: File, destination: File, replace: Boolean) {
         val result =
             JSONObject(native.publishFile(source.absolutePath, destination.absolutePath, replace))

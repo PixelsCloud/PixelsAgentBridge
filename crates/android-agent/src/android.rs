@@ -138,6 +138,55 @@ pub extern "system" fn Java_com_pixels_agent_transport_NativeBridge_publishFile(
     })
 }
 
+/// Hold the receiving directory open and verify its object identity before
+/// renameat2. A renamed/replaced path must never redirect an accepted upload.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_pixels_agent_transport_NativeBridge_publishFileBound(
+    env: JNIEnv<'_>, _object: JObject<'_>, source: JString<'_>,
+    destination: JString<'_>, replace: jboolean, parent_identity: JString<'_>,
+) -> jstring {
+    reply(env, |env| {
+        use std::os::unix::{fs::{OpenOptionsExt, MetadataExt}, io::AsRawFd};
+        let source = string(env, &source, 4096)?;
+        let destination = string(env, &destination, 4096)?;
+        let expected = string(env, &parent_identity, 192)?;
+        let destination = std::path::Path::new(&destination);
+        if !destination.is_absolute() || !std::path::Path::new(&source).is_absolute() {
+            return Err("invalid_path");
+        }
+        let parent = destination.parent().ok_or("invalid_path")?;
+        let directory = std::fs::OpenOptions::new().read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(parent).map_err(|_| "destination_parent_changed")?;
+        let metadata = directory.metadata().map_err(|_| "destination_parent_changed")?;
+        if format!("{}:{}", metadata.dev(), metadata.ino()) != expected {
+            return Err("destination_parent_changed");
+        }
+        let source = std::ffi::CString::new(source).map_err(|_| "invalid_path")?;
+        let name = destination.file_name().and_then(|v|v.to_str()).ok_or("invalid_path")?;
+        let name = std::ffi::CString::new(name).map_err(|_| "invalid_path")?;
+        // SAFETY: the directory descriptor and NUL-terminated arguments remain
+        // live for this synchronous syscall; the destination is one component.
+        let result = unsafe {libc::syscall(libc::SYS_renameat2, libc::AT_FDCWD,
+            source.as_ptr(), directory.as_raw_fd(), name.as_ptr(), if replace==0 {1u32}else{0})};
+        if result != 0 {
+            return Err(match std::io::Error::last_os_error().raw_os_error() {
+                Some(libc::EEXIST | libc::ENOTEMPTY)=>"already_exists",
+                Some(libc::EACCES | libc::EPERM)=>"access_denied",
+                _=>"atomic_publish_unavailable",
+            });
+        }
+        directory.sync_all().map_err(|_|"publication_unconfirmed")?;
+        // Publication into the pinned object is safe, but a moved directory is
+        // not confirmation that the requested display path now contains it.
+        let current = std::fs::symlink_metadata(parent).map_err(|_|"publication_unconfirmed")?;
+        if current.dev()!=metadata.dev() || current.ino()!=metadata.ino() {
+            return Err("publication_unconfirmed");
+        }
+        Ok(json!({"published":true}))
+    })
+}
+
 fn reply<'local>(
     mut env: JNIEnv<'local>,
     operation: impl FnOnce(&mut JNIEnv<'local>) -> Result<Value, &'static str>,

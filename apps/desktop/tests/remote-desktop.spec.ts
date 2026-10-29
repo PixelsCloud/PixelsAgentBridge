@@ -202,11 +202,11 @@ test("controls keep stable screen IDs and the user can leave input stopped acros
   await page.getByRole("button", { name: "Stop control" }).click();
   await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "Display" }).selectOption("adapter:left");
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("status")).toHaveText("Connected (P2P)");
   await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "FPS" }).selectOption("60");
   await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("60");
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("status")).toHaveText("Connected (P2P)");
   await expect(page.getByRole("button", { name: "Enable control" })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("combobox", { name: "FPS" }).selectOption("15");
   await expect(page.getByRole("combobox", { name: "FPS" })).toHaveValue("15");
@@ -292,7 +292,7 @@ test("late failure of an old completion cannot replace the new request status", 
   await page.evaluate(() => (window as any).fixture.deferredCompletion.old.reject("Old request expired"));
   await expect(replacement).toBeEnabled();
   await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("status")).toHaveText("Connected (P2P)");
 });
 
 test("current completion failure stays visible above the native surface and can retry", async ({ page }) => {
@@ -313,4 +313,11 @@ test("current completion failure stays visible above the native surface and can 
   await expect(complete).toHaveCount(0);
   await expect(page.locator("header").getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Stop control" })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("desktop connected status displays and updates the actual connection path", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/remote-desktop.html");
+  await expect(page.getByText("Connected (P2P)", {exact:true})).toBeVisible();
+  await page.evaluate(() => { (window as any).fixture.emit({phase:"viewing",connection_path:"relay"}); });
+  await expect(page.getByText("Connected (Relay)", {exact:true})).toBeVisible();
 });

@@ -52,7 +52,7 @@ internal class RemoteFileAdapter(
                         is FileNotFoundException -> "not_found"
                         is FileAlreadyExistsException -> "already_exists"
                         else ->
-                            if (input.optString("action") in listOf("publish", "mkdir", "delete"))
+                            if (input.optString("action") in listOf("publish", "mkdir", "delete", "managed"))
                                 "publication_unconfirmed"
                             else "storage_io_error"
                     }

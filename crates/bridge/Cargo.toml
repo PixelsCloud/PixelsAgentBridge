@@ -42,3 +42,7 @@ rmcp = { version = "=3.5.0", default-features = false, features = ["client", "tr
 [[example]]
 name = "remote_desktop_stability"
 path = "../../smoke/remote_desktop_stability.rs"
+
+[[example]]
+name = "android_desktop_protocol"
+path = "../../smoke/android_desktop_protocol.rs"

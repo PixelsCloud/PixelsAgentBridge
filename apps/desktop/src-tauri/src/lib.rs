@@ -504,6 +504,7 @@ pub fn run() {
                 operator::desktop_terminal::desktop_terminal_selection,
                 operator::desktop_terminal::desktop_terminal_start,
                 operator::desktop_terminal::desktop_terminal_watch,
+                operator::desktop_terminal::desktop_terminal_connection_path,
                 operator::desktop_terminal::desktop_terminal_input,
                 operator::desktop_terminal::desktop_terminal_resize,
                 operator::desktop_terminal::desktop_terminal_consume,

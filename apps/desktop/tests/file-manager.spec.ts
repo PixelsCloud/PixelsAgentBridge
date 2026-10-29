@@ -773,3 +773,16 @@ test("navigation and search controls share the same height beside the titlebar l
   expect(box!.x+box!.width).toBeLessThan(tab!.x);
   await page.screenshot({path:'../../.build/file-manager/navigation-polish.png'});
 });
+
+
+test("Android file pane uses the advertised app UID without a console user", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/file-manager.html?android=1");
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c:any) => c.command === "file_manager_request" && c.args.endpoint !== "local" && c.args.operation.action === "locations").map((c:any) => c.args.execution.mode))).toContain("service");
+  await expect(page.getByText("Console user is unavailable")).toHaveCount(0);
+});
+
+test("an unsupported Android file pane stops loading and displays its error", async ({ page }) => {
+  await page.goto("http://127.0.0.1:1429/tests/file-manager.html?android=1&unsupported=1");
+  await expect(page.locator(".fm-remote-tab:not([hidden])").getByText("This Android feature is not available", {exact:false})).toBeVisible();
+  await expect(page.locator(".fm-remote-tab:not([hidden]) .fm-pane-status")).toContainText("Folder unavailable");
+});

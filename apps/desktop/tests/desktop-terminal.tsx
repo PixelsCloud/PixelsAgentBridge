@@ -9,7 +9,7 @@ let channel: any;
 let index = 0;
 let offset = 0;
 const fixture = (window as any).fixture = {
-  calls: [] as any[], failInput: false, failClose: false, failSelection: new URLSearchParams(location.search).has("no-console"), delayConsume: false, releaseConsume: null as (() => void) | null,
+  connectionPath: "P2P", calls: [] as any[], failInput: false, failClose: false, failSelection: new URLSearchParams(location.search).has("no-console"), delayConsume: false, releaseConsume: null as (() => void) | null,
   output(text: string) { const bytes = new TextEncoder().encode(text); const frame = new Uint8Array(bytes.length + 9); new DataView(frame.buffer).setBigUint64(1, BigInt(offset)); frame.set(bytes, 9); channel.onmessage(frame.buffer); offset += bytes.length; },
   end() { const data = new TextEncoder().encode(JSON.stringify({ exit_code: 7, reason: "Shell exited" })); const frame = new Uint8Array(data.length + 9); frame[0] = 1; new DataView(frame.buffer).setBigUint64(1, BigInt(offset)); frame.set(data, 9); channel.onmessage(frame.buffer); },
   closeWindow() { callbacks.get(listeners.get("tauri://close-requested")!)?.({ event: "tauri://close-requested", id: 1, payload: null }); },
@@ -25,8 +25,10 @@ const fixture = (window as any).fixture = {
     fixture.calls.push({ command, args: command === "desktop_terminal_start" ? { ...args, events: undefined } : args });
     if (command === "plugin:event|listen") { listeners.set(args.event, args.handler); return 1; }
     if (command.startsWith("plugin:")) return null;
+    if (command === "desktop_terminal_connection_path") return fixture.connectionPath;
     if (command === "desktop_terminal_info") return { code: "428358431", launch_mode: new URLSearchParams(location.search).get("launch") };
     if (command === "desktop_terminal_selection") {
+      if (new URLSearchParams(location.search).has("android-system")) throw "Android does not provide a System/root terminal";
       if (fixture.failSelection) throw "no active local console login was found";
       return new URLSearchParams(location.search).get("launch") === "system" ? { mode: "service" } : { mode: "user", context_ref: "fixture-console" };
     }

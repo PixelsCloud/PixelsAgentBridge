@@ -15,6 +15,7 @@ use std::{
 use tokio::sync::{Mutex, Notify, Semaphore, watch};
 
 mod terminal;
+mod desktop_terminal;
 pub(crate) use terminal::ConnectionScope;
 #[cfg(test)]
 mod tests;
@@ -90,6 +91,7 @@ pub(crate) struct ExecutionService {
     changed: Notify,
     stopping: std::sync::atomic::AtomicBool,
     terminals: Mutex<HashMap<RequestId, Arc<terminal::Entry>>>,
+    desktop_terminals: Mutex<HashMap<RequestId, Arc<desktop_terminal::Entry>>>,
 }
 
 impl ExecutionService {
@@ -164,6 +166,7 @@ impl ExecutionService {
             changed: Notify::new(),
             stopping: std::sync::atomic::AtomicBool::new(false),
             terminals: Mutex::new(HashMap::new()),
+            desktop_terminals: Mutex::new(HashMap::new()),
         });
         let weak = Arc::downgrade(&service);
         tokio::spawn(async move {
