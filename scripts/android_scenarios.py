@@ -141,7 +141,7 @@ class AndroidTasks:
                 entry = ('打开验收页面', 'Open acceptance screen')
                 # Product UI keeps diagnostics under Settings > About. Navigate
                 # using real MCP input and fresh references, never an ADB launch.
-                route = (('设置', 'Settings'), ('关于 Pixels', 'About Pixels'), entry)
+                route = (('设置', 'Settings'), ('关于 Pixels Agent Bridge', 'About Pixels Agent Bridge', '关于 Pixels', 'About Pixels'), entry)
                 if any(self.named(screen, label) for label in entry):
                     route = (entry,)  # Earlier APKs had a direct home entry.
                 for labels in route:

@@ -92,10 +92,11 @@ async function until(action, predicate, description, milliseconds = 30000) {
   throw new Error(`Timeout: ${description}`);
 }
 async function navigate(pane, destination) {
+  await pane.getByTitle('Edit path', { exact: true }).click();
   const input = pane.locator('.fm-pathbar input');
   await input.waitFor({ state: 'visible' });
   await input.fill(destination); await input.press('Enter');
-  await until(async () => ({ path: await input.inputValue(), status: await pane.locator('.fm-pane-status [role="status"]').innerText() }), value => value.path === destination && /\d+ items/.test(value.status), 'owned directory navigation');
+  await until(async () => ({ path: await pane.locator('.fm-breadcrumbs button').last().getAttribute('title'), status: await pane.locator('.fm-pane-status [role="status"]').innerText() }), value => value.path === destination && /\d+ items/.test(value.status), 'owned directory navigation');
   assert.equal(await pane.locator('.fm-error').count(), 0, 'Owned directory produced an error');
 }
 async function transfer(button) {

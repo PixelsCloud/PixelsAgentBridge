@@ -138,7 +138,7 @@ def main():
         print(json.dumps({'check': name, 'passed': True}), flush=True)
 
     try:
-        home.start(); home.set_paused(previous_paused)
+        home.start(); home.set_paused(False)
         client = PublicMcp(operator / 'mcp.toml', args.device_code, True, run / 'mcp.log', args.mcp_executable)
         connected, raw = client.connect()
         assert connected.get('connected') and not raw.get('isError')
@@ -147,9 +147,8 @@ def main():
         (run / 'catalog.json').write_bytes(catalog_bytes)
         result['catalog_sha256'] = hashlib.sha256(catalog_bytes).hexdigest()
         result['catalog_tools'] = len(catalog['tools'])
-        open_doc('/workspace/paused.txt', 'control_paused')
-        passed('normal_pause_gate')
-        home.set_paused(False)
+        # Do not require a UI control that the current product no longer has.
+        result['not_applicable'] = ['removed_pause_button']
         file_action('pab_mkdir', {'path': remote, 'parents': False, 'exist_ok': False})
         result['cleanup_pending'] = True
         if args.sheet_search_only:

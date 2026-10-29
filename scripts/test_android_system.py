@@ -92,7 +92,7 @@ def main():
 
     try:
         home.start()
-        home.set_paused(previous_paused)
+        home.set_paused(False)
         client = PublicMcp(operator / 'mcp.toml', args.device_code, True, run / 'mcp.log', args.mcp_executable)
         tasks = AndroidTasks(client, PACKAGE, run / 'mobile-trace.jsonl')
         catalog = client.rpc('tools/list', {})
@@ -102,9 +102,9 @@ def main():
         result['catalog_tools'] = len(catalog['tools'])
         connected, raw = client.connect()
         assert connected.get('connected') and not raw.get('isError')
-        call('pab_system_info', expected_error='control_paused')
-        passed('normal_pause_gate')
-        home.set_paused(False)
+        # The current product exposes connection controls, not a pause button.
+        # Disconnection gates are covered by test_android_execution.py.
+        result['not_applicable'] = ['removed_pause_button']
         info = call('pab_system_info', {'sample_cpu': True})['data']['info']
         sdk = int(adb(args.serial, 'shell', 'getprop', 'ro.build.version.sdk').strip())
         assert info['os_name'] == 'Android' and info['mobile']['sdk'] == sdk

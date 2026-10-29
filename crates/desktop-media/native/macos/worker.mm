@@ -90,7 +90,10 @@ static void capture(const Display& display, unsigned fps, const std::string& mod
             encode_us += static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-encode_started).count());
             if (desktop && !display_current(display))
                 throw std::runtime_error("Screen changed during encoding; refresh generation");
-            next = std::max(next + std::chrono::microseconds(1000000/fps), Clock::now());
+            // An idle credit pipe can leave the old deadline far behind.
+            // Pace from this acquisition, not that expired schedule; a cached
+            // ScreenCaptureKit sample may also have an older source timestamp.
+            next = encode_started + std::chrono::microseconds(1000000/fps);
             if (packet.dropped) {
                 if (!dropped++) fprintf(stderr, "media hardware rate control skipped an unencoded frame; retaining direct IOSurface path\n");
                 // Keep this one credit, sample fresh pixels, and never invent
