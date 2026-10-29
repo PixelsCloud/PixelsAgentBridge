@@ -8,6 +8,48 @@
 
 Pixels Agent Bridge 通过 MCP 将 AI Agent 与计算机、Android 设备连接起来。用自然语言跨设备执行命令、管理文件、查询系统和操作应用；需要人工处理时，也可以直接打开远程桌面或终端接手。
 
+## 产品一览
+
+点击截图可查看原图。
+
+[![Pixels Agent Bridge 主界面](assets/images/cn/main-cn.jpg)](assets/images/cn/main-cn.jpg)
+
+### MCP 连接
+
+查看各 Agent 的连接状态、工具调用和任务。
+
+[![MCP 连接列表与 Agent 会话详情](assets/images/cn/mcp-cn.jpg)](assets/images/cn/mcp-cn.jpg)
+
+### 任务记录
+
+在本地历史中回看命令执行与文件传输详情。
+
+[![本地任务记录与命令执行详情](assets/images/cn/activity-cn.jpg)](assets/images/cn/activity-cn.jpg)
+
+### 远程桌面
+
+查看远端画面，需要时直接接手操作。
+
+[![远程桌面窗口、屏幕选择与控制工具栏](assets/images/cn/remote-cn.jpg)](assets/images/cn/remote-cn.jpg)
+
+### 文件传输
+
+双栏浏览本地与远端文件，随时掌握传输进度。
+
+[![双栏文件管理与传输进度](assets/images/cn/ft-cn.jpg)](assets/images/cn/ft-cn.jpg)
+
+### 远程终端
+
+在独立终端窗口中交互式执行远程命令。
+
+[![远程终端中的 PowerShell 交互会话](assets/images/cn/terminal-cn.jpg)](assets/images/cn/terminal-cn.jpg)
+
+### Web 管理后台
+
+集中查看用户、设备、流量与 Relay 节点状态。
+
+[![Web 后台的设备、流量与 Relay 运行概览](assets/images/cn/pab-cn.jpg)](assets/images/cn/pab-cn.jpg)
+
 ## 能做什么
 
 - **远程桌面**：独立窗口查看画面，支持切换屏幕、鼠标键盘、全屏和文字剪贴板同步。默认只查看，需要时再启用操作。

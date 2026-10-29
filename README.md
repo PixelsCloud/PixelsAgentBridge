@@ -8,6 +8,48 @@ English · [简体中文](README.zh-CN.md)
 
 Pixels Agent Bridge connects AI agents to computers and Android devices through MCP. Use natural language to run commands, manage files, inspect systems, and operate applications across devices. Open a remote desktop or terminal yourself when a task needs hands-on help.
 
+## Product at a glance
+
+Click any screenshot to view it at full size.
+
+[![Pixels Agent Bridge main interface](assets/images/en/main-en.jpg)](assets/images/en/main-en.jpg)
+
+### MCP connections
+
+See each agent's connections, tool calls, and tasks.
+
+[![MCP connections and agent session details](assets/images/en/mcp-en.jpg)](assets/images/en/mcp-en.jpg)
+
+### Activity history
+
+Review commands and file transfers in local task history.
+
+[![Local activity history with command execution details](assets/images/en/activity-en.jpg)](assets/images/en/activity-en.jpg)
+
+### Remote desktop
+
+View a remote screen and take control when needed.
+
+[![Remote desktop viewer with screen selection and control toolbar](assets/images/en/remote-en.jpg)](assets/images/en/remote-en.jpg)
+
+### File transfer
+
+Browse local and remote files side by side and track transfers.
+
+[![Two-pane file manager with transfer progress](assets/images/en/ft-en.jpg)](assets/images/en/ft-en.jpg)
+
+### Remote terminal
+
+Run commands interactively in a dedicated terminal window.
+
+[![Remote terminal running an interactive PowerShell session](assets/images/en/terminal-en.jpg)](assets/images/en/terminal-en.jpg)
+
+### Web console
+
+Monitor users, devices, traffic, and Relay nodes in one place.
+
+[![Web console overview of devices, traffic, and Relay status](assets/images/en/pab-en.jpg)](assets/images/en/pab-en.jpg)
+
 ## What it can do
 
 - **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text clipboard sync. Sessions start in view-only mode; enable control when needed.
