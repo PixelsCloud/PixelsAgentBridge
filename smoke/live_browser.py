@@ -52,6 +52,7 @@ def main():
             entry['value'] = value
             save()
             assert not value.get('error') and value.get('result', {}).get('state') not in ('failed', 'cancelled', 'unconfirmed'), tool
+            assert value.get('operation', {}).get('state') not in ('failed', 'cancelled', 'unconfirmed', 'interrupted'), tool + ' transfer failed'
             return value
 
         def check(code, name):
@@ -103,7 +104,7 @@ def main():
 
                     assert browser('setup_info')['status'] == 'ready'
                     session = browser('attach')['session_ref']
-                    root = str((home / 'AppData/Local/Temp' if windows else PurePosixPath('/tmp')) / ('pab-browser-' + str(uuid.uuid4())))
+                    root = str((home / 'AppData/Local/Temp' if windows else PurePosixPath('/private/tmp')) / ('pab-browser-' + str(uuid.uuid4())))
                     call('pab_mkdir', {'device_code': code, 'path': root, 'execution': user})
                     call('pab_file_write', {'device_code': code, 'path': root + '/upload.txt', 'content': 'Pixels synthetic upload', 'execution': user})
                     html = base64.b64encode((Path(__file__).parent / 'fixtures/browser.html').read_bytes()).decode()

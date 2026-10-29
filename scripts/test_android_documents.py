@@ -49,6 +49,7 @@ def main():
               'public_server': True, 'forced_relay': True, 'mount': args.mount,
               'checks': [], 'final_acceptance': False, 'started_at_unix': time.time()}
     home = Home(args.serial)
+    previous_paused = normal_status(args.serial)['paused']
     client = None
     handles = set()
     remote = args.mount + '/pixels-documents-' + run.name
@@ -137,7 +138,7 @@ def main():
         print(json.dumps({'check': name, 'passed': True}), flush=True)
 
     try:
-        home.start(); home.set_paused(True)
+        home.start(); home.set_paused(previous_paused)
         client = PublicMcp(operator / 'mcp.toml', args.device_code, True, run / 'mcp.log', args.mcp_executable)
         connected, raw = client.connect()
         assert connected.get('connected') and not raw.get('isError')
@@ -449,7 +450,7 @@ def main():
                 result['cleanup_error'] = str(failure)[:600]
                 result['status'] = 'failed'
             client.close()
-        try: home.start(); home.set_paused(True)
+        try: home.start(); home.set_paused(previous_paused)
         except Exception as failure:
             result['restore_error'] = str(failure)[:400]; result['status'] = 'failed'
         result['final_state'] = normal_status(args.serial)

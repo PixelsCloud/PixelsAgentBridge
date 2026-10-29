@@ -55,6 +55,7 @@ def main():
             if not allow_error:
                 assert not value.get('error'), tool
                 assert value.get('result', {}).get('state') not in ('failed', 'cancelled'), tool + ' failed'
+                assert value.get('operation', {}).get('state') not in ('failed', 'cancelled', 'unconfirmed', 'interrupted'), tool + ' transfer failed'
             return value
 
         def check(code, name):
@@ -66,7 +67,9 @@ def main():
             for device in devices:
                 code, family = device['code'], device['os']
                 assert family in ('windows', 'macos')
-                root = (r'C:\Windows\Temp\pab-doc-' if family == 'windows' else '/tmp/pab-doc-') + str(uuid.uuid4())
+                # macOS /tmp is a symlink; receiving paths deliberately require
+                # ordinary no-follow parents. Use the native backing directory.
+                root = (r'C:\Windows\Temp\pab-doc-' if family == 'windows' else '/private/tmp/pab-doc-') + str(uuid.uuid4())
                 created = False
                 native_pdf_passed = False
                 try:

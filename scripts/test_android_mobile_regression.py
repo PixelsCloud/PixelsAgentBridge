@@ -87,6 +87,7 @@ def main():
         'forced_relay': True, 'public_server': True, 'full_A01_A16': False,
         'qa_capture_started': False, 'qa_capture_stopped': False}
     home = Home(args.serial)
+    previous_paused = normal_status(args.serial)['paused']
     client = None
     tasks = None
     try:
@@ -111,7 +112,7 @@ def main():
                 assert tasks is not None
                 capture_control(tasks, enable=False)
                 result['qa_capture_stopped'] = True
-            home.set_paused(True)
+            home.set_paused(previous_paused)
             if client is not None:
                 client.tool('pab_disconnect', {'device_code': args.device_code})
             state = normal_status(args.serial)

@@ -36,6 +36,7 @@ def main():
         'mcp_sha256': hashlib.sha256(args.mcp_executable.read_bytes()).hexdigest(),
         'forced_relay': True, 'public_server': True, 'checks': [], 'final_acceptance': False}
     home = Home(args.serial)
+    previous_paused = normal_status(args.serial)['paused']
     def fixture_viewer(enabled):
         adb(args.serial, 'shell', 'am', 'broadcast', '-n', f'{PACKAGE}/com.pixels.agent.fixture.ProductionProbeReceiver',
             '--es', 'production_request_id', str(uuid.uuid4()), '--es', 'probe_action', 'file-view-fixture',
@@ -91,7 +92,7 @@ def main():
 
     try:
         home.start()
-        home.set_paused(True)
+        home.set_paused(previous_paused)
         client = PublicMcp(operator / 'mcp.toml', args.device_code, True, run / 'mcp.log', args.mcp_executable)
         tasks = AndroidTasks(client, PACKAGE, run / 'mobile-trace.jsonl')
         catalog = client.rpc('tools/list', {})
@@ -220,7 +221,7 @@ def main():
         if client is not None:
             client.close()
         try:
-            home.set_paused(True)
+            home.set_paused(previous_paused)
             result['ending_status'] = normal_status(args.serial)
         except Exception as error:
             result.update(status='failed', pause_cleanup_error=type(error).__name__)

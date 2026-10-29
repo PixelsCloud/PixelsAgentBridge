@@ -48,6 +48,7 @@ def main():
     executable = args.mcp_executable or public / 'pab-mcp.exe'
     result['provenance']['mcp_sha256'] = hashlib.sha256(executable.read_bytes()).hexdigest()
     home = Home(args.serial)
+    previous_paused = normal_status(args.serial)['paused']
     home.start()
     home.set_paused(False)
     client = PublicMcp(public / 'mcp.toml', code, True,
@@ -242,7 +243,7 @@ def main():
         result['status'] = 'passed'
     finally:
         client.close()
-        home.set_paused(True)
+        home.set_paused(previous_paused)
         result['installed_apk_unchanged'] = installed_apk_sha256(args.serial) == args.apk_sha256
         result['ending_status'] = normal_status(args.serial)
         result['finished_at_unix'] = time.time()

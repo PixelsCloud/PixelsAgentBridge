@@ -302,6 +302,15 @@ impl TaskService {
                         request.request_id
                     ))
                 };
+                // macOS temp/home paths may start with system symlinks such as
+                // /var or /tmp. Publish the real parent path so the preview can
+                // be downloaded through the no-follow transfer implementation.
+                // Keep that implementation's link/race protections unchanged.
+                #[cfg(target_os = "macos")]
+                let output = match output.parent().expect("preview has a parent").canonicalize() {
+                    Ok(parent) => parent.join(output.file_name().expect("preview has a name")),
+                    Err(error) => return failed(reply, &format!("preview_directory_unavailable: {error}")),
+                };
                 let result = if let Some((prepared, _)) = user {
                     run_user_preview(
                         path,
