@@ -38,6 +38,11 @@ class NativePresenter {
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
         if (self && message == WM_SETCURSOR && LOWORD(lparam) == HTCLIENT && self->refresh_local_cursor()) return TRUE;
+        // The surface owns keys while controlling. Letting the parent WebView
+        // process mouse activation/dialog navigation can redirect them locally.
+        if (self && self->input_.enabled() && message == WM_MOUSEACTIVATE) return MA_ACTIVATE;
+        if (self && self->input_.enabled() && message == WM_GETDLGCODE)
+            return DLGC_WANTALLKEYS | DLGC_WANTCHARS | DLGC_WANTARROWS | DLGC_WANTTAB;
         if (self && self->input_.message(window, message, wparam, lparam, self->viewport_)) return 0;
         return DefWindowProcW(window, message, wparam, lparam);
     }
@@ -165,6 +170,7 @@ public:
         }
         if (!IsWindow(window_)) throw std::runtime_error("Viewer closed by user");
         if (parent_ && !IsWindow(parent_)) throw std::runtime_error("Viewer owner closed");
+        input_.observe_focus(window_);
         observe_presentations();
         if (!swapchain_ || !processor_ || presenting_) return;
         if (parent_) {

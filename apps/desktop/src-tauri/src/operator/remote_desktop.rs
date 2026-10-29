@@ -1059,6 +1059,12 @@ async fn stream(
                                 // Native focus must consume Esc locally, including its key-up.
                                 chrome::set_fullscreen(window, owner, false).map_err(StreamFailure::renderer)?;
                             }
+                            pab_desktop_media::NativeViewerEvent::Focus { enabled: collecting, focused, foreground, requests, failures } => {
+                                tracing::info!(window = window.label(), session = %input_generation.session,
+                                    generation = input_generation.generation, collecting, focused, foreground,
+                                    focus_requests = requests, focus_failures = failures,
+                                    "remote desktop keyboard collection focus");
+                            }
                         }
                     }
                 }

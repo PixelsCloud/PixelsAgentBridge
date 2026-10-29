@@ -20,11 +20,14 @@ enum Event {
     Wheel { x: u16, y: u16, delta: i16 },
     Mode(bool),
     ExitFullscreen,
+    Focus { enabled: bool, focused: bool, foreground: bool, requests: u16, failures: u16 },
 }
 /// Local actions cannot be serialized as remote keyboard input.
 pub enum NativeViewerEvent {
     Input(RemoteDesktopInput),
     ExitFullscreen,
+    /// Local collection state only, never forwarded as remote input.
+    Focus { enabled: bool, focused: bool, foreground: bool, requests: u16, failures: u16 },
 }
 
 type Stamped = (u64, Event);
@@ -191,6 +194,8 @@ impl NativeViewerInput {
             match self.inbox.next_raw().await? {
                 Event::Input(event) => return Ok(NativeViewerEvent::Input(event)),
                 Event::ExitFullscreen => return Ok(NativeViewerEvent::ExitFullscreen),
+                Event::Focus { enabled, focused, foreground, requests, failures } =>
+                    return Ok(NativeViewerEvent::Focus { enabled, focused, foreground, requests, failures }),
                 Event::Wheel { x, y, delta } => {
                     // Wheel's position must precede its action even when motion
                     // was coalesced on another channel. Keep the network v2 API.
@@ -269,6 +274,20 @@ impl Inbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn focus_diagnostics_are_local_and_preserve_release_order() {
+        let (sink, mut inbox) = InputSink::channel();
+        assert!(sink.emit([5, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(sink.emit([9, 3, 0, 1, 0, 5, 0, 0]));
+        assert!(matches!(inbox.next_raw().await.unwrap(), Event::Input(RemoteDesktopInput::ReleaseAll)));
+        assert!(matches!(inbox.next_raw().await.unwrap(), Event::Focus {
+            enabled: true, focused: false, foreground: true, requests: 3, failures: 1
+        }));
+        for packet in [[9, 0, 0, 0, 0, 8, 0, 0], [9, 0, 0, 0, 0, 1, 0, 1]] {
+            assert!(decode(packet).is_none());
+        }
+    }
 
     #[tokio::test]
     async fn local_escape_preserves_release_order_without_becoming_a_remote_key() {
@@ -436,6 +455,12 @@ fn decode(packet: [u8; 8]) -> Option<Event> {
     let y = u16::from_le_bytes([packet[3], packet[4]]);
     let value = u16::from_le_bytes([packet[5], packet[6]]);
     let down = packet[7] != 0;
+    if packet[0] == 9 {
+        return (value <= 7 && !down).then_some(Event::Focus {
+            enabled: value & 1 != 0, focused: value & 2 != 0, foreground: value & 4 != 0,
+            requests: x, failures: y,
+        });
+    }
     if packet[0] == 6 {
         return (value <= 1).then_some(Event::Mode(value == 1));
     }
