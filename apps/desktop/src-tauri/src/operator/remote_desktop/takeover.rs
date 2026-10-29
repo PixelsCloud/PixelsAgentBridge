@@ -19,9 +19,7 @@ pub(super) async fn confirm(window:&WebviewWindow,state:&RemoteDesktopState,engl
     }else{
         ("是否强制接管？","这台设备正在被其他会话控制。强制接管将断开原控制端，释放其键盘和鼠标状态，然后建立你的连接。","强制接管","取消")
     };
-    let answer=rfd::AsyncMessageDialog::new().set_parent(window).set_title(title).set_description(body)
-        .set_level(rfd::MessageLevel::Warning).set_buttons(rfd::MessageButtons::OkCancelCustom(confirm.into(),cancel.into())).show().await;
-    if !matches!(answer,rfd::MessageDialogResult::Custom(label) if label==confirm){return Ok(false)}
+    if !crate::confirmation::ask(window.app_handle(),Some(window),title,body,confirm,cancel).await{return Ok(false)}
     // Revalidate both the local account/window and the exact remote session.
     let current=state.owner(window).await?;
     if !Arc::ptr_eq(&owner,&current) || *owner.stop.borrow() || owner.status.borrow().takeover_session!=Some(expected){return Ok(false)}

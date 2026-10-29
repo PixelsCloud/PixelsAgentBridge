@@ -56,7 +56,7 @@ export function SavedConnectionDialog({ language, connection, onClose, onRetry, 
   const isPending = connection.phase !== "connected" && connection.phase !== "failed";
 
   return (
-    <Modal open title={adding ? t.addDevice : t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
+    <Modal open centered title={adding ? t.addDevice : t.savedConnectTitle} width={430} className="saved-connect-dialog" maskClosable={false} keyboard={false}
       onCancel={onClose} footer={[
         <Button key="close" onClick={onClose}>{t.savedConnectClose}</Button>,
         connection.phase === "failed" && <Button key="retry" type="primary" icon={<RotateCw size={14} />} disabled={passwordRequired && !password} onClick={retry}>{t.savedConnectRetry}</Button>,

@@ -558,9 +558,10 @@ test("cross-pane multi-selection drags copy through the same batch API in both d
 test("closing device tabs keeps accepted transfers running and an old close reply cannot remove a reopened generation",async ({page})=>{
   const local=page.getByRole("region",{name:"This computer",exact:true});await local.getByRole("checkbox",{name:"Select file-000001.bin",exact:true}).check();await page.getByRole("button",{name:"Send (1)",exact:true}).click();
   await page.getByRole("button",{name:"Close 90 tab",exact:true}).click();await expect(page.getByRole("tab",{name:"90 428358431",exact:true})).not.toBeVisible();await expect(page.getByRole("tab",{name:"Company 559038160",exact:true})).toHaveAttribute("aria-selected","true");
-  await expect(page.getByRole("region",{name:"Transfers",exact:true})).toContainText("Transferring");expect(await page.evaluate(()=>(window as any).fixture.calls.some((call:any)=>call.command==="file_manager_batch_intent"))).toBeFalsy();
+  await expect(page.locator(".fm-task")).toHaveCount(0);expect(await page.evaluate(()=>(window as any).fixture.calls.some((call:any)=>call.command==="file_manager_batch_intent"))).toBeFalsy();
   await page.evaluate(()=>(window as any).fixture.emit("file-manager-open-tab",{code:"428358431",name:"90",os_family:"windows",generation:"20000000-0000-0000-0000-000000000090"}));
   await expect(page.getByRole("region",{name:"90",exact:true}).getByRole("status")).toContainText("100000 items");
+  await expect(page.locator(".fm-task")).toHaveCount(1);
   await page.evaluate(()=>{(window as any).fixture.holdTabClose=true;});await page.getByRole("button",{name:"Close 90 tab",exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).fixture.tabClosers.length)).toBe(1);
   await page.evaluate(()=>{const fixture=(window as any).fixture;fixture.emit("file-manager-open-tab",{code:"428358431",name:"Reopened 90",os_family:"windows",generation:"30000000-0000-0000-0000-000000000090"});fixture.tabClosers.splice(0).forEach((done:()=>void)=>done());});
@@ -785,4 +786,19 @@ test("an unsupported Android file pane stops loading and displays its error", as
   await page.goto("http://127.0.0.1:1429/tests/file-manager.html?android=1&unsupported=1");
   await expect(page.locator(".fm-remote-tab:not([hidden])").getByText("This feature is not available on this Android device.", {exact:false})).toBeVisible();
   await expect(page.locator(".fm-remote-tab:not([hidden]) .fm-pane-status")).toContainText("Folder unavailable");
+});
+test("transfer history, counts and clear completed belong only to the selected device", async ({ page }) => {
+  await page.evaluate(() => {
+    for (const [id,code,phase] of [['other-done','559038160','completed'],['this-done','428358431','completed'],['other-active','559038160','running']]) {
+      (window as any).fixture.batches.push({spec:{id,code,direction:'upload'},phase,intent:'run',revision:'1',total:'1',completed:phase==='completed'?'1':'0',skipped:'0',failed:'0',cancelled:'0',size:'12',confirmed:'12',scan_complete:true,message:null});
+    }
+  });
+  await expect(page.locator('.fm-task')).toHaveCount(1);
+  await expect(page.locator('.fm-tasks > header')).toContainText('0 active');
+  await page.getByRole('button',{name:'Clear completed',exact:true}).click();
+  await expect(page.locator('.fm-task')).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as any).fixture.batches.length)).toBe(2);
+  await page.getByRole('tab',{name:/Company/}).click();
+  await expect(page.locator('.fm-task')).toHaveCount(2);
+  await expect(page.locator('.fm-tasks > header')).toContainText('1 active');
 });

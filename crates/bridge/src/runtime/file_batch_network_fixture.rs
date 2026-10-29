@@ -18,8 +18,9 @@ struct LabConfig {mode:pab_transport::ConnectionMode,relay_urls:Vec<String>}
 fn device()->DeviceRef {DeviceRef {tenant_id:TenantId::from_u128(1),device_id:DeviceId::from_u128(2)}}
 fn actor(key:[u8;32])->OperatorRef {OperatorRef::account(UserId::from_u128(3),EndpointKey::new(key))}
 async fn endpoint(lab:&LabConfig)->PabEndpoint {
-    let mut config=PabEndpointConfig::new(lab.relay_urls.iter().map(|url|url.parse().unwrap()).collect()).unwrap();
-    if lab.mode==pab_transport::ConnectionMode::Relay {config=config.relay_only_for_testing();}
+    // The client below uses the production per-connection Relay mode and checks
+    // the selected path. Do not depend on a Debug-only endpoint constructor.
+    let config=PabEndpointConfig::new(lab.relay_urls.iter().map(|url|url.parse().unwrap()).collect()).unwrap();
     PabEndpoint::bind(config,iroh_base::SecretKey::from_bytes(&Sha256::digest(RequestId::new().to_string().as_bytes()).into())).await.unwrap()
 }
 async fn write_offer(base:&Path,run:&str,name:&str,endpoint:&PabEndpoint,root:&Path,lab:&LabConfig) {

@@ -27,6 +27,10 @@ impl FileService {
     pub(super) async fn managed(&self,owner:&str,request:&FileSystemRequest,operation:&FileManagerOperation,expected:Option<&FileExecutionIdentity>,reply:&mut FileSystemReply,cancel:&Arc<AtomicBool>)->Result<(),FileError> {
         let context=self.native_context.get().ok_or_else(||invalid("Android execution context unavailable"))?.clone();
         if expected.is_some_and(|value|!value.matches_context(&context)){return Err(FileError::new("execution_context_unavailable","managed","Android application identity changed"));}
+        // Failed lookups (including the normal absent upload destination) still
+        // ran as this verified identity. The batch coordinator must be able to
+        // distinguish not_found from a changed or unavailable execution context.
+        reply.execution_context=Some(context.clone());
         let scope=blake3::keyed_hash(&self.digest_key,b"android-managed-filesystem").to_hex().to_string();
         let result=match operation {
             FileManagerOperation::OpenDirectory {path}=>{

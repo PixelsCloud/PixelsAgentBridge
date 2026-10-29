@@ -823,3 +823,16 @@ async fn claims_obey_device_limit_and_crashed_work_only_reconciles() {
         "reconciling"
     );
 }
+#[tokio::test]
+async fn device_history_scope_precedes_limit_and_clear_preserves_other_devices() {
+    let temp=tempfile::tempdir().unwrap();let store=BatchStore::open(&temp.path().join("scoped.db")).await.unwrap();
+    let first=spec();let mut second=spec();second.device.device_id=DeviceId::from_u128(3);
+    let mut foreign=spec();foreign.device.tenant_id=TenantId::from_u128(4);
+    for batch in [&first,&second,&foreign] {store.create("owner",batch).await.unwrap();store.finish_scan("owner",batch.id,None).await.unwrap();}
+    let rows=store.list_visible_for_device("owner",first.device,1).await.unwrap();assert_eq!(rows.len(),1);assert_eq!(rows[0].spec.id,first.id);
+    assert!(store.list_visible_for_device("other",first.device,100).await.unwrap().is_empty());
+    assert_eq!(store.clear_completed_for_device("owner",first.device).await.unwrap(),vec![first.id.to_string()]);
+    assert!(store.list_visible_for_device("owner",first.device,100).await.unwrap().is_empty());
+    assert_eq!(store.list_visible("owner",100).await.unwrap().len(),2);
+    assert_eq!(store.list("owner",100).await.unwrap().len(),3);
+}

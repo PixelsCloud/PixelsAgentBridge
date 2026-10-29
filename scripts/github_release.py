@@ -110,6 +110,10 @@ def private_file(name, data):
 def build_environment(target):
     env = dict(os.environ)
     env.update(CARGO_BUILD_JOBS='4', CMAKE_BUILD_PARALLEL_LEVEL='1', CARGO_INCREMENTAL='0')
+    # Publication is distinct from the incremental, fast daily Release preset.
+    env.update(CARGO_PROFILE_RELEASE_OPT_LEVEL='3', CARGO_PROFILE_RELEASE_LTO='thin',
+               CARGO_PROFILE_RELEASE_CODEGEN_UNITS='1', CARGO_PROFILE_RELEASE_INCREMENTAL='false')
+    print('Publication Release: opt-level=3, lto=thin, codegen-units=1, incremental=false', flush=True)
     if env.get('PAB_CI_CLIENT_DEFAULTS_TOML'):
         from service_config import write_config
         defaults = tomllib.loads(env['PAB_CI_CLIENT_DEFAULTS_TOML'])

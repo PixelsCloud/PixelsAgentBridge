@@ -33,20 +33,8 @@ pub(super) async fn request(
             "取消",
         )
     };
-    // The native video surface sits above the WebView. A parented system dialog
-    // stays visible above it and keeps confirmation input on the local machine.
-    let answer = rfd::AsyncMessageDialog::new()
-        .set_parent(window)
-        .set_title(title)
-        .set_description(body)
-        .set_level(rfd::MessageLevel::Warning)
-        .set_buttons(rfd::MessageButtons::OkCancelCustom(
-            confirm.into(),
-            cancel.into(),
-        ))
-        .show()
-        .await;
-    if !matches!(answer, rfd::MessageDialogResult::Custom(label) if label == confirm) {
+    // The owned app dialog remains above native video and collects input locally.
+    if !crate::confirmation::ask(window.app_handle(), Some(window), title, body, confirm, cancel).await {
         return Ok(false);
     }
     state.close(window.label()).await;

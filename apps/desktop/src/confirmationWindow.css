@@ -1,0 +1,4 @@
+html, body, #root { margin: 0; min-height: 100%; overflow: hidden; background: #fff; }
+html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root { background: #1f1f1f; }
+.app-confirmation .ant-modal-container, .app-confirmation .ant-modal-content { box-shadow: none; padding: 32px; }
+.app-confirmation .ant-modal-confirm-content { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -48,7 +48,7 @@ function makeEntry(index: number, parent: NativePath, names = fixture.entryNameO
     if (command === "file_manager_contexts") return { state: "completed", data: { type: "execution_contexts", entries: args.forceRelay && (fixture as any).hideRelayUser ? [] : [{ mode: "user", account_name: "Test user", account_id: "uid:1001", session_id: "1", identity: { mode: "user", account_id: "uid:1001", account_name: "Test user", home: "C:\\Users\\fixture", primary_group:null, session_id:"1",logon_id:(fixture as any).nativeLogon || "fixture-login",environment_source:"native_account" }, selection: { mode: "user", context_ref: `user-${args.forceRelay ? "relay" : "auto"}${(fixture as any).nativeGeneration ? `-${(fixture as any).nativeGeneration}` : ""}` },unavailable_reason:null }] } };
     if (command === "file_manager_clear_completed") {
       if ((fixture as any).failClearCompleted) throw new Error("Could not clear completed transfers");
-      const ids = fixture.batches.filter(batch => ["completed", "completed_with_skips"].includes(batch.phase)).map(batch => batch.spec.id);
+      const ids = fixture.batches.filter(batch => String(batch.spec.code) === args.code && ["completed", "completed_with_skips"].includes(batch.phase)).map(batch => batch.spec.id);
       fixture.batches = fixture.batches.filter(batch => !ids.includes(batch.spec.id)); return ids;
     }
     if (command === "file_manager_batches") {

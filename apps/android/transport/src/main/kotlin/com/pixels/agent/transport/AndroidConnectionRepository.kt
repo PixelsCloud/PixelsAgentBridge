@@ -126,6 +126,22 @@ class AndroidConnectionRepository(
     override suspend fun runConnection() {
         // A duplicate start cannot take ownership of, or stop, the running session.
         if (!lifecycle.tryLock()) return
+        try {
+            var retryMs = 1000L
+            while (currentCoroutineContext().isActive) {
+                runConnectionOnce()
+                if (currentStatus.value.error != "peer_listener_stopped") return
+                currentStatus.value =
+                    currentStatus.value.copy(phase = ConnectionPhase.RECONNECTING, remoteReady = false)
+                delay(retryMs)
+                retryMs = (retryMs * 2).coerceAtMost(30000L)
+            }
+        } finally {
+            lifecycle.unlock()
+        }
+    }
+
+    private suspend fun runConnectionOnce() {
         var failed = false
         var nativeStarted = false
         val storageEpoch = storageLane.begin()
@@ -190,6 +206,9 @@ class AndroidConnectionRepository(
             }
             while (currentCoroutineContext().isActive) {
                 val value = withContext(Dispatchers.IO) { nativeValue(native.status()) }
+                if (value.optString("error") == "peer_listener_stopped") {
+                    throw ConnectionFailure("peer_listener_stopped")
+                }
                 if (value.optString("error") in setOf("authentication", "configuration")) {
                     throw ConnectionFailure("control_credentials_or_configuration_rejected")
                 }
@@ -354,7 +373,6 @@ class AndroidConnectionRepository(
                     ConnectionStatus(ConnectionPhase.FAILED, error = "shutdown_failed")
             } finally {
                 if (!failed) currentStatus.value = ConnectionStatus()
-                lifecycle.unlock()
             }
         }
     }

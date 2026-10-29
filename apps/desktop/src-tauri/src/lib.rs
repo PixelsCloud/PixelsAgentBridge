@@ -24,6 +24,7 @@ pub fn macos_diagnostics() -> serde_json::Value {
     })
 }
 mod browser_helper;
+mod confirmation;
 mod browser_setup;
 mod desktop_assistance;
 mod device_account;
@@ -406,6 +407,7 @@ pub fn run() {
     };
     tauri::Builder::default()
         .manage(LocalStatus::default())
+        .manage(confirmation::ConfirmationState::default())
         .manage(mcp_reporting::McpReportingState::default())
         .manage(desktop_assistance::AssistanceState::default())
         .manage(operator::OperatorState::new())
@@ -461,6 +463,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(|invoke| {
+            if invoke.message.webview().label().starts_with("confirmation-")
+                && !matches!(invoke.message.command(), "confirmation_info" | "confirmation_ready" | "confirmation_answer") {
+                invoke.resolver.reject("command is unavailable in a confirmation window");
+                return true;
+            }
             if invoke.message.webview().label().starts_with("file-manager-")
                 && !invoke.message.command().starts_with("file_manager_") {
                 invoke.resolver.reject("command is unavailable in a file transfer window");
@@ -486,6 +493,9 @@ pub fn run() {
                 return true;
             }
             let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                confirmation::confirmation_info,
+                confirmation::confirmation_ready,
+                confirmation::confirmation_answer,
                 operator::remote_desktop::desktop_viewer_window,
                 operator::remote_desktop::desktop_viewer_start,
                 operator::remote_desktop::desktop_viewer_control,

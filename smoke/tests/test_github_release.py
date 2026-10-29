@@ -18,6 +18,16 @@ import build_linux_headless
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_publication_optimization_reaches_linux_containers(self):
+        with patch.dict(os.environ, {}, clear=True):
+            env = release.build_environment('linux')
+        expected = {'CARGO_PROFILE_RELEASE_OPT_LEVEL': '3', 'CARGO_PROFILE_RELEASE_LTO': 'thin',
+                    'CARGO_PROFILE_RELEASE_CODEGEN_UNITS': '1', 'CARGO_PROFILE_RELEASE_INCREMENTAL': 'false'}
+        self.assertEqual({key: env[key] for key in expected}, expected)
+        with patch.dict(os.environ, env, clear=True):
+            args = build_linux_headless.release_profile_arguments()
+        for key, value in expected.items(): self.assertIn(key + '=' + value, args)
+
     def setUp(self):
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)

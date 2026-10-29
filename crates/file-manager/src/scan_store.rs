@@ -60,21 +60,30 @@ impl BatchStore {
         if changed != 1 {return Err(FileManagerError::Conflict);}Ok(())
     }
     pub async fn list(&self,owner:&str,limit:u16)->Result<Vec<crate::BatchSnapshot>,FileManagerError> {
-        self.list_with_dismissed(owner,limit,true).await
+        self.list_with_dismissed(owner,limit,true,None).await
     }
     pub async fn list_visible(&self,owner:&str,limit:u16)->Result<Vec<crate::BatchSnapshot>,FileManagerError> {
-        self.list_with_dismissed(owner,limit,false).await
+        self.list_with_dismissed(owner,limit,false,None).await
+    }
+    pub async fn list_visible_for_device(&self,owner:&str,device:pab_protocol::DeviceRef,limit:u16)->Result<Vec<crate::BatchSnapshot>,FileManagerError> {
+        self.list_with_dismissed(owner,limit,false,Some(device)).await
     }
     pub async fn clear_completed(&self,owner:&str)->Result<Vec<String>,FileManagerError> {
+        self.clear_completed_scoped(owner,None).await
+    }
+    pub async fn clear_completed_for_device(&self,owner:&str,device:pab_protocol::DeviceRef)->Result<Vec<String>,FileManagerError> {
+        self.clear_completed_scoped(owner,Some(device)).await
+    }
+    async fn clear_completed_scoped(&self,owner:&str,device:Option<pab_protocol::DeviceRef>)->Result<Vec<String>,FileManagerError> {
         // Keep execution receipts and transferred files. Dismiss only successful,
         // settled batches belonging to this account, atomically with the state check.
         let mut tx=self.write_transaction().await?;
-        let ids=sqlx::query_scalar("INSERT INTO fm_batch_dismissals(batch) SELECT b.id FROM fm_batches b WHERE b.owner=? AND b.scan_complete=1 AND b.message IS NULL AND NOT EXISTS(SELECT 1 FROM fm_items i WHERE i.batch=b.id AND (i.worker IS NOT NULL OR i.state NOT IN ('completed','skipped'))) AND NOT EXISTS(SELECT 1 FROM fm_batch_dismissals d WHERE d.batch=b.id) RETURNING batch").bind(owner).fetch_all(&mut *tx).await?;
+        let ids=sqlx::query_scalar("INSERT INTO fm_batch_dismissals(batch) SELECT b.id FROM fm_batches b WHERE b.owner=? AND (? IS NULL OR (json_extract(b.spec,'$.device.tenant_id')=? AND json_extract(b.spec,'$.device.device_id')=?)) AND b.scan_complete=1 AND b.message IS NULL AND NOT EXISTS(SELECT 1 FROM fm_items i WHERE i.batch=b.id AND (i.worker IS NOT NULL OR i.state NOT IN ('completed','skipped'))) AND NOT EXISTS(SELECT 1 FROM fm_batch_dismissals d WHERE d.batch=b.id) RETURNING batch").bind(owner).bind(device.map(|v|v.device_id.to_string())).bind(device.map(|v|v.tenant_id.to_string())).bind(device.map(|v|v.device_id.to_string())).fetch_all(&mut *tx).await?;
         tx.commit().await?;Ok(ids)
     }
-    async fn list_with_dismissed(&self,owner:&str,limit:u16,include_dismissed:bool)->Result<Vec<crate::BatchSnapshot>,FileManagerError> {
+    async fn list_with_dismissed(&self,owner:&str,limit:u16,include_dismissed:bool,device:Option<pab_protocol::DeviceRef>)->Result<Vec<crate::BatchSnapshot>,FileManagerError> {
         if limit == 0 || limit>100 {return Err(FileManagerError::Invalid("invalid batch list limit"));}
-        let ids:Vec<String> = sqlx::query_scalar("SELECT b.id FROM fm_batches b WHERE b.owner=? AND (? OR NOT EXISTS(SELECT 1 FROM fm_batch_dismissals d WHERE d.batch=b.id)) ORDER BY CASE WHEN b.message IS NULL AND ((b.scan_complete=0 AND (b.intent!='cancel' OR b.scan_stopped=0)) OR EXISTS(SELECT 1 FROM fm_items i WHERE i.batch=b.id AND i.state NOT IN ('completed','skipped','failed','cancelled'))) THEN 0 ELSE 1 END,b.created DESC,b.id DESC LIMIT ?").bind(owner).bind(include_dismissed).bind(i64::from(limit)).fetch_all(&self.pool).await?;
+        let ids:Vec<String> = sqlx::query_scalar("SELECT b.id FROM fm_batches b WHERE b.owner=? AND (? IS NULL OR (json_extract(b.spec,'$.device.tenant_id')=? AND json_extract(b.spec,'$.device.device_id')=?)) AND (? OR NOT EXISTS(SELECT 1 FROM fm_batch_dismissals d WHERE d.batch=b.id)) ORDER BY CASE WHEN b.message IS NULL AND ((b.scan_complete=0 AND (b.intent!='cancel' OR b.scan_stopped=0)) OR EXISTS(SELECT 1 FROM fm_items i WHERE i.batch=b.id AND i.state NOT IN ('completed','skipped','failed','cancelled'))) THEN 0 ELSE 1 END,b.created DESC,b.id DESC LIMIT ?").bind(owner).bind(device.map(|v|v.device_id.to_string())).bind(device.map(|v|v.tenant_id.to_string())).bind(device.map(|v|v.device_id.to_string())).bind(include_dismissed).bind(i64::from(limit)).fetch_all(&self.pool).await?;
         let mut result=Vec::with_capacity(ids.len());
         for id in ids {result.push(self.snapshot(owner,id.parse().map_err(|_|FileManagerError::Invalid("invalid batch ID"))?).await?);}
         Ok(result)

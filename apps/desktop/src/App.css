@@ -232,6 +232,12 @@ h1, h2, h3, p { margin: 0; }
 .saved-connect-error { overflow-wrap: anywhere; }
 .saved-connect-password { margin-top: 16px; }
 .saved-connect-note { margin-top: 19px; }
+@media (max-height: 700px) {
+  .saved-connect-stage { min-height: 40px; margin-top: 12px; }
+  .saved-connect-progress-title, .saved-connect-password { margin-top: 10px; }
+  .saved-connect-note { margin-top: 10px; }
+  .saved-connect-dialog .ant-steps-item { min-height: 42px; }
+}
 .device-dialog-error { margin-top: 10px; color: #b7494d; font-size: 12px; }
 .primary-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 8px; color: #fff; background: #218574; font-size: 12px; font-weight: 750; box-shadow: 0 6px 13px #21857424; }
 .primary-button:hover:not(:disabled) { background: #176b5d; }

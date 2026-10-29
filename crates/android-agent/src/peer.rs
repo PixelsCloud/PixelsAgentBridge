@@ -40,6 +40,18 @@ pub struct PeerRuntime {
     task: JoinHandle<()>,
 }
 
+// A failed incoming QUIC handshake belongs to that caller, not the listener.
+// Cancelling/closing one client must not prevent every subsequent connection.
+async fn accept_next<T, E, F, Fut>(mut accept: F) -> Option<T>
+where F: FnMut() -> Fut, Fut: std::future::Future<Output = Result<Option<T>, E>> {
+    loop {
+        match accept().await {
+            Ok(connection) => return connection,
+            Err(_) => continue,
+        }
+    }
+}
+
 pub async fn bind(
     config: &AndroidConfig,
     key: iroh_base::SecretKey,
@@ -204,15 +216,19 @@ impl PeerRuntime {
             let limit = Arc::new(Semaphore::new(16));
             let mut sessions = JoinSet::new();
             loop {
-                tokio::select! {
-                    incoming=listener.accept()=>{
-                        let Ok(Some(connection))=incoming else {break};
-                        let Ok(permit)=Arc::clone(&limit).try_acquire_owned() else {connection.close(b"busy");continue};
-                        let authorizer=authorizer.clone();let credential=credentials.read().expect("access credential lock").clone();let attempts=attempts.clone();let broker=Arc::clone(&platform);let context=SessionContext {execution:execution.clone(),broker,active:active.clone(),files:file_service.clone(),system:system_service.clone(),documents:document_service.clone(),commands:command_service.clone(),forwards:forwards.clone()};
-                        sessions.spawn(async move {let _permit=permit;let _=session(connection,authorizer,credential,attempts,device,context).await;});
+                // Keep an in-flight handshake alive while older sessions finish.
+                let incoming = accept_next(||listener.accept());
+                tokio::pin!(incoming);
+                let connection = loop {
+                    tokio::select! {
+                        connection=&mut incoming=>break connection,
+                        _=sessions.join_next(), if !sessions.is_empty()=>{}
                     }
-                    _=sessions.join_next(), if !sessions.is_empty()=>{}
-                }
+                };
+                let Some(connection)=connection else {break};
+                let Ok(permit)=Arc::clone(&limit).try_acquire_owned() else {connection.close(b"busy");continue};
+                let authorizer=authorizer.clone();let credential=credentials.read().expect("access credential lock").clone();let attempts=attempts.clone();let broker=Arc::clone(&platform);let context=SessionContext {execution:execution.clone(),broker,active:active.clone(),files:file_service.clone(),system:system_service.clone(),documents:document_service.clone(),commands:command_service.clone(),forwards:forwards.clone()};
+                sessions.spawn(async move {let _permit=permit;let _=session(connection,authorizer,credential,attempts,device,context).await;});
             }
         });
         Ok(Self {
@@ -233,6 +249,7 @@ impl PeerRuntime {
             .map_err(|_| "credential_unavailable")? = credential;
         Ok(())
     }
+    pub fn is_running(&self) -> bool { !self.task.is_finished() }
     pub async fn stop(self) {
         if let Some(execution) = &self.execution {
             execution.shutdown().await;
@@ -240,6 +257,27 @@ impl PeerRuntime {
         self.task.abort();
         let _ = self.task.await;
         self.endpoint.close().await;
+    }
+}
+
+#[cfg(test)]
+mod listener_tests {
+    use super::*;
+    #[tokio::test]
+    async fn failed_handshakes_do_not_end_listener_and_endpoint_close_does() {
+        let (send, receive) = tokio::sync::mpsc::channel::<Result<Option<u32>, ()>>(4);
+        let receive = Mutex::new(receive);
+        let listener = async {
+            assert_eq!(accept_next(|| async { receive.lock().await.recv().await.unwrap() }).await, Some(42));
+            assert_eq!(accept_next(|| async { receive.lock().await.recv().await.unwrap() }).await, None);
+        };
+        let callers = async {
+            send.send(Err(())).await.unwrap();
+            send.send(Err(())).await.unwrap();
+            send.send(Ok(Some(42))).await.unwrap();
+            send.send(Ok(None)).await.unwrap();
+        };
+        tokio::time::timeout(Duration::from_secs(2), async { tokio::join!(listener, callers); }).await.unwrap();
     }
 }
 

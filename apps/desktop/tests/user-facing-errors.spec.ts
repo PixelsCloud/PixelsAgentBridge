@@ -6,6 +6,7 @@ test("errors explain the cause in both supported languages without exposing back
   const cases = [
     ["remote desktop Busy: remote desktop Busy: this device already has a desktop viewer", "occupied"],
     ["android_system_action_unavailable", "androidUnsupported"],
+    ["remote desktop Unsupported: Android remote desktop is not available on this device", "androidUnsupported"],
     ["Console session discovery unavailable", "console"],
     ["remote desktop MediaUnavailable: desktop presentation backlog expired", "media"],
     ["execution_context_expired", "userChanged"],

@@ -241,10 +241,11 @@ impl ControlAgent {
             _ => unreachable!("validated device registration"),
         };
         // Failure details may contain server-controlled text. Only return fixed categories.
+        let peer_stopped = self.peer.as_ref().is_some_and(|peer| !peer.is_running());
         json!({ "phase": phase, "device_code": code, "generation": current.generation,
-            "remote_ready": self.peer.is_some() && current.phase == ControlConnectionPhase::Authenticated,
+            "remote_ready": self.peer.as_ref().is_some_and(|peer| peer.is_running()) && current.phase == ControlConnectionPhase::Authenticated,
             "failures": current.consecutive_failures, "retry_in_ms": current.retry_in_ms,
-            "error": current.last_failure.as_ref().map(|error| format!("{:?}", error.kind).to_lowercase()) })
+            "error": if peer_stopped { Some("peer_listener_stopped".to_owned()) } else { current.last_failure.as_ref().map(|error| format!("{:?}", error.kind).to_lowercase()) } })
     }
 
     pub fn poll_platform(&self) -> Result<Value, &'static str> {

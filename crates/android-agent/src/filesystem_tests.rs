@@ -288,3 +288,25 @@ async fn provider_response_loss_preserves_uncertainty_and_does_not_retry_a_mutat
     assert_eq!(std::fs::read_to_string(target).unwrap(), "共享文本");
     assert!(restarted.storage.poll().await.is_null());
 }
+#[tokio::test]
+async fn managed_missing_destination_retains_execution_context() {
+    let directory=tempfile::tempdir().unwrap();
+    let service=FileService::open(&directory.path().join("files.sqlite"),directory.path(),[3;32]).await.unwrap();
+    let mut context=crate::peer::context(&crate::peer::RuntimeOptions {database_file:String::new(),password_hash:String::new(),password_version:1,android_release:"14".into(),android_sdk:34,storage_staging_directory:None}).unwrap();
+    context.identity=Some(serde_json::from_value(json!({"mode":"service","account_id":"uid:10023","account_name":"com.pixels.agent.debug","home":"/workspace","primary_group":10023,"session_id":null,"logon_id":null,"environment_source":"service_process"})).unwrap());
+    service.native_context.set(context.clone()).unwrap();
+    let identity=FileExecutionIdentity::from_context(&context).unwrap();
+    let operation=FileManagerOperation::Inspect {path:"/workspace/new-file.txt".into()};
+    let request=FileSystemRequest {execution:ExecutionSelection::default(),request_id:RequestId::new(),path:"/".into(),operation:FileSystemAction::Managed {operation,expected_execution:Some(identity.clone())},payload_size:0,payload_sha256:None};
+    let worker=service.clone();let original=request.clone();
+    let pending=tokio::spawn(async move {worker.request("owner",original,vec![]).await});
+    let deadline=tokio::time::Instant::now()+Duration::from_secs(3);
+    loop {
+        let job=service.storage.poll().await;
+        if !job.is_null() {service.storage.complete(serde_json::from_value(job["ticket"].clone()).unwrap(),json!({"error":"not_found"})).await;break;}
+        assert!(tokio::time::Instant::now()<deadline);tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let (reply,_)=pending.await.unwrap();
+    assert_eq!(reply.state,"failed");assert_eq!(reply.error.as_ref().unwrap().code,"not_found");
+    assert!(identity.matches_context(reply.execution_context.as_ref().unwrap()));
+}

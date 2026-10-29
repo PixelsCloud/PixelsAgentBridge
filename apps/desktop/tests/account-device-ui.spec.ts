@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test';
 
+for (const language of ['zh-CN', 'en']) {
+  test(`connection failure fits a short window without a page scrollbar (${language})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 640 });
+    await page.goto(`http://127.0.0.1:1429/tests/account-device-ui.html?home&language=${language}&connection-error=device%20connection%20timed%20out`);
+    await page.locator('.home-recent-device').dblclick();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.locator('#saved-connect-password')).toBeVisible();
+    await expect(dialog.locator('.saved-connect-error')).toContainText(language === 'en' ? 'Connection timed out' : '连接超时');
+    await expect.poll(() => dialog.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(430);
+    const dimensions = await dialog.evaluate(element => {
+      const wrap = element.closest('.ant-modal-wrap')!;
+      const rect = element.getBoundingClientRect();
+      return { scrolls: wrap.scrollHeight > wrap.clientHeight + 1, top: rect.top, bottom: rect.bottom, height: innerHeight };
+    });
+    expect(dimensions.scrolls).toBe(false);
+    expect(dimensions.top).toBeGreaterThanOrEqual(0);
+    expect(dimensions.bottom).toBeLessThanOrEqual(dimensions.height);
+    await page.screenshot({ path: `../../.build/confirmation-20261029/connect-${language}.png` });
+  });
+}
+
 const connectionEntries = [
   { en:'Remote desktop', zh:'远程桌面', command:'desktop_viewer_window', args:{code:'123456789'} },
   { en:'Remote terminal', zh:'远程终端', command:'desktop_terminal_window', args:{code:'123456789',mode:'console'} },

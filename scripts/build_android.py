@@ -185,6 +185,41 @@ def build_release(version: str, env: dict[str, str]) -> Path:
     return apk
 
 
+def build_device_release(abi: str, env: dict[str, str]) -> None:
+    """Release code, existing USB package/certificate/data; never create a new key."""
+    if not (Path.home() / '.android/debug.keystore').is_file():
+        raise RuntimeError('The existing device signing key is required; do not generate a replacement')
+    serial = tomllib.loads((ROOT / '.build/android/device.toml').read_text(encoding='utf-8'))['serial']
+    adb = str(Path(env['ANDROID_HOME']) / 'platform-tools' / ('adb.exe' if os.name == 'nt' else 'adb'))
+    package = 'com.pixels.agent.debug'
+    installed = subprocess.check_output([adb, '-s', serial, 'shell', 'pm', 'path', package], env=env, text=True).strip().splitlines()
+    base = next((line.removeprefix('package:') for line in installed if line.endswith('/base.apk')), None)
+    if not base:
+        raise RuntimeError('The existing development app must be installed; this action only updates it')
+    original = ROOT / '.build/android/installed-device.apk'
+    run([adb, '-s', serial, 'pull', base, str(original)], env)
+    signer = str(Path(env['ANDROID_HOME']) / 'build-tools/36.0.0' / ('apksigner.bat' if os.name == 'nt' else 'apksigner'))
+    def certificate(apk: Path) -> list[str]:
+        value = subprocess.check_output([signer, 'verify', '--print-certs', str(apk)], env=env, text=True)
+        return re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)$', value, re.M)
+    expected = certificate(original)
+    if len(expected) != 1:
+        raise RuntimeError('Cannot verify the installed device signing identity')
+    env = dict(env, CARGO_PROFILE_RELEASE_OPT_LEVEL='2', CARGO_PROFILE_RELEASE_LTO='false',
+               CARGO_PROFILE_RELEASE_CODEGEN_UNITS='16', CARGO_PROFILE_RELEASE_INCREMENTAL='true')
+    native(abi, env, False, profile='release')
+    prepare_verifier()
+    prepare_document_runtime()
+    wrapper = str(APP_ROOT / ('gradlew.bat' if os.name == 'nt' else 'gradlew'))
+    run([wrapper, '--no-daemon', f'--max-workers={min(2, MAX_JOBS)}', '-PpixelsDeviceIdentity=true',
+         f'-PpixelsDeviceAbi={abi}', f'-PpixelsVersionCode={next_version_code(env)}',
+         ':app:assembleRelease'], env, APP_ROOT)
+    apk = APP_ROOT / 'app/build/outputs/apk/release/app-release.apk'
+    if certificate(apk) != expected:
+        raise RuntimeError('Device certificate differs; update refused, installed app preserved')
+    run([adb, '-s', serial, 'install', '-r', str(apk)], env)
+
+
 def install_updates(env: dict[str, str], include_tests: bool) -> None:
     """Update the configured development phone in place; never uninstall or clear data."""
     device_file = ROOT / ".build" / "android" / "device.toml"
@@ -253,7 +288,7 @@ def stage_server_tools() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=[
-        "check-shared", "native", "assemble", "release", "check", "format", "instrument",
+        "check-shared", "native", "assemble", "release", "device-release", "check", "format", "instrument",
         "verify", "regression", "clippy", "clippy-android", "test-native", "test-execution", "test-execution-linux", "test-port-forward", "test-port-forward-linux", "test-file-enhancements", "test-file-enhancements-linux", "test-files", "test-system", "test-documents", "test-documents-linux", "control-fixture", "remote-tools", "mcp-tools", "shared-test", "check-integration", "check-web", "server-tools", "public-compat", "linux-tools",
     ])
     parser.add_argument("--abi", choices=list(TARGETS), default="x86_64")
@@ -288,6 +323,9 @@ def main() -> None:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.action == 'release':
             build_release(args.version, env)
+            return
+        if args.action == 'device-release':
+            build_device_release(args.abi, env)
             return
         if args.action in APK_ACTIONS:
             # Kotlin/JNI must match every ABI shipped in the APK, including an

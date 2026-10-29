@@ -19,6 +19,12 @@ cp .build/linux-target-bullseye/{profile}/pab-executor .build/linux-target-bulls
 '''
 
 
+def release_profile_arguments():
+    return [argument for name in ('OPT_LEVEL', 'LTO', 'CODEGEN_UNITS', 'INCREMENTAL')
+            if (value := os.environ.get('CARGO_PROFILE_RELEASE_' + name)) is not None
+            for argument in ('--env', 'CARGO_PROFILE_RELEASE_' + name + '=' + value)]
+
+
 def defaults_arguments():
     value = os.environ.get('PAB_CLIENT_DEFAULTS_FILE')
     if value is None:
@@ -43,7 +49,7 @@ def main():
                     '--env', 'CARGO_TARGET_DIR=/src/.build/linux-target-bullseye',
                     '--env', 'CARGO_INCREMENTAL=0', '--env', f'CARGO_BUILD_JOBS={jobs}',
                     '--env', 'PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                    *defaults_arguments(), image, 'sh', '-c', command(args.profile, jobs)], check=True)
+                    *release_profile_arguments(), *defaults_arguments(), image, 'sh', '-c', command(args.profile, jobs)], check=True)
 
 
 if __name__ == '__main__':

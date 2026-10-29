@@ -26,7 +26,7 @@ async fn run(args:Vec<String>)->Result<(),Error> {
     let config=BridgeConfig::register_guest_with_secret(temp.path().join("operator.key")).await?;
     let passwords=Arc::new(SqliteDevicePasswordProvider::new(pab_agent_core::DataPaths::for_operator()?.bridge_database()));
     let mut options=BridgeRuntimeConfig::new(temp.path().join("runtime.sqlite3"));options.resume_incomplete_on_start=false;
-    let runtime=BridgeRuntime::start(config,options,passwords).await?;
+    let runtime=Arc::new(BridgeRuntime::start(config,options,passwords).await?);
     tokio::time::timeout(Duration::from_secs(120),async {
         let device=runtime.resolve_device_code(args[0].parse()?).await?;
         let connection=runtime.file_connection(device,false).await?;connection.require_managed_transfer().await?;
@@ -39,6 +39,7 @@ async fn run(args:Vec<String>)->Result<(),Error> {
         let name=format!("desktop-smoke-{}",RequestId::new());let folder=format!("/workspace/{name}");
         query(&connection,FileManagerOperation::CreateDirectory {parent:"/workspace".into(),name:name.into()}).await?;
         let result=async {
+            batch_roundtrip(runtime.clone(), device, &folder, temp.path()).await?;
             let parent=query(&connection,FileManagerOperation::InspectDirectoryObject {path:folder.clone().into()}).await?;
             let FileManagerResult::DirectoryObject {identity:parent,..}=parent.result else{return Err("missing parent identity".into())};
             let source=temp.path().join("source.bin");let bytes:Vec<u8>=(0..1024*1024).map(|n|(n%251)as u8).collect();std::fs::write(&source,&bytes)?;
@@ -80,5 +81,34 @@ async fn run(args:Vec<String>)->Result<(),Error> {
         let cleanup=query(&connection,FileManagerOperation::Delete {path:folder.into(),recursive:true}).await;
         result?;cleanup?;println!("CLEANUP_PASS");Ok::<(),Error>(())
     }).await??;
-    runtime.shutdown().await?;Ok(())
+    Arc::try_unwrap(runtime).map_err(|_|"probe runtime still owned")?.shutdown().await?;Ok(())
+}
+
+async fn batch_roundtrip(runtime:Arc<BridgeRuntime>,device:DeviceRef,folder:&str,root:&std::path::Path)->Result<(),Error> {
+    use pab_file_manager::{BatchStore,LocalFileManager,encode_path};
+    let owner=runtime.file_operation_owner().await?;
+    let store=BatchStore::open(&root.join("batch.sqlite3")).await?;
+    let local=Arc::new(LocalFileManager::open(&root.join("local.sqlite3")).await?);
+    let source=root.join("batch-tree");std::fs::create_dir_all(source.join("nested"))?;
+    let bytes=vec![83u8;41550];std::fs::write(source.join("image.bin"),&bytes)?;std::fs::write(source.join("nested/中文.txt"),"batch roundtrip 中文")?;
+    let file=root.join("single.bin");std::fs::write(&file,&bytes)?;
+    let code="919383159".parse()?;
+    let spec=FileBatchSpec {id:RequestId::new(),device,code,direction:FileTransferDirection::Upload,sources:vec![encode_path(&file),encode_path(&source)],destination:folder.into(),execution:ExecutionSelection::Service {},conflict:FileConflictPolicy::Ask,force_relay:false};
+    let (job,_)=pab_bridge::ManagedBatchJob::prepare(runtime.clone(),store.clone(),local.clone(),spec,owner.clone()).await?;job.launch();
+    wait_batch(&job).await?;
+    let received=root.join("batch-received");std::fs::create_dir(&received)?;
+    let spec=FileBatchSpec {id:RequestId::new(),device,code,direction:FileTransferDirection::Download,sources:vec![format!("{folder}/single.bin").into(),format!("{folder}/batch-tree").into()],destination:encode_path(&received),execution:ExecutionSelection::Service {},conflict:FileConflictPolicy::Ask,force_relay:false};
+    let (job,_)=pab_bridge::ManagedBatchJob::prepare(runtime.clone(),store,local,spec,owner).await?;job.launch();wait_batch(&job).await?;
+    assert_eq!(std::fs::read(received.join("single.bin"))?,bytes);assert_eq!(std::fs::read(received.join("batch-tree/image.bin"))?,bytes);assert_eq!(std::fs::read_to_string(received.join("batch-tree/nested/中文.txt"))?,"batch roundtrip 中文");
+    let connection=runtime.file_connection(device,false).await?;
+    for path in [format!("{folder}/single.bin"),format!("{folder}/batch-tree")] {query(&connection,FileManagerOperation::Delete {path:path.into(),recursive:true}).await?;}
+    println!("BATCH_PASS: Desktop ManagedBatchJob single file + nested directory upload/download, byte equality, cleanup");Ok(())
+}
+async fn wait_batch(job:&Arc<pab_bridge::ManagedBatchJob>)->Result<(),Error> {
+    tokio::time::timeout(Duration::from_secs(45),async {
+        loop {let snapshot=job.snapshot().await?;
+            if !job.running() {if snapshot.phase=="completed" {return Ok::<(),Error>(());}return Err(format!("batch failed: {:?}",snapshot).into());}
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }).await?
 }

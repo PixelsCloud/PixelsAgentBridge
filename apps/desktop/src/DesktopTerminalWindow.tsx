@@ -211,7 +211,7 @@ function TerminalContent() {
     const selection: ExecutionSelection | undefined = requestedSelection ?? (selected === "service" ? { mode: "service" } : accounts.find((entry) => entry.selection && "context_ref" in entry.selection && entry.selection.context_ref === selected)?.selection ?? undefined);
     if (!selection || !terminal.current) return;
     if (mustEnd.current && !live.current) {
-      const confirmed = await modal.confirm({ title: text.closeTitle, content: text.closeBody, okText: text.confirm, cancelText: text.cancel });
+      const confirmed = await modal.confirm({ title: text.closeTitle, content: text.closeBody, okText: text.confirm, cancelText: text.cancel, okButtonProps: { danger: true } });
       if (!confirmed) { setPhase("ended"); return; }
     }
     setPhase("starting"); setError(""); setReason("");

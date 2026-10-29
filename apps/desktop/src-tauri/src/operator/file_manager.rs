@@ -108,10 +108,9 @@ impl FileManagerState {
     }
 }
 async fn exit_question(app:&AppHandle,title:&str,body:&str,confirm:&str,cancel:&str)->bool {
-    let parent=app.webview_windows().into_values().find(|window|window.is_visible().unwrap_or(false));
-    let dialog=rfd::AsyncMessageDialog::new().set_title(title).set_description(body).set_level(rfd::MessageLevel::Warning).set_buttons(rfd::MessageButtons::OkCancelCustom(confirm.into(),cancel.into()));
-    let dialog=if let Some(parent)=parent.as_ref(){dialog.set_parent(parent)}else{dialog};
-    matches!(dialog.show().await,rfd::MessageDialogResult::Custom(label) if label==confirm)
+    let parent=app.get_webview_window("main").filter(|w|w.is_visible().unwrap_or(false))
+        .or_else(||app.webview_windows().into_values().find(|w|!w.label().starts_with("confirmation-") && w.is_visible().unwrap_or(false)));
+    crate::confirmation::ask(app,parent.as_ref(),title,body,confirm,cancel).await
 }
 impl Owner {
     async fn cleanup(&self) {
@@ -463,14 +462,20 @@ pub async fn file_manager_batches(window:WebviewWindow,state:State<'_,FileManage
     let owner=state.owner(&window).await?;
     let store=state.batches().await?;
     store.recover_stale(&owner.account_scope).await.map_err(|e|e.to_string())?;
-    let snapshots=store.list_visible(&owner.account_scope,100).await.map_err(|e|e.to_string())?;
+    let devices:Vec<_>=owner.devices.lock().await.values().map(|tab|tab.device).collect();
+    // Apply each device scope before the history limit, so another device's
+    // recent jobs cannot crowd this tab's records out of the result.
+    let mut snapshots=store.list_visible(&owner.account_scope,100).await.map_err(|e|e.to_string())?;
+    for device in devices {snapshots.extend(store.list_visible_for_device(&owner.account_scope,device,100).await.map_err(|e|e.to_string())?);}
+    let mut seen=std::collections::HashSet::new();snapshots.retain(|row|seen.insert(row.spec.id));
     let jobs=state.jobs.lock().await;
     Ok(snapshots.into_iter().map(|snapshot|{let runner_active=jobs.get(&snapshot.spec.id).is_some_and(|job|job.owner==owner.account_scope && job.running());BatchView {snapshot,runner_active}}).collect())
 }
 #[tauri::command]
-pub async fn file_manager_clear_completed(window:WebviewWindow,state:State<'_,FileManagerState>)->Result<Vec<String>,String> {
+pub async fn file_manager_clear_completed(window:WebviewWindow,code:String,state:State<'_,FileManagerState>)->Result<Vec<String>,String> {
     let owner=state.owner(&window).await?;
-    state.batches().await?.clear_completed(&owner.account_scope).await.map_err(|e|e.to_string())
+    let tab=owner.devices.lock().await.get(&code).cloned().ok_or("Device does not belong to this window")?;
+    state.batches().await?.clear_completed_for_device(&owner.account_scope,tab.device).await.map_err(|e|e.to_string())
 }
 #[tauri::command]
 pub async fn file_manager_retry_failed(window:WebviewWindow,state:State<'_,FileManagerState>,id:RequestId)->Result<BatchView,String> {
