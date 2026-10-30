@@ -39,7 +39,10 @@ function makeEntry(index: number, parent: NativePath, names = fixture.entryNameO
     if (command === "file_manager_tabs") return [{ code: "428358431", name: "90", os_family: "windows",generation:"10000000-0000-0000-0000-000000000090" }, { code: "559038160", name: "Company", os_family: "windows",generation:"10000000-0000-0000-0000-000000000091" }];
     if (command === "file_manager_close_tab") {if (fixture.holdTabClose)await new Promise<void>(resolve=>fixture.tabClosers.push(resolve));return null;}
     if (command === "file_manager_local_identity") return "Native local fixture user";
-    if (command === "file_manager_reveal_local") return null;
+    if (command === "file_manager_reveal_local") {
+      if ((fixture as any).failRevealLocal) throw new Error("File not found");
+      return null;
+    }
     if (command === "file_manager_link_status") return { connected: true, path: args.forceRelay ? "relay" : "p2p", rtt_ms: 12 };
     if (command === "file_manager_contexts" && new URLSearchParams(location.search).has("android")) {
       if (new URLSearchParams(location.search).has("unsupported")) throw new Error("This Android feature is not available");

@@ -116,8 +116,8 @@
 .fm-batch-item p { font-size:13px; overflow-wrap:anywhere; }
 .fm-item-error { color:#bb3030; }
 .fm-attribute-warnings { border-left:3px solid #b7791f; padding-left:10px; }
-.fm-conflict-actions { display:flex; gap:8px; }
-.fm-conflict-actions button { border-color:var(--border, #dce7e3); }
+.fm-conflict-actions, .fm-item-actions { display:flex; gap:8px; }
+.fm-conflict-actions button, .fm-item-actions button { border-color:var(--border, #dce7e3); }
 .fm-batch-dialog>footer>span { margin-right:auto; font-size:12px; }
 .fm-drop-destination { overflow-wrap:anywhere; font-size:13px; }
 .fm-drop-active { outline:2px solid #208773; outline-offset:-2px; }

@@ -424,6 +424,43 @@ test("completed file details preserve typed attribute warnings during polling", 
   await expect(dialog.getByRole("note")).toBeVisible();
   expect(await page.evaluate(() => (window as any).fixture.calls.some((call: any) => call.command === "file_manager_resolve_conflict"))).toBeFalsy();
 });
+for (const direction of ["download", "upload"] as const) {
+  test(`transfer details reveal only completed local destinations: ${direction}`, async ({ page }) => {
+    const nativeDestination = { encoding: "windows_wide", value: Buffer.from("C:\\Downloads\\中文 & report.txt", "utf16le").toString("base64") };
+    const renamedDestination = { encoding: "utf8", value: "C:\\Downloads\\中文 (1).txt" };
+    await page.evaluate(({ direction, nativeDestination, renamedDestination }) => {
+      const fixture = (window as any).fixture;
+      fixture.batches.push({ spec: { id: "reveal-batch", code: "428358431", direction }, phase: "running", intent: "run", revision: "1", total: "8", completed: "2", skipped: "1", failed: "1", cancelled: "1", size: "96", confirmed: "24", scan_complete: true, message: null });
+      fixture.items = ["completed", "completed", "transferring", "publishing", "failed", "cancelled", "skipped", "waiting_children"].map((state, index) => ({
+        spec: { id: `reveal-${index}`, relative_name: `item-${index}.txt`, source: { encoding: "utf8", value: `D:\\Remote\\item-${index}.txt` }, destination: nativeDestination, size: "12" },
+        effective_destination: index === 1 ? renamedDestination : undefined,
+        state, confirmed: state === "completed" ? "12" : "0", message: null, attempt: null,
+      }));
+    }, { direction, nativeDestination, renamedDestination });
+    await page.getByTitle("Transfer details", { exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Transfer details", exact: true });
+    await expect(dialog.locator(".fm-batch-item")).toHaveCount(8);
+    const buttons = dialog.getByRole("button", { name: "Open containing folder", exact: true });
+    await expect(buttons).toHaveCount(direction === "download" ? 2 : 0);
+    if (direction === "upload") {
+      expect(await page.evaluate(() => (window as any).fixture.calls.some((call: any) => call.command === "file_manager_reveal_local"))).toBeFalsy();
+      return;
+    }
+    // A moved/deleted local file reports an error without closing the details or blocking retry.
+    await page.evaluate(() => { (window as any).fixture.failRevealLocal = true; });
+    await buttons.first().click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    await expect(buttons.first()).toBeEnabled();
+    await page.evaluate(() => { (window as any).fixture.failRevealLocal = false; });
+    await buttons.first().click();
+    await expect(dialog.getByRole("alert")).not.toBeVisible();
+    await buttons.nth(1).click();
+    await expect(buttons.nth(1)).toBeEnabled();
+    expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "file_manager_reveal_local").map((call: any) => call.args.path))).toEqual([nativeDestination, nativeDestination, renamedDestination]);
+    await expect(dialog).toBeVisible();
+  });
+}
+
 test("task area resizes and collapses without remounting panes, and retries only the chosen batch", async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 640 });
   const scans = await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.args.operation?.action === "open_directory").length);

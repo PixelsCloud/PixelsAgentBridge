@@ -1,7 +1,7 @@
 import { userFacingError } from "./userFacingError";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderOpen, X } from "lucide-react";
 import { displayFileText, fileSize, pathLabel, type NativePath } from "./fileManagerApi";
 import { initialLanguage } from "./i18n";
 
@@ -10,11 +10,12 @@ type Item = { spec: { id: string; relative_name: string; source: NativePath; des
 const en = initialLanguage() === "en";
 const states: Record<string, string> = en ? { queued: "Queued", preparing: "Preparing", waiting_conflict: "Name conflict", waiting_children: "Waiting for child items", transferring: "Transferring", verifying: "Verifying", publishing: "Publishing", pause_requested: "Pausing…", paused: "Paused", cancel_requested: "Cancelling…", cancelled: "Cancelled", completed: "Completed", skipped: "Skipped", interrupted: "Interrupted", reconciling: "Reconciling", unconfirmed: "Unconfirmed", failed: "Failed" } : { queued: "排队中", preparing: "准备中", waiting_conflict: "名称冲突", waiting_children: "等待子项完成", transferring: "传输中", verifying: "校验中", publishing: "发布中", pause_requested: "暂停中…", paused: "已暂停", cancel_requested: "取消中…", cancelled: "已取消", completed: "已完成", skipped: "已跳过", interrupted: "已中断", reconciling: "正在核实", unconfirmed: "待确认", failed: "失败" };
 
-export function FileBatchDialog({ id, initialConflict, disabled, onClose, onChange }: { id: string; initialConflict: boolean; disabled: boolean; onClose: () => void; onChange: () => void }) {
+export function FileBatchDialog({ id, direction, initialConflict, disabled, onClose, onChange }: { id: string; direction: "upload" | "download"; initialConflict: boolean; disabled: boolean; onClose: () => void; onChange: () => void }) {
   const [filter, setFilter] = useState(initialConflict ? "waiting_conflict" : ""), [after, setAfter] = useState(0);
   const [items, setItems] = useState<Item[]>([]), [error, setError] = useState(""), [loading, setLoading] = useState(false), [pending, setPending] = useState<string | null>(null), [refresh, setRefresh] = useState(0);
   const [applyRemaining, setApplyRemaining] = useState(false);
   const [readError, setReadError] = useState("");
+  const [revealing, setRevealing] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null), changing = useRef(false), changed = useRef(onChange), closed = useRef(onClose);
   changed.current = onChange; closed.current = onClose;
   useEffect(() => {
@@ -58,6 +59,13 @@ export function FileBatchDialog({ id, initialConflict, disabled, onClose, onChan
     catch (cause) { setError(String(cause)); }
     finally { changing.current = false; setPending(null); setRefresh(value => value + 1); }
   }
+  async function revealDestination(item: Item) {
+    if (disabled || revealing !== null || direction !== "download" || item.state !== "completed") return;
+    setRevealing(item.spec.id); setError("");
+    try { await invoke("file_manager_reveal_local", { path: item.effective_destination || item.spec.destination }); }
+    catch (cause) { setError(String(cause)); }
+    finally { setRevealing(null); }
+  }
   return <div className="fm-modal-shade"><div ref={dialog} role="dialog" aria-modal="true" aria-label={en ? "Transfer details" : "传输详情"} className="fm-dialog fm-batch-dialog">
     <header><strong>{en ? "Transfer details" : "传输详情"}</strong><button title={en ? "Close details" : "关闭详情"} onClick={onClose}><X size={18} /></button></header>
     <div className="fm-batch-filter"><label>{en ? "Status" : "状态"}<select aria-label={en ? "Item status" : "项目状态"} value={filter} onChange={event => { setItems([]); setAfter(0); setFilter(event.target.value); }}><option value="">{en ? "All" : "全部"}</option>{Object.entries(states).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><span aria-live="polite">{loading ? en ? "Updating…" : "正在更新…" : ""}</span></div>
@@ -67,6 +75,7 @@ export function FileBatchDialog({ id, initialConflict, disabled, onClose, onChan
       <div><strong>{displayFileText(item.spec.relative_name)}</strong><span>{item.state === "completed" && !!item.metadata_result?.warnings.length ? en ? "Completed with attribute warnings" : "已完成，部分属性未保留" : states[item.state] || (en ? "Unknown status" : "状态未知")}</span></div>
       <small>{fileSize(item.confirmed)} / {fileSize(item.spec.size)}</small>
       <dl><dt>{en ? "Source" : "源路径"}</dt><dd>{pathLabel(item.spec.source)}</dd><dt>{en ? "Destination" : "目标路径"}</dt><dd>{pathLabel(item.effective_destination || item.spec.destination)}</dd>{item.attempt && <><dt>{en ? "Request" : "请求 ID"}</dt><dd>{item.attempt}</dd></>}</dl>
+      {direction === "download" && item.state === "completed" && <div className="fm-item-actions"><button disabled={disabled || revealing !== null} onClick={() => void revealDestination(item)}><FolderOpen size={16} />{en ? "Open containing folder" : "打开所在文件夹"}</button></div>}
       {item.message && <p className={item.state === "failed" ? "fm-item-error" : ""}>{userFacingError(item.message)}</p>}
       {!!item.metadata_result?.warnings.length && <div className="fm-attribute-warnings" role="note">{item.metadata_result.warnings.map(warning => <p key={warning.attribute}>
         <strong>{warning.attribute === "modified_time" ? en ? "Modified time" : "修改时间" : en ? "Permissions" : "文件权限"}：</strong>
