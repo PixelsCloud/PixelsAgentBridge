@@ -38,44 +38,41 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 
 [![Pixels Agent Bridge 主界面](assets/images/cn/main-cn.jpg)](assets/images/cn/main-cn.jpg)
 
-<table>
-  <tr>
-    <th width="50%">MCP 连接</th>
-    <th width="50%">任务记录</th>
-  </tr>
-  <tr>
-    <td align="center">查看 Agent 会话与工具调用</td>
-    <td align="center">回看本地任务记录</td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><a href="assets/images/cn/mcp-cn.jpg"><img src="assets/images/cn/mcp-cn.jpg" alt="MCP 连接列表与 Agent 会话详情" width="100%"></a></td>
-    <td width="50%" valign="top"><a href="assets/images/cn/activity-cn.jpg"><img src="assets/images/cn/activity-cn.jpg" alt="本地任务记录与命令执行详情" width="100%"></a></td>
-  </tr>
-  <tr>
-    <th width="50%">远程桌面</th>
-    <th width="50%">文件传输</th>
-  </tr>
-  <tr>
-    <td align="center">查看画面与接手操作</td>
-    <td align="center">浏览文件与跟踪传输</td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><a href="assets/images/cn/remote-cn.jpg"><img src="assets/images/cn/remote-cn.jpg" alt="远程桌面窗口、屏幕选择与控制工具栏" width="100%"></a></td>
-    <td width="50%" valign="top"><a href="assets/images/cn/ft-cn.jpg"><img src="assets/images/cn/ft-cn.jpg" alt="双栏文件管理与传输进度" width="100%"></a></td>
-  </tr>
-  <tr>
-    <th width="50%">远程终端</th>
-    <th width="50%">Web 管理后台</th>
-  </tr>
-  <tr>
-    <td align="center">交互式执行远程命令</td>
-    <td align="center">管理设备、流量与 Relay</td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><a href="assets/images/cn/terminal-cn.jpg"><img src="assets/images/cn/terminal-cn.jpg" alt="远程终端中的 PowerShell 交互会话" width="100%"></a></td>
-    <td width="50%" valign="top"><a href="assets/images/cn/pab-cn.jpg"><img src="assets/images/cn/pab-cn.jpg" alt="Web 后台的设备、流量与 Relay 运行概览" width="100%"></a></td>
-  </tr>
-</table>
+### MCP 连接
+
+查看 Agent 会话与工具调用
+
+[![MCP 连接列表与 Agent 会话详情](assets/images/cn/mcp-cn.jpg)](assets/images/cn/mcp-cn.jpg)
+
+### 任务记录
+
+回看本地任务记录
+
+[![本地任务记录与命令执行详情](assets/images/cn/activity-cn.jpg)](assets/images/cn/activity-cn.jpg)
+
+### 远程桌面
+
+查看画面与接手操作
+
+[![远程桌面窗口、屏幕选择与控制工具栏](assets/images/cn/remote-cn.jpg)](assets/images/cn/remote-cn.jpg)
+
+### 文件传输
+
+浏览文件与跟踪传输
+
+[![双栏文件管理与传输进度](assets/images/cn/ft-cn.jpg)](assets/images/cn/ft-cn.jpg)
+
+### 远程终端
+
+交互式执行远程命令
+
+[![远程终端中的 PowerShell 交互会话](assets/images/cn/terminal-cn.jpg)](assets/images/cn/terminal-cn.jpg)
+
+### Web 管理后台
+
+管理设备、流量与 Relay
+
+[![Web 后台的设备、流量与 Relay 运行概览](assets/images/cn/pab-cn.jpg)](assets/images/cn/pab-cn.jpg)
 
 ## 支持平台
 
