@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "rea
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ConfigProvider, Modal, theme } from "antd";
 import { ArrowDown, ArrowUp, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Maximize2, Minus, Pause, Play, X } from "lucide-react";
 import { FilePane, type PaneSelection } from "./FilePane";
 import { FileBatchDialog } from "./FileBatchDialog";
@@ -103,6 +104,9 @@ export default function FileManagerWindow() {
   const clearCompletedGate = useRef(false);
   const conflict = "ask";
   const [closeDialog, setCloseDialog] = useState(false);
+  const [modal, modalContext] = Modal.useModal();
+  const closePending = useRef(false);
+  const closeRequest = useRef<() => Promise<void>>(async () => {});
   const [details, setDetails] = useState<Batch | null>(null);
   const [dropped, setDropped] = useState<Dropped | null>(null);
   const [pendingSubmission, setPendingSubmission] = useState<Submission | null>(null);
@@ -117,6 +121,14 @@ export default function FileManagerWindow() {
   const resizeTasks = (height: number) => setTaskHeight(Math.max(95, Math.min(maxTaskHeight, height)));
   const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
   const closed = useRef(false), pollFailure = useRef(false), snapshotEpoch = useRef(0);
+  useEffect(() => {
+    let disposed = false;
+    const listener = appWindow.onCloseRequested(event => {
+      event.preventDefault();
+      if (!disposed) void closeRequest.current();
+    });
+    return () => { disposed = true; void listener.then(stop => stop()); };
+  }, [appWindow]);
   // End the window synchronously: old IPC promises may settle before React rerenders.
   // This window never adopts the next account; it must be opened with a new owner.
   const sessionEnded = useRef(false);
@@ -297,8 +309,30 @@ export default function FileManagerWindow() {
       setRemotes(current=>{const next={...current};delete next[generation];return next;});setExecutions(current=>{const next={...current};delete next[generation];return next;});
     }catch(cause){if(!sessionEnded.current)setError(String(cause));}finally{tabCloseGate.current=false;setClosingTab(null);}
   }
-  async function close() { if (closed.current) return; if (ongoing) { setCloseDialog(true); return; } closed.current = true; await appWindow.close(); }
-  return <main className="fm-window">
+  async function close() {
+    if (closed.current || closePending.current) return;
+    closePending.current = true;
+    setCloseDialog(true);
+    try {
+      const confirmed = await modal.confirm({
+        title: en ? "Close file transfer?" : "关闭文件传输？",
+        content: ongoing || starting || pendingSubmission
+          ? (en ? "This will close the file transfer window. Unfinished transfers will continue in the background. Other device connections will stay open." : "将关闭文件传输窗口，未完成的传输任务会继续在后台运行。其他设备连接将保持运行。")
+          : (en ? "This will close the file transfer window. Other device connections will stay open." : "将关闭文件传输窗口。其他设备连接将保持运行。"),
+        okText: en ? "Confirm close" : "确认关闭",
+        cancelText: en ? "Keep using" : "继续使用",
+        okButtonProps: { danger: true },
+        focusable: { autoFocusButton: "cancel" },
+      });
+      if (!confirmed) return;
+      closed.current = true;
+      // Confirmation already handled both title-bar and native close requests.
+      await appWindow.destroy();
+    } catch (cause) { closed.current = false; setError(String(cause)); }
+    finally { closePending.current = false; setCloseDialog(false); }
+  }
+  closeRequest.current = close;
+  return <ConfigProvider theme={{ algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { colorPrimary: "#218574", fontSize: 13, borderRadius: 7 } }}>{modalContext}<main className="fm-window">
     <header className="fm-titlebar" data-tauri-drag-region><div className="fm-titlebar-brand" data-tauri-drag-region><img src={brand} alt="Pixels" draggable={false} data-tauri-drag-region/></div><div className="fm-device-tabs" role="tablist" aria-label={en ? "Devices" : "设备"} onKeyDown={event=>{if (!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;const items=[...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']")],index=items.indexOf(document.activeElement as HTMLButtonElement);if (index<0)return;event.preventDefault();items[event.key==="Home"?0:event.key==="End"?items.length-1:(index+(event.key==="ArrowRight"?1:items.length-1))%items.length]?.focus();}}>{tabs.map(tab => <div key={tab.code} className="fm-device-tab" data-selected={active===tab.code}><button role="tab" aria-selected={active === tab.code} onClick={() => setActive(tab.code)}><span>{tab.name}</span><small>{tab.code}</small></button><button title={en ? `Close ${tab.name} tab` : `关闭 ${tab.name} 页签`} aria-label={en ? `Close ${tab.name} tab` : `关闭 ${tab.name} 页签`} disabled={ended || closingTab!==null} onClick={()=>void closeTab(tab)}><X size={13}/></button></div>)}</div><div className="fm-titlebar-space" data-tauri-drag-region/><nav><button title={en ? "Minimize" : "最小化"} onClick={() => void appWindow.minimize()}><Minus size={16} /></button><button title={en ? "Maximize" : "最大化"} onClick={() => void appWindow.toggleMaximize()}><Maximize2 size={15} /></button><button title={en ? "Close" : "关闭"} onClick={() => void close()}><X size={18} /></button></nav></header>
     {error && <div role="alert" className="fm-window-error">{userFacingError(error)}<button title={en ? "Dismiss" : "关闭提示"} onClick={() => setError("")}><X size={15} /></button></div>}
     {pendingSubmission && <div className="fm-submission" role="status"><span>{en ? "Confirming original submission" : "正在核实原提交"} · {pendingSubmission.code} · {pendingSubmission.id}</span><button disabled={starting || ended} onClick={() => void submit(pendingSubmission)}>{en ? "Retry original submission" : "核实原提交"}</button></div>}
@@ -316,6 +350,5 @@ export default function FileManagerWindow() {
     })}</div></section>
     {details && <FileBatchDialog id={details.spec.id} direction={details.spec.direction} initialConflict={details.phase === "waiting_conflict"} disabled={ended} onClose={() => setDetails(null)} onChange={() => { snapshotEpoch.current++; }} />}
     {dropped && <div className="fm-modal-shade"><div ref={dropForm} role="dialog" aria-modal="true" aria-label={en ? "Send dropped files" : "发送拖入的文件"} className="fm-dialog"><header><strong>{en ? "Send dropped files" : "发送拖入的文件"}</strong></header><p>{dropped.count} {en ? "files or folders" : "个文件或文件夹"} → {tabs.find(tab => tab.code === dropped.code)?.name || dropped.code}</p><p className="fm-drop-destination">{pathLabel(dropped.destination)}</p><ul>{dropped.names.map((name, index) => <li key={index}>{name}</li>)}</ul>{dropped.count > dropped.names.length && <p>…</p>}{error && <p role="alert" className="fm-error">{userFacingError(error)}</p>}<footer><button disabled={starting} onClick={() => setDropped(null)}>{en ? "Cancel" : "取消"}</button><button className="primary" disabled={starting || ended} onClick={() => void startDrop()}>{en ? "Send files" : "发送文件"}</button></footer></div></div>}
-    {closeDialog && <div className="fm-modal-shade"><div role="dialog" aria-modal="true" aria-label={en ? "Close file transfer" : "关闭文件传输"} className="fm-dialog"><header><strong>{en ? "Transfers are running" : "仍有传输任务"}</strong></header><p>{en ? "Close this window and keep transfers running in the background?" : "关闭窗口后，传输任务将继续在后台运行。"}</p><footer><button onClick={() => setCloseDialog(false)}>{en ? "Stay" : "留在此页"}</button><button className="primary" onClick={() => { closed.current = true; void appWindow.close(); }}>{en ? "Continue in background" : "后台继续"}</button></footer></div></div>}
-  </main>;
+  </main></ConfigProvider>;
 }

@@ -35,6 +35,7 @@ function makeEntry(index: number, parent: NativePath, names = fixture.entryNameO
   invoke: async (command: string, args: any = {}) => {
     fixture.calls.push({ command, args });
     if (command === "plugin:event|listen") { const ids = listeners.get(args.event) || []; listeners.set(args.event, [...ids, args.handler]); return next++; }
+    if (command === "plugin:window|destroy" && (fixture as any).failCloseWindow) throw new Error("Could not close window");
     if (command.startsWith("plugin:")) return null;
     if (command === "file_manager_tabs") return [{ code: "428358431", name: "90", os_family: "windows",generation:"10000000-0000-0000-0000-000000000090" }, { code: "559038160", name: "Company", os_family: "windows",generation:"10000000-0000-0000-0000-000000000091" }];
     if (command === "file_manager_close_tab") {if (fixture.holdTabClose)await new Promise<void>(resolve=>fixture.tabClosers.push(resolve));return null;}

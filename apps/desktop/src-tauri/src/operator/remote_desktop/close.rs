@@ -21,16 +21,16 @@ pub(super) async fn request(
     let (title, body, confirm, cancel) = if english {
         (
             "Close remote desktop?",
-            "This will disconnect the current remote desktop session.",
-            "Close connection",
-            "Cancel",
+            "This will disconnect the current remote desktop session. Other terminals and device connections will stay open.",
+            "Confirm close",
+            "Keep using",
         )
     } else {
         (
             "关闭远程桌面？",
-            "关闭后将断开本次远程桌面连接。",
-            "关闭连接",
-            "取消",
+            "将断开本次远程桌面连接。其他终端和设备连接将保持运行。",
+            "确认关闭",
+            "继续使用",
         )
     };
     // The owned app dialog remains above native video and collects input locally.

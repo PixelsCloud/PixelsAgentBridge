@@ -3,5 +3,5 @@
   "identifier": "file-manager",
   "description": "Independent authenticated file transfer windows",
   "windows": ["file-manager-*"],
-  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "core:window:allow-start-dragging"]
+  "permissions": ["core:default", "core:window:allow-close", "core:window:allow-destroy", "core:window:allow-minimize", "core:window:allow-toggle-maximize", "core:window:allow-start-dragging"]
 }

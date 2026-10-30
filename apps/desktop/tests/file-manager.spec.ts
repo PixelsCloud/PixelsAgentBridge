@@ -50,6 +50,67 @@ test("ETA stays unknown while scanning or awaiting publication and formats bound
 });
 test.beforeEach(async ({ page }) => { await page.goto("http://127.0.0.1:1429/tests/file-manager.html"); await expect(page.getByRole("region", { name: "This computer", exact: true }).getByRole("status")).toContainText("100000 items"); });
 
+test("file window close always asks in-app and native close shares the same confirmation", async ({ page }) => {
+  const nativeDialogs: string[] = [];
+  page.on("dialog", async dialog => { nativeDialogs.push(dialog.type()); await dialog.dismiss(); });
+  const closeCalls = () => page.evaluate(() => (window as any).fixture.calls.filter((call: any) => ["plugin:window|destroy", "plugin:window|close"].includes(call.command)).length);
+  await page.getByTitle("Close", { exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Close file transfer?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Keep using" })).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Confirm close" })).toHaveClass(/danger/);
+  await page.evaluate(() => (window as any).fixture.emit("tauri://close-requested", null));
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  expect(await closeCalls()).toBe(0);
+  await page.evaluate(() => (window as any).fixture.emit("tauri://close-requested", null));
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Keep using" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await closeCalls()).toBe(0);
+  await page.getByTitle("Close", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Confirm close" }).click();
+  await expect.poll(closeCalls).toBe(1);
+  expect(nativeDialogs).toEqual([]);
+});
+
+test("file window close preserves background transfers and can retry a failed close", async ({ page }) => {
+  await page.evaluate(() => {
+    const fixture = (window as any).fixture;
+    fixture.failCloseWindow = true;
+    fixture.batches.push({ spec: { id: "close-running", code: "428358431", direction: "download" }, phase: "running", intent: "run", revision: "1", total: "1", completed: "0", skipped: "0", failed: "0", cancelled: "0", size: "12", confirmed: "0", scan_complete: true, message: null });
+  });
+  await expect(page.getByTitle("Pause", { exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).fixture.emit("tauri://close-requested", null));
+  const dialog = page.getByRole("dialog", { name: "Close file transfer?" });
+  await expect(dialog).toContainText("Unfinished transfers will continue in the background");
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: "../../.build/file-manager-close-confirmation.png", animations: "disabled" });
+  await dialog.getByRole("button", { name: "Confirm close" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await page.evaluate(() => { (window as any).fixture.failCloseWindow = false; });
+  await page.getByTitle("Close", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Confirm close" }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "plugin:window|destroy").length)).toBe(2);
+  expect(await page.evaluate(() => (window as any).fixture.calls.filter((call: any) => call.command === "file_manager_batch_intent"))).toEqual([]);
+  expect(await page.evaluate(() => (window as any).fixture.batches[0].phase)).toBe("running");
+});
+
+for (const appearance of ["light", "dark"]) test(`file window close uses Chinese app confirmation in ${appearance} mode`, async ({ page }) => {
+  await page.addInitScript(appearance => { localStorage.setItem("pab.language", "zh-CN"); localStorage.setItem("pab.theme", appearance); }, appearance);
+  await page.reload();
+  await page.getByTitle("关闭", { exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "关闭文件传输？" });
+  await expect(dialog.getByRole("button", { name: "继续使用" })).toBeFocused();
+  await expect(dialog).toContainText("其他设备连接将保持运行");
+  await expect(dialog.getByRole("button", { name: "确认关闭" })).toHaveClass(/danger/);
+  await page.screenshot({ path: `../../.build/file-manager-close-${appearance}.png`, animations: "disabled" });
+  await dialog.getByRole("button", { name: "继续使用" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 test("directory invalidation compares native components including raw names and Windows wide paths", () => {
   const wide = (value: string) => ({ encoding: "windows_wide" as const, value: Buffer.from(value, "utf16le").toString("base64") });
   const raw = (values: number[]) => ({ encoding: "unix_bytes" as const, value: Buffer.from(values).toString("base64") });

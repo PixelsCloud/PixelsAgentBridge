@@ -9,7 +9,7 @@ const fixture = (window as any).fixture = { calls: [] as any[], hold: false, rel
     fixture.calls.push({ command, args });
     if (command === "confirmation_info") return english
       ? { title: "Take over remote desktop?", body: "This device is being controlled by another session. Taking over will disconnect that session and release its held keys and mouse buttons.", confirm: "Take over", cancel: "Cancel" }
-      : { title: "关闭远程桌面？", body: "关闭后将断开本次远程桌面连接。", confirm: "关闭连接", cancel: "取消" };
+      : { title: "关闭远程桌面？", body: "将断开本次远程桌面连接。其他终端和设备连接将保持运行。", confirm: "确认关闭", cancel: "继续使用" };
     if (command === "confirmation_answer" && fixture.hold) await new Promise<void>(resolve => { fixture.release = resolve; });
     return null;
   },
