@@ -5,6 +5,7 @@ import java.io.InputStream
 
 fun interface AtomicFilePublisher {
     fun publish(source: File, destination: File, replace: Boolean)
+
     fun publishBound(source: File, destination: File, replace: Boolean, parentIdentity: String) {
         throw StorageFailure("bound_publication_unavailable")
     }

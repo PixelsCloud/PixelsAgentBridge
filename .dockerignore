@@ -8,6 +8,7 @@ smoke/runs/
 smoke/tmp/
 docs/
 references/
+.references/
 target/
 **/target/
 **/node_modules/
@@ -53,6 +54,8 @@ AGENTS.md
 !/design/brand/
 /logs/
 /coscli_output/
+/.logs/
+/.coscli_output/
 
 # Consolidated local originals and private signing material.
 /BROWSER_AUTOMATION.md

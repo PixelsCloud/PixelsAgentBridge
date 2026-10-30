@@ -8,8 +8,6 @@ import com.pixels.agent.core.StorageMounts
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
-import java.nio.file.LinkOption
-import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -119,7 +117,8 @@ internal class WorkspaceEntry(
         if (!target.delete()) throw StorageFailure("delete_failed")
     }
 
-    override fun bindParent(identity: String): StorageEntry = WorkspaceEntry(root, file, publisher, identity)
+    override fun bindParent(identity: String): StorageEntry =
+        WorkspaceEntry(root, file, publisher, identity)
 
     override fun rename(name: String, checkpoint: () -> Unit) {
         if (!StorageMounts.validName(name)) throw StorageFailure("invalid_path")

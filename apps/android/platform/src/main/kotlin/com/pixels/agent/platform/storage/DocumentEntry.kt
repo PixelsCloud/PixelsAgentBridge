@@ -257,7 +257,8 @@ internal class DocumentEntry(
     }
 
     override fun bindParent(identity: String): StorageEntry {
-        if (parent?.metadata()?.identity != identity) throw StorageFailure("destination_parent_changed")
+        if (parent?.metadata()?.identity != identity)
+            throw StorageFailure("destination_parent_changed")
         // Keep this resolved parent document URI through staging and publication.
         parent.actual()
         return this
@@ -271,11 +272,14 @@ internal class DocumentEntry(
         val uri = actual()
         checkpoint()
         try {
-            val result = DocumentsContract.renameDocument(resolver, uri, name)
-                ?: throw StorageFailure("publication_unconfirmed")
+            val result =
+                DocumentsContract.renameDocument(resolver, uri, name)
+                    ?: throw StorageFailure("publication_unconfirmed")
             if (DocumentEntry(resolver, tree, result).metadata().name != name)
                 throw StorageFailure("publication_name_conflict")
-        } catch (_: Exception) { throw StorageFailure("publication_unconfirmed") }
+        } catch (_: Exception) {
+            throw StorageFailure("publication_unconfirmed")
+        }
     }
 
     override fun delete(checkpoint: () -> Unit) {

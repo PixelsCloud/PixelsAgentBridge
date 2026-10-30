@@ -1,5 +1,6 @@
 /.env/
 /references/
+/.references/
 /docs/*
 !/docs/USAGE_AND_SELF_HOSTING.md
 !/docs/FIRST_VERSION.md
@@ -76,6 +77,8 @@ test-results/
 playwright-report/
 /logs/
 /coscli_output/
+/.logs/
+/.coscli_output/
 .DS_Store
 Thumbs.db
 .env

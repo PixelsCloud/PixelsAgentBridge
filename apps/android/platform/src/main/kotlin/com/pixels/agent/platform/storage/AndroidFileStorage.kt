@@ -206,12 +206,26 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
     fun execute(input: JSONObject, checkpoint: () -> Unit = {}): JSONObject {
         checkpoint()
         val path = input.getString("path")
-        if (input.getString("action") == "managed_context") return JSONObject().put("identity", JSONObject()
-            .put("mode", "service").put("account_id", "uid:${android.os.Process.myUid()}").put("account_name", application.packageName)
-            .put("home", "/workspace").put("primary_group", android.system.Os.getgid()).put("session_id", JSONObject.NULL)
-            .put("logon_id", JSONObject.NULL).put("environment_source", "service_process"))
+        if (input.getString("action") == "managed_context")
+            return JSONObject()
+                .put(
+                    "identity",
+                    JSONObject()
+                        .put("mode", "service")
+                        .put("account_id", "uid:${android.os.Process.myUid()}")
+                        .put("account_name", application.packageName)
+                        .put("home", "/workspace")
+                        .put("primary_group", android.system.Os.getgid())
+                        .put("session_id", JSONObject.NULL)
+                        .put("logon_id", JSONObject.NULL)
+                        .put("environment_source", "service_process"),
+                )
         if (input.getString("action") == "managed")
-            return managed.execute(input.getJSONObject("operation"), input.getString("filesystem_scope"), checkpoint)
+            return managed.execute(
+                input.getJSONObject("operation"),
+                input.getString("filesystem_scope"),
+                checkpoint,
+            )
         if (input.getString("action") == "managed_list") return managed.listing(path)
         if (input.getString("action") == "check_staging") {
             checkStaging(input.getLong("additional_bytes"))
@@ -236,7 +250,10 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
                 )
                 .put("has_more", names.size > limit)
         }
-        val entry = input.optJSONObject("destination_parent")?.let { managed.boundTarget(path, it.getString("identity")) } ?: mounts.resolve(path)
+        val entry =
+            input.optJSONObject("destination_parent")?.let {
+                managed.boundTarget(path, it.getString("identity"))
+            } ?: mounts.resolve(path)
         return when (input.getString("action")) {
             "check_upload" -> {
                 val existing =
@@ -334,7 +351,9 @@ class AndroidFileStorage(context: Context, private val publisher: AtomicFilePubl
                 try {
                     val actual = entry.metadata()
                     JSONObject().put("metadata", metadataJson(actual)).also { result ->
-                        input.optJSONObject("transfer_metadata")?.let { result.put("metadata_result", managed.metadataResult(it, actual)) }
+                        input.optJSONObject("transfer_metadata")?.let {
+                            result.put("metadata_result", managed.metadataResult(it, actual))
+                        }
                     }
                 } catch (_: Exception) {
                     throw StorageFailure("publication_unconfirmed")
