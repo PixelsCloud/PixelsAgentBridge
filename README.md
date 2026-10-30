@@ -63,19 +63,19 @@ Ask DeepSeek Harness to check a remote device's CPU and memory usage through Pix
 
 ## What it can do
 
-- **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text clipboard sync. Sessions start in view-only mode; enable control when needed.
+- **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text/PNG image clipboard sync. Choose a 15/30/60 FPS limit (30 by default); the local pointer follows the remote cursor shape. Sessions start in view-only mode, and taking over an occupied session requires confirmation.
 - **Commands and terminals:** run programs, use independent interactive terminal windows, and read task output. Windows also provides a System terminal where supported.
-- **Files:** upload, download, search, edit, copy, and archive files, with background transfers and progress tracking.
+- **Files:** a separate two-pane file-transfer window with device tabs, file/folder transfers, progress, speed and elapsed time. Resolve name conflicts by replacing, skipping or keeping both, optionally applying the choice to remaining conflicts in that transfer. MCP also supports file search, editing, copying and archiving.
 - **Desktop automation:** capture JPEG screenshots, inspect windows and UI controls, and send mouse and keyboard input on Windows and macOS.
 - **System and development tools:** inspect system resources, processes, and networks; work with supported service, Git, and Docker operations.
 - **Documents and browsers:** extract and search documents, render supported formats, run offline OCR, and automate a Pixels-managed browser. Agents can request human help when a task requires it.
-- **Android target devices:** use supported accessibility, screenshot, file, application, notification, command, and network tools within Android's permission boundaries.
+- **Android target devices:** use supported accessibility, screenshot, file, application, notification, command, and network tools. Desktop file-transfer and terminal windows use the Android app's identity and granted access; they do not provide root or ADB-shell privileges.
 - **Desktop app:** manage devices, view local task history, and monitor each agent's MCP connections. Includes English, Simplified Chinese, and light/dark themes.
 - **Accounts and Web console:** sign in, manage users and devices, and operate Relay nodes with capacity settings, connection monitoring, maintenance, and disable/resume controls. Task history stays local and is not uploaded to the server.
 
 Desktop automatically detects and configures installed **Codex, Kimi Code, Claude Code, DeepSeek Harness, and OpenCode** clients at startup. Missing clients are skipped, existing configuration is preserved, and integrations you disable stay disabled. Other clients and headless installations can use the stdio MCP entry point.
 
-See the [first-version feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the complete workflow and platform limits. This README describes the current source; the features available in an installed package depend on its release.
+See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the complete workflow and platform limits. This README describes the current source; the features available in an installed package depend on its release.
 
 ## Supported platforms
 
@@ -91,7 +91,7 @@ Remote desktop viewing and control are provided by the Windows, macOS, and Linux
 
 ## Quick start
 
-1. **Install and sign in.** Install the appropriate package on the operator and target devices, using the same control server, then sign in on the operator. Downloads are available on the [project website](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest). See [installation and packaging](packaging/desktop/README.md), [Linux desktop](packaging/desktop/linux-desktop/README.md), or [headless Linux setup](packaging/desktop/unix/INSTALL-LINUX.txt).
+1. **Install and sign in.** Install the appropriate package on the operator and target devices, using the same control server, then sign in on the operator. Downloads are available on the [unified GitHub Release](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest). See [installation and packaging](packaging/desktop/README.md), [Linux desktop](packaging/desktop/linux-desktop/README.md), or [headless Linux setup](packaging/desktop/unix/INSTALL-LINUX.txt).
 2. **Save a connection.** Find the target's nine-digit device code and password in its app, or use `show-access` on headless Linux. Enter them in the operator's connection form and connect once. MCP then uses the saved credentials.
 3. **Use your agent.** Desktop configures detected supported clients automatically. Start a new agent session or restart the client to load MCP. **Settings → AI Agent** provides status, repair and disable controls; live sessions appear under **MCP connections**. Headless Linux uses manual MCP registration.
 4. **Give it a task:**
@@ -110,7 +110,7 @@ When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in witho
 
 Your agent calls a local MCP process, which connects to the target device's Executor. The control server handles device discovery and authentication; operation data travels over P2P when available, with Relay fallback.
 
-Each MCP maintains its own connections. Desktop shows their activity and local history. Multiple agents can use the same device, but a target permits only one remote desktop viewer at a time, and operations on shared files or the same desktop still need coordination. Remote desktop uses the existing reliable transport and device authentication.
+Each MCP maintains its own connections. Desktop shows their activity and local history. A target permits only one remote desktop viewer at a time; on supported versions, an authenticated operator can confirm a takeover that disconnects the previous viewer. Operations on shared files or the same desktop still need coordination. Remote desktop uses the existing reliable transport and device authentication.
 
 ## Build and self-host
 
@@ -125,11 +125,11 @@ python scripts/build.py desktop --profile release --package
 
 Packages are written to `.build/packages/`. Installer versions increment automatically; internal component versions remain independent, and builds reuse cached artifacts.
 
-For your own server, follow the [Web deployment guide](docs/WEB_DEPLOYMENT.md) and [Docker Compose instructions](packaging/docker/README.md). The management platform, Relay and clients have independent release versions. Configure both the control and Relay addresses; custom services override compiled defaults. Project-owned configuration uses TOML. See the [configuration reference](docs/CONFIGURATION.md) for service switching and Relay CA trust.
+For your own server, follow the [Web deployment guide](docs/WEB_DEPLOYMENT.md) and [Docker Compose instructions](packaging/docker/README.md). The management platform (Server + Web), Relay and clients retain independent component versions and are downloaded from one [GitHub Release](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest). Configure both the control and Relay addresses; custom services override compiled defaults. Project-owned configuration uses TOML. See the [configuration reference](docs/CONFIGURATION.md) for service switching and Relay CA trust.
 
 ## More documentation
 
-- [First-version features and usage (Chinese)](docs/FIRST_VERSION.md)
+- [Features and usage (Chinese)](docs/FIRST_VERSION.md)
 - [Usage and self-hosting guide (Chinese)](docs/USAGE_AND_SELF_HOSTING.md) (kept in sync with the website documentation)
 - [Builds and versioning](BUILDING.md)
 - [Configuration reference](docs/CONFIGURATION.md)

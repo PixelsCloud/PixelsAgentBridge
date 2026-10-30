@@ -12,6 +12,10 @@
 - [添加设备](#devices)
 - [接入 AI Agent](#agents)
 - [完成第一个任务](#first-task)
+- [独立文件传输](#file-transfer)
+- [远程桌面与图片剪贴板](#remote-desktop)
+- [远程终端与 Android 权限](#remote-terminal)
+- [下载与升级](#client-updates)
 - [部署您自己的服务](#self-hosting)
 - [准备配置与证书](#deploy-config)
 - [构建、启动与初始化](#deploy-start)
@@ -125,7 +129,7 @@ curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://br
 
 ## 接入 AI Agent
 
-打开 Desktop 的「设置 → AI Agent」，找到您使用的客户端并点击「一键启用」。目前支持 Codex、Claude Code、Kimi Code、DeepSeek Harness 和 OpenCode。启用后重启客户端或新建会话，让它加载 MCP 配置。
+Desktop 启动时自动检测并配置已安装的 Codex、Claude Code、Kimi Code、DeepSeek Harness 和 OpenCode，保留已有配置和主动关闭的接入。新建 Agent 会话或重启客户端以加载 MCP；「设置 → AI Agent」可查看状态、修复、启用或关闭接入。
 
 - Codex
 - Claude Code
@@ -145,6 +149,62 @@ curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://br
 
 连接成功后，可继续让 Agent 执行命令、传输文件或操作桌面。不同平台与权限下可用功能可能不同。
 
+<a id="file-transfer"></a>
+
+## 独立文件传输
+
+从设备菜单打开「文件传输」，无需先连接远程桌面。左侧是本机，右侧是目标设备；多个设备使用不同标签页。
+
+1. 分别打开源目录和目标目录。使用路径面包屑导航，点击编辑图标输入路径，或在路径右侧下拉框选择磁盘和常用目录。
+2. 选中本机文件或文件夹后点击「发送」，写入右侧当前目录；选中远端项目后点击「接收」，写入左侧当前目录。
+3. 下方任务列表分别显示进度、速度、用时、项目数和状态。按任务状态暂停、继续或取消；打开「详情」可按状态筛选并翻页查看项目。
+4. 同名冲突默认询问，可选择「替换」「跳过」或「保留两者」。勾选「对本次传输后续所有冲突应用此选择」后，仅当前批次沿用该选择；其他传输仍会询问。
+5. 「清理已完成」清理已确认完成的传输记录，可包含跳过的项目；失败和未完成的任务保留，已传输文件不会删除。
+
+目录工具栏提供搜索、隐藏文件、刷新和新建文件夹等操作。远端设备名后显示实际 P2P／Relay 路径及可用的延迟信息。
+
+本机使用当前 Desktop 用户；远端计算机使用可用的已登录桌面用户。没有可用用户时请按提示登录并解锁，程序不会静默改用后台服务身份。Android 则使用应用自身身份和已授权目录。
+
+<a id="remote-desktop"></a>
+
+## 远程桌面与图片剪贴板
+
+从设备菜单打开「远程桌面」，默认只查看。确认目标后点击「启用操作」发送键盘和鼠标输入；需要输入时先聚焦远程画面。
+
+- 可切换显示器、全屏和 15／30／60 FPS 上限，默认 30 FPS。实际帧率取决于画面变化、设备和网络条件，上限不是固定帧率保证。
+- 鼠标使用操作端本机指针，远端同步指针样式和点击热点。连接状态可查看 P2P／Relay；统计面板用于检查媒体和输入状态。
+- macOS 屏幕录制与辅助功能需要正常系统授权。锁屏、登录画面和安全桌面的可用性取决于平台、辅助服务和权限。
+
+### 复制文字、截图和图片
+
+启用操作并开启剪贴板同步后，在当前操作的查看窗口同步文字和图片。复制截图或图片后，在远端应用的可粘贴区域粘贴；也可从远端反向复制图片。图片使用 PNG 无损压缩，保留透明度。
+
+单张 PNG 上限 32 MiB，解码像素数据上限 64 MiB。超限、不支持或同步失败会显示提示；文件和富文本不在此同步范围内，传文件请用文件传输窗口。Android 暂不支持此桌面剪贴板同步。
+
+### 接管已占用的会话
+
+同一目标同时只允许一个远程桌面查看者。已有会话时会询问是否强制接管；明确确认后断开原查看者，取消则保留原会话。被控端未支持接管时，请关闭原会话或升级。接管不会绕过设备认证、系统登录或权限。
+
+<a id="remote-terminal"></a>
+
+## 远程终端与 Android 权限
+
+在设备菜单打开「远程终端」，使用目标系统提供的 Shell。Windows 在支持的环境下另提供 System 终端；结束终端会结束该 Shell 及其运行的程序，不等于断开其他终端或设备连接。
+
+Android 可从电脑 Desktop 打开文件传输和终端窗口，使用应用自身 UID，不是 Root、ADB shell 或 Windows Console 用户。文件访问限应用工作区和系统选择器已授权目录；只读权限和授权撤销仍然生效。
+
+Android 终端使用 /workspace 等实际可访问的工作目录；系统选择器授权的 /shared-… 目录通过文件工具访问，不能直接当作终端的 POSIX 工作目录。未提供的功能会显示暂无此功能或相应权限提示。
+
+<a id="client-updates"></a>
+
+## 下载与升级
+
+客户端、管理服务（Server + Web）和 Relay 在同一个 GitHub Release 下载，各组件保留实际版本号。请选择正确的平台和架构；有界面客户端、Linux 无界面服务器包和服务端分别列出。
+
+[打开统一发布页](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest)
+
+Windows、macOS 两种架构、Linux 桌面和 Linux 无界面包提供对应的签名稳定更新渠道。Linux 官网一行安装仅用于无界面服务器包；桌面版使用 DEB。Android 使用相同签名的新 APK 覆盖升级，保留应用数据、设备身份和已有授权，不卸载或清除数据。
+
 <a id="self-hosting"></a>
 
 ## 部署您自己的服务
@@ -162,6 +222,10 @@ curl -fsSL https://agent.rgaa.vip/install.sh | bash -s -- --control-url wss://br
 ### PostgreSQL
 
 持久保存账号、设备和管理数据。任务与文件仍留在本地。
+
+管理服务（包含 Web）与 Relay 的 Windows ZIP、Linux tar.gz 和客户端安装包统一放在同一个发布页面，各组件保留实际版本号。下载服务端安装包与部署运行服务是两个步骤，请按目标环境的部署指南安装并保留原有配置和数据。
+
+[下载客户端、管理服务与 Relay](https://github.com/PixelsCloud/PixelsAgentBridge/releases/latest)
 
 也可在原生 Windows 上直接运行 pab-server.exe 和 pab-relay-server.exe，不需要 WSL；PostgreSQL 可放在其他机器。原生服务安装、版本替换及回退见专项指南。
 
