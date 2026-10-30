@@ -62,7 +62,13 @@ export async function fileRequest(endpoint: string, execution: ExecutionSelectio
   try {
     let frame: FileFrame;
     try { frame = await invoke<FileFrame>("file_manager_request", { endpoint, requestId, operation, execution, forceRelay }); }
-    catch (cause) { throw new FileRequestError(`${String(cause)} · ${requestId}`, requestId, true); }
+    catch (cause) {
+      const admission = cause && typeof cause === "object" ? cause as { message?: unknown; admitted?: unknown } : null;
+      const message = typeof admission?.message === "string" ? admission.message : String(cause);
+      // Only an explicit rejection before admission permits another mutation.
+      // Lost IPC replies and legacy string errors retain the original request ID.
+      throw new FileRequestError(`${message} · ${requestId}`, requestId, admission?.admitted !== false);
+    }
     accepted = true;
     if (signal?.aborted) cancel();
     while (["running", "cancel_requested"].includes(frame.state)) {

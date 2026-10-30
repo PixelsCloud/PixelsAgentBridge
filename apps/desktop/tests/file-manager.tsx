@@ -93,6 +93,10 @@ function makeEntry(index: number, parent: NativePath, names = fixture.entryNameO
     if (command === "file_manager_path") { if (args.path.encoding !== "utf8") return null; if (/^(?:\\\\\?\\)?[a-z]:\\$/i.test(args.path.value)) return null; const value = args.path.value.replace(/\\[^\\]+\\?$/, ""); return utf8Path(/[a-z]:$/i.test(value) ? value + "\\" : value.length >= 3 ? value : "C:\\"); }
     if (command === "file_manager_request") {
       const op: FileOperation = args.operation, id: string = args.requestId;
+      if (op.action === "create_directory") {
+        if (op.name.value.includes("/")) throw { message: "expected a single native filename", admitted: false };
+        if ((fixture as any).rejectMutationBusy) { (fixture as any).rejectMutationBusy = false; throw { message: "File window is busy", admitted: false }; }
+      }
       const currentNativeReference = `user-${args.forceRelay ? "relay" : "auto"}${(fixture as any).nativeGeneration ? `-${(fixture as any).nativeGeneration}` : ""}`;
       if (args.endpoint !== "local" && args.execution?.mode === "user" && op.action !== "close_directory" && ((fixture as any).rejectNativeReads || args.execution.context_ref !== currentNativeReference)) throw new Error('Executor returned an unexpected task response: Error { code: EnvironmentChanged, message: "unknown execution context; query available contexts again" }');
       let result: any;

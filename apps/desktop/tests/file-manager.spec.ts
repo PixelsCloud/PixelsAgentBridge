@@ -802,3 +802,39 @@ test("transfer history, counts and clear completed belong only to the selected d
   await expect(page.locator('.fm-task')).toHaveCount(2);
   await expect(page.locator('.fm-tasks > header')).toContainText('1 active');
 });
+
+
+test("switching to a device with a waiting conflict opens its dialog", async ({ page }) => {
+  await page.evaluate(() => {
+    const f = (window as any).fixture;
+    f.batches.push({spec:{id:'other-conflict',code:'559038160',direction:'upload'},phase:'waiting_conflict',intent:'run',revision:'1',total:'1',completed:'0',skipped:'0',failed:'0',cancelled:'0',size:'12',confirmed:'0',scan_complete:true,message:null});
+    f.items.push({spec:{id:'other-item',relative_name:'other.txt',source:{encoding:'utf8',value:'C:/other.txt'},destination:{encoding:'utf8',value:'D:/other.txt'},size:'12'},state:'waiting_conflict',confirmed:'0',message:null,attempt:null});
+  });
+  // Let the background poll observe the other device before changing tabs.
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c:any)=>c.command==='file_manager_batches').length)).toBeGreaterThan(2);
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.getByRole('tab', {name:/Company/}).click();
+  const dialog = page.getByRole('dialog', {name:'Transfer details',exact:true});
+  await expect(dialog.getByText('other.txt',{exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  const polls = await page.evaluate(() => (window as any).fixture.calls.filter((c:any)=>c.command==='file_manager_batches').length);
+  await expect.poll(() => page.evaluate(() => (window as any).fixture.calls.filter((c:any)=>c.command==='file_manager_batches').length)).toBeGreaterThan(polls+1);
+  await expect(dialog).not.toBeVisible();
+});
+
+for (const rejection of ['invalid name', 'capacity']) {
+  test(`pre-admission ${rejection} rejection allows a corrected file mutation`, async ({page}) => {
+    const local = page.getByRole('region',{name:'This computer',exact:true});
+    if (rejection === 'capacity') await page.evaluate(() => { (window as any).fixture.rejectMutationBusy = true; });
+    await local.getByTitle('New folder',{exact:true}).click();
+    const dialog = page.getByRole('dialog',{name:'New folder',exact:true});
+    await dialog.getByRole('textbox',{name:'Name',exact:true}).fill(rejection === 'invalid name' ? 'bad/name' : 'good-name');
+    await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await expect(dialog.getByRole('button',{name:'Inspect original request',exact:true})).not.toBeVisible();
+    await dialog.getByRole('textbox',{name:'Name',exact:true}).fill('corrected-name');
+    await expect(dialog.getByRole('button',{name:'Confirm',exact:true})).toBeEnabled();
+    await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
+    await expect(dialog).not.toBeVisible();
+  });
+}

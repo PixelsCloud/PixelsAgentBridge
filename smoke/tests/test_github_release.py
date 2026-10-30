@@ -284,7 +284,7 @@ class AndroidAndContainerTests(unittest.TestCase):
                 build_android.release_version_code(invalid)
 
     def test_android_missing_signing_material_fails_before_build_or_device_access(self):
-        with patch.object(build_android, 'native') as native, patch.object(build_android, 'install_updates') as install:
+        with patch.object(build_android, 'native') as native, patch.object(build_android, 'build_device_release') as install:
             with self.assertRaisesRegex(ValueError, 'existing keystore'):
                 build_android.build_release('1.2.3', {})
             native.assert_not_called()
@@ -300,7 +300,7 @@ class AndroidAndContainerTests(unittest.TestCase):
                 PAB_ANDROID_CERT_SHA256='a'*64, ANDROID_HOME=str(root))
             with patch.object(build_android, 'native') as native, \
                  patch.object(build_android, 'prepare_verifier'), patch.object(build_android, 'prepare_document_runtime'), \
-                 patch.object(build_android, 'run') as run, patch.object(build_android, 'install_updates') as install, \
+                 patch.object(build_android, 'run') as run, patch.object(build_android, 'build_device_release') as install, \
                  patch.object(build_android, 'next_version_code', side_effect=AssertionError('must not query a phone')), \
                  patch.object(build_android.subprocess, 'run', return_value=SimpleNamespace(stdout='Signer #1 certificate SHA-256 digest: '+'a'*64+'\n')):
                 build_android.build_release('1.2.3', env)
@@ -308,8 +308,8 @@ class AndroidAndContainerTests(unittest.TestCase):
                 self.assertTrue(all(c.kwargs['profile']=='release' for c in native.call_args_list))
                 self.assertIn(':app:assembleRelease', run.call_args.args[0])
                 self.assertIn(':core:test', run.call_args.args[0])
-                self.assertIn('testDebugUnitTest', run.call_args.args[0])
-                self.assertNotIn('testReleaseUnitTest', run.call_args.args[0])
+                self.assertNotIn('testDebugUnitTest', run.call_args.args[0])
+                self.assertIn('testReleaseUnitTest', run.call_args.args[0])
                 self.assertIn('-PpixelsVersionCode=10203', run.call_args.args[0])
                 install.assert_not_called()
 

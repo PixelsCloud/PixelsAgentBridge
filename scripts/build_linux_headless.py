@@ -3,12 +3,13 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+from build_profile import apply_release_preset
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def command(profile, jobs):
-    if profile not in ('debug', 'release') or not 1 <= jobs <= 10:
+    if profile != 'release' or not 1 <= jobs <= 10:
         raise ValueError('Invalid profile or build budget')
     flags = '--release' if profile == 'release' else ''
     return f'''set -eu
@@ -37,8 +38,10 @@ def defaults_arguments():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', choices=('debug', 'release'), default='release')
+    parser.add_argument('--profile', choices=('release',), default='release')
+    parser.add_argument('--preset', choices=('fast', 'optimized'))
     args = parser.parse_args()
+    apply_release_preset(os.environ, args.preset)
     jobs = max(1, min(10, int(os.environ.get('CARGO_BUILD_JOBS', '10'))))
     image = 'pab-linux-headless-build-deps:bullseye'
     subprocess.run(['docker', 'build', '--target', 'dependencies', '-t', image, '-f',
@@ -47,7 +50,7 @@ def main():
                     f'type=bind,source={ROOT},target=/src', '--workdir', '/src',
                     '--env', 'CARGO_HOME=/src/.build/linux-cargo-home',
                     '--env', 'CARGO_TARGET_DIR=/src/.build/linux-target-bullseye',
-                    '--env', 'CARGO_INCREMENTAL=0', '--env', f'CARGO_BUILD_JOBS={jobs}',
+                    '--env', f'CARGO_INCREMENTAL={os.environ["CARGO_INCREMENTAL"]}', '--env', f'CARGO_BUILD_JOBS={jobs}',
                     '--env', 'PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
                     *release_profile_arguments(), *defaults_arguments(), image, 'sh', '-c', command(args.profile, jobs)], check=True)
 

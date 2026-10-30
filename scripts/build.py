@@ -9,6 +9,7 @@ import sys
 
 from build_version import build_lock, reserve_product_version, product_for_target, record_artifacts, macos_artifacts, macos_app_version, parse_version
 from service_products import BINARIES, artifacts as service_artifacts
+from build_profile import apply_release_preset
 
 ROOT = Path(__file__).resolve().parents[1]
 CARGO_TARGET = Path(os.environ.get('CARGO_TARGET_DIR', ROOT / 'target')).resolve()
@@ -72,7 +73,8 @@ def build_macos(version, profile, architectures, package, installer_identity=Non
 def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('targets', nargs='+', choices=['desktop', 'management', 'relay', 'server', 'web', 'desktop-web', 'docker-management', 'docker-relay', 'docker', 'linux', 'macos', 'dsh-pab'])
-    parser.add_argument('--profile', choices=['debug', 'release'], default='debug')
+    parser.add_argument('--profile', choices=['release'], default='release')
+    parser.add_argument('--preset', choices=['fast', 'optimized'], help='Fast Release for daily testing; optimized for publication')
     parser.add_argument('--package', action='store_true', help='Also package desktop/service artifacts; does not increment again')
     parser.add_argument('--image', help='Override the image tag for one Docker target')
     parser.add_argument('--macos-arch', choices=['native', 'arm64', 'aarch64', 'x86_64', 'all'], default=None)
@@ -80,6 +82,7 @@ def main():
     parser.add_argument('--release-version', help='Explicit CI product version; never increments local counters')
     parser.add_argument('--macos-installer-identity', help='Developer ID Installer identity for the macOS PKG')
     args = parser.parse_args()
+    apply_release_preset(os.environ, args.preset, publication=bool(args.release_version))
     if args.release_version:
         parse_version(args.release_version)
         products = {product_for_target(target) for target in args.targets}

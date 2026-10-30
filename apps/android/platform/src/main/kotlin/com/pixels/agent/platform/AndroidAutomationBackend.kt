@@ -318,26 +318,34 @@ class AndroidAutomationBackend(private val context: Context) : AutomationBackend
                     )
                 if (!changed) return@nodeAction failure(AutomationError.UNCONFIRMED)
                 val caret = minOf(start, end) + text.length
-                if (!node.refresh()) return@nodeAction failure(AutomationError.UNCONFIRMED)
-                // ACTION_SET_TEXT normally moves the caret to the end. Avoid a second
-                // action when this is already the requested insertion position.
-                if (
-                    node.text?.toString() == replacement &&
-                        node.textSelectionStart == caret &&
-                        node.textSelectionEnd == caret
+                com.pixels.agent.core.confirmTextInsertion(
+                    replacement,
+                    caret,
+                    read = {
+                        if (node.refresh())
+                            com.pixels.agent.core.TextInsertionObservation(
+                                node.text?.toString(),
+                                node.textSelectionStart,
+                                node.textSelectionEnd,
+                            )
+                        else null
+                    },
+                    moveCaret = {
+                        node.performAction(
+                            AccessibilityNodeInfo.ACTION_SET_SELECTION,
+                            Bundle().apply {
+                                putInt(
+                                    AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,
+                                    caret,
+                                )
+                                putInt(
+                                    AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,
+                                    caret,
+                                )
+                            },
+                        )
+                    },
                 )
-                    return@nodeAction acknowledgement(true)
-                if (
-                    node.performAction(
-                        AccessibilityNodeInfo.ACTION_SET_SELECTION,
-                        Bundle().apply {
-                            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, caret)
-                            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, caret)
-                        },
-                    )
-                )
-                    acknowledgement(true)
-                else failure(AutomationError.UNCONFIRMED)
             } catch (_: RuntimeException) {
                 failure(AutomationError.UNCONFIRMED)
             }

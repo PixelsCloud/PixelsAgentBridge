@@ -318,24 +318,24 @@ pub async fn file_manager_path(window:WebviewWindow,state:State<'_,FileManagerSt
     match name {Some(name)=>pab_file_manager::native_join(&path,&name,path_style).map(Some),None=>pab_file_manager::native_parent(&path,path_style)}.map_err(|e|e.to_string())
 }
 #[tauri::command]
-pub async fn file_manager_request(window:WebviewWindow,state:State<'_,FileManagerState>,endpoint:String,request_id:RequestId,operation:Op,execution:ExecutionSelection,force_relay:bool)->Result<Frame,String> {
-    let owner = state.owner(&window).await?;
+pub async fn file_manager_request(window:WebviewWindow,state:State<'_,FileManagerState>,endpoint:String,request_id:RequestId,operation:Op,execution:ExecutionSelection,force_relay:bool)->Result<Frame,FileAdmissionError> {
+    let owner = state.owner(&window).await.map_err(FileAdmissionError::rejected)?;
     let request = FileManagerRequest {expected_execution:None,schema_version:1,request_id,execution,operation};
-    request.validate().map_err(str::to_owned)?;
-    let tab=if endpoint=="local" {None}else{Some(owner.devices.lock().await.get(&endpoint).cloned().ok_or("Device does not belong to this window")?)};
+    request.validate().map_err(FileAdmissionError::rejected)?;
+    let tab=if endpoint=="local" {None}else{Some(owner.devices.lock().await.get(&endpoint).cloned().ok_or_else(||FileAdmissionError::rejected("Device does not belong to this window"))?)};
     let device=tab.as_ref().map(|tab|tab.device);let tab_generation=tab.as_ref().map(|tab|tab.generation);
-    let spec = serde_json::to_string(&(&endpoint,&request,force_relay)).map_err(|e|e.to_string())?;
+    let spec = serde_json::to_string(&(&endpoint,&request,force_relay)).map_err(FileAdmissionError::rejected)?;
     let mut requests = owner.requests.lock().await;
     if let Some(query) = requests.get(&request_id) {
-        if query.spec != spec {return Err("Request ID belongs to a different operation".into());}
+        if query.spec != spec {return Err(FileAdmissionError::rejected("Request ID belongs to a different operation"));}
         return Ok(query.frame.lock().await.clone());
     }
     if requests.len() >= 4096 {
         let evict = requests.iter().filter_map(|(id,query)|query.frame.try_lock().ok().filter(|frame|matches!(frame.state.as_str(),"completed"|"failed")).map(|_|*id)).take(2048).collect::<Vec<_>>();
         for id in evict {requests.remove(&id);}
-        if requests.len() >= 4096 {return Err("File window has too many unfinished requests".into());}
+        if requests.len() >= 4096 {return Err(FileAdmissionError::rejected("File window has too many unfinished requests"));}
     }
-    let permit = owner.slots.clone().try_acquire_owned().map_err(|_|"File window is busy")?;
+    let permit = owner.slots.clone().try_acquire_owned().map_err(|_|FileAdmissionError::rejected("File window is busy"))?;
     let frame = Frame {request_id,state:"running".into(),reply:None,message:None};
     let query = Arc::new(Query {spec,endpoint:endpoint.clone(),device,tab_generation,request:request.clone(),force_relay,cancel:watch::channel(false).0,frame:Mutex::new(frame.clone())});
     requests.insert(request_id,query.clone());drop(requests);
@@ -418,44 +418,44 @@ pub async fn file_manager_cancel(window:WebviewWindow,state:State<'_,FileManager
 #[derive(Serialize)]
 pub struct BatchView {#[serde(flatten)] snapshot:pab_file_manager::BatchSnapshot,runner_active:bool}
 #[derive(Serialize)]
-pub struct BatchStartError {message:String,admitted:bool}
-impl BatchStartError {
+pub struct FileAdmissionError {message:String,admitted:bool}
+impl FileAdmissionError {
     fn rejected(error:impl std::fmt::Display)->Self {Self {message:error.to_string(),admitted:false}}
     fn unknown(error:impl std::fmt::Display)->Self {Self {message:error.to_string(),admitted:true}}
 }
 #[tauri::command]
-pub async fn file_manager_start_batch(window:WebviewWindow,state:State<'_,FileManagerState>,id:RequestId,code:String,direction:pab_protocol::FileTransferDirection,sources:Vec<NativeFilePath>,destination:NativeFilePath,execution:ExecutionSelection,conflict:pab_protocol::FileConflictPolicy,force_relay:bool)->Result<BatchView,BatchStartError> {
-    if state.exit_stopping.load(Ordering::Acquire){return Err(BatchStartError::rejected("The application is saving transfers before exit"));}
-    let owner=state.owner(&window).await.map_err(BatchStartError::rejected)?;
-    let tab=owner.devices.lock().await.get(&code).cloned().ok_or_else(||BatchStartError::rejected("Device does not belong to this window"))?;
-    let spec=pab_protocol::FileBatchSpec {id,device:tab.device,code:parse_code(&code).map_err(BatchStartError::rejected)?,direction,sources,destination,execution,conflict,force_relay};
-    spec.validate().map_err(BatchStartError::rejected)?;
-    let store=state.batches().await.map_err(BatchStartError::rejected)?;
+pub async fn file_manager_start_batch(window:WebviewWindow,state:State<'_,FileManagerState>,id:RequestId,code:String,direction:pab_protocol::FileTransferDirection,sources:Vec<NativeFilePath>,destination:NativeFilePath,execution:ExecutionSelection,conflict:pab_protocol::FileConflictPolicy,force_relay:bool)->Result<BatchView,FileAdmissionError> {
+    if state.exit_stopping.load(Ordering::Acquire){return Err(FileAdmissionError::rejected("The application is saving transfers before exit"));}
+    let owner=state.owner(&window).await.map_err(FileAdmissionError::rejected)?;
+    let tab=owner.devices.lock().await.get(&code).cloned().ok_or_else(||FileAdmissionError::rejected("Device does not belong to this window"))?;
+    let spec=pab_protocol::FileBatchSpec {id,device:tab.device,code:parse_code(&code).map_err(FileAdmissionError::rejected)?,direction,sources,destination,execution,conflict,force_relay};
+    spec.validate().map_err(FileAdmissionError::rejected)?;
+    let store=state.batches().await.map_err(FileAdmissionError::rejected)?;
     state.prune_finished_jobs().await;
-    {let jobs=state.jobs.lock().await;if jobs.len()>=128 && !jobs.contains_key(&id){return Err(BatchStartError::rejected("File task capacity reached"));}}
+    {let jobs=state.jobs.lock().await;if jobs.len()>=128 && !jobs.contains_key(&id){return Err(FileAdmissionError::rejected("File task capacity reached"));}}
     // Admit the immutable submission before any remote preflight. A missing
     // WebView reply can now only observe this original ID; it cannot start a
     // duplicate preflight/worker while the first request is still preparing.
-    let inserted=store.reserve_submission(&owner.account_scope,&spec).await.map_err(BatchStartError::unknown)?;
+    let inserted=store.reserve_submission(&owner.account_scope,&spec).await.map_err(FileAdmissionError::unknown)?;
     if !inserted {
         let running=state.jobs.lock().await.get(&id).is_some_and(|job|job.owner==owner.account_scope && job.running());
-        return Ok(BatchView {snapshot:store.snapshot(&owner.account_scope,id).await.map_err(BatchStartError::unknown)?,runner_active:running});
+        return Ok(BatchView {snapshot:store.snapshot(&owner.account_scope,id).await.map_err(FileAdmissionError::unknown)?,runner_active:running});
     }
     let prepared=match pab_bridge::ManagedBatchJob::prepare(owner.runtime.clone(),store.clone(),owner.local.clone(),spec,owner.account_scope.clone()).await {
         Ok((job,_))=>job,
         Err(error)=>{
-            store.finish_scan(&owner.account_scope,id,Some(&error.to_string())).await.map_err(BatchStartError::unknown)?;
-            return Ok(BatchView {snapshot:store.snapshot(&owner.account_scope,id).await.map_err(BatchStartError::unknown)?,runner_active:false});
+            store.finish_scan(&owner.account_scope,id,Some(&error.to_string())).await.map_err(FileAdmissionError::unknown)?;
+            return Ok(BatchView {snapshot:store.snapshot(&owner.account_scope,id).await.map_err(FileAdmissionError::unknown)?,runner_active:false});
         },
     };
     if account().ok().as_ref()!=Some(&owner.account) || state.exit_stopping.load(Ordering::Acquire) {
-        store.set_intent(&owner.account_scope,id,pab_protocol::FileTransferIntent::Pause).await.map_err(BatchStartError::unknown)?;
-        store.acknowledge_scan_stopped(&owner.account_scope,id).await.map_err(BatchStartError::unknown)?;
-        return Err(BatchStartError::unknown("Account changed; inspect this batch under its original account"));
+        store.set_intent(&owner.account_scope,id,pab_protocol::FileTransferIntent::Pause).await.map_err(FileAdmissionError::unknown)?;
+        store.acknowledge_scan_stopped(&owner.account_scope,id).await.map_err(FileAdmissionError::unknown)?;
+        return Err(FileAdmissionError::unknown("Account changed; inspect this batch under its original account"));
     }
     let job=state.jobs.lock().await.entry(id).or_insert(prepared).clone();
     job.launch();
-    Ok(BatchView {snapshot:job.snapshot().await.map_err(BatchStartError::unknown)?,runner_active:job.running()})
+    Ok(BatchView {snapshot:job.snapshot().await.map_err(FileAdmissionError::unknown)?,runner_active:job.running()})
 }
 #[tauri::command]
 pub async fn file_manager_batches(window:WebviewWindow,state:State<'_,FileManagerState>)->Result<Vec<BatchView>,String> {

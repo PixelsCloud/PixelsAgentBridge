@@ -145,7 +145,10 @@ internal class RemoteAutomationAdapter(
                 is AutomationResult.Failed -> failure(result.error.name.lowercase())
                 is AutomationResult.Dispatched ->
                     RemotePlatformResult(
-                        JSONObject().put("acknowledged", result.platformAcknowledged).toString()
+                        JSONObject()
+                            .put("acknowledged", result.platformAcknowledged)
+                            .put("warnings", JSONArray(result.warnings))
+                            .toString()
                     )
                 is AutomationResult.Observed -> {
                     if (!connectionAllowed()) return failure("control_disconnected")

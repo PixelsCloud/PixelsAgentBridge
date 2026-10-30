@@ -124,6 +124,7 @@ class AndroidDesktopQueries(
                 if (reference.node != null || reference.window != windowKey(screen))
                     throw StorageFailure("target_stale")
                 var started = false
+                var warnings = emptyList<String>()
                 if (query.getString("operation") == "type_text") {
                     if (screen.truncated) throw StorageFailure("focused_control_query_incomplete")
                     val focused =
@@ -137,6 +138,7 @@ class AndroidDesktopQueries(
                             )
                         )
                     requireAction(action)
+                    warnings = (action as AutomationResult.Dispatched).warnings
                     started = true
                 }
                 response(
@@ -147,7 +149,8 @@ class AndroidDesktopQueries(
                                 .put("window_ref", query.getString("window_ref"))
                                 .put("action_started", started)
                                 .put("verification", if (started) "native_returned" else "matched"),
-                    )
+                    ),
+                    warnings = warnings,
                 )
             }
             "ui" -> ui(input, query.getJSONObject("query"))

@@ -16,6 +16,8 @@ import sys
 import tomllib
 import urllib.request
 
+from build_profile import apply_release_preset
+
 ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = ROOT / "apps" / "android"
 TARGETS = {
@@ -133,13 +135,15 @@ def prepare_document_runtime() -> None:
             temporary.unlink(missing_ok=True)
 
 
-def native(abi: str, env: dict[str, str], check: bool, profile: str = 'debug') -> None:
+def native(abi: str, env: dict[str, str], check: bool, profile: str = 'release') -> None:
+    if profile != "release":
+        raise ValueError("Android native builds require Release")
     target = TARGETS[abi][0]
     if check:
-        run(["cargo", "check", "--locked", "-j", str(MAX_JOBS), "--target", target,
+        run(["cargo", "check", "--release", "--locked", "-j", str(MAX_JOBS), "--target", target,
              "-p", "pab-agent-core", "-p", "pab-transport"], env)
         return
-    run(["cargo", "build", "--locked", *(['--release'] if profile == 'release' else []), "-j", str(MAX_JOBS), "--target", target,
+    run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "--target", target,
          "-p", "pab-android-agent"], env)
     destination = APP_ROOT / "transport" / "src" / "main" / "jniLibs" / abi
     destination.mkdir(parents=True, exist_ok=True)
@@ -159,7 +163,7 @@ def release_version_code(version: str) -> int:
 
 def build_release(version: str, env: dict[str, str]) -> Path:
     code = release_version_code(version)
-    env = dict(env, PAB_INSTALLER_VERSION=version)
+    env = apply_release_preset(dict(env, PAB_INSTALLER_VERSION=version), publication=True)
     required = ('PAB_ANDROID_KEYSTORE_FILE', 'PAB_ANDROID_KEYSTORE_PASSWORD',
                 'PAB_ANDROID_KEY_ALIAS', 'PAB_ANDROID_KEY_PASSWORD', 'PAB_ANDROID_CERT_SHA256')
     if any(not env.get(name) for name in required):
@@ -173,7 +177,7 @@ def build_release(version: str, env: dict[str, str]) -> Path:
     wrapper = str(APP_ROOT / ('gradlew.bat' if os.name == 'nt' else 'gradlew'))
     run([wrapper, '--no-daemon', f'--max-workers={min(2, MAX_JOBS)}',
          f'-PpixelsVersionCode={code}', f'-PpixelsVersionName={version}',
-         'lintRelease', ':core:test', 'testDebugUnitTest', ':app:assembleRelease'], env, APP_ROOT)
+         'lintRelease', ':core:test', 'testReleaseUnitTest', ':app:assembleRelease'], env, APP_ROOT)
     apk = APP_ROOT / 'app/build/outputs/apk/release/app-release.apk'
     apksigner = Path(env['ANDROID_HOME']) / 'build-tools/36.0.0' / ('apksigner.bat' if os.name == 'nt' else 'apksigner')
     result = subprocess.run([str(apksigner), 'verify', '--verbose', '--print-certs', str(apk)],
@@ -185,7 +189,7 @@ def build_release(version: str, env: dict[str, str]) -> Path:
     return apk
 
 
-def build_device_release(abi: str, env: dict[str, str]) -> None:
+def build_device_release(abi: str, env: dict[str, str], *, checks=False, instrument=False, install_tests=False) -> None:
     """Release code, existing USB package/certificate/data; never create a new key."""
     if not (Path.home() / '.android/debug.keystore').is_file():
         raise RuntimeError('The existing device signing key is required; do not generate a replacement')
@@ -205,41 +209,26 @@ def build_device_release(abi: str, env: dict[str, str]) -> None:
     expected = certificate(original)
     if len(expected) != 1:
         raise RuntimeError('Cannot verify the installed device signing identity')
-    env = dict(env, CARGO_PROFILE_RELEASE_OPT_LEVEL='2', CARGO_PROFILE_RELEASE_LTO='false',
-               CARGO_PROFILE_RELEASE_CODEGEN_UNITS='16', CARGO_PROFILE_RELEASE_INCREMENTAL='true')
+    env = apply_release_preset(dict(env), 'fast')
     native(abi, env, False, profile='release')
     prepare_verifier()
     prepare_document_runtime()
     wrapper = str(APP_ROOT / ('gradlew.bat' if os.name == 'nt' else 'gradlew'))
+    tasks = (['spotlessCheck', 'lintRelease', ':core:test', 'testReleaseUnitTest'] if checks else [])
+    tasks += [':app:assembleRelease']
+    if instrument:
+        tasks += [':app:assembleReleaseAndroidTest']
     run([wrapper, '--no-daemon', f'--max-workers={min(2, MAX_JOBS)}', '-PpixelsDeviceIdentity=true',
+         f'-PpixelsDeviceTests={str(instrument).lower()}',
          f'-PpixelsDeviceAbi={abi}', f'-PpixelsVersionCode={next_version_code(env)}',
-         ':app:assembleRelease'], env, APP_ROOT)
+         *tasks], env, APP_ROOT)
     apk = APP_ROOT / 'app/build/outputs/apk/release/app-release.apk'
     if certificate(apk) != expected:
         raise RuntimeError('Device certificate differs; update refused, installed app preserved')
     run([adb, '-s', serial, 'install', '-r', str(apk)], env)
-
-
-def install_updates(env: dict[str, str], include_tests: bool) -> None:
-    """Update the configured development phone in place; never uninstall or clear data."""
-    device_file = ROOT / ".build" / "android" / "device.toml"
-    if not device_file.exists():
-        return
-    serial = tomllib.loads(device_file.read_text(encoding="utf-8")).get("serial")
-    if not isinstance(serial, str) or not serial.strip():
-        raise RuntimeError(f"Set serial in {device_file}")
-    adb = shutil.which("adb", path=env["PATH"])
-    if not adb:
-        raise RuntimeError("ADB is required to update the configured Android phone")
-    state = subprocess.run([adb, "-s", serial, "get-state"], env=env,
-                           capture_output=True, text=True, check=False)
-    if state.returncode or state.stdout.strip() != "device":
-        raise RuntimeError(f"APK built, but Android device {serial} is offline or unauthorized")
-    outputs = APP_ROOT / "app" / "build" / "outputs" / "apk"
-    run([adb, "-s", serial, "install", "-r", str(outputs / "debug/app-debug.apk")], env)
-    if include_tests:
-        run([adb, "-s", serial, "install", "-r", "-t",
-             str(outputs / "androidTest/debug/app-debug-androidTest.apk")], env)
+    if install_tests:
+        run([adb, '-s', serial, 'install', '-r', '-t',
+             str(APP_ROOT / 'app/build/outputs/apk/androidTest/release/app-release-androidTest.apk')], env)
 
 
 def next_version_code(env: dict[str, str]) -> int:
@@ -250,7 +239,7 @@ def next_version_code(env: dict[str, str]) -> int:
         previous = tomllib.loads(file.read_text(encoding="utf-8"))["version_code"]
         if not isinstance(previous, int) or isinstance(previous, bool) or previous < 1:
             raise RuntimeError("Invalid Android version.toml; preserve it for recovery")
-    metadata = APP_ROOT / "app/build/outputs/apk/debug/output-metadata.json"
+    metadata = APP_ROOT / "app/build/outputs/apk/release/output-metadata.json"
     if metadata.exists():
         for element in json.loads(metadata.read_text(encoding="utf-8"))["elements"]:
             previous = max(previous, element["versionCode"])
@@ -272,14 +261,14 @@ def next_version_code(env: dict[str, str]) -> int:
 
 
 def stage_server_tools() -> None:
-    """Keep Android test binaries independent of other sessions rebuilding target/debug."""
+    """Keep Android test binaries independent of other sessions rebuilding target/release."""
     destination = ROOT / ".build/android/tools"
     destination.mkdir(parents=True, exist_ok=True)
     extension = ".exe" if os.name == "nt" else ""
     fingerprints = {}
     for name in ("pab-server", "pab-relay-server", "pab-mcp"):
         file = destination / (name + extension)
-        shutil.copy2(ROOT / "target/debug" / file.name, file)
+        shutil.copy2(ROOT / "target/release" / file.name, file)
         with file.open("rb") as stream:
             fingerprints[file.name] = hashlib.file_digest(stream, "sha256").hexdigest()
     (destination / "manifest.json").write_text(json.dumps(fingerprints, indent=2) + "\n", encoding="utf-8")
@@ -291,7 +280,7 @@ def main() -> None:
         "check-shared", "native", "assemble", "release", "device-release", "check", "format", "instrument",
         "verify", "regression", "clippy", "clippy-android", "test-native", "test-execution", "test-execution-linux", "test-port-forward", "test-port-forward-linux", "test-file-enhancements", "test-file-enhancements-linux", "test-files", "test-system", "test-documents", "test-documents-linux", "control-fixture", "remote-tools", "mcp-tools", "shared-test", "check-integration", "check-web", "server-tools", "public-compat", "linux-tools",
     ])
-    parser.add_argument("--abi", choices=list(TARGETS), default="x86_64")
+    parser.add_argument("--abi", choices=list(TARGETS), help="Defaults to the USB device ABI for APK updates, x86_64 for native checks")
     parser.add_argument("--jobs", type=int, choices=range(1, 11), default=10,
                         help="Share the ten-job total budget with other active builds")
     parser.add_argument("--install-tests", action="store_true",
@@ -303,7 +292,16 @@ def main() -> None:
     global MAX_JOBS
     MAX_JOBS = args.jobs
     limit_processors()
-    env = environment()
+    env = apply_release_preset(environment(), publication=args.action == "release")
+    if args.abi is None:
+        if args.action in ('device-release', *APK_ACTIONS):
+            serial = tomllib.loads((ROOT / '.build/android/device.toml').read_text(encoding='utf-8'))['serial']
+            adb = str(Path(env['ANDROID_HOME']) / 'platform-tools' / ('adb.exe' if os.name == 'nt' else 'adb'))
+            args.abi = subprocess.check_output([adb, '-s', serial, 'shell', 'getprop', 'ro.product.cpu.abi'], env=env, text=True).strip()
+            if args.abi not in TARGETS:
+                parser.error('The configured USB device ABI is unsupported')
+        else:
+            args.abi = 'x86_64'
     lock_path = ROOT / ".build" / "android" / "build.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as lock:
@@ -324,38 +322,37 @@ def main() -> None:
         if args.action == 'release':
             build_release(args.version, env)
             return
-        if args.action == 'device-release':
-            build_device_release(args.abi, env)
+        if args.action in ('device-release', *APK_ACTIONS):
+            if args.install_tests and args.action not in ('instrument', 'verify'):
+                parser.error('--install-tests requires instrument or verify')
+            build_device_release(args.abi, env, checks=args.action == 'verify',
+                                 instrument=args.action in ('instrument', 'verify'),
+                                 install_tests=args.install_tests)
             return
-        if args.action in APK_ACTIONS:
-            # Kotlin/JNI must match every ABI shipped in the APK, including an
-            # emulator ABI left by an earlier build. Never package stale natives.
-            for abi in TARGETS:
-                native(abi, env, False)
-        elif args.action in ("check-shared", "native"):
+        if args.action in ("check-shared", "native"):
             native(args.abi, env, args.action == "check-shared")
         if args.action == "regression":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS),
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS),
                  "-p", "pab-protocol", "-p", "pab-task-runtime",
                  "-p", "pab-agent-core", "-p", "pab-transport"], env)
         if args.action == "clippy":
-            run(["cargo", "clippy", "--locked", "-j", str(MAX_JOBS),
+            run(["cargo", "clippy", "--release", "--locked", "-j", str(MAX_JOBS),
                  "-p", "pab-android-agent", "-p", "pab-device-session", "--all-targets", "--no-deps",
                  "--", "-D", "warnings"], env)
             # Shared core has existing lint warnings; retain and review them rather
             # than changing unrelated runtime code during final APK acceptance.
-            run(["cargo", "clippy", "--locked", "-j", str(MAX_JOBS),
+            run(["cargo", "clippy", "--release", "--locked", "-j", str(MAX_JOBS),
                  "-p", "pab-agent-core", "--all-targets", "--no-deps"], env)
         if args.action == "clippy-android":
-            run(["cargo", "clippy", "--locked", "-j", str(MAX_JOBS), "--target", TARGETS[args.abi][0],
+            run(["cargo", "clippy", "--release", "--locked", "-j", str(MAX_JOBS), "--target", TARGETS[args.abi][0],
                  "-p", "pab-android-agent", "--lib", "--no-deps", "--", "-D", "warnings"], env)
         if args.action == "test-native":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent"], env)
         if args.action == "test-execution":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-terminal", "-p", "pab-task-runtime"], env)
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor", "--lib", "command"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-terminal", "-p", "pab-task-runtime"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor", "--lib", "command"], env)
         if args.action == "test-port-forward":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-device-session",
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-device-session",
                  "-p", "pab-executor", "-p", "pab-bridge", "--lib", "port_forward"], env)
         if args.action == "test-port-forward-linux":
             cache = ROOT / ".build/linux-cargo-home"
@@ -366,14 +363,16 @@ def main() -> None:
                  "--mount", "type=volume,source=pab-linux-bullseye-target-20261015,target=/cargo-target",
                  "--workdir", "/src", "--env", "CARGO_HOME=/cargo-home",
                  "--env", "CARGO_TARGET_DIR=/cargo-target", "--env", f"CARGO_BUILD_JOBS={MAX_JOBS}",
-                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1", "--env", "RAYON_NUM_THREADS=2",
+                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                 *[part for name in ("OPT_LEVEL", "LTO", "CODEGEN_UNITS", "INCREMENTAL")
+                   for part in ("--env", "CARGO_PROFILE_RELEASE_" + name + "=" + env["CARGO_PROFILE_RELEASE_" + name])], "--env", "RAYON_NUM_THREADS=2",
                  "pab-linux-headless-build-deps:bullseye", "sh", "-c",
-                 'cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-device-session -p pab-executor -p pab-bridge --lib port_forward'], env)
+                 'cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-device-session -p pab-executor -p pab-bridge --lib port_forward'], env)
         if args.action == "test-file-enhancements":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-protocol", "--lib", "filesystem"], env)
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-file-codec"], env)
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor", "-p", "pab-bridge", "--lib", "filesystem"], env)
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp", "filesystem"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-protocol", "--lib", "filesystem"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-file-codec"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor", "-p", "pab-bridge", "--lib", "filesystem"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp", "filesystem"], env)
         if args.action == "test-file-enhancements-linux":
             cache = ROOT / ".build/linux-cargo-home"
             run(["docker", "--context", "desktop-linux", "run", "--rm", "--pull", "never", "--cpus", str(MAX_JOBS), "--memory", "6g",
@@ -381,8 +380,10 @@ def main() -> None:
                  "--mount", f"type=bind,source={cache},target=/cargo-home",
                  "--mount", "type=volume,source=pab-linux-bullseye-target-20261015,target=/cargo-target",
                  "--workdir", "/src", "--env", "CARGO_HOME=/cargo-home", "--env", "CARGO_TARGET_DIR=/cargo-target", "--env", f"CARGO_BUILD_JOBS={MAX_JOBS}",
-                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1", "--env", "RAYON_NUM_THREADS=2", "pab-linux-headless-build-deps:bullseye", "sh", "-c",
-                 'cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-protocol --lib filesystem && cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-file-codec && cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-executor -p pab-bridge --lib filesystem && cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-bridge --bin pab-mcp filesystem'], env)
+                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                 *[part for name in ("OPT_LEVEL", "LTO", "CODEGEN_UNITS", "INCREMENTAL")
+                   for part in ("--env", "CARGO_PROFILE_RELEASE_" + name + "=" + env["CARGO_PROFILE_RELEASE_" + name])], "--env", "RAYON_NUM_THREADS=2", "pab-linux-headless-build-deps:bullseye", "sh", "-c",
+                 'cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-protocol --lib filesystem && cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-file-codec && cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-executor -p pab-bridge --lib filesystem && cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-bridge --bin pab-mcp filesystem'], env)
         if args.action == "test-execution-linux":
             cache = ROOT / ".build/linux-cargo-home"
             run(["docker", "--context", "desktop-linux", "run", "--rm", "--pull", "never",
@@ -392,13 +393,15 @@ def main() -> None:
                  "--mount", "type=volume,source=pab-linux-bullseye-target-20261015,target=/cargo-target",
                  "--workdir", "/src", "--env", "CARGO_HOME=/cargo-home",
                  "--env", "CARGO_TARGET_DIR=/cargo-target", "--env", f"CARGO_BUILD_JOBS={MAX_JOBS}",
-                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1", "--env", "RAYON_NUM_THREADS=2",
+                 "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                 *[part for name in ("OPT_LEVEL", "LTO", "CODEGEN_UNITS", "INCREMENTAL")
+                   for part in ("--env", "CARGO_PROFILE_RELEASE_" + name + "=" + env["CARGO_PROFILE_RELEASE_" + name])], "--env", "RAYON_NUM_THREADS=2",
                  "pab-linux-headless-build-deps:bullseye", "sh", "-c",
-                 'cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-terminal -p pab-task-runtime && cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-executor --lib command'], env)
+                 'cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-terminal -p pab-task-runtime && cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-executor --lib command'], env)
         if args.action == "test-documents":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-document",
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-document",
                  "--no-default-features", "--lib"], env)
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor",
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-executor",
                  "--lib", "document"], env)
         if args.action == "test-documents-linux":
             run(["docker", "--context", "desktop-linux", "run", "--rm", "--pull", "never",
@@ -408,25 +411,27 @@ def main() -> None:
                  "--mount", "type=volume,source=pab-linux-bullseye-target-20261015,target=/cargo-target", "--workdir", "/src",
                  "--env", "CARGO_HOME=/cargo-home", "--env", "CARGO_TARGET_DIR=/cargo-target",
                  "--env", f"CARGO_BUILD_JOBS={MAX_JOBS}", "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                 *[part for name in ("OPT_LEVEL", "LTO", "CODEGEN_UNITS", "INCREMENTAL")
+                   for part in ("--env", "CARGO_PROFILE_RELEASE_" + name + "=" + env["CARGO_PROFILE_RELEASE_" + name])],
                  "--env", "RAYON_NUM_THREADS=2", "pab-linux-headless-build-deps:bullseye", "sh", "-c",
-                 'cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-document --no-default-features --lib && cargo test --locked -j "$CARGO_BUILD_JOBS" -p pab-executor --lib document'], env)
+                 'cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-document --no-default-features --lib && cargo test --release --locked -j "$CARGO_BUILD_JOBS" -p pab-executor --lib document'], env)
         if args.action == "test-system":
             packages = ["-p", "pab-android-agent", "-p", "pab-protocol", "-p", "pab-platform",
                         "-p", "pab-desktop-control", "-p", "pab-bridge"]
             for pattern in ("system", "application", "package", "every_tool_has_exactly_one_group"):
-                run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), *packages,
+                run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), *packages,
                      "--lib", "--bins", pattern], env)
         if args.action == "test-files":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS),
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS),
                  "-p", "pab-file-codec", "-p", "pab-android-agent", "-p", "pab-executor",
                  "--lib", "filesystem"], env)
         if args.action == "control-fixture":
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent",
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent",
                  "--example", "control-fixture"], env)
         if args.action == "public-compat":
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent",
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent",
                  "--example", "public-compat"], env)
-            run([str(ROOT / "target/debug/examples" / ("public-compat.exe" if os.name == "nt" else "public-compat"))], env)
+            run([str(ROOT / "target/release/examples" / ("public-compat.exe" if os.name == "nt" else "public-compat"))], env)
         if args.action == "linux-tools":
             output = ROOT / ".build/android/tools-linux"
             output.mkdir(parents=True, exist_ok=True)
@@ -440,45 +445,35 @@ def main() -> None:
                  "--mount", f"type=bind,source={output},target=/out", "--workdir", "/src",
                  "--env", "CARGO_HOME=/cargo-home", "--env", "CARGO_TARGET_DIR=/cargo-target",
                  "--env", f"CARGO_BUILD_JOBS={MAX_JOBS}", "--env", "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                 *[part for name in ("OPT_LEVEL", "LTO", "CODEGEN_UNITS", "INCREMENTAL")
+                   for part in ("--env", "CARGO_PROFILE_RELEASE_" + name + "=" + env["CARGO_PROFILE_RELEASE_" + name])],
                  "pab-linux-headless-build-deps:bullseye", "sh", "-c",
-                 'cargo build --locked -j "$CARGO_BUILD_JOBS" -p pab-bridge --bin pab-mcp && cp /cargo-target/debug/pab-mcp /out/pab-mcp'], env)
+                 'cargo build --release --locked -j "$CARGO_BUILD_JOBS" -p pab-bridge --bin pab-mcp && cp /cargo-target/release/pab-mcp /out/pab-mcp'], env)
             (output / "manifest.json").write_text(json.dumps({"platform":"linux-x86_64",
                 "cargo_jobs":MAX_JOBS,"cpu_quota":MAX_JOBS,"installed_application_updated":False,
                 "sha256":hashlib.sha256((output / "pab-mcp").read_bytes()).hexdigest()}, indent=2), encoding="utf-8")
         if args.action == "remote-tools":
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent", "--example", "remote-fixture"], env)
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp"], env)
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-android-agent", "--example", "remote-fixture"], env)
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp"], env)
         if args.action == "mcp-tools":
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp"], env)
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-bridge", "--bin", "pab-mcp"], env)
         if args.action == "shared-test":
-            run(["cargo", "test", "--locked", "-j", str(MAX_JOBS), "-p", "pab-device-session", "-p", "pab-executor", "-p", "pab-bridge", "--lib", "--bins", "--", "--test-threads=1"], env)
+            run(["cargo", "test", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-device-session", "-p", "pab-executor", "-p", "pab-bridge", "--lib", "--bins", "--", "--test-threads=1"], env)
         if args.action == "server-tools":
-            run(["cargo", "build", "--locked", "-j", str(MAX_JOBS), "-p", "pab-server", "-p", "pab-relay", "-p", "pab-bridge", "--bin", "pab-server", "--bin", "pab-relay-server", "--bin", "pab-mcp"], env)
+            run(["cargo", "build", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-server", "-p", "pab-relay", "-p", "pab-bridge", "--bin", "pab-server", "--bin", "pab-relay-server", "--bin", "pab-mcp"], env)
             stage_server_tools()
         if args.action == "check-integration":
-            run(["cargo", "check", "--locked", "-j", str(MAX_JOBS), "-p", "pab-server", "-p", "pab-relay", "--all-targets"], env)
+            run(["cargo", "check", "--release", "--locked", "-j", str(MAX_JOBS), "-p", "pab-server", "-p", "pab-relay", "--all-targets"], env)
         if args.action == "check-web":
             runner = "npm.cmd" if os.name == "nt" else "npm"
             run([runner, "exec", "--", "tsc", "--noEmit"], env, ROOT / "apps/web")
-        if args.action in ("assemble", "check", "format", "instrument", "verify"):
+        if args.action in ("check", "format"):
             prepare_verifier()
             wrapper = str(APP_ROOT / ("gradlew.bat" if os.name == "nt" else "gradlew"))
-            tasks = {
-                "assemble": [":app:assembleDebug"],
-                "check": ["spotlessCheck", "lintDebug", ":core:test", "testDebugUnitTest"],
-                "format": ["spotlessApply"],
-                "instrument": [":app:assembleDebug", ":app:assembleDebugAndroidTest"],
-                "verify": ["spotlessApply", "spotlessCheck", "lintDebug", ":core:test",
-                           ":app:assembleDebug", ":app:assembleDebugAndroidTest"],
-            }[args.action]
-            version = []
-            if args.action != "format":
+            tasks = ["spotlessApply"] if args.action == "format" else ["spotlessCheck", "lintRelease", ":core:test", "testReleaseUnitTest"]
+            if args.action == "check":
                 prepare_document_runtime()
-            if args.action in APK_ACTIONS:
-                version = [f"-PpixelsVersionCode={next_version_code(env)}"]
-            run([wrapper, "--no-daemon", f"--max-workers={min(2, MAX_JOBS)}", *version, *tasks], env, APP_ROOT)
-            if args.action in APK_ACTIONS:
-                install_updates(env, include_tests=args.install_tests)
+            run([wrapper, "--no-daemon", f"--max-workers={min(2, MAX_JOBS)}", *tasks], env, APP_ROOT)
 
 
 if __name__ == "__main__":

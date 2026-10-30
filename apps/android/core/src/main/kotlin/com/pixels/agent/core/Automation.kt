@@ -53,8 +53,11 @@ sealed interface AutomationResult {
     data class Observed(val screen: ScreenObservation) : AutomationResult
 
     /** Platform acknowledgement alone does not establish a business postcondition. */
-    data class Dispatched(val platformAcknowledged: Boolean, val actionDispatched: Boolean = true) :
-        AutomationResult
+    data class Dispatched(
+        val platformAcknowledged: Boolean,
+        val actionDispatched: Boolean = true,
+        val warnings: List<String> = emptyList(),
+    ) : AutomationResult
 
     data class Failed(val error: AutomationError) : AutomationResult
 }

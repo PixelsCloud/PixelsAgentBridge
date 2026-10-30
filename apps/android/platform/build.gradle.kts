@@ -1,6 +1,7 @@
 plugins { alias(libs.plugins.android.library) }
 
 android {
+    testBuildType = "release"
     namespace = "com.pixels.agent.platform"
     compileSdk = 36
     defaultConfig { minSdk = 28 }

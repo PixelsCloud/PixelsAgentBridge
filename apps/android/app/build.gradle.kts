@@ -6,6 +6,11 @@ plugins {
 android {
     // Release optimization while updating the existing USB development identity.
     val deviceIdentity = providers.gradleProperty("pixelsDeviceIdentity").orNull == "true"
+    testBuildType = "release"
+    if (deviceIdentity && providers.gradleProperty("pixelsDeviceTests").orNull == "true") {
+        sourceSets["release"].java.srcDir("src/debug/kotlin")
+        sourceSets["release"].manifest.srcFile("src/debug/AndroidManifest.xml")
+    }
     namespace = "com.pixels.agent"
     compileSdk = 36
     ndkVersion = "29.0.14206865"
@@ -16,7 +21,11 @@ android {
         versionCode = providers.gradleProperty("pixelsVersionCode").map(String::toInt).getOrElse(1)
         versionName = providers.gradleProperty("pixelsVersionName").getOrElse("0.1.0-dev")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        ndk { abiFilters += if (deviceIdentity) listOf(providers.gradleProperty("pixelsDeviceAbi").get()) else listOf("arm64-v8a", "x86_64") }
+        ndk {
+            abiFilters +=
+                if (deviceIdentity) listOf(providers.gradleProperty("pixelsDeviceAbi").get())
+                else listOf("arm64-v8a", "x86_64")
+        }
     }
     val releaseKeystore = providers.environmentVariable("PAB_ANDROID_KEYSTORE_FILE")
     signingConfigs {

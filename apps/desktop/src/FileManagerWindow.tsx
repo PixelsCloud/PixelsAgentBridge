@@ -277,6 +277,7 @@ export default function FileManagerWindow() {
     finally { clearCompletedGate.current = false; setClearingCompleted(false); }
   }
   const promptedConflicts = useRef(new Set<string>());
+  useEffect(() => { setDetails(null); }, [active]);
   useEffect(() => {
     const waiting = batches.filter(batch => String(batch.spec.code) === active && batch.phase === "waiting_conflict");
     const ids = new Set(waiting.map(batch => batch.spec.id));
@@ -285,7 +286,6 @@ export default function FileManagerWindow() {
     const next = waiting.find(batch => !promptedConflicts.current.has(batch.spec.id));
     if (next) { promptedConflicts.current.add(next.spec.id); setDetails(next); }
   }, [batches, active, ended, details, dropped, closeDialog]);
-  useEffect(() => { setDetails(null); }, [active]);
   async function closeTab(tab:Tab) {
     const {code,generation}=tab;
     if (tabCloseGate.current || sessionEnded.current || ended)return;
