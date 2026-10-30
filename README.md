@@ -103,9 +103,9 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 
 ## 工作方式
 
-[![Pixels Agent Bridge 动态工作流程](diagram/workflow/agent-workflow.svg)](diagram/workflow/agent-workflow.svg)
+![Pixels Agent Bridge 动态工作流程](assets/images/agent-workflow.gif)
 
-[打开动态流程图](diagram/workflow/agent-workflow.svg)
+[查看 SVG 矢量原图](diagram/workflow/agent-workflow.svg)
 
 Agent 调用本地 MCP，由 MCP 连接目标设备的 Executor。控制服务负责设备发现和认证，操作数据优先通过 P2P 传输，无法直连时使用 Relay 中继。
 

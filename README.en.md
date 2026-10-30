@@ -103,9 +103,9 @@ When GitHub sign-in is enabled, choose **Continue with GitHub** to sign in witho
 
 ## How it works
 
-[![Pixels Agent Bridge animated workflow](diagram/workflow/agent-workflow.svg)](diagram/workflow/agent-workflow.svg)
+![Pixels Agent Bridge animated workflow](assets/images/agent-workflow.gif)
 
-[Open the animated workflow](diagram/workflow/agent-workflow.svg)
+[View the original SVG](diagram/workflow/agent-workflow.svg)
 
 Your agent calls a local MCP process, which connects to the target device's Executor. The control server handles device discovery and authentication; operation data travels over P2P when available, with Relay fallback.
 
