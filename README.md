@@ -12,6 +12,14 @@ Pixels Agent Bridge connects AI agents to computers and Android devices through 
 
 Click any screenshot to view it at full size.
 
+### In action
+
+Ask DeepSeek Harness to check a remote device's CPU and memory usage through Pixels.
+
+[![DeepSeek Harness using Pixels to query a remote device's CPU and memory status](assets/images/en/ds-install-en.png)](assets/images/en/ds-install-en.png)
+
+### Desktop overview
+
 [![Pixels Agent Bridge main interface](assets/images/en/main-en.jpg)](assets/images/en/main-en.jpg)
 
 <table>

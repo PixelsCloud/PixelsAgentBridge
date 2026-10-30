@@ -12,6 +12,14 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与计算机、Android 设备连接�
 
 点击截图可查看原图。
 
+### 真实使用场景
+
+让 DeepSeek Harness 通过 Pixels 查询远程设备的 GPU 使用状态。
+
+[![DeepSeek Harness 通过 Pixels 查询远程设备的 GPU 使用状态](assets/images/cn/ds-install-cn.png)](assets/images/cn/ds-install-cn.png)
+
+### 桌面端概览
+
 [![Pixels Agent Bridge 主界面](assets/images/cn/main-cn.jpg)](assets/images/cn/main-cn.jpg)
 
 <table>
