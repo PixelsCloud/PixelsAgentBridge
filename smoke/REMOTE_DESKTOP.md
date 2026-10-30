@@ -7,19 +7,19 @@
 遵守整机总构建并发不超过 10，准备 BUILDING.md 要求的原生工具链。Windows 需要 NASM；CMake 必须支持实际安装的 Visual Studio，嵌套 CMake/MSVC 使用单作业。已有统一 smoke Cargo 适配器通过 `native_env.py` 准备环境。
 
 ```sh
-cargo test -p pab-remote-desktop --lib --test reliable_sessions -j 4 -- --test-threads=4
-cargo test -p pab-executor --lib -j 4 -- local_ipc::media:: --test-threads=1
-cargo test -p pab-desktop-media --lib -j 4
-cargo build -p pab-desktop-media --bin pab-media-worker -j 4
-cargo test --locked -p pab-desktop-media --test windows_media_timing -j 4 -- --nocapture
-cargo test --locked -p pab-desktop-media --lib software::conversion_tests -j 4 -- --nocapture
+python -m smoke.cargo -p pab-remote-desktop --lib --test reliable_sessions -- --test-threads=4
+python -m smoke.cargo -p pab-executor --lib -- local_ipc::media:: --test-threads=1
+python -m smoke.cargo -p pab-desktop-media --lib
+python -m smoke.cargo --build -p pab-desktop-media --bin pab-media-worker
+python -m smoke.cargo -p pab-desktop-media --test windows_media_timing -- --nocapture
+python -m smoke.cargo -p pab-desktop-media --lib software::conversion_tests -- --nocapture
 ```
 
 在 Windows/macOS 的交互桌面执行（macOS 的 worker 路径没有 `.exe`）：
 
 ```sh
-python smoke/remote_desktop_worker.py --worker target/debug/pab-media-worker.exe --software --output smoke/runs/rd-metrics/software.json
-python smoke/remote_desktop_worker.py --worker target/debug/pab-media-worker.exe --output smoke/runs/rd-metrics/automatic.json
+python smoke/remote_desktop_worker.py --worker target/release/pab-media-worker.exe --software --output smoke/runs/rd-metrics/software.json
+python smoke/remote_desktop_worker.py --worker target/release/pab-media-worker.exe --output smoke/runs/rd-metrics/automatic.json
 ```
 
 检查同一编码器交替返回旧帧／带耗时帧、调码率后的帧序列、H.264 起始码、PTS 单调性、等待及编码耗时。自动选择编码器可能回退软件，不能据此声称硬件编码通过。脚本只生成合成像素，不采集或保存桌面内容。
@@ -39,7 +39,7 @@ Windows 每帧直接检查当前 DXGI 输出的尺寸、位置、旋转、显示
 `remote_desktop_stability.rs` 使用真实账号与设备密码认证、产品视频协议和已安装的原生显示 worker；不使用假视频或截图轮询，也不记录桌面像素。它不覆盖 Desktop 工具栏、重连界面或用户交互验收。先在被控机打开专用合成动画，保证测试窗口可见、动画实际生成速率高于请求帧率，再运行：
 
 ```powershell
-cargo build --release --locked -p pab-bridge --example remote_desktop_stability -j 4
+python -m smoke.cargo --build --release --locked -p pab-bridge --example remote_desktop_stability
 target/release/examples/remote_desktop_stability.exe --config C:/private/client.toml 123456789 30 300 "C:/Program Files/PixelsAgentBridge/pab-desktop.exe" > smoke/runs/rd-metrics/frames.jsonl
 python smoke/remote_desktop_stability.py smoke/runs/rd-metrics/frames.jsonl --output smoke/runs/rd-metrics/summary.json
 python smoke/remote_desktop_trace.py smoke/runs/rd-metrics/frames.jsonl --output smoke/runs/rd-metrics/trace.json
@@ -69,7 +69,7 @@ Windows 原生采集使用自己的精确定时器控制 FPS，并在私有 help
 
 `remote_desktop_trace.py` 以会话内帧号关联发送端和接收端，比较各自单调时钟上的相邻帧间隔，不相减两台机器的时钟。报告保留超过 100 ms 的显示通知间隔和附近同一路径的丢包检测计数变化；丢包检测不等于精确重传次数，相关性也不能单独证明网络根因。缺少帧记录、正常关闭或完整遥测汇总时，`trace_complete` 为 false，不得将结果记为诊断通过。
 
-需要验证未安装的候选服务时，构建 `cargo build --release --locked -p pab-executor --example remote_desktop_host -j 4`。在被控测试机的交互用户会话内运行 `remote_desktop_host.exe --config C:/private/host.toml host 900 34923`，其中 IPC 端口必须空闲且大于 1023。TOML 使用实际控制服务、Relay 与公有 CA 配置，并设置 `[executor]` 下的 `data_dir` 到专用 `smoke` 子目录；整个目录仅允许测试用户和 SYSTEM 读取。禁止复制现有设备身份或账号库。
+需要验证未安装的候选服务时，构建 `python -m smoke.cargo --build --release --locked -p pab-executor --example remote_desktop_host`。在被控测试机的交互用户会话内运行 `remote_desktop_host.exe --config C:/private/host.toml host 900 34923`，其中 IPC 端口必须空闲且大于 1023。TOML 使用实际控制服务、Relay 与公有 CA 配置，并设置 `[executor]` 下的 `data_dir` 到专用 `smoke` 子目录；整个目录仅允许测试用户和 SYSTEM 读取。禁止复制现有设备身份或账号库。
 
 该程序使用产品 Executor 和经身份验证的媒体 helper，注册独立测试设备。`data_dir/registration.json` 提供设备码与构建类型，`access-password.txt` 仅供正常设备密码认证，通过受保护通道交给控制端；不得写入命令行、报告或 Git。控制端可将同一 release `remote_desktop_host.exe` 作为显示 worker。主进程正常结束会删除密码，提前终止后须另行清理密码、自己的子进程和测试设备记录；不操作现有应用的进程、服务和配置。
 
@@ -120,7 +120,7 @@ python smoke/remote_desktop_proof.py receiver.jsonl proof-capture-PID.jsonl --ou
 ```sh
 python smoke/remote_desktop_replay.py --worker C:/private/smoke/remote_desktop_host.exe --archive C:/private/smoke/clip.pab --show-synthetic --output smoke/runs/rd-proof/hardware.json
 python smoke/remote_desktop_replay.py --worker C:/private/smoke/remote_desktop_host.exe --archive C:/private/smoke/clip.pab --show-synthetic --software --output smoke/runs/rd-proof/software.json
-cargo build --release --locked -p pab-desktop-media --example remote_desktop_color -j 4
+python -m smoke.cargo --build --release --locked -p pab-desktop-media --example remote_desktop_color
 target/release/examples/remote_desktop_color.exe replay C:/private/smoke/clip.pab
 ```
 
@@ -147,7 +147,7 @@ machine's job budget:
 New-Item -ItemType Directory -Force smoke/local/mf-qualification | Out-Null
 cl /nologo /O2 /EHsc /std:c++17 smoke/windows_mf_encoder_probe.cpp /Fosmoke/local/mf-qualification/probe.obj /Fesmoke/local/mf-qualification/probe.exe /link mfplat.lib mfuuid.lib ole32.lib d3d11.lib dxgi.lib dxguid.lib wmcodecdspuuid.lib
 & smoke/local/mf-qualification/probe.exe (Join-Path $PWD smoke/local/mf-qualification/generated.pab)
-cargo build --release --locked -p pab-desktop-media --example remote_desktop_color -j 4
+python -m smoke.cargo --build --release --locked -p pab-desktop-media --example remote_desktop_color
 & target/release/examples/remote_desktop_color.exe replay smoke/local/mf-qualification/generated.pab
 ```
 
@@ -365,7 +365,7 @@ For counted loss, delay and blackout testing without changing a machine's NIC,
 run the real QUIC integration cases:
 
 ```powershell
-cargo test --locked -j 4 -p pab-remote-desktop --test reliable_sessions network_recovery:: -- --nocapture --test-threads=1
+python -m smoke.cargo -p pab-remote-desktop --test reliable_sessions network_recovery:: -- --nocapture --test-threads=1
 ```
 
 The implementation is `smoke/remote_desktop_network_recovery.rs`. A bounded UDP

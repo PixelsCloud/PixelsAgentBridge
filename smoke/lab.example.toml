@@ -31,17 +31,20 @@ nodes = ["test-relay-a", "test-relay-b"]
 # selected interactive session, while user-switch tests retain service privileges.
 # Discover the current session ID before testing; do not assume it is 1.
 enabled = false
-worker = "target/debug/pab-executor.exe"
-process_fixture = "target/debug/examples/process_fixture.exe"
+worker = "target/release/pab-executor.exe"
+process_fixture = "target/release/examples/process_fixture.exe"
 user = "YOUR_TEST_SESSION_ID_OR_UID"
 
 [android]
-# Opt in only after preparing a test phone; connection is temporarily switched and restored.
+# Exact Release APK, ordinary saved pairing; no fixture or connection-settings changes.
+# Unlock the phone on Pixels home with the password hidden and accessibility ready.
 enabled = false
 serial = "YOUR_TEST_DEVICE_SERIAL"
-apk = "apps/android/app/build/outputs/apk/debug/app-debug.apk"
-mcp = "target/debug/pab-mcp.exe"
-fixture = "target/debug/examples/remote-fixture.exe"
+package = "com.pixels.agent"
+code = "YOUR_TEST_DEVICE_CODE"
+apk = "apps/android/app/build/outputs/apk/release/app-release.apk"
+mcp = "target/release/pab-mcp.exe"
+config = "smoke/local/android-operator.toml"
 
 # Do not put passwords, tokens, private keys or production database URLs here.
 # Existing test-specific private configuration stays in smoke/local/.

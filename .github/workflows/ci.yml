@@ -57,4 +57,4 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install 1.95.0 --profile minimal
-      - run: cargo test --locked -j 4 -p pab-protocol -p pab-transport -p pab-remote-desktop
+      - run: python3 -m smoke.cargo -p pab-protocol -p pab-transport -p pab-remote-desktop

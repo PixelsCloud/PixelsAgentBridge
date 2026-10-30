@@ -41,7 +41,11 @@
 
 运行器串行执行套件。Cargo 适配器使用 1 个作业，运行前检查其他原生构建；嵌套 CMake 和 Rayon 也限制为 1。其他会话仍需共同遵守**每台机器总编译并发不超过 10**，发现资源冲突应等待。检查本身不安装应用、不升级手机、不修改线上服务。
 
-Cargo 检查显式使用 `fixtures/client-defaults.toml` 的空默认配置，避免依赖维护者本机的私有地址和 CA。集成测试运行时再注入它自己创建的配置。`AUTO-13` 是单独显式启用的真机项目，会临时切换并恢复手机连接。
+Cargo 检查统一使用快速 Release 参数（opt-level=2、LTO=false、16 个 codegen units、增量缓存），包括独立 Executor 入口和 CI。`--profile release` 表示验收范围，不代表发版高优化参数；公开产物仍由发布构建入口生成。安装依赖默认准备到 `target/release/deps`；自定义 target/triple 时使用 `native_runtime.py --destination` 指向测试二进制目录。
+
+Cargo 检查显式使用 `fixtures/client-defaults.toml` 的空默认配置，避免依赖维护者本机的私有地址和 CA。集成测试运行时再注入它自己创建的配置。`AUTO-13` 使用候选 Release APK 的普通连接，核对安装哈希、USB/远端设备码、能力和页面观察，不切换手机服务、不访问应用私有目录。`package` 可填写保留原签名身份的不可调试 Release 设备变体，但候选哈希必须完全相同。
+
+`android.py` / `test_android_remote.py` 保留为旧内部夹具入口，不用于正式候选包验收；它们依赖可调试测试身份和专用 Activity，不能通过将公开包设为 debuggable 来满足。正式包的输入、截图、幂等、授权边界及切网验收仍由 `ANDROID-01/02` 单独记录，`AUTO-13` 通过不会代替这些项目。
 
 ## 查看范围与快速检查
 
@@ -68,7 +72,7 @@ python smoke/run.py run --target web --profile quick --arch x86_64
 先按 BUILDING.md 构建候选产物；以下命令只使用已有产物，不重新分配版本。`--binary` 和 `--assets` 指向实际构建输出：
 
 ```sh
-python smoke/web_fixture.py create --binary target/debug/pab-server.exe --assets apps/web/dist --postgres-image postgres:18.6
+python smoke/web_fixture.py create --binary target/release/pab-server.exe --assets apps/web/dist --postgres-image postgres:18.6
 ```
 
 macOS/Linux 将二进制路径改为对应平台的 `pab-server`。镜像版本可以替换成项目支持且预先拉取的 PostgreSQL tag/digest，正式验收建议固定 digest。
@@ -148,7 +152,7 @@ python smoke/live_system.py --lab smoke/local/native-lab.toml --config smoke/loc
 
 ```sh
 cargo build --locked -j 4 -p pab-os-control --example service_fixture
-python smoke/live_services.py --lab smoke/local/native-lab.toml --config smoke/local/test-operator.toml --mcp PATH_TO_MCP --windows-fixture target/debug/examples/service_fixture.exe --output smoke/runs/UNIQUE_SERVICE_RUN
+python smoke/live_services.py --lab smoke/local/native-lab.toml --config smoke/local/test-operator.toml --mcp PATH_TO_MCP --windows-fixture target/release/examples/service_fixture.exe --output smoke/runs/UNIQUE_SERVICE_RUN
 python smoke/live_browser.py --lab smoke/local/browser-lab.toml --config smoke/local/test-operator.toml --mcp PATH_TO_MCP --output smoke/runs/UNIQUE_BROWSER_RUN
 python smoke/live_containers.py --device-code TEST_DEVICE_CODE --docker-context TEST_CONTEXT --image EXISTING_FIXTURE_IMAGE --config smoke/local/test-operator.toml --mcp PATH_TO_MCP --output smoke/runs/UNIQUE_CONTAINER_RUN
 ```

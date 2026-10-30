@@ -56,7 +56,8 @@ class BuildProducts(unittest.TestCase):
         def fake_run(command, cwd=None):
             self.commands.append([str(x) for x in command])
             if command[0] == 'cargo':
-                folder = self.root / 'target/debug'
+                self.assertIn('--release', command)
+                folder = self.root / 'target/release'
                 folder.mkdir(parents=True, exist_ok=True)
                 suffix = '.exe' if build.os.name == 'nt' else ''
                 for i, value in enumerate(command[:-1]):
@@ -76,7 +77,7 @@ class BuildProducts(unittest.TestCase):
             build.main()
 
     def receipt(self, target):
-        return json.loads((self.root / f'.build/builds/{target}-debug.json').read_text())
+        return json.loads((self.root / f'.build/builds/{target}-release.json').read_text())
 
     def test_relay_build_and_package_without_node_or_web(self):
         self.exercise(['relay', '--package'], unavailable=('npm', 'node'))

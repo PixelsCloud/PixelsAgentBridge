@@ -116,7 +116,7 @@ class Versions(TestCase):
 
         def fake_run(command, cwd=None):
             commands.append(command)
-            folder = self.root / '.build/guest-desktop-linux-debug'
+            folder = self.root / '.build/guest-desktop-linux-release'
             folder.mkdir(parents=True, exist_ok=True)
             for name in ('pab-mcp', 'pab-executor', 'pab-document-worker'):
                 (folder / name).write_bytes(b'fixture')
@@ -127,7 +127,7 @@ class Versions(TestCase):
             build.main()
         self.assertEqual(len(commands), 1)
         self.assertIn('-ComponentsOnly', commands[0])
-        record = json.loads((self.root / '.build/builds/linux-debug.json').read_text())
+        record = json.loads((self.root / '.build/builds/linux-release.json').read_text())
         self.assertEqual(set(record['files']), {'pab-mcp', 'pab-executor', 'pab-document-worker'})
         self.assertEqual(read_state(self.root)['build_count'], 1)
 
@@ -156,14 +156,15 @@ class Versions(TestCase):
         def fake_run(command, cwd=None):
             commands.append([str(x) for x in command])
             if command[0] == 'cargo':
+                self.assertIn('--release', command)
                 target = command[command.index('--target') + 1]
-                folder = self.root / 'target' / target / 'debug'
+                folder = self.root / 'target' / target / 'release'
                 folder.mkdir(parents=True)
                 for name in ('pab-executor', 'pab-mcp', 'pab-document-worker'):
                     (folder / name).write_bytes(b'fixture')
             elif command[0] == 'node':
                 target = command[command.index('--target') + 1]
-                app = self.root / 'apps/desktop/src-tauri/target' / target / 'debug/bundle/macos/Pixels Agent Bridge.app'
+                app = self.root / 'apps/desktop/src-tauri/target' / target / 'release/bundle/macos/Pixels Agent Bridge.app'
                 executable = app / 'Contents/MacOS/pab-desktop'
                 executable.parent.mkdir(parents=True)
                 executable.write_bytes(b'fixture')
@@ -175,12 +176,12 @@ class Versions(TestCase):
                 self.assertEqual(signing.call_count, 8)
         self.assertEqual(read_state(self.root), {'version': '1.2.0', 'build_count': 1})
         for architecture in ('aarch64', 'x86_64'):
-            record = json.loads((self.root / f'.build/builds/macos-{architecture}-debug.json').read_text())
+            record = json.loads((self.root / f'.build/builds/macos-{architecture}-release.json').read_text())
             self.assertEqual(record['version'], '1.2.0')
             self.assertEqual(len(record['files']), 5)
         self.assertEqual(sum(cmd[0] == 'cargo' for cmd in commands), 2)
         self.assertEqual(sum('packaging/desktop/build_macos_pkg.py' in cmd for cmd in commands), 2)
-        self.assertTrue(all('--debug' in cmd for cmd in commands if cmd[0] == 'node'))
+        self.assertTrue(all('--debug' not in cmd for cmd in commands if cmd[0] == 'node'))
         self.assertTrue(all(cmd[-2:] == ['--', '--locked'] for cmd in commands if cmd[0] == 'node'))
 
     def test_missing_macos_target_does_not_consume_version(self):

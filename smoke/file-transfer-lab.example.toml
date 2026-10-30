@@ -7,7 +7,7 @@ isolated_network = true
 mode = "auto"
 relay_urls = ["https://relay.example.test"]
 
-# cargo test --locked -j 1 -p pab-bridge --lib --no-run
+# python -m smoke.cargo -p pab-bridge --lib --no-run
 # Copy the reported native libtest binary for each OS to the publishing host
 # using Pixels; record/verify SHA-256. Do not copy the source tree or keys.
 [[file_transfer.device]]

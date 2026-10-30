@@ -46,8 +46,8 @@ def adb(serial: str, *args: str, check: bool = True, timeout: float = 20) -> str
     return result.stdout
 
 
-def installed_apk_sha256(serial: str) -> str:
-    paths = adb(serial, "shell", "pm", "path", PACKAGE).splitlines()
+def installed_apk_sha256(serial: str, package: str = PACKAGE) -> str:
+    paths = adb(serial, "shell", "pm", "path", package).splitlines()
     if len(paths) != 1 or not paths[0].startswith("package:/data/app/"):
         raise RuntimeError("Expected one installed base APK for the selected package")
     path = paths[0].removeprefix("package:")

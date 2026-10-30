@@ -25,12 +25,20 @@ def command_for(adapter, directory, lab):
             raise ValueError("Linux media compatibility requires g++ and pkg-config/libdrm headers")
         return [sys.executable, str(ROOT / "smoke/linux_media_compat.py"),
                 "--output", str(directory)], ROOT, env, "counts"
-    if adapter == "android-relay":
+    if adapter in ("android-relay", "android-release"):
         android = lab.get("android", {})
         if android.get("enabled") is not True or not android.get("serial"):
             raise ValueError("Explicitly enable a prepared Android test device in lab.toml")
-        command = [sys.executable, str(ROOT / "smoke/android.py"), "--serial", android["serial"], "--output", str(directory)]
-        for name in ("apk", "mcp", "fixture"):
+        script = "android_release.py" if adapter == "android-release" else "android.py"
+        command = [sys.executable, str(ROOT / "smoke" / script), "--serial", android["serial"], "--output", str(directory)]
+        if adapter == "android-release":
+            for name in ("package", "code"):
+                value = android.get(name, "")
+                pattern = r"[0-9]{9}" if name == "code" else r"[A-Za-z]\w*(?:\.[A-Za-z]\w*)+"
+                if not isinstance(value, str) or not re.fullmatch(pattern, value):
+                    raise ValueError("Configure the Android test " + name)
+                command += ["--" + name, value]
+        for name in (("apk", "mcp", "config") if adapter == "android-release" else ("apk", "mcp", "fixture")):
             path = (ROOT / android.get(name, "missing-artifact")).resolve()
             if not path.is_file():
                 raise ValueError(f"Missing Android test artifact: {name}")
@@ -45,8 +53,8 @@ def command_for(adapter, directory, lab):
     if adapter.startswith("cargo-"):
         if adapter == "cargo-media-timing" and os.name != "nt":
             raise ValueError("Windows media timing requires a Windows host")
-        from smoke.native_env import prepare
-        env = prepare(env)
+        from smoke.cargo import environment, test_command
+        env = environment(env)
         env["PAB_CLIENT_DEFAULTS_FILE"] = str(ROOT / "smoke/fixtures/client-defaults.toml")
         selections = {
             "cargo-core": ["-p", "pab-protocol", "-p", "pab-terminal", "--lib"],
@@ -93,7 +101,7 @@ def command_for(adapter, directory, lab):
             fixture_info(fixture)
             env["DATABASE_URL"] = tomllib.loads(fixture.read_text(encoding="utf-8"))["database"]["url"]
         # A single Cargo job also bounds native build scripts that inherit NUM_JOBS.
-        return ["cargo", "test", "--locked", "-j", "1", *selections[adapter], "--", "--test-threads=1"], ROOT, env, "libtest"
+        return test_command([*selections[adapter], "--", "--test-threads=1"]), ROOT, env, "libtest"
     if adapter == "file-transfer-lab":
         settings = lab.get("file_transfer_lab", {})
         if settings.get("enabled") is not True:

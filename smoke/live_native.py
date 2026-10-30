@@ -15,7 +15,28 @@ import time
 import tomllib
 import uuid
 
-from mcp_client import McpClient, McpToolError
+if __package__:
+    from .mcp_client import McpClient, McpToolError
+else:
+    from mcp_client import McpClient, McpToolError
+
+
+def temporary_parent(family):
+    # macOS /tmp is a symlink; file operations intentionally reject link parents.
+    if family == 'windows':
+        return PureWindowsPath(r'C:\Windows\Temp')
+    if family in ('macos', 'linux'):
+        return PurePosixPath('/private/tmp' if family == 'macos' else '/tmp')
+    raise ValueError('Unsupported native test OS: ' + family)
+
+
+def owned_temporary_path(family, root):
+    parent = temporary_parent(family)
+    target = type(parent)(root)
+    if target.parent != parent or not target.name.startswith('pab-smoke-'):
+        raise ValueError('Refusing cleanup outside the owned temporary directory')
+    uuid.UUID(target.name.removeprefix('pab-smoke-'))
+    return target
 
 
 def main():
@@ -89,7 +110,7 @@ def main():
             passed('all', 'complete_tool_catalog')
             for device in lab['device']:
                 code, family = device['code'], device['os']
-                root = (r'C:\Windows\Temp\pab-smoke-' if family == 'windows' else '/tmp/pab-smoke-') + str(uuid.uuid4())
+                root = str(temporary_parent(family) / ('pab-smoke-' + str(uuid.uuid4())))
                 terminal = None
                 created = False
                 cleanup_ok = False
@@ -205,11 +226,7 @@ def main():
                         call('pab_terminal_close', {'session_id': terminal}, observe=False, allow_error=True)
                     if created:
                         # Delete only the exact UUID path created by this run.
-                        path_type = PureWindowsPath if family == 'windows' else PurePosixPath
-                        parent = path_type(r'C:\Windows\Temp' if family == 'windows' else '/tmp')
-                        target = path_type(root)
-                        assert target.parent == parent and target.name.startswith('pab-smoke-')
-                        uuid.UUID(target.name.removeprefix('pab-smoke-'))
+                        owned_temporary_path(family, root)
                         deleted = call('pab_file_delete', {'device_code': code, 'path': root, 'recursive': True,
                             'max_entries': 100, 'max_bytes': 10 * 1024 * 1024}, allow_error=True)
                         cleanup_ok = deleted.get('result', {}).get('state') == 'completed'

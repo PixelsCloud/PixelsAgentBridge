@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import importlib.util
 import platform
+import os
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,5 +33,8 @@ def stage(destination):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--destination", type=Path, default=ROOT / "target/debug/deps")
+    target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
+    if not target.is_absolute():
+        target = ROOT / target
+    parser.add_argument("--destination", type=Path, default=target / "release/deps")
     print(stage(parser.parse_args().destination))

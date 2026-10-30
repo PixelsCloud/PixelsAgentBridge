@@ -13,6 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from smoke.adapters import counts_for
+from smoke.cargo import environment, test_command
 
 
 def execute(binary, directory, native, unit_user=None):
@@ -63,9 +64,9 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     binary = args.binary
     if binary is None:
-        result = subprocess.run(["cargo", "test", "-p", "pab-executor", "--lib", "--locked", "-j1",
-                                 "--no-run", "--message-format=json"], cwd=ROOT, capture_output=True,
-                                encoding="utf-8", errors="replace")
+        result = subprocess.run(test_command(["-p", "pab-executor", "--lib",
+                                 "--no-run", "--message-format=json"]), cwd=ROOT, capture_output=True,
+                                encoding="utf-8", errors="replace", env=environment())
         (args.output / "build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
         if result.returncode:
             raise RuntimeError("Executor test build failed; inspect build.log")

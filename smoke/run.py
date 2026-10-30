@@ -231,7 +231,7 @@ def run_case(case, item, path, report, lab):
     try:
         if case["adapter"].startswith("cargo-") and other_builds_running():
             raise ValueError("Another native build is active; wait for the shared build budget")
-        if case["adapter"] == "android-relay":
+        if case["adapter"] in ("android-relay", "android-release"):
             apk = ROOT / lab.get("android", {}).get("apk", "missing-artifact")
             if not apk.is_file() or digest(apk) != report["artifact"].get("sha256"):
                 raise ValueError("Android test APK must match this report's candidate artifact")
