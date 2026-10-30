@@ -18,7 +18,7 @@ arboard = { version = "=3.6.1", default-features = false, features = ["wayland-d
 image = { version = "=0.25.10", default-features = false, features = ["png", "bmp"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Ole", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_System_DataExchange", "Win32_System_Environment", "Win32_System_JobObjects", "Win32_System_Memory", "Win32_System_Ole", "Win32_System_RemoteDesktop", "Win32_System_StationsAndDesktops", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
 cc = "1"

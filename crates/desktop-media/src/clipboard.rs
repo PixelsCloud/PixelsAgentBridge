@@ -3,6 +3,9 @@
 use pab_protocol::*;
 use std::{io, path::PathBuf, process::Stdio};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, process::{Child, ChildStdin, ChildStdout}, sync::Mutex};
+#[cfg(windows)]
+#[path = "clipboard_windows_user.rs"]
+mod windows_user;
 #[cfg(target_os = "linux")]
 #[path = "linux_clipboard_environment.rs"]
 mod linux_environment;
@@ -148,6 +151,15 @@ mod native {
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 pub fn worker_main() -> i32 {
     use std::io::{Read,Write};
+    // Windows restricts registered clipboard formats by process identity.
+    // SYSTEM capture workers must delegate to the same session's logged-in user;
+    // their bitmap fallback can otherwise silently discard PNG transparency.
+    #[cfg(windows)]
+    match windows_user::run_if_system() {
+        Ok(Some(code)) => return code,
+        Ok(None) => {},
+        Err(_) => return 1,
+    }
     #[cfg(target_os = "linux")] linux_environment::initialize();
     let mut state=None;
     let mut input=std::io::stdin().lock(); let mut output=std::io::stdout().lock();
