@@ -1,9 +1,47 @@
 package com.pixels.agent.core
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 
 class TextInsertionTest {
+    @Test
+    fun delayedTextReadbackConfirmsWithoutRepeatingInsertion() = runTest {
+        var reads = 0
+        var moves = 0
+        val result =
+            confirmTextInsertionWhenReady(
+                "hello",
+                5,
+                {
+                    reads++
+                    TextInsertionObservation(if (reads < 4) "old" else "hello", 5, 5)
+                },
+                { moves++ },
+            )
+        assertEquals(AutomationResult.Dispatched(true), result)
+        assertEquals(4, reads)
+        assertEquals(0, moves)
+    }
+
+    @Test
+    fun missingTextReadbackStopsAtBoundAndNeverMovesCaret() = runTest {
+        var reads = 0
+        val result =
+            confirmTextInsertionWhenReady(
+                "hello",
+                5,
+                {
+                    reads++
+                    null
+                },
+            ) {
+                error("No verified text")
+            }
+        assertEquals(AutomationResult.Failed(AutomationError.UNCONFIRMED), result)
+        assertEquals(21, reads)
+    }
+
     @Test
     fun matchingTextAndCaretNeedsNoSecondAction() {
         val result =

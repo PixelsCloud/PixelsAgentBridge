@@ -318,7 +318,7 @@ class AndroidAutomationBackend(private val context: Context) : AutomationBackend
                     )
                 if (!changed) return@nodeAction failure(AutomationError.UNCONFIRMED)
                 val caret = minOf(start, end) + text.length
-                com.pixels.agent.core.confirmTextInsertion(
+                com.pixels.agent.core.confirmTextInsertionWhenReady(
                     replacement,
                     caret,
                     read = {
@@ -432,7 +432,7 @@ class AndroidAutomationBackend(private val context: Context) : AutomationBackend
 
     private suspend fun nodeAction(
         reference: String,
-        action: (AccessibilityNodeInfo) -> AutomationResult,
+        action: suspend (AccessibilityNodeInfo) -> AutomationResult,
     ): AutomationResult =
         withContext(Dispatchers.Main.immediate) {
             val active = service ?: return@withContext failure(AutomationError.SERVICE_UNAVAILABLE)

@@ -1,6 +1,35 @@
 package com.pixels.agent.core
 
+import kotlinx.coroutines.delay
+
 data class TextInsertionObservation(val text: String?, val start: Int, val end: Int)
+
+/** Accessibility text updates can arrive after ACTION_SET_TEXT returns. Read only; never replay. */
+suspend fun confirmTextInsertionWhenReady(
+    expected: String,
+    caret: Int,
+    read: () -> TextInsertionObservation?,
+    moveCaret: () -> Unit,
+): AutomationResult {
+    var observed = read()
+    var remaining = 20
+    while (observed?.text != expected && remaining-- > 0) {
+        delay(25)
+        observed = read()
+    }
+    var first = true
+    return confirmTextInsertion(
+        expected,
+        caret,
+        read = {
+            if (first) {
+                first = false
+                observed
+            } else read()
+        },
+        moveCaret = moveCaret,
+    )
+}
 
 /** Confirm the text separately from the caret. Never replay a text mutation. */
 fun confirmTextInsertion(
