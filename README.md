@@ -8,6 +8,22 @@ English · [简体中文](README.zh-CN.md)
 
 Pixels Agent Bridge connects AI agents to computers and Android devices through MCP. Use natural language to run commands, manage files, inspect systems, and operate applications across devices. Open a remote desktop or terminal yourself when a task needs hands-on help.
 
+## What it can do
+
+- **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text/PNG image clipboard sync. Choose a 15/30/60 FPS limit (30 by default); the local pointer follows the remote cursor shape. Sessions start in view-only mode, and taking over an occupied session requires confirmation.
+- **Commands and terminals:** run programs, use independent interactive terminal windows, and read task output. Windows also provides a System terminal where supported.
+- **Files:** a separate two-pane file-transfer window with device tabs, file/folder transfers, progress, speed and elapsed time. Resolve name conflicts by replacing, skipping or keeping both, optionally applying the choice to remaining conflicts in that transfer. MCP also supports file search, editing, copying and archiving.
+- **Desktop automation:** capture JPEG screenshots, inspect windows and UI controls, and send mouse and keyboard input on Windows and macOS.
+- **System and development tools:** inspect system resources, processes, and networks; work with supported service, Git, and Docker operations.
+- **Documents and browsers:** extract and search documents, render supported formats, run offline OCR, and automate a Pixels-managed browser. Agents can request human help when a task requires it.
+- **Android target devices:** use supported accessibility, screenshot, file, application, notification, command, and network tools. Desktop file-transfer and terminal windows use the Android app's identity and granted access; they do not provide root or ADB-shell privileges.
+- **Desktop app:** manage devices, view local task history, and monitor each agent's MCP connections. Includes English, Simplified Chinese, and light/dark themes.
+- **Accounts and Web console:** sign in, manage users and devices, and operate Relay nodes with capacity settings, connection monitoring, maintenance, and disable/resume controls. Task history stays local and is not uploaded to the server.
+
+Desktop automatically detects and configures installed **Codex, Kimi Code, Claude Code, DeepSeek Harness, and OpenCode** clients at startup. Missing clients are skipped, existing configuration is preserved, and integrations you disable stay disabled. Other clients and headless installations can use the stdio MCP entry point.
+
+See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the complete workflow and platform limits. This README describes the current source; the features available in an installed package depend on its release.
+
 ## Product at a glance
 
 Click any screenshot to view it at full size.
@@ -60,22 +76,6 @@ Ask DeepSeek Harness to check a remote device's CPU and memory usage through Pix
     <td width="50%" valign="top"><a href="assets/images/en/pab-en.jpg"><img src="assets/images/en/pab-en.jpg" alt="Web console overview of devices, traffic, and Relay status" width="100%"></a></td>
   </tr>
 </table>
-
-## What it can do
-
-- **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text/PNG image clipboard sync. Choose a 15/30/60 FPS limit (30 by default); the local pointer follows the remote cursor shape. Sessions start in view-only mode, and taking over an occupied session requires confirmation.
-- **Commands and terminals:** run programs, use independent interactive terminal windows, and read task output. Windows also provides a System terminal where supported.
-- **Files:** a separate two-pane file-transfer window with device tabs, file/folder transfers, progress, speed and elapsed time. Resolve name conflicts by replacing, skipping or keeping both, optionally applying the choice to remaining conflicts in that transfer. MCP also supports file search, editing, copying and archiving.
-- **Desktop automation:** capture JPEG screenshots, inspect windows and UI controls, and send mouse and keyboard input on Windows and macOS.
-- **System and development tools:** inspect system resources, processes, and networks; work with supported service, Git, and Docker operations.
-- **Documents and browsers:** extract and search documents, render supported formats, run offline OCR, and automate a Pixels-managed browser. Agents can request human help when a task requires it.
-- **Android target devices:** use supported accessibility, screenshot, file, application, notification, command, and network tools. Desktop file-transfer and terminal windows use the Android app's identity and granted access; they do not provide root or ADB-shell privileges.
-- **Desktop app:** manage devices, view local task history, and monitor each agent's MCP connections. Includes English, Simplified Chinese, and light/dark themes.
-- **Accounts and Web console:** sign in, manage users and devices, and operate Relay nodes with capacity settings, connection monitoring, maintenance, and disable/resume controls. Task history stays local and is not uploaded to the server.
-
-Desktop automatically detects and configures installed **Codex, Kimi Code, Claude Code, DeepSeek Harness, and OpenCode** clients at startup. Missing clients are skipped, existing configuration is preserved, and integrations you disable stay disabled. Other clients and headless installations can use the stdio MCP entry point.
-
-See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the complete workflow and platform limits. This README describes the current source; the features available in an installed package depend on its release.
 
 ## Supported platforms
 
