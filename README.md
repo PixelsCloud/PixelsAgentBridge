@@ -14,6 +14,7 @@ Pixels Agent Bridge 通过 MCP 将 AI Agent 与计算机、Android 设备连接�
 
 - **远程桌面**：独立窗口查看画面，支持切换屏幕、鼠标键盘、全屏及文字／PNG 图片剪贴板同步。可选 15／30／60 FPS 上限，默认 30 FPS；使用本机指针并同步远端样式。默认只查看，已占用会话需明确确认后才能接管。
 - **命令与终端**：运行程序、使用独立交互式终端窗口、查看任务输出；Windows 在支持的环境下提供 System 终端。
+- **DeepSeek Harness 插件**：在 DeepSeek Harness 侧栏直接登录、添加和管理设备、打开远程终端、查看任务记录，配合 Agent 跨设备执行任务；操作端无需另装 Pixels 桌面应用。
 - **文件操作**：独立双栏文件传输窗口，支持设备标签页、文件／文件夹传输、进度、速度和用时展示。同名冲突可选择替换、跳过或保留两者，并将选择用于本次传输后续冲突。MCP 也支持文件搜索、编辑、复制和压缩。
 - **桌面自动化**：在 Windows、macOS 上获取 JPEG 截图、查询窗口与 UI 控件、发送键鼠输入。
 - **系统与开发工具**：查询系统资源、进程和网络，执行平台支持的服务管理、Git 和 Docker 操作。
@@ -69,6 +70,12 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 交互式执行远程命令
 
 [![远程终端中的 PowerShell 交互会话](assets/images/cn/terminal-cn.jpg)](assets/images/cn/terminal-cn.jpg)
+
+### DeepSeek Harness 插件
+
+在 DeepSeek Harness 侧栏使用 Pixels 管理设备、打开远程终端和查看任务记录，并让 Agent 查询远程设备的 CPU、内存与 GPU 状态。操作端无需另装 Pixels 桌面应用，被控端仍需安装 Pixels。安装与使用见[插件说明](apps/dsh-pab/README.md)。
+
+[![DeepSeek Harness 中的 Pixels 插件侧栏与远程设备状态查询](assets/images/cn/dsh.png)](assets/images/cn/dsh.png)
 
 ### Web 管理后台
 

@@ -14,6 +14,7 @@ Pixels Agent Bridge connects AI agents to computers and Android devices through 
 
 - **Remote desktop:** an independent viewer with screen switching, mouse and keyboard control, full screen, and text/PNG image clipboard sync. Choose a 15/30/60 FPS limit (30 by default); the local pointer follows the remote cursor shape. Sessions start in view-only mode, and taking over an occupied session requires confirmation.
 - **Commands and terminals:** run programs, use independent interactive terminal windows, and read task output. Windows also provides a System terminal where supported.
+- **DeepSeek Harness plugin:** sign in, add and manage devices, open remote terminals, and view task history from the DeepSeek Harness sidebar while your agent works across devices. No separate Pixels desktop app is needed on the operator machine.
 - **Files:** a separate two-pane file-transfer window with device tabs, file/folder transfers, progress, speed and elapsed time. Resolve name conflicts by replacing, skipping or keeping both, optionally applying the choice to remaining conflicts in that transfer. MCP also supports file search, editing, copying and archiving.
 - **Desktop automation:** capture JPEG screenshots, inspect windows and UI controls, and send mouse and keyboard input on Windows and macOS.
 - **System and development tools:** inspect system resources, processes, and networks; work with supported service, Git, and Docker operations.
@@ -69,6 +70,12 @@ Browse and transfer files
 Interactive commands
 
 [![Remote terminal running an interactive PowerShell session](assets/images/en/terminal-en.jpg)](assets/images/en/terminal-en.jpg)
+
+### DeepSeek Harness plugin
+
+Use Pixels in the DeepSeek Harness sidebar to manage devices, open remote terminals, and view task history while your agent checks a remote device's CPU, memory, and GPU status. The operator does not need a separate Pixels desktop app; target devices still need Pixels installed. See the [plugin guide](apps/dsh-pab/README.md) for installation and usage.
+
+[![Pixels plugin sidebar and remote device status query in DeepSeek Harness](assets/images/cn/dsh.png)](assets/images/cn/dsh.png)
 
 ### Web console
 
