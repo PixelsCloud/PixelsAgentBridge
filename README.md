@@ -1,9 +1,3 @@
-<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
-  <a href="assets/videos/pixels_showcase.mp4">观看 Pixels Agent Bridge 展示视频</a>
-</video>
-
-[观看展示视频](assets/videos/pixels_showcase.mp4)
-
 ![Pixels Agent Bridge — 让 AI 跨设备执行任务](assets/images/cn/banner-cn.svg)
 
 # Pixels Agent Bridge
@@ -34,6 +28,12 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 完整流程与平台限制见[功能与使用说明](docs/FIRST_VERSION.md)。本文描述当前源码，已安装软件提供的功能以对应发行包为准。
 
 ## 产品一览
+
+<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
+  <a href="assets/videos/pixels_showcase.mp4">观看 Pixels Agent Bridge 展示视频</a>
+</video>
+
+[观看展示视频](assets/videos/pixels_showcase.mp4)
 
 点击截图可查看原图。
 

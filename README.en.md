@@ -1,9 +1,3 @@
-<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
-  <a href="assets/videos/pixels_showcase.mp4">Watch the Pixels Agent Bridge showcase</a>
-</video>
-
-[Watch the showcase video](assets/videos/pixels_showcase.mp4)
-
 ![Pixels Agent Bridge — Your AI. Across your devices.](assets/images/en/banner-en.svg)
 
 # Pixels Agent Bridge
@@ -34,6 +28,12 @@ Desktop automatically detects and configures installed **Codex, Kimi Code, Claud
 See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the complete workflow and platform limits. This README describes the current source; the features available in an installed package depend on its release.
 
 ## Product at a glance
+
+<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
+  <a href="assets/videos/pixels_showcase.mp4">Watch the Pixels Agent Bridge showcase</a>
+</video>
+
+[Watch the showcase video](assets/videos/pixels_showcase.mp4)
 
 Click any screenshot to view it at full size.
 
