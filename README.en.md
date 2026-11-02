@@ -29,11 +29,7 @@ See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the compl
 
 ## Product at a glance
 
-<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
-  <a href="assets/videos/pixels_showcase.mp4">Watch the Pixels Agent Bridge showcase</a>
-</video>
-
-[Watch the showcase video](assets/videos/pixels_showcase.mp4)
+https://github.com/user-attachments/assets/7f54bdf9-3641-4e8b-98ab-2662f9cd2275
 
 Click any screenshot to view it at full size.
 

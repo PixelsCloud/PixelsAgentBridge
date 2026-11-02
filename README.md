@@ -29,11 +29,7 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 
 ## 产品一览
 
-<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
-  <a href="assets/videos/pixels_showcase.mp4">观看 Pixels Agent Bridge 展示视频</a>
-</video>
-
-[观看展示视频](assets/videos/pixels_showcase.mp4)
+https://github.com/user-attachments/assets/7f54bdf9-3641-4e8b-98ab-2662f9cd2275
 
 点击截图可查看原图。
 
