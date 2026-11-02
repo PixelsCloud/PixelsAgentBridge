@@ -1,3 +1,9 @@
+<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
+  <a href="assets/videos/pixels_showcase.mp4">Watch the Pixels Agent Bridge showcase</a>
+</video>
+
+[Watch the showcase video](assets/videos/pixels_showcase.mp4)
+
 ![Pixels Agent Bridge — Your AI. Across your devices.](assets/images/en/banner-en.svg)
 
 # Pixels Agent Bridge

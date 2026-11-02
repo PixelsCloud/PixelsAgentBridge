@@ -1,3 +1,9 @@
+<video src="assets/videos/pixels_showcase.mp4" controls preload="metadata" width="100%">
+  <a href="assets/videos/pixels_showcase.mp4">观看 Pixels Agent Bridge 展示视频</a>
+</video>
+
+[观看展示视频](assets/videos/pixels_showcase.mp4)
+
 ![Pixels Agent Bridge — 让 AI 跨设备执行任务](assets/images/cn/banner-cn.svg)
 
 # Pixels Agent Bridge
