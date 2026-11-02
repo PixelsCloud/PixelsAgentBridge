@@ -151,13 +151,8 @@ python scripts/build.py desktop --profile release --package
 
 ## 许可证
 
-项目自有代码采用 [PolyForm Noncommercial License 1.0.0](LICENSE)。超出该许可证
-允许用途的商业使用，必须事先取得单独书面授权；这包括以商业目的用于企业内部业务。
-标准条款对教育、公益、公共研究和政府等列明机构的许可范围保持不变。
-详情见[商业授权说明](COMMERCIAL_LICENSE.md)，联系邮箱：
-[pixels.save@gmail.com](mailto:pixels.save@gmail.com)。
+项目自有代码采用 [GNU General Public License v3.0 或后续版本（GPL-3.0-or-later）](LICENSE)，允许在遵守 GPL 条款的前提下使用、修改、分发及商业使用。分发原版或修改版时，须遵守 GPL 关于相应源码、许可证与版权声明等要求。
 
-本项目属于源码可用（source-available）软件。第三方组件保留各自的许可证与声明，
-参见 [NOTICE](NOTICE) 及各组件附带的许可文件。
+详情见[许可证与商业使用说明](COMMERCIAL_LICENSE.md)。第三方组件保留各自的许可证与声明，参见 [NOTICE](NOTICE) 及各组件附带的许可文件。
 
 遇到问题可[提交 Issue](https://github.com/PixelsCloud/PixelsAgentBridge/issues)，附上系统、复现步骤和去除凭据后的日志。

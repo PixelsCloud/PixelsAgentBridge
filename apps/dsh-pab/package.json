@@ -2,7 +2,7 @@
   "name": "dsh-pab",
   "version": "0.1.0",
   "private": true,
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "GPL-3.0-or-later",
   "description": "Pixels control panel for the DeepSeek Harness Web GUI: sign in, add devices, and control them from the right sidebar.",
   "type": "module",
   "main": "src/index.js",

@@ -151,14 +151,8 @@ For your own server, follow the [Web deployment guide](docs/WEB_DEPLOYMENT.md) a
 
 ## License
 
-Project-owned code is available under the [PolyForm Noncommercial License 1.0.0](LICENSE).
-Commercial use outside that license's permitted purposes requires a separate written
-license. This includes commercial-purpose internal business use; the standard
-license's express permissions for the organizations it lists remain unchanged.
-See [commercial licensing](COMMERCIAL_LICENSE.md) or contact
-[pixels.save@gmail.com](mailto:pixels.save@gmail.com).
+Project-owned code is licensed under the [GNU General Public License v3.0 or later (GPL-3.0-or-later)](LICENSE). Use, modification, distribution, and commercial use are permitted under the GPL. Distributing original or modified versions requires compliance with the GPL, including its requirements for Corresponding Source, license copies, and copyright notices.
 
-Pixels Agent Bridge is source-available. Third-party components retain their own
-licenses and notices; see [NOTICE](NOTICE) and the notices accompanying each component.
+See the [licensing and commercial use guide](COMMERCIAL_LICENSE.md). Third-party components retain their own licenses and notices; see [NOTICE](NOTICE) and the notices accompanying each component.
 
 [Report an issue](https://github.com/PixelsCloud/PixelsAgentBridge/issues) with your platform, reproduction steps, and logs with credentials removed.

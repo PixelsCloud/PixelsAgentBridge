@@ -34,7 +34,7 @@ resolver = "2"
 exclude = ["apps/desktop/src-tauri"]
 
 [workspace.package]
-license = "PolyForm-Noncommercial-1.0.0"
+license = "GPL-3.0-or-later"
 edition = "2024"
 rust-version = "1.95"
 

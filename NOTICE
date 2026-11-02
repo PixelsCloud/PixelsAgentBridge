@@ -1,17 +1,25 @@
 Pixels Agent Bridge
-Required Notice: Copyright (c) 2026 Pixels
-Required Notice: https://github.com/PixelsCloud/PixelsAgentBridge
+Copyright (c) 2026 Pixels
+https://github.com/PixelsCloud/PixelsAgentBridge
+SPDX-License-Identifier: GPL-3.0-or-later
 
-Except for components carrying their own license, Pixels Agent Bridge is
-available under the PolyForm Noncommercial License 1.0.0:
-https://polyformproject.org/licenses/noncommercial/1.0.0
+Except for components carrying their own license, Pixels Agent Bridge is free
+software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
 
-Uses outside the purposes permitted by that license require a separate written
-commercial license from the applicable copyright holder. Contact:
-pixels.save@gmail.com
-https://github.com/PixelsCloud/PixelsAgentBridge/blob/main/COMMERCIAL_LICENSE.md
+Pixels Agent Bridge is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
 
-The PolyForm license's express permitted purposes and statutory rights remain
-unchanged. This notice is not a commercial license. Third-party components,
-including vendored code, runtimes, fonts and icons, retain their own licenses
-and notices. The project license does not relicense those components.
+You should have received a copy of the GNU General Public License along with
+this program. If not, see https://www.gnu.org/licenses/.
+
+Commercial use is permitted under the GPL. Distribution must comply with its
+applicable requirements, including those for Corresponding Source.
+Source: https://github.com/PixelsCloud/PixelsAgentBridge
+
+Third-party components, including vendored code, runtimes, fonts and icons,
+retain their own licenses and notices. The project license does not relicense
+those components.
