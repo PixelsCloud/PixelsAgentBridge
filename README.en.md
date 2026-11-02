@@ -3,6 +3,8 @@
 # Pixels Agent Bridge
 
 > **Note:** We provide a free Relay service. For faster speeds, please deploy your own Relay service.
+>
+> **Note:** After installation, please restart your agent session for MCP to take effect.
 
 **Control your devices remotely with your AI agent.**
 

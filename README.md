@@ -3,6 +3,8 @@
 # Pixels Agent Bridge
 
 > **注意：** 我们提供免费 Relay 服务，如果想获得更快的速度，请您自行部署 Relay 服务。
+>
+> **注意：** 安装之后，请重启 Agent 的 session，以使 MCP 生效。
 
 **让 AI Agent 通过网络操作你的设备。**
 
