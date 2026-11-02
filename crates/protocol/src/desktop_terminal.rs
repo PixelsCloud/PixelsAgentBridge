@@ -187,6 +187,7 @@ mod tests {
                 remote_desktop_schema_version: None,
                 remote_desktop_cursor_schema_version: None,
                 remote_desktop_clipboard_schema_version: None,
+                file_clipboard_schema_version: None,
                 ..
             }
         ));

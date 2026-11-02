@@ -6,13 +6,36 @@ pub struct RemoteDesktopClipboardControl {
     config: DesktopVideoConfig,
     ended: watch::Receiver<bool>,
     supported: bool,
+    file_supported:bool,
 }
 impl RemoteDesktopSession {
     pub fn clipboard_control(&self) -> RemoteDesktopClipboardControl {
-        RemoteDesktopClipboardControl { connection: self.connection.clone(), config: self.opened.config.clone(), ended: self.generation_ended.subscribe(), supported: self.clipboard_version == Some(DESKTOP_CLIPBOARD_VERSION) }
+        RemoteDesktopClipboardControl { connection: self.connection.clone(), config: self.opened.config.clone(), ended: self.generation_ended.subscribe(), supported: self.clipboard_version == Some(DESKTOP_CLIPBOARD_VERSION),file_supported:self.file_clipboard_version==Some(FILE_CLIPBOARD_VERSION) }
     }
 }
 impl RemoteDesktopClipboardControl {
+    pub fn files_supported(&self)->bool{self.file_supported}
+    pub async fn files(&mut self,operation:FileClipboardOperation)->Result<FileClipboardSnapshot>{
+        if !self.file_supported{return Err(DesktopError::reject(DesktopErrorCode::Unsupported,"file_clipboard_unsupported"));}
+        if *self.ended.borrow()||self.ended.has_changed().is_err(){return Err(DesktopError::Closed);}
+        operation.validate().map_err(DesktopError::Protocol)?;
+        let header=serde_json::to_vec(&operation)?;if header.len()>FILE_CLIPBOARD_HEADER{return Err(DesktopError::Protocol("file_clipboard_too_many_files"));}
+        let timeout=Duration::from_secs(12);
+        let work=async{
+            let mut channel=stream(&self.connection,RemoteDesktopRequest::FileClipboard{version:FILE_CLIPBOARD_VERSION,session_id:self.config.session_id,generation:self.config.generation,header_bytes:header.len() as u32,payload_bytes:operation.payload().len() as u32},timeout).await?;
+            if !matches!(response(&mut channel,timeout).await?,RemoteDesktopReply::Ready){return Err(DesktopError::Protocol("file_clipboard_not_ready"));}
+            let(mut writer,mut reader)=channel.into_framed();crate::file_clipboard_wire::write(&mut writer,&header).await?;crate::file_clipboard_wire::write(&mut writer,operation.payload()).await?;
+            let response=reader.read(DESKTOP_CONTROL_BYTES).await?;
+            let (header_bytes,payload_bytes)=match serde_json::from_slice::<DeviceTaskResponse>(&response)?{
+                DeviceTaskResponse::RemoteDesktop{reply:RemoteDesktopReply::FileClipboard{header_bytes,payload_bytes}}=>(header_bytes,payload_bytes),
+                DeviceTaskResponse::RemoteDesktop{reply:RemoteDesktopReply::Error{code,message}}=>return Err(DesktopError::reject(code,message)),_=>return Err(DesktopError::Protocol("file_clipboard_invalid_reply"))};
+            let header=crate::file_clipboard_wire::read(&mut reader,header_bytes,FILE_CLIPBOARD_HEADER).await?;
+            let mut snapshot:FileClipboardSnapshot=serde_json::from_slice(&header)?;snapshot.validate().map_err(DesktopError::Protocol)?;
+            if snapshot.bytes!=payload_bytes{return Err(DesktopError::Protocol("file_clipboard_invalid_reply"));}
+            snapshot.data=crate::file_clipboard_wire::read(&mut reader,payload_bytes,FILE_CLIPBOARD_CHUNK).await?;crate::file_clipboard_wire::verify(&snapshot)?;Ok(snapshot)
+        };
+        tokio::select!{biased;_=self.ended.changed()=>Err(DesktopError::Closed),result=tokio::time::timeout(timeout,work)=>result.map_err(|_|DesktopError::Timeout)?}
+    }
     pub fn is_supported(&self) -> bool { self.supported }
     pub async fn exchange(&mut self, operation: DesktopClipboardOperation) -> Result<DesktopClipboardSnapshot> {
         if !self.supported { return Err(DesktopError::reject(DesktopErrorCode::Unsupported, "remote desktop clipboard requires an updated remote client")); }

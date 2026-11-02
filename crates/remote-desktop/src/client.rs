@@ -130,6 +130,7 @@ pub struct RemoteDesktopSession {
     close_confirmed: bool,
     cursor_version: Option<u16>,
     clipboard_version: Option<u16>,
+    file_clipboard_version: Option<u16>,
     generation_ended: watch::Sender<bool>,
 }
 /// A cursor reader never owns the desktop session. Selecting a different
@@ -425,6 +426,7 @@ impl RemoteDesktopSession {
             close_confirmed: false,
             cursor_version: None,
             clipboard_version: None,
+            file_clipboard_version: None,
             generation_ended: watch::channel(false).0,
         };
         session.attach_video().await?;
@@ -444,6 +446,7 @@ impl RemoteDesktopSession {
         self.cursor_version == Some(DESKTOP_CURSOR_SCHEMA_VERSION)
     }
     pub fn with_clipboard_support(mut self, version: Option<u16>) -> Self { self.clipboard_version = version; self }
+    pub fn with_file_clipboard_support(mut self,version:Option<u16>)->Self{self.file_clipboard_version=version;self}
     /// One stream per generation. Obtain again after selecting/restarting a
     /// screen. It may be read independently while video waits for changes.
     pub async fn open_cursor(&self) -> Result<RemoteDesktopCursor> {

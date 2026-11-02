@@ -931,7 +931,7 @@ async fn tls_account_flow(pool: PgPool) {
         } => {
             assert_eq!(request_id, scopes_request_id);
             assert_eq!(options.personal_tenant_id, personal_tenant_id);
-            assert_eq!(options.personal_mbps, 10);
+            assert_eq!(options.personal_mbps, 5);
         }
         response => panic!("unexpected traffic scopes response: {response:?}"),
     }

@@ -88,7 +88,7 @@ async fn account_device_and_user_policy_flow(pool: PgPool) {
 
     let alice_scopes = control.list_traffic_scopes(&alice).await.unwrap();
     assert_eq!(alice_scopes.personal_tenant_id, alice.personal_tenant_id);
-    assert_eq!(alice_scopes.personal_mbps, 10);
+    assert_eq!(alice_scopes.personal_mbps, 5);
 
     let alice_key = SecretKey::generate();
     let bob_key = SecretKey::generate();
@@ -165,7 +165,7 @@ async fn account_device_and_user_policy_flow(pool: PgPool) {
         .relay_policy_snapshot(Duration::from_secs(60))
         .await
         .unwrap();
-    assert_eq!(snapshot.defaults.user_mbps, 10);
+    assert_eq!(snapshot.defaults.user_mbps, 5);
     assert_eq!(snapshot.user_limits.len(), 2);
     assert_eq!(snapshot.endpoints.len(), 4);
     assert!(snapshot.endpoints.iter().any(|endpoint| {

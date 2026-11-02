@@ -16,6 +16,8 @@ use tokio::time::Instant;
 mod cursor;
 #[path = "host_clipboard.rs"]
 mod clipboard;
+#[path = "host_file_clipboard.rs"]
+mod file_clipboard;
 #[path = "host_takeover.rs"]
 mod takeover;
 #[path = "host_control.rs"]
@@ -59,6 +61,9 @@ pub trait DesktopInputSink: Send {
     fn apply(&mut self, event: RemoteDesktopInput) -> MediaFuture<'_, ()>;
 }
 pub trait DesktopBackend: Send + Sync {
+    fn supports_file_clipboard(&self)->bool{false}
+    fn file_clipboard(&self,_config:DesktopVideoConfig,_operation:FileClipboardOperation)->MediaFuture<'_,FileClipboardSnapshot>{Box::pin(async{Err(DesktopError::reject(DesktopErrorCode::Unsupported,"file_clipboard_unsupported"))})}
+    fn retire_file_clipboard(&self,_config:DesktopVideoConfig)->MediaFuture<'_,()>{Box::pin(async{Ok(())})}
     fn supports_clipboard(&self) -> bool { false }
     fn clipboard(&self, _config: DesktopVideoConfig, _operation: DesktopClipboardOperation) -> MediaFuture<'_, DesktopClipboardSnapshot> {
         Box::pin(async { Err(DesktopError::reject(DesktopErrorCode::Unsupported, "text clipboard is unavailable")) })
@@ -300,6 +305,7 @@ impl DesktopHost {
     pub fn supported_clipboard_version(&self) -> Option<u16> {
         self.shared.backend.as_ref().filter(|backend| backend.supports_clipboard()).map(|_| DESKTOP_CLIPBOARD_VERSION)
     }
+    pub fn supported_file_clipboard_version(&self)->Option<u16>{self.shared.backend.as_ref().filter(|b|b.supports_file_clipboard()).map(|_|FILE_CLIPBOARD_VERSION)}
     pub fn supported_cursor_version(&self) -> Option<u16> {
         self.shared
             .backend
@@ -325,6 +331,9 @@ impl DesktopHost {
     }
     fn release(&self, entry: &Arc<Entry>) {
         entry.stop();
+        if let Some(backend)=self.shared.backend.clone(){if let Some(config)=entry.state.lock().unwrap().as_ref().map(|s|s.video.config.clone()){
+            if let Ok(runtime)=tokio::runtime::Handle::try_current(){runtime.spawn(async move{let _=backend.retire_file_clipboard(config).await;});}
+        }}
         // Occupancy is retained until the video task has dropped its native
         // source. A new viewer must not race the previous capture worker's exit.
         if (entry.control_attached.load(Ordering::SeqCst) && !*entry.control_stopped.borrow()) || entry.state.lock().unwrap().as_ref().is_some_and(|ready| {
@@ -534,6 +543,9 @@ impl DesktopHost {
                     Ok(snapshot) => reply(&mut stream, RemoteDesktopReply::Trace { snapshot }, timeout).await?,
                     Err(error) => rejected(&mut stream, error, timeout).await?,
                 }
+            }
+            RemoteDesktopRequest::FileClipboard{version,session_id,generation,header_bytes,payload_bytes}=>{
+                self.serve_file_clipboard(owner,account,version,session_id,generation,header_bytes,payload_bytes,stream).await?;
             }
             RemoteDesktopRequest::Clipboard { version, session_id, generation, request } => {
                 self.serve_clipboard(owner, account, version, session_id, generation, request, stream, timeout).await?;

@@ -53,6 +53,7 @@ async fn mobile_jpeg_checks_identity_binary_boundaries_hash_and_codec() {
                         remote_desktop_schema_version: None,
                         remote_desktop_cursor_schema_version: None,
                         remote_desktop_clipboard_schema_version: None,
+                        file_clipboard_schema_version: None,
                         filesystem_schema_version: None,
                         transfer_schema_version: None,
                         system_query_schema_version: None,

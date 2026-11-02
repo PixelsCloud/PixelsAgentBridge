@@ -9,6 +9,10 @@ rust-version.workspace = true
 pab-protocol = { path = "../protocol" }
 pab-remote-desktop = { path = "../remote-desktop" }
 serde_json.workspace = true
+serde.workspace = true
+sha2 = "0.10"
+pab-file-manager = { path = "../file-manager" }
+pab-os-control = { path = "../os-control" }
 tokio.workspace = true
 openh264 = "=0.9.8"
 openh264-sys2 = "=0.9.9"

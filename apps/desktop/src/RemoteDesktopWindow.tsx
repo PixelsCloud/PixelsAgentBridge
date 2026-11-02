@@ -17,7 +17,7 @@ type Status = {
   phase: string; takeover_session?: string | null; error?: string; input_ready?: boolean; input_enabled?: boolean; frame_ready?: boolean;
   decoder?: string | null; quality?: Quality | null; remote_os?: string | null; connection_path?: string | null;
   performance?: PipelinePerformance | null;
-  clipboard_enabled?: boolean; clipboard_state?: string;
+  clipboard_enabled?: boolean; clipboard_state?: string; file_clipboard_state?: string;
   opened?: { config: { session_id: string; screen: Screen; fps: number; generation: number }; screens: Screen[]; input_supported?: boolean };
 };
 const english = initialLanguage() === "en";
@@ -28,8 +28,11 @@ const inputText = english
   ? { enable: "Enable control", disable: "Stop control", active: "Control enabled" }
   : { enable: "启用操作", disable: "停止操作", active: "可操作" };
 const clipboardText = english
-  ? { enable: "Enable clipboard (text and images) sync", disable: "Disable clipboard (text and images) sync", syncing: "Clipboard: transferring", too_large: "Image too large (PNG up to 32 MiB; decoded pixels up to 64 MiB)", waiting: "Clipboard: waiting for control", active: "Clipboard: syncing", disabled: "Clipboard: off", unsupported: "Clipboard: update the remote app to enable", unavailable: "Clipboard is temporarily unavailable; retrying", paste_failed: "Clipboard sync failed. Paste was not sent; please try again." }
-  : { enable: "开启剪贴板（文字、图片）同步", disable: "关闭剪贴板（文字、图片）同步", syncing: "剪贴板：正在传输", too_large: "图片过大（PNG 上限 32 MiB，解码像素上限 64 MiB）", waiting: "剪贴板（文字、图片）：等待启用操作", active: "剪贴板（文字、图片）：同步中", disabled: "剪贴板（文字、图片）：已关闭", unsupported: "剪贴板（文字、图片）：请升级远端程序", unavailable: "剪贴板（文字、图片）暂不可用，正在重试", paste_failed: "剪贴板同步失败，未发送粘贴，请重试。" };
+  ? { enable: "Enable clipboard sync", disable: "Disable clipboard sync", syncing: "Clipboard: transferring", too_large: "Image too large (PNG up to 32 MiB; decoded pixels up to 64 MiB)", waiting: "Clipboard: waiting for control", active: "Clipboard: syncing", disabled: "Clipboard: off", unsupported: "Clipboard: update the remote app to enable", unavailable: "Clipboard is temporarily unavailable; retrying", paste_failed: "Clipboard sync failed. Paste was not sent; please try again." }
+  : { enable: "开启剪贴板同步", disable: "关闭剪贴板同步", syncing: "剪贴板：正在传输", too_large: "图片过大（PNG 上限 32 MiB，解码像素上限 64 MiB）", waiting: "剪贴板（文字、图片）：等待启用操作", active: "剪贴板（文字、图片）：同步中", disabled: "剪贴板（文字、图片）：已关闭", unsupported: "剪贴板（文字、图片）：请升级远端程序", unavailable: "剪贴板（文字、图片）暂不可用，正在重试", paste_failed: "剪贴板同步失败，未发送粘贴，请重试。" };
+const fileClipboardText: Record<string, string> = english
+  ? { waiting: "Files: waiting for control", disabled: "Files: sync off", unsupported: "File clipboard is not available on this platform or remote version", active: "File clipboard enabled", preparing: "Preparing file clipboard…", ready: "Files ready: paste in the remote file manager", cut_unsupported: "File cut is not supported. Copy the files instead.", source_unavailable: "Cannot prepare these files. Check access, names and source changes.", read_failed: "File read failed. Check the connection and source, then copy and paste again.", unavailable: "File clipboard is unavailable. Please copy and paste again." }
+  : { waiting: "文件：等待启用操作", disabled: "文件：已关闭同步", unsupported: "此平台或远端版本暂无文件剪贴板功能", active: "文件剪贴板已开启", preparing: "正在准备文件剪贴板…", ready: "文件已就绪，可在远端文件管理器中粘贴", cut_unsupported: "暂不支持文件剪切，请使用复制。", source_unavailable: "无法准备所选文件，请检查访问权限、文件名或源文件变化。", read_failed: "文件读取失败，请检查连接和源文件后重新复制、粘贴。", unavailable: "文件剪贴板暂不可用，请重新复制、粘贴。" };
 
 export default function RemoteDesktopWindow() {
   const [status, setStatus] = useState<Status>({ phase: "ready" });
@@ -41,9 +44,11 @@ export default function RemoteDesktopWindow() {
   const [dark, setDark] = useState(() => localStorage.getItem("pab.theme") === "dark");
   const clipboardEnabled = status.clipboard_enabled !== false;
   const clipboardState = status.clipboard_state || "waiting";
-  const clipboardHint = clipboardState === "unsupported" && status.remote_os === "android"
+  const baseClipboardHint = clipboardState === "unsupported" && status.remote_os === "android"
     ? (english ? "Clipboard sync is not supported on Android yet" : "Android 暂无剪贴板同步功能")
     : clipboardText[clipboardState as keyof typeof clipboardText] || clipboardText.waiting;
+  const fileClipboardHint = fileClipboardText[status.file_clipboard_state === "unsupported_files" ? "unsupported" : status.file_clipboard_state || "waiting"] || fileClipboardText.waiting;
+  const clipboardHint = `${baseClipboardHint}\n${fileClipboardHint}`;
   const closePending = useRef(false);
   const takeoverPrompted = useRef<string | null>(null);
   async function requestTakeover() {
@@ -148,7 +153,7 @@ export default function RemoteDesktopWindow() {
     ...(status.phase === "viewing" && status.performance ? pipelineRows(status.performance, english) : []),
     [english ? "First frame / input ready" : "首帧／输入就绪", `${status.frame_ready ? "✓" : "—"} / ${status.input_ready ? "✓" : "—"}`],
     [english ? "Input supported" : "远端输入支持", opened ? (opened.input_supported ? "✓" : "—") : unknown],
-    [english ? "Clipboard" : "剪贴板（文字、图片）", clipboardHint],
+    [english ? "Clipboard" : "剪贴板", clipboardHint],
     [english ? "Generation" : "会话代次", opened ? String(opened.config.generation) : unknown],
     [english ? "Session" : "会话标识", opened?.config.session_id || unknown],
   ];
@@ -179,6 +184,7 @@ export default function RemoteDesktopWindow() {
       <span className="remote-desktop-phase" role="status">{phase}</span>
       {error && <span className="remote-desktop-control-error" role="alert" title={userFacingError(error)}>{userFacingError(error)}</span>}
       {status.clipboard_state === "paste_failed" && <span className="remote-desktop-control-error" role="alert" title={clipboardText.paste_failed}>{english ? "Paste not sent" : "未发送粘贴"}</span>}
+      {["unsupported_files", "cut_unsupported", "source_unavailable", "read_failed", "unavailable"].includes(status.file_clipboard_state || "") && <span className="remote-desktop-control-error" role="alert" title={fileClipboardHint}>{status.file_clipboard_state === "unsupported_files" ? (english ? "File paste unavailable" : "暂无文件粘贴功能") : (english ? "Check file clipboard" : "文件剪贴板异常")}</span>}
       {assistance[0] && <AssistanceCompletion key={assistance[0].assistance_id}
         request={assistance[0]} count={assistance.length} viewing={status.phase === "viewing"}
         onComplete={id => setAssistance(rows => rows.filter(row => row.assistance_id !== id))} />}

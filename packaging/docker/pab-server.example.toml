@@ -17,7 +17,7 @@ assets = "/usr/local/bin/web"
 
 [relay]
 control_secret = "replace-with-a-random-secret-at-least-32-bytes"
-# Account bandwidth is selected in Web administration; new accounts receive 10 Mbps.
+# Account bandwidth is selected in Web administration; new accounts receive 5 Mbps.
 
 [relay.directory]
 [[relay.directory.nodes]]

@@ -25,7 +25,7 @@ impl Drop for Registration {
         CHANGED.notify_waiters();
     }
 }
-fn authorized(capture: &Provider, config: &DesktopVideoConfig) -> bool {
+pub(super) fn authorized(capture: &Provider, config: &DesktopVideoConfig) -> bool {
     !capture.retired.load(Ordering::Acquire)
         && capture.identity.current()
         && capture
@@ -37,7 +37,7 @@ fn authorized(capture: &Provider, config: &DesktopVideoConfig) -> bool {
             .lock()
             .is_ok_and(|c| c.as_ref().is_some_and(|i| i.active()))
 }
-async fn revoked(capture: &Provider, config: &DesktopVideoConfig) {
+pub(super) async fn revoked(capture: &Provider, config: &DesktopVideoConfig) {
     while authorized(capture, config) {
         tokio::time::sleep(Duration::from_millis(30)).await;
     }

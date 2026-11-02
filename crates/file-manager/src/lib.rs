@@ -3,7 +3,7 @@
 
 mod path;
 mod native_paths;
-pub use native_paths::{keep_both_candidate,native_join, native_name, native_parent};
+pub use native_paths::{independent_sources,keep_both_candidate,native_join, native_name, native_parent};
 mod mutation;
 pub use mutation::{create_directory, create_directory_native, decode_component, delete, rename, rename_native, validate_new_name};
 mod inspect;

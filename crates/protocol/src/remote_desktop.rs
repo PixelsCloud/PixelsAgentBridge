@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 #[path = "desktop_clipboard.rs"]
 mod clipboard;
 pub use clipboard::*;
+#[path = "file_clipboard.rs"]
+mod file_clipboard;
+pub use file_clipboard::*;
 
 pub const REMOTE_DESKTOP_SCHEMA_VERSION: u16 = 2;
 pub const DESKTOP_VIDEO_CHUNK_BYTES: usize = 64 * 1024;
@@ -184,6 +187,7 @@ impl DesktopOpened {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopRequest {
+    FileClipboard { version:u16,session_id:RequestId,generation:u64,header_bytes:u32,payload_bytes:u32 },
     /// Authenticated, read-only confirmation token for the currently occupied slot.
     Occupancy,
     /// Retire only the session the user confirmed, never a replacement session.
@@ -252,6 +256,7 @@ pub enum DesktopErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteDesktopReply {
+    FileClipboard { header_bytes:u32,payload_bytes:u32 },
     Occupancy { session_id: Option<RequestId> },
     Clipboard {
         version: u16,

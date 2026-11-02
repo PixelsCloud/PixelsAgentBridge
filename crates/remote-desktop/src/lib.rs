@@ -2,6 +2,7 @@
 //! Remote desktop session and reliable video framing. Native capture/rendering
 //! are adapters; the shared connection, authentication and legacy streams stay intact.
 mod wire;
+mod file_clipboard_wire;
 pub use wire::{DesktopVideoReader, DesktopVideoWriter, VideoFrame};
 mod cursor_wire;
 pub use cursor_wire::{CursorUpdate, DesktopCursorReader, DesktopCursorWriter};

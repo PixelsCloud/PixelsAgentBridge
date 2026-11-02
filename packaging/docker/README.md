@@ -92,13 +92,13 @@ reinstall is needed for this change.
 Every initiating Desktop/MCP must sign in. Receiving devices can run unattended
 without account login; the device password is still required.
 
-New accounts receive **10 Mbps**. Web administrators choose an account limit from
+New accounts receive **5 Mbps**. Web administrators choose an account limit from
 5, 10, 20, 30, 40, 50, 60, 70, 80, 90 or 100 Mbps. There are no guest quotas,
 service-wide bandwidth settings or TOML bandwidth keys. Remove `default_user_mbps`
 and `default_guest_mbps` from existing private server TOMLs before upgrading.
 Server and Relay must be upgraded together (policy schema 6).
 
-Units are decimal **Mbps**, not MB/s: 10 Mbps = 1.25 MB/s before overhead.
+Units are decimal **Mbps**, not MB/s: 5 Mbps = 0.625 MB/s before overhead.
 
 Forwarding uses a token bucket at `Mbps * 1_000_000 / 8` bytes/second with 100 ms
 of burst credit. Excess traffic waits. All MCP connections for a user share one

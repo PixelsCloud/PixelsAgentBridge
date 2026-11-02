@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{DeviceId, EndpointKey, TenantId, UserId};
-pub const DEFAULT_RELAY_MBPS: u32 = 10;
+pub const DEFAULT_RELAY_MBPS: u32 = 5;
 pub const RELAY_MBPS_OPTIONS: &[i32] = &[5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 pub const RELAY_POLICY_SCHEMA_VERSION: u16 = 6;
 

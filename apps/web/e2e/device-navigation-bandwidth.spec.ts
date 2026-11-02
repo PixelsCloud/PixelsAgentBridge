@@ -3,7 +3,7 @@ import { designFixture } from './support/designFixture';
 
 async function fixture(page: Page, admin = true, total = 0) {
   await designFixture(page, { language: 'en', ordinary: !admin });
-  let limit = 10;
+  let limit: number | null = null;
   const writes: unknown[] = [];
   const requests: URL[] = [];
   await page.addInitScript(() => localStorage.setItem('pab-web-language', 'en'));
@@ -50,11 +50,11 @@ for (const admin of [true, false]) test(`device statistics and filters share one
   await expect(page).toHaveURL('/devices?q=fixture');
 });
 
-test('bandwidth uses explicit presets with a ten Mbps default', async ({ page }) => {
+test('bandwidth uses explicit presets with a five Mbps default', async ({ page }) => {
   const state = await fixture(page);
   await page.goto('/accounts');
   const row = page.getByRole('row').filter({ hasText: 'Fixture user' });
-  await expect(row.getByText('10 Mbps', { exact: true })).toBeVisible();
+  await expect(row.getByText('5 Mbps', { exact: true })).toBeVisible();
   const open = () => row.getByRole('button', { name: 'Bandwidth limits', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await open();

@@ -5,7 +5,7 @@ use std::{io, path::PathBuf, process::Stdio};
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, process::{Child, ChildStdin, ChildStdout}, sync::Mutex};
 #[cfg(windows)]
 #[path = "clipboard_windows_user.rs"]
-mod windows_user;
+pub(crate) mod windows_user;
 #[cfg(target_os = "linux")]
 #[path = "linux_clipboard_environment.rs"]
 mod linux_environment;

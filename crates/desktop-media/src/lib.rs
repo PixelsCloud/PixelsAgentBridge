@@ -2,6 +2,7 @@
 //! no native FFI. Compressed video and bounded cursor snapshots cross private pipes.
 mod input;
 pub mod clipboard;
+pub mod file_clipboard;
 #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
 mod clipboard_image;
 #[cfg(windows)]
@@ -37,6 +38,7 @@ pub use viewer_input::{NativeViewerEvent, NativeViewerInput};
 pub fn worker_main(arguments: impl IntoIterator<Item = String>) -> i32 {
     let arguments = arguments.into_iter().collect::<Vec<_>>();
     if arguments.as_slice() == ["clipboard"] { return clipboard::worker_main(); }
+    if arguments.as_slice() == ["file-clipboard"] { return file_clipboard::worker_main(); }
     #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     {
         use std::ffi::{CString, c_char};

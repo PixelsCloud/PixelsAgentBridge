@@ -42,6 +42,7 @@ async fn remote_desktop_unavailable_is_additive_and_presence_keeps_working() {
             remote_desktop_schema_version: None,
             remote_desktop_cursor_schema_version: None,
             remote_desktop_clipboard_schema_version: None,
+            file_clipboard_schema_version: None,
             terminal_schema_version: Some(2),
             desktop_terminal_schema_version: Some(1),
             ..

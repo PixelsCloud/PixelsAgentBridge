@@ -47,8 +47,8 @@ export function AccountsPage({ liveRevision }: { liveRevision: number }) {
     { title: t('accountStatus'), render: (_, item) => <Tag color={item.status === 'active' ? 'success' : 'default'}>{t(item.status === 'active' ? 'enabled' : 'disabled')}</Tag> },
     { title: t('associatedDevices'), render: (_, item) => <Button type="link" className="table-inline-link" aria-label={`${t('associatedDevices')} · ${item.username}`} onClick={() => setDevicesAccount(item)}>{item.device_count ?? '—'}</Button> },
     { title: t('addedDevices'), render: (_, item) => <Button type="link" className="table-inline-link" aria-label={`${t('addedDevices')} · ${item.username}`} onClick={() => setAddedAccount(item)}>{item.saved_device_count ?? '—'}</Button> },
-    { title: t('userBandwidth'), render: (_, item) => `${item.relay_limit_mbps ?? 10} Mbps` },
-    { title: t('actions'), render: (_, item) => <Space><Button onClick={() => { form.setFieldsValue(item); setEditing(item); }}>{t('edit')}</Button><Button onClick={() => { assignment.setFieldsValue({ mbps: item.relay_limit_mbps ?? 10 }); setAssigning(item); }}>{t('limits')}</Button></Space> },
+    { title: t('userBandwidth'), render: (_, item) => `${item.relay_limit_mbps ?? 5} Mbps` },
+    { title: t('actions'), render: (_, item) => <Space><Button onClick={() => { form.setFieldsValue(item); setEditing(item); }}>{t('edit')}</Button><Button onClick={() => { assignment.setFieldsValue({ mbps: item.relay_limit_mbps ?? 5 }); setAssigning(item); }}>{t('limits')}</Button></Space> },
   ]}/>
     {addedAccount && <AccountDevicesModal key={`added:${addedAccount.id}`} account={addedAccount} kind="added" liveRevision={liveRevision} onClose={() => setAddedAccount(undefined)}/>}
     {devicesAccount && <AccountDevicesModal key={devicesAccount.id} account={devicesAccount} liveRevision={liveRevision} onClose={() => setDevicesAccount(undefined)}/>}

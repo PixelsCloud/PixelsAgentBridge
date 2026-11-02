@@ -16,6 +16,7 @@ mod cursor_sessions;
 mod cursor_wire;
 mod flow_recovery;
 mod clipboard_sessions;
+mod file_clipboard_sessions;
 mod input_wire;
 mod quality_feedback;
 mod input_progress;

@@ -52,6 +52,7 @@ pub struct ViewerStatus {
     input_enabled: bool,
     clipboard_enabled: bool,
     clipboard_state: &'static str,
+    file_clipboard_state: &'static str,
     decoder: Option<&'static str>,
     quality: Option<pab_protocol::DesktopQualitySnapshot>,
     performance: Option<ViewerPerformance>,
@@ -517,6 +518,7 @@ fn publish(
         input_enabled: false,
         clipboard_enabled: owner.clipboard_requested.load(Ordering::Acquire),
         clipboard_state: if owner.clipboard_requested.load(Ordering::Acquire) { "waiting" } else { "disabled" },
+        file_clipboard_state: if owner.clipboard_requested.load(Ordering::Acquire) { "waiting" } else { "disabled" },
         decoder: None,
         quality: None,
         performance: None,
@@ -1091,7 +1093,12 @@ async fn stream(
                                 chrome::set_fullscreen(window, owner, false).map_err(StreamFailure::renderer)?;
                             }
                             pab_desktop_media::NativeViewerEvent::Focus { enabled: collecting, focused, foreground, requests, failures } => {
-                                if !collecting || !focused || !foreground {paste_work=None;paste_chord=None;clipboard.deactivate();}
+                                if !collecting || !focused || !foreground {paste_work=None;paste_chord=None;}
+                                // Prepare native file formats before the first
+                                // right-click. The viewer can own the clipboard
+                                // while its toolbar has focus; keyboard replay
+                                // still requires the focused capture surface.
+                                if collecting && foreground {clipboard.activate();} else {clipboard.deactivate();}
                                 tracing::info!(window = window.label(), session = %input_generation.session,
                                     generation = input_generation.generation, collecting, focused, foreground,
                                     focus_requests = requests, focus_failures = failures,
@@ -1119,6 +1126,7 @@ async fn stream(
             _ = performance_work => unreachable!("performance polling does not complete the viewer"),
             _ = clipboard_work => unreachable!("clipboard polling does not complete the viewer"),
         };
+        let _=tokio::time::timeout(Duration::from_secs(2),clipboard.clear_files()).await;
         if let Err(error) = &outcome {
             tracing::warn!(window = window.label(), error = %error.message,
                 acknowledgements = ?acknowledgements.trace(),

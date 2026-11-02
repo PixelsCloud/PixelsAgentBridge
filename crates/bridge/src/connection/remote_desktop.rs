@@ -52,7 +52,7 @@ impl AuthenticatedDeviceConnection {
         // environment can therefore report no cursor even though Open succeeds.
         // Query again so optional support follows the actual active capture,
         // including replacement by a legacy helper that embeds its cursor.
-        let (cursor_version, clipboard_version) = match self
+        let (cursor_version, clipboard_version,file_version) = match self
             .task_request(DeviceTaskRequest::GetEnvironment {
                 schema_version: DEVICE_TASK_SCHEMA_VERSION,
             })
@@ -63,16 +63,17 @@ impl AuthenticatedDeviceConnection {
                 remote_desktop_schema_version: Some(pab_protocol::REMOTE_DESKTOP_SCHEMA_VERSION),
                 remote_desktop_cursor_schema_version,
                 remote_desktop_clipboard_schema_version,
+                file_clipboard_schema_version,
                 ..
-            }) if context.device_ref == self.device_ref => (remote_desktop_cursor_schema_version, remote_desktop_clipboard_schema_version),
+            }) if context.device_ref == self.device_ref => (remote_desktop_cursor_schema_version, remote_desktop_clipboard_schema_version,file_clipboard_schema_version),
             _ => {
                 // Cursor discovery must not discard working video/input, nor
                 // reuse an earlier capability from a different helper.
                 tracing::debug!("desktop cursor capability refresh unavailable");
-                (None, None)
+                (None, None,None)
             }
         };
-        Ok(session.with_cursor_support(cursor_version).with_clipboard_support(clipboard_version))
+        Ok(session.with_cursor_support(cursor_version).with_clipboard_support(clipboard_version).with_file_clipboard_support(file_version))
     }
 }
 

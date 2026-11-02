@@ -8,6 +8,7 @@ use std::sync::Mutex as StdMutex;
 static ACTIVE: StdMutex<Option<String>> = StdMutex::new(None);
 struct Progress { remote: RemoteDesktopClipboardControl, local_revision: Option<u64>, remote_revision: Option<u64> }
 pub(super) struct Bridge<'a> {
+    files:files::Files,
     window: &'a WebviewWindow,
     owner: &'a Owner,
     generation: InputGeneration,
@@ -25,7 +26,8 @@ impl Drop for Bridge<'_> {
 impl<'a> Bridge<'a> {
     pub(super) fn new(window: &'a WebviewWindow, owner: &'a Owner, generation: InputGeneration, remote: RemoteDesktopClipboardControl) -> Result<Self, String> {
         let supported = remote.is_supported();
-        Ok(Self { window, owner, generation, token: format!("{}:{}", window.label(), generation.generation),
+        let files=files::Files::new(remote.clone())?;
+        Ok(Self { files,window, owner, generation, token: format!("{}:{}", window.label(), generation.generation),
             local: NativeClipboard::new(std::env::current_exe().map_err(|_| "clipboard worker unavailable")?, vec!["--media-worker".into()]),
             progress: Mutex::new(Progress { remote, local_revision: None, remote_revision: None }), notify: tokio::sync::Notify::new(), supported })
     }
@@ -59,25 +61,45 @@ impl<'a> Bridge<'a> {
     }
     pub(super) fn copied(&self) { self.notify.notify_one(); }
     pub(super) async fn run(&self) {
-        let mut timer = tokio::time::interval(Duration::from_millis(333));
+        let mut timer = tokio::time::interval(Duration::from_millis(if self.files.supported{20}else{333}));
         timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut retry_after = Instant::now();
+        let mut text_after=Instant::now();let mut had_files=false;let mut files_enabled=false;
         loop {
             tokio::select! {
                 _ = timer.tick() => {},
                 _ = self.notify.notified() => tokio::time::sleep(Duration::from_millis(60)).await,
             }
             if !self.owner.clipboard_requested.load(Ordering::Acquire) {
+                if files_enabled{self.clear_files().await;files_enabled=false;}self.publish_files("disabled");
                 let mut progress = self.progress.lock().await; progress.local_revision = None; progress.remote_revision = None;
                 self.publish("disabled"); continue;
             }
             if !self.supported { self.publish("unsupported"); continue; }
             if !self.enabled() {
+                if files_enabled{self.clear_files().await;files_enabled=false;}self.publish_files("waiting");
                 let mut progress = self.progress.lock().await;
                 progress.local_revision = None; progress.remote_revision = None;
                 self.publish("waiting"); continue;
             }
+            // On Windows the native capture surface reports the actual OS
+            // foreground window. WebView focus can remain on an inactive or
+            // minimized viewer and must not reclaim another viewer's clipboard.
+            #[cfg(not(windows))]
             if self.window.is_focused().unwrap_or(false) { self.activate(); }
+            if self.files.supported{
+                files_enabled=true;
+                let work=tokio::select!{result=self.file_tick(self.owns_clipboard())=>result,_=async{while self.enabled(){tokio::time::sleep(Duration::from_millis(20)).await;}}=>Err("file_clipboard_cancelled".into())};
+                match work{
+                    Ok(present)=>{if present{had_files=true;continue;}if had_files{
+                        if self.owns_clipboard(){
+                            if self.guarded(self.resume_plain_clipboard(false)).await.is_err(){self.publish("unavailable");continue;}
+                            had_files=false;
+                        }
+                    }},Err(_)=>{self.file_failed().await;self.publish_files("unavailable");},
+                }
+            }else{self.publish_files("unsupported");}
+            if Instant::now()<text_after{continue;}text_after=Instant::now()+Duration::from_millis(333);
             if !self.owns_clipboard() || Instant::now() < retry_after { continue; }
             match self.guarded(self.tick()).await {
                 Ok(())=>self.publish("active"),
@@ -123,6 +145,7 @@ impl<'a> Bridge<'a> {
         progress.remote_revision=Some(remote.revision);Ok(())
     }
     pub(super) async fn before_paste(&self) -> bool {
+        if self.owner.clipboard_requested.load(Ordering::Acquire){if let Some(result)=self.file_before_paste().await{return result;}}
         if !self.owner.clipboard_requested.load(Ordering::Acquire) || !self.supported{return true;}
         self.publish("syncing");
         let result=self.guarded(async {
@@ -153,6 +176,9 @@ impl<'a> Bridge<'a> {
     }
 
 }
+
+#[path="file_clipboard.rs"]
+mod files;
 
 async fn transfer(remote:&mut RemoteDesktopClipboardControl,operation:Operation)->Result<Snapshot,String>{
     let image=operation.image().map(|i|(i.width,i.height,i.bytes));

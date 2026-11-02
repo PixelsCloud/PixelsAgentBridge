@@ -118,6 +118,9 @@ fn main() {
         .define("UNICODE", None)
         .define("_UNICODE", None)
         .compile("pab_desktop_media");
+    cc::Build::new().cpp(true).std("c++17")
+        .file("native/windows/file_clipboard.cpp").flag_if_supported("/EHsc")
+        .define("UNICODE",None).define("_UNICODE",None).compile("pab_file_clipboard");
     // C++/WinRT requires C++20 with current MSVC. Keep it out of the worker TU.
     cc::Build::new()
         .cpp(true)
@@ -141,6 +144,7 @@ fn main() {
         "mfuuid",
         "wmcodecdspuuid",
         "ole32",
+        "uuid",
         "shcore",
         "shell32",
         "advapi32",

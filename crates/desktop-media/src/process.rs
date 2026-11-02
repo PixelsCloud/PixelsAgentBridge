@@ -116,6 +116,7 @@ impl Drop for MediaChild {
     }
 }
 pub struct NativeBackend {
+    files:Mutex<Option<(RequestId,u64,crate::file_clipboard::NativeFileClipboard)>>,
     clipboard: crate::clipboard::NativeClipboard,
     executable: PathBuf,
     prefix: Vec<String>,
@@ -130,6 +131,7 @@ pub struct NativeBackend {
 impl NativeBackend {
     pub fn new(executable: PathBuf, prefix: Vec<String>) -> Self {
         Self {
+            files:Mutex::new(None),
             clipboard: crate::clipboard::NativeClipboard::new(executable.clone(), prefix.clone()),
             executable,
             prefix,
@@ -143,6 +145,7 @@ impl NativeBackend {
         }
     }
     pub async fn idle(&self) {
+        {let mut files=self.files.lock().await;if let Some((_,_,worker))=files.as_ref(){let _=tokio::time::timeout(std::time::Duration::from_secs(2),worker.exchange(FileClipboardOperation::Clear)).await;}*files=None;}
         drop(self.gate.lock().await);
         drop(self.input_gate.lock().await);
         #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
@@ -259,6 +262,15 @@ impl DesktopSource for NativeSource {
     }
 }
 impl DesktopBackend for NativeBackend {
+    fn supports_file_clipboard(&self)->bool{cfg!(windows)&&self.input_enabled}
+    fn file_clipboard(&self,config:DesktopVideoConfig,operation:FileClipboardOperation)->MediaFuture<'_,FileClipboardSnapshot>{Box::pin(async move{
+        config.validate().map_err(media_error)?;
+        if !self.supports_file_clipboard(){return Err(media_error("file_clipboard_unsupported"));}
+        let mut files=self.files.lock().await;
+        if files.as_ref().is_none_or(|(id,generation,_)|*id!=config.session_id||*generation!=config.generation){*files=Some((config.session_id,config.generation,crate::file_clipboard::NativeFileClipboard::new(self.executable.clone(),self.prefix.clone())));}
+        files.as_ref().unwrap().2.exchange(operation).await.map_err(|e|media_error(e.to_string()))
+    })}
+    fn retire_file_clipboard(&self,config:DesktopVideoConfig)->MediaFuture<'_,()>{Box::pin(async move{let mut files=self.files.lock().await;if files.as_ref().is_some_and(|(id,generation,_)|*id==config.session_id&&*generation==config.generation){if let Some((_,_,worker))=files.as_ref(){let _=tokio::time::timeout(std::time::Duration::from_secs(2),worker.exchange(FileClipboardOperation::Clear)).await;}*files=None;}Ok(())})}
     fn supports_clipboard(&self) -> bool { cfg!(any(windows, target_os = "macos", target_os = "linux")) }
     fn clipboard(&self, config: DesktopVideoConfig, operation: DesktopClipboardOperation) -> MediaFuture<'_, DesktopClipboardSnapshot> {
         Box::pin(async move {

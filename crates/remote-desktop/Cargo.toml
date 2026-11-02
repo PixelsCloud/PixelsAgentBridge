@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+sha2 = "0.10"
 pab-protocol = { path = "../protocol" }
 pab-transport = { path = "../transport" }
 serde.workspace = true

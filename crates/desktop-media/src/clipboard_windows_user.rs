@@ -142,7 +142,7 @@ fn inherited(handle: HANDLE) -> io::Result<Handle> {
     Ok(Handle(copy))
 }
 
-pub(super) fn run_if_system() -> io::Result<Option<i32>> {
+pub(crate) fn run_if_system() -> io::Result<Option<i32>> {
     let mut raw = ptr::null_mut();
     if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) } == 0 {
         return Err(io::Error::last_os_error());

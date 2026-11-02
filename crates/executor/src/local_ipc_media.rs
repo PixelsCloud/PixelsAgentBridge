@@ -17,6 +17,8 @@ pub(super) mod input;
 pub(super) mod cursor;
 #[path = "local_ipc_media_clipboard.rs"]
 pub(super) mod clipboard;
+#[path = "local_ipc_media_files.rs"]
+pub(super) mod files;
 
 const VERSION: u16 = 1;
 const ENCODING_BUDGET_VERSION: u16 = 1;
@@ -34,6 +36,8 @@ struct Provider {
     active_config: Mutex<Option<DesktopVideoConfig>>,
     input_supported: bool,
     clipboard_supported: bool,
+    file_clipboard_supported:bool,
+    files:Mutex<Option<Arc<files::FileProvider>>>,
     clipboard: Mutex<Option<Arc<clipboard::ClipboardProvider>>>,
     input: Mutex<Option<Arc<input::InputProvider>>>,
     cursor_supported: bool,
@@ -155,6 +159,12 @@ async fn request(
 /// is a media error, not a device connection error.
 pub struct HelperMediaBackend;
 impl DesktopBackend for HelperMediaBackend {
+    fn supports_file_clipboard(&self)->bool{
+        providers().lock().ok().and_then(|providers|providers.iter().filter(|p|!p.sender.is_closed()&&!p.retired.load(Ordering::Acquire))
+            .max_by_key(|p|(p.active_config.lock().ok().is_some_and(|c|c.is_some()),p.supervised,p.id)).map(|p|p.file_clipboard_supported)).unwrap_or(false)
+    }
+    fn file_clipboard(&self,config:DesktopVideoConfig,operation:pab_protocol::FileClipboardOperation)->MediaFuture<'_,pab_protocol::FileClipboardSnapshot>{Box::pin(files::exchange(config,operation))}
+    fn retire_file_clipboard(&self,config:DesktopVideoConfig)->MediaFuture<'_,()>{Box::pin(async move{let _=files::exchange(config,pab_protocol::FileClipboardOperation::Clear).await;Ok(())})}
     fn supports_clipboard(&self) -> bool {
         providers().lock().ok().and_then(|providers| providers.iter()
             .filter(|provider| !provider.sender.is_closed() && !provider.retired.load(Ordering::Acquire))
@@ -344,6 +354,8 @@ pub(super) async fn serve_registered(
             active_config: Mutex::new(None),
             input_supported: frame["input_supported"].as_bool().unwrap_or(false),
             clipboard_supported: frame["clipboard_version"].as_u64() == Some(pab_protocol::DESKTOP_CLIPBOARD_VERSION.into()),
+            file_clipboard_supported:frame["file_clipboard_version"].as_u64()==Some(pab_protocol::FILE_CLIPBOARD_VERSION.into()),
+            files:Mutex::new(None),
             input: Mutex::new(None),
             clipboard: Mutex::new(None),
             cursor_supported: frame["cursor_schema_version"].as_u64()
@@ -493,6 +505,7 @@ async fn serve_helper_socket_with_role(
         &mut socket,
         &json!({"type":"register_media_helper","version":VERSION,"process_id":std::process::id(),"input_supported":backend.supports_input(),"supervised":supervised,
             "clipboard_version": backend.supports_clipboard().then_some(pab_protocol::DESKTOP_CLIPBOARD_VERSION),
+            "file_clipboard_version":backend.supports_file_clipboard().then_some(pab_protocol::FILE_CLIPBOARD_VERSION),
             "encoding_budget_version": ENCODING_BUDGET_VERSION,
             "capture_timings_version": 1,
             "cursor_schema_version": backend.supports_cursor().then_some(pab_protocol::DESKTOP_CURSOR_SCHEMA_VERSION)}),
@@ -517,6 +530,7 @@ async fn serve_helper_socket_with_role(
     .map_err(|_| LocalIpcError::Timeout)??;
     tokio::select! {
         result = serve_media_requests(socket, backend) => result,
+        result=async{if connect_auxiliary{files::serve_helper(backend,provider_id).await}else{std::future::pending().await}}=>result,
         result = async {
             if connect_auxiliary { input::serve_helper(backend, provider_id).await }
             else { std::future::pending().await }

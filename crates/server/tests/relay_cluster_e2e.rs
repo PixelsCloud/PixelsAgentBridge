@@ -87,7 +87,7 @@ async fn large_transfer(a: &PabEndpoint, b: &PabEndpoint, count: usize) {
         relay_urls: b.address().relay_urls().map(ToString::to_string).collect(),
         direct_addresses: vec![],
     };
-    tokio::time::timeout(Duration::from_secs(150), async {
+    tokio::time::timeout(Duration::from_secs(300), async {
         let (client, server) = tokio::join!(
             a.connect(*b.id().as_bytes(), &address, Duration::from_secs(25)),
             b.accept()
@@ -133,11 +133,11 @@ async fn large_transfer(a: &PabEndpoint, b: &PabEndpoint, count: usize) {
                 .unwrap();
         };
         tokio::join!(send, receive);
-        // Default account is 10 Mbps shared by all its endpoints/nodes. Even
+        // Default account is 5 Mbps shared by all its endpoints/nodes. Even
         // allowing the 100-ms initial burst, 64 MiB must not complete too early.
         if count >= 1024 {
             assert!(
-                started.elapsed() >= Duration::from_secs(50),
+                started.elapsed() >= Duration::from_secs(100),
                 "aggregate account budget was exceeded"
             );
         }
@@ -593,8 +593,8 @@ async fn cluster_failover(pool: PgPool, three_nodes: bool, diagnostics_only:bool
     let concurrent_started = std::time::Instant::now();
     tokio::join!(large_transfer(&a, &b, 512), large_transfer(&c, &d, 512));
     assert!(
-        concurrent_started.elapsed() >= Duration::from_secs(50),
-        "two nodes must not double one account's 10 Mbps budget"
+        concurrent_started.elapsed() >= Duration::from_secs(100),
+        "two nodes must not double one account's 5 Mbps budget"
     );
     eprintln!(
         "two-node concurrent 64 MiB, both application hashes matched, elapsed_ms={}",
