@@ -99,9 +99,14 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
     let session_limit = Arc::new(Semaphore::new(64));
     let mut sessions = JoinSet::new();
     let mut status = supervisor.status();
+    let mut network_recovery = NetworkRecovery::default();
     let mut heartbeat = tokio::time::interval(Duration::from_secs(3));
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    report_status(&status.borrow());
+    {
+        let initial = status.borrow();
+        report_status(&initial);
+        network_recovery.observe(initial.phase, initial.generation);
+    }
     loop {
         tokio::select! {
             _ = heartbeat.tick() => {
@@ -123,6 +128,16 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 }
                 let current = status.borrow().clone();
                 report_status(&current);
+                if network_recovery.observe(current.phase, current.generation) {
+                    // A WAN/router interruption can invalidate NAT mappings
+                    // without changing any Windows interface address. The OS
+                    // watcher deduplicates those snapshots, so explicitly redo
+                    // discovery when the authenticated control link recovers.
+                    // Do not replace the endpoint or close active sessions.
+                    endpoint.endpoint().reprobe_network().await;
+                    tracing::info!(generation = current.generation,
+                        "reprobing direct paths after control connection recovery");
+                }
                 if let Err(error) = write_heartbeat(&heartbeat_path, &current) {
                     tracing::warn!(%error, "could not update executor heartbeat");
                 }
@@ -169,6 +184,22 @@ pub async fn run_executor(config: ExecutorConfig) -> Result<(), ExecutorError> {
                 }
             }
         }
+    }
+}
+
+#[derive(Default)]
+struct NetworkRecovery {
+    authenticated_generation: Option<u64>,
+}
+impl NetworkRecovery {
+    fn observe(&mut self, phase: ControlConnectionPhase, generation: u64) -> bool {
+        if phase != ControlConnectionPhase::Authenticated {
+            return false;
+        }
+        let previous = self.authenticated_generation.replace(generation);
+        // Watch channels may coalesce the intermediate offline states. A new
+        // authenticated generation still proves a reconnect in that case.
+        previous.is_some_and(|previous| previous != generation)
     }
 }
 
@@ -263,6 +294,30 @@ pub enum ExecutorError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn network_recovery_refreshes_once_after_reauthentication() {
+        use ControlConnectionPhase::*;
+        let mut recovery = NetworkRecovery::default();
+        assert!(!recovery.observe(Connecting, 1));
+        assert!(!recovery.observe(Authenticated, 1));
+        assert!(!recovery.observe(Reconnecting, 1));
+        assert!(!recovery.observe(Connecting, 2));
+        assert!(recovery.observe(Authenticated, 2));
+        assert!(!recovery.observe(Authenticated, 2));
+        assert!(!recovery.observe(Stopped, 2));
+    }
+
+    #[test]
+    fn network_recovery_handles_coalesced_watch_updates_and_startup_retries() {
+        let mut recovery = NetworkRecovery::default();
+        // Initial authentication can follow failed startup attempts. It is not
+        // recovery of an established endpoint, regardless of generation value.
+        assert!(!recovery.observe(ControlConnectionPhase::Authenticated, 4));
+        // Intermediate offline states may be overwritten before being read.
+        assert!(recovery.observe(ControlConnectionPhase::Authenticated, 7));
+        assert!(!recovery.observe(ControlConnectionPhase::Authenticated, 7));
+    }
 
     #[test]
     fn builds_a_valid_native_device_hello_payload() {

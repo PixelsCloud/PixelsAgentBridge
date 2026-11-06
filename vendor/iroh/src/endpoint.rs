@@ -1662,6 +1662,19 @@ impl Endpoint {
         self.inner.network_change().await;
     }
 
+    /// Reprobe direct addresses and peer paths after a confirmed network outage.
+    ///
+    /// Unlike `network_change`, this also runs when local interface addresses
+    /// are unchanged (for example, after a router loses its NAT mappings).
+    /// Keep the existing sockets, endpoint identity and authenticated connections;
+    /// only rerun discovery and path validation, as for a minor link change.
+    pub async fn reprobe_network(&self) {
+        if self.is_closed() {
+            return;
+        }
+        self.inner.force_network_change(false).await;
+    }
+
     // # Methods to update internal state.
 
     /// Sets the initial user-defined data to be published in Address Lookups for this endpoint.

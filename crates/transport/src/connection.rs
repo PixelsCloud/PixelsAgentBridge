@@ -567,6 +567,51 @@ mod traffic_tests {
     use super::*;
 
     #[tokio::test]
+    async fn network_reprobe_preserves_an_existing_direct_stream() {
+        let bind = |key| {
+            iroh::Endpoint::builder(iroh::endpoint::presets::Minimal)
+                .secret_key(iroh::SecretKey::from_bytes(&[key; 32]))
+                .alpns(vec![crate::PAB_ALPN.to_vec()])
+                .relay_mode(iroh::RelayMode::Disabled)
+                .bind()
+        };
+        let a = bind(43).await.unwrap();
+        let b = bind(44).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(20), async {
+            let (outgoing, incoming) = tokio::join!(a.connect(b.addr(), crate::PAB_ALPN), async {
+                b.accept().await.unwrap().await.unwrap()
+            });
+            let a_connection = PabConnection::new(outgoing.unwrap());
+            let b_connection = PabConnection::new(incoming);
+            let sender = async {
+                let mut stream = a_connection.open_bi(Duration::from_secs(5)).await.unwrap();
+                for round in 0..4_u8 {
+                    if round == 1 {
+                        a.reprobe_network().await;
+                        b.reprobe_network().await;
+                        // Actor requests fence the explicit reprobe messages.
+                        assert!(a.remote_info(b.id()).await.is_some());
+                        assert!(b.remote_info(a.id()).await.is_some());
+                    }
+                    stream.send_binary_frame(&[round; 1024], Duration::from_secs(5)).await.unwrap();
+                    let reply = stream.receive_binary_frame(Duration::from_secs(5)).await.unwrap();
+                    assert_eq!(reply, vec![round; 1024]);
+                }
+            };
+            let receiver = async {
+                let mut stream = b_connection.accept_bi(Duration::from_secs(5)).await.unwrap();
+                for _ in 0..4 {
+                    let bytes = stream.receive_binary_frame(Duration::from_secs(5)).await.unwrap();
+                    stream.send_binary_frame(&bytes, Duration::from_secs(5)).await.unwrap();
+                }
+            };
+            tokio::join!(sender, receiver);
+        }).await.unwrap();
+        a.close().await;
+        b.close().await;
+    }
+
+    #[tokio::test]
     async fn direct_quic_transfer_counts_real_bytes_in_both_directions() {
         let bind = |key| {
             iroh::Endpoint::builder(iroh::endpoint::presets::Minimal)
