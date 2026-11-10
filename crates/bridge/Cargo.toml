@@ -50,3 +50,11 @@ path = "../../smoke/android_desktop_protocol.rs"
 [[example]]
 name = "image_clipboard_network"
 path = "../../smoke/image_clipboard_network.rs"
+
+[[example]]
+name = "large_file_transfer"
+path = "../../smoke/large_file_transfer.rs"
+
+[[example]]
+name = "large_file_initialization"
+path = "../../smoke/large_file_initialization.rs"

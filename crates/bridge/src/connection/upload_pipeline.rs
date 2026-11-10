@@ -108,7 +108,12 @@ async fn upload_with_budget(
             control.check()?;
             // This read is never restarted by a progress tick or credit wakeup.
             // On timeout/error both stream halves are discarded together.
-            let bytes = tokio::time::timeout(timeout, reader.read(MAX_PAB_MESSAGE_BYTES))
+            let read_timeout = if confirmed == size {
+                super::file_transfer::verification_timeout(timeout)
+            } else {
+                timeout
+            };
+            let bytes = tokio::time::timeout(read_timeout, reader.read(MAX_PAB_MESSAGE_BYTES))
                 .await
                 .map_err(|_| PabConnectionError::Timeout)??;
             let response: DeviceTaskResponse =
@@ -152,6 +157,45 @@ mod tests {
     use super::*;
     use sha2::{Digest, Sha256};
     const TIMEOUT: Duration = Duration::from_secs(5);
+
+    #[tokio::test]
+    async fn slow_verification_is_allowed_only_after_all_bytes_are_acknowledged() {
+        for acknowledge in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("source");
+            let data = b"verification phase";
+            tokio::fs::write(&path, data).await.unwrap();
+            let digest = format!("{:x}", Sha256::digest(data));
+            let (a, b, client, server) = super::super::file_transfer::tests::pair().await;
+            let stream = client.connection.open_bi(TIMEOUT).await.unwrap();
+            let peer = async {
+                let mut stream = server.accept_bi(TIMEOUT).await.unwrap();
+                assert_eq!(stream.receive_binary_frame(TIMEOUT).await.unwrap(), data);
+                stream.expect_receive_end(TIMEOUT).await.unwrap();
+                if acknowledge {
+                    stream.send_frame_json(&DeviceTaskResponse::FileProgress {
+                        offset: data.len() as u64,
+                    }, TIMEOUT).await.unwrap();
+                }
+                tokio::time::sleep(Duration::from_millis(600)).await;
+                if acknowledge {
+                    stream.send_json(&DeviceTaskResponse::FileComplete {
+                        size: data.len() as u64, sha256: digest.clone(),
+                    }, TIMEOUT).await.unwrap();
+                }
+            };
+            let mut file = File::open(path).await.unwrap();
+            let control = TransferControl::default();
+            let budget = Arc::new(Semaphore::new(256));
+            let sender = upload_with_budget(stream, &mut file, 0, data.len() as u64,
+                &digest, Duration::from_millis(200), &control, |_, _| {}, budget.clone());
+            let (result, ()) = tokio::join!(sender, peer);
+            assert_eq!(result.is_ok(), acknowledge, "{result:?}");
+            assert_eq!(budget.available_permits(), 256);
+            a.close().await;
+            b.close().await;
+        }
+    }
 
     #[tokio::test]
     async fn sends_multiple_frames_before_ack_and_restores_all_credit_after_errors() {

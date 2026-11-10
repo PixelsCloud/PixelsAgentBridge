@@ -21,6 +21,13 @@ use super::{AuthenticatedDeviceConnection, BridgeError, TransferControl};
 // pipeline budget alone would not bound buffers of streams waiting for credit.
 static TRANSFER_IO_SLOTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
 
+// The peer hashes the whole source before FileReady, and the whole received
+// file before FileComplete. These disk-bound phases can exceed the frame idle
+// timeout for large files. Keep them bounded without relaxing payload I/O.
+pub(super) fn verification_timeout(io_timeout: Duration) -> Duration {
+    io_timeout.max(Duration::from_secs(30 * 60))
+}
+
 enum DownloadTarget {
     Legacy(pab_file_manager::StagingTarget),
     #[cfg(unix)]
@@ -248,7 +255,7 @@ impl AuthenticatedDeviceConnection {
             )
             .await?;
         }
-        let ready = response(&mut stream, timeout).await?;
+        let ready = response(&mut stream, verification_timeout(timeout)).await?;
         let offset = match ready {
             DeviceTaskResponse::FileReady {
                 size: remote_size,
@@ -478,7 +485,7 @@ impl AuthenticatedDeviceConnection {
         }
         let mut received=offset;
         let receive_result=async {
-        let ready = response(&mut stream, timeout).await?;
+        let ready = response(&mut stream, verification_timeout(timeout)).await?;
         let (size, sha256) = match ready {
             DeviceTaskResponse::FileReady {
                 size,

@@ -4,6 +4,35 @@ use pab_transport::{PabConnection, PabEndpoint, PabEndpointAddress, PabEndpointC
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::test]
+async fn download_can_prepare_for_longer_than_the_frame_idle_timeout() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("download.bin");
+    let (a, b, client, server) = pair().await;
+    let device = client.device_ref();
+    let id = RequestId::new();
+    let peer = async {
+        let mut environment = server.accept_bi(TIMEOUT).await.unwrap();
+        assert!(matches!(environment.receive_json::<DeviceTaskRequest>(TIMEOUT).await.unwrap(), DeviceTaskRequest::GetEnvironment {..}));
+        let reply = serde_json::json!({"type":"environment","transfer_schema_version":null,"context":{"device_ref":device,"execution":context(),"source":"executor_verified","observed_at_unix_ms":1,"freshness":"current"}});
+        environment.send_json(&serde_json::from_value::<DeviceTaskResponse>(reply).unwrap(), TIMEOUT).await.unwrap();
+        let mut stream = server.accept_bi(TIMEOUT).await.unwrap();
+        assert!(matches!(stream.receive_json::<DeviceTaskRequest>(TIMEOUT).await.unwrap(), DeviceTaskRequest::DownloadFile { request_id, .. } if request_id == id));
+        // Legacy peers send no preparation heartbeat while hashing a large file.
+        tokio::time::sleep(Duration::from_secs(61)).await;
+        let digest = format!("{:x}", Sha256::digest(b"data"));
+        stream.send_frame_json(&DeviceTaskResponse::FileReady { size: 4, offset: 0, sha256: digest.clone() }, TIMEOUT).await.unwrap();
+        stream.send_binary_frame(b"data", TIMEOUT).await.unwrap();
+        stream.send_json(&DeviceTaskResponse::FileComplete { size: 4, sha256: digest }, TIMEOUT).await.unwrap();
+    };
+    let receiver = client.download_file(id, "/remote/source", &path, false, |_, _| {});
+    let (result, ()) = tokio::join!(receiver, peer);
+    result.unwrap();
+    assert_eq!(std::fs::read(path).unwrap(), b"data");
+    a.close().await;
+    b.close().await;
+}
+
+#[tokio::test]
 async fn corrupt_download_discards_only_its_open_staging_file_and_preserves_the_destination() {
     let dir=tempfile::tempdir().unwrap();let path=dir.path().join("target.bin");std::fs::write(&path,b"keep original destination").unwrap();
     let unrelated=dir.path().join(".target.bin.pab-unrelated.part");std::fs::write(&unrelated,b"keep unrelated partial").unwrap();
