@@ -31,7 +31,9 @@ See the [feature and usage guide (Chinese)](docs/FIRST_VERSION.md) for the compl
 
 ## Product at a glance
 
-https://github.com/user-attachments/assets/7f54bdf9-3641-4e8b-98ab-2662f9cd2275
+[![Pixels Agent Bridge demo video](assets/videos/pixels_showcase.jpg)](assets/videos/pixels_showcase.mp4)
+
+[View or download the latest demo video (MP4)](assets/videos/pixels_showcase.mp4)
 
 Click any screenshot to view it at full size.
 

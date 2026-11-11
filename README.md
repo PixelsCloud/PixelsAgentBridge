@@ -31,7 +31,9 @@ Desktop 启动时自动检测并接入已安装的 **Codex、Kimi Code、Claude 
 
 ## 产品一览
 
-https://github.com/user-attachments/assets/7f54bdf9-3641-4e8b-98ab-2662f9cd2275
+[![Pixels Agent Bridge 演示视频](assets/videos/pixels_showcase.jpg)](assets/videos/pixels_showcase.mp4)
+
+[查看／下载最新版演示视频（MP4）](assets/videos/pixels_showcase.mp4)
 
 点击截图可查看原图。
 
