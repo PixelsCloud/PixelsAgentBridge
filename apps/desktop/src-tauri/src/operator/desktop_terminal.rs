@@ -160,24 +160,29 @@ pub async fn desktop_terminal_window(
     } else {
         format!("Pixels · {} · {code}", saved.alias)
     };
-    let builder = WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::App(format!("index.html?desktopTerminal={label}").into()),
-    )
-    .title(title)
-    .inner_size(1100.0, 720.0)
-    .min_inner_size(640.0, 400.0)
-    .resizable(true)
-    .maximizable(true)
-    .decorations(false);
-    #[cfg(all(windows, debug_assertions))]
-    let builder = if let Some(arguments) = acceptance_browser_arguments() {
-        builder.additional_browser_args(&arguments).initialization_script("window.__PIXELS_TERMINAL_ACCEPTANCE__ = {onFrame: null, paused: false, pending: [], pendingBytes: 0, maxPendingBytes: 0};")
-    } else {
-        builder
+    let built = {
+        let label = label.clone();
+        crate::child_windows::build(&app, move |app| {
+            let builder = WebviewWindowBuilder::new(
+                app,
+                &label,
+                WebviewUrl::App(format!("index.html?desktopTerminal={label}").into()),
+            )
+            .title(title)
+            .inner_size(1100.0, 720.0)
+            .min_inner_size(640.0, 400.0)
+            .resizable(true)
+            .maximizable(true)
+            .decorations(false);
+            #[cfg(all(windows, debug_assertions))]
+            let builder = if let Some(arguments) = acceptance_browser_arguments() {
+                builder.additional_browser_args(&arguments).initialization_script("window.__PIXELS_TERMINAL_ACCEPTANCE__ = {onFrame: null, paused: false, pending: [], pendingBytes: 0, maxPendingBytes: 0};")
+            } else {
+                builder
+            };
+            Ok(builder)
+        }).await
     };
-    let built = builder.build();
     match built {
         Ok(created) => {
             let mut changes = pab_agent_core::account::account_changes();

@@ -25,6 +25,7 @@ pub fn macos_diagnostics() -> serde_json::Value {
 }
 mod browser_helper;
 mod confirmation;
+mod child_windows;
 mod browser_setup;
 mod desktop_assistance;
 mod device_account;
@@ -418,6 +419,7 @@ pub fn run() {
         .manage(update::UpdateState::default())
         .on_window_event(tray::on_window_event)
         .setup(move |app| {
+            child_windows::initialize(app)?;
             let device_accounts = device_account::DeviceAccountService::default();
             app.manage(device_accounts.clone());
             tauri::async_runtime::spawn(device_accounts.run());

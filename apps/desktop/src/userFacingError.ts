@@ -10,6 +10,7 @@ export const errorMessages = {
   confirmation: ["无法显示确认窗口，请稍后重试。", "Could not open the confirmation dialog. Please try again."],
   assistance: ["无法更新协助请求，请检查请求状态后再试。", "Could not update the assistance request. Check its status before trying again."],
   window: ["无法打开操作窗口，请关闭多余窗口后重试。", "Could not open the window. Close any unused windows and try again."],
+  windowEnvironment: ["窗口组件已失去连接。请先保存当前操作，再从托盘完全退出 Pixels 并重新打开。", "The window component disconnected. Save your work, then fully exit Pixels from the tray and reopen it."],
   configChanged: ["配置已被其他操作修改，请刷新后重新操作。", "Settings changed during this operation. Refresh before making changes again."],
   signOut: ["退出账号失败，当前登录状态已保留，请稍后重试。", "Could not sign out. Your current sign-in was preserved; please try again."],
   accountChanged: ["账号已切换，请在当前账号下重新打开文件传输。", "Account changed. Reopen file transfer under the current account."],
@@ -63,6 +64,7 @@ export const errorMessages = {
 type ErrorKey = keyof typeof errorMessages;
 
 const rules: readonly [RegExp, ErrorKey][] = [
+  [/webview_environment_(?:disconnected|unavailable)|0x80010108|RPC_E_DISCONNECTED/i, "windowEnvironment"],
   [/could not clear completed transfers/i, "clearTransfers"],
   [/could not resolve conflict/i, "resolveConflict"],
   [/open_macos_permission_settings/i, "macosSettings"],

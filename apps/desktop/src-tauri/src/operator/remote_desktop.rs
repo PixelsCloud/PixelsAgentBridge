@@ -359,25 +359,30 @@ pub(crate) async fn open_window(
             .filter(|s| !s.is_empty())
             .unwrap_or("远程桌面")
     );
-    let builder = WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::App(format!("index.html?desktopViewer={label}").into()),
-    )
-    .title(title)
-    .inner_size(1100.0, 760.0)
-    .min_inner_size(640.0, 400.0)
-    .resizable(true)
-    .decorations(false);
-    // All WebViews sharing the acceptance profile must use identical WebView2
-    // environment arguments, as the terminal and main window already do.
-    #[cfg(all(windows, debug_assertions))]
-    let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments() {
-        builder.additional_browser_args(&arguments)
-    } else {
-        builder
+    let built = {
+        let label = label.clone();
+        crate::child_windows::build(&app, move |app| {
+            let builder = WebviewWindowBuilder::new(
+                app,
+                &label,
+                WebviewUrl::App(format!("index.html?desktopViewer={label}").into()),
+            )
+            .title(title)
+            .inner_size(1100.0, 760.0)
+            .min_inner_size(640.0, 400.0)
+            .resizable(true)
+            .decorations(false);
+            // Match the main window's arguments when an acceptance profile is used.
+            #[cfg(all(windows, debug_assertions))]
+            let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments() {
+                builder.additional_browser_args(&arguments)
+            } else {
+                builder
+            };
+            Ok(builder)
+        }).await
     };
-    match builder.build() {
+    match built {
         Ok(created) => {
             let closed_label = label.clone();
             let closing_window = created.clone();

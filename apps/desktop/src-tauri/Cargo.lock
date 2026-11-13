@@ -5628,6 +5628,7 @@ dependencies = [
  "url",
  "uuid",
  "webbrowser",
+ "webview2-com",
  "windows-sys 0.61.2",
  "xcap",
  "zeroize",

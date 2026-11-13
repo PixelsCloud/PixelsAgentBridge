@@ -170,10 +170,16 @@ pub async fn file_manager_window(app:AppHandle,window:WebviewWindow,state:State<
     let label = format!("file-manager-{}",RequestId::new());
     let owner = Arc::new(Owner {scope:label.clone(),account:account_key,account_scope,runtime,local,devices:Mutex::new(HashMap::from([(tab.code.clone(),tab)])),requests:Mutex::new(HashMap::new()),snapshots:Mutex::new(Vec::new()),slots:Arc::new(Semaphore::new(8)),closed:AtomicBool::new(false),ended:watch::channel(false).0,drops:Mutex::new(VecDeque::new())});
     windows.insert(label.clone(),owner.clone());
-    let builder = WebviewWindowBuilder::new(&app,&label,WebviewUrl::App("index.html?fileManager=1".into())).title("Pixels · File transfer").inner_size(1200.0,760.0).min_inner_size(960.0,640.0).decorations(false).resizable(true);
-    #[cfg(all(windows, debug_assertions))]
-    let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments(){builder.additional_browser_args(&arguments)}else{builder};
-    match builder.build() {
+    let built = {
+        let label = label.clone();
+        crate::child_windows::build(&app, move |app| {
+            let builder = WebviewWindowBuilder::new(app,&label,WebviewUrl::App("index.html?fileManager=1".into())).title("Pixels · File transfer").inner_size(1200.0,760.0).min_inner_size(960.0,640.0).decorations(false).resizable(true);
+            #[cfg(all(windows, debug_assertions))]
+            let builder = if let Some(arguments) = super::desktop_terminal::acceptance_browser_arguments(){builder.additional_browser_args(&arguments)}else{builder};
+            Ok(builder)
+        }).await
+    };
+    match built {
         Ok(created) => {
             let close_app = app.clone();let close_label = label.clone();
             created.on_window_event(move |event| {

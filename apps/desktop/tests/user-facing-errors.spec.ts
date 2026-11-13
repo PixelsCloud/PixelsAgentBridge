@@ -4,6 +4,9 @@ import { messages } from "../src/i18n";
 
 test("errors explain the cause in both supported languages without exposing backend details", () => {
   const cases = [
+    ["webview_environment_disconnected", "windowEnvironment"],
+    ["webview_environment_unavailable", "windowEnvironment"],
+    ["WebView2 error: HRESULT(0x80010108)", "windowEnvironment"],
     ["remote desktop Busy: remote desktop Busy: this device already has a desktop viewer", "occupied"],
     ["android_system_action_unavailable", "androidUnsupported"],
     ["remote desktop Unsupported: Android remote desktop is not available on this device", "androidUnsupported"],

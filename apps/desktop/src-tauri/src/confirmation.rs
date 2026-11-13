@@ -71,11 +71,17 @@ async fn ask_inner(app: &AppHandle, parent: Option<&WebviewWindow>, question: Qu
         pending.insert(label.clone(), Pending { question: question.clone(), answer: Some(sender), ready: false, parent: parent_label });
     }
     let _cleanup = Cleanup { app: app.clone(), label: label.clone(), parent: parent.cloned() };
-    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html?confirmation=1".into()))
-        .title(&question.title).inner_size(628.0, 280.0).decorations(false).resizable(false)
-        .minimizable(false).maximizable(false).skip_taskbar(true).visible(false);
-    let builder = if let Some(parent) = parent { builder.parent(parent).map_err(|e| e.to_string())? } else { builder };
-    let dialog = builder.build().map_err(|e| e.to_string())?;
+    let dialog = {
+        let label = label.clone();
+        let parent = parent.cloned();
+        crate::child_windows::build(app, move |app| {
+            let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html?confirmation=1".into()))
+                .title(&question.title).inner_size(628.0, 280.0).decorations(false).resizable(false)
+                .minimizable(false).maximizable(false).skip_taskbar(true).visible(false);
+            let builder = if let Some(parent) = parent.as_ref() { builder.parent(parent).map_err(|e| e.to_string())? } else { builder };
+            Ok(builder)
+        }).await?
+    };
     let handle = app.clone(); let event_label = label.clone();
     dialog.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed) {
