@@ -221,6 +221,118 @@ async fn associations_are_proved_isolated_idempotent_and_never_change_device_ide
 }
 
 #[sqlx::test(migrations = "./migrations")]
+async fn same_session_automatic_associations_share_proof_and_record_one_change(pool: PgPool) {
+    let (app, _) = app(pool.clone(), true).await;
+    let (id, secret) = fixture(&pool).await;
+    let (token, _, _) = account(&app, "same-session-race").await;
+    let path = format!("/api/account/devices/{id}/association");
+    // Desktop and MCP use the same login token but have independent sync loops.
+    let (first, second) = tokio::join!(
+        signed_challenge(&app, &token, &path, &secret, "automatic", None),
+        signed_challenge(&app, &token, &path, &secret, "automatic", None)
+    );
+    let (first_result, second_result) = tokio::join!(
+        native_call(&app, "PUT", &path, &token, first.clone()),
+        native_call(&app, "PUT", &path, &token, second.clone())
+    );
+    for (status, body) in [first_result, second_result] {
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["status"], "associated");
+        assert_eq!(body["revision"], 1);
+    }
+    assert_eq!(first["challenge_id"], second["challenge_id"]);
+    // A later periodic check must not invalidate a successful request's retry.
+    let (status, current) = native_call(
+        &app,
+        "POST",
+        &format!("{path}-challenge"),
+        &token,
+        json!({"action":"automatic"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(current.get("challenge").is_none());
+    assert_eq!(
+        native_call(&app, "PUT", &path, &token, first).await.0,
+        StatusCode::OK
+    );
+    let events: Vec<String> = sqlx::query_scalar(
+        "SELECT result FROM web_admin_events WHERE action='device.associated' AND resource_id=$1",
+    )
+    .bind(id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(events, ["succeeded"]);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn same_session_challenge_retries_preserve_expiry_and_reject_expired_proofs(pool: PgPool) {
+    let (app, _) = app(pool.clone(), true).await;
+    let (id, secret) = fixture(&pool).await;
+    let (token, _, _) = account(&app, "same-session-expiry").await;
+    let path = format!("/api/account/devices/{id}/association");
+    let first = signed_challenge(&app, &token, &path, &secret, "automatic", None).await;
+    let payload: Value =
+        sqlx::query_scalar("SELECT payload FROM device_account_challenges WHERE id=$1")
+            .bind(Uuid::parse_str(first["challenge_id"].as_str().unwrap()).unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let repeated = signed_challenge(&app, &token, &path, &secret, "automatic", None).await;
+    assert_eq!(first, repeated);
+    let unchanged: Value =
+        sqlx::query_scalar("SELECT payload FROM device_account_challenges WHERE id=$1")
+            .bind(Uuid::parse_str(first["challenge_id"].as_str().unwrap()).unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        payload, unchanged,
+        "retry must not extend signed challenge lifetime"
+    );
+    sqlx::query("UPDATE device_account_challenges SET expires_at=now()-interval '1 second' WHERE device_id=$1")
+        .bind(id).execute(&pool).await.unwrap();
+    let replacement = signed_challenge(&app, &token, &path, &secret, "automatic", None).await;
+    assert_ne!(first["challenge_id"], replacement["challenge_id"]);
+    assert_eq!(
+        native_call(&app, "PUT", &path, &token, first).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        native_call(&app, "PUT", &path, &token, replacement).await.0,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn challenge_reuse_requires_the_same_action_and_endpoint(pool: PgPool) {
+    let (app, _) = app(pool.clone(), true).await;
+    let (id, secret) = fixture(&pool).await;
+    let (token, _, _) = account(&app, "reuse-proof-scope").await;
+    let path = format!("/api/account/devices/{id}/association");
+    let automatic = signed_challenge(&app, &token, &path, &secret, "automatic", None).await;
+    let explicit = signed_challenge(&app, &token, &path, &secret, "associate", Some(0)).await;
+    assert_ne!(automatic["challenge_id"], explicit["challenge_id"]);
+    let retried = signed_challenge(&app, &token, &path, &secret, "associate", Some(0)).await;
+    assert_eq!(explicit, retried);
+    let replacement_key = SecretKey::generate();
+    sqlx::query("UPDATE endpoints SET endpoint_key=$1 WHERE device_id=$2")
+        .bind(replacement_key.public().as_bytes().as_slice())
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let rotated =
+        signed_challenge(&app, &token, &path, &replacement_key, "associate", Some(0)).await;
+    assert_ne!(explicit["challenge_id"], rotated["challenge_id"]);
+    assert_eq!(
+        native_call(&app, "PUT", &path, &token, rotated).await.0,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
 async fn unlink_blocks_existing_sessions_but_new_login_associates_automatically(pool: PgPool) {
     let (app, _) = app(pool.clone(), true).await;
     let (id, secret) = fixture(&pool).await;

@@ -135,7 +135,34 @@ pub(crate) async fn challenge(
                 as i64
                 + 300_000,
         };
-        // At most one outstanding challenge for this session/device. Other sessions cannot invalidate it.
+        // Desktop and MCP can request a proof concurrently using the same login.
+        // Reuse their pending challenge while the device lock is held, rather
+        // than deleting a challenge another caller is already signing. Keep the
+        // original expiry; retries must not extend a signed proof's lifetime.
+        let pending: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT payload FROM device_account_challenges WHERE device_id=$1 AND session_hash=$2 AND applied_revision IS NULL AND expires_at>clock_timestamp() ORDER BY expires_at DESC LIMIT 1 FOR UPDATE",
+        )
+        .bind(id)
+        .bind(&hash)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(payload) = pending {
+            let pending: DeviceAccountChallenge =
+                serde_json::from_value(payload).map_err(|_| WebError::invalid())?;
+            if pending.device_id == challenge.device_id
+                && pending.user_id == challenge.user_id
+                && pending.server_origin == challenge.server_origin
+                && pending.endpoint_key == challenge.endpoint_key
+                && pending.action == challenge.action
+                && pending.expected_revision == challenge.expected_revision
+            {
+                result.challenge = Some(pending);
+                tx.commit().await?;
+                return Ok(Json(result));
+            }
+        }
+        // A changed action, revision or endpoint requires a new proof. Other
+        // login sessions cannot invalidate this session's challenge.
         sqlx::query("DELETE FROM device_account_challenges WHERE expires_at<now() OR (device_id=$1 AND session_hash=$2)")
             .bind(id).bind(&hash).execute(&mut *tx).await?;
         sqlx::query("INSERT INTO device_account_challenges(id,device_id,session_hash,payload,expires_at) VALUES($1,$2,$3,$4,to_timestamp($5::double precision/1000))")
